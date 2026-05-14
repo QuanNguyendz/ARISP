@@ -1,0 +1,81 @@
+# Glossary – AI-Powered Recruitment and Interview Support Platform for Enterprises (ARISP)
+
+Thuật ngữ và định nghĩa domain dùng trong dự án.
+
+---
+
+## Domain Terms
+
+| Thuật ngữ | Định nghĩa |
+|---|---|
+| **Organization / Enterprise** | Doanh nghiệp khách hàng đang sử dụng nền tảng ARISP |
+| **HR Admin / Recruiter** | Nhân sự doanh nghiệp – tạo Job Posting, cấu hình phỏng vấn, review quyết định AI |
+| **Candidate** | Ứng viên tham gia phỏng vấn AI tự động |
+| **Job Posting** | Tin tuyển dụng do HR tạo, gồm JD và cấu hình phỏng vấn |
+| **Application** | Hồ sơ ứng tuyển của Candidate cho một Job Posting cụ thể (gồm CV + thông tin cá nhân) |
+| **Interview Session** | Một phiên phỏng vấn tự động từ đầu đến cuối do AI dẫn dắt, gồm nhiều câu hỏi và câu trả lời |
+| **Question** | Câu hỏi do AI tạo ra trong một Interview Session, bám sát JD + CV của ứng viên |
+| **Answer** | Câu trả lời của Candidate cho một Question (audio → transcript qua STT) |
+| **AI Evaluation** | Đánh giá tổng hợp của AI sau khi session kết thúc: Verdict + Score + Reasoning |
+| **Verdict** | Kết quả sơ bộ của AI: `Pass` hoặc `Not Pass` |
+| **HR Review** | Bước HR xem Evaluation Report và Confirm hoặc Override quyết định của AI |
+| **Override** | HR thay đổi Verdict của AI kèm ghi chú lý do |
+| **AI Interviewer** | AI agent đóng vai nhà phỏng vấn tự động trong Interview Session |
+| **Evaluation Report** | Báo cáo đầy đủ AI xuất sau session: Verdict, Score, Reasoning, per-question analysis |
+| **Scoring Rubric** | Bộ tiêu chí đánh giá tùy chỉnh theo vị trí (technical, communication, culture fit, v.v.) |
+| **JD (Job Description)** | Mô tả công việc – AI dùng để định hướng câu hỏi sát yêu cầu doanh nghiệp |
+| **CV (Resume)** | Hồ sơ ứng viên – AI dùng để cá nhân hóa câu hỏi theo kinh nghiệm thực tế |
+| **Transcript** | Nội dung text được chuyển từ audio của ứng viên (qua Google Speech-to-Text STT) |
+| **Adaptive Difficulty** | Cơ chế AI tự điều chỉnh độ khó câu hỏi theo chất lượng câu trả lời |
+| **Interview Playbook** | Tập hợp tài liệu phỏng vấn nội bộ của doanh nghiệp (style guide, question bank, rubric...) – đưa vào RAG để AI phỏng vấn đúng phong cách công ty |
+| **Org Knowledge Base** | Cơ sở kiến thức của Organization trong pgvector – bao gồm Playbook documents được chunk và embed |
+| **Question Bank** | Ngân hàng câu hỏi do HR chuẩn bị – AI ưu tiên hỏi từ đây trước khi tự sinh |
+| **Must-ask Questions** | Câu hỏi bắt buộc phải hỏi trước khi session kết thúc, do HR định nghĩa trong Playbook |
+| **Competency Framework** | Ma trận kỹ năng theo level (Junior/Mid/Senior) của từng vị trí – AI dùng để biết đánh giá năng lực nào |
+| **Red Flag Guide** | Tài liệu mô tả dấu hiệu cần probe sâu hoặc loại bỏ ứng viên – AI nhận biết và xử lý khi gặp |
+| **Technical Scenario** | Bài toán / case study cụ thể HR chuẩn bị – AI dẫn dắt ứng viên qua scenario trong session |
+| **Playbook Scope** | Phạm vi áp dụng của tài liệu Playbook: Organization (toàn công ty), Job Posting (vị trí cụ thể), Round (vòng cụ thể) |
+
+---
+
+## Technical Terms
+
+| Thuật ngữ | Định nghĩa |
+|---|---|
+| **STT** | Speech-to-Text – chuyển giọng nói thành văn bản (Google Speech-to-Text streaming) |
+| **TTS** | Text-to-Speech – chuyển văn bản thành giọng nói (ElevenLabs Flash v2.5 streaming) |
+| **RAG** | Retrieval-Augmented Generation – AI retrieve relevant chunks từ JD/CV vector store trước khi generate câu hỏi |
+| **pgvector** | PostgreSQL extension lưu và tìm kiếm vector embeddings (dùng cho RAG) |
+| **VAD** | Voice Activity Detection – detect khi ứng viên sắp dừng nói để trigger RAG retrieval sớm |
+| **SignalR Hub** | Endpoint realtime ASP.NET Core, quản lý session lifecycle events |
+| **ADR** | Architecture Decision Record – tài liệu ghi lại quyết định kiến trúc và lý do |
+| **Clean Architecture** | Pattern tổ chức code: Domain → Application → Infrastructure → API |
+| **EF Core Migration** | Script thay đổi database schema tạo bởi Entity Framework Core |
+| **JWT** | JSON Web Token – cơ chế xác thực stateless |
+| **CQRS** | Command Query Responsibility Segregation – tách read/write operations |
+| **Result Pattern** | Trả về `Result<T>` thay vì throw exception cho business errors |
+| **Multi-tenant** | Kiến trúc cho phép nhiều Organization dùng chung hạ tầng, dữ liệu tách biệt qua `organization_id` |
+| **Hybrid Idle Strategy** | Chiến lược HeyGen: chỉ bật Streaming Avatar khi AI nói, phát idle video loop khi AI im để tiết kiệm cost |
+| **Bridge file** | File chỉ chứa @import references, không có nội dung trực tiếp (AGENTS.md, CLAUDE.md) |
+| **Source of truth** | `.ai/` folder – nơi duy nhất chứa thông tin chính thức, mọi tool đọc từ đây |
+
+---
+
+## Abbreviations
+
+| Viết tắt | Đầy đủ |
+|---|---|
+| **ARISP** | AI-Powered Recruitment and Interview Support Platform for Enterprises |
+| AI | Artificial Intelligence |
+| VPS | Virtual Private Server |
+| CDN | Content Delivery Network |
+| SSL | Secure Sockets Layer |
+| CORS | Cross-Origin Resource Sharing |
+| ORM | Object-Relational Mapping |
+| EF | Entity Framework |
+| MVP | Minimum Viable Product |
+| JD | Job Description |
+| CV | Curriculum Vitae (Resume) |
+| HR | Human Resources |
+| SaaS | Software as a Service |
+| B2B | Business-to-Business |
