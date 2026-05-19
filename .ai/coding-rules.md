@@ -80,19 +80,40 @@ frontend/src/
 ## Git & CI/CD
 
 ### Branch naming
-- `main` – production
-- `develop` – integration branch
-- `feature/<tên-feature>` – ví dụ: `feature/interview-session-flow`
-- `fix/<mô-tả-lỗi>` – ví dụ: `fix/jwt-refresh-token-expiry`
+
+| Prefix | Mục đích | Ví dụ |
+|---|---|---|
+| `main` | Production | `main` |
+| `develop` | Integration branch – merge mọi feature vào đây | `develop` |
+| `setup/<scope>` | Khởi tạo cấu trúc thư mục / boilerplate giai đoạn đầu | `setup/frontend`, `setup/backend`, `setup/docker` |
+| `feature/<scope>/<tên>` | Tính năng mới, có scope để phân biệt FE/BE | `feature/be/interview-session-flow`, `feature/fe/candidate-dashboard` |
+| `fix/<scope>/<mô-tả>` | Bug fix | `fix/be/jwt-refresh-token-expiry`, `fix/fe/video-recording-crash` |
+| `chore/<scope>/<mô-tả>` | Config, CI, dependency, không ảnh hưởng logic | `chore/docker/compose-healthcheck`, `chore/be/update-nuget` |
+| `docs/<mô-tả>` | Cập nhật tài liệu thuần | `docs/update-api-schema` |
+
+> **Scope convention:** `be` | `fe` | `docker` | `infra` | `db` | `ai`
+
+#### Giai đoạn setup cấu trúc song song (nhiều người)
+Khi nhiều người cùng khởi tạo thư mục từ đầu, mỗi người tạo branch riêng từ `develop`:
+```
+develop
+  └── setup/frontend     # người làm FE: React + Vite boilerplate
+  └── setup/backend      # người làm BE: .NET Clean Architecture scaffold
+  └── setup/docker       # người làm Docker: Compose + Dockerfile
+  └── setup/db           # người làm DB: migration init + seed
+```
+Sau khi hoàn thành, lần lượt tạo PR → merge vào `develop`. Resolve conflict theo thứ tự: `backend` → `frontend` → `docker` → `db`.
 
 ### Commit message
 ```
 <type>(<scope>): <mô tả ngắn>
 
-type: feat | fix | refactor | docs | test | chore
-scope: auth | interview | ai | frontend | infra | ...
+type: feat | fix | refactor | docs | test | chore | setup
+scope: be | fe | docker | db | ai | infra | auth | interview | ...
 
 Ví dụ:
-feat(interview): add AI question generation endpoint
-fix(auth): correct JWT expiry calculation
+setup(be): scaffold Clean Architecture folder structure
+setup(fe): init Vite + React + TypeScript boilerplate
+feat(be/interview): add AI question generation endpoint
+fix(fe/auth): correct JWT expiry calculation
 ```
