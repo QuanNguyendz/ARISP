@@ -228,6 +228,26 @@ public interface IEmbeddingProvider
 - **Must-ask enforcement:** `PlaybookService` track danh sách `must_ask` questions đã hỏi. `InterviewService` nhận signal "còn câu bắt buộc chưa hỏi" trước khi trigger điều kiện dừng.
 - **Ràng buộc:** Tài liệu scope theo `organization_id` (Org level) hoặc `job_posting_id` (Job/Round level). Không lẫy lẫn giữa Organizations.
 
+### ADR-026: Job Board (IT-focused)
+- **Quyết định:** Tích hợp Job Board IT vào nền tảng ARISP. Ứng viên tạo tài khoản, tìm kiếm và tự ứng tuyển. Tên công ty hiển thị công khai.
+- **Flow:** Candidate self-apply → HR review CV → HR chủ động gửi magic link (không tự động).
+- **Nguồn dữ liệu:** Job Posting của doanh nghiệp là nguồn chung – không tạo entity riêng cho Job Board listing.
+- **Thị trường:** Chỉ tập trung IT (không phải job board tổng quát).
+- **Subscription gộp:** Một subscription duy nhất bao gồm cả Job Board lẫn AI Interview Platform.
+
+### ADR-027: Practice Interview Session (Phỏng vấn thử)
+- **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity.
+- **Truy cập:** Chỉ qua magic link sau khi Candidate xác nhận vị trí ứng tuyển. Không xuất hiện trên Job Board hay Candidate Portal.
+- **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng.
+- **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
+- **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
+- **Chi phí:** Tính vào subscription của doanh nghiệp.
+
+### ADR-028: Subscription Model – Unified
+- **Quyết định:** Doanh nghiệp trả một subscription duy nhất bao gồm: quyền đăng tin trên Job Board IT + quyền dùng AI Interview Platform.
+- **Lý do:** Đơn giản hóa pricing, giảm ma sát khi onboard, tạo giá trị rõ ràng.
+- **Usage tracking:** Theo dõi số interview sessions (practice + real), số job postings active, storage.
+
 ---
 
 ## AI Media Pipeline – Full Streaming Interview Loop
@@ -287,7 +307,8 @@ public interface IEmbeddingProvider
 | `AuthService` | JWT, role management, magic link (Candidate Portal), SSO integration |
 | `OrganizationService` | Enterprise accounts, team HR management, subscription, billing |
 | `JobPostingService` | CRUD Job Posting, round config, interview mode, availability slots, persona |
-| `ApplicationService` | Candidate application (CV + info), invite flow |
+| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application) |
+| `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
 | `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow) |
 | `SchedulingService` | Availability slots, booking, reminder emails, reschedule |
 | `InterviewService` | Session lifecycle, multi-round flow, adaptive difficulty, auto-progression, must-ask enforcement |

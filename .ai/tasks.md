@@ -77,6 +77,23 @@ _Chưa có task nào đang thực hiện._
 - [ ] Candidate: nhận invite → submit CV + thông tin cá nhân (Application)
 - [ ] CV upload & parse (PDF → text extraction)
 
+### Phase 2b – Job Board & Practice Interview
+- [ ] Database schema: `candidate_accounts` (self-registered), extend `job_postings` với flag `is_public_listing`
+- [ ] EF Core migrations
+- [ ] Candidate self-registration: email + password (role `Candidate`)
+- [ ] Candidate: tìm kiếm Job Posting IT (keyword, level, salary range, location)
+- [ ] Candidate: xem Job Detail (tên công ty, JD, yêu cầu hiển thị công khai)
+- [ ] Candidate: self-apply → submit CV + thông tin cá nhân → tạo `Application`
+- [ ] HR Admin: xem danh sách ứng viên tự ứng tuyển qua Job Board (kèm CV)
+- [ ] HR Admin: gửi magic link thủ công cho ứng viên sau khi review CV
+- [ ] Magic link screen: xác nhận vị trí ứng tuyển → chọn Phỏng vấn thử / Phỏng vấn thực
+- [ ] **Practice Interview:**
+  - [ ] `ApplicationService`: check eligibility (`practice_session_used` flag per application)
+  - [ ] Practice Session: `session_type = practice`, interview flow dùng JD + CV only (không load Playbook)
+  - [ ] Practice Session: Evaluation Report riêng, HR xem được, không ảnh hưởng verdict
+  - [ ] Disable nút "Phỏng vấn thử" sau khi đã dùng 1 lần
+- [ ] Real Session: chỉ mở khi đúng slot Candidate đã booking
+
 ### Phase 3 – Scheduling & Interview Code
 - [ ] Database schema: `availability_slots`, `interview_bookings`, `interview_codes`
 - [ ] EF Core migrations
@@ -104,6 +121,9 @@ _Chưa có task nào đang thực hiện._
 - [ ] **Language-aware:** TTS voice selection theo ngôn ngữ (ElevenLabs multilingual)
 - [ ] **Language-aware:** STT `languageCode` config theo ngôn ngữ (Google STT)
 - [ ] Điều kiện dừng: AI tự dừng khi khai thác hết context JD + CV
+- [ ] **Session Type – phân biệt `practice` vs `real`:**
+  - [ ] `practice`: chỉ retrieve JD + CV chunks, không load Playbook, gated bởi eligibility check
+  - [ ] `real`: retrieve JD + CV + Playbook chunks (full RAG pipeline), mở đúng slot đã đặt
 
 ### Phase 4b – Interview Playbook (Org Knowledge Base)
 - [ ] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round, type: style/competency/question_bank/...)
