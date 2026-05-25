@@ -1,0 +1,21 @@
+# ============================================
+# ARISP – Root .gitignore
+# ============================================
+
+# --- Environment files (secrets) ---
+docker/.env
+!docker/.env.example
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDE ---
+.vs/
+.vscode/
+*.suo
+*.user
+*.swp
+*.swo
+*~
