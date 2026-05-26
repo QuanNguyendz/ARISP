@@ -19,3 +19,17 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+# --- .NET / C# ---
+[Db]in/
+[Oo]bj/
+[Bb]in/
+[Ob]j/
+[Dd]ebug/
+[Rr]elease/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
