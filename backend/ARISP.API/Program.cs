@@ -1,6 +1,16 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using System.Security.Claims;
+using ARISP.API.Hubs;
+using ARISP.API.Middleware;
+using ARISP.Application.Interfaces;
+using ARISP.Application.Services;
+using ARISP.Domain.Constants;
+using ARISP.Domain.Entities;
+using ARISP.Infrastructure.Data;
+using ARISP.Infrastructure.Repositories;
+using ARISP.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -9,14 +19,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using ARISP.API.Hubs;
-using ARISP.API.Middleware;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
-using ARISP.Infrastructure.Data;
-using ARISP.Infrastructure.Repositories;
-using ARISP.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -111,8 +113,28 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["JWT:Issuer"] ?? "ARISP",
         ValidAudience = builder.Configuration["JWT:Audience"] ?? "ARISP_Client",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        RoleClaimType = ClaimTypes.Role // Explicitly map role claim
     };
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    // 1. Chính sách dành riêng cho cấp quản trị tối cao
+    options.AddPolicy("SuperAdminOnly", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin));
+
+    // 2. Chính sách dành cho quản lý nhân sự trở lên (Bao gồm cả SuperAdmin và HR Admin)
+    options.AddPolicy("HrManagement", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin));
+
+    // 3. Chính sách dành cho toàn bộ nhân viên nội bộ có quyền vào hệ thống quản lý chuyên môn
+    options.AddPolicy("InternalStaff", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.Recruiter));
+
+    // 4. Chính sách biệt lập dành riêng cho Ứng viên
+    options.AddPolicy("CandidateOnly", policy =>
+        policy.RequireRole(AppRoles.Candidate));
 });
 
 builder.Services.AddCors(options =>
@@ -166,7 +188,7 @@ async Task SeedDataAsync(ARISPDbContext db)
     Console.WriteLine("Seeding ARISP prototype databases...");
 
     var orgId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    var userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    var userId = Guid.Parse("22222222-2222-2222-2222-222222222223");
     var jobId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     var candidateId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     var appId = Guid.Parse("55555555-5555-5555-5555-555555555555");
@@ -195,9 +217,9 @@ async Task SeedDataAsync(ARISPDbContext db)
         {
             Id = userId,
             OrganizationId = orgId,
-            Email = "hr@arisp.com",
-            PasswordHash = "password", // simple for prototype
-            Role = "hr_admin",
+            Email = "hradmin@arisp.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = AppRoles.HrAdmin,
             FullName = "Alex HR Admin",
             Department = "IT Recruitment",
             IsActive = true
@@ -248,7 +270,7 @@ async Task SeedDataAsync(ARISPDbContext db)
         {
             Id = candidateId,
             Email = "candidate@example.com",
-            PasswordHash = "password",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             FullName = "John Doe Candidate",
             Phone = "0987654321",
             Headline = "C# .NET Backend Developer | AI Enthusiast"

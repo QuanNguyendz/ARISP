@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using ARISP.Application.DTOs;
 using ARISP.Application.Services;
 
@@ -18,6 +19,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> SubmitApplication([FromHeader(Name = "X-Organization-Id")] string orgIdStr, [FromBody] SubmitApplicationRequest request)
         {
             if (!Guid.TryParse(orgIdStr, out var orgId))
@@ -36,6 +38,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpGet("{id}/practice-eligibility")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPracticeEligibility(Guid id)
         {
             var result = await _applicationService.CheckPracticeEligibilityAsync(id);

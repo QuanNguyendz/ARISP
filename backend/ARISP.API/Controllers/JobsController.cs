@@ -10,7 +10,6 @@ using ARISP.Domain.Entities;
 
 namespace ARISP.API.Controllers
 {
-    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class JobsController : ControllerBase
@@ -27,6 +26,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request)
         {
             var orgId = _currentUserService.OrganizationId ?? Guid.Empty;
@@ -79,6 +79,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetJobs()
         {
             var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync();
@@ -101,6 +102,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost("{id}/slots")]
+        [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> AddAvailabilitySlots(Guid id, [FromBody] List<AvailabilitySlot> slots)
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id);
