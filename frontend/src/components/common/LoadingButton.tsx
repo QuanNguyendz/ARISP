@@ -1,5 +1,6 @@
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import { SxProps, Theme } from '@mui/material/styles';
 
 interface LoadingButtonProps {
   children: React.ReactNode;
@@ -11,6 +12,8 @@ interface LoadingButtonProps {
   type?: 'button' | 'submit' | 'reset';
   onClick?: () => void;
   fullWidth?: boolean;
+  sx?: SxProps<Theme>;
+  className?: string;
 }
 
 export default function LoadingButton({
@@ -23,6 +26,8 @@ export default function LoadingButton({
   type = 'button',
   onClick,
   fullWidth = false,
+  sx,
+  className,
 }: LoadingButtonProps) {
   return (
     <Button
@@ -33,6 +38,8 @@ export default function LoadingButton({
       disabled={disabled || loading}
       onClick={onClick}
       fullWidth={fullWidth}
+      sx={sx}
+      className={className}
       startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
     >
       {children}

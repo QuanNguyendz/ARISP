@@ -23,11 +23,11 @@ export type ApplicationStatus =
   | 'rejected';
 
 export interface ApplicationDetail extends Application {
-  interviews: InterviewSession[];
+  interviews: ApplicationInterviewSession[];
   notes?: string;
 }
 
-export interface InterviewSession {
+export interface ApplicationInterviewSession {
   id: string;
   applicationId: string;
   round: number;

@@ -1,3 +1,9 @@
 export { default as AuthLayout } from './AuthLayout';
-export { default as MainLayout } from './MainLayout';
+export { default as AdminLayout } from './AdminLayout';
+export { default as CandidateLayout } from './CandidateLayout';
 export { default as InterviewLayout } from './InterviewLayout';
+export { default as CandidateNav } from './CandidateNav';
+export { default as CandidateFooter } from './CandidateFooter';
+export { default as Navigation } from './Navigation';
+export { default as PublicNav } from './PublicNav';
+export { default as Footer } from './Footer';

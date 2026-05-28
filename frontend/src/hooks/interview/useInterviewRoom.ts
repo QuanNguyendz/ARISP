@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useInterviewStore } from '@store/interview';
 import { interviewService } from '@services/interview';
-import type { EyeTrackingData, TabSwitchData } from '@types/interview';
+import type { EyeTrackingData, TabSwitchData } from '../../types/interview';
 
 export function useInterviewRoom(sessionId: string) {
   const { room, connectionStatus, error, initRoom, setConnectionStatus, setError } = useInterviewStore();

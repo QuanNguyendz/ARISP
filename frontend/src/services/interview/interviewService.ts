@@ -1,5 +1,5 @@
 import { apiClient } from '../apiClient';
-import type { InterviewSession, ScheduleInterviewRequest, InterviewCodeResponse } from '@types/interview';
+import type { InterviewSession, ScheduleInterviewRequest, InterviewCodeResponse } from '../../types/interview';
 
 interface SessionFilters {
   applicationId?: string;

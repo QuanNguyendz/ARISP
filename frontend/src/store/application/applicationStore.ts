@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Application, ApplicationDetail } from '@types/application';
+import type { Application, ApplicationDetail } from '../../types/application';
 
 interface ApplicationState {
   applications: Application[];
