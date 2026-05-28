@@ -8,7 +8,7 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 
 | Thuật ngữ | Định nghĩa |
 |---|---|
-| **Organization / Enterprise** | Doanh nghiệp khách hàng đang sử dụng nền tảng ARISP |
+| **Organization / Company** | Doanh nghiệp sử dụng nội bộ nền tảng ARISP (Single-tenant) |
 | **HR Admin / Recruiter** | Nhân sự doanh nghiệp – tạo Job Posting, cấu hình phỏng vấn, review quyết định AI |
 | **Candidate** | Ứng viên tham gia phỏng vấn AI tự động |
 | **Job Posting** | Tin tuyển dụng do HR tạo, gồm JD và cấu hình phỏng vấn |
@@ -59,7 +59,7 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **JWT** | JSON Web Token – cơ chế xác thực stateless |
 | **CQRS** | Command Query Responsibility Segregation – tách read/write operations |
 | **Result Pattern** | Trả về `Result<T>` thay vì throw exception cho business errors |
-| **Multi-tenant** | Kiến trúc cho phép nhiều Organization dùng chung hạ tầng, dữ liệu tách biệt qua `organization_id` |
+| **Single-tenant** | Kiến trúc hệ thống dành riêng cho 1 doanh nghiệp duy nhất, không dùng `organization_id` phân tách |
 | **Hybrid Idle Strategy** | Chiến lược HeyGen: chỉ bật Streaming Avatar khi AI nói, phát idle video loop khi AI im để tiết kiệm cost |
 | **Bridge file** | File chỉ chứa @import references, không có nội dung trực tiếp (AGENTS.md, CLAUDE.md) |
 | **Source of truth** | `.ai/` folder – nơi duy nhất chứa thông tin chính thức, mọi tool đọc từ đây |
@@ -82,6 +82,3 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | JD | Job Description |
 | CV | Curriculum Vitae (Resume) |
 | HR | Human Resources |
-| SaaS | Software as a Service |
-| B2B | Business-to-Business |
-| B2C | Business-to-Consumer |

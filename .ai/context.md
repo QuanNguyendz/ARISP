@@ -2,9 +2,9 @@
 
 ## Tổng quan dự án
 
-ARISP là nền tảng tuyển dụng B2B SaaS tích hợp **Job Board IT** và **AI Interview Automation**. Ứng viên tự tìm và ứng tuyển việc làm IT trực tiếp trên nền tảng. AI tự động phỏng vấn ứng viên qua nhiều vòng, đánh giá Pass/Not Pass, HR xác nhận. Không cần nhân sự nội bộ tham gia trực tiếp vào buổi phỏng vấn.
+ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Job Board IT** và **AI Interview Automation**. Ứng viên tự tìm và ứng tuyển việc làm IT trực tiếp trên nền tảng. AI tự động phỏng vấn ứng viên qua nhiều vòng, đánh giá Pass/Not Pass, HR xác nhận. Không cần nhân sự nội bộ tham gia trực tiếp vào buổi phỏng vấn.
 
-**Mô hình kinh doanh:** B2B SaaS – Enterprise subscription (gộp Job Board + AI Interview Platform).
+**Mô hình kinh doanh:** Single-tenant – Dành riêng cho 1 doanh nghiệp sử dụng nội bộ (gộp Job Board + AI Interview Platform).
 
 ---
 
@@ -12,25 +12,22 @@ ARISP là nền tảng tuyển dụng B2B SaaS tích hợp **Job Board IT** và 
 
 | Role | Mô tả |
 |---|---|
-| **SuperAdmin** | Quản trị nền tảng – Enterprise accounts, billing, system config |
+| **System Admin** | Quản trị nền tảng – System config, quản lý user HR |
 | **HR Admin / Recruiter** | Tạo Job Posting, cấu hình phỏng vấn, cấp Interview Code, review & confirm AI decision |
-| **Candidate** | Tạo tài khoản, tìm kiếm và ứng tuyển việc IT qua Job Board; tham gia phỏng vấn AI (remote/on-site); xem lại recording & feedback qua Candidate Portal |
+| **Candidate** | Tạo tài khoản, tìm kiếm và ứng tuyển việc IT qua Job Board; tham gia phỏng vấn AI (Practice Remote / Real On-site); xem lại recording & feedback qua Candidate Portal |
 
 ---
 
 ## Interview Mode – Remote vs On-site
 
-### Remote Interview (tại nhà)
-- Candidate nhận **invite link** qua email sau khi submit CV.
-- Candidate tự **schedule lịch** trong **Availability Slots** do HR cấu hình.
-- Phỏng vấn qua web browser. Sau phỏng vấn, truy cập **Candidate Portal** xem recording + feedback.
+### Remote Interview (Phỏng vấn thử - Practice Session)
+- **CHỈ DÀNH CHO PHỎNG VẤN THỬ (PRACTICE).**
+- Candidate nhận **magic link** qua email, truy cập vào Candidate Portal từ nhà qua web browser để làm quen với AI.
 
-### On-site Interview (tại công ty)
+### On-site Interview (Phỏng vấn thật tại công ty)
+- **BẮT BUỘC CHO MỌI VÒNG PHỎNG VẤN THẬT.**
 - Candidate đến văn phòng. HR cấp **Interview Code** (one-time, có TTL – mặc định 2 giờ).
-- Candidate nhập code tại thiết bị công ty → vào phỏng vấn ngay, không cần tài khoản.
-- Code vô hiệu hóa ngay sau khi dùng.
-
-> Cùng một Job Posting có thể cấu hình: chỉ Remote, chỉ On-site, hoặc cả hai.
+- Candidate nhập code tại thiết bị Kiosk của công ty → vào phỏng vấn ngay. Code vô hiệu hóa ngay sau khi dùng.
 
 ---
 
@@ -43,22 +40,23 @@ ARISP là nền tảng tuyển dụng B2B SaaS tích hợp **Job Board IT** và 
 | Tên vị trí / Lĩnh vực | ✅ | Ví dụ: Backend Developer, IT |
 | JD (Job Description) | ✅ | AI phân tích JD để tạo câu hỏi & detect yêu cầu ngôn ngữ |
 | Cấu hình vòng phỏng vấn | ✅ | Số vòng, loại vòng (Screening / Technical), ngôn ngữ |
-| Interview Mode | ✅ | Remote / On-site / Cả hai |
-| Availability Slots (Remote) | ⬜ | Khung giờ ứng viên được phép chọn |
+| Phỏng vấn thật | ✅ | Mặc định On-site (Tại công ty) |
+| Availability Slots (Practice) | ⬜ | Khung giờ cho phép ứng viên chọn để làm Phỏng vấn thử (Remote) |
 | Scoring Rubric | ⬜ | Custom tiêu chí đánh giá per Job Posting |
 | Interview Persona | ⬜ | Tên, giọng, phong cách avatar AI |
 | **Interview Playbook** | ⬜ | Upload tài liệu phỏng vấn nội bộ (câu hỏi, kịch bản, rubric chi tiết, ...) |
 
 ### Phase 2: Candidate Application
 - Candidate tự ứng tuyển qua **Job Board** (chủ động) hoặc được HR mời trực tiếp (passive).
-- HR xem CV → chủ động gửi **magic link** (invite) cho ứng viên phù hợp.
-- Candidate nhận magic link → **xác nhận vị trí ứng tuyển** → chọn:
-  - **Phỏng vấn thử** (nếu còn lượt – 1 lần per Application), hoặc
-  - **Schedule phỏng vấn thực** (chọn Availability Slot do HR cấu hình).
+- AI tự động phân tích CV, so khớp với JD và chấm điểm (`AI Match Score`).
+- Dựa trên bảng xếp hạng điểm AI, HR chọn ứng viên điểm cao và hệ thống tự động gửi **magic link**.
+- Candidate nhận magic link → truy cập **Candidate Portal** để:
+  - Xem thông tin vị trí ứng tuyển.
+  - Chọn khung giờ (Availability Slot) để làm **Phỏng vấn thử (Practice Remote)** (nếu còn lượt – 1 lần per Application).
 
-### Phase 3: Schedule / Access
-- **Remote:** Candidate chọn slot → nhận link phỏng vấn.
-- **On-site:** HR cấp Interview Code → Candidate nhập code → vào phỏng vấn.
+### Phase 3: Access Real Interview (On-site)
+- Candidate đến văn phòng công ty theo lịch hẹn miệng/email với HR.
+- HR cấp **Interview Code** → Candidate nhập code tại Kiosk của công ty → vào phỏng vấn thật.
 
 ### Phase 4: Multi-round AI Interview
 
@@ -93,7 +91,7 @@ Round N kết thúc → AI Evaluation → HR Review
 ### Phase 6: HR Review & Confirm
 - HR xem Evaluation Report + recording.
 - **Confirm** hoặc **Override** (kèm `override_reason` bắt buộc).
-- Sau confirm → trigger auto-progression hoặc gửi kết quả.
+- Sau confirm → hệ thống tự động lưu kết quả, cấp Interview Code mới nếu có vòng sau (Round N+1) hoặc gửi thông báo từ chối.
 
 ### Phase 7: Candidate Portal
 - Đăng nhập bằng email + magic link (không cần password).
@@ -111,11 +109,11 @@ Doanh nghiệp upload tài liệu phỏng vấn nội bộ để AI phỏng vấ
 
 | Cấp | Loại tài liệu | Ví dụ |
 |---|---|---|
-| **Organization** | Interview Style Guide | "Chúng tôi phỏng vấn thân thiện, tập trung vào tư duy" |
-| **Organization** | Competency Framework | Ma trận kỹ năng theo level (Junior/Mid/Senior) |
-| **Organization** | Culture & Values Guide | Mission, core values, culture fit indicators |
-| **Organization** | Compliance / Must-not-ask | Câu hỏi không được hỏi (tuổi, tôn giáo...) |
-| **Organization** | Red Flag Guide | Dấu hiệu cần probe sâu hoặc loại bỏ ứng viên |
+| **Company** | Interview Style Guide | "Chúng tôi phỏng vấn thân thiện, tập trung vào tư duy" |
+| **Company** | Competency Framework | Ma trận kỹ năng theo level (Junior/Mid/Senior) |
+| **Company** | Culture & Values Guide | Mission, core values, culture fit indicators |
+| **Company** | Compliance / Must-not-ask | Câu hỏi không được hỏi (tuổi, tôn giáo...) |
+| **Company** | Red Flag Guide | Dấu hiệu cần probe sâu hoặc loại bỏ ứng viên |
 | **Job Posting** | Question Bank | Danh sách câu hỏi bắt buộc/gợi ý per vị trí |
 | **Job Posting** | Technical Scenarios | Bài toán / case study cụ thể cho vị trí |
 | **Job Posting** | Expected Answer Guide | Câu trả lời tốt cần đề cập gì |
@@ -134,9 +132,8 @@ Khi AI sinh câu hỏi → retrieve từ:
   ⑤ Round Playbook         (weight cao – phù hợp vòng hiện tại)
 ```
 
-### Enterprise Admin
-- Quản lý team HR: phân quyền theo department.
-- Subscription & billing management.
+### System Admin
+- Quản lý team HR: phân quyền theo bộ phận.
 - **Audit log:** mọi hành động quan trọng (confirm/override, khi nào, lý do).
 
 ### AI Enhancement
@@ -156,8 +153,7 @@ Khi AI sinh câu hỏi → retrieve từ:
 - **Thị trường:** Chỉ tập trung IT (Dev, DevOps, QA, Data, Design, PM, ...)
 - **Tên công ty:** Hiển thị công khai trên tin tuyển dụng
 - **Self-apply:** Ứng viên chủ động ứng tuyển → HR xem CV → HR chủ động gửi magic link
-- **Nguồn dữ liệu:** Job Posting của doanh nghiệp là nguồn chung cho cả Job Board lẫn AI Interview Platform
-- **Subscription gộp:** Doanh nghiệp trả một subscription duy nhất cho cả Job Board lẫn AI Interview
+- **Nguồn dữ liệu:** Job Posting nội bộ là nguồn chung cho cả Job Board lẫn AI Interview Platform
 
 ### Practice Interview (Phỏng vấn thử)
 
@@ -214,9 +210,10 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 8. **AI/LLM:** Business logic không gọi trực tiếp OpenAI SDK – qua `IAIProvider` + `IEmbeddingProvider`. Swap qua env var `AI_PROVIDER=openai|local`.
 9. **WebRTC** chỉ dùng cho media stream. Session events dùng SignalR.
 10. **Streaming-First:** Không chấp nhận batch nếu có alternative streaming khả thi.
-11. **Multi-tenant:** Mọi entity thuộc Enterprise phải có `organization_id`. Repository layer enforce isolation.
+11. **Single-tenant:** Hệ thống phục vụ cho 1 công ty duy nhất. Không sử dụng `organization_id`.
 12. **Interview Code:** One-time-use, TTL ngắn (mặc định 2 giờ, cấu hình được), vô hiệu hóa ngay sau khi dùng.
 13. **Language detection:** AI detect từ JD – không hardcode mapping ngôn ngữ.
+14. **Connection Drop Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, AI resume lại luồng câu hỏi chưa hỏi (track qua bảng `must_ask_tracking`).
 
 ---
 

@@ -117,24 +117,24 @@ public interface IEmbeddingProvider
 - Chỉ kết nối HeyGen Streaming khi AI nói (~3 phút/session). Khi im: client phát idle video loop.
 - Tiết kiệm ~$2.78/session (~90% HeyGen cost).
 
-### ADR-012: Multi-tenant Data Isolation
-- Mọi entity thuộc Enterprise có `organization_id`. Repository layer enforce filter.
-- Application layer không tự quản lý isolation.
+### ADR-012: Single-tenant Architecture
+- Hệ thống được thiết kế độc quyền cho 1 doanh nghiệp (Single-tenant).
+- Không sử dụng kiến trúc Multi-tenant hay `organization_id` để phân tách dữ liệu.
 
 ### ADR-013: Candidate Invite Flow
-- HR tạo Job Posting → hệ thống sinh invite link (signed JWT, 24–72h) → gửi email.
-- Candidate nhấn link → submit CV → chọn slot (Remote) hoặc nhận Interview Code (On-site).
+- HR tạo Job Posting → duyệt CV → gửi magic link cho ứng viên làm quen phỏng vấn thử (Practice Remote).
+- Ứng viên đến văn phòng theo lịch hẹn → HR cấp Interview Code (On-site) cho phỏng vấn thật.
 
 ### ADR-014: AI Evaluation & HR Confirm Flow
 - AI generate Evaluation Report sau mỗi Round.
 - HR Confirm/Override (override bắt buộc có `override_reason` cho audit trail).
 - Notification: email + in-app (SignalR) khi Evaluation hoàn thành.
 
-### ADR-015: Interview Mode – Remote vs On-site
-- **Remote:** Candidate phỏng vấn từ browser tại nhà. Xác thực qua invite link JWT.
-- **On-site:** Candidate đến văn phòng, nhập **Interview Code** tại thiết bị công ty.
-- Cùng một Job Posting có thể bật cả hai mode.
+### ADR-015: Interview Mode – Practice (Remote) vs Real (On-site)
+- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser tại nhà để làm quen hệ thống. Xác thực qua magic link.
+- **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng, nhập **Interview Code** tại thiết bị Kiosk.
 - **On-site Kiosk:** Frontend app chạy ở chế độ kiosk (full-screen, không expose các route khác) trên thiết bị công ty.
+- **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
 ### ADR-016: Interview Code (On-site Access Control)
 - **Format:** 6–8 ký tự alphanumeric, case-insensitive (ví dụ: `ARX-7K2P`).
@@ -147,8 +147,8 @@ public interface IEmbeddingProvider
 ### ADR-017: Multi-round Interview
 - HR cấu hình số vòng và loại vòng per Job Posting: `[{round: 1, type: "Screening"}, {round: 2, type: "Technical"}]`.
 - Mỗi vòng là một `InterviewSession` độc lập với `session_config` riêng.
-- **Auto-progression:** Sau khi HR confirm Pass ở Round N → hệ thống tạo invite Round N+1 tự động.
-- **Scheduling:** Candidate chọn slot mới cho Round N+1 (Remote) hoặc nhận Interview Code mới (On-site).
+- **Auto-progression:** Sau khi HR confirm Pass ở Round N → hệ thống lưu trạng thái.
+- **Scheduling:** HR hẹn lịch offline với ứng viên và sinh Interview Code mới cho Round N+1 khi ứng viên đến công ty.
 
 ### ADR-018: Language-aware AI Interviewer
 - **Detection:** Khi Job Posting được tạo, `IAIProvider.DetectLanguageRequirementAsync(jdText)` phân tích JD.
@@ -173,11 +173,11 @@ public interface IEmbeddingProvider
 - **Integration:** CheatScore và CheatSignals xuất hiện trong Evaluation Report (section riêng) cho HR xem xét.
 - **Policy:** ARISP không tự động fail ứng viên chỉ dựa trên CheatScore – HR quyết định cuối.
 
-### ADR-020: Scheduling Service (Availability Slots)
-- HR cấu hình `AvailabilitySlots` per Job Posting: danh sách khung giờ (start, end, timezone, capacity).
-- Candidate chọn slot → slot bị giảm capacity → khi hết slot không cho chọn nữa.
-- Reminder email 24h và 1h trước giờ phỏng vấn.
-- Hỗ trợ reschedule (trong thời hạn cho phép, cấu hình được per Job Posting).
+### ADR-020: Scheduling Service (Practice Session Only)
+- HR cấu hình `AvailabilitySlots` per Job Posting: danh sách khung giờ trống để ứng viên làm Phỏng vấn thử (Remote).
+- Candidate chọn slot trên Portal → slot bị giảm capacity → khi hết slot không cho chọn nữa.
+- Reminder email 24h và 1h trước giờ phỏng vấn thử.
+- Đối với Phỏng vấn thật (On-site), tính năng này KHÔNG áp dụng. HR tự điều phối lịch trực tiếp với ứng viên.
 
 ### ADR-021: Candidate Portal
 - **Auth:** Magic link qua email (không cần password). Magic link có TTL 15 phút, one-time-use.
@@ -186,14 +186,14 @@ public interface IEmbeddingProvider
 
 ### ADR-022: ATS Integration (Webhook/API)
 - ARISP push events sang ATS qua Webhook: `application.submitted`, `interview.completed`, `evaluation.confirmed`.
-- Payload chuẩn hóa (JSON). HR Admin cấu hình webhook URL + secret per Organization.
+- Payload chuẩn hóa (JSON). HR Admin cấu hình webhook URL + secret trong phần Admin Settings.
 - Retry logic với exponential backoff nếu ATS endpoint lỗi.
 - Supported ATS: Workday, SAP SuccessFactors, Greenhouse (và bất kỳ ATS nào hỗ trợ webhook).
 
 ### ADR-023: SSO Integration
 - Hỗ trợ SAML 2.0, OpenID Connect (Google Workspace, Microsoft Entra).
-- SSO chỉ áp dụng cho HR Admin/Recruiter – Candidate dùng magic link.
-- Per-Organization SSO config (IdP metadata, client ID/secret lưu encrypted).
+- SSO chỉ áp dụng cho HR Admin/System Admin – Candidate dùng magic link.
+- System SSO config (IdP metadata, client ID/secret lưu encrypted).
 
 ### ADR-024: Bias Detection & Fairness
 - **Data collected:** Evaluation scores theo demographic groups (nếu Candidate cung cấp và đồng ý).

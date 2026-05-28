@@ -51,13 +51,12 @@ _Chưa có task nào đang thực hiện._
 - [ ] Setup Docker + docker-compose (backend, frontend, postgres, redis)
 - [ ] Setup Nginx config cơ bản
 
-### Phase 1 – Auth & Multi-tenant
-- [ ] Database schema: `organizations`, `users`, `roles`, `refresh_tokens`
+### Phase 1 – Auth & Single-tenant Setup
+- [ ] Database schema: `users`, `refresh_tokens`
 - [ ] EF Core migrations
-- [ ] Đăng ký / Đăng nhập endpoint (HR Admin + SuperAdmin)
+- [ ] Đăng ký / Đăng nhập endpoint (HR Admin + System Admin)
 - [ ] JWT issue + refresh token
-- [ ] Role-based authorization middleware (`SuperAdmin`, `HRAdmin`, `Candidate`)
-- [ ] Multi-tenant isolation: mọi query filter theo `organization_id`
+- [ ] Role-based authorization middleware (`SystemAdmin`, `HRAdmin`, `Candidate`)
 - [ ] Magic link auth cho Candidate Portal (email + one-time token, TTL 15 phút)
 - [ ] SSO foundation: SAML 2.0 + OpenID Connect (Google Workspace, Microsoft Entra)
 
@@ -67,8 +66,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] HR Admin: CRUD Job Posting
   - [ ] Thông tin cơ bản (tên vị trí, lĩnh vực, JD)
   - [ ] Cấu hình multi-round: số vòng, loại vòng (Screening/Technical), ngôn ngữ
-  - [ ] Interview Mode: Remote / On-site / Cả hai
-  - [ ] Availability Slots (Remote): danh sách khung giờ, capacity, timezone
+  - [ ] Availability Slots (Practice): danh sách khung giờ, capacity cho phỏng vấn thử
+  - [ ] Phỏng vấn thật: Mặc định On-site (Tại công ty)
   - [ ] Scoring Rubric (optional): custom tiêu chí đánh giá
   - [ ] Interview Persona (optional): tên, giọng avatar AI
 - [ ] Language detection khi tạo Job Posting: `LanguageDetectionService` gọi AI phân tích JD
@@ -92,16 +91,12 @@ _Chưa có task nào đang thực hiện._
   - [ ] Practice Session: `session_type = practice`, interview flow dùng JD + CV only (không load Playbook)
   - [ ] Practice Session: Evaluation Report riêng, HR xem được, không ảnh hưởng verdict
   - [ ] Disable nút "Phỏng vấn thử" sau khi đã dùng 1 lần
-- [ ] Real Session: chỉ mở khi đúng slot Candidate đã booking
 
-### Phase 3 – Scheduling & Interview Code
+### Phase 3 – Scheduling (Practice) & Interview Code
 - [ ] Database schema: `availability_slots`, `interview_bookings`, `interview_codes`
 - [ ] EF Core migrations
-- [ ] **Remote:** Candidate chọn slot → booking → xác nhận email + link phỏng vấn
-- [ ] **Remote:** Capacity management (slot hết → disabled)
-- [ ] **Remote:** Reminder email 24h và 1h trước giờ phỏng vấn
-- [ ] **Remote:** Reschedule trong thời hạn cho phép
-- [ ] **On-site:** HR generate Interview Code (format `ARX-7K2P`, 6–8 ký tự alphanumeric)
+- [ ] **Practice (Remote):** Candidate chọn slot → booking → nhận nhắc nhở 24h/1h
+- [ ] HR generate Interview Code (format `ARX-7K2P`, 6–8 ký tự alphanumeric) cho thi thật
   - [ ] One-time-use: vô hiệu hóa sau khi dùng
   - [ ] TTL: mặc định 2 giờ, cấu hình per Job Posting
   - [ ] Bind với `application_id` cụ thể
@@ -123,7 +118,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Điều kiện dừng: AI tự dừng khi khai thác hết context JD + CV
 - [ ] **Session Type – phân biệt `practice` vs `real`:**
   - [ ] `practice`: chỉ retrieve JD + CV chunks, không load Playbook, gated bởi eligibility check
-  - [ ] `real`: retrieve JD + CV + Playbook chunks (full RAG pipeline), mở đúng slot đã đặt
+  - [ ] `real`: retrieve JD + CV + Playbook chunks (full RAG pipeline), yêu cầu nhập Interview Code tại Kiosk.
 
 ### Phase 4b – Interview Playbook (Org Knowledge Base)
 - [ ] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round, type: style/competency/question_bank/...)
@@ -141,9 +136,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] Database schema: `interview_rounds`, `round_evaluations`
 - [ ] Multi-round config: HR cấu hình danh sách vòng per Job Posting
 - [ ] `InterviewService` hỗ trợ `round_number` và `round_type` per session
-- [ ] Auto-progression: sau HR confirm Pass Round N → tự động invite Round N+1
-  - [ ] Remote: tạo booking slot mới cho Round 2
-  - [ ] On-site: HR generate Interview Code mới cho Round 2
+- [ ] Auto-progression: sau HR confirm Pass Round N → lưu kết quả
+  - [ ] On-site: HR hẹn lịch offline và generate Interview Code mới cho Round N+1 khi ứng viên đến công ty.
 - [ ] Email notification cho Candidate khi được invite Round tiếp theo
 
 ### Phase 6 – AI Evaluation & HR Review
