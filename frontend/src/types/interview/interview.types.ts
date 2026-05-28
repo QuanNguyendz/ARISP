@@ -17,6 +17,21 @@ export interface InterviewRoomState {
   };
 }
 
+export interface InterviewSession {
+  id: string;
+  applicationId: string;
+  round: number;
+  type: 'Screening' | 'Technical';
+  sessionType: 'real' | 'practice';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  scheduledAt?: Date;
+  startedAt?: Date;
+  endedAt?: Date;
+  recordingUrl?: string;
+  verdict?: 'Pass' | 'NotPass';
+  overallScore?: number;
+}
+
 export interface EyeTrackingData {
   gazeX: number;
   gazeY: number;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InterviewRoomState, EyeTrackingData, ResponseTimingData, TabSwitchData } from '@types/interview';
+import type { InterviewRoomState, EyeTrackingData, ResponseTimingData, TabSwitchData } from '../../types/interview';
 
 interface InterviewState {
   room: InterviewRoomState | null;
@@ -11,11 +11,11 @@ interface InterviewState {
   setCurrentQuestion: (question: string, index: number) => void;
   setCandidateSpeaking: (speaking: boolean) => void;
   setAiSpeaking: (speaking: boolean) => void;
-  updateSignals: {
+  updateSignals: (signals: {
     eyeTracking?: EyeTrackingData;
     responseTiming?: ResponseTimingData;
     tabSwitch?: TabSwitchData;
-  };
+  }) => void;
   setConnectionStatus: (status: InterviewState['connectionStatus']) => void;
   setError: (error: string | null) => void;
   resetRoom: () => void;

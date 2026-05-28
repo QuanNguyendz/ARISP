@@ -1,7 +1,5 @@
 export * from './auth';
-export * from './admin';
-export * from './candidate';
-export * from './interview';
-export * from './job-board';
-export * from './kiosk';
+export * from './landing';
+export { default as JobDetailPage } from './job-board/JobDetailPage';
+export { default as KioskPage } from './kiosk/KioskPage';
 export { default as NotFoundPage } from './NotFoundPage';

@@ -1,5 +1,5 @@
 import { apiClient } from '../apiClient';
-import type { Application, ApplicationDetail, CreateApplicationRequest } from '@types/application';
+import type { Application, ApplicationDetail, CreateApplicationRequest } from '../../types/application';
 
 interface ApplicationFilters {
   status?: Application['status'];

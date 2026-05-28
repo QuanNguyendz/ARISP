@@ -1,5 +1,5 @@
 import { apiClient } from '../apiClient';
-import type { EvaluationReport, HRReview, EvaluationFilter } from '@types/evaluation';
+import type { EvaluationReport, HRReview, EvaluationFilter } from '../../types/evaluation';
 
 interface PaginatedResponse<T> {
   items: T[];

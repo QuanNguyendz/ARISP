@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
 
 export default function InterviewLayout() {
   return (
@@ -12,14 +11,15 @@ export default function InterviewLayout() {
         color: 'white',
         display: 'flex',
         flexDirection: 'column',
+        '& .MuiBox-root': { flex: 1 },
       }}
     >
-      <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.light' }}>
           ARISP - Interview Room
         </Typography>
       </Box>
-      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch', minHeight: 0 }}>
         <Outlet />
       </Box>
     </Box>
