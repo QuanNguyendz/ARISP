@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { EyeTrackingData, TabSwitchData } from '@types/interview';
+import type { EyeTrackingData, TabSwitchData } from '../../types/interview';
 
 interface CheatDetectionConfig {
   enableEyeTracking: boolean;

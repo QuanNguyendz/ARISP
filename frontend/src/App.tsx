@@ -1,121 +1,130 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from '@store/auth/authStore';
+import { getDevAuth, isDevMode } from '@utils/devAuth';
 
-import AuthLayout from '@components/layout/AuthLayout';
-import MainLayout from '@components/layout/MainLayout';
+import AdminLayout from '@components/layout/AdminLayout';
+import CandidateLayout from '@components/layout/CandidateLayout';
 import InterviewLayout from '@components/layout/InterviewLayout';
 
+// Auth Pages
 import LoginPage from '@pages/auth/LoginPage';
-import MagicLinkCallbackPage from '@pages/auth/MagicLinkCallbackPage';
+import RegisterPage from '@pages/auth/RegisterPage';
+import CandidateLoginPage from '@pages/auth/CandidateLoginPage';
+import CandidateRegisterPage from '@pages/auth/CandidateRegisterPage';
 
+// Admin Pages
 import DashboardPage from '@pages/admin/DashboardPage';
 import JobPostingsPage from '@pages/admin/JobPostingsPage';
 import JobPostingDetailPage from '@pages/admin/JobPostingDetailPage';
 import CreateJobPostingPage from '@pages/admin/CreateJobPostingPage';
 import CandidatesPage from '@pages/admin/CandidatesPage';
+import CandidateDetailPage from '@pages/admin/CandidateDetailPage';
 import InterviewSessionsPage from '@pages/admin/InterviewSessionsPage';
 import EvaluationReviewPage from '@pages/admin/EvaluationReviewPage';
+import ReportsPage from '@pages/admin/ReportsPage';
 import PlaybooksPage from '@pages/admin/PlaybooksPage';
 import SettingsPage from '@pages/admin/SettingsPage';
 import TeamPage from '@pages/admin/TeamPage';
 
-import CandidateDashboardPage from '@pages/candidate/DashboardPage';
-import MyApplicationsPage from '@pages/candidate/MyApplicationsPage';
+// Candidate Pages
+import CandidateHome from '@pages/candidate/CandidateHome';
 import InterviewSchedulePage from '@pages/candidate/InterviewSchedulePage';
-import RecordingPage from '@pages/candidate/RecordingPage';
+import PortalPage from '@pages/candidate/PortalPage';
 import FeedbackPage from '@pages/candidate/FeedbackPage';
 
+// Interview Pages
 import InterviewRoomPage from '@pages/interview/InterviewRoomPage';
 import PracticeSessionPage from '@pages/interview/PracticeSessionPage';
 
-import JobBoardPage from '@pages/job-board/JobBoardPage';
+// Landing Pages
+import HomePage from '@pages/landing/HomePage';
+import FindJobPage from '@pages/landing/FindJobPage';
 import JobDetailPage from '@pages/job-board/JobDetailPage';
-
+import CandidateApply from '@pages/CandidateApply';
 import KioskPage from '@pages/kiosk/KioskPage';
-
 import NotFoundPage from '@pages/NotFoundPage';
 
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
-  const { isAuthenticated, user } = useAuthStore();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  return <>{children}</>;
-};
-
 function App() {
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isDevMode && !isAuthenticated) {
+      const devAuth = getDevAuth();
+      if (devAuth) {
+        setAuth(devAuth.user, devAuth.tokens);
+      }
+    }
+  }, [isDevMode, isAuthenticated, setAuth]);
+
   return (
     <Routes>
-      <Route path="/auth">
-        <Route element={<AuthLayout />}>
-          <Route path="login" element={<LoginPage />} />
-          <Route path="magic-callback" element={<MagicLinkCallbackPage />} />
-        </Route>
+      {/* ==================== PUBLIC ROUTES ==================== */}
+
+      {/* Root - Job Board */}
+      <Route path="/" element={<FindJobPage />} />
+
+      {/* Employer Landing Page */}
+      <Route path="/nha-tuyen-dung" element={<HomePage />} />
+
+      {/* employer Login/Register */}
+      <Route path="/dang-nhap" element={<LoginPage />} />
+      <Route path="/dang-ky" element={<RegisterPage />} />
+
+      {/* Candidate Login/Register */}
+      <Route path="/dang-nhap-ung-vien" element={<CandidateLoginPage />} />
+      <Route path="/dang-ky-ung-vien" element={<CandidateRegisterPage />} />
+
+      {/* ==================== CANDIDATE PROTECTED ROUTES ==================== */}
+
+      <Route element={<CandidateLayout />}>
+        <Route path="/ung-vien" element={<CandidateHome />} />
+        <Route path="/ung-vien/ho-so" element={<CandidateHome />} />
+        <Route path="/ung-vien/cong-viec" element={<CandidateHome />} />
       </Route>
 
-      <Route path="/admin">
-        <Route element={<ProtectedRoute allowedRoles={['SuperAdmin', 'HRAdmin', 'Recruiter']} />}>
-          <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="job-postings">
-              <Route index element={<JobPostingsPage />} />
-              <Route path="create" element={<CreateJobPostingPage />} />
-              <Route path=":id" element={<JobPostingDetailPage />} />
-              <Route path=":id/edit" element={<CreateJobPostingPage />} />
-            </Route>
-            <Route path="candidates" element={<CandidatesPage />} />
-            <Route path="interviews">
-              <Route index element={<InterviewSessionsPage />} />
-              <Route path=":sessionId/review" element={<EvaluationReviewPage />} />
-            </Route>
-            <Route path="playbooks" element={<PlaybooksPage />} />
-            <Route path="team" element={<TeamPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-        </Route>
+      {/* Candidate Pages (standalone) */}
+      <Route path="/ung-vien/ung-tuyen" element={<CandidateApply />} />
+      <Route path="/ung-vien/ung-tuyen/:id" element={<CandidateApply />} />
+      <Route path="/ung-vien/phong-van" element={<InterviewSchedulePage />} />
+      <Route path="/ung-vien/cong-cua" element={<PortalPage />} />
+      <Route path="/ung-vien/ket-qua" element={<FeedbackPage />} />
+      <Route path="/ung-vien/ket-qua/:id" element={<FeedbackPage />} />
+
+      {/* ==================== HR ADMIN ROUTES ==================== */}
+
+      <Route element={<AdminLayout />}>
+        <Route path="/quan-ly" element={<DashboardPage />} />
+        <Route path="/quan-ly/tin-tuyen-dung" element={<JobPostingsPage />} />
+        <Route path="/quan-ly/tin-tuyen-dung/tao-moi" element={<CreateJobPostingPage />} />
+        <Route path="/quan-ly/tin-tuyen-dung/:id" element={<JobPostingDetailPage />} />
+        <Route path="/quan-ly/ung-vien" element={<CandidatesPage />} />
+        <Route path="/quan-ly/ung-vien/:id" element={<CandidateDetailPage />} />
+        <Route path="/quan-ly/danh-gia" element={<EvaluationReviewPage />} />
+        <Route path="/quan-ly/bao-cao" element={<ReportsPage />} />
+        <Route path="/quan-ly/cai-dat" element={<SettingsPage />} />
+        <Route path="/quan-ly/playbooks" element={<PlaybooksPage />} />
+        <Route path="/quan-ly/nhom" element={<TeamPage />} />
+        <Route path="/quan-ly/phong-van" element={<InterviewSessionsPage />} />
       </Route>
 
-      <Route path="/candidate">
-        <Route element={<ProtectedRoute allowedRoles={['Candidate']} />}>
-          <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/candidate/dashboard" replace />} />
-            <Route path="dashboard" element={<CandidateDashboardPage />} />
-            <Route path="applications" element={<MyApplicationsPage />} />
-            <Route path="schedule" element={<InterviewSchedulePage />} />
-            <Route path="recordings" element={<RecordingPage />} />
-            <Route path="feedback" element={<FeedbackPage />} />
-          </Route>
-        </Route>
+      {/* Interview Routes */}
+      <Route path="/interview" element={<InterviewLayout />}>
+        <Route path="room/:sessionId" element={<InterviewRoomPage />} />
+        <Route path="practice/:applicationId" element={<PracticeSessionPage />} />
       </Route>
 
-      <Route path="/interview">
-        <Route element={<InterviewLayout />}>
-          <Route path="room/:sessionId" element={<InterviewRoomPage />} />
-          <Route path="practice/:applicationId" element={<PracticeSessionPage />} />
-        </Route>
+      {/* Kiosk */}
+      <Route path="/kiosk" element={<InterviewLayout />}>
+        <Route index element={<KioskPage />} />
       </Route>
 
-      <Route path="/jobs">
-        <Route element={<MainLayout />}>
-          <Route index element={<JobBoardPage />} />
-          <Route path=":id" element={<JobDetailPage />} />
-        </Route>
-      </Route>
+      {/* Public Pages */}
+      <Route path="/jobs" element={<FindJobPage />} />
+      <Route path="/jobs/:id" element={<JobDetailPage />} />
 
-      <Route path="/kiosk">
-        <Route element={<InterviewLayout />}>
-          <Route index element={<KioskPage />} />
-        </Route>
-      </Route>
-
-      <Route path="/" element={<Navigate to="/jobs" replace />} />
+      {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

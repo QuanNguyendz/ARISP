@@ -5,654 +5,485 @@
 
 ## Mục Lục
 
-1. [Giới Thiệu](#giới-thiệu)
-2. [Cấu Trúc Thư Mục](#cấu-trúc-thư-mục)
-3. [Chi Tiết Từng Thành Phần](#chi-tiết-từng-thành-phần)
-4. [Routing - Điều Hướng](#routing---điều-hướng)
-5. [State Management - Quản Lý Trạng Thái](#state-management---quản-lý-trạng-thái)
-6. [API Services - Dịch Vụ API](#api-services---dịch-vụ-api)
-7. [Types - Kiểu Dữ Liệu](#types---kiểu-dữ-liệu)
-8. [Hooks Tùy Chỉnh](#hooks-tùy-chỉnh)
-9. [Utils - Tiện Ích](#utils---tiện-ích)
-10. [Cài Đặt và Chạy](#cài-đặt-và-chạy)
+1. [Giới Thiệu](#1-giới-thiệu)
+2. [Cấu Trúc Thư Mục](#2-cấu-trúc-thư-mục)
+3. [Routing - Điều Hướng](#3-routing---điều-hướng)
+4. [Quản Lý Trạng Thái](#4-quản-lý-trạng-thái)
+5. [Services - Giao Tiếp API](#5-services---giao-tiếp-api)
+6. [Types - Kiểu Dữ Liệu](#6-types---kiểu-dữ-liệu)
+7. [Hooks Tùy Chỉnh](#7-hooks-tùy-chỉnh)
+8. [Utils - Tiện Ích](#8-utils---tiện-ích)
+9. [Cài Đặt và Chạy](#9-cài-đặt-và-chạy)
 
 ---
 
-## Giới Thiệu
+## 1. Giới Thiệu
 
-### Công Nghệ Sử Dụng
+### 1.1 Tổng Quan
 
-| Công Nghệ | Phiên Bản | Mô Tả |
-|-----------|-----------|--------|
+ARISP là nền tảng tuyển dụng thông minh sử dụng AI để hỗ trợ quy trình phỏng vấn. Ứng dụng có 3 nhóm người dùng chính:
+
+- **Nhà tuyển dụng (Admin/Hr)**: Quản lý tin tuyển dụng, xem ứng viên, đánh giá kết quả phỏng vấn
+- **Ứng viên (Candidate)**: Tìm việc, ứng tuyển, tham gia phỏng vấn AI, xem kết quả
+- **Phỏng vấn AI**: Phòng phỏng vấn thông minh với real-time transcription và đánh giá tự động
+
+### 1.2 Công Nghệ Sử Dụng
+
+| Công nghệ | Phiên bản | Mô tả |
+|---|---|---|
 | React | 18.x | Thư viện UI chính |
-| TypeScript | 5.x | Ngôn ngữ lập trình |
-| Vite | 5.x | Build tool |
-| MUI (Material UI) | 5.x | Component library |
-| Tailwind CSS | 3.x | Utility-first CSS |
+| TypeScript | 5.x | Ngôn ngữ lập trình chính |
+| Vite | 5.x | Công cụ build nhanh |
+| Tailwind CSS | 3.x | Utility-first CSS framework |
+| Framer Motion | 11.x | Animation library |
+| React Router | 6.x | Routing / điều hướng |
 | Zustand | 4.x | State management |
-| React Router | 6.x | Routing |
 | Axios | 1.x | HTTP client |
-| Zod | 3.x | Schema validation |
+| Lucide React | 0.x | Icon library |
 
-### Kiến Trúc Ứng Dụng
+### 1.3 Kiến Trúc Tổng Quan
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         App.tsx                             │
-│                   (Router Configuration)                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-   ┌─────────┐          ┌─────────┐          ┌─────────┐
-   │  Pages  │          │  Pages  │          │  Pages  │
-   │ (Admin) │          │(Candidate)         │(Interview)       │
-   └─────────┘          └─────────┘          └─────────┘
-        │                     │                     │
-        ▼                     ▼                     ▼
-   ┌─────────────────────────────────────────────────────────┐
-   │                    Services Layer                       │
-   │   (API calls - jobService, authService, etc.)          │
-   └─────────────────────────────────────────────────────────┘
-        │                     │                     │
-        ▼                     ▼                     ▼
-   ┌─────────────────────────────────────────────────────────┐
-   │                    Store Layer (Zustand)                │
-   │         (authStore, applicationStore, interviewStore)   │
-   └─────────────────────────────────────────────────────────┘
+main.tsx (Entry point)
+    │
+    └── App.tsx (Router - tất cả routes)
+              │
+              ├── pages/landing/      → Trang chủ công khai (Home, Tìm việc)
+              ├── pages/auth/         → Đăng nhập / Đăng ký (Nhà tuyển dụng & Ứng viên)
+              ├── pages/admin/        → Dashboard quản lý (Nhà tuyển dụng)
+              ├── pages/candidate/    → Trang ứng viên (Hồ sơ, đơn ứng tuyển, lịch phỏng vấn)
+              ├── pages/interview/    → Phòng phỏng vấn AI
+              ├── pages/job-board/    → Chi tiết việc làm công khai
+              ├── pages/kiosk/        → Chế độ kiosk
+              └── pages/NotFoundPage  → Trang 404
 ```
 
 ---
 
-## Cấu Trúc Thư Mục
+## 2. Cấu Trúc Thư Mục
 
 ```
-frontend/
-├── .env.example                    # Template biến môi trường
-├── index.html                      # HTML entry point
-├── package.json                    # Dependencies
-├── vite.config.ts                  # Cấu hình Vite
-├── tsconfig.json                    # Cấu hình TypeScript
-├── tailwind.config.js               # Cấu hình Tailwind CSS
-├── postcss.config.js                # Cấu hình PostCSS
+frontend/src/
 │
-└── src/
-    ├── App.tsx                      # Root component + Routing
-    ├── main.tsx                     # Entry point (ReactDOM)
-    ├── index.css                     # Global styles
-    │
-    ├── assets/                      # Static assets
-    │   ├── icons/
-    │   └── images/
-    │
-    ├── components/                  # Reusable components
-    │   ├── common/                  # Components chung (ErrorAlert, Loading...)
-    │   ├── layout/                  # Layout wrappers
-    │   ├── interview/               # Interview-specific components
-    │   ├── job-board/               # Job board components
-    │   └── portal/                  # Portal components
-    │
-    ├── config/                      # Configuration
-    │   ├── constants.ts              # Hằng số ứng dụng
-    │   └── env.ts                    # Environment variables
-    │
-    ├── contexts/                    # React Contexts (Provider)
-    │
-    ├── hooks/                       # Custom React Hooks
-    │   ├── cheat-detection/          # Hook phát hiện gian lận
-    │   ├── interview/               # Hook phòng phỏng vấn
-    │   └── recording/               # Hook ghi âm
-    │
-    ├── pages/                       # Page components (Route-level)
-    │   ├── admin/                    # Trang quản trị HR
-    │   ├── auth/                     # Trang đăng nhập/đăng ký
-    │   ├── candidate/                # Trang ứng viên
-    │   ├── interview/                # Trang phỏng vấn
-    │   ├── job-board/                # Trang việc làm công khai
-    │   └── kiosk/                    # Trang kiosk tại quầy
-    │
-    ├── services/                    # API Services
-    │   ├── apiClient.ts              # Axios instance + interceptors
-    │   ├── application/              # Service quản lý đơn ứng tuyển
-    │   ├── auth/                     # Service xác thực
-    │   ├── evaluation/               # Service đánh giá
-    │   ├── interview/                # Service phỏng vấn
-    │   ├── job/                      # Service tin tuyển dụng
-    │   └── schedule/                 # Service lịch phỏng vấn
-    │
-    ├── store/                       # Zustand Stores
-    │   ├── auth/                     # Auth state
-    │   ├── application/             # Application state
-    │   └── interview/               # Interview state
-    │
-    ├── types/                       # TypeScript Interfaces
-    │   ├── application/
-    │   ├── auth/
-    │   ├── evaluation/
-    │   ├── interview/
-    │   ├── job/
-    │   └── organization/
-    │
-    └── utils/                       # Utility Functions
-        ├── audio/                    # Xử lý âm thanh
-        ├── format/                   # Định dạng (date, currency...)
-        └── validation/               # Zod validation schemas
+├── main.tsx                      # Entry point - Render App component
+├── App.tsx                       # Router chính - Định nghĩa tất cả routes
+├── vite-env.d.ts                # Type declarations cho Vite
+│
+├── config/
+│   └── constants.ts             # Hằng số: API URL, ROLES, INTERVIEW_MODES
+│
+├── routes/
+│   └── index.ts                # Định nghĩa route paths dạng constant
+│
+├── contexts/
+│   └── AuthContext.tsx         # Auth context (đang phát triển)
+│
+├── components/                  # UI Components có thể tái sử dụng
+│   │
+│   ├── ui/                     # Components cơ bản
+│   │   ├── Button.tsx          # Button với variants (primary, secondary, ghost)
+│   │   ├── GlassCard.tsx      # Card với hiệu ứng glass morphism
+│   │   └── Container.tsx       # Layout container (Container, ContainerItem)
+│   │
+│   ├── layout/                 # Layout wrapper cho từng nhóm trang
+│   │   ├── AdminLayout.tsx     # Sidebar navigation cho admin
+│   │   ├── AuthLayout.tsx     # Wrapper đơn giản cho trang auth
+│   │   ├── CandidateLayout.tsx # Layout cho trang ứng viên
+│   │   ├── InterviewLayout.tsx # Layout cho phòng phỏng vấn (MUI)
+│   │   ├── Navigation.tsx      # Navigation công khai
+│   │   ├── PublicNav.tsx       # Public navigation cố định
+│   │   ├── CandidateNav.tsx    # Navigation cho ứng viên
+│   │   ├── CandidateFooter.tsx # Footer cho ứng viên
+│   │   └── Footer.tsx         # Footer công khai
+│   │
+│   ├── common/                 # Shared components
+│   │   ├── LoadingButton.tsx   # MUI Button với trạng thái loading
+│   │   ├── LoadingSpinner.tsx  # Spinner hiển thị loading
+│   │   └── ErrorAlert.tsx     # Alert thông báo lỗi
+│   │
+│   ├── sections/               # Section components cho landing page
+│   │   ├── Hero.tsx            # Hero section với video background
+│   │   ├── Demo.tsx           # Demo/features section
+│   │   ├── CTA.tsx            # Call to Action section
+│   │   ├── Stats.tsx          # Statistics section với animation
+│   │   └── ScrollStorytelling.tsx # Scroll-driven animation
+│   │
+│   └── three/                  # Three.js components
+│       ├── AISphereDemo.tsx   # AI Sphere demo visualization
+│       └── ThreeBackground.tsx # 3D background cho landing page
+│
+├── pages/                       # Page components - Mỗi route có 1 page
+│   │
+│   ├── landing/                # Trang công khai
+│   │   ├── index.ts           # Barrel exports
+│   │   ├── HomePage.tsx       # Trang chủ nhà tuyển dụng (/nha-tuyen-dung)
+│   │   └── FindJobPage.tsx    # Trang tìm kiếm việc làm (/)
+│   │
+│   ├── auth/                   # Trang xác thực
+│   │   ├── index.ts
+│   │   ├── LoginPage.tsx      # Đăng nhập nhà tuyển dụng (/dang-nhap)
+│   │   ├── RegisterPage.tsx    # Đăng ký nhà tuyển dụng (/dang-ky)
+│   │   ├── CandidateLoginPage.tsx  # Đăng nhập ứng viên (/dang-nhap-ung-vien)
+│   │   └── CandidateRegisterPage.tsx # Đăng ký ứng viên (/dang-ky-ung-vien)
+│   │
+│   ├── admin/                  # Dashboard quản lý (wrapped by AdminLayout)
+│   │   ├── index.ts
+│   │   ├── DashboardPage.tsx   # Tổng quan dashboard
+│   │   ├── JobPostingsPage.tsx # Danh sách tin tuyển dụng
+│   │   ├── JobPostingDetailPage.tsx # Chi tiết tin tuyển dụng
+│   │   ├── CreateJobPostingPage.tsx # Tạo mới tin tuyển dụng
+│   │   ├── CandidatesPage.tsx  # Danh sách ứng viên
+│   │   ├── CandidateDetailPage.tsx # Chi tiết hồ sơ ứng viên
+│   │   ├── InterviewSessionsPage.tsx # Các phiên phỏng vấn
+│   │   ├── EvaluationReviewPage.tsx # Xem và duyệt đánh giá
+│   │   ├── ReportsPage.tsx    # Báo cáo thống kê
+│   │   ├── PlaybooksPage.tsx  # Quản lý kịch bản phỏng vấn
+│   │   ├── SettingsPage.tsx   # Cài đặt tài khoản
+│   │   └── TeamPage.tsx       # Quản lý nhóm
+│   │
+│   ├── candidate/              # Trang dành cho ứng viên
+│   │   ├── index.ts
+│   │   ├── CandidateHome.tsx   # Trang chủ ứng viên (/ung-vien)
+│   │   ├── DashboardPage.tsx   # Dashboard ứng viên
+│   │   ├── MyApplicationsPage.tsx # Danh sách đơn ứng tuyển
+│   │   ├── InterviewSchedulePage.tsx # Lịch phỏng vấn
+│   │   ├── PortalPage.tsx      # Cổng thông tin ứng viên (/ung-vien/cong-cua)
+│   │   └── FeedbackPage.tsx    # Kết quả phỏng vấn (/ung-vien/ket-qua)
+│   │
+│   ├── interview/              # Phòng phỏng vấn AI (wrapped by InterviewLayout)
+│   │   ├── index.ts
+│   │   ├── InterviewRoomPage.tsx # Phòng phỏng vấn thực tế
+│   │   └── PracticeSessionPage.tsx # Phiên luyện tập
+│   │
+│   ├── job-board/              # Trang công khai về việc làm
+│   │   └── JobDetailPage.tsx  # Chi tiết việc làm (/jobs/:id)
+│   │
+│   ├── kiosk/                  # Chế độ kiosk
+│   │   └── KioskPage.tsx      # Trang kiosk (/kiosk)
+│   │
+│   ├── NotFoundPage.tsx        # Trang 404
+│   └── index.ts               # Barrel exports
+│
+├── services/                   # Giao tiếp API
+│   ├── index.ts              # Barrel exports
+│   ├── apiClient.ts          # Axios instance - interceptors, auth headers
+│   │
+│   ├── auth/                 # Authentication
+│   │   ├── index.ts
+│   │   └── authService.ts   # Login, register, refresh token, logout
+│   │
+│   ├── job/                  # Tin tuyển dụng
+│   │   ├── index.ts
+│   │   └── jobService.ts    # CRUD tin tuyển dụng
+│   │
+│   ├── application/          # Đơn ứng tuyển
+│   │   ├── index.ts
+│   │   └── applicationService.ts # CRUD đơn ứng tuyển
+│   │
+│   ├── interview/            # Phiên phỏng vấn
+│   │   ├── index.ts
+│   │   └── interviewService.ts # Tạo/get phiên phỏng vấn, transcription
+│   │
+│   ├── evaluation/           # Đánh giá
+│   │   ├── index.ts
+│   │   └── evaluationService.ts # Lấy báo cáo đánh giá
+│   │
+│   └── schedule/             # Lịch phỏng vấn
+│       ├── index.ts
+│       └── scheduleService.ts # Availability slots
+│
+├── types/                     # TypeScript type definitions
+│   ├── index.ts             # Barrel exports
+│   │
+│   ├── auth/
+│   │   ├── index.ts
+│   │   └── auth.types.ts   # User, AuthTokens, LoginRequest, RegisterRequest
+│   │
+│   ├── job/
+│   │   ├── index.ts
+│   │   └── job.types.ts    # JobPosting, CreateJobPostingRequest, SalaryRange
+│   │
+│   ├── application/
+│   │   ├── index.ts
+│   │   └── application.types.ts # Application, ApplicationDetail
+│   │
+│   ├── interview/
+│   │   ├── index.ts
+│   │   └── interview.types.ts # InterviewRoomState, Signal, Candidate
+│   │
+│   ├── evaluation/
+│   │   ├── index.ts
+│   │   └── evaluation.types.ts # EvaluationReport, CriterionScore
+│   │
+│   └── organization/
+│       ├── index.ts
+│       └── organization.types.ts # Organization, Subscription
+│
+├── store/                     # Zustand state stores
+│   ├── index.ts
+│   │
+│   ├── auth/                # Auth state
+│   │   ├── index.ts
+│   │   └── authStore.ts    # User, tokens, login, logout, isAuthenticated
+│   │
+│   ├── application/         # Application state
+│   │   ├── index.ts
+│   │   └── applicationStore.ts # Applications list
+│   │
+│   └── interview/           # Interview room state
+│       ├── index.ts
+│       └── interviewStore.ts # Interview room signals, state
+│
+├── hooks/                    # Custom React hooks
+│   ├── index.ts
+│   │
+│   ├── interview/           # Interview room hooks
+│   │   ├── index.ts
+│   │   └── useInterviewRoom.ts # Business logic cho phòng phỏng vấn
+│   │
+│   └── cheat-detection/     # Anti-cheat hooks
+│       ├── index.ts
+│       └── useCheatDetection.ts # Phát hiện tab switch, eye tracking
+│
+└── utils/                    # Tiện ích
+    ├── index.ts
+    ├── devAuth.ts          # Dev mode authentication helpers
+    └── format/
+        ├── index.ts
+        └── format.ts       # Format ngày tháng, thời gian
 ```
 
 ---
 
-## Chi Tiết Từng Thành Phần
+## 3. Routing - Điều Hướng
 
-### 1. Components (`src/components/`)
+### 3.1 Route Paths
 
-#### Components Chung (`components/common/`)
-
-| Component | Mô Tả | Props |
-|-----------|-------|-------|
-| `ErrorAlert` | Hiển thị thông báo lỗi | `message`, `severity`, `onClose` |
-| `LoadingButton` | Button với trạng thái loading | `loading`, `children`, `...ButtonProps` |
-| `LoadingSpinner` | Spinner loading | `size`, `color` |
-
-#### Layouts (`components/layout/`)
-
-| Layout | Mô Tả | Sử Dụng Cho |
-|--------|-------|-------------|
-| `AuthLayout` | Layout cho trang đăng nhập | Trang auth |
-| `MainLayout` | Layout chính với sidebar | Trang dashboard, admin |
-| `InterviewLayout` | Layout cho phòng phỏng vấn | Trang phỏng vấn |
-
-### 2. Pages (`src/pages/`)
-
-#### Trang Admin (`pages/admin/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `DashboardPage` | `/admin` | Tổng quan dashboard HR |
-| `JobPostingsPage` | `/admin/jobs` | Danh sách tin tuyển dụng |
-| `CreateJobPostingPage` | `/admin/jobs/create` | Tạo tin tuyển dụng |
-| `JobPostingDetailPage` | `/admin/jobs/:id` | Chi tiết tin tuyển dụng |
-| `CandidatesPage` | `/admin/candidates` | Danh sách ứng viên |
-| `EvaluationReviewPage` | `/admin/evaluations` | Xem lại đánh giá |
-| `InterviewSessionsPage` | `/admin/interviews` | Quản lý buổi phỏng vấn |
-| `TeamPage` | `/admin/team` | Quản lý nhóm |
-| `PlaybooksPage` | `/admin/playbooks` | Quản lý playbook |
-| `SettingsPage` | `/admin/settings` | Cài đặt |
-
-#### Trang Candidate (`pages/candidate/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `DashboardPage` | `/candidate` | Dashboard ứng viên |
-| `MyApplicationsPage` | `/candidate/applications` | Đơn ứng tuyển của tôi |
-| `InterviewSchedulePage` | `/candidate/schedule` | Lịch phỏng vấn |
-| `FeedbackPage` | `/candidate/feedback` | Xem phản hồi |
-| `RecordingPage` | `/candidate/recordings` | Bản ghi phỏng vấn |
-
-#### Trang Interview (`pages/interview/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `InterviewRoomPage` | `/interview/:id` | Phòng phỏng vấn chính |
-| `PracticeSessionPage` | `/interview/practice` | Phiên luyện tập |
-
-#### Trang Job Board (`pages/job-board/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `JobBoardPage` | `/jobs` | Danh sách việc làm công khai |
-| `JobDetailPage` | `/jobs/:id` | Chi tiết việc làm |
-
-#### Trang Auth (`pages/auth/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `LoginPage` | `/login` | Trang đăng nhập |
-| `MagicLinkCallbackPage` | `/auth/callback` | Callback từ magic link |
-
-#### Trang Kiosk (`pages/kiosk/`)
-
-| Page | Route | Mô Tả |
-|------|-------|-------|
-| `KioskPage` | `/kiosk` | Giao diện kiosk tại quầy |
-
----
-
-## Routing - Điều Hướng
-
-### Cấu Hình Routes (trong `App.tsx`)
+Định nghĩa tại `routes/index.ts`:
 
 ```typescript
-// Public Routes
-/                     → Trang chủ
-/login                → LoginPage
-/jobs                 → JobBoardPage
-/jobs/:id             → JobDetailPage
-/kiosk                → KioskPage
+export const routes = {
+  // Public
+  home: '/',
+  login: '/dang-nhap',
+  register: '/dang-ky',
 
-// Protected Routes (Candidate)
-/candidate            → DashboardPage
-/candidate/applications → MyApplicationsPage
-/candidate/schedule   → InterviewSchedulePage
-/candidate/feedback    → FeedbackPage
-/candidate/recordings   → RecordingPage
+  // HR Admin
+  dashboard: '/quan-ly',
+  jobPostings: '/quan-ly/tin-tuyen-dung',
+  candidates: '/quan-ly/ung-vien',
+  evaluations: '/quan-ly/danh-gia',
+  reports: '/quan-ly/bao-cao',
 
-// Protected Routes (Interview Room)
-/interview/:id         → InterviewRoomPage
-/interview/practice    → PracticeSessionPage
+  // Candidate
+  candidateApply: '/ung-vien/ung-tuyen',
+  candidateInterview: '/ung-vien/phong-van',
+  candidatePortal: '/ung-vien/cong-cua',
 
-// Protected Routes (Admin - HR Role)
-/admin                → DashboardPage
-/admin/jobs           → JobPostingsPage
-/admin/jobs/create    → CreateJobPostingPage
-/admin/jobs/:id       → JobPostingDetailPage
-/admin/candidates      → CandidatesPage
-/admin/evaluations     → EvaluationReviewPage
-/admin/interviews      → InterviewSessionsPage
-/admin/team           → TeamPage
-/admin/playbooks       → PlaybooksPage
-/admin/settings        → SettingsPage
+  // Interview
+  interviewRoom: '/phong-van/:sessionId',
+  interviewKiosk: '/kiosk',
+} as const;
 ```
 
-### Protected Routes
+### 3.2 Tất Cả Routes trong App.tsx
 
-Routes được bảo vệ bằng `ProtectedRoute` component:
-- Kiểm tra authentication (auth state)
-- Kiểm tra authorization (role-based access)
-- Redirect về login nếu chưa đăng nhập
+| Route | Component | Layout | Mô tả |
+|---|---|---|---|
+| `/` | `FindJobPage` | - | Trang tìm việc |
+| `/nha-tuyen-dung` | `HomePage` | - | Landing page nhà tuyển dụng |
+| `/dang-nhap` | `LoginPage` | - | Đăng nhập nhà tuyển dụng |
+| `/dang-ky` | `RegisterPage` | - | Đăng ký nhà tuyển dụng |
+| `/dang-nhap-ung-vien` | `CandidateLoginPage` | - | Đăng nhập ứng viên |
+| `/dang-ky-ung-vien` | `CandidateRegisterPage` | - | Đăng ký ứng viên |
+| `/ung-vien` | `CandidateHome` | `CandidateLayout` | Trang chủ ứng viên |
+| `/ung-vien/ung-tuyen` | `CandidateApply` | - | Trang ứng tuyển |
+| `/ung-vien/phong-van` | `InterviewSchedulePage` | - | Lịch phỏng vấn |
+| `/ung-vien/cong-cua` | `PortalPage` | - | Cổng thông tin |
+| `/ung-vien/ket-qua` | `FeedbackPage` | - | Kết quả đánh giá |
+| `/quan-ly` | `DashboardPage` | `AdminLayout` | Dashboard admin |
+| `/quan-ly/tin-tuyen-dung` | `JobPostingsPage` | `AdminLayout` | Danh sách tin tuyển dụng |
+| `/quan-ly/tin-tuyen-dung/tao-moi` | `CreateJobPostingPage` | `AdminLayout` | Tạo tin tuyển dụng |
+| `/quan-ly/tin-tuyen-dung/:id` | `JobPostingDetailPage` | `AdminLayout` | Chi tiết tin |
+| `/quan-ly/ung-vien` | `CandidatesPage` | `AdminLayout` | Danh sách ứng viên |
+| `/quan-ly/ung-vien/:id` | `CandidateDetailPage` | `AdminLayout` | Chi tiết ứng viên |
+| `/quan-ly/danh-gia` | `EvaluationReviewPage` | `AdminLayout` | Duyệt đánh giá |
+| `/quan-ly/bao-cao` | `ReportsPage` | `AdminLayout` | Báo cáo |
+| `/quan-ly/cai-dat` | `SettingsPage` | `AdminLayout` | Cài đặt |
+| `/quan-ly/playbooks` | `PlaybooksPage` | `AdminLayout` | Kịch bản phỏng vấn |
+| `/quan-ly/nhom` | `TeamPage` | `AdminLayout` | Quản lý nhóm |
+| `/quan-ly/phong-van` | `InterviewSessionsPage` | `AdminLayout` | Phiên phỏng vấn |
+| `/interview/room/:sessionId` | `InterviewRoomPage` | `InterviewLayout` | Phòng phỏng vấn |
+| `/interview/practice/:applicationId` | `PracticeSessionPage` | `InterviewLayout` | Luyện tập |
+| `/kiosk` | `KioskPage` | `InterviewLayout` | Chế độ kiosk |
+| `/jobs/:id` | `JobDetailPage` | - | Chi tiết việc làm |
+| `*` | `NotFoundPage` | - | Trang 404 |
 
 ---
 
-## State Management - Quản Lý Trạng Thái
+## 4. Quản Lý Trạng Thái
 
-Sử dụng **Zustand** để quản lý state.
-
-### Auth Store (`store/auth/authStore.ts`)
+### 4.1 Auth Store (Zustand)
 
 ```typescript
+// store/auth/authStore.ts
 interface AuthState {
   user: User | null;
   tokens: AuthTokens | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-
-  // Actions
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
   setAuth: (user: User, tokens: AuthTokens) => void;
-  refreshToken: () => Promise<void>;
+  clearAuth: () => void;
 }
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  tokens: null,
+  isAuthenticated: false,
+  setAuth: (user, tokens) => set({ user, tokens, isAuthenticated: true }),
+  clearAuth: () => set({ user: null, tokens: null, isAuthenticated: false }),
+}));
 ```
 
-### Application Store (`store/application/applicationStore.ts`)
+Sử dụng: `const { user, isAuthenticated, setAuth, clearAuth } = useAuthStore()`
+
+### 4.2 Interview Store
 
 ```typescript
-interface ApplicationState {
-  applications: Application[];
-  currentApplication: Application | null;
-  filters: ApplicationFilters;
-
-  // Actions
-  fetchApplications: (filters?: ApplicationFilters) => Promise<void>;
-  getApplicationById: (id: string) => Promise<Application>;
-  createApplication: (data: CreateApplicationRequest) => Promise<Application>;
-  updateApplicationStatus: (id: string, status: ApplicationStatus) => Promise<void>;
-}
-```
-
-### Interview Store (`store/interview/interviewStore.ts`)
-
-```typescript
-interface InterviewState {
-  currentSession: InterviewSession | null;
-  recordingBlob: Blob | null;
-  cheatAlerts: CheatAlert[];
-
-  // Actions
-  startSession: (config: SessionConfig) => Promise<void>;
-  endSession: () => Promise<void>;
-  sendMessage: (message: string) => Promise<void>;
-  startRecording: () => Promise<void>;
-  stopRecording: () => Promise<void>;
-}
+// store/interview/interviewStore.ts
+// Quản lý signals, state của phòng phỏng vấn real-time
 ```
 
 ---
 
-## API Services - Dịch Vụ API
+## 5. Services - Giao Tiếp API
 
-### API Client (`services/apiClient.ts`)
-
-Axios instance với các tính năng:
-- Base URL từ environment
-- Request interceptor: Thêm JWT token
-- Response interceptor: Xử lý 401 (refresh token)
+### 5.1 API Client
 
 ```typescript
-// Usage
-import { apiClient } from '@services/apiClient';
-
-const response = await apiClient.get('/users');
+// services/apiClient.ts
+// Axios instance với:
+// - Base URL từ constants.ts
+// - Request interceptor: gắn auth token
+// - Response interceptor: xử lý 401, refresh token
 ```
 
-### Services
+### 5.2 Các Service Chính
 
-| Service | Mô Tả | Endpoints |
-|---------|-------|-----------|
-| `authService` | Xác thực người dùng | login, logout, refresh, magic-link |
-| `jobService` | Quản lý tin tuyển dụng | CRUD, publish, pause |
-| `applicationService` | Quản lý đơn ứng tuyển | CRUD, update status |
-| `interviewService` | Quản lý phỏng vấn | Sessions, messages, transcripts |
-| `evaluationService` | Đánh giá ứng viên | Create, get evaluations |
-| `scheduleService` | Quản lý lịch phỏng vấn | Slots, bookings |
-
-### Ví Dụ Sử Dụng Service
-
-```typescript
-import { jobService } from '@services/job';
-
-// Get all job postings
-const { items, total, page, pageSize, totalPages } = await jobService.getJobPostings({
-  status: 'active',
-  page: 1,
-  pageSize: 10
-});
-
-// Create new job
-const newJob = await jobService.createJobPosting({
-  title: 'Senior Developer',
-  description: '...',
-  requirements: ['5+ years experience'],
-  skills: ['React', 'TypeScript'],
-  location: 'Ho Chi Minh City',
-  interviewConfig: { ... }
-});
-```
+| Service | File | Các hàm chính |
+|---|---|---|
+| `authService` | `auth/authService.ts` | `login`, `register`, `refreshToken`, `logout` |
+| `jobService` | `job/jobService.ts` | `getJobPostings`, `createJobPosting`, `getPublicJobPostings` |
+| `applicationService` | `application/applicationService.ts` | `createApplication`, `getApplications` |
+| `interviewService` | `interview/interviewService.ts` | `createSession`, `getSession`, `transcribe` |
+| `evaluationService` | `evaluation/evaluationService.ts` | `getEvaluations`, `getMyEvaluations` |
+| `scheduleService` | `schedule/scheduleService.ts` | `getAvailabilitySlots` |
 
 ---
 
-## Types - Kiểu Dữ Liệu
+## 6. Types - Kiểu Dữ Liệu
 
-### Job Types (`types/job/`)
-
-```typescript
-interface JobPosting {
-  id: string;
-  organizationId: string;
-  title: string;
-  description: string;
-  requirements: string[];
-  skills: string[];
-  location: string;
-  salaryRange?: SalaryRange;
-  interviewConfig: InterviewConfig;
-  status: 'draft' | 'active' | 'paused' | 'closed';
-  createdAt: Date;
-  updatedAt: Date;
-  applicationCount: number;
-}
-
-interface InterviewConfig {
-  rounds: RoundConfig[];
-  interviewModes: ('Remote' | 'OnSite')[];
-  availabilitySlots?: AvailabilitySlot[];
-  languageRequirement?: LanguageRequirement;
-  scoringRubric?: ScoringRubric;
-  persona?: InterviewPersona;
-}
-
-interface InterviewPersona {
-  name: string;
-  gender: 'male' | 'female';
-  style: 'friendly' | 'professional' | 'strict';
-  voiceId?: string;
-}
-```
-
-### Auth Types (`types/auth/`)
-
-```typescript
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'admin' | 'hr' | 'candidate';
-  organizationId?: string;
-  avatar?: string;
-}
-
-interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
-```
-
-### Application Types (`types/application/`)
-
-```typescript
-interface Application {
-  id: string;
-  jobId: string;
-  candidateId: string;
-  status: 'pending' | 'screening' | 'interview' | 'offer' | 'rejected' | 'accepted';
-  resume: Resume;
-  coverLetter?: string;
-  appliedAt: Date;
-  updatedAt: Date;
-}
-```
-
-### Interview Types (`types/interview/`)
-
-```typescript
-interface InterviewSession {
-  id: string;
-  jobPostingId: string;
-  applicationId: string;
-  candidateId: string;
-  interviewerId?: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  currentRound: number;
-  messages: ChatMessage[];
-  startedAt?: Date;
-  endedAt?: Date;
-  evaluation?: Evaluation;
-}
-```
+| Module | File | Các interface chính |
+|---|---|---|
+| Auth | `auth/auth.types.ts` | `User`, `AuthTokens`, `LoginRequest`, `RegisterRequest` |
+| Job | `job/job.types.ts` | `JobPosting`, `CreateJobPostingRequest`, `SalaryRange` |
+| Application | `application/application.types.ts` | `Application`, `ApplicationDetail`, `ApplicationStatus` |
+| Interview | `interview/interview.types.ts` | `InterviewRoomState`, `Signal`, `Candidate`, `WebRTCSignal` |
+| Evaluation | `evaluation/evaluation.types.ts` | `EvaluationReport`, `CriterionScore` |
+| Organization | `organization/organization.types.ts` | `Organization`, `Subscription` |
 
 ---
 
-## Hooks Tùy Chỉnh
+## 7. Hooks Tùy Chỉnh
 
-### 1. useInterviewRoom (`hooks/interview/useInterviewRoom.ts`)
+### 7.1 `useInterviewRoom(sessionId: string)`
 
-Hook quản lý phòng phỏng vấn:
+Logic business cho phòng phỏng vấn: kết nối WebRTC, quản lý signals, transcription.
 
-```typescript
-const {
-  // State
-  isConnected,
-  messages,
-  currentRound,
-  isRecording,
-  error,
+### 7.2 `useCheatDetection(config: CheatDetectionConfig)`
 
-  // Actions
-  connect,
-  disconnect,
-  sendMessage,
-  startRecording,
-  stopRecording,
-  nextRound,
-} = useInterviewRoom(sessionId);
-```
-
-### 2. useRecording (`hooks/recording/useRecording.ts`)
-
-Hook ghi âm:
-
-```typescript
-const {
-  isRecording,
-  duration,
-  audioLevel,
-  startRecording,
-  stopRecording,
-  pauseRecording,
-  resumeRecording,
-  getAudioBlob,
-} = useRecording();
-```
-
-### 3. useCheatDetection (`hooks/cheat-detection/useCheatDetection.ts`)
-
-Hook phát hiện gian lận:
-
-```typescript
-const {
-  alerts,
-  isMonitoring,
-  startMonitoring,
-  stopMonitoring,
-  clearAlerts,
-} = useCheatDetection({
-  onCheatDetected: (alert) => {
-    console.log('Cheat detected:', alert.type);
-  },
-});
-```
+Phát hiện gian lận:
+- Theo dõi tab switch / window blur
+- Eye tracking (nếu có camera permission)
+- Cảnh báo khi phát hiện hành vi bất thường
 
 ---
 
-## Utils - Tiện Ích
+## 8. Utils - Tiện Ích
 
-### Validation Schemas (`utils/validation/schemas.ts`)
-
-Sử dụng **Zod** để validate dữ liệu:
-
-```typescript
-import { loginSchema, jobPostingSchema, applicationSchema } from '@utils/validation';
-
-// Validate login form
-const result = loginSchema.safeParse(formData);
-if (!result.success) {
-  // Handle validation error
-}
-
-// Validate job posting
-const jobResult = jobPostingSchema.safeParse(jobData);
-```
-
-### Format Utils (`utils/format/format.ts`)
-
-```typescript
-import { formatDate, formatCurrency, formatDuration } from '@utils/format';
-
-formatDate(new Date(), 'DD/MM/YYYY');     // "26/05/2026"
-formatCurrency(1000000, 'VND');           // "1.000.000 VND"
-formatDuration(3665);                      // "1h 1m 5s"
-```
-
-### Audio Utils (`utils/audio/audio.ts`)
-
-```typescript
-import { AudioProcessor } from '@utils/audio';
-
-// Process audio from microphone
-const processor = new AudioProcessor();
-processor.start();
-processor.getVolumeLevel();  // 0-1
-processor.stop();
-```
+| File | Mô tả |
+|---|---|
+| `utils/devAuth.ts` | Helpers cho dev mode: `getDevAuth()`, `isDevMode` - tự động đăng nhập khi `VITE_DEV_AUTH=true` |
+| `utils/format/format.ts` | Format ngày tháng: `formatDate()`, `formatTime()`, `formatDateTime()` |
+| `config/constants.ts` | Hằng số: `API_BASE_URL`, `ROLES`, `INTERVIEW_MODES`, `DEFAULT_PAGINATION` |
 
 ---
 
-## Cài Đặt và Chạy
+## 9. Cài Đặt và Chạy
 
-### Yêu Cầu
+### 9.1 Yêu Cầu
 
-- Node.js >= 18.x
-- npm >= 9.x hoặc yarn >= 1.x
+- Node.js 18+
+- npm 9+
 
-### Các Bước
+### 9.2 Cài Đặt
 
 ```bash
-# 1. Di chuyển vào thư mục frontend
 cd frontend
-
-# 2. Cài đặt dependencies
 npm install
-
-# 3. Tạo file .env từ .env.example
-cp .env.example .env
-
-# 4. Chỉnh sửa .env với API URL của bạn
-# VITE_API_BASE_URL=http://localhost:8080/api
-
-# 5. Chạy development server
-npm run dev
-
-# 6. Build cho production
-npm run build
-
-# 7. Preview production build
-npm run preview
 ```
 
-### Scripts Có Sẵn
+### 9.3 Chạy Development Server
 
-| Script | Mô Tả |
-|--------|-------|
-| `npm run dev` | Chạy development server |
-| `npm run build` | Build production |
-| `npm run preview` | Preview production build |
-| `npm run lint` | Chạy ESLint |
-| `npm run lint:fix` | Tự động fix lint errors |
-| `npm run format` | Format code với Prettier |
+```bash
+npm run dev
+```
 
-### Environment Variables
+Ứng dụng sẽ chạy tại `http://localhost:5173`
+
+### 9.4 Build Production
+
+```bash
+npm run build
+```
+
+Output sẽ nằm trong thư mục `dist/`
+
+### 9.5 Biến Môi Trường
+
+Tạo file `.env` trong thư mục `frontend/`:
 
 ```env
-# .env
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_APP_NAME=ARISP
-VITE_APP_ENV=development
+VITE_API_URL=http://localhost:8080/api
+VITE_WS_URL=ws://localhost:8080/ws
+VITE_DEV_AUTH=false
 ```
 
----
+### 9.6 Dev Mode Auth
 
-## Quy Ước Đặt Tên
+Để tự động đăng nhập dev, set trong `.env`:
 
-### Files
+```env
+VITE_DEV_AUTH=true
+```
 
-- Components: `PascalCase.tsx` (VD: `JobPostingCard.tsx`)
-- Services: `camelCase.ts` (VD: `jobService.ts`)
-- Hooks: `camelCase.ts` (VD: `useInterviewRoom.ts`)
-- Utils: `camelCase.ts` (VD: `formatDate.ts`)
-- Types: `kebab-case.types.ts` (VD: `job.types.ts`)
-
-### Folders
-
-- Tất cả folders sử dụng `kebab-case`: `job-postings`, `my-applications`
-- Index files cho exports: `index.ts`
-
-### Imports
-
-- Sử dụng alias path: `@/components/...`, `@/services/...`, `@/types/...`
-- Relative imports cho cùng folder: `./Button`
+Điều này sẽ tự động load user và tokens từ `devAuth.ts` khi khởi động app.
 
 ---
 
-## Next Steps - Bước Tiếp Theo
+## 10. Ghi Chú Quan Trọng
 
-1. **Cài backend** - Triển khai backend API tương ứng
-2. **Hoàn thiện components** - Các folders trống cần được implement
-3. **Contexts** - Thêm AuthProvider, ThemeProvider
-4. **Testing** - Thêm unit tests và integration tests
-5. **CI/CD** - Cấu hình GitHub Actions
+### 10.1 MUI vs Tailwind
 
----
+Dự án sử dụng **chủ yếu Tailwind CSS** cho styling. MUI (Material UI) chỉ được dùng cho một số components cụ thể trong `interview/` và `components/common/`. Cần thống nhất để tránh conflict CSS.
 
-## Liên Hệ / Hỗ Trợ
+### 10.2 AuthLayout
 
-Nếu có câu hỏi về dự án, vui lòng refer documentation hoặc liên hệ team development.
+`AuthLayout` được định nghĩa trong codebase nhưng hiện tại **không được sử dụng** trong routes. Các trang auth (`LoginPage`, `RegisterPage`) được render trực tiếp mà không qua layout wrapper.
+
+### 10.3 API Base URL
+
+Backend API được cấu hình trong `config/constants.ts`. Đảm bảo backend chạy và URL chính xác trong file `.env`.
+
+### 10.4 WebSocket
+
+Tính năng real-time (phỏng vấn AI) sử dụng WebSocket cho transcription và signals. Cần cấu hình `VITE_WS_URL` đúng.

@@ -1,5 +1,5 @@
 import { apiClient } from '../apiClient';
-import type { AvailabilitySlot } from '@types/job';
+import type { AvailabilitySlot } from '../../types/job';
 
 interface SlotFilters {
   jobPostingId: string;

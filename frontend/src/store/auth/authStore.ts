@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, AuthTokens } from '@types/auth';
+import type { User, AuthTokens } from '../../types/auth';
 
 interface AuthState {
   user: User | null;
@@ -11,6 +11,7 @@ interface AuthState {
   updateUser: (user: Partial<User>) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
+  login: (user: User, tokens: AuthTokens) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -43,6 +44,8 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setLoading: (loading) => set({ isLoading: loading }),
+      
+      login: (user, tokens) => set({ user, tokens, isAuthenticated: true, isLoading: false }),
     }),
     {
       name: 'arisp-auth',
