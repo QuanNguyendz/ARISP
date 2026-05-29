@@ -11,7 +11,10 @@ using ARISP.Domain.Entities;
 using ARISP.Infrastructure.Data;
 using ARISP.Infrastructure.Repositories;
 using ARISP.Infrastructure.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -96,12 +99,13 @@ builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
 
-// Configure JWT Authentication
+// Configure JWT Authentication and external SSO
 var jwtSecret = builder.Configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
+
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
@@ -116,6 +120,40 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
         RoleClaimType = ClaimTypes.Role // Explicitly map role claim
     };
+})
+// External cookie to receive external provider claims
+.AddCookie("External", options =>
+{
+    options.Cookie.Name = "ARISP.External";
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+})
+// Google OAuth2 (used for HR internal SSO)
+.AddGoogle("Google", options =>
+{
+    options.SignInScheme = "External";
+
+    var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+    var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+
+    // 🛡️ Nếu trống, gán chuỗi Mock để tránh crash pipeline khi chạy Local/Swagger
+    options.ClientId = string.IsNullOrEmpty(googleClientId) ? "MOCK_GOOGLE_CLIENT_ID_FOR_LOCAL" : googleClientId;
+    options.ClientSecret = string.IsNullOrEmpty(googleSecret) ? "MOCK_GOOGLE_SECRET_FOR_LOCAL" : googleSecret;
+})
+// Azure AD / Microsoft Entra (OpenID Connect)
+.AddOpenIdConnect("AzureAD", options =>
+{
+    options.SignInScheme = "External";
+
+    var azureAuthority = builder.Configuration["Authentication:AzureAd:Authority"] ?? Environment.GetEnvironmentVariable("AZURE_AD_AUTHORITY");
+    var azureClientId = builder.Configuration["Authentication:AzureAd:ClientId"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
+    var azureSecret = builder.Configuration["Authentication:AzureAd:ClientSecret"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");
+
+    options.Authority = string.IsNullOrEmpty(azureAuthority) ? "https://login.microsoftonline.com/common/v2.0" : azureAuthority;
+    options.ClientId = string.IsNullOrEmpty(azureClientId) ? "00000000-0000-0000-0000-000000000000" : azureClientId;
+    options.ClientSecret = string.IsNullOrEmpty(azureSecret) ? "MOCK_AZURE_SECRET_FOR_LOCAL" : azureSecret;
+
+    options.ResponseType = "code";
+    options.SaveTokens = true;
 });
 
 builder.Services.AddAuthorization(options =>
@@ -188,7 +226,7 @@ async Task SeedDataAsync(ARISPDbContext db)
     Console.WriteLine("Seeding ARISP prototype databases...");
 
     var orgId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    var userId = Guid.Parse("22222222-2222-2222-2222-222222222223");
+    var userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     var jobId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     var candidateId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     var appId = Guid.Parse("55555555-5555-5555-5555-555555555555");
@@ -217,7 +255,7 @@ async Task SeedDataAsync(ARISPDbContext db)
         {
             Id = userId,
             OrganizationId = orgId,
-            Email = "hradmin@arisp.com",
+            Email = "hr@arisp.com",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             Role = AppRoles.HrAdmin,
             FullName = "Alex HR Admin",

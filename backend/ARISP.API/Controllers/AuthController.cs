@@ -14,6 +14,7 @@ using ARISP.Application.Interfaces;
 using ARISP.Domain.Entities;
 using ARISP.Domain.Constants;
 using ARISP.Infrastructure.Data;
+using Microsoft.AspNetCore.Authentication;
 
 namespace ARISP.API.Controllers
 {
@@ -32,61 +33,175 @@ namespace ARISP.API.Controllers
             _dbContext = dbContext;
         }
 
-        [HttpPost("login")]
+        /// <summary>
+        /// CỔNG ĐĂNG NHẬP 1: DÀNH RIÊNG CHO ỨNG VIÊN (Candidate - Tại /jobs/login)
+        /// Xác thực truyền thống qua form điền Email + Mật khẩu cá nhân
+        /// </summary>
+        [HttpPost("candidate/login")]
         [AllowAnonymous]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> CandidateLogin([FromBody] LoginRequest request)
         {
-            // 1. Thử tìm trong bảng Users trước (HR, Recruiter, Admin)
-            var user = await _dbContext.Users
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
-
-            if (user != null)
-            {
-                bool isValidPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-
-                if (!isValidPassword)
-                    return Unauthorized(new { message = "Invalid email or password." });
-
-                var token = GenerateJwtTokenForUser(user);
-                return Ok(new AuthResponse
-                {
-                    AccessToken = token,
-                    RefreshToken = Guid.NewGuid().ToString("N"),
-                    FullName = user.FullName ?? "HR Recruiter",
-                    Role = user.Role,
-                    OrganizationId = user.OrganizationId
-                });
-            }
-
-            // 2. Nếu không có ở bảng Users, thử tìm trong bảng CandidateAccounts
+            // 🛡️ ĐÃ SỬA: Bảo mật biệt lập cổng, không quét thông tin vào bảng Users nội bộ nữa
             var candidate = await _dbContext.CandidateAccounts
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(c => c.Email == request.Email);
 
-            if (candidate != null)
+            if (candidate == null)
+                return Unauthorized(new { message = "Invalid email or password." });
+
+            bool isValidCandidatePass = BCrypt.Net.BCrypt.Verify(request.Password, candidate.PasswordHash);
+            if (!isValidCandidatePass)
+                return Unauthorized(new { message = "Invalid email or password." });
+
+            var token = GenerateJwtTokenForCandidate(candidate);
+            return Ok(new AuthResponse
             {
-                bool isValidCandidatePass = BCrypt.Net.BCrypt.Verify(request.Password, candidate.PasswordHash);
-
-                if (!isValidCandidatePass)
-                    return Unauthorized(new { message = "Invalid email or password." });
-
-                // Sinh token dành riêng cho Candidate
-                var token = GenerateJwtTokenForCandidate(candidate);
-                return Ok(new AuthResponse
-                {
-                    AccessToken = token,
-                    RefreshToken = Guid.NewGuid().ToString("N"),
-                    FullName = candidate.FullName ?? "Candidate",
-                    Role = AppRoles.Candidate,
-                    OrganizationId = Guid.Empty // Candidate không thuộc tổ chức nội bộ nào cố định ban đầu
-                });
-            }
-
-            // 3. Không tìm thấy ở cả 2 bảng
-            return Unauthorized(new { message = "Invalid email or password." });
+                AccessToken = token,
+                RefreshToken = Guid.NewGuid().ToString("N"),
+                FullName = candidate.FullName ?? "Candidate",
+                Role = AppRoles.Candidate,
+                OrganizationId = Guid.Empty
+            });
         }
 
+        /// <summary>
+        /// CỔNG ĐĂNG NHẬP 2: ĐIỀU HƯỚNG CHALLENGE OAUTH2 (Dành cho nội bộ Super Admin, HR Leader, Recruiter)
+        /// </summary>
+        [HttpGet("external/signin")]
+        [AllowAnonymous]
+        public IActionResult ExternalSignIn([FromQuery] string provider = "Google", [FromQuery] string returnUrl = "/")
+        {
+            if (string.IsNullOrEmpty(provider)) provider = "Google";
+
+            var props = new AuthenticationProperties
+            {
+                RedirectUri = Url.Action("ExternalCallback", new { provider, returnUrl })
+            };
+
+            return Challenge(props, provider);
+        }
+
+        /// <summary>
+        /// CỔNG ĐĂNG NHẬP 2 (CALLBACK): TIẾP NHẬN DỮ LIỆU ĐĂNG NHẬP OAUTH2 VÀ XỬ LÝ JIT PROVISIONING
+        /// </summary>
+        [HttpGet("external/callback")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ExternalCallback([FromQuery] string provider = "Google", [FromQuery] string returnUrl = "/")
+        {
+            var result = await HttpContext.AuthenticateAsync("External");
+            if (result?.Succeeded != true)
+            {
+                return BadRequest(new { message = "External authentication failed." });
+            }
+
+            var externalPrincipal = result.Principal;
+            var email = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email || c.Type == "email")?.Value;
+            var name = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name || c.Type == "name")?.Value;
+
+            if (string.IsNullOrEmpty(email))
+            {
+                await HttpContext.SignOutAsync("External");
+                return BadRequest(new { message = "External provider did not return an email." });
+            }
+
+            var allowed = _configuration["Authentication:AllowedDomains"] ?? _configuration["Auth:AllowedDomains"] ?? string.Empty;
+            var allowedDomains = allowed.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
+            var emailDomain = email.Split('@').ElementAtOrDefault(1)?.ToLower() ?? string.Empty;
+
+            var isDomainAllowed = !allowedDomains.Any() || allowedDomains.Contains(emailDomain);
+            if (!isDomainAllowed)
+            {
+                await HttpContext.SignOutAsync("External");
+                return Forbid();
+            }
+
+            // Tìm nhân viên trong bảng nội bộ
+            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user != null)
+            {
+                // Nếu tài khoản bị khóa hoặc đang ở trạng thái chờ duyệt (Pending)
+                if (!user.IsActive || user.Role == "Pending")
+                {
+                    await HttpContext.SignOutAsync("External");
+                    var pendingUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "pending_approval") });
+                    return Redirect(pendingUrl);
+                }
+
+                var token = GenerateJwtTokenForUser(user);
+                await HttpContext.SignOutAsync("External");
+
+                var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(token)}&role={Uri.EscapeDataString(user.Role)}");
+                return Redirect(redirectUrl);
+            }
+
+            // 🚀 ĐÃ SỬA LUỒNG JIT PROVISIONING: Khởi tạo User mới ở trạng thái chờ duyệt hoàn toàn
+            Guid orgId;
+            var cfgOrg = _configuration["Authentication:DefaultOrganizationId"] ?? _configuration["Auth:DefaultOrganizationId"];
+            if (!Guid.TryParse(cfgOrg, out orgId))
+            {
+                var firstOrg = await _dbContext.Organizations.FirstOrDefaultAsync();
+                orgId = firstOrg?.Id ?? Guid.Empty;
+            }
+
+            var newUser = new User
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = orgId == Guid.Empty ? Guid.NewGuid() : orgId,
+                Email = email,
+                PasswordHash = "password", // Đánh dấu tài khoản SSO
+                Role = "Pending", // 🛡️ ĐÃ SỬA: Để trống vai trò thực tế, gán nhãn Chờ duyệt để Super Admin vào cấp quyền chuẩn sau
+                FullName = name,
+                Department = null,
+                IsActive = false // Chờ SuperAdmin kích hoạt mới được cấp quyền truy cập
+            };
+
+            await _dbContext.Users.AddAsync(newUser);
+            await _dbContext.SaveChangesAsync();
+
+            await HttpContext.SignOutAsync("External");
+            var createdPendingUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "created_pending") });
+            return Redirect(createdPendingUrl);
+        }
+
+        private string BuildRedirectUrl(string returnUrl, (string, string)[] queryPairs = null, string fragment = null)
+        {
+            var adminFrontend = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? string.Empty;
+
+            string target = returnUrl;
+            if (string.IsNullOrEmpty(target)) target = "/";
+
+            bool isLocal = Url.IsLocalUrl(target);
+            bool allowedExternal = false;
+            if (!string.IsNullOrEmpty(adminFrontend) && !string.IsNullOrEmpty(target))
+            {
+                allowedExternal = target.StartsWith(adminFrontend, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (!isLocal && !allowedExternal)
+            {
+                target = !string.IsNullOrEmpty(adminFrontend) ? adminFrontend : "/admin";
+            }
+
+            if (queryPairs != null && queryPairs.Length > 0)
+            {
+                var separator = target.Contains("?") ? "&" : "?";
+                var qs = string.Join("&", queryPairs.Select(p => $"{Uri.EscapeDataString(p.Item1)}={Uri.EscapeDataString(p.Item2)}"));
+                target = target + separator + qs;
+            }
+
+            if (!string.IsNullOrEmpty(fragment))
+            {
+                if (fragment.StartsWith("#")) fragment = fragment.Substring(1);
+                target = target + "#" + fragment;
+            }
+
+            return target;
+        }
+
+        /// <summary>
+        /// ĐĂNG KÝ TỰ DO DÀNH CHO ỨNG VIÊN (Candidate)
+        /// </summary>
         [HttpPost("candidate/register")]
         [AllowAnonymous]
         public async Task<IActionResult> RegisterCandidate([FromBody] CandidateRegisterRequest request)
@@ -112,6 +227,9 @@ namespace ARISP.API.Controllers
             return Ok(new { message = "Candidate registered successfully." });
         }
 
+        /// <summary>
+        /// CỔNG ĐĂNG NHẬP 3: XÁC THỰC PASSWORDLESS CHO CANDIDATE PORTAL QUA MAGIC LINK
+        /// </summary>
         [HttpGet("magic-link/verify")]
         [AllowAnonymous]
         public async Task<IActionResult> VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
@@ -119,18 +237,13 @@ namespace ARISP.API.Controllers
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
                 return BadRequest(new { message = "Invalid token or email." });
 
-            // tìm kiếm Candidate thực tế trong DB để lấy ID cấp Token chuẩn
             var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email == email);
             var candidate = candidates.FirstOrDefault();
 
             if (candidate == null)
-            {
                 return NotFound(new { message = "Candidate account not found." });
-            }
 
-            // sinh JWT Token riêng cho Candidate, không phụ thuộc token query (giả định đã được xác thực qua email)
             var candidateToken = GenerateJwtTokenForCandidate(candidate);
-
             return Ok(new
             {
                 message = "Magic link authenticated successfully.",
@@ -138,21 +251,28 @@ namespace ARISP.API.Controllers
             });
         }
 
-        // hàm sinh token cho User (super_admin, hr_admin, recruiter) với các claim cần thiết để phân quyền và xác thực sau này
         private string GenerateJwtTokenForUser(User user)
         {
+            // 🛡️ ĐÃ SỬA: Map quyền chuẩn hóa an toàn dựa theo dữ liệu thực tế từ AppRoles
+            var roleClaimValue = user.Role switch
+            {
+                "super_admin" => AppRoles.SuperAdmin,
+                "hr_admin" => AppRoles.HrAdmin,
+                "recruiter" => AppRoles.Recruiter,
+                _ => user.Role
+            };
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role), // role: super_admin / hr_admin / recruiter
+                new Claim(ClaimTypes.Role, roleClaimValue),
                 new Claim("organization_id", user.OrganizationId.ToString())
             };
 
             return CreateTokenString(claims);
         }
 
-        // hàm sinh token riêng cho Ứng viên (Candidate)
         private string GenerateJwtTokenForCandidate(CandidateAccount candidate)
         {
             var claims = new[]
@@ -165,7 +285,6 @@ namespace ARISP.API.Controllers
             return CreateTokenString(claims);
         }
 
-        // Hàm lõi tạo chuỗi mã hóa Token (Tránh lặp code)
         private string CreateTokenString(Claim[] claims)
         {
             var keyStr = _configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
