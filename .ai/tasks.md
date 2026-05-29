@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-30
 
 ---
 
@@ -26,7 +26,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Tạo GitHub repository (private, tên `ARISP`)
 - [ ] Thêm toàn bộ thành viên vào repo với quyền phù hợp (Admin / Write)
 - [ ] Thiết lập **branch strategy:**
-  - `main` – production-ready, chỉ merge qua PR được review
+  - `main` – production-ready, chỉ merge qua Pull Request được review
   - `develop` – integration branch, merge từ các feature branch
   - `feature/<tên-feature>` – ví dụ: `feature/auth-jwt`
   - `fix/<mô-tả-lỗi>` – ví dụ: `fix/jwt-refresh-token-expiry`
@@ -51,24 +51,24 @@ _Chưa có task nào đang thực hiện._
 - [ ] Setup Docker + docker-compose (backend, frontend, postgres, redis)
 - [ ] Setup Nginx config cơ bản
 
-### Phase 1 – Auth & Multi-tenant
-- [ ] Database schema: `organizations`, `users`, `roles`, `refresh_tokens`
-- [ ] EF Core migrations
-- [ ] Đăng ký / Đăng nhập endpoint (HR Admin + SuperAdmin)
-- [ ] JWT issue + refresh token
-- [ ] Role-based authorization middleware (`SuperAdmin`, `HRAdmin`, `Candidate`)
-- [ ] Multi-tenant isolation: mọi query filter theo `organization_id`
+### Phase 1 – Global Settings & Auth Setup
+- [ ] Database schema: `users`, `refresh_tokens`, `system_settings` (Không dùng `organizations` và `subscriptions`)
+- [ ] EF Core migrations (loại bỏ IMultiTenant và các cột organization_id)
+- [ ] Đăng ký / Đăng nhập endpoint (HR Admin + Recruiter + Super Admin)
+- [ ] JWT issue + refresh token (không chứa organization_id claim)
+- [ ] Role-based authorization middleware cụ thể cho 4 role (`SuperAdmin`, `HRAdmin`, `Recruiter`, `Candidate`)
 - [ ] Magic link auth cho Candidate Portal (email + one-time token, TTL 15 phút)
-- [ ] SSO foundation: SAML 2.0 + OpenID Connect (Google Workspace, Microsoft Entra)
+- [ ] **OAuth2 & Domain Validation:** Tích hợp Google OAuth2 / Microsoft Entra ID cho HR Users
+- [ ] **OAuth2 & Domain Validation:** Viết middleware validate email domain đăng nhập từ Google/Microsoft thuộc danh sách `allowed_email_domains` lưu trong bảng `system_settings`
 
 ### Phase 2 – Job Posting & Application
 - [ ] Database schema: `job_postings`, `interview_round_configs`, `applications`
 - [ ] EF Core migrations
-- [ ] HR Admin: CRUD Job Posting
+- [ ] HR Admin / Recruiter: CRUD Job Posting
   - [ ] Thông tin cơ bản (tên vị trí, lĩnh vực, JD)
   - [ ] Cấu hình multi-round: số vòng, loại vòng (Screening/Technical), ngôn ngữ
-  - [ ] Interview Mode: Remote / On-site / Cả hai
-  - [ ] Availability Slots (Remote): danh sách khung giờ, capacity, timezone
+  - [ ] Availability Slots (Practice): danh sách khung giờ, capacity cho phỏng vấn thử
+  - [ ] Phỏng vấn thật: Bắt buộc On-site (Tại công ty) - Trường `interview_mode` mặc định là `'onsite'`
   - [ ] Scoring Rubric (optional): custom tiêu chí đánh giá
   - [ ] Interview Persona (optional): tên, giọng avatar AI
 - [ ] Language detection khi tạo Job Posting: `LanguageDetectionService` gọi AI phân tích JD
@@ -84,24 +84,28 @@ _Chưa có task nào đang thực hiện._
 - [ ] Candidate: tìm kiếm Job Posting IT (keyword, level, salary range, location)
 - [ ] Candidate: xem Job Detail (tên công ty, JD, yêu cầu hiển thị công khai)
 - [ ] Candidate: self-apply → submit CV + thông tin cá nhân → tạo `Application`
-- [ ] HR Admin: xem danh sách ứng viên tự ứng tuyển qua Job Board (kèm CV)
-- [ ] HR Admin: gửi magic link thủ công cho ứng viên sau khi review CV
+- [ ] HR Admin / Recruiter: xem danh sách ứng viên tự ứng tuyển qua Job Board (kèm CV)
+- [ ] HR Admin / Recruiter: gửi magic link thủ công cho ứng viên sau khi review CV
 - [ ] Magic link screen: xác nhận vị trí ứng tuyển → chọn Phỏng vấn thử / Phỏng vấn thực
 - [ ] **Practice Interview:**
   - [ ] `ApplicationService`: check eligibility (`practice_session_used` flag per application)
   - [ ] Practice Session: `session_type = practice`, interview flow dùng JD + CV only (không load Playbook)
   - [ ] Practice Session: Evaluation Report riêng, HR xem được, không ảnh hưởng verdict
   - [ ] Disable nút "Phỏng vấn thử" sau khi đã dùng 1 lần
-- [ ] Real Session: chỉ mở khi đúng slot Candidate đã booking
 
-### Phase 3 – Scheduling & Interview Code
+### Phase 2c – Online Test (Multiple Choice Quiz)
+- [ ] Database schema: `online_test_questions`, `online_test_submissions`
+- [ ] EF Core migrations
+- [ ] HR Admin / Recruiter: CRUD câu hỏi trắc nghiệm per Job Posting
+- [ ] Candidate: Thực hiện làm bài trắc nghiệm trên Candidate Portal (Giao diện web trắc nghiệm)
+- [ ] Backend: Tự động chấm điểm (Auto-scoring) sau khi nộp bài và so khớp đạt/không đạt dựa trên điểm sàn
+- [ ] Auto-progression: Nếu ứng viên đạt trắc nghiệm -> Cho phép HR tạo Interview Code cho vòng phỏng vấn tiếp theo
+
+### Phase 3 – Scheduling (Practice) & Interview Code
 - [ ] Database schema: `availability_slots`, `interview_bookings`, `interview_codes`
 - [ ] EF Core migrations
-- [ ] **Remote:** Candidate chọn slot → booking → xác nhận email + link phỏng vấn
-- [ ] **Remote:** Capacity management (slot hết → disabled)
-- [ ] **Remote:** Reminder email 24h và 1h trước giờ phỏng vấn
-- [ ] **Remote:** Reschedule trong thời hạn cho phép
-- [ ] **On-site:** HR generate Interview Code (format `ARX-7K2P`, 6–8 ký tự alphanumeric)
+- [ ] **Practice (Remote):** Candidate chọn slot → booking → nhận nhắc nhở 24h/1h
+- [ ] HR generate Interview Code (format `ARX-7K2P`, 6–8 ký tự alphanumeric) cho thi thật
   - [ ] One-time-use: vô hiệu hóa sau khi dùng
   - [ ] TTL: mặc định 2 giờ, cấu hình per Job Posting
   - [ ] Bind với `application_id` cụ thể
@@ -112,8 +116,8 @@ _Chưa có task nào đang thực hiện._
 ### Phase 4 – AI Interview Core
 - [ ] Database schema: `interview_sessions`, `questions`, `answers`, `document_chunks`
 - [ ] Bật pgvector extension trên PostgreSQL
-- [ ] `IEmbeddingProvider` interface + `OpenAIEmbeddingProvider` impl (`text-embedding-3-small`)
-- [ ] `RagService`: chunk JD/CV, embed, lưu pgvector, retrieve context khi sinh câu hỏi
+- [ ] `IEmbeddingProvider` interface + `OpenAIEmbeddingProvider` impl (`text-embedding-3-small` - gỡ bỏ organization_id)
+- [ ] `RagService`: chunk JD/CV, embed, lưu pgvector, retrieve context khi sinh câu hỏi (không lọc theo organization_id)
 - [ ] `IAIProvider` interface + `OpenAIProvider` impl (GPT-4o streaming)
 - [ ] AI question generation với RAG context + adaptive difficulty
 - [ ] Interview session flow: start → question loop → adaptive difficulty → end
@@ -123,43 +127,42 @@ _Chưa có task nào đang thực hiện._
 - [ ] Điều kiện dừng: AI tự dừng khi khai thác hết context JD + CV
 - [ ] **Session Type – phân biệt `practice` vs `real`:**
   - [ ] `practice`: chỉ retrieve JD + CV chunks, không load Playbook, gated bởi eligibility check
-  - [ ] `real`: retrieve JD + CV + Playbook chunks (full RAG pipeline), mở đúng slot đã đặt
+  - [ ] `real`: retrieve JD + CV + Playbook chunks (full RAG pipeline), yêu cầu nhập Interview Code tại Kiosk.
 
 ### Phase 4b – Interview Playbook (Org Knowledge Base)
-- [ ] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round, type: style/competency/question_bank/...)
+- [ ] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round, type: style/competency/question_bank/... - không dùng organization_id)
 - [ ] EF Core migrations
 - [ ] Document upload endpoint (PDF, DOCX, TXT, Markdown, JSON)
 - [ ] `DocumentParserService`: extract text từ PDF/DOCX
-- [ ] `PlaybookService`: chunk, embed (qua `IEmbeddingProvider`), lưu vào pgvector với scope tag
+- [ ] `PlaybookService`: chunk, embed (qua `IEmbeddingProvider`), lưu vào pgvector với scope tag (không lây lẫn giữa các job/round)
 - [ ] `PlaybookService`: track must-ask questions đã hỏi trong session
 - [ ] `InterviewService`: nhận signal must-ask chưa xong trước khi kết thúc session
 - [ ] `RagService`: cập nhật retrieve logic – merge JD/CV chunks + Playbook chunks theo weighted scope
-- [ ] HR Admin UI: quản lý Playbook documents (upload, preview, xóa) per Org/Job Posting/Round
+- [ ] HR Admin UI: quản lý Playbook documents (upload, preview, xóa) per Job Posting/Round
 - [ ] Validation: file size limit, format check, virus scan (optional)
 
 ### Phase 5 – Multi-round & Auto-progression
 - [ ] Database schema: `interview_rounds`, `round_evaluations`
 - [ ] Multi-round config: HR cấu hình danh sách vòng per Job Posting
 - [ ] `InterviewService` hỗ trợ `round_number` và `round_type` per session
-- [ ] Auto-progression: sau HR confirm Pass Round N → tự động invite Round N+1
-  - [ ] Remote: tạo booking slot mới cho Round 2
-  - [ ] On-site: HR generate Interview Code mới cho Round 2
+- [ ] Auto-progression: sau HR Leader duyệt Pass Round N → lưu kết quả
+  - [ ] On-site: Recruiter hẹn lịch offline và generate Interview Code mới cho Round N+1 khi ứng viên đến công ty.
 - [ ] Email notification cho Candidate khi được invite Round tiếp theo
 
 ### Phase 6 – AI Evaluation & HR Review
-- [ ] Database schema: `evaluations`, `language_assessments`, `hr_reviews`, `audit_logs`
+- [ ] Database schema: `evaluations`, `language_assessments`, `hr_reviews`, `audit_logs` (loại bỏ organization_id)
 - [ ] AI Evaluation sau mỗi Round: Verdict + Score + Reasoning
 - [ ] **Language Assessment** (Round 1, nếu có language requirement):
   - [ ] `IAIProvider.AssessLanguageProficiencyAsync()`: fluency, grammar, vocabulary, comprehension
   - [ ] Đưa vào Evaluation Report như criterion riêng
 - [ ] Evaluation Report: per-question analysis + recommended next step
-- [ ] HR Dashboard:
+- [ ] HR Dashboard (Phân quyền rõ ràng cho 3 role: SuperAdmin, HR Leader, Recruiter):
   - [ ] Danh sách Application per Job Posting (filter, sort)
   - [ ] Xem Evaluation Report + recording per Application per Round
-  - [ ] Confirm / Override verdict (Override bắt buộc có `override_reason`)
+  - [ ] Confirm / Override verdict (HR Leader có quyền duyệt, Recruiter chỉ có quyền xem)
 - [ ] `AuditLogService`: ghi lại mọi Confirm/Override với timestamp + HR user + reason
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
-- [ ] Email kết quả cho Candidate sau khi HR confirm
+- [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
 
 ### Phase 7 – Media & Realtime
 - [ ] Frontend: VAD (Voice Activity Detection) – detect near-end-of-speech, trigger early RAG
@@ -193,32 +196,28 @@ _Chưa có task nào đang thực hiện._
   - [ ] Transcript
   - [ ] Evaluation Report (phần HR cho phép share)
   - [ ] Feedback (nếu HR bật)
-- [ ] HR Admin: cấu hình per Job Posting những gì Candidate được xem
+- [ ] HR Leader: cấu hình per Job Posting những gì Candidate được xem
 
-### Phase 10 – Enterprise Admin
-- [ ] Team HR management:
-  - [ ] Invite HR member vào Organization
-  - [ ] Phân quyền theo department (HR Admin có thể chỉ thấy Job Posting của dept mình)
-- [ ] Subscription & billing:
-  - [ ] Plan management (Basic, Professional, Enterprise)
-  - [ ] Usage tracking (số interview sessions, storage)
-  - [ ] Invoice history
-- [ ] Audit log dashboard: SuperAdmin và HR Admin xem toàn bộ audit trail
+### Phase 10 – System Configuration & Global Audit
+- [ ] Quản lý tài khoản HR nhân viên (chỉ Super Admin thực hiện):
+  - [ ] Mời hoặc phân quyền tài khoản HR (Super Admin, HR Leader, Recruiter)
+  - [ ] Phân quyền theo department
+- [ ] **System Settings UI (Chỉ dành cho Super Admin):**
+  - [ ] Cấu hình allowed_email_domains (ví dụ: `fsoft.vn, fpt.com`)
+  - [ ] Cấu hình global webhooks (ATS webhook url/secret, Slack/Teams webhook urls)
+- [ ] Audit log dashboard: Super Admin xem toàn bộ audit trail hệ thống
 
 ### Phase 11 – Integrations
-- [ ] **ATS Webhook:**
-  - [ ] HR Admin cấu hình webhook URL + secret per Organization
+- [ ] **ATS Webhook (Global):**
   - [ ] Push events: `application.submitted`, `interview.completed`, `evaluation.confirmed`
   - [ ] Retry logic với exponential backoff
   - [ ] Webhook delivery log (success/failure per event)
-- [ ] **SSO:**
-  - [ ] SAML 2.0 SP implementation
-  - [ ] OpenID Connect (Google Workspace, Microsoft Entra)
-  - [ ] Per-Organization SSO config (IdP metadata lưu encrypted)
-- [ ] **Slack/Teams Notifications:**
+- [ ] **OAuth2 & Domain validation:**
+  - [ ] Google Workspace / Microsoft Entra ID OAuth2 provider integration
+  - [ ] Domain parsing and allowed domain verification on callback
+- [ ] **Slack/Teams Notifications (Global Webhook):**
   - [ ] HR nhận notification khi Evaluation cần Review
   - [ ] HR nhận notification khi Candidate schedule/reschedule
-  - [ ] HR Admin cấu hình webhook URL per Organization
 
 ### Phase 12 – Infra & Deploy
 - [ ] GitHub Actions CI/CD pipeline
@@ -235,7 +234,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] **Bias Detection & Fairness Report:**
   - [ ] Opt-in demographic data collection
   - [ ] Statistical analysis per Job Posting
-  - [ ] Fairness Report cho HR Admin + SuperAdmin
+  - [ ] Fairness Report cho HR Leader + Super Admin
 - [ ] Analytics dashboard cho HR:
   - [ ] Pass rate per Job Posting / Round
   - [ ] Average score distribution

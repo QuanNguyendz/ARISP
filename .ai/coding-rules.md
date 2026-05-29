@@ -73,7 +73,7 @@ frontend/src/
 - Mọi thay đổi schema qua **EF Core Migration** – không sửa DB trực tiếp.
 - Luôn có `created_at`, `updated_at` trên mọi entity chính.
 - Soft delete (`deleted_at` nullable) thay vì hard delete cho dữ liệu quan trọng.
-- **Multi-tenant:** Mọi entity thuộc về một Enterprise phải có cột `organization_id`. Repository layer phải enforce filter theo `organization_id` của user đang đăng nhập – không để lọt data chéo giữa các Enterprise.
+- **Single-tenant:** Ứng dụng thiết kế cho nội bộ một doanh nghiệp, KHÔNG cần cô lập dữ liệu theo `organization_id`.
 
 ---
 
