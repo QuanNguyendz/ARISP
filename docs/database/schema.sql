@@ -1,9 +1,8 @@
 -- =============================================================================
--- ARISP – Full Database Schema
+-- ARISP – Full Database Schema (Strictly Single-tenant)
 -- PostgreSQL + vector | Supabase hosted
--- Generated from .ai/context.md + architecture.md + tasks.md
 -- Convention: snake_case tables/columns | UUID PKs | soft delete via deleted_at
--- Last updated: 2026-05-23
+-- Last updated: 2026-05-30
 -- =============================================================================
 
 -- Extensions
@@ -11,37 +10,33 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- =============================================================================
--- PHASE 1 – AUTH & MULTI-TENANT
+-- PHASE 1 – GLOBAL SYSTEM CONFIGURATION & AUTH
 -- =============================================================================
 
-CREATE TABLE organizations (
+-- Global configuration table for Single-tenant system settings
+CREATE TABLE system_settings (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name                VARCHAR(255)    NOT NULL,
-    slug                VARCHAR(100)    NOT NULL UNIQUE,       -- URL-safe identifier
-    plan                VARCHAR(50)     NOT NULL DEFAULT 'basic', -- basic | professional | enterprise
-    is_active           BOOLEAN         NOT NULL DEFAULT TRUE,
-    -- SSO config (per-org, stored encrypted)
-    sso_provider        VARCHAR(50),                            -- saml | google | microsoft | NULL
-    sso_metadata        TEXT,                                   -- encrypted IdP metadata / client config
-    -- ATS Webhook
-    ats_webhook_url     TEXT,
-    ats_webhook_secret  TEXT,                                   -- stored encrypted
-    -- Slack/Teams notification
-    slack_webhook_url   TEXT,
-    teams_webhook_url   TEXT,
-    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    deleted_at          TIMESTAMPTZ
+    key                 VARCHAR(100)    NOT NULL UNIQUE,
+    value               TEXT            NOT NULL,
+    description         TEXT,
+    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
+
+-- Seed default global system configurations
+INSERT INTO system_settings (key, value, description) VALUES
+('allowed_email_domains', 'fsoft.vn', 'Danh sách các domain email được phép xác thực đăng nhập qua OAuth2 (cách nhau bởi dấu phẩy)'),
+('oauth_enabled', 'true', 'Cho phép đăng nhập bằng tài khoản OAuth2 / OpenID Connect công ty'),
+('ats_webhook_url', '', 'Global ATS Webhook URL endpoint'),
+('ats_webhook_secret', '', 'Global ATS Webhook secret token (stored encrypted)'),
+('slack_webhook_url', '', 'Global Slack Webhook URL for real-time HR notifications'),
+('teams_webhook_url', '', 'Global Teams Webhook URL for real-time HR notifications');
 
 -- HR Admin / Recruiter / SuperAdmin accounts
 -- Candidate tự đăng ký qua Job Board → xem bảng candidate_accounts
 CREATE TABLE users (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            REFERENCES organizations(id) ON DELETE CASCADE,
-    -- NULL chỉ cho super_admin
     email               VARCHAR(255)    NOT NULL UNIQUE,
-    password_hash       TEXT,                                   -- NULL nếu SSO-only
+    password_hash       TEXT,                                   -- NULL nếu chỉ dùng OAuth2 / OIDC
     role                VARCHAR(50)     NOT NULL,               -- super_admin | hr_admin | recruiter
     full_name           VARCHAR(255),
     department          VARCHAR(255),
@@ -74,7 +69,7 @@ CREATE TABLE magic_links (
 -- =============================================================================
 -- PHASE 2b – CANDIDATE ACCOUNTS (Job Board self-registration)
 -- Candidate tự đăng ký → tìm kiếm và self-apply qua Job Board
--- Khác với HR users: không thuộc organization, auth riêng
+-- Khác với HR users: không thuộc tổ chức cụ thể, auth riêng biệt
 -- =============================================================================
 
 CREATE TABLE candidate_accounts (
@@ -110,12 +105,11 @@ CREATE TABLE candidate_refresh_tokens (
 
 CREATE TABLE job_postings (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id         UUID            NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     created_by_user_id      UUID            NOT NULL REFERENCES users(id),
     title                   VARCHAR(255)    NOT NULL,
     department              VARCHAR(255),
     job_description         TEXT            NOT NULL,           -- JD raw text, fed to AI
-    interview_mode          VARCHAR(20)     NOT NULL DEFAULT 'remote', -- remote | onsite | both
+    interview_mode          VARCHAR(20)     NOT NULL DEFAULT 'onsite', -- onsite (real interview is strictly onsite)
     status                  VARCHAR(50)     NOT NULL DEFAULT 'draft',  -- draft | active | closed | archived
     -- Job Board: có hiển thị công khai trên Job Board IT không
     is_public_listing       BOOLEAN         NOT NULL DEFAULT FALSE,
@@ -123,7 +117,7 @@ CREATE TABLE job_postings (
     detected_language       VARCHAR(10),                        -- e.g. 'en', 'ja', 'ko', NULL = Vietnamese
     language_requirement    TEXT,                               -- e.g. "TOEIC > 700 hoặc IELTS > 6.5"
     language_confirmed      BOOLEAN         NOT NULL DEFAULT FALSE,
-    -- Scheduling config (Remote)
+    -- Scheduling config (Practice Remote)
     reschedule_deadline_hours INT           DEFAULT 24,
     invite_token_ttl_hours  INT             NOT NULL DEFAULT 48,
     -- Scoring rubric (JSON array of criteria)
@@ -144,7 +138,7 @@ CREATE TABLE interview_round_configs (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_posting_id      UUID            NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
     round_number        INT             NOT NULL,
-    round_type          VARCHAR(50)     NOT NULL,               -- screening | technical | hr | culture_fit
+    round_type          VARCHAR(50)     NOT NULL,               -- screening | technical | online_test
     interview_language  VARCHAR(10),                            -- NULL = inherit from job_posting
     interview_code_ttl_hours INT        NOT NULL DEFAULT 2,
     max_duration_minutes INT            NOT NULL DEFAULT 45,
@@ -154,7 +148,6 @@ CREATE TABLE interview_round_configs (
 -- Candidate application (CV + personal info)
 CREATE TABLE applications (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id         UUID            NOT NULL REFERENCES organizations(id),
     job_posting_id          UUID            NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
     -- Link tới candidate_accounts nếu self-apply qua Job Board; NULL nếu HR-invited
     candidate_account_id    UUID            REFERENCES candidate_accounts(id),
@@ -183,7 +176,7 @@ CREATE TABLE applications (
 -- PHASE 3 – SCHEDULING & INTERVIEW CODE
 -- =============================================================================
 
--- Availability slots HR configures per Job Posting (Remote)
+-- Availability slots HR configures per Job Posting (Remote phỏng vấn thử)
 CREATE TABLE availability_slots (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_posting_id      UUID            NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
@@ -209,15 +202,14 @@ CREATE TABLE interview_bookings (
     reminder_24h_sent       BOOLEAN         NOT NULL DEFAULT FALSE,
     reminder_1h_sent        BOOLEAN         NOT NULL DEFAULT FALSE,
     rescheduled_from_id     UUID            REFERENCES interview_bookings(id),
-    created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
 -- On-site Interview Code (ADR-016)
 -- One-time-use, TTL configurable, bound to application_id
 CREATE TABLE interview_codes (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            NOT NULL REFERENCES organizations(id),
     application_id      UUID            NOT NULL REFERENCES applications(id),
     round_number        INT             NOT NULL DEFAULT 1,
     code                VARCHAR(20)     NOT NULL UNIQUE,        -- e.g. ARX-7K2P
@@ -233,7 +225,6 @@ CREATE TABLE interview_codes (
 
 CREATE TABLE interview_sessions (
     id                              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id                 UUID            NOT NULL REFERENCES organizations(id),
     application_id                  UUID            NOT NULL REFERENCES applications(id),
     round_number                    INT             NOT NULL DEFAULT 1,
     round_type                      VARCHAR(50)     NOT NULL,
@@ -282,7 +273,6 @@ CREATE TABLE answers (
 -- source_type = 'playbook' → source_id = playbook_document_id
 CREATE TABLE document_chunks (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            NOT NULL REFERENCES organizations(id),
     source_type         VARCHAR(50)     NOT NULL,               -- jd | cv | playbook
     source_id           UUID            NOT NULL,
     chunk_index         INT             NOT NULL,
@@ -295,7 +285,6 @@ CREATE TABLE document_chunks (
 );
 
 -- IVFFlat index cho cosine similarity search
--- Lưu ý: chạy VACUUM ANALYZE document_chunks trước khi build index nếu dataset lớn
 CREATE INDEX ON document_chunks USING ivfflat (embedding vector_cosine_ops);
 
 -- =============================================================================
@@ -304,7 +293,6 @@ CREATE INDEX ON document_chunks USING ivfflat (embedding vector_cosine_ops);
 
 CREATE TABLE playbook_documents (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            NOT NULL REFERENCES organizations(id),
     scope               VARCHAR(50)     NOT NULL,               -- org | job_posting | round
     scope_ref_id        UUID,
     -- NULL nếu scope = 'org'
@@ -351,7 +339,6 @@ CREATE TABLE must_ask_tracking (
 
 CREATE TABLE evaluations (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id         UUID            NOT NULL REFERENCES organizations(id),
     session_id              UUID            NOT NULL UNIQUE REFERENCES interview_sessions(id),
     application_id          UUID            NOT NULL REFERENCES applications(id),
     round_number            INT             NOT NULL,
@@ -377,7 +364,6 @@ CREATE TABLE evaluations (
 
 CREATE TABLE hr_reviews (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id         UUID            NOT NULL REFERENCES organizations(id),
     evaluation_id           UUID            NOT NULL REFERENCES evaluations(id),
     reviewed_by_user_id     UUID            NOT NULL REFERENCES users(id),
     final_verdict           VARCHAR(20)     NOT NULL,           -- pass | not_pass
@@ -407,38 +393,17 @@ CREATE TABLE cheat_detection_signals (
 );
 
 -- =============================================================================
--- PHASE 10 – ENTERPRISE ADMIN
+-- PHASE 10 – SYSTEM AUDIT
 -- =============================================================================
-
--- Subscription & billing (ADR-028: unified subscription – Job Board + AI Interview)
-CREATE TABLE subscriptions (
-    id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id         UUID            NOT NULL UNIQUE REFERENCES organizations(id),
-    plan                    VARCHAR(50)     NOT NULL DEFAULT 'basic', -- basic | professional | enterprise
-    status                  VARCHAR(50)     NOT NULL DEFAULT 'active', -- active | suspended | cancelled
-    billing_cycle           VARCHAR(20)     NOT NULL DEFAULT 'monthly', -- monthly | annual
-    current_period_start    TIMESTAMPTZ     NOT NULL,
-    current_period_end      TIMESTAMPTZ     NOT NULL,
-    -- Usage counters (reset per billing period)
-    sessions_used           INT             NOT NULL DEFAULT 0,
-    sessions_limit          INT,                                -- NULL = unlimited
-    job_postings_active     INT             NOT NULL DEFAULT 0, -- số job postings đang active
-    job_postings_limit      INT,
-    storage_used_mb         INT             NOT NULL DEFAULT 0,
-    storage_limit_mb        INT,
-    created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW()
-);
 
 -- Audit log (mọi hành động quan trọng – ADR-014, ADR-016)
 CREATE TABLE audit_logs (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            REFERENCES organizations(id),
     actor_user_id       UUID            REFERENCES users(id),
     action              VARCHAR(100)    NOT NULL,
     -- hr_confirm | hr_override | interview_code_generated | interview_code_used
-    -- job_posting_created | job_posting_published | user_invited | sso_login
-    -- ats_webhook_sent | playbook_uploaded | subscription_changed | ...
+    -- job_posting_created | job_posting_published | user_invited | oauth_login
+    -- ats_webhook_sent | playbook_uploaded | system_setting_changed | ...
     entity_type         VARCHAR(50),
     entity_id           UUID,
     metadata            JSONB,                                  -- action-specific context
@@ -453,7 +418,6 @@ CREATE TABLE audit_logs (
 -- ATS Webhook delivery log (ADR-022)
 CREATE TABLE webhook_deliveries (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    organization_id     UUID            NOT NULL REFERENCES organizations(id),
     event_type          VARCHAR(100)    NOT NULL,
     -- application.submitted | interview.completed | evaluation.confirmed
     payload             JSONB           NOT NULL,
@@ -466,35 +430,53 @@ CREATE TABLE webhook_deliveries (
 );
 
 -- =============================================================================
+-- PHASE 2c – ONLINE TEST (MULTIPLE CHOICE QUIZ)
+-- =============================================================================
+
+-- Ngân hàng câu hỏi trắc nghiệm của tin tuyển dụng
+CREATE TABLE online_test_questions (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_posting_id      UUID            NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
+    question_text       TEXT            NOT NULL,               -- Nội dung câu hỏi trắc nghiệm
+    options             JSONB           NOT NULL,               -- Danh sách đáp án: ["A", "B", "C", "D"]
+    correct_option      INT             NOT NULL,               -- Vị trí đáp án đúng (0, 1, 2, 3)
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+-- Kết quả nộp bài trắc nghiệm của ứng viên
+CREATE TABLE online_test_submissions (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    application_id      UUID            NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    round_number        INT             NOT NULL DEFAULT 1,
+    selected_answers    JSONB           NOT NULL,               -- Đáp án ứng viên chọn: {"q_uuid_1": 2, "q_uuid_2": 0}
+    score               NUMERIC(5,2)    NOT NULL,               -- Điểm số tự động chấm (ví dụ: 80.00)
+    is_passed           BOOLEAN         NOT NULL DEFAULT FALSE, -- Kết quả tự động đạt/không đạt dựa trên điểm sàn
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================================
 -- INDEXES
 -- =============================================================================
 
--- Multi-tenant isolation (filter phổ biến nhất)
-CREATE INDEX idx_users_organization_id              ON users(organization_id);
-CREATE INDEX idx_job_postings_organization_id       ON job_postings(organization_id);
-CREATE INDEX idx_applications_organization_id       ON applications(organization_id);
+-- Global Query Optimization Indexes
 CREATE INDEX idx_applications_job_posting_id        ON applications(job_posting_id);
 CREATE INDEX idx_applications_candidate_account_id  ON applications(candidate_account_id);
-CREATE INDEX idx_interview_sessions_organization_id ON interview_sessions(organization_id);
 CREATE INDEX idx_interview_sessions_application_id  ON interview_sessions(application_id);
 CREATE INDEX idx_interview_sessions_session_type    ON interview_sessions(session_type);
-CREATE INDEX idx_evaluations_organization_id        ON evaluations(organization_id);
 CREATE INDEX idx_evaluations_application_id         ON evaluations(application_id);
 CREATE INDEX idx_evaluations_session_type           ON evaluations(session_type);
-CREATE INDEX idx_audit_logs_organization_id         ON audit_logs(organization_id);
 CREATE INDEX idx_audit_logs_actor_user_id           ON audit_logs(actor_user_id);
 CREATE INDEX idx_document_chunks_source             ON document_chunks(source_type, source_id);
-CREATE INDEX idx_document_chunks_organization_id    ON document_chunks(organization_id);
 
 -- Interview Code lookups (TTL validation, one-time-use check – ADR-016)
 CREATE INDEX idx_interview_codes_code               ON interview_codes(code);
 CREATE INDEX idx_interview_codes_application_id     ON interview_codes(application_id);
 CREATE INDEX idx_interview_codes_expires_at         ON interview_codes(expires_at) WHERE used_at IS NULL;
 
--- Playbook
-CREATE INDEX idx_playbook_documents_org_scope       ON playbook_documents(organization_id, scope, scope_ref_id);
+-- Playbook Scope queries (no tenant partition)
+CREATE INDEX idx_playbook_documents_scope           ON playbook_documents(scope, scope_ref_id);
 
--- Scheduling
+-- Scheduling Slots
 CREATE INDEX idx_availability_slots_job_posting     ON availability_slots(job_posting_id);
 CREATE INDEX idx_interview_bookings_application_id  ON interview_bookings(application_id);
 
@@ -502,16 +484,20 @@ CREATE INDEX idx_interview_bookings_application_id  ON interview_bookings(applic
 CREATE INDEX idx_cheat_signals_session              ON cheat_detection_signals(session_id);
 
 -- Webhook
-CREATE INDEX idx_webhook_deliveries_org             ON webhook_deliveries(organization_id);
 CREATE INDEX idx_webhook_deliveries_next_retry      ON webhook_deliveries(next_retry_at) WHERE delivered_at IS NULL;
 
 -- Job Board
 CREATE INDEX idx_job_postings_public_active         ON job_postings(is_public_listing, status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_candidate_accounts_email           ON candidate_accounts(email);
 
--- Soft-delete partial indexes
-CREATE INDEX idx_job_postings_active    ON job_postings(organization_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_applications_active    ON applications(organization_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_users_active           ON users(organization_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_playbook_docs_active   ON playbook_documents(organization_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_candidate_accounts_active ON candidate_accounts(email) WHERE deleted_at IS NULL;
+-- Soft-delete indexes for active records
+CREATE INDEX idx_job_postings_active_deleted        ON job_postings(deleted_at);
+CREATE INDEX idx_applications_active_deleted        ON applications(deleted_at);
+CREATE INDEX idx_users_active_deleted               ON users(deleted_at);
+CREATE INDEX idx_playbook_docs_active_deleted       ON playbook_documents(deleted_at);
+CREATE INDEX idx_candidate_accounts_active          ON candidate_accounts(email) WHERE deleted_at IS NULL;
+
+-- Online Test
+CREATE INDEX idx_online_test_questions_job          ON online_test_questions(job_posting_id);
+CREATE INDEX idx_online_test_submissions_app        ON online_test_submissions(application_id);
+
