@@ -1,35 +1,130 @@
-# ============================================
-# ARISP – Root .gitignore
-# ============================================
+# =======================================================================
+# ARISP – Comprehensive Root .gitignore
+# =======================================================================
 
-# --- Environment files (secrets) ---
-docker/.env
-!docker/.env.example
-
-# --- OS files ---
+# -----------------------------------------------------------------------
+# Operating System Files
+# -----------------------------------------------------------------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 Desktop.ini
 
-# --- IDE ---
+# -----------------------------------------------------------------------
+# IDE and Editors
+# -----------------------------------------------------------------------
+# Visual Studio
 .vs/
-.vscode/
 *.suo
 *.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.suo.tmp
+
+# Visual Studio Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.history/
+*.code-workspace
+
+# JetBrains (Rider, WebStorm, etc.)
+.idea/
+*.iws
+out/
+_ReSharper*/
+*.user.*
+
+# Text Editors / General
+*~
 *.swp
 *.swo
-*~
+.lock-wscript
 
-# --- .NET / C# ---
-[Db]in/
-[Oo]bj/
+# -----------------------------------------------------------------------
+# Environment Files & Secrets (MUST NEVER BE COMMITTED)
+# -----------------------------------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.local
+docker/.env
+!docker/.env.example
+frontend/.env
+!frontend/.env.example
+supabase/.env.keys
+supabase/.env.local
+supabase/.env.*.local
+
+# -----------------------------------------------------------------------
+# Node.js & React Frontend (Vite / npm)
+# -----------------------------------------------------------------------
+# Dependencies
+node_modules/
+jspm_packages/
+web_modules/
+
+# Production / Build output
+dist/
+dist-ssr/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Frontend Testing / Tooling caches
+coverage/
+.eslintcache
+.stylelintcache
+.tsbuildinfo
+.npm/
+.parcel-cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.node_repl_history
+
+# -----------------------------------------------------------------------
+# .NET / C# Backend
+# -----------------------------------------------------------------------
+# Build folders (case-insensitive for safety, standard ignores)
 [Bb]in/
-[Ob]j/
+[Oo]bj/
 [Dd]ebug/
 [Rr]elease/
 [Ll]og/
 [Ll]ogs/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
+_ReSharper.**/
+
+# EF Core & Migration artifacts
+*.db-journal
+*.db-shm
+*.db-wal
+
+# -----------------------------------------------------------------------
+# Supabase & Local Services
+# -----------------------------------------------------------------------
+supabase/.temp/
+supabase/.branches/
+
