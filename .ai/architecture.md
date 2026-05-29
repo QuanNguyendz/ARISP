@@ -1,6 +1,6 @@
 # Architecture – ARISP (AI-Powered Recruitment and Interview Support Platform for Enterprises)
 
-## Tổng quan kiến trúc
+## Tổng quan kiến trúc (Strictly Single-tenant)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -29,23 +29,25 @@
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │  Auth    │  │ Job &    │  │  Interview   │  │ AI Orchestrat.│  │
 │  │  Module  │  │ App Mgmt │  │  Session Mgmt│  │ (IAIProvider) │  │
-│  └──────────┘  └──────────┘  └──────────────┘  └───────┬───────┘  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐          │          │
-│  │Interview │  │Evaluation│  │  Enterprise  │  ┌───────▼───────┐  │
-│  │Code Svc  │  │& HR Rvw  │  │  Admin       │  │  RAG Pipeline │  │
-│  └──────────┘  └──────────┘  └──────────────┘  └───────────────┘  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐                      │
-│  │  Cheat   │  │Integrat. │  │  Scheduling  │                      │
-│  │Detection │  │(ATS/SSO) │  │  Service     │                      │
-│  └──────────┘  └──────────┘  └──────────────┘                      │
+│  │  (OAuth2)│  │          │  │              │  │               │  │
+│  │  └──────────┘  └──────────┘  └──────────────┘  └───────┬───────┘  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐          │          │
+│  │  │Interview │  │Evaluation│  │  System      │  ┌───────▼───────┐  │
+│  │  │Code Svc  │  │& HR Rvw  │  │  Settings    │  │  RAG Pipeline │  │
+│  │  └──────────┘  └──────────┘  └──────────────┘  └───────────────┘  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐                      │
+│  │  │  Cheat   │  │Integrat. │  │  Scheduling  │                      │
+│  │  │Detection │  │(ATS/Slk) │  │  Service     │                      │
+│  │  └──────────┘  └──────────┘  └──────────────┘                      │
+│  └──────────────────────────────────────────────────────────────────┘
 └──────┬──────────────────┬──────────────────────────────────────────┘
        │ EF Core          │ Redis / External APIs
 ┌──────▼──────┐  ┌────────▼──────┐  ┌──────────────────────────────┐
 │ PostgreSQL  │  │  Redis Cache  │  │ OpenAI (GPT-4o + Embeddings) │
 │ (Supabase)  │  └───────────────┘  │ Google STT / ElevenLabs TTS  │
 │ + pgvector  │                     │ HeyGen Avatar / SendGrid     │
-└─────────────┘                     │ ATS Webhooks / SSO / Slack   │
-                                    └──────────────────────────────┘
+│ (No tenant) │                     │ ATS Webhooks / OAuth2 / Slack│
+└─────────────┘                     └──────────────────────────────┘
 ```
 
 ---
@@ -54,7 +56,7 @@
 
 ### ADR-001: Backend Framework
 - **Quyết định:** ASP.NET Core .NET 8
-- **Lý do:** Type safety, performance, enterprise ecosystem, team quen thuộc.
+- **Lý do:** Type safety, performance, enterprise ecosystem.
 - **Thay thế đã loại:** Node.js/Express, Go
 
 ### ADR-002: Database Hosting
@@ -106,7 +108,8 @@ public interface IAIProvider
 public interface IEmbeddingProvider
 {
     Task<float[]> EmbedAsync(string text, CancellationToken ct);
-    Task<IEnumerable<DocumentChunk>> RetrieveAsync(float[] queryVector, int topK, CancellationToken ct);
+    // Retrieve không còn organizationId
+    Task<IEnumerable<DocumentChunk>> RetrieveAsync(Guid? sourceId, float[] queryVector, int topK, CancellationToken ct);
 }
 ```
 
@@ -118,8 +121,9 @@ public interface IEmbeddingProvider
 - Tiết kiệm ~$2.78/session (~90% HeyGen cost).
 
 ### ADR-012: Single-tenant Architecture
-- Hệ thống được thiết kế độc quyền cho 1 doanh nghiệp (Single-tenant).
-- Không sử dụng kiến trúc Multi-tenant hay `organization_id` để phân tách dữ liệu.
+- **Quyết định:** Hệ thống được thiết kế độc quyền cho **1 doanh nghiệp duy nhất sử dụng nội bộ** (Single-tenant).
+- **Chi tiết:** Xóa bỏ hoàn toàn các bảng `organizations` và `subscriptions`. Không sử dụng cột `organization_id` ở bất cứ thực thể nào.
+- **Global Config:** Các cấu hình toàn doanh nghiệp (tên miền cho phép đăng nhập, webhook ATS, Slack/Teams) được lưu tại bảng `system_settings` hoặc file cấu hình ứng dụng (`appsettings.json`).
 
 ### ADR-013: Candidate Invite Flow
 - HR tạo Job Posting → duyệt CV → gửi magic link cho ứng viên làm quen phỏng vấn thử (Practice Remote).
@@ -127,7 +131,7 @@ public interface IEmbeddingProvider
 
 ### ADR-014: AI Evaluation & HR Confirm Flow
 - AI generate Evaluation Report sau mỗi Round.
-- HR Confirm/Override (override bắt buộc có `override_reason` cho audit trail).
+- HR Leader phê duyệt kết quả hoặc ghi đè verdict (Override bắt buộc nhập `override_reason` cho audit trail).
 - Notification: email + in-app (SignalR) khi Evaluation hoàn thành.
 
 ### ADR-015: Interview Mode – Practice (Remote) vs Real (On-site)
@@ -140,14 +144,18 @@ public interface IEmbeddingProvider
 - **Format:** 6–8 ký tự alphanumeric, case-insensitive (ví dụ: `ARX-7K2P`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
-- **Binding:** Mỗi code bind với một `application_id` cụ thể – không dùng code người khác.
-- **Generation:** HR Admin tạo thủ công hoặc batch generate cho nhiều ứng viên.
+- **Binding:** Mỗi code bind với một `application_id` cụ thể.
+- **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt.
 - **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id` nào.
 
 ### ADR-017: Multi-round Interview
-- HR cấu hình số vòng và loại vòng per Job Posting: `[{round: 1, type: "Screening"}, {round: 2, type: "Technical"}]`.
+- HR cấu hình số vòng và loại vòng per Job Posting (ví dụ: `[{round: 1, type: "screening"}, {round: 2, type: "technical"}]`).
+- Các loại vòng phỏng vấn (`round_type`) hệ thống hỗ trợ sẵn bao gồm:
+  - `screening`: Phỏng vấn sơ loại (chú trọng kỹ năng mềm và giao tiếp, kiểm tra ngôn ngữ).
+  - `technical`: Phỏng vấn chuyên môn sâu (chú trọng kỹ năng kỹ thuật, giải quyết bài toán).
+  - `online_test`: Vòng Online Test - Multiple Choice Test (Làm trắc nghiệm trực tuyến).
 - Mỗi vòng là một `InterviewSession` độc lập với `session_config` riêng.
-- **Auto-progression:** Sau khi HR confirm Pass ở Round N → hệ thống lưu trạng thái.
+- **Auto-progression:** Sau khi HR Leader duyệt Pass ở Round N → hệ thống lưu trạng thái.
 - **Scheduling:** HR hẹn lịch offline với ứng viên và sinh Interview Code mới cho Round N+1 khi ứng viên đến công ty.
 
 ### ADR-018: Language-aware AI Interviewer
@@ -164,7 +172,7 @@ public interface IEmbeddingProvider
 
 ### ADR-019: Cheat Detection
 - **Signal collection:** Frontend thu thập signals trong session:
-  - **Eye tracking:** webcam-based gaze estimation (thư viện JS như `GazeCloudAPI` hoặc `WebGazer.js`).
+  - **Eye tracking:** webcam-based gaze estimation (thư viện JS như `WebGazer.js`).
   - **Response timing:** thời gian giữa khi câu hỏi được đặt và ứng viên bắt đầu trả lời.
   - **Speech pattern:** STT partial transcript analysis – phát hiện reading cadence (đọc văn bản thay vì nói tự nhiên).
   - **Tab switching / focus loss:** browser visibility API.
@@ -185,15 +193,14 @@ public interface IEmbeddingProvider
 - **Content:** Recording (nếu HR bật), transcript, Evaluation Report (phần HR cho phép share), feedback.
 
 ### ADR-022: ATS Integration (Webhook/API)
-- ARISP push events sang ATS qua Webhook: `application.submitted`, `interview.completed`, `evaluation.confirmed`.
-- Payload chuẩn hóa (JSON). HR Admin cấu hình webhook URL + secret trong phần Admin Settings.
+- ARISP push events sang ATS của công ty qua Webhook: `application.submitted`, `interview.completed`, `evaluation.confirmed`.
+- Payload chuẩn hóa (JSON). Webhook URL và Secret được cấu hình toàn cục trong `system_settings`.
 - Retry logic với exponential backoff nếu ATS endpoint lỗi.
-- Supported ATS: Workday, SAP SuccessFactors, Greenhouse (và bất kỳ ATS nào hỗ trợ webhook).
 
-### ADR-023: SSO Integration
-- Hỗ trợ SAML 2.0, OpenID Connect (Google Workspace, Microsoft Entra).
-- SSO chỉ áp dụng cho HR Admin/System Admin – Candidate dùng magic link.
-- System SSO config (IdP metadata, client ID/secret lưu encrypted).
+### ADR-023: SSO & OAuth2 Corporate Domain Validation
+- **Xác thực nội bộ:** Hỗ trợ đăng nhập cho nhóm người dùng công ty (`super_admin`, `hr_admin`, `recruiter`) bằng **OAuth2 / OIDC** (Google Workspace hoặc Microsoft Entra ID). SAML 2.0 hoàn toàn bị loại bỏ.
+- **Domain Validation:** Khi đăng nhập qua OAuth2, hệ thống bắt buộc phân tách và kiểm tra phần domain của địa chỉ email (ví dụ: `hr@fsoft.vn` -> lấy ra `fsoft.vn`). Email này phải thuộc danh sách tên miền được phép truy cập (`allowed_email_domains` được quy định trong cấu hình toàn cục `system_settings`). Mọi email domain công cộng hoặc không khớp sẽ bị chặn truy cập lập tức.
+- **Ứng viên:** Candidate Portal sử dụng Magic Link gửi qua email cá nhân có TTL ngắn, không áp dụng OAuth2.
 
 ### ADR-024: Bias Detection & Fairness
 - **Data collected:** Evaluation scores theo demographic groups (nếu Candidate cung cấp và đồng ý).
@@ -202,51 +209,48 @@ public interface IEmbeddingProvider
 - **Privacy:** Demographic data phải được Candidate đồng ý cung cấp (opt-in) và được mã hóa.
 
 ### ADR-025: Interview Playbook – Org Knowledge Base
-- **Quyết định:** HR Admin upload tài liệu phỏng vấn nội bộ theo 3 cấp scope: Organization / Job Posting / Round. Tài liệu được chunk, embed vào pgvector và retrieve trong RAG pipeline để AI phỏng vấn đúng phong cách + nội dung mong muốn của doanh nghiệp.
+- **Quyết định:** HR Admin upload tài liệu phỏng vấn nội bộ theo 3 cấp scope: Company / Job Posting / Round. Tài liệu được chunk, embed vào pgvector và retrieve trong RAG pipeline để AI phỏng vấn đúng phong cách + nội dung mong muốn của doanh nghiệp.
 - **Document types hỗ trợ:**
 
   | Type key | Mô tả | Scope |
   |---|---|---|
-  | `interview_style_guide` | Phong cách, tone, approach phỏng vấn | Org |
-  | `competency_framework` | Ma trận kỹ năng theo level | Org |
-  | `culture_values` | Văn hóa, giá trị cốt lõi, culture fit indicators | Org |
-  | `compliance_guide` | Câu hỏi không được hỏi (pháp lý) | Org |
-  | `red_flag_guide` | Dấu hiệu cần probe sâu hoặc loại bỏ | Org |
+  | `interview_style_guide` | Phong cách, tone, approach phỏng vấn | Company |
+  | `competency_framework` | Ma trận kỹ năng theo level | Company |
+  | `culture_values` | Văn hóa, giá trị cốt lõi, culture fit indicators | Company |
+  | `compliance_guide` | Câu hỏi không được hỏi (pháp lý) | Company |
+  | `red_flag_guide` | Dấu hiệu cần probe sâu hoặc loại bỏ | Company |
   | `question_bank` | Ngân hàng câu hỏi gợi ý per vị trí | Job Posting |
   | `technical_scenarios` | Bài toán / case study cụ thể | Job Posting |
   | `expected_answers` | Hướng dẫn câu trả lời tốt cần đề cập | Job Posting |
   | `must_ask` | Câu hỏi bắt buộc phải hỏi trước khi kết thúc | Job Posting |
   | `round_playbook` | Playbook cụ thể per Round | Round |
-  | `past_transcripts` | Transcript phỏng vấn ẩn danh (AI học từ mẫu thành công) | Org / Job Posting |
+  | `past_transcripts` | Transcript phỏng vấn ẩn danh (AI học từ mẫu thành công) | Company / Job Posting |
 
 - **Format upload:** PDF, DOCX, TXT, Markdown, JSON (question bank format).
 - **RAG weighting khi retrieve:**
   - JD + CV: weight cao (candidate-specific)
-  - Org Playbook (style, compliance, values): weight trung bình (brand consistency)
+  - Company Playbook (style, compliance, values): weight trung bình (brand consistency)
   - Job Posting Playbook (question_bank, scenarios, must_ask): weight cao (content accuracy)
   - Round Playbook: weight cao (phù hợp vòng hiện tại)
 - **Must-ask enforcement:** `PlaybookService` track danh sách `must_ask` questions đã hỏi. `InterviewService` nhận signal "còn câu bắt buộc chưa hỏi" trước khi trigger điều kiện dừng.
-- **Ràng buộc:** Tài liệu scope theo `organization_id` (Org level) hoặc `job_posting_id` (Job/Round level). Không lẫy lẫn giữa Organizations.
+- **Ràng buộc:** Không lọt dữ liệu tài liệu phỏng vấn ra ngoài hệ thống.
 
 ### ADR-026: Job Board (IT-focused)
-- **Quyết định:** Tích hợp Job Board IT vào nền tảng ARISP. Ứng viên tạo tài khoản, tìm kiếm và tự ứng tuyển. Tên công ty hiển thị công khai.
+- **Quyết định:** Tích hợp Job Board IT vào nền tảng ARISP. Ứng viên tạo tài khoản, tìm kiếm và tự ứng tuyển.
 - **Flow:** Candidate self-apply → HR review CV → HR chủ động gửi magic link (không tự động).
 - **Nguồn dữ liệu:** Job Posting của doanh nghiệp là nguồn chung – không tạo entity riêng cho Job Board listing.
 - **Thị trường:** Chỉ tập trung IT (không phải job board tổng quát).
-- **Subscription gộp:** Một subscription duy nhất bao gồm cả Job Board lẫn AI Interview Platform.
 
 ### ADR-027: Practice Interview Session (Phỏng vấn thử)
 - **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity.
-- **Truy cập:** Chỉ qua magic link sau khi Candidate xác nhận vị trí ứng tuyển. Không xuất hiện trên Job Board hay Candidate Portal.
+- **Truy cập:** Chỉ qua magic link sau khi Candidate xác nhận vị trí ứng tuyển. Không xuất hiện trên Job Board hay Candidate Portal công cộng.
 - **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng.
 - **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
 - **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
-- **Chi phí:** Tính vào subscription của doanh nghiệp.
 
-### ADR-028: Subscription Model – Unified
-- **Quyết định:** Doanh nghiệp trả một subscription duy nhất bao gồm: quyền đăng tin trên Job Board IT + quyền dùng AI Interview Platform.
-- **Lý do:** Đơn giản hóa pricing, giảm ma sát khi onboard, tạo giá trị rõ ràng.
-- **Usage tracking:** Theo dõi số interview sessions (practice + real), số job postings active, storage.
+### ADR-028: Usage Tracking Model
+- **Quyết định:** Nền tảng được cấu hình giới hạn sử dụng (Usage counters) toàn hệ thống thay vì quản lý gói cước (subscriptions) cho nhiều công ty.
+- **Usage tracking:** Theo dõi tổng số interview sessions đã thực hiện (practice + real), số job postings active, tài nguyên lưu trữ video recording.
 
 ---
 
@@ -258,7 +262,7 @@ public interface IEmbeddingProvider
       ▼
 [Google Speech Streaming STT (language-configured)]
       │ partial transcripts
-      │ (VAD near-end) → [RAG: retrieve từ JD + CV + Org Playbook + Job Playbook + Round Playbook]
+      │ (VAD near-end) → [RAG: retrieve từ JD + CV + Playbook]
       │ (final transcript ~300ms sau dừng)
       ▼
 [GPT-4o Streaming] ◄── context + retrieved chunks (JD/CV/Playbook) + system prompt
@@ -278,43 +282,44 @@ public interface IEmbeddingProvider
 
 ```
 [Job Posting: Round 1 = Screening, Round 2 = Technical]
-       │
+        │
 [Candidate submit CV → access interview]
-       │
+        │
 [Round 1 Session] ← language-aware (detect từ JD)
-       │ session end
+        │ session end
 [Round 1 Evaluation (AI)] + [Cheat Detection Report]
-       │
-[HR Review Round 1]
+        │
+[HR Leader Review Round 1]
   ├── Not Pass → email từ chối → DONE
   └── Pass → Auto-invite Round 2
              │
-         [Round 2 Session] ← technical deep-dive
+         [Round 2 Session] ← technical deep-dive (On-site)
              │ session end
          [Round 2 Evaluation (AI)]
              │
-         [HR Review Round 2]
+         [HR Leader Review Round 2]
            ├── Not Pass → email từ chối
            └── Pass → email mời vòng tiếp / offer
 ```
 
 ---
 
-## Service Boundaries (dự kiến)
+## Service Boundaries
 
 | Service / Interface | Trách nhiệm |
 |---|---|
-| `AuthService` | JWT, role management, magic link (Candidate Portal), SSO integration |
-| `OrganizationService` | Enterprise accounts, team HR management, subscription, billing |
-| `JobPostingService` | CRUD Job Posting, round config, interview mode, availability slots, persona |
+| `AuthService` | JWT, role management, magic link (Candidate Portal), **OAuth2 OIDC Integration & Domain validation** |
+| `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
+| `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona |
 | `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application) |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
-| `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow) |
+| `OnlineTestService` | Quản lý câu hỏi trắc nghiệm (`online_test_questions`), lưu kết quả nộp bài (`online_test_submissions`), tự động chấm điểm và đánh giá đạt/trượt |
+| `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow Kiosk) |
 | `SchedulingService` | Availability slots, booking, reminder emails, reschedule |
 | `InterviewService` | Session lifecycle, multi-round flow, adaptive difficulty, auto-progression, must-ask enforcement |
-| `PlaybookService` | Upload, parse, chunk, embed tài liệu Playbook per scope (Org/Job Posting/Round); track must-ask questions đã hỏi |
+| `PlaybookService` | Upload, parse, chunk, embed tài liệu Playbook per scope (Company/Job Posting/Round); track must-ask questions đã hỏi |
 | `IAIProvider` | Stream question, analyze answer, generate evaluation, detect language, assess language |
-| `IEmbeddingProvider` | Embed + retrieve từ pgvector (JD/CV/Playbook chunks) |
+| `IEmbeddingProvider` | Embed + retrieve từ pgvector (JD/CV/Playbook chunks) - không dùng organization_id |
 | `ISTTProvider` | Google Speech streaming (primary), Whisper (fallback) |
 | `RagService` | Chunk JD/CV/Playbook, embed, store, retrieve context theo weighted scope |
 | `LanguageDetectionService` | Gọi AI detect ngôn ngữ từ JD, lưu kết quả vào Job Posting |
@@ -324,8 +329,8 @@ public interface IEmbeddingProvider
 | `CheatDetectionService` | Tổng hợp signals từ frontend, generate CheatScore + CheatSignals |
 | `HRReviewService` | Confirm/Override, audit trail, auto-progression trigger |
 | `NotificationService` | Email (SendGrid/SES) + in-app SignalR: invite, reminder, evaluation ready, result |
-| `IntegrationService` | ATS webhook push, SSO config per Organization |
+| `IntegrationService` | ATS webhook push (global), Slack/Teams webhook notification (global) |
 | `BiasDetectionService` | Fairness analysis per Job Posting (post-MVP) |
-| `AuditLogService` | Ghi lại mọi hành động quan trọng (confirm/override/login/config change) |
+| `AuditLogService` | Ghi lại mọi hành động quan trọng toàn hệ thống |
 | `WebRTCSignalingHub` | SignalR Hub: ICE candidates, SDP offer/answer |
 | `SessionHub` | SignalR Hub: session lifecycle events |

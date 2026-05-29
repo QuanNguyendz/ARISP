@@ -4,77 +4,89 @@
 > **DB:** PostgreSQL (Supabase hosted) + pgvector extension
 > **ORM:** EF Core – mọi thay đổi schema đi qua migration, không sửa DB trực tiếp
 > **Convention:** `snake_case` tables/columns · UUID PKs · `created_at` / `updated_at` trên mọi bảng chính · soft delete qua `deleted_at`
-> **Last updated:** 2026-05-23
+> **Last updated:** 2026-05-30
 
 ---
 
-## Sơ đồ quan hệ tổng quan
+## Sơ đồ quan hệ tổng quan (Strict Single-tenant)
 
 ```
-users (role: system_admin | hr_admin | recruiter)
-job_postings
+system_settings (Global configs: Allowed domains, OAuth2, Webhooks, etc.)
+
+users (role: super_admin | hr_admin | recruiter)
+job_postings (interview_mode: onsite)
   ├── interview_round_configs
-  ├── availability_slots
+  ├── availability_slots (Phỏng vấn thử)
   └── playbook_documents (scope: org | job_posting | round)
 applications
-  ├── [candidate_accounts] ← nếu source = 'job_board'
-  ├── interview_codes (On-site)
+  ├── [candidate_accounts] ← nếu ứng viên ứng tuyển từ 'job_board'
+  ├── interview_codes (Mã On-site phục vụ Kiosk)
   ├── interview_bookings (Practice Remote)
-  └── interview_sessions (mỗi round = 1 session)
+  └── interview_sessions (Phiên phỏng vấn AI per round)
   │           ├── questions
   │           │     └── answers
   │           ├── must_ask_tracking
   │           ├── cheat_detection_signals
   │           └── evaluations
   │                 └── hr_reviews
-  ├── document_chunks (pgvector – JD / CV / Playbook embeddings)
-  ├── audit_logs
-  └── webhook_deliveries
+  ├── document_chunks (pgvector – embeddings của JD, CV, Playbook)
+  ├── audit_logs (Lịch sử thao tác hệ thống)
+  └── webhook_deliveries (Nhật ký gửi webhook sang ATS bên thứ 3)
 
-candidate_accounts  ← Candidate tự đăng ký qua Job Board (độc lập với organizations)
+candidate_accounts  ← Ứng viên tự đăng ký qua Job Board (đăng nhập riêng biệt)
   └── candidate_refresh_tokens
 ```
 
 ---
 
-## Phase 1 – Auth & Single-tenant Setup
+## Phase 1 – Global Settings & Auth
 
-### `users`
-HR Admin, Recruiter, SuperAdmin. **Không** bao gồm Candidate tự đăng ký – xem `candidate_accounts`.
+### `system_settings`
+Bảng cấu hình hệ thống toàn cục dành riêng cho môi trường Single-tenant. Lưu trữ thông tin đăng nhập, danh sách email domain được phép truy cập, webhook URL của ATS/Slack/Teams toàn công ty.
 
 | Cột | Kiểu | Ghi chú |
 |-----|------|---------|
-| `email` | VARCHAR UNIQUE | |
-| `password_hash` | TEXT | NULL nếu SSO-only |
+| `id` | UUID PK | Khởi tạo mặc định qua `uuid_generate_v4()` |
+| `key` | VARCHAR(100) UNIQUE | Khóa cấu hình (ví dụ: `allowed_email_domains`, `slack_webhook_url`) |
+| `value` | TEXT | Giá trị cấu hình |
+| `description` | TEXT | Mô tả chức năng cấu hình |
+| `updated_at` | TIMESTAMPTZ | Tự động cập nhật thời gian |
+
+### `users`
+HR Admin, Recruiter, SuperAdmin. **Không** bao gồm Candidate – xem `candidate_accounts`. 
+
+| Cột | Kiểu | Ghi chú |
+|-----|------|---------|
+| `id` | UUID PK | |
+| `email` | VARCHAR UNIQUE | Validate domain theo cấu hình `allowed_email_domains` khi đăng nhập OAuth2 |
+| `password_hash` | TEXT | NULL nếu chỉ dùng OAuth2 / OIDC công ty |
 | `role` | VARCHAR(50) | `super_admin` \| `hr_admin` \| `recruiter` |
-| `department` | VARCHAR | phân quyền per department |
+| `department` | VARCHAR | Phòng ban nội bộ |
 
 ### `refresh_tokens`
 JWT refresh token store cho users. Hash token trước khi lưu.
 
 ### `magic_links`
-One-time link cho Candidate Portal. TTL 15 phút.
+One-time link đăng nhập Candidate Portal. TTL 15 phút.
 
 ---
 
 ## Phase 2b – Candidate Accounts (Job Board)
 
 ### `candidate_accounts`
-Candidate tự đăng ký tài khoản trên ARISP để dùng Job Board. **Tách biệt** với bảng `users` (HR/Admin).
+Candidate tự đăng ký tài khoản trên ARISP để tìm việc và tự ứng tuyển qua Job Board. **Tách biệt hoàn toàn** với bảng `users` (nhân sự công ty).
 
 | Cột | Kiểu | Ghi chú |
 |-----|------|---------|
 | `id` | UUID PK | |
-| `email` | VARCHAR UNIQUE | |
+| `email` | VARCHAR UNIQUE | Cho phép mọi email cá nhân (gmail, yahoo, v.v.) |
 | `password_hash` | TEXT | |
 | `full_name` | VARCHAR | |
 | `phone` | VARCHAR | optional |
 | `headline` | VARCHAR(255) | e.g. "Backend Developer 3 yrs exp" |
-| `profile_cv_url` | TEXT | CV mặc định, tăng tốc khi apply |
-| `is_active` | BOOLEAN | |
-| `email_verified` | BOOLEAN | |
+| `profile_cv_url` | TEXT | CV mặc định |
 
-> **Lý do tách biệt:** Candidate Job Board có vòng đời và auth flow khác (password login, email verify) so với HR users (có thể SSO, thuộc Organization). Candidate được invite trực tiếp từ HR không cần account.
+> **Lý do tách biệt:** Ứng viên dùng tài khoản cá nhân có vòng đời đăng nhập và cơ chế xác thực riêng biệt, trong khi nhân viên công ty (`users`) đăng nhập qua OAuth2 bắt buộc validate email domain doanh nghiệp.
 
 ### `candidate_refresh_tokens`
 Refresh tokens riêng cho candidate_accounts.
@@ -84,215 +96,181 @@ Refresh tokens riêng cho candidate_accounts.
 ## Phase 2 – Job Posting & Application
 
 ### `job_postings`
-Tin tuyển dụng. Core entity driving toàn bộ flow.
+Tin tuyển dụng và cấu hình AI Interviewer.
 
 | Cột | Kiểu | Ghi chú |
 |-----|------|---------|
-| `rejection_reason` | TEXT | **[MỚI]** Lý do khi sếp Reject bản draft |
-| `status` | VARCHAR | `draft` \| `active` \| `closed` \| `archived` \| `rejected` |
-| `is_public_listing` | BOOLEAN | **[MỚI]** có hiển thị trên Job Board IT không |
-| `detected_language` | VARCHAR(10) | AI detect từ JD: `en`, `ja`, ... NULL = Vietnamese |
-| `language_requirement` | TEXT | "TOEIC > 700..." |
-| `language_confirmed` | BOOLEAN | HR confirm trước khi publish |
-| `scoring_rubric` | JSONB | custom criteria array |
-| `persona_name` | VARCHAR | tên AI interviewer |
-| `persona_voice_id` | TEXT | ElevenLabs voice ID |
+| `created_by_user_id` | UUID FK | Người tạo tin (`users.id`) |
+| `interview_mode` | VARCHAR | Mặc định là `onsite` (Mọi phiên phỏng vấn thật bắt buộc On-site) |
+| `status` | VARCHAR | `draft` \| `active` \| `closed` \| `archived` |
+| `is_public_listing` | BOOLEAN | Có hiển thị công khai trên Job Board IT không |
+| `detected_language` | VARCHAR(10) | AI tự động phát hiện ngôn ngữ yêu cầu từ JD |
+| `scoring_rubric` | JSONB | Bộ tiêu chí đánh giá cho Job |
+| `persona_name` | VARCHAR | Tên avatar AI đại diện |
 
 ### `interview_round_configs`
 Config từng vòng phỏng vấn per Job Posting. UNIQUE(job_posting_id, round_number).
 
 | Cột | Ghi chú |
 |-----|---------|
-| `round_type` | `screening` \| `technical` \| `hr` \| `culture_fit` |
-| `interview_language` | override nếu khác language của Job Posting |
-| `interview_code_ttl_hours` | On-site code TTL, default 2h |
-| `max_duration_minutes` | giới hạn thời gian session |
+| `round_type` | `screening` \| `technical` \| `online_test` (Online Test - Multiple Choice Test) |
+| `interview_code_ttl_hours` | TTL của mã code On-site lúc đến thi thật (mặc định 2h) |
+| `max_duration_minutes` | Thời gian giới hạn phiên phỏng vấn |
 
 ### `applications`
-Hồ sơ Candidate ứng tuyển.
+Hồ sơ Candidate ứng tuyển cho một Job Posting.
 
 | Cột | Ghi chú |
 |-----|---------|
-| `candidate_account_id` | **[MỚI]** FK → `candidate_accounts`; NULL nếu HR-invited |
-| `source` | **[MỚI]** `job_board` (self-apply) \| `invited` (HR gửi link) |
-| `status` | `invited` → `cv_submitted` → `screening` → `interview` → `pass` / `not_pass` / `withdrawn` |
-| `rejection_reason_internal` | **[MỚI]** Lý do HR đánh trượt ứng viên |
-| `rejection_email_sent_at` | **[MỚI]** Timestamp khi email chia buồn được gửi |
-| `cv_text` | parsed text từ PDF – đưa vào RAG |
-| `invite_token_hash` | hash của signed JWT invite |
-| `practice_session_used` | **[MỚI]** flag 1 lần per application (ADR-027) |
-| `demographic_data` | JSONB encrypted, opt-in cho Bias Detection |
+| `job_posting_id` | FK → `job_postings.id` |
+| `candidate_account_id` | FK → `candidate_accounts.id`; NULL nếu HR tạo thủ công ứng viên |
+| `source` | `job_board` (ứng viên tự apply) \| `invited` (HR chủ động mời) |
+| `status` | Trạng thái ứng tuyển: `invited` → `cv_submitted` → `screening` → `interview` → `pass` / `not_pass` |
+| `practice_session_used` | Flag đánh dấu đã dùng lượt phỏng vấn thử (tối đa 1 lần per Application) |
+| `cv_text` | Văn bản trích xuất từ CV để đưa vào RAG pipeline |
 
 ---
 
 ## Phase 3 – Scheduling & Interview Code
 
 ### `availability_slots`
-HR cấu hình khung giờ cho Phỏng vấn thử (Practice Remote). `booked_count` tăng khi Candidate chọn.
+HR cấu hình khung giờ rảnh để ứng viên chọn lịch phỏng vấn thử (Practice Remote).
 
 ### `interview_bookings`
-Candidate chọn slot cho Phỏng vấn thử → tạo booking. Hỗ trợ reschedule (`rescheduled_from_id` tự refer).
+Mỗi khi ứng viên chọn một slot phỏng vấn thử thì tạo booking. Hỗ trợ dời lịch (`rescheduled_from_id`).
 
 ### `interview_codes`
-On-site access control. **One-time-use** – `used_at` set ngay sau khi dùng.
+Mã truy cập phỏng vấn thật On-site tại công ty. **Sử dụng duy nhất 1 lần (One-time-use)**. 
 
 | Cột | Ghi chú |
 |-----|---------|
-| `code` | `ARX-7K2P` format, UNIQUE |
-| `expires_at` | default +2h từ lúc tạo |
-| `used_at` | NULL = chưa dùng |
-
-> **Index:** `idx_interview_codes_expires_at` (partial – WHERE used_at IS NULL) để validate TTL nhanh.
+| `code` | Định dạng 6-8 ký tự alphanumeric (ví dụ: `ARX-7K2P`), UNIQUE |
+| `expires_at` | Thời gian hết hạn của mã (mặc định +2 giờ từ lúc tạo) |
+| `used_at` | Ghi nhận thời điểm sử dụng. NULL = chưa dùng, mã còn hiệu lực |
 
 ---
 
 ## Phase 4 – AI Interview Core
 
 ### `interview_sessions`
-Mỗi round = 1 session. Multi-round = nhiều sessions cho 1 application.
+Một phiên phỏng vấn AI cụ thể ứng với từng vòng của ứng viên.
 
 | Cột | Ghi chú |
 |-----|---------|
-| `session_type` | **[MỚI]** `practice` \| `real` (ADR-027) |
+| `session_type` | `practice` (phỏng vấn thử từ nhà) \| `real` (phỏng vấn thật bắt buộc On-site) |
 | `status` | `pending` \| `active` \| `completed` \| `aborted` \| `error` |
-| `interview_language` | ngôn ngữ phỏng vấn thực tế |
-| `recording_url` | video/audio lưu trữ |
-| `recording_visible_to_candidate` | HR config khi review |
+| `recording_url` | Đường dẫn lưu trữ video/audio recording |
 
-> **`session_type` logic:**
-> - `practice`: chỉ retrieve JD + CV chunks, không load Playbook, không ảnh hưởng verdict tuyển dụng.
-> - `real`: full RAG (JD + CV + Playbook), mở đúng slot đã đặt, kết quả ảnh hưởng quyết định.
+*Lưu ý về nguồn RAG:*
+* `practice`: Chỉ retrieve thông tin từ JD + CV ứng viên. Không nạp Playbook bảo mật của công ty.
+* `real`: Thực hiện RAG toàn diện (JD + CV + Playbook đầy đủ các cấp của doanh nghiệp).
 
 ### `questions`
-AI-generated hoặc từ Playbook.
-
-| Cột | Ghi chú |
-|-----|---------|
-| `source` | `ai_generated` \| `playbook_must_ask` \| `playbook_suggested` |
-| `difficulty_level` | 1–5, adaptive difficulty |
+Các câu hỏi do AI sinh ra hoặc lấy từ Playbook ngân hàng câu hỏi.
 
 ### `answers`
-STT transcript của Candidate. `response_time_ms` dùng cho Cheat Detection.
+Nội dung câu trả lời của ứng viên trích xuất qua STT. Cột `response_time_ms` ghi nhận thời gian phản xạ hỗ trợ phát hiện gian lận.
 
 ### `document_chunks`
-**pgvector store** cho JD + CV + Playbook. `embedding VECTOR(1536)` – text-embedding-3-small.
-
-| Cột | Ghi chú |
-|-----|---------|
-| `source_type` | `jd` \| `cv` \| `playbook` |
-| `source_id` | job_posting_id / application_id / playbook_document_id |
-| `embedding` | VECTOR(1536) – indexed bằng IVFFlat |
-| `metadata` | JSONB chứa scope/document_type cho weighted RAG |
+Bảng lưu trữ vector embeddings của JD, CV và tài liệu Playbook. Cột `embedding` dùng kiểu dữ liệu `VECTOR(1536)` từ pgvector.
 
 ---
 
 ## Phase 4b – Interview Playbook
 
 ### `playbook_documents`
-Tài liệu nội bộ doanh nghiệp. Sau upload → parse → chunk → embed vào `document_chunks`.
-
-| `document_type` | Scope |
-|-----------------|-------|
-| `interview_style_guide` | org |
-| `competency_framework` | org |
-| `culture_values` | org |
-| `compliance_guide` | org |
-| `red_flag_guide` | org |
-| `past_transcripts` | org / job_posting |
-| `question_bank` | job_posting |
-| `technical_scenarios` | job_posting |
-| `expected_answers` | job_posting |
-| `must_ask` | job_posting |
-| `round_playbook` | round |
-
-> **[MỚI]** Thêm cột `error_message` để lưu lý do khi `status = 'error'`.
+Tài liệu phỏng vấn nội bộ doanh nghiệp. Được phân loại theo phạm vi `scope` (`org` - toàn hệ thống, `job_posting` - tin tuyển dụng cụ thể, `round` - vòng phỏng vấn cụ thể).
 
 ### `must_ask_tracking`
-Track câu hỏi bắt buộc đã hỏi chưa trong session. `InterviewService` check trước khi trigger end.
+Theo dõi các câu hỏi bắt buộc (must-ask) đã được AI hỏi trong phiên phỏng vấn thật chưa.
 
 ---
 
 ## Phase 6 – AI Evaluation & HR Review
 
 ### `evaluations`
+Báo cáo đánh giá của AI sau khi phiên phỏng vấn kết thúc.
 
 | Cột | Ghi chú |
 |-----|---------|
-| `session_type` | **[MỚI]** `practice` \| `real` – phân biệt practice evaluation |
-| `ai_verdict` | `pass` \| `not_pass` |
-| `overall_score` | 0–100 |
-| `criterion_scores` | JSONB: `{technical, communication, culture_fit, language_proficiency, ...}` |
-| `question_analyses` | JSONB array: per-question breakdown |
-| `cheat_score` | 0–100 |
-| `cheat_signals` | JSONB: `[{type, description, severity}]` |
-| `language_assessment` | JSONB: `{fluency, grammar, vocabulary, comprehension, overall_score}` |
-| `updated_at` | **[MỚI]** theo convention |
+| `ai_verdict` | Kết quả đề xuất từ AI: `pass` \| `not_pass` |
+| `overall_score` | Điểm đánh giá tổng quan (0–100) |
+| `criterion_scores` | Điểm số theo các tiêu chí (JSONB): kỹ thuật, giao tiếp, ngoại ngữ, văn hóa... |
+| `cheat_score` | Điểm nghi ngờ gian lận (0–100) tổng hợp từ tín hiệu thu thập |
+| `cheat_signals` | Chi tiết các tín hiệu nghi vấn phát hiện được |
+| `language_assessment` | Đánh giá năng lực ngoại ngữ (nếu Job có yêu cầu ngôn ngữ) |
 
 ### `hr_reviews`
-HR confirm hoặc override. `override_reason` bắt buộc khi `is_override = true`.
-Các cột `share_*` control những gì Candidate thấy trên Candidate Portal.
-
-| Cột | Ghi chú |
-|-----|---------|
-| `updated_at` | **[MỚI]** theo convention |
+HR Leader phê duyệt (`Confirm`) hoặc thay đổi kết quả AI (`Override`). Bắt buộc nhập `override_reason` khi có thay đổi verdict. Các cờ `share_*` kiểm soát nội dung hiển thị sang phía ứng viên trên portal.
 
 ---
 
 ## Phase 8 – Cheat Detection
 
 ### `cheat_detection_signals`
-Raw signals gửi từ frontend trong session:
-
-| `signal_type` | Mô tả |
-|---------------|-------|
-| `eye_tracking` | gaze estimation data |
-| `response_timing` | ms từ question → answer start |
-| `speech_pattern` | reading cadence detection |
-| `tab_switch` | tab switching event |
-| `focus_loss` | browser focus lost |
+Nhật ký các tín hiệu gian lận thu thập định kỳ từ thiết bị Kiosk frontend gửi lên trong phiên phỏng vấn: `eye_tracking`, `response_timing`, `speech_pattern` (cadence cadence), `tab_switch`, `focus_loss`.
 
 ---
 
-## Phase 10 – System Admin
+## Phase 10 – System Audit
 
 ### `audit_logs`
-Ghi mọi hành động quan trọng: `hr_confirm`, `hr_override`, `interview_code_generated`, `sso_login`, v.v.
+Nhật ký ghi nhận mọi thao tác quan trọng trên hệ thống để phục vụ quản trị và kiểm toán: đăng nhập, thay đổi cấu hình, tạo mã code, xác nhận/ghi đè đánh giá.
 
 ---
 
 ## Phase 11 – Integrations
 
 ### `webhook_deliveries`
-ATS webhook delivery log với retry tracking. Events: `application.submitted`, `interview.completed`, `evaluation.confirmed`.
+Nhật ký truyền tải dữ liệu tự động sang hệ thống ATS của doanh nghiệp (Workday, SuccessFactors, v.v.) qua webhook khi các sự kiện ứng tuyển/phỏng vấn hoàn tất.
 
 ---
 
-## Changelog (so với phiên bản trước)
+## Phase 2c – Online Test (Multiple Choice Quiz)
+
+### `online_test_questions`
+Ngân hàng câu hỏi trắc nghiệm riêng biệt cho từng tin tuyển dụng. HR có thể tạo bộ đề thi trắc nghiệm riêng cho từng vị trí.
+
+| Cột | Kiểu | Ghi chú |
+|-----|------|---------|
+| `job_posting_id` | UUID FK | Liên kết với `job_postings.id` |
+| `question_text` | TEXT | Nội dung câu hỏi trắc nghiệm |
+| `options` | JSONB | Mảng danh sách các lựa chọn trắc nghiệm (ví dụ: `["A", "B", "C", "D"]`) |
+| `correct_option` | INT | Số chỉ mục của đáp án đúng (0, 1, 2, 3) |
+
+### `online_test_submissions`
+Lưu kết quả nộp bài thi trắc nghiệm của ứng viên. Hệ thống tự động chấm điểm (`score`) dựa trên việc so khớp đáp án đã chọn với đáp án đúng của bộ đề.
+
+| Cột | Kiểu | Ghi chú |
+|-----|------|---------|
+| `application_id` | UUID FK | Liên kết hồ sơ ứng tuyển của ứng viên (`applications.id`) |
+| `round_number` | INT | Vòng thi thực hiện (ví dụ: 1 hoặc 2) |
+| `selected_answers` | JSONB | Bản ghi các đáp án ứng viên đã chọn (ví dụ: `{"q_uuid_1": 2, "q_uuid_2": 0}`) |
+| `score` | NUMERIC(5,2) | Điểm số đạt được (0.00 - 100.00) |
+| `is_passed` | BOOLEAN | Kết quả đạt hay trượt (Auto-evaluated) |
+
+---
+
+## Changelog cập nhật (Single-tenant & OAuth2 Domain Validation)
 
 | # | Thay đổi | Lý do |
 |---|----------|-------|
-| 1 | Thêm `candidate_accounts` + `candidate_refresh_tokens` | ADR-026: Job Board self-registration |
-| 2 | Thêm `is_public_listing` vào `job_postings` | tasks.md Phase 2b |
-| 3 | Thêm `candidate_account_id` + `source` vào `applications` | Phân biệt job_board vs invited flow |
-| 4 | Thêm `practice_session_used` vào `applications` | ADR-027: 1 lần per application |
-| 5 | Thêm `session_type` vào `interview_sessions` | ADR-027: practice vs real |
-| 6 | Thêm `session_type` vào `evaluations` | Nhất quán với interview_sessions |
-| 7 | Thêm `updated_at` vào `evaluations` + `hr_reviews` | Convention bắt buộc |
-| 8 | Thêm `error_message` vào `playbook_documents` | UX: hiển thị lý do lỗi parse |
-| 9 | Thêm `job_postings_active/limit` vào `subscriptions` | ADR-028: usage tracking |
-| 10 | Thêm index `expires_at` (partial) cho `interview_codes` | ADR-016: TTL validation performance |
-| 11 | Thêm index `next_retry_at` (partial) cho `webhook_deliveries` | ADR-022: retry logic |
-| 12 | Thêm các indexes mới cho `candidate_accounts`, `interview_sessions` session_type, `applications` candidate_account_id | Query performance |
-| 13 | Đổi role `candidate` ra khỏi `users.role` enum | Candidate không còn trong `users` table |
+| 1 | **Xóa bỏ** bảng `organizations` và `subscriptions` | Hệ thống chuyển sang **Single-tenant** (Dành riêng 1 doanh nghiệp sử dụng nội bộ), không cần phân tách dữ liệu đa tổ chức hay quản lý gói cước đa dạng. |
+| 2 | **Loại bỏ** cột `organization_id` ở tất cả các bảng | Đảm bảo tính tối giản của Single-tenant, loại bỏ nguy cơ lẫn lộn dữ liệu và giảm tải cấu trúc database. |
+| 3 | **Thêm** bảng `system_settings` | Quản trị và lưu trữ các thiết lập toàn hệ thống như danh sách Allowed Domain xác thực OAuth2, Webhook ATS, Slack, Teams toàn cục. |
+| 4 | **Loại bỏ** các cột `sso_provider` và `sso_metadata` cũ | Chuyển dịch từ mô hình SAML phức tạp sang OAuth2/OIDC chuẩn hóa và validate domain công ty trực tiếp ở Application layer. |
+| 5 | **Thay đổi** mặc định `job_postings.interview_mode` | Mặc định chuyển sang `'onsite'` do toàn bộ quy trình phỏng vấn thật bắt buộc tại công ty. |
+| 6 | **Dọn dẹp** toàn bộ indexes liên quan tới `organization_id` | Tối ưu hóa hiệu năng truy vấn, loại bỏ các index partition tenant không còn sử dụng. |
+| 7 | **Thêm** hai bảng `online_test_questions` và `online_test_submissions` | Hỗ trợ vòng thi trắc nghiệm trực tuyến (Online Test - Multiple Choice Test) độc lập, sạch sẽ, không ảnh hưởng đến dữ liệu phỏng vấn AI. |
 
 ---
 
 ## Quy tắc bắt buộc khi viết EF Core migration
 
-1. KHÔNG sử dụng `organization_id`. Hệ thống là Single-tenant nội bộ.
-2. Không xóa cứng dữ liệu quan trọng – dùng `deleted_at` (soft delete).
-3. Tên migration mô tả hành động: `AddInterviewSessionTable`, `AddCheatScoreToEvaluations`.
-4. Bật `pgvector` extension trước khi tạo `document_chunks` table.
-5. IVFFlat index trên `document_chunks.embedding` cần chạy riêng sau khi có đủ data (hoặc dùng HNSW cho dataset nhỏ).
-6. `session_type` phải được enforce ở Application layer (không chỉ DB) để ngăn Candidate dùng practice session > 1 lần.
-7. `practice_session_used` flag phải được set **atomic** cùng lúc tạo practice session để tránh race condition.
+1. **Tuyệt đối không sử dụng `organization_id`**. Hệ thống là Single-tenant hoàn chỉnh. Mọi thiết lập dùng chung qua `system_settings` or file cấu hình.
+2. Không bao giờ xóa vật lý dữ liệu quan trọng – bắt buộc sử dụng cột `deleted_at` (soft delete) cho các bảng chính.
+3. Bật extension `uuid-ossp` và `vector` tại file migration đầu tiên trước khi thiết lập các bảng.
+4. Trường `interview_mode` trong `job_postings` mặc định là `'onsite'`. Phân biệt phỏng vấn thử qua cột `session_type = 'practice'` trong `interview_sessions`.
+5. Tạo index `idx_webhook_deliveries_next_retry` và `idx_interview_codes_expires_at` với điều kiện lọc (partial index) để đảm bảo tốc độ vận hành cho các tác vụ nền.
+6. **Thiết lập hai bảng `online_test_questions` và `online_test_submissions` biệt lập** cho trắc nghiệm thay vì gộp chung vào bảng AI Interview để đảm bảo code gọn gàng, dữ liệu sạch và dễ quản lý dài hạn.
+
