@@ -26,7 +26,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Tạo GitHub repository (private, tên `ARISP`)
 - [ ] Thêm toàn bộ thành viên vào repo với quyền phù hợp (Admin / Write)
 - [ ] Thiết lập **branch strategy:**
-  - `main` – production-ready, chỉ merge qua PR được review
+  - `main` – production-ready, chỉ merge qua Pull Request được review
   - `develop` – integration branch, merge từ các feature branch
   - `feature/<tên-feature>` – ví dụ: `feature/auth-jwt`
   - `fix/<mô-tả-lỗi>` – ví dụ: `fix/jwt-refresh-token-expiry`
