@@ -50,8 +50,7 @@ namespace ARISP.API.Controllers
                 AccessToken = token,
                 RefreshToken = Guid.NewGuid().ToString("N"),
                 FullName = user.FullName ?? "HR Recruiter",
-                Role = user.Role,
-                OrganizationId = user.OrganizationId
+                Role = user.Role
             };
 
             return Ok(response);
@@ -82,7 +81,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpGet("magic-link/verify")]
-        public async Task<IActionResult> VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
+        public IActionResult VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
         {
             // Simply verify email magic link for Candidate Portal access
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
@@ -101,8 +100,7 @@ namespace ARISP.API.Controllers
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("organization_id", user.OrganizationId.ToString())
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
             var token = new JwtSecurityToken(
