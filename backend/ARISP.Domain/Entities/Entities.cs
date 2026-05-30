@@ -3,28 +3,9 @@ using System.Collections.Generic;
 
 namespace ARISP.Domain.Entities
 {
-    public class Organization : ISoftDelete
+    public class User : ISoftDelete
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string Name { get; set; } = string.Empty;
-        public string Slug { get; set; } = string.Empty;
-        public string Plan { get; set; } = "basic"; // basic | professional | enterprise
-        public bool IsActive { get; set; } = true;
-        public string? SsoProvider { get; set; }
-        public string? SsoMetadata { get; set; }
-        public string? AtsWebhookUrl { get; set; }
-        public string? AtsWebhookSecret { get; set; }
-        public string? SlackWebhookUrl { get; set; }
-        public string? TeamsWebhookUrl { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset? DeletedAt { get; set; }
-    }
-
-    public class User : ISoftDelete, IMultiTenant
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; } // references organization (nullable only for super admin in schema, Guid here)
         public string Email { get; set; } = string.Empty;
         public string? PasswordHash { get; set; }
         public string Role { get; set; } = "recruiter"; // super_admin | hr_admin | recruiter
@@ -84,10 +65,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class JobPosting : ISoftDelete, IMultiTenant
+    public class JobPosting : ISoftDelete
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid CreatedByUserId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
@@ -121,10 +101,9 @@ namespace ARISP.Domain.Entities
         public int MaxDurationMinutes { get; set; } = 45;
     }
 
-    public class Application : ISoftDelete, IMultiTenant
+    public class Application : ISoftDelete
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid JobPostingId { get; set; }
         public Guid? CandidateAccountId { get; set; }
         public string CandidateEmail { get; set; } = string.Empty;
@@ -173,10 +152,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class InterviewCode : IMultiTenant
+    public class InterviewCode
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid ApplicationId { get; set; }
         public int RoundNumber { get; set; } = 1;
         public string Code { get; set; } = string.Empty; // ARX-7K2P
@@ -186,10 +164,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class InterviewSession : IMultiTenant
+    public class InterviewSession
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid ApplicationId { get; set; }
         public int RoundNumber { get; set; } = 1;
         public string RoundType { get; set; } = string.Empty;
@@ -229,10 +206,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class DocumentChunk : IMultiTenant
+    public class DocumentChunk
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public string SourceType { get; set; } = string.Empty; // jd | cv | playbook
         public Guid SourceId { get; set; }
         public int ChunkIndex { get; set; }
@@ -242,10 +218,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class PlaybookDocument : ISoftDelete, IMultiTenant
+    public class PlaybookDocument : ISoftDelete
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public string Scope { get; set; } = "org"; // org | job_posting | round
         public Guid? ScopeRefId { get; set; }
         public int? RoundNumber { get; set; }
@@ -272,10 +247,9 @@ namespace ARISP.Domain.Entities
         public Guid? QuestionId { get; set; }
     }
 
-    public class Evaluation : IMultiTenant
+    public class Evaluation
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid SessionId { get; set; }
         public Guid ApplicationId { get; set; }
         public int RoundNumber { get; set; }
@@ -293,10 +267,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class HrReview : IMultiTenant
+    public class HrReview
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid EvaluationId { get; set; }
         public Guid ReviewedByUserId { get; set; }
         public string FinalVerdict { get; set; } = "not_pass"; // pass | not_pass
@@ -320,29 +293,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset RecordedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class Subscription : IMultiTenant
+    public class AuditLog
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
-        public string Plan { get; set; } = "basic"; // basic | professional | enterprise
-        public string Status { get; set; } = "active"; // active | suspended | cancelled
-        public string BillingCycle { get; set; } = "monthly"; // monthly | annual
-        public DateTimeOffset CurrentPeriodStart { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset CurrentPeriodEnd { get; set; } = DateTimeOffset.UtcNow.AddMonths(1);
-        public int SessionsUsed { get; set; } = 0;
-        public int? SessionsLimit { get; set; }
-        public int JobPostingsActive { get; set; } = 0;
-        public int? JobPostingsLimit { get; set; }
-        public int StorageUsedMb { get; set; } = 0;
-        public int? StorageLimitMb { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
-    }
-
-    public class AuditLog : IMultiTenant
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public Guid? ActorUserId { get; set; }
         public string Action { get; set; } = string.Empty;
         public string? EntityType { get; set; }
@@ -352,10 +305,9 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
-    public class WebhookDelivery : IMultiTenant
+    public class WebhookDelivery
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid OrganizationId { get; set; }
         public string EventType { get; set; } = string.Empty;
         public string Payload { get; set; } = "{}"; // JSON payload
         public int? ResponseStatus { get; set; }

@@ -25,15 +25,6 @@ namespace ARISP.Infrastructure.Services
             }
         }
 
-        public Guid? OrganizationId
-        {
-            get
-            {
-                var orgClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("organization_id")?.Value;
-                return Guid.TryParse(orgClaim, out var parsedGuid) ? parsedGuid : null;
-            }
-        }
-
         public string? Role => _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value
                                 ?? _httpContextAccessor.HttpContext?.User?.FindFirst("role")?.Value;
     }

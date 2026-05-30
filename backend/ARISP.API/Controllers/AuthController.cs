@@ -41,7 +41,7 @@ namespace ARISP.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateLogin([FromBody] LoginRequest request)
         {
-            // 🛡️ ĐÃ SỬA: Bảo mật biệt lập cổng, không quét thông tin vào bảng Users nội bộ nữa
+            // Bảo mật biệt lập cổng, không quét thông tin vào bảng Users nội bộ nữa
             var candidate = await _dbContext.CandidateAccounts
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(c => c.Email == request.Email);
@@ -54,13 +54,14 @@ namespace ARISP.API.Controllers
                 return Unauthorized(new { message = "Invalid email or password." });
 
             var token = GenerateJwtTokenForCandidate(candidate);
+
+            // 🛡️ ĐÃ SỬA: Giải quyết xong Conflict & Loại bỏ hoàn toàn OrganizationId
             return Ok(new AuthResponse
             {
                 AccessToken = token,
                 RefreshToken = Guid.NewGuid().ToString("N"),
                 FullName = candidate.FullName ?? "Candidate",
-                Role = AppRoles.Candidate,
-                OrganizationId = Guid.Empty
+                Role = AppRoles.Candidate
             });
         }
 
@@ -135,25 +136,16 @@ namespace ARISP.API.Controllers
                 return Redirect(redirectUrl);
             }
 
-            // 🚀 ĐÃ SỬA LUỒNG JIT PROVISIONING: Khởi tạo User mới ở trạng thái chờ duyệt hoàn toàn
-            Guid orgId;
-            var cfgOrg = _configuration["Authentication:DefaultOrganizationId"] ?? _configuration["Auth:DefaultOrganizationId"];
-            if (!Guid.TryParse(cfgOrg, out orgId))
-            {
-                var firstOrg = await _dbContext.Organizations.FirstOrDefaultAsync();
-                orgId = firstOrg?.Id ?? Guid.Empty;
-            }
-
+            // 🚀 ĐÃ SỬA LUỒNG JIT PROVISIONING: Loại bỏ hoàn toàn truy vết tới bảng Organizations
             var newUser = new User
             {
                 Id = Guid.NewGuid(),
-                OrganizationId = orgId == Guid.Empty ? Guid.NewGuid() : orgId,
                 Email = email,
                 PasswordHash = "password", // Đánh dấu tài khoản SSO
-                Role = "Pending", // 🛡️ ĐÃ SỬA: Để trống vai trò thực tế, gán nhãn Chờ duyệt để Super Admin vào cấp quyền chuẩn sau
+                Role = "Pending",                      // Khởi tạo trạng thái chờ duyệt tuyển dụng
                 FullName = name,
                 Department = null,
-                IsActive = false // Chờ SuperAdmin kích hoạt mới được cấp quyền truy cập
+                IsActive = false                       // Chờ SuperAdmin hoặc HR Admin duyệt kích hoạt
             };
 
             await _dbContext.Users.AddAsync(newUser);
@@ -231,7 +223,7 @@ namespace ARISP.API.Controllers
         /// CỔNG ĐĂNG NHẬP 3: XÁC THỰC PASSWORDLESS CHO CANDIDATE PORTAL QUA MAGIC LINK
         /// </summary>
         [HttpGet("magic-link/verify")]
-        [AllowAnonymous]
+        [AllowAnonymous] // Đã sửa gộp Conflict: Đảm bảo cổng Magic Link cho phép gọi ẩn danh không cần Bearer Token trước
         public async Task<IActionResult> VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
         {
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
@@ -253,7 +245,7 @@ namespace ARISP.API.Controllers
 
         private string GenerateJwtTokenForUser(User user)
         {
-            // 🛡️ ĐÃ SỬA: Map quyền chuẩn hóa an toàn dựa theo dữ liệu thực tế từ AppRoles
+            // Map quyền chuẩn hóa an toàn dựa theo dữ liệu thực tế từ AppRoles
             var roleClaimValue = user.Role switch
             {
                 "super_admin" => AppRoles.SuperAdmin,
@@ -262,12 +254,12 @@ namespace ARISP.API.Controllers
                 _ => user.Role
             };
 
+            // 🛡️ ĐÃ SỬA: Đã giải quyết Conflict và lược bỏ hoàn toàn Claim "organization_id"
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, roleClaimValue),
-                new Claim("organization_id", user.OrganizationId.ToString())
+                new Claim(ClaimTypes.Role, roleClaimValue)
             };
 
             return CreateTokenString(claims);

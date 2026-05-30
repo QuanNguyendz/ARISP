@@ -10,14 +10,12 @@ namespace ARISP.Infrastructure.Repositories
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ARISPDbContext _context;
-        private readonly ICurrentUserService _currentUserService;
         private readonly ConcurrentDictionary<string, object> _repositories;
         private bool _disposed;
 
-        public UnitOfWork(ARISPDbContext context, ICurrentUserService currentUserService)
+        public UnitOfWork(ARISPDbContext context)
         {
             _context = context;
-            _currentUserService = currentUserService;
             _repositories = new ConcurrentDictionary<string, object>();
         }
 
@@ -26,7 +24,7 @@ namespace ARISP.Infrastructure.Repositories
             var type = typeof(T).Name;
 
             return (IRepository<T>)_repositories.GetOrAdd(type, _ => 
-                new Repository<T>(_context, _currentUserService));
+                new Repository<T>(_context));
         }
 
         public async Task<int> SaveChangesAsync(CancellationToken ct = default)

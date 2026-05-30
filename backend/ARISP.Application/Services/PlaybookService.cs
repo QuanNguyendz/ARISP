@@ -18,11 +18,10 @@ namespace ARISP.Application.Services
             _embeddingProvider = embeddingProvider;
         }
 
-        public async Task<PlaybookDocument> UploadPlaybookAsync(Guid organizationId, Guid uploadedByUserId, string scope, Guid? scopeRefId, int? roundNumber, string documentType, string fileName, string fileUrl, string fileFormat, string parsedText, CancellationToken ct = default)
+        public async Task<PlaybookDocument> UploadPlaybookAsync(Guid uploadedByUserId, string scope, Guid? scopeRefId, int? roundNumber, string documentType, string fileName, string fileUrl, string fileFormat, string parsedText, CancellationToken ct = default)
         {
             var document = new PlaybookDocument
             {
-                OrganizationId = organizationId,
                 Scope = scope,
                 ScopeRefId = scopeRefId,
                 RoundNumber = roundNumber,
@@ -48,7 +47,6 @@ namespace ARISP.Application.Services
                     var embedding = await _embeddingProvider.EmbedAsync(chunkText, ct);
                     var chunk = new DocumentChunk
                     {
-                        OrganizationId = organizationId,
                         SourceType = "playbook",
                         SourceId = document.Id,
                         ChunkIndex = chunkIndex++,

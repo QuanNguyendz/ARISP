@@ -21,7 +21,7 @@ namespace ARISP.Application.Services
             _embeddingProvider = embeddingProvider;
         }
 
-        public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(Guid organizationId, SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
+        public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
         {
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(request.JobPostingId, ct);
             if (jobPosting == null)
@@ -29,7 +29,6 @@ namespace ARISP.Application.Services
 
             var application = new ARISP.Domain.Entities.Application
             {
-                OrganizationId = organizationId,
                 JobPostingId = request.JobPostingId,
                 CandidateEmail = request.CandidateEmail,
                 CandidateName = request.CandidateName,
@@ -53,7 +52,6 @@ namespace ARISP.Application.Services
                     var embedding = await _embeddingProvider.EmbedAsync(chunkText, ct);
                     var chunk = new DocumentChunk
                     {
-                        OrganizationId = organizationId,
                         SourceType = "cv",
                         SourceId = application.Id,
                         ChunkIndex = chunkIndex++,

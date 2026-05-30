@@ -33,7 +33,6 @@ namespace ARISP.API.Controllers
                     u.Email,
                     u.Role,
                     u.FullName,
-                    u.OrganizationId,
                     u.CreatedAt
                 })
                 .ToListAsync();
@@ -63,7 +62,6 @@ namespace ARISP.API.Controllers
             var audit = new AuditLog
             {
                 Id = Guid.NewGuid(),
-                OrganizationId = user.OrganizationId,
                 ActorUserId = actorId,
                 Action = "user_approved",
                 EntityType = "User",

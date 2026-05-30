@@ -65,7 +65,7 @@ namespace ARISP.Infrastructure.Services
             return vector;
         }
 
-        public async Task<IEnumerable<DocumentChunk>> RetrieveAsync(Guid organizationId, Guid? sourceId, float[] queryVector, int topK = 5, CancellationToken ct = default)
+        public async Task<IEnumerable<DocumentChunk>> RetrieveAsync(Guid? sourceId, float[] queryVector, int topK = 5, CancellationToken ct = default)
         {
             // Convert vector to pgvector string representation: [0.1, 0.2, 0.3...]
             var vectorString = $"[{string.Join(",", queryVector)}]";
@@ -74,15 +74,15 @@ namespace ARISP.Infrastructure.Services
             if (sourceId.HasValue)
             {
                 return await _context.DocumentChunks
-                    .FromSqlRaw("SELECT * FROM document_chunks WHERE organization_id = {0} AND source_id = {1} ORDER BY embedding <=> {2}::vector LIMIT {3}",
-                        organizationId, sourceId.Value, vectorString, topK)
+                    .FromSqlRaw("SELECT * FROM document_chunks WHERE source_id = {0} ORDER BY embedding <=> {1}::vector LIMIT {2}",
+                        sourceId.Value, vectorString, topK)
                     .ToListAsync(ct);
             }
             else
             {
                 return await _context.DocumentChunks
-                    .FromSqlRaw("SELECT * FROM document_chunks WHERE organization_id = {0} ORDER BY embedding <=> {1}::vector LIMIT {2}",
-                        organizationId, vectorString, topK)
+                    .FromSqlRaw("SELECT * FROM document_chunks ORDER BY embedding <=> {0}::vector LIMIT {1}",
+                        vectorString, topK)
                     .ToListAsync(ct);
             }
         }

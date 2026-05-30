@@ -20,15 +20,9 @@ namespace ARISP.API.Controllers
 
         [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> SubmitApplication([FromHeader(Name = "X-Organization-Id")] string orgIdStr, [FromBody] SubmitApplicationRequest request)
+        public async Task<IActionResult> SubmitApplication([FromBody] SubmitApplicationRequest request)
         {
-            if (!Guid.TryParse(orgIdStr, out var orgId))
-            {
-                // If orgId is not provided in header, let's use a default organization
-                orgId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-            }
-
-            var result = await _applicationService.SubmitApplicationAsync(orgId, request, "job_board");
+            var result = await _applicationService.SubmitApplicationAsync(request, "job_board");
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });

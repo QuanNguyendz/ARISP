@@ -29,18 +29,13 @@ namespace ARISP.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request)
         {
-            var orgId = _currentUserService.OrganizationId ?? Guid.Empty;
             var userId = _currentUserService.UserId ?? Guid.Empty;
-
-            if (orgId == Guid.Empty)
-                return Unauthorized(new { message = "Organization scope missing." });
 
             // Auto detect language requirement from JD
             var detectedLang = await _aiProvider.DetectLanguageRequirementAsync(request.JobDescription, default);
 
             var job = new JobPosting
             {
-                OrganizationId = orgId,
                 CreatedByUserId = userId,
                 Title = request.Title,
                 Department = request.Department,

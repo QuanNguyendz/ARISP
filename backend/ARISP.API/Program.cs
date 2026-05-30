@@ -138,23 +138,23 @@ builder.Services.AddAuthentication(options =>
     // 🛡️ Nếu trống, gán chuỗi Mock để tránh crash pipeline khi chạy Local/Swagger
     options.ClientId = string.IsNullOrEmpty(googleClientId) ? "MOCK_GOOGLE_CLIENT_ID_FOR_LOCAL" : googleClientId;
     options.ClientSecret = string.IsNullOrEmpty(googleSecret) ? "MOCK_GOOGLE_SECRET_FOR_LOCAL" : googleSecret;
-})
-// Azure AD / Microsoft Entra (OpenID Connect)
-.AddOpenIdConnect("AzureAD", options =>
-{
-    options.SignInScheme = "External";
-
-    var azureAuthority = builder.Configuration["Authentication:AzureAd:Authority"] ?? Environment.GetEnvironmentVariable("AZURE_AD_AUTHORITY");
-    var azureClientId = builder.Configuration["Authentication:AzureAd:ClientId"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
-    var azureSecret = builder.Configuration["Authentication:AzureAd:ClientSecret"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");
-
-    options.Authority = string.IsNullOrEmpty(azureAuthority) ? "https://login.microsoftonline.com/common/v2.0" : azureAuthority;
-    options.ClientId = string.IsNullOrEmpty(azureClientId) ? "00000000-0000-0000-0000-000000000000" : azureClientId;
-    options.ClientSecret = string.IsNullOrEmpty(azureSecret) ? "MOCK_AZURE_SECRET_FOR_LOCAL" : azureSecret;
-
-    options.ResponseType = "code";
-    options.SaveTokens = true;
 });
+//// Azure AD / Microsoft Entra (OpenID Connect)
+//.AddOpenIdConnect("AzureAD", options =>
+//{
+//    options.SignInScheme = "External";
+
+//    var azureAuthority = builder.Configuration["Authentication:AzureAd:Authority"] ?? Environment.GetEnvironmentVariable("AZURE_AD_AUTHORITY");
+//    var azureClientId = builder.Configuration["Authentication:AzureAd:ClientId"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
+//    var azureSecret = builder.Configuration["Authentication:AzureAd:ClientSecret"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");
+
+//    options.Authority = string.IsNullOrEmpty(azureAuthority) ? "https://login.microsoftonline.com/common/v2.0" : azureAuthority;
+//    options.ClientId = string.IsNullOrEmpty(azureClientId) ? "00000000-0000-0000-0000-000000000000" : azureClientId;
+//    options.ClientSecret = string.IsNullOrEmpty(azureSecret) ? "MOCK_AZURE_SECRET_FOR_LOCAL" : azureSecret;
+
+//    options.ResponseType = "code";
+//    options.SaveTokens = true;
+//});
 
 builder.Services.AddAuthorization(options =>
 {
@@ -225,36 +225,18 @@ async Task SeedDataAsync(ARISPDbContext db)
 {
     Console.WriteLine("Seeding ARISP prototype databases...");
 
-    var orgId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     var userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     var jobId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     var candidateId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     var appId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
-    // 1. Organization
-    var org = await db.Organizations.IgnoreQueryFilters().FirstOrDefaultAsync(o => o.Id == orgId);
-    if (org == null)
-    {
-        org = new Organization
-        {
-            Id = orgId,
-            Name = "ARISP Enterprise Ltd",
-            Slug = "arisp-enterprise",
-            Plan = "professional",
-            IsActive = true
-        };
-        await db.Organizations.AddAsync(org);
-        await db.SaveChangesAsync();
-    }
-
-    // 2. HR User
+    // 1. HR User
     var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId);
     if (user == null)
     {
         user = new User
         {
             Id = userId,
-            OrganizationId = orgId,
             Email = "hr@arisp.com",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             Role = AppRoles.HrAdmin,
@@ -266,14 +248,13 @@ async Task SeedDataAsync(ARISPDbContext db)
         await db.SaveChangesAsync();
     }
 
-    // 3. Job Posting
+    // 2. Job Posting
     var job = await db.JobPostings.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId);
     if (job == null)
     {
         job = new JobPosting
         {
             Id = jobId,
-            OrganizationId = orgId,
             CreatedByUserId = userId,
             Title = "Senior Backend Engineer (.NET & AI)",
             Department = "IT Engineering",
@@ -300,7 +281,7 @@ async Task SeedDataAsync(ARISPDbContext db)
         await db.SaveChangesAsync();
     }
 
-    // 4. Candidate Account
+    // 3. Candidate Account
     var candidate = await db.CandidateAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == candidateId);
     if (candidate == null)
     {
@@ -317,14 +298,13 @@ async Task SeedDataAsync(ARISPDbContext db)
         await db.SaveChangesAsync();
     }
 
-    // 5. Application
+    // 4. Application
     var appRecord = await db.Applications.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == appId);
     if (appRecord == null)
     {
         appRecord = new Application
         {
             Id = appId,
-            OrganizationId = orgId,
             JobPostingId = jobId,
             CandidateAccountId = candidateId,
             CandidateEmail = "candidate@example.com",

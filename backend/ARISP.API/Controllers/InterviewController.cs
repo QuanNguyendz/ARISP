@@ -20,14 +20,9 @@ namespace ARISP.API.Controllers
 
         [HttpPost("session/start")]
         [Authorize(Policy = "CandidateOnly")]
-        public async Task<IActionResult> StartSession([FromHeader(Name = "X-Organization-Id")] string orgIdStr, [FromBody] StartSessionRequest request)
+        public async Task<IActionResult> StartSession([FromBody] StartSessionRequest request)
         {
-            if (!Guid.TryParse(orgIdStr, out var orgId))
-            {
-                orgId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-            }
-
-            var result = await _interviewService.StartSessionAsync(orgId, request);
+            var result = await _interviewService.StartSessionAsync(request);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
