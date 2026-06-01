@@ -1,12 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace ARISP.Application.DTOs
 {
     // Auth DTOs
     public class LoginRequest
     {
+        [Required]
+        [EmailAddress]
         public string Email { get; set; } = string.Empty;
+        [Required]
         public string Password { get; set; } = string.Empty;
     }
 
@@ -20,6 +24,22 @@ namespace ARISP.Application.DTOs
 
     public class CandidateRegisterRequest
     {
+        //[Required(ErrorMessage = "Email là bắt buộc.")]
+        //[EmailAddress(ErrorMessage = "Định dạng Email không hợp lệ.")]
+        //public string Email { get; set; } = null!;
+
+        //[Required(ErrorMessage = "Mật khẩu là bắt buộc.")]
+        //[MinLength(8, ErrorMessage = "Mật khẩu phải có tối thiểu 8 ký tự.")]
+        //[MaxLength(30, ErrorMessage = "Mật khẩu không được vượt quá 30 ký tự.")]
+        //// Yêu cầu: Ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt
+        //[RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,30}$",
+        //    ErrorMessage = "Mật khẩu phải bao gồm ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt.")]
+        //public string Password { get; set; } = null!;
+
+        //[Required(ErrorMessage = "Họ và tên là bắt buộc.")]
+        //public string FullName { get; set; } = null!;
+
+        //public string? Phone { get; set; }
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
