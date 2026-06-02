@@ -22,6 +22,11 @@ namespace ARISP.Application.DTOs
         public string Role { get; set; } = string.Empty;
     }
 
+    public class FirebaseAuthResponse : AuthResponse
+    {
+        public string FirebaseUid { get; set; } = string.Empty;
+    }
+
     public class CandidateRegisterRequest
     {
         //[Required(ErrorMessage = "Email là bắt buộc.")]

@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-05-30
+**Last updated:** 2026-06-02
 
 ---
 
@@ -241,3 +241,12 @@ _Chưa có task nào đang thực hiện._
   - [ ] Language proficiency benchmark
   - [ ] Time-to-hire metrics
   - [ ] Cheat Detection aggregate stats
+
+---
+
+## Completed
+
+- [x] 2026-06-02: Linked Firebase project `arisp-auth-service` to the React frontend and ASP.NET Core backend auth bridge.
+  - Added frontend Firebase SDK config via `VITE_FIREBASE_*`.
+  - Added Candidate Firebase email/password auth flow with backend token exchange.
+  - Added ASP.NET Core named Firebase JWT bearer validation and `POST /api/auth/firebase/candidate/login`.

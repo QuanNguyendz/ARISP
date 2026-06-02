@@ -66,6 +66,67 @@ namespace ARISP.API.Controllers
         }
 
         /// <summary>
+        /// CỔNG ĐĂNG NHẬP FIREBASE: Backend xác thực Firebase ID token rồi cấp JWT nội bộ ARISP.
+        /// Frontend gửi Authorization: Bearer {firebase_id_token}.
+        /// </summary>
+        [HttpPost("firebase/candidate/login")]
+        [Authorize(AuthenticationSchemes = "Firebase")]
+        public async Task<IActionResult> FirebaseCandidateLogin()
+        {
+            var firebaseUid = User.FindFirst("user_id")?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+            var email = User.FindFirst(ClaimTypes.Email)?.Value
+                ?? User.FindFirst("email")?.Value;
+            var name = User.FindFirst(ClaimTypes.Name)?.Value
+                ?? User.FindFirst("name")?.Value
+                ?? email;
+
+            if (string.IsNullOrWhiteSpace(firebaseUid) || string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized(new { message = "Firebase token does not contain required user identity claims." });
+            }
+
+            var candidateEmail = email;
+            var candidateName = string.IsNullOrWhiteSpace(name) ? candidateEmail : name;
+
+            var candidate = await _dbContext.CandidateAccounts
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Email == candidateEmail);
+
+            if (candidate == null)
+            {
+                candidate = new CandidateAccount
+                {
+                    Id = Guid.NewGuid(),
+                    Email = candidateEmail,
+                    PasswordHash = "FIREBASE_AUTH",
+                    FullName = candidateName,
+                    EmailVerified = true
+                };
+
+                await _dbContext.CandidateAccounts.AddAsync(candidate);
+                await _dbContext.SaveChangesAsync();
+            }
+            else if (!candidate.EmailVerified)
+            {
+                candidate.EmailVerified = true;
+                await _dbContext.SaveChangesAsync();
+            }
+
+            var token = GenerateJwtTokenForCandidate(candidate);
+
+            return Ok(new FirebaseAuthResponse
+            {
+                AccessToken = token,
+                RefreshToken = Guid.NewGuid().ToString("N"),
+                FullName = candidate.FullName ?? "Candidate",
+                Role = AppRoles.Candidate,
+                FirebaseUid = firebaseUid
+            });
+        }
+
+        /// <summary>
         /// CỔNG ĐĂNG NHẬP 2: ĐIỀU HƯỚNG CHALLENGE OAUTH2 (Dành cho nội bộ Super Admin, HR Leader, Recruiter)
         /// </summary>
         [HttpGet("external/signin")]
@@ -156,7 +217,7 @@ namespace ARISP.API.Controllers
             return Redirect(createdPendingUrl);
         }
 
-        private string BuildRedirectUrl(string returnUrl, (string, string)[] queryPairs = null, string fragment = null)
+        private string BuildRedirectUrl(string returnUrl, (string, string)[]? queryPairs = null, string? fragment = null)
         {
             var adminFrontend = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? string.Empty;
 

@@ -121,6 +121,23 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role // Explicitly map role claim
     };
 })
+.AddJwtBearer("Firebase", options =>
+{
+    var firebaseProjectId = builder.Configuration["Authentication:Firebase:ProjectId"]
+        ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID")
+        ?? "arisp-auth-service";
+
+    options.Authority = $"https://securetoken.google.com/{firebaseProjectId}";
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
+        ValidateAudience = true,
+        ValidAudience = firebaseProjectId,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true
+    };
+})
 // External cookie to receive external provider claims
 .AddCookie("External", options =>
 {
@@ -131,6 +148,7 @@ builder.Services.AddAuthentication(options =>
 .AddGoogle("Google", options =>
 {
     options.SignInScheme = "External";
+    options.CallbackPath = "/api/auth/external/google-callback";
 
     var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
     var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");

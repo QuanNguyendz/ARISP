@@ -26,6 +26,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dayjs": "^1.11.12",
+    "firebase": "^12.14.0",
     "framer-motion": "^12.40.0",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^1.16.0",

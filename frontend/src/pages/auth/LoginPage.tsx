@@ -49,7 +49,7 @@ export default function LoginPage() {
 
   const handleOAuthLogin = () => {
     setOauthLoading(true);
-    const returnUrl = encodeURIComponent(window.location.origin + '/auth/login');
+    const returnUrl = window.location.origin + '/auth/login';
     window.location.href = authService.buildOAuthRedirectUrl('Google', returnUrl);
   };
 
