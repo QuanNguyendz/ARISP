@@ -45,12 +45,11 @@ export default function LoginPage() {
       );
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [navigate, searchParams, setAuthFromResponse]);
 
   const handleOAuthLogin = () => {
     setOauthLoading(true);
-    const returnUrl = encodeURIComponent(window.location.origin + '/auth/login');
-    window.location.href = authService.buildOAuthRedirectUrl('Google', returnUrl);
+    window.location.href = authService.buildOAuthRedirectUrl('Google', '/auth/login');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,14 +58,15 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await authService.candidateLogin({ email, password });
+      const response = await authService.employerLogin({ email, password });
       const user = setAuthFromResponse(response);
 
       if (user.role === 'Candidate') {
-        navigate('/candidate/portal');
-      } else {
-        navigate('/admin/dashboard');
+        setError('Tài khoản này là tài khoản ứng viên. Vui lòng đăng nhập bằng màn dành cho ứng viên.');
+        return;
       }
+
+      navigate('/admin/dashboard');
     } catch (err: any) {
       setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
@@ -76,7 +76,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary flex">
-      {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -84,7 +83,6 @@ export default function LoginPage() {
           transition={{ duration: 0.6 }}
           className="w-full max-w-md"
         >
-          {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
               <Brain className="w-6 h-6 text-white" />
@@ -92,13 +90,11 @@ export default function LoginPage() {
             <span className="text-2xl font-semibold text-white">ARISP</span>
           </div>
 
-          {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-semibold text-white mb-3">Chào mừng trở lại</h1>
             <p className="text-text-secondary">Đăng nhập để quản lý hoạt động tuyển dụng của bạn</p>
           </div>
 
-          {/* OAuth Pending / Error Message */}
           {oauthMessage && (
             <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -106,13 +102,9 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-white/80 mb-2">Email</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
                 <input
@@ -126,12 +118,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-white/80">
-                  Mật khẩu
-                </label>
+                <label className="block text-sm font-medium text-white/80">Mật khẩu</label>
                 <button type="button" className="text-sm text-accent-primary hover:text-accent-secondary transition-colors">
                   Quên mật khẩu?
                 </button>
@@ -156,7 +145,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
@@ -164,7 +152,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Remember */}
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -176,7 +163,6 @@ export default function LoginPage() {
               </label>
             </div>
 
-            {/* Submit */}
             <motion.button
               type="submit"
               disabled={isLoading}
@@ -195,7 +181,6 @@ export default function LoginPage() {
             </motion.button>
           </form>
 
-          {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/10" />
@@ -205,7 +190,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* SSO */}
           <button
             onClick={handleOAuthLogin}
             disabled={oauthLoading}
@@ -221,18 +205,6 @@ export default function LoginPage() {
             Đăng nhập với Google
           </button>
 
-          {/* Register */}
-          <p className="text-center mt-8 text-text-secondary">
-            Chưa có tài khoản?{' '}
-            <Link
-              to="/auth/register"
-              className="text-accent-primary hover:text-accent-secondary transition-colors font-medium"
-            >
-              Đăng ký ngay
-            </Link>
-          </p>
-
-          {/* Back to Candidate */}
           <p className="text-center mt-4">
             <Link
               to="/auth/candidate-login"
@@ -244,15 +216,12 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      {/* Right Side - Decorative */}
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-accent-primary/10 via-bg-secondary to-violet/10 relative overflow-hidden">
-        {/* Background elements */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent-primary/20 rounded-full blur-[100px]" />
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet/20 rounded-full blur-[100px]" />
         </div>
 
-        {/* Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -266,7 +235,6 @@ export default function LoginPage() {
             AI tự động phỏng vấn và đánh giá ứng viên, giúp bạn tìm kiếm nhân tài nhanh hơn 10 lần.
           </p>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
             {[
               { value: '2M+', label: 'Phỏng vấn' },
@@ -284,3 +252,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

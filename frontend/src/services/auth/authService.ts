@@ -3,8 +3,8 @@ import type {
   AuthResponse,
   CandidateRegisterRequest,
   User,
-} from '../../types/auth';
-import { API_BASE_URL } from '@config/constants';
+} from '../../types/auth/auth.types';
+import { API_BASE_URL, ROLES } from '@config/constants';
 
 export interface RegisterRequest {
   email: string;
@@ -26,6 +26,20 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export const authService = {
+  async employerLogin(_credentials: LoginRequest): Promise<AuthResponse> {
+    if (USE_FAKE_AUTH) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return {
+        accessToken: 'mock-employer-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'HR Admin',
+        role: ROLES.HRAdmin,
+      };
+    }
+
+    window.location.href = authService.buildOAuthRedirectUrl('Google', `${window.location.origin}/auth/login`);
+    throw new Error('Redirecting to Google sign-in');
+  },
 
   async candidateLogin(credentials: LoginRequest): Promise<AuthResponse> {
     if (USE_FAKE_AUTH) {
@@ -34,7 +48,7 @@ export const authService = {
         accessToken: 'mock-candidate-token-' + Date.now(),
         refreshToken: 'mock-refresh-token-' + Date.now(),
         fullName: 'Nguyễn Văn An',
-        role: 'Candidate',
+        role: ROLES.Candidate,
       };
     }
 
@@ -69,7 +83,7 @@ export const authService = {
         accessToken: 'mock-magic-link-token-' + Date.now(),
         refreshToken: 'mock-refresh-token-' + Date.now(),
         fullName: 'Nguyễn Văn An',
-        role: 'Candidate',
+        role: ROLES.Candidate,
       };
     }
 
@@ -83,7 +97,7 @@ export const authService = {
       accessToken: data.token,
       refreshToken: '',
       fullName: '',
-      role: 'Candidate',
+      role: ROLES.Candidate,
     };
   },
 
@@ -110,7 +124,7 @@ export const authService = {
         id: 'mock-user',
         email: 'mock@arisp.com',
         name: 'Mock User',
-        role: 'Candidate',
+        role: ROLES.Candidate,
       };
     }
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
@@ -121,7 +135,7 @@ export const authService = {
 
   buildOAuthRedirectUrl(provider: string = 'Google', returnUrl: string = '/'): string {
     const encodedReturnUrl = encodeURIComponent(returnUrl);
-    return `${API_BASE_URL}/auth/external/signin?provider=${provider}&returnUrl=${encodedReturnUrl}`;
+    return `${API_BASE_URL}/auth/external/signin?provider=${encodeURIComponent(provider)}&returnUrl=${encodedReturnUrl}`;
   },
 
   parseOAuthCallback(url: string): { accessToken?: string; role?: string; status?: string; message?: string } {
