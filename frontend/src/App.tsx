@@ -96,17 +96,17 @@ function App() {
 
       <Route element={<AdminLayout />}>
         <Route path="/admin/dashboard" element={<DashboardPage />} />
-        <Route path="/quan-ly/tin-tuyen-dung" element={<JobPostingsPage />} />
-        <Route path="/quan-ly/tin-tuyen-dung/tao-moi" element={<CreateJobPostingPage />} />
-        <Route path="/quan-ly/tin-tuyen-dung/:id" element={<JobPostingDetailPage />} />
-        <Route path="/quan-ly/ung-vien" element={<CandidatesPage />} />
-        <Route path="/quan-ly/ung-vien/:id" element={<CandidateDetailPage />} />
-        <Route path="/quan-ly/danh-gia" element={<EvaluationReviewPage />} />
-        <Route path="/quan-ly/bao-cao" element={<ReportsPage />} />
-        <Route path="/quan-ly/cai-dat" element={<SettingsPage />} />
-        <Route path="/quan-ly/playbooks" element={<PlaybooksPage />} />
-        <Route path="/quan-ly/nhom" element={<TeamPage />} />
-        <Route path="/quan-ly/phong-van" element={<InterviewSessionsPage />} />
+        <Route path="/admin/jobs" element={<JobPostingsPage />} />
+        <Route path="/admin/jobs/create" element={<CreateJobPostingPage />} />
+        <Route path="/admin/jobs/:id" element={<JobPostingDetailPage />} />
+        <Route path="/admin/candidates" element={<CandidatesPage />} />
+        <Route path="/admin/candidates/:id" element={<CandidateDetailPage />} />
+        <Route path="/admin/evaluations" element={<EvaluationReviewPage />} />
+        <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/settings" element={<SettingsPage />} />
+        <Route path="/admin/playbooks" element={<PlaybooksPage />} />
+        <Route path="/admin/team" element={<TeamPage />} />
+        <Route path="/admin/interviews" element={<InterviewSessionsPage />} />
       </Route>
 
       {/* Interview Routes */}

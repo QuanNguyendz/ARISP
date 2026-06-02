@@ -10,6 +10,7 @@ using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
 using ARISP.Application.Services;
 using ARISP.Domain.Entities;
+using ARISP.Domain.Constants;
 
 namespace ARISP.API.Controllers
 {
@@ -30,7 +31,7 @@ namespace ARISP.API.Controllers
 
         /// <summary>HR tạo job posting kèm cấu hình vòng phỏng vấn.</summary>
         [HttpPost]
-        [Authorize(Roles = HrRoles)]
+        [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request, CancellationToken ct)
         {
             if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
@@ -116,7 +117,7 @@ namespace ARISP.API.Controllers
                 WorkMode = request.WorkMode,
                 SalaryMin = request.SalaryMin,
                 SalaryMax = request.SalaryMax,
-                SalaryCurrency = request.SalaryCurrency,
+                SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency,
                 SalaryIsNegotiable = request.SalaryIsNegotiable,
                 EmploymentType = request.EmploymentType,
                 ExperienceLevel = request.ExperienceLevel,
@@ -165,13 +166,19 @@ namespace ARISP.API.Controllers
             return Ok(response);
         }
 
-        /// <summary>Chi tiết job cho trang mô tả công việc (không cần đăng nhập).</summary>
+        /// <summary>Chi tiết job cho trang mô tả công việc (Hỗ trợ HR xem cả draft/paused).</summary>
         [HttpGet("{id:guid}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetJobById(Guid id, CancellationToken ct)
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
-            if (job == null || !job.IsPublicListing || job.Status != "active")
+            if (job == null)
+                return NotFound(new { message = "Job posting not found." });
+
+            var isStaff = User.Identity?.IsAuthenticated == true &&
+                          (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.HrAdmin) || User.IsInRole(AppRoles.Recruiter));
+
+            if (!isStaff && (job.Status != "active" || !job.IsPublicListing))
                 return NotFound(new { message = "Job posting not found." });
 
             var rounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
@@ -182,8 +189,22 @@ namespace ARISP.API.Controllers
             return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
 
+        /// <summary>Danh sách toàn bộ job dành cho HR (bao gồm cả draft, closed...).</summary>
+        [HttpGet("admin")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetAdminJobs(CancellationToken ct)
+        {
+            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
+
+            var response = jobs
+                .OrderByDescending(j => j.CreatedAt)
+                .Select(j => JobPostingListItemResponse.FromEntity(j));
+
+            return Ok(response);
+        }
+
         [HttpPost("{id:guid}/slots")]
-        [Authorize(Roles = HrRoles)]
+        [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> AddAvailabilitySlots(Guid id, [FromBody] List<CreateAvailabilitySlotRequest> slots, CancellationToken ct)
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);

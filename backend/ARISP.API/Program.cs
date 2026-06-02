@@ -101,6 +101,9 @@ builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
 
+// NOTE: In .NET 8, JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear() has no effect
+// because AddJwtBearer uses JsonWebTokenHandler by default. Use MapInboundClaims = false instead.
+
 // Configure JWT Authentication and external SSO
 var jwtSecret = builder.Configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
 
@@ -111,6 +114,8 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    // Prevent mapping JWT short claim names (sub, role, email) to long XML namespace URIs
+    options.MapInboundClaims = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -120,7 +125,24 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["JWT:Issuer"] ?? "ARISP",
         ValidAudience = builder.Configuration["JWT:Audience"] ?? "ARISP_Client",
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-        RoleClaimType = ClaimTypes.Role // Explicitly map role claim
+        RoleClaimType = "role", // Map role claim using standard short name
+        NameClaimType = "sub"  // Map name/ID claim using standard short name
+    };
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
+            logger.LogError(context.Exception, "JWT Auth Failed: {Message}", context.Exception.Message);
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
+            var claims = context.Principal?.Claims?.Select(c => $"{c.Type}={c.Value}") ?? Enumerable.Empty<string>();
+            logger.LogInformation("JWT Token Validated. Claims: [{Claims}]", string.Join(", ", claims));
+            return Task.CompletedTask;
+        }
     };
 })
 .AddJwtBearer("Firebase", options =>

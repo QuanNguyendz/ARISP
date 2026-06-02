@@ -6,14 +6,14 @@ export const routes = {
 
   // HR Admin
   dashboard: '/admin/dashboard',
-  jobPostings: '/quan-ly/tin-tuyen-dung',
-  jobPostingCreate: '/quan-ly/tin-tuyen-dung/tao-moi',
-  jobPostingDetail: (id: string) => `/quan-ly/tin-tuyen-dung/${id}`,
-  candidates: '/quan-ly/ung-vien',
-  candidateDetail: (id: string) => `/quan-ly/ung-vien/${id}`,
-  evaluations: '/quan-ly/danh-gia',
+  jobPostings: '/admin/jobs',
+  jobPostingCreate: '/admin/jobs/create',
+  jobPostingDetail: (id: string) => `/admin/jobs/${id}`,
+  candidates: '/admin/candidates',
+  candidateDetail: (id: string) => `/admin/candidates/${id}`,
+  evaluations: '/admin/evaluations',
   reports: '/admin/reports',
-  settings: '/quan-ly/cai-dat',
+  settings: '/admin/settings',
 
   // Candidate
   candidateApply: '/candidate/applications',

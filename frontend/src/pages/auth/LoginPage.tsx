@@ -29,7 +29,7 @@ export default function LoginPage() {
           accessToken: callbackData.accessToken,
           refreshToken: '',
           fullName: '',
-          role: callbackData.role as any,
+          role: callbackData.role,
         });
         window.history.replaceState({}, '', window.location.pathname);
         navigate('/admin/dashboard');

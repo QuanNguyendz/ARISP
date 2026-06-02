@@ -32,7 +32,7 @@ export default function InterviewSessionsPage() {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${session.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
                     {session.status === 'completed' ? 'Hoàn thành' : 'Đang chờ'}
                   </span>
-                  <a href="/quan-ly/danh-gia" className="px-4 py-2 rounded-lg bg-accent-primary/20 text-accent-primary text-sm hover:bg-accent-primary/30">Xem</a>
+                  <a href="/admin/evaluations" className="px-4 py-2 rounded-lg bg-accent-primary/20 text-accent-primary text-sm hover:bg-accent-primary/30">Xem</a>
                 </div>
               </div>
             </div>
