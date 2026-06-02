@@ -53,7 +53,7 @@ export default function EvaluationReviewPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-white/40">{evaluation.date}</span>
-                <a href="/quan-ly/danh-gia" className="px-4 py-2 rounded-lg bg-accent-primary/20 text-accent-primary text-sm font-medium hover:bg-accent-primary/30 transition-colors">Xem chi tiết</a>
+                <a href="/admin/evaluations" className="px-4 py-2 rounded-lg bg-accent-primary/20 text-accent-primary text-sm font-medium hover:bg-accent-primary/30 transition-colors">Xem chi tiết</a>
               </div>
             </div>
           </motion.div>

@@ -125,7 +125,7 @@ export default function CreateJobPostingPage() {
       };
 
       await jobService.createJobPosting(requestPayload);
-      navigate('/quan-ly/tin-tuyen-dung');
+      navigate('/admin/jobs');
     } catch (err: any) {
       console.error(err);
       setError(err?.response?.data?.message || err.message || 'Có lỗi xảy ra khi tạo tin tuyển dụng.');
@@ -139,7 +139,7 @@ export default function CreateJobPostingPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <button
-          onClick={() => navigate('/quan-ly/tin-tuyen-dung')}
+          onClick={() => navigate('/admin/jobs')}
           className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -450,7 +450,7 @@ export default function CreateJobPostingPage() {
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => navigate('/quan-ly/tin-tuyen-dung')}
+                onClick={() => navigate('/admin/jobs')}
                 className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-medium text-center text-sm hover:bg-white/10 transition-colors"
                 disabled={submitting}
               >

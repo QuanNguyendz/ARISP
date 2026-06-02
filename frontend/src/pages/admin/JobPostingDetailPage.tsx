@@ -66,7 +66,7 @@ export default function JobPostingDetailPage() {
         <h2 className="text-2xl font-bold text-white mb-2">Đã xảy ra lỗi</h2>
         <p className="text-text-secondary mb-6">{error || 'Không tìm thấy dữ liệu.'}</p>
         <button
-          onClick={() => navigate('/quan-ly/tin-tuyen-dung')}
+          onClick={() => navigate('/admin/jobs')}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -80,7 +80,7 @@ export default function JobPostingDetailPage() {
     <div className="p-6 lg:p-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <button
-          onClick={() => navigate('/quan-ly/tin-tuyen-dung')}
+          onClick={() => navigate('/admin/jobs')}
           className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

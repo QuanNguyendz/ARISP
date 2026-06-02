@@ -161,7 +161,7 @@ export default function CandidatesPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    onClick={() => navigate(`/quan-ly/ung-vien/${candidate.id}`)}
+                    onClick={() => navigate(`/admin/candidates/${candidate.id}`)}
                     className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer transition-colors"
                   >
                     <td className="py-4 px-4">

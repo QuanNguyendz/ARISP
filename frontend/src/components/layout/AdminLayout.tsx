@@ -19,11 +19,11 @@ import { useAuthStore } from '@store/auth/authStore';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
-  { icon: FileText, label: 'Tin tuyển dụng', path: '/quan-ly/tin-tuyen-dung' },
-  { icon: Users, label: 'Ứng viên', path: '/quan-ly/ung-vien' },
-  { icon: BarChart3, label: 'Đánh giá', path: '/quan-ly/danh-gia' },
-  { icon: BarChart3, label: 'Báo cáo', path: '/quan-ly/bao-cao' },
-  { icon: Settings, label: 'Cài đặt', path: '/quan-ly/cai-dat' },
+  { icon: FileText, label: 'Tin tuyển dụng', path: '/admin/jobs' },
+  { icon: Users, label: 'Ứng viên', path: '/admin/candidates' },
+  { icon: BarChart3, label: 'Đánh giá', path: '/admin/evaluations' },
+  { icon: BarChart3, label: 'Báo cáo', path: '/admin/reports' },
+  { icon: Settings, label: 'Cài đặt', path: '/admin/settings' },
 ];
 
 const getInitials = (name?: string) => {
@@ -54,7 +54,7 @@ export default function AdminLayout() {
   const filteredItems = sidebarItems.filter((item) => {
     // Hide Báo cáo and Cài đặt from Recruiter role
     if (userRole === 'recruiter') {
-      if (item.path === '/quan-ly/bao-cao' || item.path === '/quan-ly/cai-dat') {
+      if (item.path === '/admin/reports' || item.path === '/admin/settings') {
         return false;
       }
     }

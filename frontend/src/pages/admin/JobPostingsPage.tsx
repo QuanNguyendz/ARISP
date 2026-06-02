@@ -64,7 +64,7 @@ export default function JobPostingsPage() {
           <p className="text-sm text-white/40">Quản lý các tin tuyển dụng và cấu hình phỏng vấn AI</p>
         </div>
         <a
-          href="/quan-ly/tin-tuyen-dung/tao-moi"
+          href="/admin/jobs/create"
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
         >
           <Plus className="w-4 h-4" />
@@ -106,7 +106,7 @@ export default function JobPostingsPage() {
           <h3 className="text-lg font-semibold text-white mb-2">Chưa có tin tuyển dụng</h3>
           <p className="text-text-secondary text-sm mb-6">Hãy tạo tin tuyển dụng đầu tiên của bạn để bắt đầu tiếp nhận hồ sơ.</p>
           <a
-            href="/quan-ly/tin-tuyen-dung/tao-moi"
+            href="/admin/jobs/create"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4.5 h-4.5" />
@@ -161,7 +161,7 @@ export default function JobPostingsPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-white/30">Tạo ngày: {formatDate(job.createdAt)}</span>
                   <div className="flex items-center gap-2">
-                    <a href={`/quan-ly/tin-tuyen-dung/${job.id}`} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+                    <a href={`/admin/jobs/${job.id}`} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
                       <Eye className="w-4 h-4 text-white/50" />
                     </a>
                     <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">

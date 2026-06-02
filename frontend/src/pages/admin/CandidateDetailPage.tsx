@@ -5,7 +5,7 @@ export default function CandidateDetailPage() {
   return (
     <div className="p-6 lg:p-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <a href="/quan-ly/ung-vien" className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white mb-6 transition-colors">
+        <a href="/admin/candidates" className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Quay lại
         </a>

@@ -68,7 +68,7 @@ export default function DashboardPage() {
             <Bell className="w-5 h-5" />
           </button>
           <a
-            href="/quan-ly/tin-tuyen-dung/tao-moi"
+            href="/admin/jobs/create"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
@@ -115,7 +115,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-white/40">Cần HR xem xét</p>
                 </div>
               </div>
-              <a href="/quan-ly/danh-gia" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Xem tất cả</a>
+              <a href="/admin/evaluations" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Xem tất cả</a>
             </div>
 
             <div className="space-y-3">
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs text-white/30">{review.timeAgo}</span>
-                    <a href="/quan-ly/danh-gia" className="px-3 py-1.5 rounded-lg bg-accent-primary/20 text-accent-primary text-xs font-medium hover:bg-accent-primary/30 transition-colors">Xem</a>
+                    <a href="/admin/evaluations" className="px-3 py-1.5 rounded-lg bg-accent-primary/20 text-accent-primary text-xs font-medium hover:bg-accent-primary/30 transition-colors">Xem</a>
                   </div>
                 </div>
               ))}
@@ -143,7 +143,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-white">Đánh giá gần đây</h2>
-              <a href="/quan-ly/danh-gia" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Xem tất cả</a>
+              <a href="/admin/evaluations" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Xem tất cả</a>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {recentEvaluations.map((evaluation, index) => (
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                     <span className="text-xs text-white/30">{evaluation.date}</span>
-                    <a href="/quan-ly/danh-gia" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Chi tiết →</a>
+                    <a href="/admin/evaluations" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Chi tiết →</a>
                   </div>
                 </motion.div>
               ))}
@@ -192,13 +192,13 @@ export default function DashboardPage() {
           >
             <h2 className="text-sm font-semibold text-white mb-4">Thao tác nhanh</h2>
             <div className="space-y-2">
-              <a href="/quan-ly/tin-tuyen-dung/tao-moi" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-accent-primary/30 transition-colors">
+              <a href="/admin/jobs/create" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-accent-primary/30 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-accent-primary/20 flex items-center justify-center">
                   <Plus className="w-4 h-4 text-accent-primary" />
                 </div>
                 <span className="text-sm text-white">Tạo tin tuyển dụng</span>
               </a>
-              <a href="/quan-ly/bao-cao" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-violet/30 transition-colors">
+              <a href="/admin/reports" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-violet/30 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-violet/20 flex items-center justify-center">
                   <BarChart3 className="w-4 h-4 text-violet" />
                 </div>
