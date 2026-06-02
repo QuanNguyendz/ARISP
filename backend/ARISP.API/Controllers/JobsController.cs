@@ -96,9 +96,9 @@ namespace ARISP.API.Controllers
             var job = new JobPosting
             {
                 CreatedByUserId = userId,
-                Title = request.Title.Trim(),
+                Title = request.Title!.Trim(),
                 Department = request.Department?.Trim(),
-                JobDescription = request.JobDescription.Trim(),
+                JobDescription = request.JobDescription!.Trim(),
                 InterviewMode = request.InterviewMode,
                 Status = "draft",
                 IsPublicListing = request.IsPublicListing,
