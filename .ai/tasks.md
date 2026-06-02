@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-06-02
+**Last updated:** 2026-06-03
 
 ---
 
@@ -74,8 +74,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] Language detection khi tạo Job Posting: `LanguageDetectionService` gọi AI phân tích JD
 - [ ] HR confirm/chỉnh language requirement trước khi publish
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
-- [ ] Candidate: nhận invite → submit CV + thông tin cá nhân (Application)
-- [ ] CV upload & parse (PDF → text extraction)
+- [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
+- [x] CV upload & parse (PDF → text extraction) (Backend with CV parser stub)
 
 ### Phase 2b – Job Board & Practice Interview
 - [ ] Database schema: `candidate_accounts` (self-registered), extend `job_postings` với flag `is_public_listing`

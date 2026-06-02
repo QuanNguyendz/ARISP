@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
@@ -64,6 +64,8 @@ namespace ARISP.API.Controllers
                 Role = AppRoles.Candidate
             });
         }
+
+
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP FIREBASE: Backend xác thực Firebase ID token rồi cấp JWT nội bộ ARISP.

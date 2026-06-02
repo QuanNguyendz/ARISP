@@ -2,7 +2,7 @@
 -- ARISP – Full Database Schema (Strictly Single-tenant)
 -- PostgreSQL + vector | Supabase hosted
 -- Convention: snake_case tables/columns | UUID PKs | soft delete via deleted_at
--- Last updated: 2026-05-30
+-- Last updated: 2026-06-01
 -- =============================================================================
 
 -- Extensions
@@ -113,6 +113,19 @@ CREATE TABLE job_postings (
     status                  VARCHAR(50)     NOT NULL DEFAULT 'draft',  -- draft | active | closed | archived
     -- Job Board: có hiển thị công khai trên Job Board IT không
     is_public_listing       BOOLEAN         NOT NULL DEFAULT FALSE,
+    -- Job Board listing metadata (Tier 1)
+    location                VARCHAR(255),                           -- e.g. Ho Chi Minh City, Ha Noi
+    work_mode               VARCHAR(20),                            -- onsite | remote | hybrid
+    salary_min              NUMERIC(12,2),
+    salary_max              NUMERIC(12,2),
+    salary_currency         VARCHAR(3)      NOT NULL DEFAULT 'VND',
+    salary_is_negotiable    BOOLEAN         NOT NULL DEFAULT FALSE,
+    employment_type         VARCHAR(30),                            -- full_time | part_time | contract | internship
+    experience_level        VARCHAR(30),                            -- fresher | junior | mid | senior | lead | manager
+    skills                  TEXT[],                                 -- e.g. {"C#", ".NET", "PostgreSQL"}
+    job_category            VARCHAR(100),                           -- backend | frontend | devops | qa | data | ai_ml | mobile | pm | ...
+    
+    is_urgent               BOOLEAN         NOT NULL DEFAULT FALSE,
     -- Language detection result (set by LanguageDetectionService, confirmed by HR)
     detected_language       VARCHAR(10),                        -- e.g. 'en', 'ja', 'ko', NULL = Vietnamese
     language_requirement    TEXT,                               -- e.g. "TOEIC > 700 hoặc IELTS > 6.5"
@@ -127,6 +140,7 @@ CREATE TABLE job_postings (
     persona_voice_id        TEXT,                               -- ElevenLabs voice ID
     persona_style           TEXT,
     published_at            TIMESTAMPTZ,
+    application_deadline    TIMESTAMPTZ,
     created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     deleted_at              TIMESTAMPTZ
@@ -488,6 +502,11 @@ CREATE INDEX idx_webhook_deliveries_next_retry      ON webhook_deliveries(next_r
 
 -- Job Board
 CREATE INDEX idx_job_postings_public_active         ON job_postings(is_public_listing, status) WHERE deleted_at IS NULL;
+CREATE INDEX idx_job_postings_public_filters        ON job_postings(is_public_listing, status, work_mode, experience_level, job_category)
+    WHERE deleted_at IS NULL AND is_public_listing = TRUE;
+CREATE INDEX idx_job_postings_skills                ON job_postings USING GIN (skills);
+CREATE INDEX idx_job_postings_salary                ON job_postings(salary_min, salary_max)
+    WHERE deleted_at IS NULL AND salary_is_negotiable = FALSE;
 CREATE INDEX idx_candidate_accounts_email           ON candidate_accounts(email);
 
 -- Soft-delete indexes for active records

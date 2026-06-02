@@ -8,5 +8,6 @@ namespace ARISP.Application.Interfaces
     {
         IRepository<T> Repository<T>() where T : class;
         Task<int> SaveChangesAsync(CancellationToken ct = default);
+        Task<int> ExecuteSqlRawAsync(string sql, object[] parameters, CancellationToken ct = default);
     }
 }
