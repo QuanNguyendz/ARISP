@@ -88,6 +88,18 @@ namespace ARISP.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? DeletedAt { get; set; }
+        public string? Location { get; set; }
+        public string? WorkMode { get; set; }
+        public decimal? SalaryMin { get; set; }
+        public decimal? SalaryMax { get; set; }
+        public string? SalaryCurrency { get; set; }
+        public bool? SalaryIsNegotiable { get; set; } = false;
+        public string? EmploymentType { get; set; }
+        public string? ExperienceLevel { get; set; }
+        public List<string>? Skills { get; set; } = new List<string>();
+        public string? JobCategory { get; set; }
+        public DateTimeOffset? ApplicationDeadline { get; set; }
+        public bool? IsUrgent { get; set; } = false;
     }
 
     public class InterviewRoundConfig

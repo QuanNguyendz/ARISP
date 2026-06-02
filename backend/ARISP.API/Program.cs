@@ -297,34 +297,50 @@ async Task SeedDataAsync(ARISPDbContext db)
     var job = await db.JobPostings.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId);
     if (job == null)
     {
-        job = new JobPosting
-        {
-            Id = jobId,
-            CreatedByUserId = userId,
-            Title = "Senior Backend Engineer (.NET & AI)",
-            Department = "IT Engineering",
-            JobDescription = "We are looking for a Senior .NET Backend Engineer to build AI-driven recruiting services. Requires 5+ years of C# ASP.NET Core experience, Postgres database optimizations, and integrating with OpenAI APIs. English speaking capability is a plus.",
-            InterviewMode = "both",
-            Status = "active",
-            IsPublicListing = true,
-            DetectedLanguage = "en",
-            LanguageRequirement = "TOEIC > 700 hoặc IELTS > 6.5",
-            LanguageConfirmed = true
-        };
+        job = new JobPosting { Id = jobId };
         await db.JobPostings.AddAsync(job);
-        await db.SaveChangesAsync();
+    }
 
-        // Round Config
-        var config = new InterviewRoundConfig
+    job.CreatedByUserId = userId;
+    job.Title = "Senior Backend Engineer (.NET & AI)";
+    job.Department = "IT Engineering";
+    job.JobDescription = "We are looking for a Senior .NET Backend Engineer to build AI-driven recruiting services. Requires 5+ years of C# ASP.NET Core experience, Postgres database optimizations, and integrating with OpenAI APIs. English speaking capability is a plus.";
+    job.InterviewMode = "both";
+    job.Status = "active";
+    job.IsPublicListing = true;
+    job.DetectedLanguage = "en";
+    job.LanguageRequirement = "TOEIC > 700 hoặc IELTS > 6.5";
+    job.LanguageConfirmed = true;
+    job.Location = "Ho Chi Minh City";
+    job.WorkMode = "hybrid";
+    job.SalaryMin = 2000;
+    job.SalaryMax = 3500;
+    job.SalaryCurrency = "USD";
+    job.SalaryIsNegotiable = false;
+    job.EmploymentType = "full_time";
+    job.ExperienceLevel = "senior";
+    job.Skills = new System.Collections.Generic.List<string> { "C#", ".NET Core", "PostgreSQL", "OpenAI" };
+    job.JobCategory = "Backend";
+    job.ApplicationDeadline = DateTimeOffset.UtcNow.AddDays(30);
+    job.IsUrgent = true;
+    job.ScoringRubric = "[{\"criterion\":\"C# Knowledge\",\"weight\":40},{\"criterion\":\"System Design\",\"weight\":30},{\"criterion\":\"Communication\",\"weight\":30}]";
+
+    await db.SaveChangesAsync();
+
+    // Round Config
+    var config = await db.InterviewRoundConfigs.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.JobPostingId == jobId && r.RoundNumber == 1);
+    if (config == null)
+    {
+        config = new InterviewRoundConfig
         {
             JobPostingId = jobId,
-            RoundNumber = 1,
-            RoundType = "screening",
-            MaxDurationMinutes = 30
+            RoundNumber = 1
         };
         await db.InterviewRoundConfigs.AddAsync(config);
-        await db.SaveChangesAsync();
     }
+    config.RoundType = "screening";
+    config.MaxDurationMinutes = 30;
+    await db.SaveChangesAsync();
 
     // 3. Candidate Account
     var candidate = await db.CandidateAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == candidateId);
