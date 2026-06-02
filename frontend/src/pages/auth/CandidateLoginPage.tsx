@@ -25,9 +25,9 @@ export default function CandidateLoginPage() {
       const user = setAuthFromResponse(response);
       
       if (user.role === 'Candidate') {
-        navigate('/ung-vien/cong-cua');
+        navigate('/candidate/portal');
       } else {
-        navigate('/quan-ly');
+        navigate('/admin/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
@@ -157,7 +157,7 @@ export default function CandidateLoginPage() {
           <p className="mt-8 text-center text-text-secondary">
             Chưa có tài khoản?{' '}
             <Link
-              to="/dang-ky-ung-vien"
+              to="/auth/candidate-register"
               className="text-accent-primary hover:text-accent-secondary font-medium transition-colors"
             >
               Đăng ký ngay
@@ -167,7 +167,7 @@ export default function CandidateLoginPage() {
           {/* Back to Employer */}
           <p className="mt-4 text-center">
             <Link
-              to="/dang-nhap"
+              to="/auth/login"
               className="text-sm text-text-tertiary hover:text-white transition-colors"
             >
               ← Dành cho nhà tuyển dụng

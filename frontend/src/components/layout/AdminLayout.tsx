@@ -18,7 +18,7 @@ import {
 import { useAuthStore } from '@store/auth/authStore';
 
 const sidebarItems = [
-  { icon: LayoutDashboard, label: 'Tổng quan', path: '/quan-ly' },
+  { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
   { icon: FileText, label: 'Tin tuyển dụng', path: '/quan-ly/tin-tuyen-dung' },
   { icon: Users, label: 'Ứng viên', path: '/quan-ly/ung-vien' },
   { icon: BarChart3, label: 'Đánh giá', path: '/quan-ly/danh-gia' },
@@ -49,7 +49,7 @@ export default function AdminLayout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-4 border-b border-white/5">
-          <Link to="/quan-ly" className="flex items-center gap-3">
+          <Link to="/admin/dashboard" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center flex-shrink-0">
               <Brain className="w-4 h-4 text-white" />
             </div>
@@ -142,7 +142,7 @@ export default function AdminLayout() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => { useAuthStore.getState().logout(); window.location.href = '/dang-nhap'; }}
+                onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
                 className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <LogOut className="w-5 h-5 flex-shrink-0" />
@@ -173,7 +173,7 @@ export default function AdminLayout() {
             >
               {/* Logo */}
               <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
-                <Link to="/quan-ly" className="flex items-center gap-3">
+                <Link to="/admin/dashboard" className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
                     <Brain className="w-4 h-4 text-white" />
                   </div>
@@ -222,7 +222,7 @@ export default function AdminLayout() {
                   </div>
                 </div>
                 <button
-                  onClick={() => { useAuthStore.getState().logout(); window.location.href = '/dang-nhap'; }}
+                  onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
                   className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut className="w-5 h-5" />
@@ -244,7 +244,7 @@ export default function AdminLayout() {
           >
             <Menu className="w-6 h-6 text-white/80" />
           </button>
-          <Link to="/quan-ly" className="flex items-center gap-2">
+          <Link to="/admin/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
               <Brain className="w-4 h-4 text-white" />
             </div>

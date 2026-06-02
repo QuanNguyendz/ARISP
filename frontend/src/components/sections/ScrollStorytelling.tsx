@@ -42,7 +42,7 @@ function SectionUpload() {
 
             <div className="flex items-center gap-2 pt-4">
               <button
-                onClick={() => window.location.href = '/dang-ky'}
+                onClick={() => window.location.href = '/auth/register'}
                 className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
               >
                 Try it free

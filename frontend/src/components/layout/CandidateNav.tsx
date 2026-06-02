@@ -75,7 +75,7 @@ export default function CandidateNav() {
           <div className="hidden lg:flex items-center gap-3">
             {/* Button chuyển sang NTD */}
             <Link
-              to="/nha-tuyen-dung"
+              to="/employer"
               className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 border border-white/10"
             >
               <Building2 className="w-4 h-4" />
@@ -101,14 +101,14 @@ export default function CandidateNav() {
                     className="absolute right-0 mt-2 w-56 glass rounded-xl p-2"
                   >
                     <Link
-                      to="/ung-vien/cong-cua"
+                      to="/candidate/portal"
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
                       <User className="w-4 h-4" />
                       Hồ sơ của tôi
                     </Link>
                     <Link
-                      to="/ung-vien/ung-tuyen"
+                      to="/candidate/applications"
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
                       <FileText className="w-4 h-4" />
@@ -128,13 +128,13 @@ export default function CandidateNav() {
             ) : (
               <>
                 <Link
-                  to="/dang-nhap-ung-vien"
+                  to="/auth/candidate-login"
                   className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors"
                 >
                   Đăng nhập
                 </Link>
                 <Link
-                  to="/dang-ky-ung-vien"
+                  to="/auth/candidate-register"
                   className="px-5 py-2.5 rounded-full bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                 >
                   Đăng ký
@@ -165,7 +165,7 @@ export default function CandidateNav() {
             <div className="px-6 py-6 space-y-2">
               {/* Button chuyển sang NTD - Mobile */}
               <Link
-                to="/nha-tuyen-dung"
+                to="/employer"
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-white/5 transition-colors border border-white/10"
               >
                 <Building2 className="w-5 h-5" />
@@ -197,7 +197,7 @@ export default function CandidateNav() {
               {isAuthenticated ? (
                 <div className="space-y-2">
                   <Link
-                    to="/ung-vien/cong-cua"
+                    to="/candidate/portal"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                   >
@@ -215,14 +215,14 @@ export default function CandidateNav() {
               ) : (
                 <div className="space-y-2">
                   <Link
-                    to="/dang-nhap-ung-vien"
+                    to="/auth/candidate-login"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="block w-full px-4 py-3 text-sm font-medium text-text-secondary hover:text-white text-center rounded-lg hover:bg-white/5 transition-colors"
                   >
                     Đăng nhập
                   </Link>
                   <Link
-                    to="/dang-ky-ung-vien"
+                    to="/auth/candidate-register"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="block w-full px-4 py-3 text-sm font-semibold text-white text-center rounded-lg bg-gradient-to-r from-accent-primary to-violet"
                   >

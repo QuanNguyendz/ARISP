@@ -47,7 +47,7 @@ export default function CandidateRegisterPage() {
     setIsLoading(true);
     try {
       await authService.candidateRegister({ email, password, fullName, phone });
-      navigate('/dang-nhap-ung-vien?registered=true');
+      navigate('/auth/candidate-login?registered=true');
     } catch (err: any) {
       setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
@@ -220,11 +220,11 @@ export default function CandidateRegisterPage() {
               />
               <span className="text-sm text-text-secondary">
                 Tôi đồng ý với{' '}
-              <Link to="/dang-nhap-ung-vien" className="text-accent-primary hover:underline">
+              <Link to="/auth/candidate-login" className="text-accent-primary hover:underline">
                   Điều khoản sử dụng
                 </Link>{' '}
                 và{' '}
-                <Link to="/dang-nhap-ung-vien" className="text-accent-primary hover:underline">
+                <Link to="/auth/candidate-login" className="text-accent-primary hover:underline">
                   Chính sách bảo mật
                 </Link>
               </span>
@@ -259,7 +259,7 @@ export default function CandidateRegisterPage() {
           <p className="mt-8 text-center text-text-secondary">
             Đã có tài khoản?{' '}
             <Link
-              to="/dang-nhap-ung-vien"
+              to="/auth/candidate-login"
               className="text-accent-primary hover:text-accent-secondary font-medium transition-colors"
             >
               Đăng nhập ngay
@@ -269,7 +269,7 @@ export default function CandidateRegisterPage() {
           {/* Back to Employer */}
           <p className="mt-4 text-center">
             <Link
-              to="/dang-ky"
+              to="/auth/login"
               className="text-sm text-text-tertiary hover:text-white transition-colors"
             >
               ← Dành cho nhà tuyển dụng

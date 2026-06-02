@@ -23,14 +23,14 @@ export default function PublicNav() {
             <Link to="/jobs" className="text-text-secondary hover:text-white transition-colors">
               Tìm việc
             </Link>
-            <Link to="/nha-tuyen-dung" className="text-text-secondary hover:text-white transition-colors">
+            <Link to="/employer" className="text-text-secondary hover:text-white transition-colors">
               Dành cho NTD
             </Link>
-            <Link to="/dang-nhap" className="text-text-secondary hover:text-white transition-colors">
+            <Link to="/auth/login" className="text-text-secondary hover:text-white transition-colors">
               Đăng nhập
             </Link>
             <Link
-              to="/dang-ky"
+              to="/auth/register"
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
             >
               Đăng ký
@@ -63,21 +63,21 @@ export default function PublicNav() {
                 Tìm việc
               </Link>
               <Link
-                to="/nha-tuyen-dung"
+                to="/employer"
                 className="text-text-secondary hover:text-white transition-colors py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Dành cho NTD
               </Link>
               <Link
-                to="/dang-nhap"
+                to="/auth/login"
                 className="text-text-secondary hover:text-white transition-colors py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Đăng nhập
               </Link>
               <Link
-                to="/dang-ky"
+                to="/auth/register"
                 className="px-5 py-3 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium text-center"
                 onClick={() => setMobileMenuOpen(false)}
               >

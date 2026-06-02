@@ -32,7 +32,7 @@ export default function LoginPage() {
           role: callbackData.role as any,
         });
         window.history.replaceState({}, '', window.location.pathname);
-        navigate('/quan-ly');
+        navigate('/admin/dashboard');
         return;
       }
     }
@@ -49,7 +49,7 @@ export default function LoginPage() {
 
   const handleOAuthLogin = () => {
     setOauthLoading(true);
-    const returnUrl = encodeURIComponent(window.location.origin + '/dang-nhap');
+    const returnUrl = encodeURIComponent(window.location.origin + '/auth/login');
     window.location.href = authService.buildOAuthRedirectUrl('Google', returnUrl);
   };
 
@@ -63,9 +63,9 @@ export default function LoginPage() {
       const user = setAuthFromResponse(response);
 
       if (user.role === 'Candidate') {
-        navigate('/ung-vien/cong-cua');
+        navigate('/candidate/portal');
       } else {
-        navigate('/quan-ly');
+        navigate('/admin/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
@@ -225,7 +225,7 @@ export default function LoginPage() {
           <p className="text-center mt-8 text-text-secondary">
             Chưa có tài khoản?{' '}
             <Link
-              to="/dang-ky"
+              to="/auth/register"
               className="text-accent-primary hover:text-accent-secondary transition-colors font-medium"
             >
               Đăng ký ngay
@@ -235,7 +235,7 @@ export default function LoginPage() {
           {/* Back to Candidate */}
           <p className="text-center mt-4">
             <Link
-              to="/dang-nhap-ung-vien"
+              to="/auth/candidate-login"
               className="text-sm text-text-tertiary hover:text-white transition-colors"
             >
               ← Dành cho ứng viên

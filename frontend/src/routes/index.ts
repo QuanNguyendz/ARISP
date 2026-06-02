@@ -1,28 +1,28 @@
 export const routes = {
   // Public
   home: '/',
-  login: '/dang-nhap',
-  register: '/dang-ky',
-  
+  login: '/auth/login',
+  register: '/auth/register',
+
   // HR Admin
-  dashboard: '/quan-ly',
+  dashboard: '/admin/dashboard',
   jobPostings: '/quan-ly/tin-tuyen-dung',
   jobPostingCreate: '/quan-ly/tin-tuyen-dung/tao-moi',
   jobPostingDetail: (id: string) => `/quan-ly/tin-tuyen-dung/${id}`,
   candidates: '/quan-ly/ung-vien',
   candidateDetail: (id: string) => `/quan-ly/ung-vien/${id}`,
   evaluations: '/quan-ly/danh-gia',
-  reports: '/quan-ly/bao-cao',
+  reports: '/admin/reports',
   settings: '/quan-ly/cai-dat',
-  
+
   // Candidate
-  candidateApply: '/ung-vien/ung-tuyen',
-  candidateInterview: '/ung-vien/phong-van',
-  candidatePortal: '/ung-vien/cong-cua',
-  candidateResult: (id: string) => `/ung-vien/ket-qua/${id}`,
-  
+  candidateApply: '/candidate/applications',
+  candidateInterview: '/candidate/interviews',
+  candidatePortal: '/candidate/portal',
+  candidateResult: (id: string) => `/candidate/results/${id}`,
+
   // Interview
-  interviewRoom: '/phong-van/:sessionId',
+  interviewRoom: '/interview/room/:sessionId',
   interviewKiosk: '/kiosk',
 } as const;
 

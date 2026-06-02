@@ -14,13 +14,13 @@ const footerLinks = {
     { label: 'Salary Guide', href: '/jobs' },
   ],
   ứng_viên: [
-    { label: 'Tạo hồ sơ', href: '/dang-ky-ung-vien' },
-    { label: 'Hồ sơ của tôi', href: '/ung-vien/cong-cua' },
-    { label: 'Việc đã ứng tuyển', href: '/ung-vien/ung-tuyen' },
-    { label: 'Phỏng vấn', href: '/ung-vien/phong-van' },
+    { label: 'Tạo hồ sơ', href: '/auth/candidate-register' },
+    { label: 'Hồ sơ của tôi', href: '/candidate/portal' },
+    { label: 'Việc đã ứng tuyển', href: '/candidate/applications' },
+    { label: 'Phỏng vấn', href: '/candidate/interviews' },
   ],
   về_arisp: [
-    { label: 'Giới thiệu', href: '/nha-tuyen-dung' },
+    { label: 'Giới thiệu', href: '/employer' },
     { label: 'Blog', href: '/jobs' },
     { label: 'Liên hệ', href: '/jobs' },
     { label: 'Chính sách', href: '/jobs' },

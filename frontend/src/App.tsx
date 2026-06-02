@@ -66,36 +66,36 @@ function App() {
       <Route path="/" element={<FindJobPage />} />
 
       {/* Employer Landing Page */}
-      <Route path="/nha-tuyen-dung" element={<HomePage />} />
+      <Route path="/employer" element={<HomePage />} />
 
       {/* employer Login/Register */}
-      <Route path="/dang-nhap" element={<LoginPage />} />
-      <Route path="/dang-ky" element={<RegisterPage />} />
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/register" element={<RegisterPage />} />
 
       {/* Candidate Login/Register */}
-      <Route path="/dang-nhap-ung-vien" element={<CandidateLoginPage />} />
-      <Route path="/dang-ky-ung-vien" element={<CandidateRegisterPage />} />
+      <Route path="/auth/candidate-login" element={<CandidateLoginPage />} />
+      <Route path="/auth/candidate-register" element={<CandidateRegisterPage />} />
 
       {/* ==================== CANDIDATE PROTECTED ROUTES ==================== */}
 
       <Route element={<CandidateLayout />}>
-        <Route path="/ung-vien" element={<CandidateHome />} />
-        <Route path="/ung-vien/ho-so" element={<CandidateHome />} />
-        <Route path="/ung-vien/cong-viec" element={<CandidateHome />} />
+        <Route path="/candidate/dashboard" element={<CandidateHome />} />
+        <Route path="/candidate/profile" element={<CandidateHome />} />
+        <Route path="/candidate/jobs" element={<CandidateHome />} />
       </Route>
 
       {/* Candidate Pages (standalone) */}
-      <Route path="/ung-vien/ung-tuyen" element={<CandidateApply />} />
-      <Route path="/ung-vien/ung-tuyen/:id" element={<CandidateApply />} />
-      <Route path="/ung-vien/phong-van" element={<InterviewSchedulePage />} />
-      <Route path="/ung-vien/cong-cua" element={<PortalPage />} />
-      <Route path="/ung-vien/ket-qua" element={<FeedbackPage />} />
-      <Route path="/ung-vien/ket-qua/:id" element={<FeedbackPage />} />
+      <Route path="/candidate/applications" element={<CandidateApply />} />
+      <Route path="/candidate/applications/:id" element={<CandidateApply />} />
+      <Route path="/candidate/interviews" element={<InterviewSchedulePage />} />
+      <Route path="/candidate/portal" element={<PortalPage />} />
+      <Route path="/candidate/results" element={<FeedbackPage />} />
+      <Route path="/candidate/results/:id" element={<FeedbackPage />} />
 
       {/* ==================== HR ADMIN ROUTES ==================== */}
 
       <Route element={<AdminLayout />}>
-        <Route path="/quan-ly" element={<DashboardPage />} />
+        <Route path="/admin/dashboard" element={<DashboardPage />} />
         <Route path="/quan-ly/tin-tuyen-dung" element={<JobPostingsPage />} />
         <Route path="/quan-ly/tin-tuyen-dung/tao-moi" element={<CreateJobPostingPage />} />
         <Route path="/quan-ly/tin-tuyen-dung/:id" element={<JobPostingDetailPage />} />
