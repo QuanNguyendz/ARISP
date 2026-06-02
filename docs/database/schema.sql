@@ -124,7 +124,7 @@ CREATE TABLE job_postings (
     experience_level        VARCHAR(30),                            -- fresher | junior | mid | senior | lead | manager
     skills                  TEXT[],                                 -- e.g. {"C#", ".NET", "PostgreSQL"}
     job_category            VARCHAR(100),                           -- backend | frontend | devops | qa | data | ai_ml | mobile | pm | ...
-    application_deadline    TIMESTAMPTZ,
+    
     is_urgent               BOOLEAN         NOT NULL DEFAULT FALSE,
     -- Language detection result (set by LanguageDetectionService, confirmed by HR)
     detected_language       VARCHAR(10),                        -- e.g. 'en', 'ja', 'ko', NULL = Vietnamese
@@ -140,6 +140,7 @@ CREATE TABLE job_postings (
     persona_voice_id        TEXT,                               -- ElevenLabs voice ID
     persona_style           TEXT,
     published_at            TIMESTAMPTZ,
+    application_deadline    TIMESTAMPTZ,
     created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     deleted_at              TIMESTAMPTZ

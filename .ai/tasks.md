@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-05-30
+**Last updated:** 2026-06-03
 
 ---
 
@@ -26,7 +26,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Tạo GitHub repository (private, tên `ARISP`)
 - [ ] Thêm toàn bộ thành viên vào repo với quyền phù hợp (Admin / Write)
 - [ ] Thiết lập **branch strategy:**
-  - `main` – production-ready, chỉ merge qua PR được review
+  - `main` – production-ready, chỉ merge qua Pull Request được review
   - `develop` – integration branch, merge từ các feature branch
   - `feature/<tên-feature>` – ví dụ: `feature/auth-jwt`
   - `fix/<mô-tả-lỗi>` – ví dụ: `fix/jwt-refresh-token-expiry`
@@ -74,8 +74,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] Language detection khi tạo Job Posting: `LanguageDetectionService` gọi AI phân tích JD
 - [ ] HR confirm/chỉnh language requirement trước khi publish
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
-- [ ] Candidate: nhận invite → submit CV + thông tin cá nhân (Application)
-- [ ] CV upload & parse (PDF → text extraction)
+- [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
+- [x] CV upload & parse (PDF → text extraction) (Backend with CV parser stub)
 
 ### Phase 2b – Job Board & Practice Interview
 - [ ] Database schema: `candidate_accounts` (self-registered), extend `job_postings` với flag `is_public_listing`
@@ -241,3 +241,12 @@ _Chưa có task nào đang thực hiện._
   - [ ] Language proficiency benchmark
   - [ ] Time-to-hire metrics
   - [ ] Cheat Detection aggregate stats
+
+---
+
+## Completed
+
+- [x] 2026-06-02: Linked Firebase project `arisp-auth-service` to the React frontend and ASP.NET Core backend auth bridge.
+  - Added frontend Firebase SDK config via `VITE_FIREBASE_*`.
+  - Added Candidate Firebase email/password auth flow with backend token exchange.
+  - Added ASP.NET Core named Firebase JWT bearer validation and `POST /api/auth/firebase/candidate/login`.

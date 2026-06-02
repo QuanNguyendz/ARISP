@@ -334,3 +334,14 @@ public interface IEmbeddingProvider
 | `AuditLogService` | Ghi lại mọi hành động quan trọng toàn hệ thống |
 | `WebRTCSignalingHub` | SignalR Hub: ICE candidates, SDP offer/answer |
 | `SessionHub` | SignalR Hub: session lifecycle events |
+
+---
+
+## Recent Architecture Notes
+
+### ADR-029: Firebase Auth Bridge for Candidate Accounts
+- **Decision:** Frontend React initializes Firebase Web SDK from `VITE_FIREBASE_*` environment variables. Candidate email/password registration and login can use Firebase Authentication when configured.
+- **Backend validation:** ASP.NET Core validates Firebase ID tokens with issuer `https://securetoken.google.com/{project_id}` and audience `{project_id}` through a named JWT bearer scheme `Firebase`.
+- **Token exchange:** Firebase identity is not used directly for protected ARISP APIs. `POST /api/auth/firebase/candidate/login` verifies the Firebase ID token, creates or updates the matching `candidate_accounts` row, then issues the existing ARISP JWT.
+- **Scope:** Firebase is currently used only as an optional Candidate identity provider. HR/Super Admin SSO remains Google OAuth2 / OIDC with domain validation.
+- **Config:** Firebase Web app values are public client configuration and live in frontend env vars. No Firebase service account secret is required for the current validation flow.
