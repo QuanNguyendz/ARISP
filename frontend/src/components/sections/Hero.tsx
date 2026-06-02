@@ -63,7 +63,7 @@ export default function Hero() {
       >
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <motion.button
-            onClick={() => navigate('/auth/register')}
+            onClick={() => navigate('/dang-ky')}
             className="group relative w-full sm:w-auto px-7 py-3.5 rounded-full bg-white text-bg-primary font-medium text-sm transition-all duration-300 hover:bg-white/90 flex items-center justify-center gap-2"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

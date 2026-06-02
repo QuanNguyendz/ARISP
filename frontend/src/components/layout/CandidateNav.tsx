@@ -101,14 +101,14 @@ export default function CandidateNav() {
                     className="absolute right-0 mt-2 w-56 glass rounded-xl p-2"
                   >
                     <Link
-                      to="/candidate/dashboard"
+                      to="/ung-vien/cong-cua"
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
                       <User className="w-4 h-4" />
                       Hồ sơ của tôi
                     </Link>
                     <Link
-                      to="/candidate/applications"
+                      to="/ung-vien/ung-tuyen"
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
                       <FileText className="w-4 h-4" />
@@ -128,13 +128,13 @@ export default function CandidateNav() {
             ) : (
               <>
                 <Link
-                  to="/auth/candidate-login"
+                  to="/dang-nhap-ung-vien"
                   className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors"
                 >
                   Đăng nhập
                 </Link>
                 <Link
-                  to="/auth/candidate-register"
+                  to="/dang-ky-ung-vien"
                   className="px-5 py-2.5 rounded-full bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                 >
                   Đăng ký
@@ -197,7 +197,7 @@ export default function CandidateNav() {
               {isAuthenticated ? (
                 <div className="space-y-2">
                   <Link
-                    to="/candidate/dashboard"
+                    to="/ung-vien/cong-cua"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                   >
@@ -215,14 +215,14 @@ export default function CandidateNav() {
               ) : (
                 <div className="space-y-2">
                   <Link
-                    to="/auth/candidate-login"
+                    to="/dang-nhap-ung-vien"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="block w-full px-4 py-3 text-sm font-medium text-text-secondary hover:text-white text-center rounded-lg hover:bg-white/5 transition-colors"
                   >
                     Đăng nhập
                   </Link>
                   <Link
-                    to="/auth/candidate-register"
+                    to="/dang-ky-ung-vien"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="block w-full px-4 py-3 text-sm font-semibold text-white text-center rounded-lg bg-gradient-to-r from-accent-primary to-violet"
                   >

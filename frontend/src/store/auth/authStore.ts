@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, AuthTokens } from '../../types/auth';
+import type { User, AuthTokens, AuthResponse } from '../../types/auth';
 
 interface AuthState {
   user: User | null;
@@ -8,10 +8,20 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setAuth: (user: User, tokens: AuthTokens) => void;
+  setAuthFromResponse: (response: AuthResponse) => User;
   updateUser: (user: Partial<User>) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
   login: (user: User, tokens: AuthTokens) => void;
+}
+
+function authResponseToUser(response: AuthResponse, id?: string): User {
+  return {
+    id: id || 'unknown',
+    email: '',
+    name: response.fullName,
+    role: response.role,
+  };
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -30,6 +40,17 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         }),
 
+      setAuthFromResponse: (response) => {
+        const user = authResponseToUser(response);
+        const tokens: AuthTokens = {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        };
+        set({ user, tokens, isAuthenticated: true, isLoading: false });
+        return user;
+      },
+
       updateUser: (partialUser) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...partialUser } : null,
@@ -44,7 +65,7 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setLoading: (loading) => set({ isLoading: loading }),
-      
+
       login: (user, tokens) => set({ user, tokens, isAuthenticated: true, isLoading: false }),
     }),
     {

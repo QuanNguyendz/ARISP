@@ -29,12 +29,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/auth/candidate-register" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/dang-ky-ung-vien" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Tạo hồ sơ
                 </Link>
               </li>
               <li>
-                <Link to="/candidate/feedback" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/ung-vien/ket-qua" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Kết quả phỏng vấn
                 </Link>
               </li>
@@ -46,17 +46,17 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Dành cho NTD</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/auth/register" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/dang-ky" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Đăng ký tuyển dụng
                 </Link>
               </li>
               <li>
-                <Link to="/admin/dashboard" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/quan-ly" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Quản lý tuyển dụng
                 </Link>
               </li>
               <li>
-                <Link to="/admin/reports" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/quan-ly/bao-cao" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Báo cáo & Phân tích
                 </Link>
               </li>

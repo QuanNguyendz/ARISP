@@ -6,8 +6,8 @@ import { useAuthStore } from '@store/auth/authStore';
 
 const candidateLinks = [
   { label: 'Tìm việc', href: '/jobs', icon: Briefcase },
-  { label: 'Việc đã ứng tuyển', href: '/candidate/applications', icon: FileText },
-  { label: 'Phỏng vấn', href: '/candidate/interview', icon: Calendar },
+  { label: 'Việc đã ứng tuyển', href: '/ung-vien/ung-tuyen', icon: FileText },
+  { label: 'Phỏng vấn', href: '/ung-vien/phong-van', icon: Calendar },
 ];
 
 export default function CandidateLayout({ children }: { children?: React.ReactNode }) {
@@ -69,7 +69,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
             {/* Right Side - Auth */}
             <div className="hidden lg:flex items-center gap-3">
               <Link
-                to="/auth/login"
+                to="/dang-nhap"
                 className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 border border-white/10"
               >
                 Nhà tuyển dụng
@@ -78,7 +78,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
               {isAuthenticated && user ? (
                 <div className="flex items-center gap-3">
                   <Link
-                    to="/candidate/dashboard"
+                    to="/ung-vien/cong-cua"
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
@@ -96,13 +96,13 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
               ) : (
                 <>
                   <Link
-                    to="/auth/candidate-login"
+                    to="/dang-nhap-ung-vien"
                     className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors"
                   >
                     Đăng nhập
                   </Link>
                   <Link
-                    to="/auth/candidate-register"
+                    to="/dang-ky-ung-vien"
                     className="px-5 py-2.5 rounded-full bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                   >
                     Đăng ký

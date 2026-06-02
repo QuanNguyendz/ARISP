@@ -31,7 +31,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      navigate('/auth/login');
+      navigate('/dang-nhap');
     }, 2000);
   };
 
@@ -250,7 +250,7 @@ export default function RegisterPage() {
           <p className="text-center mt-8 text-text-secondary">
             Đã có tài khoản?{' '}
             <button
-              onClick={() => navigate('/auth/login')}
+              onClick={() => navigate('/dang-nhap')}
               className="text-accent-primary hover:text-accent-secondary transition-colors font-medium"
             >
               Đăng nhập ngay

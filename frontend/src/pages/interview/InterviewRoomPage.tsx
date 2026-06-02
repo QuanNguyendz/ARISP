@@ -51,7 +51,7 @@ export default function InterviewRoomPage() {
   };
 
   const handleEndInterview = () => {
-    navigate('/candidate/feedback');
+    navigate('/ung-vien/ket-qua');
   };
 
   if (!sessionId) {
@@ -74,7 +74,7 @@ export default function InterviewRoomPage() {
             Cảm ơn bạn đã tham gia phỏng vấn. Kết quả sẽ được gửi qua email trong vòng 24 giờ.
           </p>
           <button
-            onClick={() => navigate('/candidate/feedback')}
+            onClick={() => navigate('/ung-vien/ket-qua')}
             className="px-8 py-4 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
           >
             Xem kết quả

@@ -49,7 +49,7 @@ export default function AdminLayout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-4 border-b border-white/5">
-          <Link to="/admin/dashboard" className="flex items-center gap-3">
+          <Link to="/quan-ly" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center flex-shrink-0">
               <Brain className="w-4 h-4 text-white" />
             </div>
@@ -173,7 +173,7 @@ export default function AdminLayout() {
             >
               {/* Logo */}
               <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
-                <Link to="/admin/dashboard" className="flex items-center gap-3">
+                <Link to="/quan-ly" className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
                     <Brain className="w-4 h-4 text-white" />
                   </div>
@@ -244,7 +244,7 @@ export default function AdminLayout() {
           >
             <Menu className="w-6 h-6 text-white/80" />
           </button>
-          <Link to="/admin/dashboard" className="flex items-center gap-2">
+          <Link to="/quan-ly" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
               <Brain className="w-4 h-4 text-white" />
             </div>

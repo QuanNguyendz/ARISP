@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Brain, Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, CheckCircle } from 'lucide-react';
+import { Brain, Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
+import { authService } from '@services/auth/authService';
 
 export default function CandidateRegisterPage() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -12,6 +14,8 @@ export default function CandidateRegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const passwordRequirements = [
     { label: 'Ít nhất 8 ký tự', met: password.length >= 8 },
@@ -19,6 +23,37 @@ export default function CandidateRegisterPage() {
     { label: 'Có số', met: /[0-9]/.test(password) },
     { label: 'Có ký tự đặc biệt', met: /[!@#$%^&*]/.test(password) },
   ];
+
+  const allRequirementsMet = passwordRequirements.every((r) => r.met);
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!allRequirementsMet) {
+      setError('Mật khẩu chưa đủ mạnh.');
+      return;
+    }
+    if (!passwordsMatch) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    if (!agreeTerms) {
+      setError('Bạn cần đồng ý với điều khoản sử dụng.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await authService.candidateRegister({ email, password, fullName, phone });
+      navigate('/dang-nhap-ung-vien?registered=true');
+    } catch (err: any) {
+      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg-primary flex">
@@ -49,7 +84,7 @@ export default function CandidateRegisterPage() {
           </div>
 
           {/* Form */}
-          <form className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Full Name */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -63,6 +98,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Nguyễn Văn A"
                   className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  required
                 />
               </div>
             </div>
@@ -80,6 +116,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="email@example.com"
                   className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  required
                 />
               </div>
             </div>
@@ -114,6 +151,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Tạo mật khẩu"
                   className="w-full pl-12 pr-12 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  required
                 />
                 <button
                   type="button"
@@ -123,7 +161,7 @@ export default function CandidateRegisterPage() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              
+
               {/* Password Strength */}
               <div className="mt-3 space-y-2">
                 {passwordRequirements.map((req) => (
@@ -157,6 +195,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu"
                   className="w-full pl-12 pr-12 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  required
                 />
                 <button
                   type="button"
@@ -166,6 +205,9 @@ export default function CandidateRegisterPage() {
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {confirmPassword.length > 0 && !passwordsMatch && (
+                <p className="text-red-400 text-xs mt-1">Mật khẩu không khớp</p>
+              )}
             </div>
 
             {/* Terms */}
@@ -178,24 +220,38 @@ export default function CandidateRegisterPage() {
               />
               <span className="text-sm text-text-secondary">
                 Tôi đồng ý với{' '}
-                <Link to="/auth/login" className="text-accent-primary hover:underline">
+              <Link to="/dang-nhap-ung-vien" className="text-accent-primary hover:underline">
                   Điều khoản sử dụng
                 </Link>{' '}
                 và{' '}
-                <Link to="/auth/login" className="text-accent-primary hover:underline">
+                <Link to="/dang-nhap-ung-vien" className="text-accent-primary hover:underline">
                   Chính sách bảo mật
                 </Link>
               </span>
             </label>
 
-            {/* submit */}
+            {/* Error */}
+            {error && (
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            )}
+
+            {/* Submit */}
             <button
               type="submit"
-              disabled={!agreeTerms}
+              disabled={isLoading || !allRequirementsMet || !passwordsMatch || !agreeTerms}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Tạo tài khoản
-              <ArrowRight className="w-5 h-5" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Đang đăng ký...
+                </>
+              ) : (
+                <>
+                  Tạo tài khoản
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           </form>
 
@@ -203,7 +259,7 @@ export default function CandidateRegisterPage() {
           <p className="mt-8 text-center text-text-secondary">
             Đã có tài khoản?{' '}
             <Link
-              to="/auth/candidate-login"
+              to="/dang-nhap-ung-vien"
               className="text-accent-primary hover:text-accent-secondary font-medium transition-colors"
             >
               Đăng nhập ngay
@@ -213,7 +269,7 @@ export default function CandidateRegisterPage() {
           {/* Back to Employer */}
           <p className="mt-4 text-center">
             <Link
-              to="/auth/register"
+              to="/dang-ky"
               className="text-sm text-text-tertiary hover:text-white transition-colors"
             >
               ← Dành cho nhà tuyển dụng
@@ -233,7 +289,7 @@ export default function CandidateRegisterPage() {
           <h2 className="text-2xl font-bold text-white mb-8 text-center">
             Tại sao chọn ARISP?
           </h2>
-          
+
           <div className="space-y-6">
             {[
               {

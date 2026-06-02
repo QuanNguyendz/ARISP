@@ -37,7 +37,7 @@ export default function CTA() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <motion.button
-              onClick={() => navigate('/auth/register')}
+              onClick={() => navigate('/dang-ky')}
               className="group relative px-8 py-4 rounded-full bg-white text-bg-primary font-medium text-sm transition-all duration-300 hover:bg-white/90 flex items-center gap-2"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -46,7 +46,7 @@ export default function CTA() {
               <ArrowRight className="w-4 h-4" />
             </motion.button>
             <motion.button
-              onClick={() => navigate('/auth/login')}
+              onClick={() => navigate('/dang-nhap')}
               className="px-8 py-4 rounded-full text-white/50 hover:text-white text-sm font-medium transition-colors duration-300"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
