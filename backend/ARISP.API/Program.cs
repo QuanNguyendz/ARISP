@@ -94,6 +94,8 @@ builder.Services.AddScoped<ITTSService, MockTTSService>();
 builder.Services.AddScoped<IAvatarService, MockAvatarService>();
 builder.Services.AddScoped<INotificationService, MockNotificationService>();
 
+builder.Services.AddTransient<IEmailService, EmailService>();
+
 // Application Services
 builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();

@@ -25,12 +25,14 @@ namespace ARISP.API.Controllers
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
         private readonly ARISPDbContext _dbContext;
+        private readonly IEmailService _emailService;
 
-        public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, ARISPDbContext dbContext)
+        public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, ARISPDbContext dbContext, IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
             _dbContext = dbContext;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -41,7 +43,6 @@ namespace ARISP.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateLogin([FromBody] LoginRequest request)
         {
-            // Bảo mật biệt lập cổng, không quét thông tin vào bảng Users nội bộ nữa
             var candidate = await _dbContext.CandidateAccounts
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(c => c.Email == request.Email);
@@ -55,7 +56,6 @@ namespace ARISP.API.Controllers
 
             var token = GenerateJwtTokenForCandidate(candidate);
 
-            // 🛡️ ĐÃ SỬA: Giải quyết xong Conflict & Loại bỏ hoàn toàn OrganizationId
             return Ok(new AuthResponse
             {
                 AccessToken = token,
@@ -69,7 +69,6 @@ namespace ARISP.API.Controllers
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP FIREBASE: Backend xác thực Firebase ID token rồi cấp JWT nội bộ ARISP.
-        /// Frontend gửi Authorization: Bearer {firebase_id_token}.
         /// </summary>
         [HttpPost("firebase/candidate/login")]
         [Authorize(AuthenticationSchemes = "Firebase")]
@@ -129,7 +128,7 @@ namespace ARISP.API.Controllers
         }
 
         /// <summary>
-        /// CỔNG ĐĂNG NHẬP 2: ĐIỀU HƯỚNG CHALLENGE OAUTH2 (Dành cho nội bộ Super Admin, HR Leader, Recruiter)
+        /// CỔNG ĐĂNG NHẬP 2: ĐIỀU HƯỚNG CHALLENGE OAUTH2
         /// </summary>
         [HttpGet("external/signin")]
         [AllowAnonymous]
@@ -179,12 +178,10 @@ namespace ARISP.API.Controllers
                 return Forbid();
             }
 
-            // Tìm nhân viên trong bảng nội bộ
             var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == email);
 
             if (user != null)
             {
-                // Nếu tài khoản bị khóa hoặc đang ở trạng thái chờ duyệt (Pending)
                 if (!user.IsActive || user.Role == "Pending")
                 {
                     await HttpContext.SignOutAsync("External");
@@ -199,16 +196,15 @@ namespace ARISP.API.Controllers
                 return Redirect(redirectUrl);
             }
 
-            // 🚀 ĐÃ SỬA LUỒNG JIT PROVISIONING: Loại bỏ hoàn toàn truy vết tới bảng Organizations
             var newUser = new User
             {
                 Id = Guid.NewGuid(),
                 Email = email,
-                PasswordHash = "password", // Đánh dấu tài khoản SSO
-                Role = "Pending",                      // Khởi tạo trạng thái chờ duyệt tuyển dụng
+                PasswordHash = "password",
+                Role = "Pending",
                 FullName = name,
                 Department = null,
-                IsActive = false                       // Chờ SuperAdmin hoặc HR Admin duyệt kích hoạt
+                IsActive = false
             };
 
             await _dbContext.Users.AddAsync(newUser);
@@ -286,7 +282,7 @@ namespace ARISP.API.Controllers
         /// CỔNG ĐĂNG NHẬP 3: XÁC THỰC PASSWORDLESS CHO CANDIDATE PORTAL QUA MAGIC LINK
         /// </summary>
         [HttpGet("magic-link/verify")]
-        [AllowAnonymous] // Đã sửa gộp Conflict: Đảm bảo cổng Magic Link cho phép gọi ẩn danh không cần Bearer Token trước
+        [AllowAnonymous]
         public async Task<IActionResult> VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
         {
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
@@ -306,9 +302,109 @@ namespace ARISP.API.Controllers
             });
         }
 
+        /// <summary>
+        /// API YÊU CẦU QUÊN MẬT KHẨU: Tạo token khôi phục và gửi qua hòm thư điện tử
+        /// </summary>
+        [HttpPost("candidate/forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CandidateForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest(new { message = "Email is required." });
+
+            var candidate = await _dbContext.CandidateAccounts
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Email == request.Email);
+
+            // Bảo mật: Luôn báo Ok để tránh kẻ xấu lợi dụng dò tìm email có tồn tại hay không
+            if (candidate == null)
+                return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
+
+            var resetToken = Guid.NewGuid().ToString("N");
+
+            // 1. Tạo bản ghi MagicLink mới dựa trên class MagicLink
+            var magicLinkRecord = new MagicLink
+            {
+                Id = Guid.NewGuid(),
+                Email = candidate.Email,
+                TokenHash = resetToken,
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(2), // Link có giá trị trong 2 giờ
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            // 2. Lưu token vào bảng MagicLinks
+            await _dbContext.MagicLinks.AddAsync(magicLinkRecord);
+            await _dbContext.SaveChangesAsync();
+
+            var resetLink = $"http://localhost:3000/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}";
+
+            var emailBody = $@"
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;'>
+                    <h2 style='color: #0056b3; text-align: center;'>ARISP Account Password Reset</h2>
+                    <p>Hi {candidate.FullName ?? "Candidate"},</p>
+                    <p>We received a request to reset your password. Click the button below to set up a new password. This link is valid for 2 hours:</p>
+                    <div style='text-align: center; margin: 30px 0;'>
+                        <a href='{resetLink}' style='background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;'>Reset Password</a>
+                    </div>
+                    <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
+                    <p style='word-break: break-all; color: #666;'>{resetLink}</p>
+                    <hr style='border: none; border-top: 1px solid #eee;'/>
+                    <p style='font-size: 12px; color: #999;'>If you did not request this change, please ignore this email.</p>
+                </div>";
+
+            await _emailService.SendEmailAsync(candidate.Email, "Reset Your ARISP Account Password", emailBody);
+
+            return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
+        }
+
+        /// <summary>
+        /// API ĐẶT LẠI MẬT KHẨU: Xác thực token hợp lệ từ bảng MagicLinks và cập nhật mật khẩu mới
+        /// </summary>
+        [HttpPost("candidate/reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CandidateResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return BadRequest(new { message = "Missing required fields." });
+            }
+
+            // 1. Tìm ứng viên dựa theo email
+            var candidate = await _dbContext.CandidateAccounts
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Email == request.Email);
+
+            if (candidate == null)
+            {
+                return BadRequest(new { message = "Invalid email or recovery token." });
+            }
+
+            // 🛠️ ĐÃ SỬA ĐỔI CHUẨN: Tìm token hợp lệ trong bảng MagicLinks
+            var magicLink = await _dbContext.MagicLinks
+                .FirstOrDefaultAsync(m => m.Email == request.Email
+                                       && m.TokenHash == request.Token
+                                       && m.UsedAt == null
+                                       && m.ExpiresAt > DateTimeOffset.UtcNow);
+
+            if (magicLink == null)
+            {
+                return BadRequest(new { message = "Invalid, expired, or already used recovery token." });
+            }
+
+            // 2. Cập nhật mật khẩu mới hóa mã BCrypt
+            candidate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            candidate.UpdatedAt = DateTimeOffset.UtcNow;
+
+            // 3. Đánh dấu token đã được sử dụng để tránh dùng lại (Tăng cường bảo mật)
+            magicLink.UsedAt = DateTimeOffset.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
+        }
+
         private string GenerateJwtTokenForUser(User user)
         {
-            // Map quyền chuẩn hóa an toàn dựa theo dữ liệu thực tế từ AppRoles
             var roleClaimValue = user.Role switch
             {
                 "super_admin" => AppRoles.SuperAdmin,
@@ -317,7 +413,6 @@ namespace ARISP.API.Controllers
                 _ => user.Role
             };
 
-            // 🛡️ ĐÃ SỬA: Đã giải quyết Conflict và lược bỏ hoàn toàn Claim "organization_id"
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
