@@ -245,18 +245,6 @@ try
     
     // Check/create extensions and seed schema tables if needed
     // In Supabase, the public schema was already initialized completely via apply_schema.js, so we only need to perform Seeding!
-    try
-    {
-        await dbContext.Database.ExecuteSqlRawAsync("CREATE CAST (varchar AS vector) WITH INOUT AS IMPLICIT;");
-    }
-    catch (Exception) { /* Already exists or not permitted */ }
-
-    try
-    {
-        await dbContext.Database.ExecuteSqlRawAsync("CREATE CAST (text AS vector) WITH INOUT AS IMPLICIT;");
-    }
-    catch (Exception) { /* Already exists or not permitted */ }
-
     await SeedDataAsync(dbContext);
 }
 catch (Exception ex)
