@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -106,8 +106,12 @@ namespace ARISP.Application.DTOs
     {
         public Guid Id { get; set; }
         public Guid JobPostingId { get; set; }
+        public string? JobTitle { get; set; }
         public string CandidateEmail { get; set; } = string.Empty;
         public string CandidateName { get; set; } = string.Empty;
+        public string? CandidatePhone { get; set; }
+        public string? CvFileUrl { get; set; }
+        public string? CvText { get; set; }
         public string Source { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public bool PracticeSessionUsed { get; set; }

@@ -50,25 +50,28 @@ namespace ARISP.Application.Services
                 foreach (var chunkText in chunks)
                 {
                     var embedding = await _embeddingProvider.EmbedAsync(chunkText, ct);
-                    var chunk = new DocumentChunk
-                    {
-                        SourceType = "cv",
-                        SourceId = application.Id,
-                        ChunkIndex = chunkIndex++,
-                        ChunkText = chunkText,
-                        Embedding = embedding
-                    };
-                    await _unitOfWork.Repository<DocumentChunk>().AddAsync(chunk, ct);
+                    var embeddingString = $"[{string.Join(",", embedding)}]";
+                    var chunkId = Guid.NewGuid();
+                    var createdAt = DateTimeOffset.UtcNow;
+
+                    await _unitOfWork.ExecuteSqlRawAsync(
+                        "INSERT INTO document_chunks (id, source_type, source_id, chunk_index, chunk_text, embedding, metadata, created_at) VALUES ({0}, {1}, {2}, {3}, {4}, {5}::vector, {6}::jsonb, {7})",
+                        new object[] { chunkId, "cv", application.Id, chunkIndex++, chunkText, embeddingString, "{}", createdAt },
+                        ct
+                    );
                 }
-                await _unitOfWork.SaveChangesAsync(ct);
             }
 
             var response = new ApplicationResponse
             {
                 Id = application.Id,
                 JobPostingId = application.JobPostingId,
+                JobTitle = jobPosting?.Title ?? "Unknown Job",
                 CandidateEmail = application.CandidateEmail,
                 CandidateName = application.CandidateName,
+                CandidatePhone = application.CandidatePhone,
+                CvFileUrl = application.CvFileUrl,
+                CvText = application.CvText,
                 Source = application.Source,
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
@@ -76,6 +79,31 @@ namespace ARISP.Application.Services
             };
 
             return Result.Success(response);
+        }
+
+        public async Task<Result<List<ApplicationResponse>>> GetAllApplicationsAsync(CancellationToken ct = default)
+        {
+            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetAllAsync(ct);
+            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
+            var jobDict = jobs.ToDictionary(j => j.Id, j => j.Title);
+
+            var responseList = applications.Select(app => new ApplicationResponse
+            {
+                Id = app.Id,
+                JobPostingId = app.JobPostingId,
+                JobTitle = jobDict.TryGetValue(app.JobPostingId, out var title) ? title : "Unknown Job",
+                CandidateEmail = app.CandidateEmail,
+                CandidateName = app.CandidateName,
+                CandidatePhone = app.CandidatePhone,
+                CvFileUrl = app.CvFileUrl,
+                CvText = app.CvText,
+                Source = app.Source,
+                Status = app.Status,
+                PracticeSessionUsed = app.PracticeSessionUsed,
+                CreatedAt = app.CreatedAt
+            }).ToList();
+
+            return Result.Success(responseList);
         }
 
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, CancellationToken ct = default)

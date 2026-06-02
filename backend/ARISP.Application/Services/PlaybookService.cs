@@ -45,21 +45,17 @@ namespace ARISP.Application.Services
                 foreach (var chunkText in chunks)
                 {
                     var embedding = await _embeddingProvider.EmbedAsync(chunkText, ct);
-                    var chunk = new DocumentChunk
-                    {
-                        SourceType = "playbook",
-                        SourceId = document.Id,
-                        ChunkIndex = chunkIndex++,
-                        ChunkText = chunkText,
-                        Embedding = embedding,
-                        Metadata = $"{{\"scope\": \"{scope}\", \"document_type\": \"{documentType}\"}}"
-                    };
-                    await _unitOfWork.Repository<DocumentChunk>().AddAsync(chunk, ct);
-                }
+                    var embeddingString = $"[{string.Join(",", embedding)}]";
+                    var chunkId = Guid.NewGuid();
+                    var createdAt = DateTimeOffset.UtcNow;
+                    var metadataJson = $"{{\"scope\": \"{scope}\", \"document_type\": \"{documentType}\"}}";
 
-                // If document type is "must_ask", seed must_ask tracking logic (for future interview sessions)
-                // In actual deployment, sessions pull from here to generate must_ask_tracking
-                await _unitOfWork.SaveChangesAsync(ct);
+                    await _unitOfWork.ExecuteSqlRawAsync(
+                        "INSERT INTO document_chunks (id, source_type, source_id, chunk_index, chunk_text, embedding, metadata, created_at) VALUES ({0}, {1}, {2}, {3}, {4}, {5}::vector, {6}::jsonb, {7})",
+                        new object[] { chunkId, "playbook", document.Id, chunkIndex++, chunkText, embeddingString, metadataJson, createdAt },
+                        ct
+                    );
+                }
             }
 
             return document;

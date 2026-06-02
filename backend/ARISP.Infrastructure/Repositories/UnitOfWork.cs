@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARISP.Application.Interfaces;
 using ARISP.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ARISP.Infrastructure.Repositories
 {
@@ -30,6 +31,11 @@ namespace ARISP.Infrastructure.Repositories
         public async Task<int> SaveChangesAsync(CancellationToken ct = default)
         {
             return await _context.SaveChangesAsync(ct);
+        }
+
+        public async Task<int> ExecuteSqlRawAsync(string sql, object[] parameters, CancellationToken ct = default)
+        {
+            return await _context.Database.ExecuteSqlRawAsync(sql, parameters, ct);
         }
 
         public void Dispose()

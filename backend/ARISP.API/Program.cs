@@ -213,6 +213,21 @@ if (app.Environment.IsDevelopment() || true) // always enable swagger for protot
 }
 
 app.UseCors("AllowFrontend");
+
+app.UseStaticFiles();
+
+// Ensure local uploads directory exists and configure to serve static CV files
+var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
+
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -230,6 +245,18 @@ try
     
     // Check/create extensions and seed schema tables if needed
     // In Supabase, the public schema was already initialized completely via apply_schema.js, so we only need to perform Seeding!
+    try
+    {
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE CAST (varchar AS vector) WITH INOUT AS IMPLICIT;");
+    }
+    catch (Exception) { /* Already exists or not permitted */ }
+
+    try
+    {
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE CAST (text AS vector) WITH INOUT AS IMPLICIT;");
+    }
+    catch (Exception) { /* Already exists or not permitted */ }
+
     await SeedDataAsync(dbContext);
 }
 catch (Exception ex)
