@@ -168,7 +168,7 @@ export default function PortalPage() {
                     </button>
                     {app.status === 'review' && (
                       <button
-                        onClick={() => navigate('/candidate/feedback')}
+                        onClick={() => navigate('/candidate/results')}
                         className="px-4 py-2 rounded-lg bg-white/5 text-white/50 text-sm font-medium hover:bg-white/10 transition-colors"
                       >
                         Xem kết quả

@@ -333,7 +333,7 @@ export default function CandidateDashboardPage() {
                 ))}
               </div>
               <Link
-                to="/candidate/profile"
+                to="/candidate/portal"
                 className="mt-4 block w-full py-3 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-medium text-center hover:opacity-90 transition-opacity"
               >
                 Cập nhật hồ sơ
@@ -372,7 +372,7 @@ export default function CandidateDashboardPage() {
               <h3 className="font-semibold text-white mb-4">Thao tác nhanh</h3>
               <div className="space-y-2">
                 <Link
-                  to="/candidate/profile"
+                  to="/candidate/portal"
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                 >
                   <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/30">
@@ -390,7 +390,7 @@ export default function CandidateDashboardPage() {
                   <span className="text-sm text-text-secondary group-hover:text-white">Tìm việc mới</span>
                 </Link>
                 <Link
-                  to="/candidate/feedback"
+                  to="/candidate/results"
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                 >
                   <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 group-hover:bg-violet-500/30">

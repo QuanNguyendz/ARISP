@@ -24,7 +24,9 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config as any;
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
       const refreshToken = useAuthStore.getState().tokens?.refreshToken;
       if (refreshToken) {
         try {
@@ -32,14 +34,13 @@ apiClient.interceptors.response.use(
             refreshToken,
           });
           const { accessToken } = response.data;
+          const currentTokens = useAuthStore.getState().tokens!;
           useAuthStore.getState().setAuth(useAuthStore.getState().user!, {
-            ...useAuthStore.getState().tokens!,
+            ...currentTokens,
             accessToken,
           });
-          if (error.config) {
-            error.config.headers.Authorization = `Bearer ${accessToken}`;
-            return apiClient(error.config);
-          }
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return apiClient(originalRequest);
         } catch {
           useAuthStore.getState().logout();
         }

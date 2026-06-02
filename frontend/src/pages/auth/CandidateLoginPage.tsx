@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@store/auth/authStore';
+import { authService } from '@services/auth/authService';
 
 export default function CandidateLoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { setAuthFromResponse } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,22 +21,16 @@ export default function CandidateLoginPage() {
     setIsLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await authService.candidateLogin({ email, password });
+      const user = setAuthFromResponse(response);
       
-      if (email && password) {
-        login({
-          id: '1',
-          email: email,
-          name: 'Nguyễn Văn A',
-          role: 'Candidate',
-        }, { accessToken: 'demo-token', refreshToken: 'demo-refresh', expiresAt: Date.now() + 86400000 });
-        
-        navigate('/candidate/dashboard');
+      if (user.role === 'Candidate') {
+        navigate('/candidate/portal');
       } else {
-        setError('Email hoặc mật khẩu không đúng');
+        navigate('/admin/dashboard');
       }
-    } catch {
-      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
+    } catch (err: any) {
+      setError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -130,12 +125,12 @@ export default function CandidateLoginPage() {
                 />
                 <span className="text-sm text-text-secondary">Ghi nhớ đăng nhập</span>
               </label>
-              <Link
-                to="/auth/login"
+              <button
+                type="button"
                 className="text-sm text-accent-primary hover:text-accent-secondary transition-colors"
               >
                 Quên mật khẩu?
-              </Link>
+              </button>
             </div>
 
             {/* Submit */}

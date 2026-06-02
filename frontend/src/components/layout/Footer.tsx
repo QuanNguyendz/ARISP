@@ -34,7 +34,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/candidate/feedback" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/candidate/results" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Kết quả phỏng vấn
                 </Link>
               </li>
@@ -56,7 +56,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/admin/reports" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link to="/quan-ly/bao-cao" className="text-text-secondary hover:text-white transition-colors text-sm">
                   Báo cáo & Phân tích
                 </Link>
               </li>

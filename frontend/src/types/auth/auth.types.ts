@@ -23,10 +23,24 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+export interface CandidateRegisterRequest {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+}
+
 export interface MagicLinkRequest {
   email: string;
 }
 
 export interface MagicLinkCallback {
   token: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  fullName: string;
+  role: 'SuperAdmin' | 'HRAdmin' | 'Recruiter' | 'Candidate';
 }

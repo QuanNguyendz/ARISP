@@ -145,7 +145,7 @@ function JobCard({ job, onSave }: { job: typeof FEATURED_JOBS[0], onSave: (id: s
             </div>
             <h3 
               className="text-lg font-semibold text-text-primary group-hover:text-accent-primary transition-colors cursor-pointer"
-              onClick={() => navigate(`/ung-vien/ung-tuyen/${job.id}`)}
+              onClick={() => navigate(`/candidate/applications/${job.id}`)}
             >
               {job.title}
             </h3>
@@ -198,7 +198,7 @@ function JobCard({ job, onSave }: { job: typeof FEATURED_JOBS[0], onSave: (id: s
           {job.applicants} ứng viên
         </span>
         <button 
-          onClick={() => navigate(`/ung-vien/ung-tuyen/${job.id}`)}
+          onClick={() => navigate(`/candidate/applications/${job.id}`)}
           className="px-4 py-2 rounded-lg bg-accent-primary/20 text-accent-primary font-medium text-sm hover:bg-accent-primary hover:text-white transition-all flex items-center gap-2"
         >
           Ứng tuyển ngay
@@ -448,7 +448,7 @@ export default function FindJob() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button 
-                  onClick={() => navigate('/dang-ky')}
+                  onClick={() => navigate('/auth/register')}
                   className="px-8 py-4 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
                 >
                   Tạo hồ sơ miễn phí
@@ -492,7 +492,7 @@ export default function FindJob() {
               </div>
             </div>
             <a 
-              href="/nha-tuyen-dung"
+              href="/employer"
               target="_blank"
               rel="noopener noreferrer"
               className="px-6 py-3 rounded-xl bg-white text-bg-primary font-medium hover:bg-white/90 transition-colors flex items-center gap-2 whitespace-nowrap"

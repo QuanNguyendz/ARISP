@@ -23,7 +23,7 @@ export default function PublicNav() {
             <Link to="/jobs" className="text-text-secondary hover:text-white transition-colors">
               Tìm việc
             </Link>
-            <Link to="/nha-tuyen-dung" className="text-text-secondary hover:text-white transition-colors">
+            <Link to="/employer" className="text-text-secondary hover:text-white transition-colors">
               Dành cho NTD
             </Link>
             <Link to="/auth/login" className="text-text-secondary hover:text-white transition-colors">
@@ -63,7 +63,7 @@ export default function PublicNav() {
                 Tìm việc
               </Link>
               <Link
-                to="/nha-tuyen-dung"
+                to="/employer"
                 className="text-text-secondary hover:text-white transition-colors py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
