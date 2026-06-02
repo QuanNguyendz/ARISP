@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'SuperAdmin' | 'HRAdmin' | 'Recruiter' | 'Candidate';
+  role: string; // Backend sends: Super_admin, Hr_admin, Recruiter, Candidate
   organizationId?: string;
   avatarUrl?: string;
 }
@@ -42,5 +42,5 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   fullName: string;
-  role: 'SuperAdmin' | 'HRAdmin' | 'Recruiter' | 'Candidate';
+  role: string; // Backend sends: Super_admin, Hr_admin, Recruiter, Candidate
 }

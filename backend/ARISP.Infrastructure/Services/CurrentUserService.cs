@@ -18,14 +18,15 @@ namespace ARISP.Infrastructure.Services
         {
             get
             {
-                var idClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                var idClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value
+                              ?? _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                               ?? _httpContextAccessor.HttpContext?.User?.FindFirst("user_id")?.Value;
 
                 return Guid.TryParse(idClaim, out var parsedGuid) ? parsedGuid : null;
             }
         }
 
-        public string? Role => _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value
-                                ?? _httpContextAccessor.HttpContext?.User?.FindFirst("role")?.Value;
+        public string? Role => _httpContextAccessor.HttpContext?.User?.FindFirst("role")?.Value
+                                ?? _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value;
     }
 }

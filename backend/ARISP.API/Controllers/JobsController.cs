@@ -117,7 +117,7 @@ namespace ARISP.API.Controllers
                 WorkMode = request.WorkMode,
                 SalaryMin = request.SalaryMin,
                 SalaryMax = request.SalaryMax,
-                SalaryCurrency = request.SalaryCurrency,
+                SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency,
                 SalaryIsNegotiable = request.SalaryIsNegotiable,
                 EmploymentType = request.EmploymentType,
                 ExperienceLevel = request.ExperienceLevel,
