@@ -1,67 +1,35 @@
 import { apiClient } from '../apiClient';
 import type { JobPosting, CreateJobPostingRequest } from '@/types/job';
 
-interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-interface JobPostingFilters {
-  status?: JobPosting['status'];
-  search?: string;
-  page?: number;
-  pageSize?: number;
-}
-
 export const jobService = {
-  async getJobPostings(filters?: JobPostingFilters): Promise<PaginatedResponse<JobPosting>> {
-    const { data } = await apiClient.get<PaginatedResponse<JobPosting>>('/job-postings', {
-      params: filters,
-    });
+  // HR Admin: Get all jobs (draft, active, paused, closed)
+  async getAdminJobPostings(): Promise<JobPosting[]> {
+    const { data } = await apiClient.get<JobPosting[]>('/jobs/admin');
     return data;
   },
 
+  // Public: Get active public jobs
+  async getPublicJobPostings(): Promise<JobPosting[]> {
+    const { data } = await apiClient.get<JobPosting[]>('/jobs');
+    return data;
+  },
+
+  // Get job detail by ID (Supports both public candidates and HR staff)
   async getJobPostingById(id: string): Promise<JobPosting> {
-    const { data } = await apiClient.get<JobPosting>(`/job-postings/${id}`);
+    const { data } = await apiClient.get<JobPosting>(`/jobs/${id}`);
     return data;
   },
 
+  // HR Admin: Create a new job posting
   async createJobPosting(request: CreateJobPostingRequest): Promise<JobPosting> {
-    const { data } = await apiClient.post<JobPosting>('/job-postings', request);
+    const { data } = await apiClient.post<JobPosting>('/jobs', request);
     return data;
   },
 
-  async updateJobPosting(id: string, request: Partial<CreateJobPostingRequest>): Promise<JobPosting> {
-    const { data } = await apiClient.put<JobPosting>(`/job-postings/${id}`, request);
+  // HR Admin: Add availability slots for a job posting
+  async addAvailabilitySlots(id: string, slots: any[]): Promise<any> {
+    const { data } = await apiClient.post(`/jobs/${id}/slots`, slots);
     return data;
-  },
-
-  async deleteJobPosting(id: string): Promise<void> {
-    await apiClient.delete(`/job-postings/${id}`);
-  },
-
-  async publishJobPosting(id: string): Promise<JobPosting> {
-    const { data } = await apiClient.post<JobPosting>(`/job-postings/${id}/publish`);
-    return data;
-  },
-
-  async pauseJobPosting(id: string): Promise<JobPosting> {
-    const { data } = await apiClient.post<JobPosting>(`/job-postings/${id}/pause`);
-    return data;
-  },
-
-  async detectLanguageRequirement(jdText: string): Promise<{ language: string; requirement: string; confidence: number } | null> {
-    const { data } = await apiClient.post('/job-postings/detect-language', { jdText });
-    return data;
-  },
-
-  async getPublicJobPostings(filters?: { search?: string; location?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<JobPosting>> {
-    const { data } = await apiClient.get<PaginatedResponse<JobPosting>>('/public/job-postings', {
-      params: filters,
-    });
-    return data;
-  },
+  }
 };
+export default jobService;

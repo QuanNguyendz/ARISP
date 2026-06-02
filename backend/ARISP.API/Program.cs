@@ -101,6 +101,9 @@ builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
 
+// Clear DefaultInboundClaimTypeMap to keep original JWT claim names ("role", "sub", "email")
+System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
 // Configure JWT Authentication and external SSO
 var jwtSecret = builder.Configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
 
@@ -120,7 +123,8 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["JWT:Issuer"] ?? "ARISP",
         ValidAudience = builder.Configuration["JWT:Audience"] ?? "ARISP_Client",
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-        RoleClaimType = ClaimTypes.Role // Explicitly map role claim
+        RoleClaimType = "role", // Map role claim using standard short name
+        NameClaimType = "sub"  // Map name/ID claim using standard short name
     };
 })
 .AddJwtBearer("Firebase", options =>

@@ -415,9 +415,9 @@ namespace ARISP.API.Controllers
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, roleClaimValue)
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim("role", roleClaimValue)
             };
 
             return CreateTokenString(claims);
@@ -427,9 +427,9 @@ namespace ARISP.API.Controllers
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, candidate.Id.ToString()),
-                new Claim(ClaimTypes.Email, candidate.Email),
-                new Claim(ClaimTypes.Role, AppRoles.Candidate)
+                new Claim(JwtRegisteredClaimNames.Sub, candidate.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, candidate.Email),
+                new Claim("role", AppRoles.Candidate)
             };
 
             return CreateTokenString(claims);
