@@ -58,8 +58,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] JWT issue + refresh token (không chứa organization_id claim)
 - [ ] Role-based authorization middleware cụ thể cho 4 role (`SuperAdmin`, `HRAdmin`, `Recruiter`, `Candidate`)
 - [ ] Magic link auth cho Candidate Portal (email + one-time token, TTL 15 phút)
-- [ ] **OAuth2 & Domain Validation:** Tích hợp Google OAuth2 / Microsoft Entra ID cho HR Users
-- [ ] **OAuth2 & Domain Validation:** Viết middleware validate email domain đăng nhập từ Google/Microsoft thuộc danh sách `allowed_email_domains` lưu trong bảng `system_settings`
+- [ ] **OAuth2 & Domain Validation:** Tích hợp Google OAuth2 / Microsoft Entra ID cho HR Users (Chỉ cho phép đăng nhập nếu email đã được tạo trước bởi Super Admin / Admin)
+- [ ] **OAuth2 & Domain Validation:** Viết middleware/service validate: 1) Email domain thuộc `allowed_email_domains` trong `system_settings`; 2) Email đã tồn tại sẵn trong database (Pre-provisioned). Chặn đăng nhập và không tự động đăng ký/tạo tài khoản nháp nếu email chưa có trong DB.
 
 ### Phase 2 – Job Posting & Application
 - [ ] Database schema: `job_postings`, `interview_round_configs`, `applications`
@@ -214,7 +214,7 @@ _Chưa có task nào đang thực hiện._
   - [ ] Webhook delivery log (success/failure per event)
 - [ ] **OAuth2 & Domain validation:**
   - [ ] Google Workspace / Microsoft Entra ID OAuth2 provider integration
-  - [ ] Domain parsing and allowed domain verification on callback
+  - [ ] Domain parsing, allowed domain verification, and database email validation on callback (Pre-provisioned check)
 - [ ] **Slack/Teams Notifications (Global Webhook):**
   - [ ] HR nhận notification khi Evaluation cần Review
   - [ ] HR nhận notification khi Candidate schedule/reschedule
