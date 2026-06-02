@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using ARISP.Application.DTOs;
 using ARISP.Application.Services;
 
@@ -18,6 +19,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost("session/start")]
+        [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> StartSession([FromBody] StartSessionRequest request)
         {
             var result = await _interviewService.StartSessionAsync(request);
@@ -30,6 +32,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost("session/{id}/answer")]
+        [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> SubmitAnswer(Guid id, [FromBody] SubmitAnswerRequest request)
         {
             var result = await _interviewService.SubmitAnswerAsync(id, request.QuestionId, request.Transcript, request.ResponseTimeMs);
@@ -42,6 +45,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost("session/{id}/end")]
+        [Authorize]
         public async Task<IActionResult> EndSession(Guid id, [FromQuery] string status = "completed")
         {
             var result = await _interviewService.EndSessionAsync(id, status);
@@ -54,6 +58,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost("review/confirm")]
+        [Authorize(Policy = "HrManagement")]
         public async Task<IActionResult> ConfirmReview([FromHeader(Name = "X-User-Id")] string userIdStr, [FromBody] ConfirmReviewRequest request)
         {
             if (!Guid.TryParse(userIdStr, out var userId))

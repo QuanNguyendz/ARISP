@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using ARISP.Application.DTOs;
 using ARISP.Application.Services;
 
@@ -18,6 +19,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> SubmitApplication([FromBody] SubmitApplicationRequest request)
         {
             var result = await _applicationService.SubmitApplicationAsync(request, "job_board");
@@ -30,6 +32,7 @@ namespace ARISP.API.Controllers
         }
 
         [HttpGet("{id}/practice-eligibility")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPracticeEligibility(Guid id)
         {
             var result = await _applicationService.CheckPracticeEligibilityAsync(id);

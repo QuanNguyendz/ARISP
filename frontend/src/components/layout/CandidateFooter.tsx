@@ -15,12 +15,12 @@ const footerLinks = {
   ],
   ứng_viên: [
     { label: 'Tạo hồ sơ', href: '/auth/candidate-register' },
-    { label: 'Hồ sơ của tôi', href: '/candidate/dashboard' },
+    { label: 'Hồ sơ của tôi', href: '/candidate/portal' },
     { label: 'Việc đã ứng tuyển', href: '/candidate/applications' },
-    { label: 'Phỏng vấn', href: '/candidate/interview' },
+    { label: 'Phỏng vấn', href: '/candidate/interviews' },
   ],
   về_arisp: [
-    { label: 'Giới thiệu', href: '/nha-tuyen-dung' },
+    { label: 'Giới thiệu', href: '/employer' },
     { label: 'Blog', href: '/jobs' },
     { label: 'Liên hệ', href: '/jobs' },
     { label: 'Chính sách', href: '/jobs' },

@@ -16,7 +16,7 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const location = useLocation();
-  const isEmployerPage = location.pathname === '/nha-tuyen-dung';
+  const isEmployerPage = location.pathname === '/employer';
   const { user, logout, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function Navigation() {
           <div className="hidden lg:flex items-center gap-3">
             {/* Mode Switcher */}
             <Link
-              to={isEmployerPage ? "/" : "/nha-tuyen-dung"}
+              to={isEmployerPage ? "/" : "/employer"}
               className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 border border-white/10"
             >
               <Briefcase className="w-4 h-4" />
@@ -106,7 +106,7 @@ export default function Navigation() {
                     className="absolute right-0 mt-2 w-48 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl p-2"
                   >
                     <Link
-                      to="/quan-ly"
+                      to="/admin/dashboard"
                       onClick={() => setIsDropdownOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
@@ -126,14 +126,14 @@ export default function Navigation() {
             ) : (
               <>
                 <Link
-                  to="/dang-nhap"
+                  to="/auth/login"
                   className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors duration-300"
                 >
                   Login
                 </Link>
 
                 <Link
-                  to="/dang-ky"
+                  to="/auth/register"
                   className="px-5 py-2.5 rounded-full bg-white text-bg-primary font-medium text-sm hover:bg-white/90 transition-colors"
                 >
                   Get started
@@ -177,7 +177,7 @@ export default function Navigation() {
             <div className="px-6 py-6 space-y-1">
               {/* Mobile Mode Switcher */}
               <Link
-                to={isEmployerPage ? "/" : "/nha-tuyen-dung"}
+                to={isEmployerPage ? "/" : "/employer"}
                 className="flex items-center gap-2 p-2 mb-4 rounded-xl bg-white/5"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -199,7 +199,7 @@ export default function Navigation() {
                 {isAuthenticated && user ? (
                   <>
                     <Link
-                      to="/quan-ly"
+                      to="/admin/dashboard"
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="block w-full px-4 py-3 text-base font-medium text-white/70 hover:text-white text-left hover:bg-white/5 rounded-lg transition-colors duration-300"
                     >
@@ -216,14 +216,14 @@ export default function Navigation() {
                 ) : (
                   <>
                     <Link
-                      to="/dang-nhap"
+                      to="/auth/login"
                       className="block w-full px-4 py-3 text-base font-medium text-white/70 hover:text-white text-left hover:bg-white/5 rounded-lg transition-colors duration-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Login
                     </Link>
                     <Link
-                      to="/dang-ky"
+                      to="/auth/register"
                       className="block w-full px-5 py-3 rounded-full bg-white text-bg-primary text-sm font-medium text-center hover:bg-white/90 transition-colors"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >

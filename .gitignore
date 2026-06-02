@@ -116,6 +116,7 @@ coverage/
 [Ll]og/
 [Ll]ogs/
 _ReSharper.**/
+**/appsettings.Development.json
 
 # EF Core & Migration artifacts
 *.db-journal

@@ -1,7 +1,20 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Security.Claims;
+using ARISP.API.Hubs;
+using ARISP.API.Middleware;
+using ARISP.Application.Interfaces;
+using ARISP.Application.Services;
+using ARISP.Domain.Constants;
+using ARISP.Domain.Entities;
+using ARISP.Infrastructure.Data;
+using ARISP.Infrastructure.Repositories;
+using ARISP.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -9,14 +22,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using ARISP.API.Hubs;
-using ARISP.API.Middleware;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
-using ARISP.Infrastructure.Data;
-using ARISP.Infrastructure.Repositories;
-using ARISP.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,12 +99,13 @@ builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
 
-// Configure JWT Authentication
+// Configure JWT Authentication and external SSO
 var jwtSecret = builder.Configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
+
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
@@ -111,8 +117,80 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["JWT:Issuer"] ?? "ARISP",
         ValidAudience = builder.Configuration["JWT:Audience"] ?? "ARISP_Client",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        RoleClaimType = ClaimTypes.Role // Explicitly map role claim
     };
+})
+.AddJwtBearer("Firebase", options =>
+{
+    var firebaseProjectId = builder.Configuration["Authentication:Firebase:ProjectId"]
+        ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID")
+        ?? "arisp-auth-service";
+
+    options.Authority = $"https://securetoken.google.com/{firebaseProjectId}";
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
+        ValidateAudience = true,
+        ValidAudience = firebaseProjectId,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true
+    };
+})
+// External cookie to receive external provider claims
+.AddCookie("External", options =>
+{
+    options.Cookie.Name = "ARISP.External";
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+})
+// Google OAuth2 (used for HR internal SSO)
+.AddGoogle("Google", options =>
+{
+    options.SignInScheme = "External";
+    options.CallbackPath = "/api/auth/external/google-callback";
+
+    var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+    var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+
+    // 🛡️ Nếu trống, gán chuỗi Mock để tránh crash pipeline khi chạy Local/Swagger
+    options.ClientId = string.IsNullOrEmpty(googleClientId) ? "MOCK_GOOGLE_CLIENT_ID_FOR_LOCAL" : googleClientId;
+    options.ClientSecret = string.IsNullOrEmpty(googleSecret) ? "MOCK_GOOGLE_SECRET_FOR_LOCAL" : googleSecret;
+});
+//// Azure AD / Microsoft Entra (OpenID Connect)
+//.AddOpenIdConnect("AzureAD", options =>
+//{
+//    options.SignInScheme = "External";
+
+//    var azureAuthority = builder.Configuration["Authentication:AzureAd:Authority"] ?? Environment.GetEnvironmentVariable("AZURE_AD_AUTHORITY");
+//    var azureClientId = builder.Configuration["Authentication:AzureAd:ClientId"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
+//    var azureSecret = builder.Configuration["Authentication:AzureAd:ClientSecret"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");
+
+//    options.Authority = string.IsNullOrEmpty(azureAuthority) ? "https://login.microsoftonline.com/common/v2.0" : azureAuthority;
+//    options.ClientId = string.IsNullOrEmpty(azureClientId) ? "00000000-0000-0000-0000-000000000000" : azureClientId;
+//    options.ClientSecret = string.IsNullOrEmpty(azureSecret) ? "MOCK_AZURE_SECRET_FOR_LOCAL" : azureSecret;
+
+//    options.ResponseType = "code";
+//    options.SaveTokens = true;
+//});
+
+builder.Services.AddAuthorization(options =>
+{
+    // 1. Chính sách dành riêng cho cấp quản trị tối cao
+    options.AddPolicy("SuperAdminOnly", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin));
+
+    // 2. Chính sách dành cho quản lý nhân sự trở lên (Bao gồm cả SuperAdmin và HR Admin)
+    options.AddPolicy("HrManagement", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin));
+
+    // 3. Chính sách dành cho toàn bộ nhân viên nội bộ có quyền vào hệ thống quản lý chuyên môn
+    options.AddPolicy("InternalStaff", policy =>
+        policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.Recruiter));
+
+    // 4. Chính sách biệt lập dành riêng cho Ứng viên
+    options.AddPolicy("CandidateOnly", policy =>
+        policy.RequireRole(AppRoles.Candidate));
 });
 
 builder.Services.AddCors(options =>
@@ -178,8 +256,8 @@ async Task SeedDataAsync(ARISPDbContext db)
         {
             Id = userId,
             Email = "hr@arisp.com",
-            PasswordHash = "password", // simple for prototype
-            Role = "hr_admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = AppRoles.HrAdmin,
             FullName = "Alex HR Admin",
             Department = "IT Recruitment",
             IsActive = true
@@ -245,7 +323,7 @@ async Task SeedDataAsync(ARISPDbContext db)
         {
             Id = candidateId,
             Email = "candidate@example.com",
-            PasswordHash = "password",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             FullName = "John Doe Candidate",
             Phone = "0987654321",
             Headline = "C# .NET Backend Developer | AI Enthusiast"
