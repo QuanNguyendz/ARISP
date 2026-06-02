@@ -26,10 +26,40 @@ const sidebarItems = [
   { icon: Settings, label: 'Cài đặt', path: '/quan-ly/cai-dat' },
 ];
 
+const getInitials = (name?: string) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, Math.min(name.length, 2)).toUpperCase();
+};
+
+const getDisplayRole = (role?: string) => {
+  if (!role) return 'Nhân viên';
+  const r = role.toLowerCase();
+  if (r === 'super_admin' || r === 'superadmin') return 'Super Admin';
+  if (r === 'hr_admin' || r === 'hradmin') return 'HR Admin';
+  if (r === 'recruiter') return 'Recruiter';
+  return role;
+};
+
 export default function AdminLayout() {
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { user } = useAuthStore();
+  const userRole = user?.role?.toLowerCase() || '';
+
+  const filteredItems = sidebarItems.filter((item) => {
+    // Hide Báo cáo and Cài đặt from Recruiter role
+    if (userRole === 'recruiter') {
+      if (item.path === '/quan-ly/bao-cao' || item.path === '/quan-ly/cai-dat') {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
@@ -71,7 +101,7 @@ export default function AdminLayout() {
         {/* Navigation */}
         <nav className="flex-1 p-3 overflow-y-auto">
           <div className="space-y-1">
-            {sidebarItems.map((item) => (
+            {filteredItems.map((item) => (
               <button
                 key={item.path}
                 onClick={() => window.location.href = item.path}
@@ -120,7 +150,7 @@ export default function AdminLayout() {
         <div className="p-3 border-t border-white/5">
           <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
-              MA
+              {getInitials(user?.name)}
             </div>
             <AnimatePresence>
               {!isSidebarCollapsed && (
@@ -130,8 +160,8 @@ export default function AdminLayout() {
                   exit={{ opacity: 0 }}
                   className="flex-1 min-w-0"
                 >
-                  <p className="text-sm font-medium text-white truncate">Minh Anh</p>
-                  <p className="text-xs text-white/40 truncate">HR Admin</p>
+                  <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
+                  <p className="text-xs text-white/40 truncate">{getDisplayRole(user?.role)}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -190,7 +220,7 @@ export default function AdminLayout() {
               {/* Navigation */}
               <nav className="flex-1 p-3 overflow-y-auto">
                 <div className="space-y-1">
-                  {sidebarItems.map((item) => (
+                  {filteredItems.map((item) => (
                     <button
                       key={item.path}
                       onClick={() => {
@@ -214,11 +244,11 @@ export default function AdminLayout() {
               <div className="p-3 border-t border-white/5">
                 <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white">
-                    MA
+                    {getInitials(user?.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">Minh Anh</p>
-                    <p className="text-xs text-white/40 truncate">HR Admin</p>
+                    <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
+                    <p className="text-xs text-white/40 truncate">{getDisplayRole(user?.role)}</p>
                   </div>
                 </div>
                 <button
