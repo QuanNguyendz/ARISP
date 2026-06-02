@@ -9,11 +9,11 @@ namespace ARISP.Domain.Constants
     public static class AppRoles
     {
         // Người trong công ty (trong class Users)
-        public const string SuperAdmin = "super_admin";
-        public const string HrAdmin = "hr_admin";
-        public const string Recruiter = "recruiter";
+        public const string SuperAdmin = "Super_admin";
+        public const string HrAdmin = "Hr_admin";
+        public const string Recruiter = "Recruiter";
 
         // Người bên ngoài công ty (trong class Candidates)
-        public const string Candidate = "candidate";
+        public const string Candidate = "Candidate";
     }
 }

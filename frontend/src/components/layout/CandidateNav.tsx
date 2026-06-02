@@ -75,7 +75,7 @@ export default function CandidateNav() {
           <div className="hidden lg:flex items-center gap-3">
             {/* Button chuyển sang NTD */}
             <Link
-              to="/nha-tuyen-dung"
+              to="/employer"
               className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 border border-white/10"
             >
               <Building2 className="w-4 h-4" />
@@ -101,7 +101,7 @@ export default function CandidateNav() {
                     className="absolute right-0 mt-2 w-56 glass rounded-xl p-2"
                   >
                     <Link
-                      to="/candidate/dashboard"
+                      to="/candidate/portal"
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                     >
                       <User className="w-4 h-4" />
@@ -165,7 +165,7 @@ export default function CandidateNav() {
             <div className="px-6 py-6 space-y-2">
               {/* Button chuyển sang NTD - Mobile */}
               <Link
-                to="/nha-tuyen-dung"
+                to="/employer"
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-white/5 transition-colors border border-white/10"
               >
                 <Building2 className="w-5 h-5" />
@@ -197,7 +197,7 @@ export default function CandidateNav() {
               {isAuthenticated ? (
                 <div className="space-y-2">
                   <Link
-                    to="/candidate/dashboard"
+                    to="/candidate/portal"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                   >

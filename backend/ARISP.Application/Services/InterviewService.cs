@@ -32,7 +32,7 @@ namespace ARISP.Application.Services
             _notificationService = notificationService;
         }
 
-        public async Task<Result<StartSessionResponse>> StartSessionAsync(Guid organizationId, StartSessionRequest request, CancellationToken ct = default)
+        public async Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);
             if (application == null)
@@ -63,7 +63,6 @@ namespace ARISP.Application.Services
 
             var session = new InterviewSession
             {
-                OrganizationId = organizationId,
                 ApplicationId = application.Id,
                 RoundNumber = request.RoundNumber,
                 RoundType = roundConfig.RoundType,
@@ -80,7 +79,7 @@ namespace ARISP.Application.Services
             if (request.SessionType == "real")
             {
                 var playbooks = await _unitOfWork.Repository<PlaybookDocument>()
-                    .FindAsync(p => p.OrganizationId == organizationId && p.Scope == "job_posting" && p.ScopeRefId == jobPosting.Id && p.DocumentType == "must_ask", ct);
+                    .FindAsync(p => p.Scope == "job_posting" && p.ScopeRefId == jobPosting.Id && p.DocumentType == "must_ask", ct);
                 
                 foreach (var playbook in playbooks)
                 {
@@ -164,7 +163,7 @@ namespace ARISP.Application.Services
             if (session.SessionType == "real")
             {
                 var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
-                    .FindAsync(c => c.OrganizationId == session.OrganizationId && c.SourceType == "playbook", ct);
+                    .FindAsync(c => c.SourceType == "playbook", ct);
                 ragContext.AddRange(playbookChunks.Select(c => $"[Org Playbook] {c.ChunkText}"));
             }
 
@@ -376,7 +375,6 @@ namespace ARISP.Application.Services
 
             var evaluation = new Evaluation
             {
-                OrganizationId = session.OrganizationId,
                 SessionId = sessionId,
                 ApplicationId = application.Id,
                 RoundNumber = session.RoundNumber,
@@ -415,7 +413,6 @@ namespace ARISP.Application.Services
 
             var review = new HrReview
             {
-                OrganizationId = evaluation.OrganizationId,
                 EvaluationId = evaluation.Id,
                 ReviewedByUserId = hrUserId,
                 FinalVerdict = request.FinalVerdict,
@@ -447,7 +444,6 @@ namespace ARISP.Application.Services
             // Save Audit Log (mandatory for confirm/override actions)
             var auditLog = new AuditLog
             {
-                OrganizationId = evaluation.OrganizationId,
                 ActorUserId = hrUserId,
                 Action = isOverride ? "hr_override" : "hr_confirm",
                 EntityType = "evaluation",

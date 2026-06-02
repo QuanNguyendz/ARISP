@@ -11,17 +11,11 @@ namespace ARISP.Infrastructure.Data
 {
     public class ARISPDbContext : DbContext
     {
-        private readonly ICurrentUserService _currentUserService;
-
-        public Guid TenantId => _currentUserService.OrganizationId ?? Guid.Empty;
-
-        public ARISPDbContext(DbContextOptions<ARISPDbContext> options, ICurrentUserService currentUserService)
+        public ARISPDbContext(DbContextOptions<ARISPDbContext> options)
             : base(options)
         {
-            _currentUserService = currentUserService;
         }
 
-        public DbSet<Organization> Organizations => Set<Organization>();
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<MagicLink> MagicLinks => Set<MagicLink>();
@@ -42,7 +36,6 @@ namespace ARISP.Infrastructure.Data
         public DbSet<Evaluation> Evaluations => Set<Evaluation>();
         public DbSet<HrReview> HrReviews => Set<HrReview>();
         public DbSet<CheatDetectionSignal> CheatDetectionSignals => Set<CheatDetectionSignal>();
-        public DbSet<Subscription> Subscriptions => Set<Subscription>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
@@ -54,7 +47,7 @@ namespace ARISP.Infrastructure.Data
             modelBuilder.HasPostgresExtension("uuid-ossp");
             modelBuilder.HasPostgresExtension("vector");
 
-            // Define snake_case mappings and query filters for multi-tenancy & soft delete
+            // Define snake_case mappings and query filters for soft delete
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 var clrType = entityType.ClrType;
@@ -80,23 +73,6 @@ namespace ARISP.Infrastructure.Data
                     var propertyAccess = System.Linq.Expressions.Expression.Property(parameter, nameof(ISoftDelete.DeletedAt));
                     var nullCheck = System.Linq.Expressions.Expression.Equal(propertyAccess, System.Linq.Expressions.Expression.Constant(null, typeof(DateTimeOffset?)));
                     var lambda = System.Linq.Expressions.Expression.Lambda(nullCheck, parameter);
-                    
-                    modelBuilder.Entity(clrType).HasQueryFilter(lambda);
-                }
-
-                // Configure multi-tenant filter (automatic scoping)
-                if (typeof(IMultiTenant).IsAssignableFrom(clrType))
-                {
-                    // Enforce organization isolation automatically
-                    var parameter = System.Linq.Expressions.Expression.Parameter(clrType, "e");
-                    var propertyAccess = System.Linq.Expressions.Expression.Property(parameter, nameof(IMultiTenant.OrganizationId));
-                    
-                    // Filter: OrganizationId == TenantId
-                    var dbContextConst = System.Linq.Expressions.Expression.Constant(this);
-                    var tenantIdProperty = System.Linq.Expressions.Expression.Property(dbContextConst, nameof(TenantId));
-                    
-                    var equalCheck = System.Linq.Expressions.Expression.Equal(propertyAccess, tenantIdProperty);
-                    var lambda = System.Linq.Expressions.Expression.Lambda(equalCheck, parameter);
                     
                     modelBuilder.Entity(clrType).HasQueryFilter(lambda);
                 }
@@ -164,15 +140,6 @@ namespace ARISP.Infrastructure.Data
         {
             foreach (var entry in ChangeTracker.Entries())
             {
-                // Auto multi-tenant assignment on Create
-                if (entry.State == EntityState.Added && entry.Entity is IMultiTenant tenantEntity)
-                {
-                    if (tenantEntity.OrganizationId == Guid.Empty && _currentUserService.OrganizationId.HasValue)
-                    {
-                        tenantEntity.OrganizationId = _currentUserService.OrganizationId.Value;
-                    }
-                }
-
                 // Auto timestamps
                 var clrType = entry.Entity.GetType();
                 var updatedAtProp = clrType.GetProperty("UpdatedAt");

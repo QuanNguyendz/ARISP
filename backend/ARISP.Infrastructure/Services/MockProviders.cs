@@ -69,15 +69,15 @@ namespace ARISP.Infrastructure.Services
             return Task.CompletedTask;
         }
 
-        public Task SendSlackNotificationAsync(Guid organizationId, string message, CancellationToken ct = default)
+        public Task SendSlackNotificationAsync(string message, CancellationToken ct = default)
         {
-            Console.WriteLine($"[SLACK] Org: {organizationId} | Msg: {message}");
+            Console.WriteLine($"[SLACK] Msg: {message}");
             return Task.CompletedTask;
         }
 
-        public Task SendTeamsNotificationAsync(Guid organizationId, string message, CancellationToken ct = default)
+        public Task SendTeamsNotificationAsync(string message, CancellationToken ct = default)
         {
-            Console.WriteLine($"[TEAMS] Org: {organizationId} | Msg: {message}");
+            Console.WriteLine($"[TEAMS] Msg: {message}");
             return Task.CompletedTask;
         }
 
