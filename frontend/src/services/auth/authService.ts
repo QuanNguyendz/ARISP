@@ -120,6 +120,36 @@ export const authService = {
     return parseResponse<AuthResponse>(response);
   },
 
+  async resetPassword(request: { email: string; token: string; newPassword: string }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return { message: 'Password reset successfully.' };
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+
+    return parseResponse<{ message: string }>(response);
+  },
+
+  async forgotPassword(request: { email: string }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return { message: 'If the email exists, a reset link has been sent.' };
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+
+    return parseResponse<{ message: string }>(response);
+  },
+
   async verifyMagicLink(email: string, token: string): Promise<AuthResponse> {
     if (USE_FAKE_AUTH) {
       await new Promise(resolve => setTimeout(resolve, 500));
