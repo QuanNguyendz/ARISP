@@ -111,11 +111,12 @@ export default function CandidateLoginPage() {
                 <span className="text-sm text-text-secondary">Ghi nhớ đăng nhập</span>
               </label>
               <button
-                type="button"
-                className="text-sm text-accent-primary hover:text-accent-secondary transition-colors"
-              >
-                Quên mật khẩu?
-              </button>
+                  type="button"
+                  onClick={() => navigate('/auth/forgot-password')}
+                  className="text-sm text-accent-primary hover:text-accent-secondary transition-colors focus:outline-none"
+                >
+                  Quên mật khẩu?
+                </button>
             </div>
 
             <button

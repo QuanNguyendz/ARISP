@@ -1,8 +1,12 @@
+// 🟢 ĐÃ XÓA: Bỏ dòng import ResetPasswordPage thừa thãi ở đây đi
+
 export const routes = {
   // Public
   home: '/',
   login: '/auth/login',
   register: '/auth/register',
+  forgotPassword: '/auth/forgot-password',
+  resetPassword: '/auth/reset-password', // 🟢 Đug chuẩn: Chỉ khai báo chuỗi đường dẫn (string url) giống các route khác
 
   // HR Admin
   dashboard: '/admin/dashboard',
@@ -26,4 +30,5 @@ export const routes = {
   interviewKiosk: '/kiosk',
 } as const;
 
-export type Routes = typeof routes;
+// Đổi tên type để không trùng với thư viện react-router-dom
+export type AppRoutesType = typeof routes;

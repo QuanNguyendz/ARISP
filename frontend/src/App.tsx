@@ -12,6 +12,8 @@ import LoginPage from '@pages/auth/LoginPage';
 import RegisterPage from '@pages/auth/RegisterPage';
 import CandidateLoginPage from '@pages/auth/CandidateLoginPage';
 import CandidateRegisterPage from '@pages/auth/CandidateRegisterPage';
+import ForgotPasswordPage from '@pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '@pages/auth/ResetPasswordPage';
 
 // Admin Pages
 import DashboardPage from '@pages/admin/DashboardPage';
@@ -75,6 +77,10 @@ function App() {
       {/* Candidate Login/Register */}
       <Route path="/auth/candidate-login" element={<CandidateLoginPage />} />
       <Route path="/auth/candidate-register" element={<CandidateRegisterPage />} />
+
+      {/* Reset Password Route */}
+      <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
       {/* ==================== CANDIDATE PROTECTED ROUTES ==================== */}
 

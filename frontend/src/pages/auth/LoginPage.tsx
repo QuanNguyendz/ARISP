@@ -132,7 +132,11 @@ transition={{ duration: 0.6 }}
                 <label className="block text-sm font-medium text-white/80">
                   Mật khẩu
                 </label>
-                <button type="button" className="text-sm text-accent-primary hover:text-accent-secondary transition-colors">
+                <button
+                  type="button"
+                  onClick={() => navigate('/auth/forgot-password')}
+                  className="text-sm text-accent-primary hover:text-accent-secondary transition-colors focus:outline-none"
+                >
                   Quên mật khẩu?
                 </button>
               </div>
