@@ -100,6 +100,7 @@ builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
+builder.Services.AddScoped<InterviewCodeService>();
 
 // NOTE: In .NET 8, JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear() has no effect
 // because AddJwtBearer uses JsonWebTokenHandler by default. Use MapInboundClaims = false instead.

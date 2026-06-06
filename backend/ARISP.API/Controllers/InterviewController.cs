@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -8,26 +8,120 @@ using ARISP.Application.Services;
 namespace ARISP.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/interview")] // Đồng bộ chuẩn prefix số ít theo đúng yêu cầu đồng bộ hệ thống backend
     public class InterviewController : ControllerBase
     {
         private readonly InterviewService _interviewService;
+        private readonly InterviewCodeService _interviewCodeService;
 
-        public InterviewController(InterviewService interviewService)
+        public InterviewController(InterviewService interviewService, InterviewCodeService interviewCodeService)
         {
             _interviewService = interviewService;
+            _interviewCodeService = interviewCodeService;
         }
+
+        /// <summary>
+        /// POST /api/interview/generate-code
+        /// </summary>
+        [HttpPost("generate-code")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GenerateInterviewCode([FromBody] GenerateCodeRequest request, CancellationToken ct)
+        {
+            var hrUserId = GetCurrentUserId();
+
+            var result = await _interviewCodeService.GenerateCodeAsync(request.ApplicationId, request.RoundNumber, hrUserId, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(new
+            {
+                code = result.Value.Code,
+                expiresAt = result.Value.ExpiresAt,
+                applicationId = result.Value.ApplicationId
+            });
+        }
+
+        /// <summary>
+        /// POST /api/interview/generate-code-batch (MỚI BỔ SUNG)
+        /// </summary>
+        [HttpPost("generate-code-batch")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GenerateInterviewCodeBatch([FromBody] GenerateBatchRequest request, CancellationToken ct)
+        {
+            var hrUserId = GetCurrentUserId();
+
+            var result = await _interviewCodeService.GenerateBatchAsync(request.ApplicationIds, request.RoundNumber, hrUserId, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            // Map định dạng trả về mảng danh sách: [ { code, applicationId }, ... ]
+            var response = result.Value.Select(c => new
+            {
+                code = c.Code,
+                applicationId = c.ApplicationId
+            });
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// POST /api/interview/validate-code
+        /// </summary>
+        [HttpPost("validate-code")]
+        [AllowAnonymous] // Kiosk công cộng không cần Token Đăng nhập
+        public async Task<IActionResult> ValidateInterviewCode([FromBody] ValidateCodeRequest request, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(request.Code))
+            {
+                return BadRequest(new { message = "Mã phỏng vấn không được để trống.", valid = false });
+            }
+
+            var result = await _interviewCodeService.ValidateCodeAsync(request.Code, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error, valid = false });
+            }
+
+            if (!result.Value.Valid)
+            {
+                return Ok(new { valid = false, message = "Mã phỏng vấn không hợp lệ, đã sử dụng hoặc hết hạn." });
+            }
+
+            return Ok(new
+            {
+                valid = true,
+                sessionId = result.Value.SessionId
+            });
+        }
+
+        /// <summary>
+        /// GET /api/interview/codes?jobPostingId={id} (MỚI BỔ SUNG)
+        /// </summary>
+        [HttpGet("codes")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetCodesByJob([FromQuery] Guid jobPostingId, CancellationToken ct)
+        {
+            if (jobPostingId == Guid.Empty)
+            {
+                return BadRequest(new { message = "JobPostingId không hợp lệ." });
+            }
+
+            var list = await _interviewCodeService.GetCodesByJobAsync(jobPostingId, ct);
+            return Ok(list);
+        }
+
+        #region ================= EXISTED INTERVIEW SESSION ENDPOINTS =================
 
         [HttpPost("session/start")]
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> StartSession([FromBody] StartSessionRequest request)
         {
             var result = await _interviewService.StartSessionAsync(request);
-            if (result.IsFailure)
-            {
-                return BadRequest(new { message = result.Error });
-            }
-
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
 
@@ -36,11 +130,7 @@ namespace ARISP.API.Controllers
         public async Task<IActionResult> SubmitAnswer(Guid id, [FromBody] SubmitAnswerRequest request)
         {
             var result = await _interviewService.SubmitAnswerAsync(id, request.QuestionId, request.Transcript, request.ResponseTimeMs);
-            if (result.IsFailure)
-            {
-                return BadRequest(new { message = result.Error });
-            }
-
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
 
@@ -49,11 +139,7 @@ namespace ARISP.API.Controllers
         public async Task<IActionResult> EndSession(Guid id, [FromQuery] string status = "completed")
         {
             var result = await _interviewService.EndSessionAsync(id, status);
-            if (result.IsFailure)
-            {
-                return BadRequest(new { message = result.Error });
-            }
-
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
         }
 
@@ -63,16 +149,23 @@ namespace ARISP.API.Controllers
         {
             if (!Guid.TryParse(userIdStr, out var userId))
             {
-                userId = Guid.Parse("22222222-2222-2222-2222-222222222222"); // Recruiter default
+                userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
             }
-
             var result = await _interviewService.SubmitHrReviewAsync(userId, request);
-            if (result.IsFailure)
-            {
-                return BadRequest(new { message = result.Error });
-            }
-
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
+        }
+
+        #endregion
+
+        private Guid GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var parsedId))
+            {
+                return parsedId;
+            }
+            return Guid.Parse("22222222-2222-2222-2222-222222222222"); // Mặc định phòng hờ
         }
     }
 }
