@@ -302,4 +302,36 @@ namespace ARISP.Application.DTOs
         public string Token { get; set; } = string.Empty;
         public string NewPassword { get; set; } = string.Empty;
     }
+
+    // Refresh Token DTOs
+    public class RefreshTokenRequest
+    {
+        [Required]
+        public string RefreshToken { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Response cho GET /api/auth/me – match FE User type { id, email, name, role }
+    /// </summary>
+    public class UserMeResponse
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+    }
+
+    public class LogoutRequest
+    {
+        public string? RefreshToken { get; set; }
+    }
+
+    // Magic Link DTOs
+    public class SendMagicLinkRequest
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        public Guid? ApplicationId { get; set; }
+    }
 }
