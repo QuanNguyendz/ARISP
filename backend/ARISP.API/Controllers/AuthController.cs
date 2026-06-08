@@ -2,6 +2,7 @@ using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +28,8 @@ namespace ARISP.API.Controllers
         private readonly ARISPDbContext _dbContext;
         private readonly IEmailService _emailService;
 
+        private const int REFRESH_TOKEN_EXPIRY_DAYS = 30;
+
         public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, ARISPDbContext dbContext, IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
@@ -34,6 +37,10 @@ namespace ARISP.API.Controllers
             _dbContext = dbContext;
             _emailService = emailService;
         }
+
+        // ============================================================
+        // CANDIDATE LOGIN ENDPOINTS
+        // ============================================================
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP 1: DÀNH RIÊNG CHO ỨNG VIÊN (Candidate - Tại /jobs/login)
@@ -54,18 +61,20 @@ namespace ARISP.API.Controllers
             if (!isValidCandidatePass)
                 return Unauthorized(new { message = "Invalid email or password." });
 
-            var token = GenerateJwtTokenForCandidate(candidate);
+            // Cập nhật thời gian đăng nhập cuối
+            candidate.LastLoginAt = DateTimeOffset.UtcNow;
+
+            var accessToken = GenerateJwtTokenForCandidate(candidate);
+            var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
 
             return Ok(new AuthResponse
             {
-                AccessToken = token,
-                RefreshToken = Guid.NewGuid().ToString("N"),
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
                 FullName = candidate.FullName ?? "Candidate",
                 Role = AppRoles.Candidate
             });
         }
-
-
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP FIREBASE: Backend xác thực Firebase ID token rồi cấp JWT nội bộ ARISP.
@@ -115,17 +124,24 @@ namespace ARISP.API.Controllers
                 await _dbContext.SaveChangesAsync();
             }
 
-            var token = GenerateJwtTokenForCandidate(candidate);
+            candidate.LastLoginAt = DateTimeOffset.UtcNow;
+
+            var accessToken = GenerateJwtTokenForCandidate(candidate);
+            var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
 
             return Ok(new FirebaseAuthResponse
             {
-                AccessToken = token,
-                RefreshToken = Guid.NewGuid().ToString("N"),
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
                 FullName = candidate.FullName ?? "Candidate",
                 Role = AppRoles.Candidate,
                 FirebaseUid = firebaseUid
             });
         }
+
+        // ============================================================
+        // HR / INTERNAL STAFF LOGIN (OAuth2)
+        // ============================================================
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP 2: ĐIỀU HƯỚNG CHALLENGE OAUTH2
@@ -189,10 +205,13 @@ namespace ARISP.API.Controllers
                     return Redirect(pendingUrl);
                 }
 
+                user.LastLoginAt = DateTimeOffset.UtcNow;
+
                 var token = GenerateJwtTokenForUser(user);
+                var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
                 await HttpContext.SignOutAsync("External");
 
-                var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(token)}&role={Uri.EscapeDataString(user.Role)}");
+                var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(token)}&refresh_token={Uri.EscapeDataString(refreshToken)}&role={Uri.EscapeDataString(user.Role)}");
                 return Redirect(redirectUrl);
             }
 
@@ -215,40 +234,184 @@ namespace ARISP.API.Controllers
             return Redirect(createdPendingUrl);
         }
 
-        private string BuildRedirectUrl(string returnUrl, (string, string)[]? queryPairs = null, string? fragment = null)
+        // ============================================================
+        // REFRESH TOKEN ENDPOINTS
+        // ============================================================
+
+        /// <summary>
+        /// REFRESH TOKEN CHO HR USER (Internal Staff)
+        /// FE apiClient.ts:33 gọi endpoint này khi access token hết hạn (401)
+        /// </summary>
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RefreshTokenForUser([FromBody] RefreshTokenRequest request)
         {
-            var adminFrontend = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return BadRequest(new { message = "Refresh token is required." });
 
-            string target = returnUrl;
-            if (string.IsNullOrEmpty(target)) target = "/";
+            var tokenHash = HashToken(request.RefreshToken);
 
-            bool isLocal = Url.IsLocalUrl(target);
-            bool allowedExternal = false;
-            if (!string.IsNullOrEmpty(adminFrontend) && !string.IsNullOrEmpty(target))
+            var storedToken = await _dbContext.RefreshTokens
+                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash
+                                        && rt.RevokedAt == null
+                                        && rt.ExpiresAt > DateTimeOffset.UtcNow);
+
+            if (storedToken == null)
+                return Unauthorized(new { message = "Invalid or expired refresh token." });
+
+            // Revoke token cũ
+            storedToken.RevokedAt = DateTimeOffset.UtcNow;
+
+            // Tìm user để sinh JWT mới
+            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == storedToken.UserId);
+            if (user == null)
+                return Unauthorized(new { message = "User not found." });
+
+            // Sinh token mới
+            var newAccessToken = GenerateJwtTokenForUser(user);
+            var newRefreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
+
+            return Ok(new AuthResponse
             {
-                allowedExternal = target.StartsWith(adminFrontend, StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (!isLocal && !allowedExternal)
-            {
-                target = !string.IsNullOrEmpty(adminFrontend) ? adminFrontend : "/admin";
-            }
-
-            if (queryPairs != null && queryPairs.Length > 0)
-            {
-                var separator = target.Contains("?") ? "&" : "?";
-                var qs = string.Join("&", queryPairs.Select(p => $"{Uri.EscapeDataString(p.Item1)}={Uri.EscapeDataString(p.Item2)}"));
-                target = target + separator + qs;
-            }
-
-            if (!string.IsNullOrEmpty(fragment))
-            {
-                if (fragment.StartsWith("#")) fragment = fragment.Substring(1);
-                target = target + "#" + fragment;
-            }
-
-            return target;
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken,
+                FullName = user.FullName ?? "",
+                Role = user.Role
+            });
         }
+
+        /// <summary>
+        /// REFRESH TOKEN CHO CANDIDATE
+        /// </summary>
+        [HttpPost("candidate/refresh")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RefreshTokenForCandidate([FromBody] RefreshTokenRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return BadRequest(new { message = "Refresh token is required." });
+
+            var tokenHash = HashToken(request.RefreshToken);
+
+            var storedToken = await _dbContext.CandidateRefreshTokens
+                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash
+                                        && rt.RevokedAt == null
+                                        && rt.ExpiresAt > DateTimeOffset.UtcNow);
+
+            if (storedToken == null)
+                return Unauthorized(new { message = "Invalid or expired refresh token." });
+
+            // Revoke token cũ
+            storedToken.RevokedAt = DateTimeOffset.UtcNow;
+
+            // Tìm candidate để sinh JWT mới
+            var candidate = await _dbContext.CandidateAccounts.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Id == storedToken.CandidateAccountId);
+            if (candidate == null)
+                return Unauthorized(new { message = "Candidate not found." });
+
+            // Sinh token mới
+            var newAccessToken = GenerateJwtTokenForCandidate(candidate);
+            var newRefreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
+
+            return Ok(new AuthResponse
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken,
+                FullName = candidate.FullName ?? "Candidate",
+                Role = AppRoles.Candidate
+            });
+        }
+
+        // ============================================================
+        // USER INFO & LOGOUT
+        // ============================================================
+
+        /// <summary>
+        /// LẤY THÔNG TIN NGƯỜI DÙNG HIỆN TẠI TỪ JWT TOKEN
+        /// FE authService.ts:207 gọi endpoint này
+        /// </summary>
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            var userId = User.FindFirst("sub")?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst("email")?.Value
+                ?? User.FindFirst(ClaimTypes.Email)?.Value;
+            var role = User.FindFirst("role")?.Value
+                ?? User.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "Invalid token." });
+
+            string fullName = "";
+
+            // Xác định user type dựa theo role
+            if (role == AppRoles.Candidate)
+            {
+                if (Guid.TryParse(userId, out var candidateGuid))
+                {
+                    var candidate = await _dbContext.CandidateAccounts.IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(c => c.Id == candidateGuid);
+                    fullName = candidate?.FullName ?? "";
+                }
+            }
+            else
+            {
+                if (Guid.TryParse(userId, out var userGuid))
+                {
+                    var user = await _dbContext.Users.IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(u => u.Id == userGuid);
+                    fullName = user?.FullName ?? "";
+                }
+            }
+
+            return Ok(new UserMeResponse
+            {
+                Id = userId,
+                Email = email ?? "",
+                Name = fullName,
+                Role = role ?? ""
+            });
+        }
+
+        /// <summary>
+        /// ĐĂNG XUẤT – REVOKE REFRESH TOKEN HIỆN TẠI
+        /// FE authService.ts:183 gọi endpoint này
+        /// </summary>
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout([FromBody] LogoutRequest? request = null)
+        {
+            if (!string.IsNullOrWhiteSpace(request?.RefreshToken))
+            {
+                var tokenHash = HashToken(request.RefreshToken);
+
+                // Thử tìm trong bảng RefreshTokens (HR User)
+                var hrToken = await _dbContext.RefreshTokens
+                    .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                if (hrToken != null)
+                {
+                    hrToken.RevokedAt = DateTimeOffset.UtcNow;
+                }
+
+                // Thử tìm trong bảng CandidateRefreshTokens
+                var candidateToken = await _dbContext.CandidateRefreshTokens
+                    .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                if (candidateToken != null)
+                {
+                    candidateToken.RevokedAt = DateTimeOffset.UtcNow;
+                }
+
+                await _dbContext.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Logged out successfully." });
+        }
+
+        // ============================================================
+        // CANDIDATE REGISTRATION
+        // ============================================================
 
         /// <summary>
         /// ĐĂNG KÝ TỰ DO DÀNH CHO ỨNG VIÊN (Candidate)
@@ -278,6 +441,10 @@ namespace ARISP.API.Controllers
             return Ok(new { message = "Candidate registered successfully." });
         }
 
+        // ============================================================
+        // MAGIC LINK ENDPOINTS
+        // ============================================================
+
         /// <summary>
         /// CỔNG ĐĂNG NHẬP 3: XÁC THỰC PASSWORDLESS CHO CANDIDATE PORTAL QUA MAGIC LINK
         /// </summary>
@@ -301,6 +468,10 @@ namespace ARISP.API.Controllers
                 token = candidateToken
             });
         }
+
+        // ============================================================
+        // PASSWORD RECOVERY ENDPOINTS
+        // ============================================================
 
         /// <summary>
         /// API YÊU CẦU QUÊN MẬT KHẨU: Tạo token khôi phục và gửi qua hòm thư điện tử
@@ -401,6 +572,102 @@ namespace ARISP.API.Controllers
             await _dbContext.SaveChangesAsync();
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
+        }
+
+        // ============================================================
+        // PRIVATE HELPERS
+        // ============================================================
+
+        private string BuildRedirectUrl(string returnUrl, (string, string)[]? queryPairs = null, string? fragment = null)
+        {
+            var adminFrontend = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? string.Empty;
+
+            string target = returnUrl;
+            if (string.IsNullOrEmpty(target)) target = "/";
+
+            bool isLocal = Url.IsLocalUrl(target);
+            bool allowedExternal = false;
+            if (!string.IsNullOrEmpty(adminFrontend) && !string.IsNullOrEmpty(target))
+            {
+                allowedExternal = target.StartsWith(adminFrontend, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (!isLocal && !allowedExternal)
+            {
+                target = !string.IsNullOrEmpty(adminFrontend) ? adminFrontend : "/admin";
+            }
+
+            if (queryPairs != null && queryPairs.Length > 0)
+            {
+                var separator = target.Contains("?") ? "&" : "?";
+                var qs = string.Join("&", queryPairs.Select(p => $"{Uri.EscapeDataString(p.Item1)}={Uri.EscapeDataString(p.Item2)}"));
+                target = target + separator + qs;
+            }
+
+            if (!string.IsNullOrEmpty(fragment))
+            {
+                if (fragment.StartsWith("#")) fragment = fragment.Substring(1);
+                target = target + "#" + fragment;
+            }
+
+            return target;
+        }
+
+        /// <summary>
+        /// Hash token bằng SHA256 để lưu an toàn trong DB
+        /// </summary>
+        private static string HashToken(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToBase64String(bytes);
+        }
+
+        /// <summary>
+        /// Sinh refresh token mới cho HR User, hash SHA256 rồi lưu vào bảng RefreshTokens.
+        /// Trả về token gốc (chưa hash) để gửi cho client.
+        /// </summary>
+        private async Task<string> GenerateAndStoreRefreshTokenForUserAsync(Guid userId)
+        {
+            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            var tokenHash = HashToken(rawToken);
+
+            var refreshTokenEntity = new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TokenHash = tokenHash,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(REFRESH_TOKEN_EXPIRY_DAYS),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            await _dbContext.RefreshTokens.AddAsync(refreshTokenEntity);
+            await _dbContext.SaveChangesAsync();
+
+            return rawToken;
+        }
+
+        /// <summary>
+        /// Sinh refresh token mới cho Candidate, hash SHA256 rồi lưu vào bảng CandidateRefreshTokens.
+        /// Trả về token gốc (chưa hash) để gửi cho client.
+        /// </summary>
+        private async Task<string> GenerateAndStoreRefreshTokenForCandidateAsync(Guid candidateAccountId)
+        {
+            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            var tokenHash = HashToken(rawToken);
+
+            var refreshTokenEntity = new CandidateRefreshToken
+            {
+                Id = Guid.NewGuid(),
+                CandidateAccountId = candidateAccountId,
+                TokenHash = tokenHash,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(REFRESH_TOKEN_EXPIRY_DAYS),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            await _dbContext.CandidateRefreshTokens.AddAsync(refreshTokenEntity);
+            await _dbContext.SaveChangesAsync();
+
+            return rawToken;
         }
 
         private string GenerateJwtTokenForUser(User user)
