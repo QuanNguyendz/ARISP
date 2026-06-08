@@ -288,7 +288,26 @@ async Task SeedDataAsync(ARISPDbContext db)
     var candidateId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     var appId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
-    // 1. HR User
+    // 1. Super Admin User
+    var superAdminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    var superAdmin = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == superAdminId);
+    if (superAdmin == null)
+    {
+        superAdmin = new User
+        {
+            Id = superAdminId,
+            Email = "superadmin@arisp.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = AppRoles.SuperAdmin,
+            FullName = "Alex Super Admin",
+            Department = "Administration",
+            IsActive = true
+        };
+        await db.Users.AddAsync(superAdmin);
+        await db.SaveChangesAsync();
+    }
+
+    // 1.2. HR User
     var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId);
     if (user == null)
     {
@@ -511,6 +530,92 @@ async Task SeedDataAsync(ARISPDbContext db)
             UpdatedAt = DateTimeOffset.UtcNow.AddHours(-4)
         };
         await db.Evaluations.AddAsync(eval2);
+        await db.SaveChangesAsync();
+    }
+
+    // 6. Phong VG Candidate
+    var phongCandidateId = Guid.Parse("44444444-4444-4444-4444-555555555555");
+    var phongCandidate = await db.CandidateAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == phongCandidateId);
+    if (phongCandidate == null)
+    {
+        phongCandidate = new CandidateAccount
+        {
+            Id = phongCandidateId,
+            Email = "phongvg04@gmail.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            FullName = "Phong VG Candidate",
+            Phone = "0999999999",
+            Headline = "AI & .NET Backend Candidate"
+        };
+        await db.CandidateAccounts.AddAsync(phongCandidate);
+        await db.SaveChangesAsync();
+    }
+
+    var phongAppId = Guid.Parse("55555555-5555-5555-5555-666666666666");
+    var phongApp = await db.Applications.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == phongAppId);
+    if (phongApp == null)
+    {
+        phongApp = new Application
+        {
+            Id = phongAppId,
+            JobPostingId = jobId,
+            CandidateAccountId = phongCandidateId,
+            CandidateEmail = "phongvg04@gmail.com",
+            CandidateName = "Phong VG Candidate",
+            CandidatePhone = "0999999999",
+            Source = "job_board",
+            Status = "cv_submitted",
+            CvText = "Phong VG is a backend developer interested in testing email notifications."
+        };
+        await db.Applications.AddAsync(phongApp);
+        await db.SaveChangesAsync();
+    }
+
+    var phongSessionId = Guid.Parse("99999999-9999-9999-9999-777777777777");
+    var phongSession = await db.InterviewSessions.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == phongSessionId);
+    if (phongSession == null)
+    {
+        phongSession = new InterviewSession
+        {
+            Id = phongSessionId,
+            ApplicationId = phongAppId,
+            RoundNumber = 1,
+            RoundType = "screening",
+            SessionType = "real",
+            InterviewLanguage = "vi",
+            Status = "completed",
+            StartedAt = DateTimeOffset.UtcNow.AddHours(-1),
+            EndedAt = DateTimeOffset.UtcNow.AddHours(-1).AddMinutes(30),
+            DurationSeconds = 1800
+        };
+        await db.InterviewSessions.AddAsync(phongSession);
+        await db.SaveChangesAsync();
+    }
+
+    var phongEvalId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    var phongEval = await db.Evaluations.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == phongEvalId);
+    if (phongEval == null)
+    {
+        phongEval = new Evaluation
+        {
+            Id = phongEvalId,
+            SessionId = phongSessionId,
+            ApplicationId = phongAppId,
+            RoundNumber = 1,
+            SessionType = "real",
+            AiVerdict = "pass",
+            OverallScore = 89.0m,
+            CriterionScores = "{\"technical\":90.0,\"communication\":85.0,\"culture_fit\":92.0}",
+            Reasoning = "Phong VG shows excellent problem solving skills, great motivation, and is ready for technical round.",
+            RecommendedNextStep = "Mời ứng viên tham gia vòng phỏng vấn chuyên sâu Technical.",
+            QuestionAnalyses = "[]",
+            CheatScore = 0.0m,
+            CheatSignals = "[]",
+            LanguageAssessment = "{\"overall_score\":8.5}",
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1)
+        };
+        await db.Evaluations.AddAsync(phongEval);
         await db.SaveChangesAsync();
     }
 

@@ -75,5 +75,126 @@ namespace ARISP.API.Controllers
 
             return Ok(new { message = "User approved successfully." });
         }
+
+        [HttpGet("users")]
+        public async Task<IActionResult> GetAllUsers(
+            [FromQuery] string? search = null,
+            [FromQuery] string? role = null,
+            [FromQuery] bool? isActive = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            var query = _dbContext.Users.IgnoreQueryFilters().AsQueryable();
+
+            // 1. Search term filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var cleanSearch = search.Trim().ToLower();
+                query = query.Where(u => 
+                    (u.FullName != null && u.FullName.ToLower().Contains(cleanSearch)) || 
+                    (u.Email != null && u.Email.ToLower().Contains(cleanSearch))
+                );
+            }
+
+            // 2. Role filter
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                var normalizedRole = role.Trim().ToLower();
+                query = query.Where(u => u.Role != null && u.Role.ToLower() == normalizedRole);
+            }
+
+            // 3. Status filter
+            if (isActive.HasValue)
+            {
+                query = query.Where(u => u.IsActive == isActive.Value);
+            }
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(u => u.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(u => new {
+                    u.Id,
+                    u.Email,
+                    u.FullName,
+                    u.Role,
+                    u.IsActive,
+                    u.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+                Items = items
+            });
+        }
+
+        [HttpPut("users/{id}/role")]
+        public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateRoleRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Role))
+            {
+                return BadRequest(new { message = "Role is required." });
+            }
+
+            var normalizedRole = request.Role.Trim().ToLower();
+            if (normalizedRole != "hr_admin" && normalizedRole != "recruiter")
+            {
+                return BadRequest(new { message = "Invalid role. Role must be 'hr_admin' or 'recruiter'." });
+            }
+
+            // Get current actor user from claims
+            var actorClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier || c.Type == "sub");
+            if (actorClaim != null && Guid.TryParse(actorClaim.Value, out var actorId))
+            {
+                if (actorId == id)
+                {
+                    return BadRequest(new { message = "You cannot change your own role." });
+                }
+            }
+
+            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            user.Role = normalizedRole;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _dbContext.Users.Update(user);
+
+            // create audit log
+            var audit = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorUserId = actorClaim != null && Guid.TryParse(actorClaim.Value, out var parsedActorId) ? parsedActorId : null,
+                Action = "user_role_updated",
+                EntityType = "User",
+                EntityId = user.Id,
+                Metadata = $"{{\"email\":\"{user.Email}\",\"new_role\":\"{user.Role}\"}}",
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            await _dbContext.AuditLogs.AddAsync(audit);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "User role updated successfully." });
+        }
+    }
+
+    public class UpdateRoleRequest
+    {
+        public string Role { get; set; } = string.Empty;
     }
 }

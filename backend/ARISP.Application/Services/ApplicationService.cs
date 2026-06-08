@@ -30,6 +30,7 @@ namespace ARISP.Application.Services
             var application = new ARISP.Domain.Entities.Application
             {
                 JobPostingId = request.JobPostingId,
+                CandidateAccountId = request.CandidateAccountId,
                 CandidateEmail = request.CandidateEmail,
                 CandidateName = request.CandidateName,
                 CandidatePhone = request.CandidatePhone,

@@ -91,9 +91,20 @@ namespace ARISP.API.Controllers
             // Extract or simulate CV text using parser stub
             var cvText = await ParseCvFileAsync(request.CvFile, request.CandidateName, request.CandidateEmail, request.CandidatePhone, request.JobPostingId);
 
+            Guid? candidateAccountId = null;
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                var subClaim = User.FindFirst("sub")?.Value;
+                if (Guid.TryParse(subClaim, out var parsedId))
+                {
+                    candidateAccountId = parsedId;
+                }
+            }
+
             var serviceRequest = new SubmitApplicationRequest
             {
                 JobPostingId = request.JobPostingId,
+                CandidateAccountId = candidateAccountId,
                 CandidateEmail = request.CandidateEmail,
                 CandidateName = request.CandidateName,
                 CandidatePhone = request.CandidatePhone,

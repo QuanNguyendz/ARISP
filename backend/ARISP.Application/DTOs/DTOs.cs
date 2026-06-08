@@ -234,6 +234,7 @@ namespace ARISP.Application.DTOs
     public class SubmitApplicationRequest
     {
         public Guid JobPostingId { get; set; }
+        public Guid? CandidateAccountId { get; set; }
         public string CandidateEmail { get; set; } = string.Empty;
         public string CandidateName { get; set; } = string.Empty;
         public string? CandidatePhone { get; set; }
