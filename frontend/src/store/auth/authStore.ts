@@ -43,7 +43,7 @@ function authResponseToUser(response: AuthResponse): User {
   const payload = parseJwtPayload(response.accessToken);
 
   return {
-    id: payload?.sub || 'unknown',
+    id: response.userId || payload?.sub || 'unknown',
     email: payload?.email || '',
     name: response.fullName || payload?.name || payload?.unique_name || payload?.email || 'Unknown User',
     role: response.role || payload?.role || '',

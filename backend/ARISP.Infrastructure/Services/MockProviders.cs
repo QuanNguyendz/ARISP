@@ -63,10 +63,24 @@ namespace ARISP.Infrastructure.Services
 
     public class MockNotificationService : INotificationService
     {
-        public Task SendEmailAsync(string toEmail, string subject, string content, CancellationToken ct = default)
+        private readonly IEmailService _emailService;
+
+        public MockNotificationService(IEmailService emailService)
         {
-            Console.WriteLine($"[EMAIL] To: {toEmail} | Subject: {subject} | Content: {content}");
-            return Task.CompletedTask;
+            _emailService = emailService;
+        }
+
+        public async Task SendEmailAsync(string toEmail, string subject, string content, CancellationToken ct = default)
+        {
+            Console.WriteLine($"[EMAIL] Sending actual email to: {toEmail} | Subject: {subject}");
+            try
+            {
+                await _emailService.SendEmailAsync(toEmail, subject, content);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL ERROR] Failed to send email via SMTP: {ex.Message}");
+            }
         }
 
         public Task SendSlackNotificationAsync(string message, CancellationToken ct = default)
