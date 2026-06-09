@@ -1,15 +1,26 @@
 export interface EvaluationReport {
   id: string;
   sessionId: string;
-  verdict: 'Pass' | 'NotPass';
-  overallScore: number;
-  criteria: CriterionScore[];
-  languageAssessment?: LanguageAssessment;
-  cheatScore?: number;
-  cheatSignals?: CheatSignal[];
-  perQuestionAnalysis: QuestionAnalysis[];
-  recommendedNextStep?: string;
-  generatedAt: Date;
+  applicationId: string;
+  roundNumber: number;
+  sessionType: string;
+  aiVerdict: 'pass' | 'not_pass' | string;
+  overallScore?: number | null;
+  criterionScores?: Record<string, number> | null;
+  reasoning?: string | null;
+  recommendedNextStep?: string | null;
+  questionAnalyses?: QuestionAnalysis[] | null;
+  cheatScore?: number | null;
+  cheatSignals?: CheatSignal[] | null;
+  languageAssessment?: LanguageAssessment | null;
+  createdAt: string;
+  updatedAt?: string;
+  candidateName?: string;
+  candidateEmail?: string;
+  jobTitle?: string;
+  status?: 'pending' | 'completed';
+  finalVerdict?: 'pass' | 'not_pass' | string;
+  hrReview?: HRReview | null;
 }
 
 export interface CriterionScore {
@@ -29,10 +40,10 @@ export interface LanguageAssessment {
 }
 
 export interface CheatSignal {
-  type: 'eye_tracking' | 'response_timing' | 'speech_pattern' | 'tab_switch';
-  severity: 'low' | 'medium' | 'high';
+  type: 'eye_tracking' | 'response_timing' | 'speech_pattern' | 'tab_switch' | string;
+  severity: 'low' | 'medium' | 'high' | string;
   description: string;
-  timestamp?: Date;
+  timestamp?: string;
 }
 
 export interface QuestionAnalysis {
@@ -46,16 +57,33 @@ export interface QuestionAnalysis {
 export interface HRReview {
   id: string;
   evaluationId: string;
-  hrDecision: 'confirmed' | 'overridden';
+  reviewedByUserId: string;
+  finalVerdict: 'pass' | 'not_pass' | string;
+  isOverride: boolean;
   overrideReason?: string;
-  reviewedBy: string;
-  reviewedAt: Date;
+  shareRecording: boolean;
+  shareTranscript: boolean;
+  shareEvaluation: boolean;
+  shareFeedback: boolean;
+  candidateFeedback?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EvaluationFilter {
   jobPostingId?: string;
-  applicationId?: string;
-  verdict?: 'Pass' | 'NotPass' | 'Pending';
-  dateFrom?: Date;
-  dateTo?: Date;
+  status?: 'completed' | 'pending' | 'pass' | 'not_pass';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface SubmitEvaluationReviewPayload {
+  evaluationId: string;
+  finalVerdict: 'pass' | 'not_pass';
+  overrideReason?: string;
+  shareRecording?: boolean;
+  shareTranscript?: boolean;
+  shareEvaluation?: boolean;
+  shareFeedback?: boolean;
+  candidateFeedback?: string;
 }

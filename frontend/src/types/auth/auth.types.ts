@@ -43,4 +43,5 @@ export interface AuthResponse {
   refreshToken: string;
   fullName: string;
   role: string; // Backend sends: Super_admin, Hr_admin, Recruiter, Candidate
+  userId?: string;
 }
