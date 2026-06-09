@@ -17,7 +17,7 @@ interface AuthState {
 
 function authResponseToUser(response: AuthResponse, id?: string): User {
   return {
-    id: id || 'unknown',
+    id: id || response.userId || 'unknown',
     email: '',
     name: response.fullName,
     role: response.role,
