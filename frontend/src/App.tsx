@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from '@store/auth/authStore';
 import { getDevAuth, isDevMode } from '@utils/devAuth';
@@ -6,6 +6,7 @@ import { getDevAuth, isDevMode } from '@utils/devAuth';
 import AdminLayout from '@components/layout/AdminLayout';
 import CandidateLayout from '@components/layout/CandidateLayout';
 import InterviewLayout from '@components/layout/InterviewLayout';
+import ProtectedRoute from '@components/auth/ProtectedRoute';
 
 // Auth Pages
 import LoginPage from '@pages/auth/LoginPage';
@@ -14,6 +15,7 @@ import CandidateLoginPage from '@pages/auth/CandidateLoginPage';
 import CandidateRegisterPage from '@pages/auth/CandidateRegisterPage';
 import ForgotPasswordPage from '@pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '@pages/auth/ResetPasswordPage';
+import OAuthCallbackPage from '@pages/auth/OAuthCallbackPage';
 
 // Admin Pages
 import DashboardPage from '@pages/admin/DashboardPage';
@@ -58,49 +60,52 @@ function App() {
         setAuth(devAuth.user, devAuth.tokens);
       }
     }
-  }, [isDevMode, isAuthenticated, setAuth]);
+  }, [isAuthenticated, setAuth]);
 
   return (
     <Routes>
+      <Route path="/403" element={<NotFoundPage />} />
+
       {/* ==================== PUBLIC ROUTES ==================== */}
-
-      {/* Root - Job Board */}
       <Route path="/" element={<FindJobPage />} />
-
-      {/* Employer Landing Page */}
       <Route path="/employer" element={<HomePage />} />
-
-      {/* employer Login/Register */}
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
-
-      {/* Candidate Login/Register */}
+      <Route path="/auth/callback" element={<OAuthCallbackPage />} />
       <Route path="/auth/candidate-login" element={<CandidateLoginPage />} />
       <Route path="/auth/candidate-register" element={<CandidateRegisterPage />} />
-
-      {/* Reset Password Route */}
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/jobs" element={<FindJobPage />} />
+      <Route path="/jobs/:id" element={<JobDetailPage />} />
 
       {/* ==================== CANDIDATE PROTECTED ROUTES ==================== */}
-
-      <Route element={<CandidateLayout />}>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={['Candidate']}>
+            <CandidateLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/candidate/dashboard" element={<CandidateHome />} />
         <Route path="/candidate/profile" element={<CandidateHome />} />
         <Route path="/candidate/jobs" element={<CandidateHome />} />
+        <Route path="/candidate/applications" element={<CandidateApply />} />
+        <Route path="/candidate/applications/:id" element={<CandidateApply />} />
+        <Route path="/candidate/interviews" element={<InterviewSchedulePage />} />
+        <Route path="/candidate/portal" element={<PortalPage />} />
+        <Route path="/candidate/results" element={<FeedbackPage />} />
+        <Route path="/candidate/results/:id" element={<FeedbackPage />} />
       </Route>
 
-      {/* Candidate Pages (standalone) */}
-      <Route path="/candidate/applications" element={<CandidateApply />} />
-      <Route path="/candidate/applications/:id" element={<CandidateApply />} />
-      <Route path="/candidate/interviews" element={<InterviewSchedulePage />} />
-      <Route path="/candidate/portal" element={<PortalPage />} />
-      <Route path="/candidate/results" element={<FeedbackPage />} />
-      <Route path="/candidate/results/:id" element={<FeedbackPage />} />
-
       {/* ==================== HR ADMIN ROUTES ==================== */}
-
-      <Route element={<AdminLayout />}>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={['Super_admin', 'Hr_admin', 'Recruiter']}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/admin/dashboard" element={<DashboardPage />} />
         <Route path="/admin/jobs" element={<JobPostingsPage />} />
         <Route path="/admin/jobs/create" element={<CreateJobPostingPage />} />
@@ -116,7 +121,14 @@ function App() {
       </Route>
 
       {/* Interview Routes */}
-      <Route path="/interview" element={<InterviewLayout />}>
+      <Route
+        path="/interview"
+        element={
+          <ProtectedRoute allowedRoles={['Candidate']}>
+            <InterviewLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="room/:sessionId" element={<InterviewRoomPage />} />
         <Route path="practice/:applicationId" element={<PracticeSessionPage />} />
       </Route>
@@ -126,12 +138,8 @@ function App() {
         <Route index element={<KioskPage />} />
       </Route>
 
-      {/* Public Pages */}
-      <Route path="/jobs" element={<FindJobPage />} />
-      <Route path="/jobs/:id" element={<JobDetailPage />} />
-
-      {/* 404 */}
-      <Route path="*" element={<NotFoundPage />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
+      <Route path="/404" element={<NotFoundPage />} />
     </Routes>
   );
 }
