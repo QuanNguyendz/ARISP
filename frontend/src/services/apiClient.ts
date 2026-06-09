@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosRequestHeaders } from 'axios';
 import { API_BASE_URL } from '@config/constants';
 import { useAuthStore } from '@store/auth';
 
@@ -13,9 +13,18 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const tokens = useAuthStore.getState().tokens;
+    const user = useAuthStore.getState().user;
+    const headers = (config.headers ?? {}) as AxiosRequestHeaders;
+
     if (tokens?.accessToken) {
-      config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+      headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
+
+    if (user?.id) {
+      headers['X-User-Id'] = user.id;
+    }
+
+    config.headers = headers;
     return config;
   },
   (error) => Promise.reject(error)

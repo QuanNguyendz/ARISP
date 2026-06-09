@@ -124,6 +124,14 @@ namespace ARISP.Infrastructure.Data
                 .Property(a => a.Metadata)
                 .HasColumnType("jsonb");
 
+            modelBuilder.Entity<AuditLog>()
+                .Property(a => a.IpAddress)
+                .HasColumnType("inet")
+                .HasConversion(
+                    v => string.IsNullOrEmpty(v) ? null : System.Net.IPAddress.Parse(v),
+                    v => v == null ? null : v.ToString()
+                );
+
             modelBuilder.Entity<WebhookDelivery>()
                 .Property(w => w.Payload)
                 .HasColumnType("jsonb");

@@ -1,5 +1,10 @@
 import { apiClient } from '../apiClient';
-import type { EvaluationReport, HRReview, EvaluationFilter } from '../../types/evaluation';
+import type {
+  EvaluationReport,
+  HRReview,
+  EvaluationFilter,
+  SubmitEvaluationReviewPayload,
+} from '../../types/evaluation';
 
 interface PaginatedResponse<T> {
   items: T[];
@@ -27,16 +32,27 @@ export const evaluationService = {
     return data;
   },
 
-  async confirmEvaluation(evaluationId: string): Promise<HRReview> {
-    const { data } = await apiClient.post<HRReview>(`/evaluations/${evaluationId}/confirm`);
+  async submitReview(payload: SubmitEvaluationReviewPayload): Promise<{ success: boolean }> {
+    const { data } = await apiClient.post<{ success: boolean }>('/interview/review/confirm', payload);
     return data;
   },
 
-  async overrideEvaluation(evaluationId: string, reason: string): Promise<HRReview> {
-    const { data } = await apiClient.post<HRReview>(`/evaluations/${evaluationId}/override`, {
+  async confirmEvaluation(evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>): Promise<{ success: boolean }> {
+    return this.submitReview({
+      evaluationId: evaluation.id,
+      finalVerdict: evaluation.aiVerdict === 'not_pass' ? 'not_pass' : 'pass',
+    });
+  },
+
+  async overrideEvaluation(
+    evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>,
+    reason: string,
+  ): Promise<{ success: boolean }> {
+    return this.submitReview({
+      evaluationId: evaluation.id,
+      finalVerdict: evaluation.aiVerdict === 'pass' ? 'not_pass' : 'pass',
       overrideReason: reason,
     });
-    return data;
   },
 
   async getMyEvaluations(): Promise<EvaluationReport[]> {
@@ -44,3 +60,5 @@ export const evaluationService = {
     return data;
   },
 };
+
+export type { PaginatedResponse, HRReview };

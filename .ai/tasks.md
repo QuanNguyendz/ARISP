@@ -250,3 +250,8 @@ _Chưa có task nào đang thực hiện._
   - Added frontend Firebase SDK config via `VITE_FIREBASE_*`.
   - Added Candidate Firebase email/password auth flow with backend token exchange.
   - Added ASP.NET Core named Firebase JWT bearer validation and `POST /api/auth/firebase/candidate/login`.
+- [x] 2026-06-06: Implemented the backend API endpoints for the Evaluation module.
+  - Created `EvaluationsController` with endpoints for listing evaluations (with job posting and status filters), retrieving detailed evaluations by ID or Session ID, and fetching evaluations by `applicationId`.
+  - Created `EvaluationService` using the Repository pattern via `IUnitOfWork` to separate query logic.
+  - Created detailed response DTOs (`EvaluationDetailResponse`, `EvaluationListItemResponse`, and sub-DTOs) to parse JSONB database columns into typed objects.
+  - Registered `EvaluationService` in dependency injection and built successfully.
