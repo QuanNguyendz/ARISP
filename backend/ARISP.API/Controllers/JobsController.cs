@@ -229,5 +229,236 @@ namespace ARISP.API.Controllers
 
             return Ok(new { message = "Availability slots configured successfully." });
         }
+        /// <summary>
+        /// HTTP PUT /api/jobs/{id}
+        /// HR cập nhật job posting kèm cấu hình vòng phỏng vấn.
+        /// Chỉ cho phép người tạo hoặc SuperAdmin, HrAdmin chỉnh sửa.
+        /// Không cho phép cập nhật khi status là archived.
+        /// </summary>
+        [HttpPut("{id:guid}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJob(Guid id, [FromBody] CreateJobPostingRequest request, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Không tìm thấy tin tuyển dụng." });
+
+            // 1. Validate ownership & roles
+            var isAuthorized = _currentUserService.Role == AppRoles.SuperAdmin ||
+                               _currentUserService.Role == AppRoles.HrAdmin ||
+                               job.CreatedByUserId == userId;
+            if (!isAuthorized)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền cập nhật tin tuyển dụng này." });
+            }
+
+            // 2. Không cho update nếu Status == "archived"
+            if (string.Equals(job.Status, "archived", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Không thể cập nhật tin tuyển dụng đã lưu trữ (archived)." });
+            }
+
+            // 3. Validation logic (Đồng bộ với CreateJob)
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return BadRequest(new { message = "Title is required." });
+
+            if (string.IsNullOrWhiteSpace(request.JobDescription))
+                return BadRequest(new { message = "JobDescription is required." });
+
+            if (request.Title?.Length > 200)
+                return BadRequest(new { message = "Title cannot exceed 200 characters." });
+
+            var allowedModes = new[] { "remote", "onsite", "both" };
+            if (!allowedModes.Contains(request.InterviewMode))
+                return BadRequest(new { message = "InterviewMode must be 'remote', 'onsite', or 'both'." });
+
+            if (request.InterviewMode != "remote" && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Location is required when InterviewMode is not 'remote'." });
+
+            if (request.SalaryMin < 0 || request.SalaryMax < 0)
+                return BadRequest(new { message = "Salary cannot be negative." });
+
+            if (request.SalaryMin.HasValue && request.SalaryMax.HasValue && request.SalaryMax < request.SalaryMin)
+                return BadRequest(new { message = "SalaryMax cannot be less than SalaryMin." });
+
+            if (request.SalaryIsNegotiable && (request.SalaryMin.HasValue || request.SalaryMax.HasValue))
+            {
+                return BadRequest(new { message = "SalaryMin and SalaryMax must be null when SalaryIsNegotiable is true." });
+            }
+
+            var allowedCategories = new[] { "backend", "frontend", "devops", "qa", "data", "ai_ml", "mobile", "pm", "designer", "other" };
+            if (!string.IsNullOrWhiteSpace(request.JobCategory) && !allowedCategories.Contains(request.JobCategory.ToLower()))
+                return BadRequest(new { message = $"JobCategory is invalid. Must be one of: {string.Join(", ", allowedCategories)}" });
+
+            // Chỉ check deadline trong tương lai nếu deadline bị thay đổi
+            if (request.ApplicationDeadline.HasValue &&
+                request.ApplicationDeadline.Value <= DateTimeOffset.UtcNow &&
+                request.ApplicationDeadline.Value != job.ApplicationDeadline)
+            {
+                return BadRequest(new { message = "ApplicationDeadline must be in the future." });
+            }
+
+            if (request.RescheduleDeadlineHours < 0)
+                return BadRequest(new { message = "RescheduleDeadlineHours cannot be negative." });
+
+            if (request.InviteTokenTtlHours <= 0)
+                return BadRequest(new { message = "InviteTokenTtlHours must be greater than 0." });
+
+            if (request.RoundConfigs == null || request.RoundConfigs.Count == 0)
+                return BadRequest(new { message = "At least one interview round configuration is required." });
+
+            foreach (var round in request.RoundConfigs)
+            {
+                if (round.RoundNumber <= 0) return BadRequest(new { message = "RoundNumber must be > 0." });
+                if (round.MaxDurationMinutes <= 0) return BadRequest(new { message = "MaxDurationMinutes must be > 0." });
+                if (round.InterviewCodeTtlHours <= 0) return BadRequest(new { message = "InterviewCodeTtlHours must be > 0." });
+            }
+
+            var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
+
+            // 4. Update fields
+            job.Title = request.Title.Trim();
+            job.Department = request.Department?.Trim();
+            job.JobDescription = request.JobDescription.Trim();
+            job.InterviewMode = request.InterviewMode;
+            job.IsPublicListing = request.IsPublicListing;
+            job.DetectedLanguage = detectedLang;
+            job.LanguageRequirement = !string.IsNullOrWhiteSpace(request.LanguageRequirement)
+                                        ? request.LanguageRequirement
+                                        : (detectedLang == "vi" ? "Tiếng Việt" : "Yêu cầu ngôn ngữ " + detectedLang);
+            job.RescheduleDeadlineHours = request.RescheduleDeadlineHours;
+            job.InviteTokenTtlHours = request.InviteTokenTtlHours;
+            job.ScoringRubric = request.ScoringRubric.HasValue ? request.ScoringRubric.Value.GetRawText() : null;
+            job.PersonaName = request.PersonaName;
+            job.PersonaVoiceId = request.PersonaVoiceId;
+            job.PersonaStyle = request.PersonaStyle;
+            job.Location = request.Location;
+            job.WorkMode = request.WorkMode;
+            job.SalaryMin = request.SalaryMin;
+            job.SalaryMax = request.SalaryMax;
+            job.SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency;
+            job.SalaryIsNegotiable = request.SalaryIsNegotiable;
+            job.EmploymentType = request.EmploymentType;
+            job.ExperienceLevel = request.ExperienceLevel;
+            job.Skills = request.Skills ?? new List<string>();
+            job.JobCategory = request.JobCategory?.ToLower();
+            job.ApplicationDeadline = request.ApplicationDeadline;
+            job.IsUrgent = request.IsUrgent;
+            job.UpdatedAt = DateTimeOffset.UtcNow; // Ghi nhận thời gian update nếu entity hỗ trợ
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // 5. Re-create InterviewRoundConfig nếu có sự thay đổi
+            var existingRounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
+            var existingList = existingRounds.OrderBy(r => r.RoundNumber).ToList();
+            var requestList = request.RoundConfigs.OrderBy(r => r.RoundNumber).ToList();
+
+            bool roundsChanged = existingList.Count != requestList.Count;
+            if (!roundsChanged)
+            {
+                for (int i = 0; i < existingList.Count; i++)
+                {
+                    var ext = existingList[i];
+                    var req = requestList[i];
+                    if (ext.RoundNumber != req.RoundNumber ||
+                        ext.RoundType != req.RoundType ||
+                        ext.InterviewLanguage != (req.InterviewLanguage ?? detectedLang) ||
+                        ext.InterviewCodeTtlHours != req.InterviewCodeTtlHours ||
+                        ext.MaxDurationMinutes != req.MaxDurationMinutes)
+                    {
+                        roundsChanged = true;
+                        break;
+                    }
+                }
+            }
+
+            var finalRoundDtos = new List<RoundConfigDto>();
+            if (roundsChanged)
+            {
+                // Delete các config cũ bằng cách lặp qua từng phần tử
+                foreach (var round in existingRounds)
+                {
+                    _unitOfWork.Repository<InterviewRoundConfig>().Delete(round);
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                // Add các config mới
+                foreach (var round in request.RoundConfigs.OrderBy(r => r.RoundNumber))
+                {
+                    var config = new InterviewRoundConfig
+                    {
+                        JobPostingId = job.Id,
+                        RoundNumber = round.RoundNumber,
+                        RoundType = round.RoundType,
+                        InterviewLanguage = round.InterviewLanguage ?? detectedLang,
+                        InterviewCodeTtlHours = round.InterviewCodeTtlHours,
+                        MaxDurationMinutes = round.MaxDurationMinutes
+                    };
+                    await _unitOfWork.Repository<InterviewRoundConfig>().AddAsync(config, ct);
+                    finalRoundDtos.Add(RoundConfigDto.FromEntity(config));
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            else
+            {
+                finalRoundDtos = existingList.Select(RoundConfigDto.FromEntity).ToList();
+            }
+
+            return Ok(JobPostingResponse.FromEntity(job, finalRoundDtos));
+        }
+
+        /// <summary>
+        /// HTTP DELETE /api/jobs/{id}
+        /// HR thực hiện xóa mềm (soft delete) tin tuyển dụng.
+        /// Không cho phép xóa nếu có hồ sơ ứng tuyển (Application) đang hoạt động.
+        /// </summary>
+        [HttpDelete("{id:guid}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> DeleteJob(Guid id, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Không tìm thấy tin tuyển dụng." });
+
+            // 1. Validate ownership & roles
+            var isAuthorized = _currentUserService.Role == AppRoles.SuperAdmin ||
+                               _currentUserService.Role == AppRoles.HrAdmin ||
+                               job.CreatedByUserId == userId;
+            if (!isAuthorized)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền xóa tin tuyển dụng này." });
+            }
+
+            // 2. Validate theo Spec: Loại trừ hồ sơ đã fail ("not_pass"), đã rút ("withdrawn") và đã pass hoàn toàn ("pass")
+            var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                ct);
+
+            if (activeApps.Any())
+            {
+                return BadRequest(new
+                {
+                    message = "Cannot delete job with active applications. Không thể xóa tin tuyển dụng này vì đang có hồ sơ ứng tuyển đang hoạt động."
+                });
+            }
+
+            // 3. Thực hiện XÓA MỀM (Soft Delete) theo đúng Spec thiết kế
+            job.DeletedAt = DateTimeOffset.UtcNow;
+            job.Status = "archived"; // Đồng bộ chuyển trạng thái thành lưu trữ
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
+        }
     }
 }
