@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Briefcase, FileText, Calendar, User, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '@store/auth/authStore';
@@ -146,7 +146,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
 
       {/* Main Content */}
       <main className="flex-1 pt-16">
-        {children}
+        {children ?? <Outlet />}
       </main>
 
       {/* Footer */}
