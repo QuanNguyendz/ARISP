@@ -1,5 +1,11 @@
 import { apiClient } from '../apiClient';
-import type { InterviewSession, ScheduleInterviewRequest, InterviewCodeResponse } from '../../types/interview';
+import type {
+  InterviewSession,
+  ScheduleInterviewRequest,
+  InterviewCodeResponse,
+  StartSessionRequest,
+  StartSessionResponse,
+} from '../../types/interview';
 
 interface SessionFilters {
   applicationId?: string;
@@ -30,13 +36,13 @@ export const interviewService = {
     return data;
   },
 
-  async startSession(id: string): Promise<{ sessionToken: string }> {
-    const { data } = await apiClient.post<{ sessionToken: string }>(`/interviews/${id}/start`);
+  async startSession(request: StartSessionRequest): Promise<StartSessionResponse> {
+    const { data } = await apiClient.post<StartSessionResponse>('/interviews/session/start', request);
     return data;
   },
 
   async endSession(id: string): Promise<void> {
-    await apiClient.post(`/interviews/${id}/end`);
+    await apiClient.post(`/interviews/session/${id}/end`);
   },
 
   async pauseSession(id: string): Promise<void> {
