@@ -622,4 +622,10 @@ namespace ARISP.Application.DTOs
         public string Email { get; set; } = string.Empty;
         public Guid? ApplicationId { get; set; }
     }
+
+    public class UpdateApplicationStatusRequest
+    {
+        [Required(ErrorMessage = "Trạng thái (status) là bắt buộc.")]
+        public string Status { get; set; } = string.Empty;
+    }
 }
