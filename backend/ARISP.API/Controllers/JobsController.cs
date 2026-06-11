@@ -476,5 +476,76 @@ namespace ARISP.API.Controllers
 
             return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
         }
+
+        /// <summary>
+        /// HTTP PATCH /api/jobs/{id}/status
+        /// HR hoặc người tạo job chỉnh sửa trạng thái của job.
+        /// </summary>
+        [HttpPatch("{id:guid}/status")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJobStatus(Guid id, [FromBody] UpdateJobStatusRequest request, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            if (string.IsNullOrWhiteSpace(request.Status))
+                return BadRequest(new { message = "Status is required." });
+
+            var status = request.Status.Trim().ToLowerInvariant();
+            var allowedStatuses = new[] { "draft", "active", "closed", "archived" };
+            if (!allowedStatuses.Contains(status))
+                return BadRequest(new { message = $"Trạng thái không hợp lệ. Sử dụng một trong: {string.Join(", ", allowedStatuses)}." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Job posting not found." });
+
+            var isAuthorized = _currentUserService.Role == AppRoles.SuperAdmin ||
+                               _currentUserService.Role == AppRoles.HrAdmin ||
+                               job.CreatedByUserId == userId;
+            if (!isAuthorized)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền thay đổi trạng thái tin tuyển dụng này." });
+            }
+
+            if (string.Equals(job.Status, "archived", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Không thể thay đổi trạng thái của tin tuyển dụng đã lưu trữ." });
+            }
+
+            if (string.Equals(status, "archived", StringComparison.OrdinalIgnoreCase))
+            {
+                var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                    a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                    ct);
+
+                if (activeApps.Any())
+                {
+                    return BadRequest(new
+                    {
+                        message = "Không thể chuyển tin tuyển dụng sang archived khi đang có hồ sơ ứng tuyển đang hoạt động."
+                    });
+                }
+
+                job.DeletedAt = DateTimeOffset.UtcNow;
+            }
+
+            if (string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) && job.PublishedAt == null)
+            {
+                job.PublishedAt = DateTimeOffset.UtcNow;
+            }
+
+            job.Status = status;
+            job.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            var rounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
+            var roundDtos = rounds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
+
+            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
+        }
     }
 }

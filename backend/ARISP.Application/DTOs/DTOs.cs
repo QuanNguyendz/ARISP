@@ -90,6 +90,11 @@ namespace ARISP.Application.DTOs
         public bool IsUrgent { get; set; } = false;
     }
 
+    public class UpdateJobStatusRequest
+    {
+        public string Status { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// DTO cấu hình thông tin chi tiết cho từng vòng phỏng vấn (Interview Round) thuộc Job Posting.
     /// </summary>
