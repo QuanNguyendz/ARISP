@@ -90,6 +90,14 @@ namespace ARISP.Application.DTOs
         public bool IsUrgent { get; set; } = false;
     }
 
+    public class UpdateJobStatusRequest
+    {
+        [Required(ErrorMessage = "Trạng thái (status) là bắt buộc.")]
+        public string Status { get; set; } = string.Empty;
+
+        public string? RejectionReason { get; set; } // Chỉ bắt buộc khi đổi status sang 'rejected'
+    }
+
     /// <summary>
     /// DTO cấu hình thông tin chi tiết cho từng vòng phỏng vấn (Interview Round) thuộc Job Posting.
     /// </summary>

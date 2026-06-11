@@ -73,7 +73,8 @@ namespace ARISP.Domain.Entities
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
         public string InterviewMode { get; set; } = "remote"; // remote | onsite | both
-        public string Status { get; set; } = "draft"; // draft | active | closed | archived
+        public string Status { get; set; } = "draft"; // draft | pending | active | rejected | closed | archived
+        public string? RejectionReason { get; set; }
         public bool IsPublicListing { get; set; } = false;
         public string? DetectedLanguage { get; set; }
         public string? LanguageRequirement { get; set; }

@@ -156,7 +156,7 @@ namespace ARISP.API.Controllers
         public async Task<IActionResult> GetJobs(CancellationToken ct)
         {
             var jobs = await _unitOfWork.Repository<JobPosting>().FindAsync(
-                j => j.IsPublicListing && j.Status == "active",
+                j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow),
                 ct);
 
             var response = jobs
@@ -459,6 +459,159 @@ namespace ARISP.API.Controllers
             await _unitOfWork.SaveChangesAsync(ct);
 
             return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
+        }
+
+        /// <summary>
+        /// Cập nhật trạng thái Job dựa trên quy trình duyệt (Approval Workflow).
+        /// </summary>
+        /// <remarks>
+        /// <b>Quy tắc chuyển trạng thái:</b>
+        /// <br/>• <b>Recruiter (Người tạo):</b> Chỉ chuyển: <c>draft</c> → <c>pending</c> (Gửi duyệt), hoặc bài đang <c>active</c> → <c>closed</c> (Đóng).
+        /// <br/>• <b>HrAdmin / SuperAdmin:</b> Được duyệt <c>pending</c> → <c>active</c> (Mở tin), từ chối → <c>rejected</c>, hoặc lưu trữ → <c>archived</c>.
+        /// <br/>• <b>Nộp lại bài:</b> Bài bị từ chối (<c>rejected</c>) sửa xong chuyển lại thành <c>pending</c> để duyệt lại.
+        /// <br/><br/>
+        /// <i>Lưu ý:</i> Bắt buộc truyền <c>RejectionReason</c> khi từ chối bài viết (<c>status = "rejected"</c>).
+        /// </remarks>
+        [HttpPatch("{id:guid}/status")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJobStatus(Guid id, [FromBody] UpdateJobStatusRequest request, CancellationToken ct)
+        {
+            // 1. Xác thực người dùng
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            if (string.IsNullOrWhiteSpace(request.Status))
+                return BadRequest(new { message = "Status is required." });
+
+            var targetStatus = request.Status.Trim().ToLowerInvariant();
+            var allowedStatuses = new[] { "draft", "pending", "active", "rejected", "closed", "archived" };
+
+            if (!allowedStatuses.Contains(targetStatus))
+                return BadRequest(new { message = $"Trạng thái không hợp lệ. Sử dụng một trong: {string.Join(", ", allowedStatuses)}." });
+
+            if (targetStatus == "draft")
+                return BadRequest(new { message = "Không thể chuyển trạng thái về 'draft'. 'draft' chỉ dùng khi tạo hoặc chỉnh sửa nháp ban đầu." });
+
+            // 2. Lấy thông tin Job tuyển dụng
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Job posting not found." });
+
+            var currentStatus = job.Status?.Trim().ToLowerInvariant();
+
+            // 3. Phân quyền kiểm tra cơ bản
+            var isSuperOrHrAdmin = _currentUserService.Role == AppRoles.SuperAdmin || _currentUserService.Role == AppRoles.HrAdmin;
+            var isOwner = job.CreatedByUserId == userId;
+
+            if (!isSuperOrHrAdmin && !isOwner)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền thay đổi trạng thái tin tuyển dụng này." });
+            }
+
+            // Nếu trạng thái không thay đổi, không cần xử lý tiếp
+            if (currentStatus == targetStatus)
+            {
+                return BadRequest(new { message = $"Tin tuyển dụng hiện tại đã ở trạng thái '{targetStatus}' rồi." });
+            }
+
+            // Chặn mọi hành động nếu Job đã bị lưu trữ (archived)
+            if (currentStatus == "archived")
+            {
+                return BadRequest(new { message = "Không thể thay đổi trạng thái của tin tuyển dụng đã lưu trữ (archived)." });
+            }
+
+            // 4. --- VALIDATE STATE TRANSITIONS & ROLES WORKFLOW ---
+
+            // CASE A: Hành động từ chối (Chuyển sang 'rejected') -> Bắt buộc phải là Admin và phải có lý do
+            if (targetStatus == "rejected")
+            {
+                if (!isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ HrAdmin hoặc SuperAdmin mới có quyền từ chối duyệt bài." });
+
+                if (currentStatus != "pending")
+                    return BadRequest(new { message = "Chỉ có thể từ chối (rejected) những bài viết đang ở trạng thái chờ duyệt (pending)." });
+
+                if (string.IsNullOrWhiteSpace(request.RejectionReason))
+                    return BadRequest(new { message = "Vui lòng cung cấp lý do từ chối duyệt bài (RejectionReason)." });
+
+                job.RejectionReason = request.RejectionReason.Trim();
+            }
+
+            // CASE B: Hành động Phê duyệt public bài (Chuyển sang 'active') -> Chỉ Admin mới được duyệt
+            if (targetStatus == "active")
+            {
+                if (!isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ HrAdmin hoặc SuperAdmin mới có quyền kích hoạt/phê duyệt bài viết." });
+
+                // Admin có thể kích hoạt từ bài pending, hoặc tái kích hoạt lại bài đã closed
+                if (currentStatus != "pending" && currentStatus != "closed")
+                    return BadRequest(new { message = "Chỉ có thể kích hoạt (active) từ trạng thái chờ duyệt (pending) hoặc đã đóng (closed)." });
+
+                // Kiểm tra xem hạn nộp đã hết chưa, tránh trường hợp bài hết hạn mà kích hoạt lại bừa bãi
+                if (job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
+                {
+                    return BadRequest(new { message = "Hạn nộp hồ sơ của Job này đã ở quá khứ. Hãy cập nhật lại gia hạn Deadline trước khi chuyển sang Active." });
+                }
+
+                // Điền ngày public đầu tiên nếu chưa có
+                if (job.PublishedAt == null) job.PublishedAt = DateTimeOffset.UtcNow;
+
+                // Duyệt thành công thì xóa bỏ vết lý do từ chối cũ (nếu có trước đó)
+                job.RejectionReason = null;
+            }
+
+            // CASE C: Hành động Gửi duyệt bài (Chuyển sang 'pending') -> Thường dành cho Recruiter/Owner nộp bài
+            if (targetStatus == "pending")
+            {
+                if (!isOwner)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ Recruiter/Owner mới có quyền gửi duyệt bài." });
+
+                if (currentStatus != "draft" && currentStatus != "rejected")
+                    return BadRequest(new { message = "Chỉ có thể gửi duyệt (pending) khi bài viết đang là bản nháp (draft) hoặc bị từ chối (rejected)." });
+
+                // Khi sửa xong nộp lại, xóa tạm lý do từ chối cũ để chờ kết quả mới
+                job.RejectionReason = null;
+            }
+
+            // CASE D: Đóng bài tuyển dụng (Chuyển sang 'closed') -> Đủ người hoặc hết hạn bài
+            if (targetStatus == "closed")
+            {
+                if (!isOwner && !isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ Recruiter/Owner hoặc HrAdmin/SuperAdmin mới có quyền đóng bài." });
+
+                if (currentStatus != "active")
+                    return BadRequest(new { message = "Chỉ có thể đóng (closed) một tin tuyển dụng đang hoạt động (active)." });
+            }
+
+            // CASE E: Lưu trữ / Xóa mềm bài tuyển dụng (Chuyển sang 'archived')
+            if (targetStatus == "archived")
+            {
+                // Kiểm tra xem có hồ sơ ứng tuyển nào đang xử lý dở dang không
+                var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                    a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                    ct);
+
+                if (activeApps.Any())
+                {
+                    return BadRequest(new { message = "Không thể chuyển tin tuyển dụng sang lưu trữ (archived) khi đang có hồ sơ ứng tuyển đang hoạt động." });
+                }
+
+                job.DeletedAt = DateTimeOffset.UtcNow;
+            }
+
+            // 5. Đồng bộ cập nhật vào database
+            job.Status = targetStatus;
+            job.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // Lấy lại danh sách rounds trả về cho đồng bộ cấu trúc Response
+            var rds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
+            var roundDtos = rds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
+
+            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
     }
 }
