@@ -39,6 +39,37 @@ namespace ARISP.API.Controllers
             _applicationService = applicationService;
         }
 
+        [HttpGet("{id}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetApplicationById(Guid id, CancellationToken ct) // Thêm ct ở đây
+        {
+            var result = await _applicationService.GetApplicationByIdAsync(id, ct); // Truyền ct vào đây
+            if (result.IsFailure)
+            {
+                return NotFound(new { message = result.Error });
+            }
+
+            return Ok(result.Value);
+        }
+
+        [HttpPatch("{id}/status")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateApplicationStatus(Guid id, [FromBody] UpdateApplicationStatusRequest request, CancellationToken ct) // Thêm ct ở đây
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var result = await _applicationService.UpdateApplicationStatusAsync(id, request.Status, ct); // Truyền ct vào đây
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(result.Value);
+        }
+
         [HttpPost]
         [Consumes("multipart/form-data")]
         [AllowAnonymous]
