@@ -107,6 +107,7 @@ Tin tuyển dụng, metadata Job Board IT và cấu hình AI Interviewer.
 | `job_description` | TEXT | JD raw text, đưa vào RAG / AI phỏng vấn |
 | `interview_mode` | VARCHAR(20) | Mặc định `onsite` — phỏng vấn thật bắt buộc On-site |
 | `status` | VARCHAR(50) | `draft` \| `active` \| `closed` \| `archived` |
+| `rejection_reason` | TEXT | Lý do HR/Admin từ chối duyệt bài |
 | `is_public_listing` | BOOLEAN | Có hiển thị công khai trên Job Board IT không |
 | **Job Board listing** | | |
 | `location` | VARCHAR(255) | Thành phố chính (vd. `Ho Chi Minh City`, `Ha Noi`) |

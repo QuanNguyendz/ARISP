@@ -110,20 +110,21 @@ CREATE TABLE job_postings (
     department              VARCHAR(255),
     job_description         TEXT            NOT NULL,           -- JD raw text, fed to AI
     interview_mode          VARCHAR(20)     NOT NULL DEFAULT 'onsite', -- onsite (real interview is strictly onsite)
-    status                  VARCHAR(50)     NOT NULL DEFAULT 'draft',  -- draft | active | closed | archived
+    status                  VARCHAR(50)     NOT NULL DEFAULT 'draft',  -- draft | pending | active | rejected | closed | archived
+    rejection_reason        TEXT,                                      -- Lý do HrAdmin/SuperAdmin từ chối duyệt bài
     -- Job Board: có hiển thị công khai trên Job Board IT không
     is_public_listing       BOOLEAN         NOT NULL DEFAULT FALSE,
     -- Job Board listing metadata (Tier 1)
-    location                VARCHAR(255),                           -- e.g. Ho Chi Minh City, Ha Noi
-    work_mode               VARCHAR(20),                            -- onsite | remote | hybrid
+    location                VARCHAR(255),                               -- e.g. Ho Chi Minh City, Ha Noi
+    work_mode               VARCHAR(20),                                -- onsite | remote | hybrid
     salary_min              NUMERIC(12,2),
     salary_max              NUMERIC(12,2),
     salary_currency         VARCHAR(3)      NOT NULL DEFAULT 'VND',
     salary_is_negotiable    BOOLEAN         NOT NULL DEFAULT FALSE,
-    employment_type         VARCHAR(30),                            -- full_time | part_time | contract | internship
-    experience_level        VARCHAR(30),                            -- fresher | junior | mid | senior | lead | manager
-    skills                  TEXT[],                                 -- e.g. {"C#", ".NET", "PostgreSQL"}
-    job_category            VARCHAR(100),                           -- backend | frontend | devops | qa | data | ai_ml | mobile | pm | ...
+    employment_type         VARCHAR(30),                                -- full_time | part_time | contract | internship
+    experience_level        VARCHAR(30),                                -- fresher | junior | mid | senior | lead | manager
+    skills                  TEXT[],                                     -- e.g. {"C#", ".NET", "PostgreSQL"}
+    job_category            VARCHAR(100),                               -- backend | frontend | devops | qa | data | ai_ml | mobile | pm | ...
     
     is_urgent               BOOLEAN         NOT NULL DEFAULT FALSE,
     -- Language detection result (set by LanguageDetectionService, confirmed by HR)
