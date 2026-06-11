@@ -145,7 +145,7 @@ namespace ARISP.API.Controllers
 
         /// <summary>
         /// CỔNG ĐĂNG NHẬP NỘI BỘ: Dành cho Super Admin, HR Admin, Recruiter
-        /// Xác thực truyền thống qua form điền Email + Mật khẩu (dùng cho dev/test hoặc fallback khi OAuth2 không khả dụng)
+        /// Xác thực truyền thống qua form điền Email + Mật khẩu (tài khoản được Super Admin cấp phát trước)
         /// </summary>
         [HttpPost("staff/login")]
         [AllowAnonymous]
@@ -262,23 +262,10 @@ namespace ARISP.API.Controllers
                 return Redirect(redirectUrl);
             }
 
-            var newUser = new User
-            {
-                Id = Guid.NewGuid(),
-                Email = email,
-                PasswordHash = "password",
-                Role = "Pending",
-                FullName = name,
-                Department = null,
-                IsActive = false
-            };
-
-            await _dbContext.Users.AddAsync(newUser);
-            await _dbContext.SaveChangesAsync();
-
+            // Tài khoản chưa được Super Admin cấp phát → CHẶN đăng nhập, KHÔNG tự động tạo tài khoản
             await HttpContext.SignOutAsync("External");
-            var createdPendingUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "created_pending") });
-            return Redirect(createdPendingUrl);
+            var rejectedUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", "account_not_provisioned") });
+            return Redirect(rejectedUrl);
         }
 
         // ============================================================
