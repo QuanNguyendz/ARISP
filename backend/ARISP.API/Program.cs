@@ -308,7 +308,7 @@ async Task SeedDataAsync(ARISPDbContext db)
         await db.SaveChangesAsync();
     }
 
-    // 1.2. HR User
+    // 1.2. HR Admin User
     var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId);
     if (user == null)
     {
@@ -323,6 +323,25 @@ async Task SeedDataAsync(ARISPDbContext db)
             IsActive = true
         };
         await db.Users.AddAsync(user);
+        await db.SaveChangesAsync();
+    }
+
+    // 1.3. Recruiter User
+    var recruiterId = Guid.Parse("da211fba-70ef-4ab4-8fb9-5287f3ca6960");
+    var recruiter = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == recruiterId);
+    if (recruiter == null)
+    {
+        recruiter = new User
+        {
+            Id = recruiterId,
+            Email = "recruiter@arisp.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = AppRoles.Recruiter,
+            FullName = "Emily Recruiter",
+            Department = "IT Recruitment",
+            IsActive = true
+        };
+        await db.Users.AddAsync(recruiter);
         await db.SaveChangesAsync();
     }
 
