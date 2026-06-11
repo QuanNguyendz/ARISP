@@ -26,6 +26,12 @@ export const jobService = {
     return data;
   },
 
+  // HR Admin: Update an existing job posting
+  async updateJob(id: string, request: CreateJobPostingRequest): Promise<JobPosting> {
+    const { data } = await apiClient.put<JobPosting>(`/jobs/${id}`, request);
+    return data;
+  },
+
   // HR Admin: Add availability slots for a job posting
   async addAvailabilitySlots(id: string, slots: any[]): Promise<any> {
     const { data } = await apiClient.post(`/jobs/${id}/slots`, slots);

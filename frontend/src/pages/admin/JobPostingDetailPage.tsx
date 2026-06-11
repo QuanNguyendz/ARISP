@@ -120,7 +120,7 @@ export default function JobPostingDetailPage() {
           </div>
           <button
             type="button"
-            onClick={() => navigate(`/admin/jobs/${job.id}`)}
+            onClick={() => navigate(`/admin/jobs/${job.id}/edit`)}
             className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
           >
             <Edit2 className="w-4 h-4" />

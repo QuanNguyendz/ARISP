@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,11 +14,44 @@ namespace ARISP.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEmbeddingProvider _embeddingProvider;
+        // Define valid status transitions in a static dictionary
+        private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "invited", new(StringComparer.OrdinalIgnoreCase) { "cv_submitted", "withdrawn" } },
+            { "cv_submitted", new(StringComparer.OrdinalIgnoreCase) { "screening", "withdrawn" } },
+            { "screening", new(StringComparer.OrdinalIgnoreCase) { "interview", "not_pass", "withdrawn" } },
+            { "interview", new(StringComparer.OrdinalIgnoreCase) { "pass", "not_pass", "withdrawn" } },
+            { "pass", new(StringComparer.OrdinalIgnoreCase) { "withdrawn" } },
+            { "not_pass", new(StringComparer.OrdinalIgnoreCase) { "screening", "interview" } },
+            { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
+        };
 
         public ApplicationService(IUnitOfWork unitOfWork, IEmbeddingProvider embeddingProvider)
         {
             _unitOfWork = unitOfWork;
             _embeddingProvider = embeddingProvider;
+        }
+
+        /// <summary>
+        /// Hàm tiện ích dùng chung để Map Entity sang Response (Tránh lặp code)
+        /// </summary>
+        private static ApplicationResponse MapToResponse(ARISP.Domain.Entities.Application application, JobPosting? jobPosting)
+        {
+            return new ApplicationResponse
+            {
+                Id = application.Id,
+                JobPostingId = application.JobPostingId,
+                JobTitle = jobPosting?.Title ?? "Unknown Job",
+                CandidateEmail = application.CandidateEmail,
+                CandidateName = application.CandidateName,
+                CandidatePhone = application.CandidatePhone,
+                CvFileUrl = application.CvFileUrl,
+                CvText = application.CvText,
+                Source = application.Source,
+                Status = application.Status,
+                PracticeSessionUsed = application.PracticeSessionUsed,
+                CreatedAt = application.CreatedAt
+            };
         }
 
         public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
@@ -111,6 +144,74 @@ namespace ARISP.Application.Services
             }).ToList();
 
             return Result.Success(responseList);
+        }
+
+        /// <summary>
+        /// Retrieves detailed application by its Guid ID.
+        /// </summary>
+        public async Task<Result<ApplicationResponse>> GetApplicationByIdAsync(Guid id, CancellationToken ct = default)
+        {
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(id, ct);
+            if (application == null)
+                return Result.Failure<ApplicationResponse>("Application not found.");
+
+            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+
+            return Result.Success(MapToResponse(application, jobPosting));
+        }
+
+        /// <summary>
+        /// Updates the application status after validating transition rules.
+        /// </summary>
+        public async Task<Result<ApplicationResponse>> UpdateApplicationStatusAsync(Guid id, string newStatus, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(newStatus))
+                return Result.Failure<ApplicationResponse>("Target status cannot be empty.");
+
+            var repository = _unitOfWork.Repository<ARISP.Domain.Entities.Application>();
+            var application = await repository.GetByIdAsync(id, ct);
+            if (application == null)
+                return Result.Failure<ApplicationResponse>("Application not found.");
+
+            string currentStatus = application.Status?.Trim() ?? string.Empty;
+            newStatus = newStatus.Trim().ToLowerInvariant();
+
+            // 1. Tối ưu: Lấy danh sách trạng thái hợp lệ trực tiếp từ bộ Keys của Dictionary tĩnh
+            if (!AllowedStatusTransitions.ContainsKey(newStatus))
+            {
+                return Result.Failure<ApplicationResponse>($"Status '{newStatus}' is invalid. Allowed values: {string.Join(", ", AllowedStatusTransitions.Keys)}");
+            }
+
+            // 2. Prevent updating if status is unchanged
+            if (string.Equals(currentStatus, newStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<ApplicationResponse>($"Application is already in '{newStatus}' status.");
+            }
+
+            // 3. Validate status transition
+            if (AllowedStatusTransitions.TryGetValue(currentStatus, out var allowedNextStates))
+            {
+                if (!allowedNextStates.Contains(newStatus))
+                {
+                    return Result.Failure<ApplicationResponse>($"Cannot transition application status from '{currentStatus}' to '{newStatus}'.");
+                }
+            }
+            else
+            {
+                return Result.Failure<ApplicationResponse>($"Transition mapping for current status '{currentStatus}' is not configured.");
+            }
+
+            // 4. Update status and save
+            application.Status = newStatus;
+            application.UpdatedAt = DateTimeOffset.UtcNow;
+
+            repository.Update(application);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // Get job info for the response
+            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+
+            return Result.Success(MapToResponse(application, jobPosting));
         }
 
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, CancellationToken ct = default)
