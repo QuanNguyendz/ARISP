@@ -132,7 +132,7 @@ export default function JobPostingsPage() {
     setMenuPosition(null);
 
     if (action.key === 'edit') {
-      navigate(`/admin/jobs/${job.id}`);
+      navigate(`/admin/jobs/${job.id}/edit`);
       return;
     }
 
@@ -280,7 +280,7 @@ export default function JobPostingsPage() {
                     </a>
                     <button
                       type="button"
-                      onClick={() => navigate(`/admin/jobs/${job.id}`)}
+                      onClick={() => navigate(`/admin/jobs/${job.id}/edit`)}
                       className="p-2 rounded-lg hover:bg-white/10 transition-colors"
                     >
                       <Edit2 className="w-4 h-4 text-white/50" />

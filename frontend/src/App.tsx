@@ -108,7 +108,8 @@ function App() {
       >
         <Route path="/admin/dashboard" element={<DashboardPage />} />
         <Route path="/admin/jobs" element={<JobPostingsPage />} />
-        <Route path="/admin/jobs/create" element={<CreateJobPostingPage />} />
+        <Route path="/admin/jobs/create" element={<CreateJobPostingPage mode="create" />} />
+        <Route path="/admin/jobs/:id/edit" element={<CreateJobPostingPage mode="edit" />} />
         <Route path="/admin/jobs/:id" element={<JobPostingDetailPage />} />
         <Route path="/admin/candidates" element={<CandidatesPage />} />
         <Route path="/admin/candidates/:id" element={<CandidateDetailPage />} />

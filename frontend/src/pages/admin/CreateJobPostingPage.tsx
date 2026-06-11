@@ -1,13 +1,19 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Trash2, Loader2, PlusCircle, Check } from 'lucide-react';
 import jobService from '@/services/job/jobService';
-import type { CreateJobPostingRequest, RoundConfig } from '@/types/job';
+import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@/types/job';
 
-export default function CreateJobPostingPage() {
+interface CreateJobPostingPageProps {
+  mode: 'create' | 'edit';
+}
+
+export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps) {
+  const { id: jobId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(mode === 'edit');
   const [error, setError] = useState<string | null>(null);
 
   // Form Fields
@@ -40,6 +46,46 @@ export default function CreateJobPostingPage() {
       maxDurationMinutes: 30,
     },
   ]);
+
+  // Fetch job data when in edit mode
+  useEffect(() => {
+    if (mode === 'edit' && jobId) {
+      async function fetchJob() {
+        try {
+          setLoading(true);
+          const job: JobPosting = await jobService.getJobPostingById(jobId);
+          setTitle(job.title || '');
+          setDepartment(job.department || '');
+          setJobDescription(job.jobDescription || '');
+          setInterviewMode(job.interviewMode || 'onsite');
+          setLocation(job.location || '');
+          setWorkMode(job.workMode || job.employmentType || 'fulltime');
+          setSalaryIsNegotiable(job.salaryIsNegotiable ?? true);
+          setSalaryMin(job.salaryMin ?? '');
+          setSalaryMax(job.salaryMax ?? '');
+          setSalaryCurrency(job.salaryCurrency || 'USD');
+          setExperienceLevel(job.experienceLevel || 'mid');
+          setIsUrgent(job.isUrgent || false);
+          setIsPublicListing(job.isPublicListing ?? true);
+          setLanguageRequirement(job.languageRequirement || '');
+          setSkills(job.skills || []);
+          setRounds(job.roundConfigs?.length ? job.roundConfigs : [{
+            roundNumber: 1,
+            roundType: 'screening',
+            interviewLanguage: 'vi',
+            interviewCodeTtlHours: 2,
+            maxDurationMinutes: 30,
+          }]);
+        } catch (err) {
+          console.error(err);
+          setError('Không thể tải dữ liệu tin tuyển dụng.');
+        } finally {
+          setLoading(false);
+        }
+      }
+      fetchJob();
+    }
+  }, [mode, jobId]);
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && skillInput.trim()) {
@@ -124,15 +170,29 @@ export default function CreateJobPostingPage() {
         languageRequirement: languageRequirement.trim() || undefined,
       };
 
-      await jobService.createJobPosting(requestPayload);
+      if (mode === 'edit' && jobId) {
+        await jobService.updateJob(jobId, requestPayload);
+      } else {
+        await jobService.createJobPosting(requestPayload);
+      }
       navigate('/admin/jobs');
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || err.message || 'Có lỗi xảy ra khi tạo tin tuyển dụng.');
+      setError(err?.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu tin tuyển dụng.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  // Loading state for edit mode
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+        <Loader2 className="w-10 h-10 text-accent-primary animate-spin" />
+        <p className="text-sm text-white/40">Đang tải dữ liệu tin tuyển dụng...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8">
@@ -145,7 +205,9 @@ export default function CreateJobPostingPage() {
           <ArrowLeft className="w-4 h-4" />
           Quay lại danh sách
         </button>
-        <h1 className="text-3xl font-semibold text-white mb-1">Tạo tin tuyển dụng mới</h1>
+        <h1 className="text-3xl font-semibold text-white mb-1">
+          {mode === 'edit' ? 'Chỉnh sửa tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
+        </h1>
         <p className="text-text-secondary text-sm">Thiết lập thông tin tuyển dụng & cấu hình quy trình phỏng vấn AI</p>
       </motion.div>
 
@@ -469,7 +531,7 @@ export default function CreateJobPostingPage() {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Đăng tin
+                    {mode === 'edit' ? 'Lưu thay đổi' : 'Đăng tin'}
                   </>
                 )}
               </button>
