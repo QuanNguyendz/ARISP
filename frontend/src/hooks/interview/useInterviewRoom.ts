@@ -13,7 +13,7 @@ export function useInterviewRoom(sessionId: string) {
     setConnectionStatus('connecting');
 
     interviewService
-      .startSession(sessionId)
+      .startSession({ applicationId: sessionId, roundNumber: 1, sessionType: 'real' })
       .then(() => {
         setConnectionStatus('connected');
       })

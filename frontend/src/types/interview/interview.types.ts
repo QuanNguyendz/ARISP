@@ -89,3 +89,17 @@ export interface InterviewCodeResponse {
   expiresAt: Date;
   applicationId: string;
 }
+
+export interface StartSessionRequest {
+  applicationId: string;
+  roundNumber?: number;
+  sessionType?: 'real' | 'practice';
+}
+
+export interface StartSessionResponse {
+  sessionId: string;
+  status: string;
+  language: string;
+  heyGenSdpOffer?: string;
+  heyGenSessionId?: string;
+}

@@ -305,6 +305,33 @@ namespace ARISP.Application.DTOs
         public string NewPassword { get; set; } = string.Empty;
     }
 
+    public class GenerateCodeRequest
+    {
+        public Guid ApplicationId { get; set; }
+        public int? RoundNumber { get; set; }
+    }
+
+    public class GenerateBatchRequest
+    {
+        public List<Guid> ApplicationIds { get; set; } = new();
+        public int? RoundNumber { get; set; }
+    }
+
+    public class ValidateCodeRequest
+    {
+        public string Code { get; set; } = string.Empty;
+    }
+
+    public class InterviewCodeSummaryDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public int RoundNumber { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
+        public DateTimeOffset? UsedAt { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string CandidateName { get; set; } = string.Empty;
+    }
+
     // ==========================================
     // Evaluation DTOs
     // ==========================================
