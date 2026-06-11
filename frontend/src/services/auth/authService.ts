@@ -35,6 +35,26 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export const authService = {
+  async staffLogin(credentials: LoginRequest): Promise<AuthResponse> {
+    if (USE_FAKE_AUTH) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return {
+        accessToken: 'mock-staff-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'HR Admin',
+        role: ROLES.HRAdmin,
+      };
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/staff/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+
+    return parseResponse<AuthResponse>(response);
+  },
+
   async employerLogin(_credentials: LoginRequest): Promise<AuthResponse> {
     if (USE_FAKE_AUTH) {
       await new Promise(resolve => setTimeout(resolve, 800));

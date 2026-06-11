@@ -1,17 +1,52 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { authService } from '@services/auth/authService';
+import { useAuthStore } from '@store/auth/authStore';
+
+// Get dashboard path based on role
+function getRoleDashboard(role: string): string {
+  const r = role.toLowerCase().replace(/\s+/g, '_');
+  switch (r) {
+    case 'super_admin':
+      return '/super-admin/dashboard';
+    case 'hr_admin':
+      return '/hr/dashboard';
+    case 'recruiter':
+      return '/recruiter/dashboard';
+    case 'candidate':
+      return '/candidate/portal';
+    default:
+      return '/hr/dashboard';
+  }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Redirect if already authenticated
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userRole = useAuthStore((state) => state.user?.role);
+
+  useEffect(() => {
+    if (isAuthenticated && userRole) {
+      const from = (location.state as any)?.from?.pathname;
+      if (from) {
+        navigate(from, { replace: true });
+      } else {
+        navigate(getRoleDashboard(userRole), { replace: true });
+      }
+    }
+  }, [isAuthenticated, userRole, location, navigate]);
 
   const handleOAuthLogin = () => {
     setOauthLoading(true);
@@ -25,12 +60,16 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await authService.employerLogin({ email, password });
+      const response = await authService.staffLogin({ email, password });
+      setAuthFromResponse(response);
+
+      // Redirect based on role
+      const dashboard = getRoleDashboard(response.role || 'Hr_admin');
+      const from = (location.state as any)?.from?.pathname;
+      navigate(from || dashboard, { replace: true });
     } catch (err: any) {
-      if (err.message !== 'Redirecting to Google sign-in') {
-        setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
-        setOauthLoading(false);
-      }
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+      setOauthLoading(false);
     } finally {
       setIsLoading(false);
     }
