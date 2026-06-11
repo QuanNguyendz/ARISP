@@ -92,7 +92,10 @@ namespace ARISP.Application.DTOs
 
     public class UpdateJobStatusRequest
     {
+        [Required(ErrorMessage = "Trạng thái (status) là bắt buộc.")]
         public string Status { get; set; } = string.Empty;
+
+        public string? RejectionReason { get; set; } // Chỉ bắt buộc khi đổi status sang 'rejected'
     }
 
     /// <summary>

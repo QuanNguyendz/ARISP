@@ -27,6 +27,12 @@ namespace ARISP.Application.Services
             if (jobPosting == null)
                 return Result.Failure<ApplicationResponse>("Job posting not found.");
 
+            if (jobPosting.Status != "active")
+                return Result.Failure<ApplicationResponse>("Tin tuyển dụng này hiện không hoạt động hoặc đã bị đóng.");
+
+            if (jobPosting.ApplicationDeadline.HasValue && jobPosting.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
+                return Result.Failure<ApplicationResponse>("Tin tuyển dụng này đã hết hạn nộp hồ sơ.");
+
             var application = new ARISP.Domain.Entities.Application
             {
                 JobPostingId = request.JobPostingId,
