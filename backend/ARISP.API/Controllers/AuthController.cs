@@ -140,6 +140,53 @@ namespace ARISP.API.Controllers
         }
 
         // ============================================================
+        // HR / INTERNAL STAFF LOGIN (Email + Password)
+        // ============================================================
+
+        /// <summary>
+        /// CỔNG ĐĂNG NHẬP NỘI BỘ: Dành cho Super Admin, HR Admin, Recruiter
+        /// Xác thực truyền thống qua form điền Email + Mật khẩu (dùng cho dev/test hoặc fallback khi OAuth2 không khả dụng)
+        /// </summary>
+        [HttpPost("staff/login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> StaffLogin([FromBody] LoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+                return BadRequest(new { message = "Email và mật khẩu là bắt buộc." });
+
+            var user = await _dbContext.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+                return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
+
+            if (!user.IsActive)
+                return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên." });
+
+            if (string.IsNullOrEmpty(user.PasswordHash) || user.PasswordHash == "FIREBASE_AUTH")
+                return BadRequest(new { message = "Tài khoản này chỉ hỗ trợ đăng nhập qua SSO (Google/Microsoft)." });
+
+            bool isValidPass = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            if (!isValidPass)
+                return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
+
+            user.LastLoginAt = DateTimeOffset.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            var accessToken = GenerateJwtTokenForUser(user);
+            var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
+
+            return Ok(new AuthResponse
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                FullName = user.FullName ?? "Staff",
+                Role = user.Role
+            });
+        }
+
+        // ============================================================
         // HR / INTERNAL STAFF LOGIN (OAuth2)
         // ============================================================
 
