@@ -320,6 +320,22 @@ namespace ARISP.API.Controllers
 
             var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
 
+            // --- Cập nhật trạng thái (Status) dựa trên Business Logic ---
+            if (request.ApplicationDeadline.HasValue && request.ApplicationDeadline.Value > DateTimeOffset.UtcNow)
+            {
+                // Nếu tin đang bị expired (hết hạn) mà được gia hạn deadline mới -> tự động Active lại
+                if (string.Equals(job.Status, "expired", StringComparison.OrdinalIgnoreCase))
+                {
+                    job.Status = "active";
+                }
+            }
+
+            // Nếu tin đang là bản nháp (draft), khi HR cập nhật thông tin chuẩn chỉnh -> chuyển thành Active công khai
+            if (string.Equals(job.Status, "draft", StringComparison.OrdinalIgnoreCase))
+            {
+                job.Status = "active"; // Hoặc đổi thành "pending" nếu hệ thống có bước duyệt bài
+            }
+
             // 4. Update fields
             job.Title = request.Title.Trim();
             job.Department = request.Department?.Trim();
