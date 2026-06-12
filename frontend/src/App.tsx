@@ -3,10 +3,14 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@store/auth/authStore';
 import { getDevAuth, isDevMode } from '@utils/devAuth';
 
-import AdminLayout from '@components/layout/AdminLayout';
 import CandidateLayout from '@components/layout/CandidateLayout';
 import InterviewLayout from '@components/layout/InterviewLayout';
 import ProtectedRoute from '@components/auth/ProtectedRoute';
+
+// Layouts for each role
+import SuperAdminLayout from '@components/layout/SuperAdminLayout';
+import HrLayout from '@components/layout/HrLayout';
+import RecruiterLayout from '@components/layout/RecruiterLayout';
 
 // Auth Pages
 import LoginPage from '@pages/auth/LoginPage';
@@ -17,19 +21,36 @@ import ForgotPasswordPage from '@pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '@pages/auth/ResetPasswordPage';
 import OAuthCallbackPage from '@pages/auth/OAuthCallbackPage';
 
-// Admin Pages
-import DashboardPage from '@pages/admin/DashboardPage';
-import JobPostingsPage from '@pages/admin/JobPostingsPage';
-import JobPostingDetailPage from '@pages/admin/JobPostingDetailPage';
-import CreateJobPostingPage from '@pages/admin/CreateJobPostingPage';
-import CandidatesPage from '@pages/admin/CandidatesPage';
-import CandidateDetailPage from '@pages/admin/CandidateDetailPage';
-import InterviewSessionsPage from '@pages/admin/InterviewSessionsPage';
-import EvaluationReviewPage from '@pages/admin/EvaluationReviewPage';
-import ReportsPage from '@pages/admin/ReportsPage';
-import PlaybooksPage from '@pages/admin/PlaybooksPage';
-import SettingsPage from '@pages/admin/SettingsPage';
-import TeamPage from '@pages/admin/TeamPage';
+// Super Admin Pages
+import SuperAdminDashboardPage from '@pages/super-admin/DashboardPage';
+import SuperAdminUsersPage from '@pages/super-admin/UsersPage';
+import SuperAdminPendingUsersPage from '@pages/super-admin/PendingUsersPage';
+import SuperAdminAuditLogsPage from '@pages/super-admin/AuditLogsPage';
+import SuperAdminSettingsPage from '@pages/super-admin/SettingsPage';
+
+// HR Admin Pages (from hr/ folder)
+import HrDashboardPage from '@pages/hr/DashboardPage';
+import HrPendingJobsPage from '@pages/hr/PendingJobsPage';
+import HrJobsPage from '@pages/hr/JobsPage';
+import HrCandidatesPage from '@pages/hr/CandidatesPage';
+import HrCandidateDetailPage from '@pages/hr/CandidateDetailPage';
+import HrEvaluationsPage from '@pages/hr/EvaluationReviewPage';
+import HrReportsPage from '@pages/hr/ReportsPage';
+import HrPlaybooksPage from '@pages/hr/PlaybooksPage';
+import HrTeamPage from '@pages/hr/TeamPage';
+import HrInterviewsPage from '@pages/hr/InterviewSessionsPage';
+import HrJobDetailPage from '@pages/hr/JobPostingDetailPage';
+import HrSettingsPage from '@pages/hr/SettingsPage';
+
+// Recruiter Pages (from recruiter/ folder)
+import RecruiterDashboardPage from '@pages/recruiter/DashboardPage';
+import RecruiterMyJobsPage from '@pages/recruiter/MyJobsPage';
+import RecruiterCreateJobPage from '@pages/recruiter/CreateJobPostingPage';
+import RecruiterCandidatesPage from '@pages/recruiter/CandidatesPage';
+import RecruiterCandidateDetailPage from '@pages/recruiter/CandidateDetailPage';
+import RecruiterEvaluationsPage from '@pages/recruiter/EvaluationReviewPage';
+import RecruiterInterviewsPage from '@pages/recruiter/InterviewSessionsPage';
+import RecruiterSettingsPage from '@pages/recruiter/SettingsPage';
 
 // Candidate Pages
 import CandidateHome from '@pages/candidate/CandidateHome';
@@ -98,43 +119,75 @@ function App() {
         <Route path="/candidate/results/:id" element={<FeedbackPage />} />
       </Route>
 
-      {/* ==================== HR ADMIN ROUTES ==================== */}
+      {/* ==================== SUPER ADMIN ROUTES ==================== */}
       <Route
         element={
-          <ProtectedRoute allowedRoles={['Super_admin', 'Hr_admin', 'Recruiter']}>
-            <AdminLayout />
+          <ProtectedRoute allowedRoles={['Super_admin']}>
+            <SuperAdminLayout />
           </ProtectedRoute>
         }
       >
-        <Route path="/admin/dashboard" element={<DashboardPage />} />
-        <Route path="/admin/jobs" element={<JobPostingsPage />} />
-        <Route path="/admin/jobs/create" element={<CreateJobPostingPage mode="create" />} />
-        <Route path="/admin/jobs/:id/edit" element={<CreateJobPostingPage mode="edit" />} />
-        <Route path="/admin/jobs/:id" element={<JobPostingDetailPage />} />
-        <Route path="/admin/candidates" element={<CandidatesPage />} />
-        <Route path="/admin/candidates/:id" element={<CandidateDetailPage />} />
-        <Route path="/admin/evaluations" element={<EvaluationReviewPage />} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/settings" element={<SettingsPage />} />
-        <Route path="/admin/playbooks" element={<PlaybooksPage />} />
-        <Route path="/admin/team" element={<TeamPage />} />
-        <Route path="/admin/interviews" element={<InterviewSessionsPage />} />
+        <Route path="/super-admin/dashboard" element={<SuperAdminDashboardPage />} />
+        <Route path="/super-admin/users" element={<SuperAdminUsersPage />} />
+        <Route path="/super-admin/users/pending" element={<SuperAdminPendingUsersPage />} />
+        <Route path="/super-admin/audit-logs" element={<SuperAdminAuditLogsPage />} />
+        <Route path="/super-admin/settings" element={<SuperAdminSettingsPage />} />
       </Route>
 
-      {/* Interview Routes */}
+      {/* ==================== HR ADMIN ROUTES ==================== */}
       <Route
-        path="/interview"
+        element={
+          <ProtectedRoute allowedRoles={['Hr_admin']}>
+            <HrLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/hr/dashboard" element={<HrDashboardPage />} />
+        <Route path="/hr/jobs/pending" element={<HrPendingJobsPage />} />
+        <Route path="/hr/jobs" element={<HrJobsPage />} />
+        <Route path="/hr/jobs/:id" element={<HrJobDetailPage />} />
+        <Route path="/hr/candidates" element={<HrCandidatesPage />} />
+        <Route path="/hr/candidates/:id" element={<HrCandidateDetailPage />} />
+        <Route path="/hr/evaluations" element={<HrEvaluationsPage />} />
+        <Route path="/hr/reports" element={<HrReportsPage />} />
+        <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
+        <Route path="/hr/team" element={<HrTeamPage />} />
+        <Route path="/hr/interviews" element={<HrInterviewsPage />} />
+        <Route path="/hr/settings" element={<HrSettingsPage />} />
+      </Route>
+
+      {/* ==================== RECRUITER ROUTES ==================== */}
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={['Recruiter']}>
+            <RecruiterLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/recruiter/dashboard" element={<RecruiterDashboardPage />} />
+        <Route path="/recruiter/jobs/create" element={<RecruiterCreateJobPage mode="create" />} />
+        <Route path="/recruiter/my-jobs" element={<RecruiterMyJobsPage />} />
+        <Route path="/recruiter/my-jobs/:id" element={<RecruiterCreateJobPage mode="edit" />} />
+        <Route path="/recruiter/candidates" element={<RecruiterCandidatesPage />} />
+        <Route path="/recruiter/candidates/:id" element={<RecruiterCandidateDetailPage />} />
+        <Route path="/recruiter/evaluations" element={<RecruiterEvaluationsPage />} />
+        <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
+        <Route path="/recruiter/settings" element={<RecruiterSettingsPage />} />
+      </Route>
+
+      {/* ==================== INTERVIEW ROUTES ==================== */}
+      <Route
         element={
           <ProtectedRoute allowedRoles={['Candidate']}>
             <InterviewLayout />
           </ProtectedRoute>
         }
       >
-        <Route path="room/:sessionId" element={<InterviewRoomPage />} />
-        <Route path="practice/:applicationId" element={<PracticeSessionPage />} />
+        <Route path="/interview/room/:sessionId" element={<InterviewRoomPage />} />
+        <Route path="/interview/practice/:applicationId" element={<PracticeSessionPage />} />
       </Route>
 
-      {/* Kiosk */}
+      {/* ==================== KIOSK ROUTE ==================== */}
       <Route path="/kiosk" element={<InterviewLayout />}>
         <Route index element={<KioskPage />} />
       </Route>

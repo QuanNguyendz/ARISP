@@ -14,6 +14,23 @@ type CallbackState =
   | { kind: 'pending'; message: string }
   | { kind: 'error'; message: string };
 
+// Get dashboard path based on role
+function getRoleDashboard(role: string): string {
+  const r = role.toLowerCase().replace(/\s+/g, '_');
+  switch (r) {
+    case 'super_admin':
+      return '/super-admin/dashboard';
+    case 'hr_admin':
+      return '/hr/dashboard';
+    case 'recruiter':
+      return '/recruiter/dashboard';
+    case 'candidate':
+      return '/candidate/portal';
+    default:
+      return '/hr/dashboard';
+  }
+}
+
 export default function OAuthCallbackPage() {
   const navigate = useNavigate();
   const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse);
@@ -29,14 +46,15 @@ export default function OAuthCallbackPage() {
     const message = new URLSearchParams(window.location.search).get('message') ?? parsedCallback.message;
 
     if (parsedCallback.accessToken) {
+      const role = parsedCallback.role ?? 'Hr_admin';
       setAuthFromResponse({
         accessToken: parsedCallback.accessToken,
         refreshToken: new URLSearchParams(window.location.hash.slice(1)).get('refresh_token') ?? '',
         fullName: '',
-        role: parsedCallback.role ?? '',
+        role: role,
       });
       window.history.replaceState({}, '', '/auth/callback');
-      navigate('/admin/dashboard', { replace: true });
+      navigate(getRoleDashboard(role), { replace: true });
       return;
     }
 
