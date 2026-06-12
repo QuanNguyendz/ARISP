@@ -460,6 +460,11 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Email already registered." });
             }
 
+            if (!IsValidCandidatePassword(request.Password, out var validationError))
+            {
+                return BadRequest(new { message = validationError });
+            }
+
             var account = new CandidateAccount
             {
                 Email = request.Email,
@@ -596,6 +601,11 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Invalid, expired, or already used recovery token." });
             }
 
+            if (!IsValidCandidatePassword(request.NewPassword, out var validationError))
+            {
+                return BadRequest(new { message = validationError });
+            }
+
             // 2. Cập nhật mật khẩu mới hóa mã BCrypt
             candidate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             candidate.UpdatedAt = DateTimeOffset.UtcNow;
@@ -606,6 +616,38 @@ namespace ARISP.API.Controllers
             await _dbContext.SaveChangesAsync();
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
+        }
+
+        private bool IsValidCandidatePassword(string password, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+            {
+                errorMessage = "Mật khẩu phải có ít nhất 8 ký tự.";
+                return false;
+            }
+
+            if (!password.Any(char.IsUpper))
+            {
+                errorMessage = "Mật khẩu phải chứa ít nhất một chữ hoa.";
+                return false;
+            }
+
+            if (!password.Any(char.IsDigit))
+            {
+                errorMessage = "Mật khẩu phải chứa ít nhất một chữ số.";
+                return false;
+            }
+
+            const string specialCharacters = "!@#$%^&*";
+            if (!password.Any(c => specialCharacters.Contains(c)))
+            {
+                errorMessage = "Mật khẩu phải chứa ít nhất một ký tự đặc biệt trong !@#$%^&*.";
+                return false;
+            }
+
+            return true;
         }
 
         // ============================================================
