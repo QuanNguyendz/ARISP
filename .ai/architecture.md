@@ -311,8 +311,10 @@ public interface IEmbeddingProvider
 |---|---|
 | `AuthService` | JWT, role management, magic link (Candidate Portal), **OAuth2 OIDC Integration & Domain validation** |
 | `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
-| `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona |
-| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application) |
+| `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona, **JD file upload (PDF/DOCX)** |
+| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application), **đính kèm CV-JD Analysis vào Application** |
+| `CvJdAnalysisService` | **[NEW]** Nhận CV file + JD (file/text) → gọi Gemini API phân tích → trả matchScore + summary. Cache kết quả per CV hash + JobPosting |
+| `IGeminiProvider` | **[NEW]** Interface abstract cho Google Gemini API. Method: `AnalyzeCvJdMatchAsync(cvFile, jdContent, ct)` |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
 | `OnlineTestService` | Quản lý câu hỏi trắc nghiệm (`online_test_questions`), lưu kết quả nộp bài (`online_test_submissions`), tự động chấm điểm và đánh giá đạt/trượt |
 | `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow Kiosk) |
@@ -346,3 +348,72 @@ public interface IEmbeddingProvider
 - **Token exchange:** Firebase identity is not used directly for protected ARISP APIs. `POST /api/auth/firebase/candidate/login` verifies the Firebase ID token, creates or updates the matching `candidate_accounts` row, then issues the existing ARISP JWT.
 - **Scope:** Firebase is currently used only as an optional Candidate identity provider. HR/Super Admin SSO remains Google OAuth2 / OIDC with domain validation.
 - **Config:** Firebase Web app values are public client configuration and live in frontend env vars. No Firebase service account secret is required for the current validation flow.
+
+### ADR-030: Gemini CV-JD Match Analysis
+- **Quyết định:** Sử dụng **Google Gemini 2.5 Flash** để phân tích mức độ phù hợp giữa CV của ứng viên và JD của vị trí tuyển dụng.
+- **Mục đích:** Cung cấp cho candidate một **bản đánh giá nhanh** về mức độ phù hợp trước khi ứng tuyển. Dù điểm cao hay thấp, candidate vẫn có thể ứng tuyển.
+- **Reuse principle:** Kết quả phân tích được lưu vào bảng `cv_jd_analyses`. Khi candidate submit Application, hệ thống link `analysis_id` vào Application – HR nhận được kết quả y hệt mà không cần chạy lại Gemini.
+- **Auto-analysis on apply:** Nếu candidate ứng tuyển mà chưa từng chạy analysis, hệ thống tự động gọi Gemini 1 lần rồi đính kèm.
+- **Input:** CV file (PDF/DOCX) + JD file gốc (PDF/DOCX) hoặc JD text.
+- **Output (JSON):**
+  ```json
+  {
+    "matchScore": 78,
+    "summary": "Hồ sơ phù hợp tốt với yêu cầu vị trí...",
+    "skillsMatched": ["C#", ".NET Core", "PostgreSQL"],
+    "skillsGaps": ["Docker", "Kubernetes"],
+    "experienceRelevance": "3 năm kinh nghiệm backend phù hợp với yêu cầu Mid-Senior",
+    "overallRecommendation": "Phù hợp tốt. Nên bổ sung kỹ năng containerization."
+  }
+  ```
+- **Provider abstraction:** Gemini được gọi qua `IGeminiProvider` interface. Không gọi Gemini SDK trực tiếp trong business logic.
+- **Tại sao Gemini mà không GPT-4o?** Gemini 2.5 Flash hỗ trợ multimodal file input (PDF nạp trực tiếp) với chi phí thấp hơn GPT-4o cho tác vụ phân tích document. GPT-4o vẫn được dùng cho RAG + phỏng vấn AI (streaming).
+
+  ```csharp
+  public interface IGeminiProvider
+  {
+      Task<CvJdAnalysisResult> AnalyzeCvJdMatchAsync(
+          Stream cvFileStream,
+          string cvFileName,
+          Stream? jdFileStream,      // null nếu không có file JD
+          string? jdFileName,
+          string jdText,             // fallback text JD
+          CancellationToken ct);
+  }
+  ```
+
+### ADR-031: JD File Upload & Storage
+- **Quyết định:** Mở rộng `JobPosting` entity hỗ trợ upload file JD gốc (PDF/DOCX) bên cạnh trường `JobDescription` (text).
+- **Lý do:** Gemini AI phân tích từ file gốc (giữ được formatting, bảng biểu, bullet points) cho kết quả chính xác hơn so với plain text.
+- **Thêm cột mới vào `job_postings`:**
+  - `jd_file_url` (string, nullable): URL/path tới file JD gốc đã upload.
+  - `jd_file_name` (string, nullable): Tên file gốc (ví dụ: "JD_Backend_Senior.pdf").
+  - `jd_file_format` (string, nullable): Định dạng file ("pdf", "docx").
+- **Logic:** Khi HR tạo/sửa Job Posting, có thể paste text JD hoặc upload file JD, hoặc cả hai.
+- **Gemini sử dụng:** Ưu tiên file JD gốc (nếu có) → fallback sang `job_description` text.
+- **Format hỗ trợ:** PDF, DOCX (giới hạn 10MB).
+
+### ADR-032: CvJdAnalysis Entity & Database Schema
+- **Bảng mới: `cv_jd_analyses`**
+
+  | Cột | Kiểu | Mô tả |
+  |------|------|-------|
+  | `id` | UUID PK | |
+  | `candidate_account_id` | UUID FK → `candidate_accounts` | Candidate thực hiện phân tích (nullable nếu chưa login) |
+  | `job_posting_id` | UUID FK → `job_postings` | Job được phân tích |
+  | `application_id` | UUID FK → `applications`, nullable | Link với Application sau khi ứng tuyển |
+  | `cv_file_url` | string | URL tới file CV đã upload |
+  | `cv_file_name` | string | Tên file CV gốc |
+  | `match_score` | decimal (0–100) | Điểm phù hợp tổng thể |
+  | `summary` | text | Tóm tắt đánh giá tổng quan |
+  | `skills_matched` | jsonb | `["C#", ".NET", "SQL"]` |
+  | `skills_gaps` | jsonb | `["Docker", "K8s"]` |
+  | `experience_relevance` | text | Đánh giá kinh nghiệm |
+  | `overall_recommendation` | text | Khuyến nghị tổng quan |
+  | `raw_response` | jsonb | Response gốc từ Gemini (lưu để debug/audit) |
+  | `created_at` | timestamptz | |
+
+- **Thêm cột vào `applications`:**
+  - `cv_jd_analysis_id` (UUID FK → `cv_jd_analyses`, nullable): Link tới kết quả phân tích đã chạy.
+
+- **Index:** `(candidate_account_id, job_posting_id)` – để lookup nhanh kết quả đã phân tích (tránh chạy lại).
