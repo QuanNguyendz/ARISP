@@ -76,69 +76,6 @@ namespace ARISP.API.Controllers
             });
         }
 
-        /// <summary>
-        /// CỔNG ĐĂNG NHẬP FIREBASE: Backend xác thực Firebase ID token rồi cấp JWT nội bộ ARISP.
-        /// </summary>
-        [HttpPost("firebase/candidate/login")]
-        [Authorize(AuthenticationSchemes = "Firebase")]
-        public async Task<IActionResult> FirebaseCandidateLogin()
-        {
-            var firebaseUid = User.FindFirst("user_id")?.Value
-                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-            var email = User.FindFirst(ClaimTypes.Email)?.Value
-                ?? User.FindFirst("email")?.Value;
-            var name = User.FindFirst(ClaimTypes.Name)?.Value
-                ?? User.FindFirst("name")?.Value
-                ?? email;
-
-            if (string.IsNullOrWhiteSpace(firebaseUid) || string.IsNullOrWhiteSpace(email))
-            {
-                return Unauthorized(new { message = "Firebase token does not contain required user identity claims." });
-            }
-
-            var candidateEmail = email;
-            var candidateName = string.IsNullOrWhiteSpace(name) ? candidateEmail : name;
-
-            var candidate = await _dbContext.CandidateAccounts
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(c => c.Email == candidateEmail);
-
-            if (candidate == null)
-            {
-                candidate = new CandidateAccount
-                {
-                    Id = Guid.NewGuid(),
-                    Email = candidateEmail,
-                    PasswordHash = "FIREBASE_AUTH",
-                    FullName = candidateName,
-                    EmailVerified = true
-                };
-
-                await _dbContext.CandidateAccounts.AddAsync(candidate);
-                await _dbContext.SaveChangesAsync();
-            }
-            else if (!candidate.EmailVerified)
-            {
-                candidate.EmailVerified = true;
-                await _dbContext.SaveChangesAsync();
-            }
-
-            candidate.LastLoginAt = DateTimeOffset.UtcNow;
-
-            var accessToken = GenerateJwtTokenForCandidate(candidate);
-            var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
-
-            return Ok(new FirebaseAuthResponse
-            {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
-                FullName = candidate.FullName ?? "Candidate",
-                Role = AppRoles.Candidate,
-                FirebaseUid = firebaseUid
-            });
-        }
-
         // ============================================================
         // HR / INTERNAL STAFF LOGIN (Email + Password)
         // ============================================================
@@ -164,8 +101,8 @@ namespace ARISP.API.Controllers
             if (!user.IsActive)
                 return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên." });
 
-            if (string.IsNullOrEmpty(user.PasswordHash) || user.PasswordHash == "FIREBASE_AUTH")
-                return BadRequest(new { message = "Tài khoản này chỉ hỗ trợ đăng nhập qua SSO (Google/Microsoft)." });
+            if (string.IsNullOrEmpty(user.PasswordHash))
+                return BadRequest(new { message = "Tài khoản này chỉ hỗ trợ đăng nhập qua SSO." });
 
             bool isValidPass = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
             if (!isValidPass)
