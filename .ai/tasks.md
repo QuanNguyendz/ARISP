@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-06-03
+**Last updated:** 2026-06-14
 
 ---
 
@@ -66,6 +66,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] EF Core migrations
 - [ ] HR Admin / Recruiter: CRUD Job Posting
   - [ ] Thông tin cơ bản (tên vị trí, lĩnh vực, JD)
+  - [ ] **Upload file JD gốc (PDF/DOCX)** bên cạnh text JD – lưu vào `jd_file_url`, `jd_file_name`, `jd_file_format`
   - [ ] Cấu hình multi-round: số vòng, loại vòng (Screening/Technical), ngôn ngữ
   - [ ] Availability Slots (Practice): danh sách khung giờ, capacity cho phỏng vấn thử
   - [ ] Phỏng vấn thật: Bắt buộc On-site (Tại công ty) - Trường `interview_mode` mặc định là `'onsite'`
@@ -76,6 +77,33 @@ _Chưa có task nào đang thực hiện._
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
 - [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
 - [x] CV upload & parse (PDF → text extraction) (Backend with CV parser stub)
+
+### Phase 2a – CV-JD Match Analysis (Gemini AI)
+- [ ] Database schema: thêm `jd_file_url`, `jd_file_name`, `jd_file_format` vào `job_postings`
+- [ ] Database schema: tạo bảng mới `cv_jd_analyses` (match_score, summary, skills_matched, skills_gaps, experience_relevance, overall_recommendation, raw_response)
+- [ ] Database schema: thêm `cv_jd_analysis_id` vào `applications` (FK → `cv_jd_analyses`, nullable)
+- [ ] EF Core migrations
+- [ ] `IGeminiProvider` interface + `GeminiProvider` impl (Google Gemini 2.5 Flash API)
+  - [ ] Method: `AnalyzeCvJdMatchAsync(cvFileStream, jdFileStream/jdText)` → `CvJdAnalysisResult`
+  - [ ] Hỗ trợ multimodal input: gửi file PDF/DOCX trực tiếp cho Gemini
+  - [ ] Config: Gemini API key qua env var `GEMINI_API_KEY`
+- [ ] `CvJdAnalysisService`:
+  - [ ] Nhận CV file + Job Posting ID → lấy JD (file/text) → gọi `IGeminiProvider` → lưu kết quả vào `cv_jd_analyses`
+  - [ ] Check đã có analysis cho cùng CV hash + JobPosting chưa → trả kết quả cũ (không gọi lại Gemini)
+  - [ ] Khi candidate submit Application: link `cv_jd_analysis_id` vào Application
+  - [ ] Nếu chưa có analysis khi submit → tự động chạy 1 lần rồi đính kèm
+- [ ] API endpoints:
+  - [ ] `POST /api/cv-analysis/analyze` – Candidate upload CV + jobPostingId → nhận kết quả phân tích (public, không cần login)
+  - [ ] `GET /api/cv-analysis/{id}` – Lấy kết quả đã phân tích
+  - [ ] `GET /api/applications/{id}/cv-analysis` – HR xem kết quả CV-JD analysis của Application
+- [ ] Frontend – Job Detail Page:
+  - [ ] Khu vực upload CV để kiểm tra độ phù hợp (trước khi ứng tuyển)
+  - [ ] Hiển thị kết quả: Match Score (thanh progress), Summary, Skills Matched/Gaps
+  - [ ] Nút "Ứng tuyển ngay" hoạt động bất kể điểm cao/thấp
+- [ ] Frontend – HR Candidate Detail Page:
+  - [ ] Hiển thị CV-JD Analysis (Match Score, Summary, Skills) cho HR review
+- [ ] Frontend – Job Posting Create/Edit:
+  - [ ] Thêm khu vực upload file JD gốc (PDF/DOCX) bên cạnh textarea JD text
 
 ### Phase 2b – Job Board & Practice Interview
 - [ ] Database schema: `candidate_accounts` (self-registered), extend `job_postings` với flag `is_public_listing`
