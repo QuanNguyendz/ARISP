@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,10 +72,13 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 
-// Database connection mapping
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
-    ?? "Host=aws-1-ap-northeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mwdfddlmkfdmzdckfpgx;Password=d5fzV3?WQfZz9wA;SSL Mode=Require;Trust Server Certificate=true"; // Fallback to Test DB
+// Database connection mapping — đọc từ user-secrets / env var, không hardcode
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection") is { Length: > 0 } cs ? cs :
+    Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") is { Length: > 0 } env ? env :
+    throw new InvalidOperationException(
+        "ConnectionStrings:DefaultConnection chưa được cấu hình.\n" +
+        "Chạy: dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"<connection-string>\"");
 
 builder.Services.AddDbContext<ARISPDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
@@ -107,8 +111,13 @@ builder.Services.AddScoped<EvaluationService>();
 // NOTE: In .NET 8, JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear() has no effect
 // because AddJwtBearer uses JsonWebTokenHandler by default. Use MapInboundClaims = false instead.
 
-// Configure JWT Authentication and external SSO
-var jwtSecret = builder.Configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
+// Configure JWT Authentication and external SSO — đọc từ user-secrets / env var, không hardcode
+var jwtSecret =
+    builder.Configuration["JWT:Secret"] is { Length: > 0 } s ? s :
+    Environment.GetEnvironmentVariable("JWT_SECRET") is { Length: > 0 } envJwt ? envJwt :
+    throw new InvalidOperationException(
+        "JWT:Secret chưa được cấu hình.\n" +
+        "Chạy: dotnet user-secrets set \"JWT:Secret\" \"<secret-key>\"");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -152,6 +161,10 @@ builder.Services.AddAuthentication(options =>
 .AddCookie("External", options =>
 {
     options.Cookie.Name = "ARISP.External";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Secure flag when HTTPS
+    // Lax works for OAuth redirect (top-level GET) and does NOT require the Secure flag,
+    // so it functions over plain HTTP in local dev. (SameSite=None would be dropped on HTTP.)
+    options.Cookie.SameSite = SameSiteMode.Lax;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
 })
 // Google OAuth2 (used for HR internal SSO)
@@ -159,6 +172,11 @@ builder.Services.AddAuthentication(options =>
 {
     options.SignInScheme = "External";
     options.CallbackPath = "/api/auth/external/google-callback";
+
+    // Correlation cookie defaults to SameSite=None, which the browser drops over plain HTTP.
+    // Use Lax so the OAuth round-trip works in local dev without HTTPS.
+    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
     var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
     var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
@@ -203,14 +221,28 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(AppRoles.Candidate));
 });
 
+var allowedOrigins = (builder.Configuration["Authentication:AdminFrontendUrl"] ?? "https://localhost:3000")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
+});
+
+// Trust X-Forwarded-Proto / X-Forwarded-For from Nginx reverse proxy.
+// Without this, ASP.NET Core sees http:// internally and generates wrong OAuth redirect_uri.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Docker internal network — clear default network restrictions so Nginx container is trusted
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 var app = builder.Build();
@@ -221,6 +253,9 @@ if (app.Environment.IsDevelopment() || true) // always enable swagger for protot
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Must be first — rewrites Request.Scheme/Host before any middleware reads them
+app.UseForwardedHeaders();
 
 app.UseCors("AllowFrontend");
 

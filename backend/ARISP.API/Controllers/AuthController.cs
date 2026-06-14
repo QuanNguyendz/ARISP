@@ -487,7 +487,8 @@ namespace ARISP.API.Controllers
             await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord);
             await _unitOfWork.SaveChangesAsync();
 
-            var resetLink = $"http://localhost:3000/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}";
+            var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+            var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}";
 
             var emailBody = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;'>
@@ -723,7 +724,10 @@ namespace ARISP.API.Controllers
 
         private string CreateTokenString(Claim[] claims)
         {
-            var keyStr = _configuration["JWT:Secret"] ?? "ARISP_SUPER_SECRET_JWT_KEY_MINIMUM_256_BITS_FOR_SECURITY";
+            var keyStr = _configuration["JWT:Secret"] is { Length: > 0 } s ? s
+                : Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
+            if (string.IsNullOrEmpty(keyStr))
+                throw new InvalidOperationException("JWT:Secret is not configured.");
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyStr));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
