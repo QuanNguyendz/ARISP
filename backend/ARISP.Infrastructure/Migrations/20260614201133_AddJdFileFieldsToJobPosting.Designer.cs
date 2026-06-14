@@ -14,8 +14,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ARISP.Infrastructure.Migrations
 {
     [DbContext(typeof(ARISPDbContext))]
-    [Migration("20260614175231_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260614201133_AddJdFileFieldsToJobPosting")]
+    partial class AddJdFileFieldsToJobPosting
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -799,6 +799,18 @@ namespace ARISP.Infrastructure.Migrations
                     b.Property<bool?>("IsUrgent")
                         .HasColumnType("boolean")
                         .HasColumnName("is_urgent");
+
+                    b.Property<string>("JdFileFormat")
+                        .HasColumnType("text")
+                        .HasColumnName("jd_file_format");
+
+                    b.Property<string>("JdFileName")
+                        .HasColumnType("text")
+                        .HasColumnName("jd_file_name");
+
+                    b.Property<string>("JdFileUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("jd_file_url");
 
                     b.Property<string>("JobCategory")
                         .HasColumnType("text")
