@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -8,8 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using ARISP.Application.Interfaces;
 using ARISP.Domain.Constants;
 using ARISP.Domain.Entities;
-using ARISP.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace ARISP.API.Controllers
 {
@@ -18,21 +17,20 @@ namespace ARISP.API.Controllers
     [Authorize(Policy = "SuperAdminOnly")]
     public class AdminController : ControllerBase
     {
-        private readonly ARISPDbContext _dbContext;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IEmailService _emailService;
 
-        public AdminController(ARISPDbContext dbContext, IEmailService emailService)
+        public AdminController(IUnitOfWork unitOfWork, IEmailService emailService)
         {
-            _dbContext = dbContext;
+            _unitOfWork = unitOfWork;
             _emailService = emailService;
         }
 
         [HttpGet("users/pending")]
         public async Task<IActionResult> GetPendingUsers()
         {
-            var users = await _dbContext.Users
-                .IgnoreQueryFilters()
-                .Where(u => !u.IsActive)
+            var users = await _unitOfWork.Repository<User>().FindAsync(u => !u.IsActive);
+            var usersResponse = users
                 .Select(u => new {
                     u.Id,
                     u.Email,
@@ -40,15 +38,15 @@ namespace ARISP.API.Controllers
                     u.FullName,
                     u.CreatedAt
                 })
-                .ToListAsync();
+                .ToList();
 
-            return Ok(users);
+            return Ok(usersResponse);
         }
 
         [HttpPost("users/{id}/approve")]
         public async Task<IActionResult> ApproveUser(Guid id)
         {
-            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
             if (user == null)
                 return NotFound(new { message = "User not found." });
 
@@ -56,7 +54,7 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "User already active." });
 
             user.IsActive = true;
-            _dbContext.Users.Update(user);
+            _unitOfWork.Repository<User>().Update(user);
 
             // create audit log
             Guid? actorId = null;
@@ -75,8 +73,8 @@ namespace ARISP.API.Controllers
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            await _dbContext.AuditLogs.AddAsync(audit);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<AuditLog>().AddAsync(audit);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new { message = "User approved successfully." });
         }
@@ -105,9 +103,8 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Role phải là 'hr_admin' hoặc 'recruiter'." });
 
             // Kiểm tra email đã tồn tại chưa
-            var existingUser = await _dbContext.Users
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLower());
+            var existingUsers = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == request.Email.Trim().ToLower());
+            var existingUser = existingUsers.FirstOrDefault();
 
             if (existingUser != null)
                 return Conflict(new { message = "Email này đã được sử dụng bởi tài khoản khác." });
@@ -126,7 +123,7 @@ namespace ARISP.API.Controllers
                 IsActive = true
             };
 
-            await _dbContext.Users.AddAsync(newUser);
+            await _unitOfWork.Repository<User>().AddAsync(newUser);
 
             // Audit log
             Guid? actorId = null;
@@ -144,8 +141,8 @@ namespace ARISP.API.Controllers
                 Metadata = $"{{\"email\":\"{newUser.Email}\",\"role\":\"{newUser.Role}\"}}",
                 CreatedAt = DateTimeOffset.UtcNow
             };
-            await _dbContext.AuditLogs.AddAsync(audit);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<AuditLog>().AddAsync(audit);
+            await _unitOfWork.SaveChangesAsync();
 
             // Gửi email thông báo tài khoản cho staff mới
             var roleName = normalizedRole == "hr_admin" ? "HR Admin" : "Recruiter";
@@ -248,34 +245,19 @@ namespace ARISP.API.Controllers
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
-            var query = _dbContext.Users.IgnoreQueryFilters().AsQueryable();
+            var cleanSearch = !string.IsNullOrWhiteSpace(search) ? search.Trim().ToLower() : null;
+            var normalizedRole = !string.IsNullOrWhiteSpace(role) ? role.Trim().ToLower() : null;
 
-            // 1. Search term filter
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var cleanSearch = search.Trim().ToLower();
-                query = query.Where(u => 
-                    (u.FullName != null && u.FullName.ToLower().Contains(cleanSearch)) || 
-                    (u.Email != null && u.Email.ToLower().Contains(cleanSearch))
-                );
-            }
+            var users = await _unitOfWork.Repository<User>().FindAsync(u =>
+                (cleanSearch == null || (u.FullName != null && u.FullName.ToLower().Contains(cleanSearch)) || (u.Email != null && u.Email.ToLower().Contains(cleanSearch))) &&
+                (normalizedRole == null || (u.Role != null && u.Role.ToLower() == normalizedRole)) &&
+                (!isActive.HasValue || u.IsActive == isActive.Value)
+            );
 
-            // 2. Role filter
-            if (!string.IsNullOrWhiteSpace(role))
-            {
-                var normalizedRole = role.Trim().ToLower();
-                query = query.Where(u => u.Role != null && u.Role.ToLower() == normalizedRole);
-            }
+            var filteredUsers = users.ToList();
+            var totalCount = filteredUsers.Count;
 
-            // 3. Status filter
-            if (isActive.HasValue)
-            {
-                query = query.Where(u => u.IsActive == isActive.Value);
-            }
-
-            var totalCount = await query.CountAsync();
-
-            var items = await query
+            var items = filteredUsers
                 .OrderByDescending(u => u.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -287,7 +269,7 @@ namespace ARISP.API.Controllers
                     u.IsActive,
                     u.CreatedAt
                 })
-                .ToListAsync();
+                .ToList();
 
             return Ok(new
             {
@@ -323,7 +305,7 @@ namespace ARISP.API.Controllers
                 }
             }
 
-            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
             if (user == null)
             {
                 return NotFound(new { message = "User not found." });
@@ -332,7 +314,7 @@ namespace ARISP.API.Controllers
             user.Role = normalizedRole;
             user.UpdatedAt = DateTimeOffset.UtcNow;
 
-            _dbContext.Users.Update(user);
+            _unitOfWork.Repository<User>().Update(user);
 
             // create audit log
             var audit = new AuditLog
@@ -346,8 +328,8 @@ namespace ARISP.API.Controllers
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            await _dbContext.AuditLogs.AddAsync(audit);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<AuditLog>().AddAsync(audit);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new { message = "User role updated successfully." });
         }

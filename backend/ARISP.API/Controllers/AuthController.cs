@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -14,7 +13,6 @@ using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
 using ARISP.Domain.Entities;
 using ARISP.Domain.Constants;
-using ARISP.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
 
 namespace ARISP.API.Controllers
@@ -25,16 +23,14 @@ namespace ARISP.API.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
-        private readonly ARISPDbContext _dbContext;
         private readonly IEmailService _emailService;
 
         private const int REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
-        public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, ARISPDbContext dbContext, IEmailService emailService)
+        public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
-            _dbContext = dbContext;
             _emailService = emailService;
         }
 
@@ -50,9 +46,8 @@ namespace ARISP.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateLogin([FromBody] LoginRequest request)
         {
-            var candidate = await _dbContext.CandidateAccounts
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(c => c.Email == request.Email);
+            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email == request.Email);
+            var candidate = candidates.FirstOrDefault();
 
             if (candidate == null)
                 return Unauthorized(new { message = "Invalid email or password." });
@@ -63,6 +58,8 @@ namespace ARISP.API.Controllers
 
             // Cập nhật thời gian đăng nhập cuối
             candidate.LastLoginAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<CandidateAccount>().Update(candidate);
+            await _unitOfWork.SaveChangesAsync();
 
             var accessToken = GenerateJwtTokenForCandidate(candidate);
             var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
@@ -91,9 +88,8 @@ namespace ARISP.API.Controllers
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
                 return BadRequest(new { message = "Email và mật khẩu là bắt buộc." });
 
-            var user = await _dbContext.Users
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == request.Email);
+            var user = users.FirstOrDefault();
 
             if (user == null)
                 return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
@@ -109,7 +105,8 @@ namespace ARISP.API.Controllers
                 return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
 
             user.LastLoginAt = DateTimeOffset.UtcNow;
-            await _dbContext.SaveChangesAsync();
+            _unitOfWork.Repository<User>().Update(user);
+            await _unitOfWork.SaveChangesAsync();
 
             var accessToken = GenerateJwtTokenForUser(user);
             var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
@@ -178,7 +175,8 @@ namespace ARISP.API.Controllers
                 return Forbid();
             }
 
-            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == email);
+            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == email);
+            var user = users.FirstOrDefault();
 
             if (user != null)
             {
@@ -190,6 +188,8 @@ namespace ARISP.API.Controllers
                 }
 
                 user.LastLoginAt = DateTimeOffset.UtcNow;
+                _unitOfWork.Repository<User>().Update(user);
+                await _unitOfWork.SaveChangesAsync();
 
                 var token = GenerateJwtTokenForUser(user);
                 var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
@@ -222,19 +222,22 @@ namespace ARISP.API.Controllers
 
             var tokenHash = HashToken(request.RefreshToken);
 
-            var storedToken = await _dbContext.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash
-                                        && rt.RevokedAt == null
-                                        && rt.ExpiresAt > DateTimeOffset.UtcNow);
+            var storedTokens = await _unitOfWork.Repository<RefreshToken>().FindAsync(rt => 
+                rt.TokenHash == tokenHash
+                && rt.RevokedAt == null
+                && rt.ExpiresAt > DateTimeOffset.UtcNow);
+            var storedToken = storedTokens.FirstOrDefault();
 
             if (storedToken == null)
                 return Unauthorized(new { message = "Invalid or expired refresh token." });
 
             // Revoke token cũ
             storedToken.RevokedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<RefreshToken>().Update(storedToken);
+            await _unitOfWork.SaveChangesAsync();
 
             // Tìm user để sinh JWT mới
-            var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == storedToken.UserId);
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(storedToken.UserId);
             if (user == null)
                 return Unauthorized(new { message = "User not found." });
 
@@ -263,20 +266,22 @@ namespace ARISP.API.Controllers
 
             var tokenHash = HashToken(request.RefreshToken);
 
-            var storedToken = await _dbContext.CandidateRefreshTokens
-                .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash
-                                        && rt.RevokedAt == null
-                                        && rt.ExpiresAt > DateTimeOffset.UtcNow);
+            var storedTokens = await _unitOfWork.Repository<CandidateRefreshToken>().FindAsync(rt => 
+                rt.TokenHash == tokenHash
+                && rt.RevokedAt == null
+                && rt.ExpiresAt > DateTimeOffset.UtcNow);
+            var storedToken = storedTokens.FirstOrDefault();
 
             if (storedToken == null)
                 return Unauthorized(new { message = "Invalid or expired refresh token." });
 
             // Revoke token cũ
             storedToken.RevokedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<CandidateRefreshToken>().Update(storedToken);
+            await _unitOfWork.SaveChangesAsync();
 
             // Tìm candidate để sinh JWT mới
-            var candidate = await _dbContext.CandidateAccounts.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(c => c.Id == storedToken.CandidateAccountId);
+            var candidate = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(storedToken.CandidateAccountId);
             if (candidate == null)
                 return Unauthorized(new { message = "Candidate not found." });
 
@@ -322,8 +327,7 @@ namespace ARISP.API.Controllers
             {
                 if (Guid.TryParse(userId, out var candidateGuid))
                 {
-                    var candidate = await _dbContext.CandidateAccounts.IgnoreQueryFilters()
-                        .FirstOrDefaultAsync(c => c.Id == candidateGuid);
+                    var candidate = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateGuid);
                     fullName = candidate?.FullName ?? "";
                 }
             }
@@ -331,8 +335,7 @@ namespace ARISP.API.Controllers
             {
                 if (Guid.TryParse(userId, out var userGuid))
                 {
-                    var user = await _dbContext.Users.IgnoreQueryFilters()
-                        .FirstOrDefaultAsync(u => u.Id == userGuid);
+                    var user = await _unitOfWork.Repository<User>().GetByIdAsync(userGuid);
                     fullName = user?.FullName ?? "";
                 }
             }
@@ -359,22 +362,24 @@ namespace ARISP.API.Controllers
                 var tokenHash = HashToken(request.RefreshToken);
 
                 // Thử tìm trong bảng RefreshTokens (HR User)
-                var hrToken = await _dbContext.RefreshTokens
-                    .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                var hrTokens = await _unitOfWork.Repository<RefreshToken>().FindAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                var hrToken = hrTokens.FirstOrDefault();
                 if (hrToken != null)
                 {
                     hrToken.RevokedAt = DateTimeOffset.UtcNow;
+                    _unitOfWork.Repository<RefreshToken>().Update(hrToken);
                 }
 
                 // Thử tìm trong bảng CandidateRefreshTokens
-                var candidateToken = await _dbContext.CandidateRefreshTokens
-                    .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                var candidateTokens = await _unitOfWork.Repository<CandidateRefreshToken>().FindAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
+                var candidateToken = candidateTokens.FirstOrDefault();
                 if (candidateToken != null)
                 {
                     candidateToken.RevokedAt = DateTimeOffset.UtcNow;
+                    _unitOfWork.Repository<CandidateRefreshToken>().Update(candidateToken);
                 }
 
-                await _dbContext.SaveChangesAsync();
+                await _unitOfWork.SaveChangesAsync();
             }
 
             return Ok(new { message = "Logged out successfully." });
@@ -459,9 +464,8 @@ namespace ARISP.API.Controllers
             if (string.IsNullOrWhiteSpace(request.Email))
                 return BadRequest(new { message = "Email is required." });
 
-            var candidate = await _dbContext.CandidateAccounts
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(c => c.Email == request.Email);
+            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email == request.Email);
+            var candidate = candidates.FirstOrDefault();
 
             // Bảo mật: Luôn báo Ok để tránh kẻ xấu lợi dụng dò tìm email có tồn tại hay không
             if (candidate == null)
@@ -480,8 +484,8 @@ namespace ARISP.API.Controllers
             };
 
             // 2. Lưu token vào bảng MagicLinks
-            await _dbContext.MagicLinks.AddAsync(magicLinkRecord);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord);
+            await _unitOfWork.SaveChangesAsync();
 
             var resetLink = $"http://localhost:3000/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}";
 
@@ -517,21 +521,21 @@ namespace ARISP.API.Controllers
             }
 
             // 1. Tìm ứng viên dựa theo email
-            var candidate = await _dbContext.CandidateAccounts
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(c => c.Email == request.Email);
+            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email == request.Email);
+            var candidate = candidates.FirstOrDefault();
 
             if (candidate == null)
             {
                 return BadRequest(new { message = "Invalid email or recovery token." });
             }
 
-            // 🛠️ ĐÃ SỬA ĐỔI CHUẨN: Tìm token hợp lệ trong bảng MagicLinks
-            var magicLink = await _dbContext.MagicLinks
-                .FirstOrDefaultAsync(m => m.Email == request.Email
-                                       && m.TokenHash == request.Token
-                                       && m.UsedAt == null
-                                       && m.ExpiresAt > DateTimeOffset.UtcNow);
+            // Tìm token hợp lệ trong bảng MagicLinks
+            var magicLinks = await _unitOfWork.Repository<MagicLink>().FindAsync(m => 
+                m.Email == request.Email
+                && m.TokenHash == request.Token
+                && m.UsedAt == null
+                && m.ExpiresAt > DateTimeOffset.UtcNow);
+            var magicLink = magicLinks.FirstOrDefault();
 
             if (magicLink == null)
             {
@@ -546,11 +550,13 @@ namespace ARISP.API.Controllers
             // 2. Cập nhật mật khẩu mới hóa mã BCrypt
             candidate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             candidate.UpdatedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<CandidateAccount>().Update(candidate);
 
             // 3. Đánh dấu token đã được sử dụng để tránh dùng lại (Tăng cường bảo mật)
             magicLink.UsedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<MagicLink>().Update(magicLink);
 
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
         }
@@ -653,8 +659,8 @@ namespace ARISP.API.Controllers
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            await _dbContext.RefreshTokens.AddAsync(refreshTokenEntity);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<RefreshToken>().AddAsync(refreshTokenEntity);
+            await _unitOfWork.SaveChangesAsync();
 
             return rawToken;
         }
@@ -677,8 +683,8 @@ namespace ARISP.API.Controllers
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            await _dbContext.CandidateRefreshTokens.AddAsync(refreshTokenEntity);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Repository<CandidateRefreshToken>().AddAsync(refreshTokenEntity);
+            await _unitOfWork.SaveChangesAsync();
 
             return rawToken;
         }
