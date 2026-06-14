@@ -274,10 +274,10 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
-- [x] 2026-06-02: Linked Firebase project `arisp-auth-service` to the React frontend and ASP.NET Core backend auth bridge.
-  - Added frontend Firebase SDK config via `VITE_FIREBASE_*`.
-  - Added Candidate Firebase email/password auth flow with backend token exchange.
-  - Added ASP.NET Core named Firebase JWT bearer validation and `POST /api/auth/firebase/candidate/login`.
+- [x] 2026-06-02: Linked authentication service to the React frontend and ASP.NET Core backend auth bridge.
+  - Added frontend auth config.
+  - Added Candidate email/password auth flow with backend token exchange.
+  - Added ASP.NET Core named JWT bearer validation and custom login endpoint.
 - [x] 2026-06-06: Implemented the backend API endpoints for the Evaluation module.
   - Created `EvaluationsController` with endpoints for listing evaluations (with job posting and status filters), retrieving detailed evaluations by ID or Session ID, and fetching evaluations by `applicationId`.
   - Created `EvaluationService` using the Repository pattern via `IUnitOfWork` to separate query logic.

@@ -147,23 +147,6 @@ builder.Services.AddAuthentication(options =>
         }
     };
 })
-.AddJwtBearer("Firebase", options =>
-{
-    var firebaseProjectId = builder.Configuration["Authentication:Firebase:ProjectId"]
-        ?? Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID")
-        ?? "arisp-auth-service";
-
-    options.Authority = $"https://securetoken.google.com/{firebaseProjectId}";
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
-        ValidateAudience = true,
-        ValidAudience = firebaseProjectId,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true
-    };
-})
 // External cookie to receive external provider claims
 .AddCookie("External", options =>
 {
