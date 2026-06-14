@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-06-14
+**Last updated:** 2026-06-15
 
 ---
 
@@ -79,7 +79,7 @@ _Chưa có task nào đang thực hiện._
 - [x] CV upload & parse (PDF → text extraction) (Backend with CV parser stub)
 
 ### Phase 2a – CV-JD Match Analysis (Gemini AI)
-- [ ] Database schema: thêm `jd_file_url`, `jd_file_name`, `jd_file_format` vào `job_postings`
+- [x] Database schema: thêm `jd_file_url`, `jd_file_name`, `jd_file_format` vào `job_postings` (2026-06-15 – migration `AddJdFileFieldsToJobPosting`)
 - [ ] Database schema: tạo bảng mới `cv_jd_analyses` (match_score, summary, skills_matched, skills_gaps, experience_relevance, overall_recommendation, raw_response)
 - [ ] Database schema: thêm `cv_jd_analysis_id` vào `applications` (FK → `cv_jd_analyses`, nullable)
 - [ ] EF Core migrations
@@ -286,6 +286,12 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-06-15: Sửa lỗi schema lệch entity gây HTTP 500 ở `GET /api/jobs`.
+  - Nguyên nhân: migration `InitialCreate` bị sửa tại chỗ (thêm 3 cột JD) sau khi đã apply, nên EF báo "up to date" và DB thật thiếu cột `jd_file_format`, `jd_file_name`, `jd_file_url`.
+  - Thêm 3 cột thiếu vào bảng `job_postings` trên DB hiện tại.
+  - Khôi phục `InitialCreate` về đúng trạng thái gốc (gỡ 3 cột JD khỏi `.cs`, `.Designer.cs`, `ModelSnapshot.cs`).
+  - Tạo migration độc lập `20260614201133_AddJdFileFieldsToJobPosting` (Up: AddColumn x3, Down: DropColumn x3) để lịch sử migration trung thực cho cả DB mới lẫn DB đã seed.
 
 - [x] 2026-06-02: Linked authentication service to the React frontend and ASP.NET Core backend auth bridge.
   - Added frontend auth config.
