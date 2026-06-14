@@ -1,0 +1,46 @@
+{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "ConnectionStrings": {
+        "DefaultConnection": "Host=<supabase-host>;Port=5432;Database=postgres;Username=<username>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true"
+    },
+    "JWT": {
+        "Secret": "<generate-a-256-bit-random-string>"
+    },
+    "Authentication": {
+        "Google": {
+            "ClientId": "<google-oauth-client-id>",
+            "ClientSecret": "<google-oauth-client-secret>"
+        }
+    },
+    "EmailSettings": {
+        "SmtpServer": "smtp.gmail.com",
+        "SmtpPort": "587",
+        "SenderName": "ARISP Team Support",
+        "SenderEmail": "<sender-email>",
+        "AppPassword": "<gmail-app-password>"
+    },
+
+    "_README": [
+        "=== HƯỚNG DẪN CẤU HÌNH LOCAL ===",
+        "",
+        "1. Copy file này và đổi tên (bỏ đuôi .example):",
+        "      cp appsettings.Development.json.example appsettings.Development.json",
+        "",
+        "2. Điền các giá trị thật vào file vừa tạo (thay tất cả <...>).",
+        "   Liên hệ team lead để lấy key — KHÔNG chia sẻ key qua chat/email.",
+        "",
+        "3. File appsettings.Development.json đã có trong .gitignore.",
+        "   KHÔNG commit file đó lên GitHub.",
+        "",
+        "=== KEY CẦN LẤY TỪ TEAM LEAD ===",
+        "  - ConnectionStrings.DefaultConnection  (Supabase DB password)",
+        "  - JWT.Secret                           (256-bit random string)",
+        "  - Authentication.Google.ClientId/Secret (Google Cloud Console)",
+        "  - EmailSettings.AppPassword            (Gmail App Password)"
+    ]
+}
