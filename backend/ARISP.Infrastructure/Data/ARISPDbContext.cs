@@ -38,6 +38,9 @@ namespace ARISP.Infrastructure.Data
         public DbSet<CheatDetectionSignal> CheatDetectionSignals => Set<CheatDetectionSignal>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+        public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+        public DbSet<OnlineTestQuestion> OnlineTestQuestions => Set<OnlineTestQuestion>();
+        public DbSet<OnlineTestSubmission> OnlineTestSubmissions => Set<OnlineTestSubmission>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -134,6 +137,14 @@ namespace ARISP.Infrastructure.Data
 
             modelBuilder.Entity<WebhookDelivery>()
                 .Property(w => w.Payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OnlineTestQuestion>()
+                .Property(q => q.Options)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .Property(s => s.SelectedAnswers)
                 .HasColumnType("jsonb");
 
             modelBuilder.Entity<InterviewRoundConfig>()

@@ -10,4 +10,3 @@
 @.ai/coding-rules.md
 @.ai/tasks.md
 @.ai/glossary.md
-@.tools/antigravity/rules.md

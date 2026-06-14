@@ -141,7 +141,7 @@ public interface IEmbeddingProvider
 - **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
 ### ADR-016: Interview Code (On-site Access Control)
-- **Format:** 6–8 ký tự alphanumeric, case-insensitive (ví dụ: `ARX-7K2P`).
+- **Format:** 6 ký tự alphanumeric, case-insensitive (ví dụ: `ARX7K2`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
 - **Binding:** Mỗi code bind với một `application_id` cụ thể.
@@ -198,7 +198,7 @@ public interface IEmbeddingProvider
 - Retry logic với exponential backoff nếu ATS endpoint lỗi.
 
 ### ADR-023: SSO & OAuth2 Corporate Domain Validation
-- **Xác thực nội bộ:** Hỗ trợ đăng nhập cho nhóm người dùng công ty (`super_admin`, `hr_admin`, `recruiter`) bằng **OAuth2 / OIDC** (Google Workspace hoặc Microsoft Entra ID - Google Sign-In). SAML 2.0 hoàn toàn bị loại bỏ.
+- **Xác thực nội bộ:** Nhóm người dùng công ty (`super_admin`, `hr_admin`, `recruiter`) đăng nhập bằng **Email + Mật khẩu**. Hỗ trợ thêm **Google OAuth2** (Google Sign-In). SAML 2.0 hoàn toàn bị loại bỏ.
 - **Yêu cầu Pre-provisioning (Cấp trước tài khoản)**: Chỉ những email đã được Super Admin hoặc Admin tạo sẵn trong database mới được phép đăng nhập. Nếu đăng nhập bằng Google Sign-In mà email chưa tồn tại trong database (chưa được cấp tài khoản trước đó), hệ thống **chặn đăng nhập và tuyệt đối không tự động đăng ký/tạo tài khoản nháp**.
 - **Domain Validation:** Khi đăng nhập qua OAuth2, hệ thống bắt buộc phân tách và kiểm tra phần domain của địa chỉ email (ví dụ: `hr@fsoft.vn` -> lấy ra `fsoft.vn`). Email này phải thuộc danh sách tên miền được phép truy cập (`allowed_email_domains` được quy định trong cấu hình toàn cục `system_settings`). Mọi email domain công cộng hoặc không khớp sẽ bị chặn truy cập lập tức.
 - **Ứng viên:** Candidate Portal sử dụng Magic Link gửi qua email cá nhân có TTL ngắn, không áp dụng OAuth2.

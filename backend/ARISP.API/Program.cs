@@ -77,7 +77,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Host=aws-1-ap-northeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mwdfddlmkfdmzdckfpgx;Password=d5fzV3?WQfZz9wA;SSL Mode=Require;Trust Server Certificate=true"; // Fallback to Test DB
 
 builder.Services.AddDbContext<ARISPDbContext>(options =>
-    options.UseNpgsql(connectionString)); // Simplified standard connection
+    options.UseNpgsql(connectionString, npgsql =>
+        npgsql.MigrationsHistoryTable("ef_migrations_history")));
 
 // DI configurations
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -250,15 +251,14 @@ try
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ARISPDbContext>();
-    Console.WriteLine("Applying migrations/checks...");
-    
-    // Check/create extensions and seed schema tables if needed
-    // In Supabase, the public schema was already initialized completely via apply_schema.js, so we only need to perform Seeding!
+    Console.WriteLine("Applying EF Core migrations...");
+    await dbContext.Database.MigrateAsync();
+    Console.WriteLine("Migrations applied. Running seed...");
     await SeedDataAsync(dbContext);
 }
 catch (Exception ex)
 {
-    Log.Error(ex, "Failed to apply database seeding.");
+    Log.Error(ex, "Failed to apply migrations or seed data.");
 }
 
 app.Run();

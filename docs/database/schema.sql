@@ -109,6 +109,9 @@ CREATE TABLE job_postings (
     title                   VARCHAR(255)    NOT NULL,
     department              VARCHAR(255),
     job_description         TEXT            NOT NULL,           -- JD raw text, fed to AI
+    jd_file_url             TEXT,                               -- URL file JD gốc upload (PDF/DOCX) – Gemini ưu tiên file này
+    jd_file_name            VARCHAR(255),                       -- tên file gốc
+    jd_file_format          VARCHAR(20),                        -- pdf | docx
     interview_mode          VARCHAR(20)     NOT NULL DEFAULT 'onsite', -- onsite (real interview is strictly onsite)
     status                  VARCHAR(50)     NOT NULL DEFAULT 'draft',  -- draft | pending | active | rejected | closed | archived
     rejection_reason        TEXT,                                      -- Lý do HrAdmin/SuperAdmin từ chối duyệt bài

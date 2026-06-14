@@ -10,6 +10,9 @@ namespace ARISP.Domain.Entities
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
+        public string? JdFileUrl { get; set; }      // URL file JD gốc (PDF/DOCX) – Gemini ưu tiên file này
+        public string? JdFileName { get; set; }     // tên file gốc
+        public string? JdFileFormat { get; set; }   // pdf | docx
         public string InterviewMode { get; set; } = "remote"; // remote | onsite | both
         public string Status { get; set; } = "draft"; // draft | pending | active | rejected | closed | archived
         public string? RejectionReason { get; set; }
