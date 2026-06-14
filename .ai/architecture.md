@@ -342,12 +342,9 @@ public interface IEmbeddingProvider
 
 ## Recent Architecture Notes
 
-### ADR-029: Firebase Auth Bridge for Candidate Accounts
-- **Decision:** Frontend React initializes Firebase Web SDK from `VITE_FIREBASE_*` environment variables. Candidate email/password registration and login can use Firebase Authentication when configured.
-- **Backend validation:** ASP.NET Core validates Firebase ID tokens with issuer `https://securetoken.google.com/{project_id}` and audience `{project_id}` through a named JWT bearer scheme `Firebase`.
-- **Token exchange:** Firebase identity is not used directly for protected ARISP APIs. `POST /api/auth/firebase/candidate/login` verifies the Firebase ID token, creates or updates the matching `candidate_accounts` row, then issues the existing ARISP JWT.
-- **Scope:** Firebase is currently used only as an optional Candidate identity provider. HR/Super Admin SSO remains Google OAuth2 / OIDC with domain validation.
-- **Config:** Firebase Web app values are public client configuration and live in frontend env vars. No Firebase service account secret is required for the current validation flow.
+### ADR-029: [DEPRECATED] Previous External Auth Bridge for Candidate Accounts
+- **Status:** DEPRECATED (Superseded by local email/password authentication and direct Google OAuth2 SSO).
+- **History:** Previously, frontend React initialized an external authentication Web SDK and the backend validated its ID tokens. This integration has been completely removed to simplify the infrastructure and rely on direct authentication.
 
 ### ADR-030: Gemini CV-JD Match Analysis
 - **Quyết định:** Sử dụng **Google Gemini 2.5 Flash** để phân tích mức độ phù hợp giữa CV của ứng viên và JD của vị trí tuyển dụng.

@@ -96,10 +96,6 @@ export const authService = {
     return parseResponse<{ message: string }>(response);
   },
 
-  async candidateGoogleLogin(): Promise<AuthResponse> {
-    throw new Error('Candidate Google login via Firebase is no longer supported.');
-  },
-
   async resetPassword(request: { email: string; token: string; newPassword: string }): Promise<{ message: string }> {
     if (USE_FAKE_AUTH) {
       await new Promise((resolve) => setTimeout(resolve, 800));
