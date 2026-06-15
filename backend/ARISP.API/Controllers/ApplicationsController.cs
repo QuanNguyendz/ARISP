@@ -1,12 +1,14 @@
 using System;
-using System.IO;
-using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using ARISP.Application.DTOs;
+using ARISP.Application.Interfaces;
+using ARISP.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using ARISP.Application.DTOs;
-using ARISP.Application.Services;
 
 namespace ARISP.API.Controllers
 {
@@ -33,17 +35,19 @@ namespace ARISP.API.Controllers
     public class ApplicationsController : ControllerBase
     {
         private readonly ApplicationService _applicationService;
+        private readonly IDocumentParserService _documentParserService;
 
-        public ApplicationsController(ApplicationService applicationService)
+        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService)
         {
             _applicationService = applicationService;
+            _documentParserService = documentParserService;
         }
 
         [HttpGet("{id}")]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> GetApplicationById(Guid id, CancellationToken ct) // Thêm ct ở đây
+        public async Task<IActionResult> GetApplicationById(Guid id, CancellationToken ct)
         {
-            var result = await _applicationService.GetApplicationByIdAsync(id, ct); // Truyền ct vào đây
+            var result = await _applicationService.GetApplicationByIdAsync(id, ct);
             if (result.IsFailure)
             {
                 return NotFound(new { message = result.Error });
@@ -54,14 +58,14 @@ namespace ARISP.API.Controllers
 
         [HttpPatch("{id}/status")]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> UpdateApplicationStatus(Guid id, [FromBody] UpdateApplicationStatusRequest request, CancellationToken ct) // Thêm ct ở đây
+        public async Task<IActionResult> UpdateApplicationStatus(Guid id, [FromBody] UpdateApplicationStatusRequest request, CancellationToken ct)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            var result = await _applicationService.UpdateApplicationStatusAsync(id, request.Status, ct); // Truyền ct vào đây
+            var result = await _applicationService.UpdateApplicationStatusAsync(id, request.Status, ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -119,8 +123,29 @@ namespace ARISP.API.Controllers
 
             var cvFileUrl = $"/uploads/{uniqueFileName}";
 
-            // Extract or simulate CV text using parser stub
-            var cvText = await ParseCvFileAsync(request.CvFile, request.CandidateName, request.CandidateEmail, request.CandidatePhone, request.JobPostingId);
+            // Extract CV text using the real document parser service
+            string cvText;
+            try
+            {
+                using (var stream = request.CvFile.OpenReadStream())
+                {
+                    cvText = await _documentParserService.ParseDocumentAsync(stream, extension);
+                }
+
+                if (!string.IsNullOrEmpty(cvText))
+                {
+                    cvText = cvText.Replace("\0", string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Clean up file if parsing fails
+                if (System.IO.File.Exists(filePath))
+                {
+                    try { System.IO.File.Delete(filePath); } catch { /* Ignore cleanup error */ }
+                }
+                return BadRequest(new { message = $"Không thể phân tích file CV: {ex.Message}" });
+            }
 
             Guid? candidateAccountId = null;
             if (User.Identity?.IsAuthenticated == true)
@@ -181,40 +206,6 @@ namespace ARISP.API.Controllers
             }
 
             return Ok(new { eligible = result.Value });
-        }
-
-        private async Task<string> ParseCvFileAsync(IFormFile cvFile, string name, string email, string? phone, Guid jobId)
-        {
-            var extension = Path.GetExtension(cvFile.FileName)?.ToLower();
-            if (extension == ".txt")
-            {
-                using var reader = new StreamReader(cvFile.OpenReadStream());
-                return await reader.ReadToEndAsync();
-            }
-
-            // Return simulated parsed text for PDF / DOCX files
-            return $"--- TRÍCH XUẤT THÔNG TIN CV (STUB) ---\n" +
-                   $"Họ và tên: {name}\n" +
-                   $"Email: {email}\n" +
-                   $"Số điện thoại: {phone ?? "Không có"}\n" +
-                   $"Mã Job Posting: {jobId}\n" +
-                   $"Tên file gốc: {cvFile.FileName}\n" +
-                   $"Ngày trích xuất: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss zzz}\n" +
-                   $"-------------------------------------\n" +
-                   $"TỔNG QUAN NĂNG LỰC:\n" +
-                   $"Lập trình viên backend có kinh nghiệm thực tế phát triển các hệ thống API doanh nghiệp bằng công nghệ C# .NET và AI.\n\n" +
-                   $"KỸ NĂNG CHUYÊN MÔN:\n" +
-                   $"- Ngôn ngữ lập trình: C#, SQL, JavaScript\n" +
-                   $"- Frameworks: .NET 8, ASP.NET Core Web API, EF Core, SignalR, WebRTC\n" +
-                   $"- Cơ sở dữ liệu: PostgreSQL (Supabase/pgvector), Redis\n" +
-                   $"- Công nghệ AI: Tích hợp RAG, OpenAI API (GPT-4o)\n" +
-                   $"- Công cụ & Quy trình: Git, Docker, CI/CD Github Actions\n\n" +
-                   $"KINH NGHIỆM LÀM VIỆC:\n" +
-                   $"Backend Engineer | FPT Software (2024 - Hiện tại)\n" +
-                   $"- Tham gia xây dựng các dịch vụ backend phục vụ quản lý nhân sự và phỏng vấn AI.\n" +
-                   $"- Thiết kế và tối ưu cơ sở dữ liệu Postgres, tích hợp embedding vector để tìm kiếm ứng viên.\n\n" +
-                   $"HỌC VẤN:\n" +
-                   $"Đại học Bách Khoa Hà Nội | Chuyên ngành Công nghệ thông tin";
         }
     }
 }
