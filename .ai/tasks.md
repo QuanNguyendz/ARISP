@@ -171,7 +171,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round – entity `PlaybookDocument` + `DocumentChunk` đã có)
 - [ ] EF Core migrations
 - [ ] Document upload endpoint (PDF, DOCX, TXT, Markdown, JSON)
-- [ ] `DocumentParserService`: extract text từ PDF/DOCX
+- [x] `DocumentParserService`: extract text từ PDF/DOCX
 - [x] `PlaybookService`: chunk, embed (qua `IEmbeddingProvider`), lưu vào pgvector với scope tag
 - [x] `PlaybookService`: track must-ask questions đã hỏi trong session (`MustAskTracking` entity)
 - [x] `InterviewService`: nhận signal must-ask chưa xong trước khi kết thúc session
@@ -295,6 +295,11 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-06-15: Sửa lỗi font không nhất quán giữa các OS (Windows hiển thị sai dấu tiếng Việt).
+  - Nguyên nhân: `Inter`/`Plus Jakarta Sans` được khai báo nhưng chưa bao giờ được tải → fallback khác nhau (macOS→SF Pro, Windows→Arial).
+  - Self-host font qua `@fontsource/inter` + `@fontsource/plus-jakarta-sans` (import weight 400–800, kèm subset vietnamese) trong `main.tsx`.
+  - Thêm fallback hệ thống (`system-ui`, `Segoe UI`, `-apple-system`...) vào font stack ở `tailwind.config.js` + `index.css`.
 
 - [x] 2026-06-15: Bộ mockup UI redesign (HTML/Tailwind) trong `design/mockups/` + logo ARISP.
   - 10 màn: design system, Job Board, Job Detail, HR Dashboard, Interview Room, Kiosk, auth (login/register/admin), Logo showcase.
