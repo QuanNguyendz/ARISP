@@ -171,7 +171,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Database schema: `playbook_documents`, `playbook_chunks` (scope: org/job_posting/round – entity `PlaybookDocument` + `DocumentChunk` đã có)
 - [ ] EF Core migrations
 - [ ] Document upload endpoint (PDF, DOCX, TXT, Markdown, JSON)
-- [ ] `DocumentParserService`: extract text từ PDF/DOCX
+- [x] `DocumentParserService`: extract text từ PDF/DOCX
 - [x] `PlaybookService`: chunk, embed (qua `IEmbeddingProvider`), lưu vào pgvector với scope tag
 - [x] `PlaybookService`: track must-ask questions đã hỏi trong session (`MustAskTracking` entity)
 - [x] `InterviewService`: nhận signal must-ask chưa xong trước khi kết thúc session
