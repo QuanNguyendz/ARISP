@@ -98,6 +98,7 @@ builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
 builder.Services.AddScoped<ITTSService, MockTTSService>();
 builder.Services.AddScoped<IAvatarService, MockAvatarService>();
 builder.Services.AddScoped<INotificationService, MockNotificationService>();
+builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
 
 builder.Services.AddTransient<IEmailService, EmailService>();
 
