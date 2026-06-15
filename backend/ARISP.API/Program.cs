@@ -93,6 +93,8 @@ builder.Services.AddScoped<OpenAIProvider>();
 builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
 builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
 
+builder.Services.AddScoped<IGeminiProvider, ARISP.Infrastructure.AI.GeminiProvider>();
+
 // STT, TTS, Avatar, Notification mock stubs
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
 builder.Services.AddScoped<ITTSService, MockTTSService>();

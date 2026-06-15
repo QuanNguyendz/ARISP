@@ -83,7 +83,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Database schema: tạo bảng mới `cv_jd_analyses` (match_score, summary, skills_matched, skills_gaps, red_flags, experience_relevance, overall_recommendation, ai_model, status, error_message, prompt_tokens, completion_tokens, processing_time_ms, raw_response)
 - [x] Database schema: thêm `cv_jd_analysis_id` vào `applications` (FK → `cv_jd_analyses`, nullable)
 - [x] EF Core migrations
-- [ ] `IGeminiProvider` interface + `GeminiProvider` impl (Google Gemini 2.5 Flash API)
+- [x] `IGeminiProvider` interface + `GeminiProvider` impl (Google Gemini 2.5 Flash API)
   - [ ] Method: `AnalyzeCvJdMatchAsync(cvFileStream, jdFileStream/jdText)` → `CvJdAnalysisResult`
   - [ ] Hỗ trợ multimodal input: gửi file PDF/DOCX trực tiếp cho Gemini
   - [ ] Config: Gemini API key qua env var `GEMINI_API_KEY`
