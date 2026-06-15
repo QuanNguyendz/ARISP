@@ -1,245 +1,272 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Brain, Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
-import { authService } from '@services/auth/authService';
-import { useAuthStore } from '@store/auth/authStore';
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  Sparkles,
+  ShieldAlert,
+} from 'lucide-react'
+import { authService } from '@services/auth/authService'
+import { useAuthStore } from '@store/auth/authStore'
+
+// Logo component
+function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
+  const h = size === 'sm' ? 8 : 10
+  const w = size === 'sm' ? 8 : 10
+  return (
+    <svg
+      className={`h-${h} w-${w}`}
+      viewBox="0 0 96 96"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="ARISP"
+    >
+      <defs>
+        <linearGradient
+          id="lg-login"
+          x1="12"
+          y1="10"
+          x2="84"
+          y2="86"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#4f46e5" />
+          <stop offset="1" stopColor="#9333ea" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-login)" />
+      <path
+        d="M30 70 L48 26 L66 70"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
+      <path
+        d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
+        fill="white"
+        fillOpacity="0.95"
+      />
+    </svg>
+  )
+}
 
 // Get dashboard path based on role
 function getRoleDashboard(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_');
+  const r = role.toLowerCase().replace(/\s+/g, '_')
   switch (r) {
     case 'super_admin':
-      return '/super-admin/dashboard';
+      return '/super-admin/dashboard'
     case 'hr_admin':
-      return '/hr/dashboard';
+      return '/hr/dashboard'
     case 'recruiter':
-      return '/recruiter/dashboard';
+      return '/recruiter/dashboard'
     case 'candidate':
-      return '/candidate/portal';
+      return '/candidate/portal'
     default:
-      return '/hr/dashboard';
+      return '/hr/dashboard'
   }
 }
 
 export default function LoginPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
-  const [error, setError] = useState('');
+  const navigate = useNavigate()
+  const location = useLocation()
+  const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  // Redirect if already authenticated
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const userRole = useAuthStore((state) => state.user?.role);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const userRole = useAuthStore((state) => state.user?.role)
 
   useEffect(() => {
     if (isAuthenticated && userRole) {
-      const from = (location.state as any)?.from?.pathname;
+      const from = (location.state as any)?.from?.pathname
       if (from) {
-        navigate(from, { replace: true });
+        navigate(from, { replace: true })
       } else {
-        navigate(getRoleDashboard(userRole), { replace: true });
+        navigate(getRoleDashboard(userRole), { replace: true })
       }
     }
-  }, [isAuthenticated, userRole, location, navigate]);
+  }, [isAuthenticated, userRole, location, navigate])
 
   const handleOAuthLogin = () => {
-    setOauthLoading(true);
-    const returnUrl = `${window.location.origin}/auth/callback`;
-    window.location.href = authService.buildOAuthRedirectUrl('Google', returnUrl);
-  };
+    setOauthLoading(true)
+    const returnUrl = `${window.location.origin}/auth/callback`
+    window.location.href = authService.buildOAuthRedirectUrl('Google', returnUrl)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
 
     try {
-      const response = await authService.staffLogin({ email, password });
-      setAuthFromResponse(response);
+      const response = await authService.staffLogin({ email, password })
+      setAuthFromResponse(response)
 
-      // Redirect based on role
-      const dashboard = getRoleDashboard(response.role || 'Hr_admin');
-      const from = (location.state as any)?.from?.pathname;
-      navigate(from || dashboard, { replace: true });
+      const dashboard = getRoleDashboard(response.role || 'Hr_admin')
+      const from = (location.state as any)?.from?.pathname
+      navigate(from || dashboard, { replace: true })
     } catch (err: any) {
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
-      setOauthLoading(false);
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.')
+      setOauthLoading(false)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-bg-primary flex">
-      <div className="flex-1 flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-md"
-        >
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
-              <Brain className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-semibold text-white">ARISP</span>
+    <div className="min-h-screen bg-ink-50 text-ink-900 antialiased flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-ink-50 to-ai-50" />
+
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Logo />
+          <h1 className="mt-4 font-display text-2xl font-extrabold">ARISP Workspace</h1>
+          <p className="mt-1 text-sm text-ink-500">
+            Đăng nhập nội bộ · HR · Recruiter · Super Admin
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="rounded-2xl border border-ink-200 bg-white p-7 shadow-xl">
+          {/* Google OAuth (primary cho nội bộ) */}
+          <button
+            onClick={handleOAuthLogin}
+            disabled={oauthLoading}
+            className="w-full rounded-xl border border-ink-200 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-3 disabled:opacity-50"
+          >
+            {oauthLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <svg className="h-5 w-5" viewBox="0 0 48 48">
+                <path
+                  fill="#FFC107"
+                  d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+                />
+                <path
+                  fill="#FF3D00"
+                  d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"
+                />
+                <path
+                  fill="#4CAF50"
+                  d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+                />
+                <path
+                  fill="#1976D2"
+                  d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+                />
+              </svg>
+            )}
+            Đăng nhập với Google
+          </button>
+
+          <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
+            <span className="h-px flex-1 bg-ink-200"></span>
+            hoặc dùng email công ty
+            <span className="h-px flex-1 bg-ink-200"></span>
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-white mb-3">Chào mừng trở lại</h1>
-            <p className="text-text-secondary">Đăng nhập để quản lý hoạt động tuyển dụng của bạn</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">Email công ty</label>
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <Mail className="w-4 h-4 text-ink-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  placeholder="ban@congty.com"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-white/80">Mật khẩu</label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-sm font-medium text-ink-600">Mật khẩu</label>
                 <button
                   type="button"
                   onClick={() => navigate('/auth/forgot-password')}
-                  className="text-sm text-accent-primary hover:text-accent-secondary transition-colors focus:outline-none"
+                  className="text-sm font-medium text-brand-600 hover:underline"
                 >
                   Quên mật khẩu?
                 </button>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <Lock className="w-4 h-4 text-ink-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="w-full bg-transparent text-sm outline-none"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-white transition-colors"
+                  className="text-ink-400 hover:text-ink-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-300">{error}</p>
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="remember"
-                className="w-5 h-5 rounded border-white/20 bg-white/5 text-accent-primary focus:ring-accent-primary focus:ring-offset-0"
-              />
-              <label htmlFor="remember" className="text-sm text-text-secondary">
-                Ghi nhớ đăng nhập
-              </label>
-            </div>
-
-            <motion.button
+            <button
               type="submit"
               disabled={isLoading}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
                   Đăng nhập
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
-            </motion.button>
+            </button>
           </form>
 
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-bg-primary text-text-tertiary">hoặc</span>
-            </div>
+          {/* Pre-provisioning note */}
+          <div className="mt-5 flex gap-2.5 rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-ink-400 mt-0.5" />
+            <span>
+              Tài khoản nội bộ do <b>Super Admin</b> cấp trước. Không hỗ trợ tự đăng ký. Chỉ email
+              thuộc miền công ty được phép.
+            </span>
           </div>
+        </div>
 
-          <button
-            onClick={handleOAuthLogin}
-            disabled={oauthLoading}
-            className="w-full py-4 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {oauthLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-              </svg>
-            )}
-            Đăng nhập với Google
-          </button>
-
-          <p className="text-center mt-8 text-text-secondary">
-            Chưa có tài khoản?{' '}
-            <Link
-              to="/auth/register"
-              className="text-accent-primary hover:text-accent-secondary transition-colors font-medium"
-            >
-              Đăng ký ngay
-            </Link>
-          </p>
-
-          <p className="text-center mt-4">
-            <Link to="/auth/candidate-login" className="text-sm text-text-tertiary hover:text-white transition-colors">
-              ← Dành cho ứng viên
-            </Link>
-          </p>
-        </motion.div>
-      </div>
-
-      <div className="hidden lg:flex flex-1 items-center justify-center relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-accent-primary/20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.25),transparent_25%),radial-gradient(circle_at_80%_60%,rgba(59,130,246,0.2),transparent_30%)]" />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="relative z-10 max-w-lg px-12 text-center"
-        >
-          <div className="w-24 h-24 mx-auto mb-8 rounded-3xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center">
-            <Brain className="w-12 h-12 text-white" />
-          </div>
-          <h2 className="text-4xl font-semibold text-white mb-4 leading-tight">
-            Tuyển dụng thông minh cùng AI
-          </h2>
-          <p className="text-lg text-white/70 leading-relaxed">
-            Tập trung quản lý pipeline tuyển dụng, đánh giá ứng viên và tối ưu trải nghiệm tuyển chọn trên một nền tảng thống nhất.
-          </p>
-        </motion.div>
+        <p className="mt-6 text-center text-sm text-ink-500">
+          Bạn là ứng viên?
+          <Link to="/auth/candidate-login" className="font-semibold text-brand-600 hover:underline">
+            {' '}
+            Đăng nhập tại Job Board
+          </Link>
+        </p>
       </div>
     </div>
-  );
+  )
 }

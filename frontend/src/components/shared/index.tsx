@@ -1,24 +1,24 @@
-import { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Bell } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Plus, Bell } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 interface ActionButton {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  icon?: ReactNode;
-  variant?: 'primary' | 'secondary';
+  label: string
+  href?: string
+  onClick?: () => void
+  icon?: ReactNode
+  variant?: 'primary' | 'secondary'
 }
 
 interface PageHeaderProps {
-  title: string;
-  description?: string;
-  actions?: ActionButton[];
+  title: string
+  description?: string
+  actions?: ActionButton[]
   badge?: {
-    text: string;
-    color?: string;
-  };
+    text: string
+    color?: string
+  }
 }
 
 export function PageHeader({ title, description, actions, badge }: PageHeaderProps) {
@@ -30,26 +30,28 @@ export function PageHeader({ title, description, actions, badge }: PageHeaderPro
     >
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl font-semibold text-white">{title}</h1>
+          <h1 className="text-2xl font-semibold text-ink-900 dark:text-white">{title}</h1>
           {badge && (
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color || 'bg-accent-primary/20 text-accent-primary'}`}>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color || 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'}`}
+            >
               {badge.text}
             </span>
           )}
         </div>
-        {description && <p className="text-sm text-white/40">{description}</p>}
+        {description && <p className="text-sm text-ink-500 dark:text-ink-400">{description}</p>}
       </div>
       {actions && actions.length > 0 && (
         <div className="flex items-center gap-3">
-          {actions.map((action, index) => (
+          {actions.map((action, index) =>
             action.href ? (
               <Link
                 key={index}
                 to={action.href}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   action.variant === 'secondary'
-                    ? 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
-                    : 'bg-gradient-to-r from-accent-primary to-violet text-white hover:opacity-90'
+                    ? 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10'
+                    : 'bg-gradient-to-r from-brand-600 to-ai-600 text-white hover:opacity-90'
                 }`}
               >
                 {action.icon || <Plus className="w-4 h-4" />}
@@ -59,44 +61,57 @@ export function PageHeader({ title, description, actions, badge }: PageHeaderPro
               <button
                 key={index}
                 onClick={action.onClick}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   action.variant === 'secondary'
-                    ? 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
-                    : 'bg-gradient-to-r from-accent-primary to-violet text-white hover:opacity-90'
+                    ? 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10'
+                    : 'bg-gradient-to-r from-brand-600 to-ai-600 text-white hover:opacity-90'
                 }`}
               >
                 {action.icon || <Plus className="w-4 h-4" />}
                 {action.label}
               </button>
             )
-          ))}
+          )}
         </div>
       )}
     </motion.div>
-  );
+  )
 }
 
 interface StatsCardProps {
-  label: string;
-  value: string | number;
-  change?: string;
-  color?: string;
+  label: string
+  value: string | number
+  change?: string
+  color?: string
 }
 
-export function StatsCard({ label, value, change, color = 'text-blue-400' }: StatsCardProps) {
+export function StatsCard({
+  label,
+  value,
+  change,
+  color = 'text-blue-600 dark:text-blue-400',
+}: StatsCardProps) {
   return (
-    <div className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-5 overflow-hidden group hover:bg-white/[0.05] transition-colors">
+    <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
       <div className="flex items-center justify-between mb-3">
-        <span className={`text-sm font-medium ${color}`}>{label}</span>
-        {change && <span className="text-xs text-emerald-400 font-medium">{change}</span>}
+        <span className={`text-sm font-medium ${color.replace('dark:', '')} dark:${color}`}>
+          {label}
+        </span>
+        {change && (
+          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+            {change}
+          </span>
+        )}
       </div>
-      <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+      <p className={`text-2xl font-semibold ${color.replace('dark:', '')} dark:${color}`}>
+        {value}
+      </p>
     </div>
-  );
+  )
 }
 
 interface StatsGridProps {
-  stats: StatsCardProps[];
+  stats: StatsCardProps[]
 }
 
 export function StatsGrid({ stats }: StatsGridProps) {
@@ -113,33 +128,33 @@ export function StatsGrid({ stats }: StatsGridProps) {
         </motion.div>
       ))}
     </div>
-  );
+  )
 }
 
 interface EmptyStateProps {
-  icon: ReactNode;
-  title: string;
-  description: string;
+  icon: ReactNode
+  title: string
+  description: string
   action?: {
-    label: string;
-    href?: string;
-    onClick?: () => void;
-  };
+    label: string
+    href?: string
+    onClick?: () => void
+  }
 }
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-12 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+    <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-12 text-center shadow-card">
+      <div className="w-16 h-16 rounded-2xl bg-ink-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-4">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-      <p className="text-text-secondary text-sm mb-6 max-w-md mx-auto">{description}</p>
-      {action && (
-        action.href ? (
+      <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-2">{title}</h3>
+      <p className="text-ink-500 dark:text-ink-400 text-sm mb-6 max-w-md mx-auto">{description}</p>
+      {action &&
+        (action.href ? (
           <Link
             to={action.href}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             {action.label}
@@ -147,72 +162,71 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         ) : (
           <button
             onClick={action.onClick}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             {action.label}
           </button>
-        )
-      )}
+        ))}
     </div>
-  );
+  )
 }
 
 interface LoadingSpinnerProps {
-  message?: string;
+  message?: string
 }
 
 export function LoadingSpinner({ message = 'Đang tải dữ liệu...' }: LoadingSpinnerProps) {
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
-      <div className="w-10 h-10 rounded-full border-2 border-accent-primary/30 border-t-accent-primary animate-spin" />
-      <p className="text-sm text-white/40">{message}</p>
+      <div className="w-10 h-10 rounded-full border-2 border-brand-300 dark:border-brand-500/30 border-t-brand-600 dark:border-t-brand-400 animate-spin" />
+      <p className="text-sm text-ink-500 dark:text-ink-400">{message}</p>
     </div>
-  );
+  )
 }
 
 interface ErrorAlertProps {
-  message: string;
-  onDismiss?: () => void;
+  message: string
+  onDismiss?: () => void
 }
 
 export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
   return (
-    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-6 flex items-start justify-between gap-3">
+    <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-sm mb-6 flex items-start justify-between gap-3">
       <span>{message}</span>
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
-          className="text-red-300/70 hover:text-red-200 transition-colors"
+          className="text-red-400 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200 transition-colors"
         >
           Đóng
         </button>
       )}
     </div>
-  );
+  )
 }
 
 interface NoticeAlertProps {
-  message: string;
-  onDismiss?: () => void;
+  message: string
+  onDismiss?: () => void
 }
 
 export function NoticeAlert({ message, onDismiss }: NoticeAlertProps) {
   return (
-    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm mb-6 flex items-start justify-between gap-3">
+    <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-sm mb-6 flex items-start justify-between gap-3">
       <span>{message}</span>
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
-          className="text-amber-200/70 hover:text-amber-100 transition-colors"
+          className="text-amber-500 dark:text-amber-300 hover:text-amber-700 dark:hover:text-amber-200 transition-colors"
         >
           Đóng
         </button>
       )}
     </div>
-  );
+  )
 }
 
 export function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -232,5 +246,5 @@ export function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M5 12h14" />
       <path d="M12 5v14" />
     </svg>
-  );
+  )
 }

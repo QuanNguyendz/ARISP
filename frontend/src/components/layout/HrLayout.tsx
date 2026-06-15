@@ -1,288 +1,406 @@
-import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
-  FileText,
+  Briefcase,
   Users,
-  BarChart3,
+  Video,
+  ClipboardCheck,
+  BookOpen,
+  UserCog,
   Settings,
+  CircleHelp,
+  Search,
   Bell,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
+  Plus,
   Menu,
   LogOut,
-  BookOpen,
-  Video,
-  ClipboardList,
-  UserCog,
-  Clock,
-} from 'lucide-react';
-import { useAuthStore } from '@store/auth/authStore';
+  User,
+  Moon,
+  Sun,
+} from 'lucide-react'
+import { useAuthStore } from '@store/auth/authStore'
+import { useThemeStore } from '@store/theme'
+
+// Logo component
+function Logo() {
+  return (
+    <svg
+      className="h-8 w-8"
+      viewBox="0 0 96 96"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="ARISP"
+    >
+      <defs>
+        <linearGradient
+          id="lg-hr-layout"
+          x1="12"
+          y1="10"
+          x2="84"
+          y2="86"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#4f46e5" />
+          <stop offset="1" stopColor="#9333ea" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-hr-layout)" />
+      <path
+        d="M30 70 L48 26 L66 70"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
+      <path
+        d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
+        fill="white"
+        fillOpacity="0.95"
+      />
+    </svg>
+  )
+}
 
 const sidebarItems = [
-  { icon: LayoutDashboard, label: 'Tổng quan', path: '/hr/dashboard' },
-  { icon: Clock, label: 'Chờ duyệt', path: '/hr/jobs/pending', badge: 'pending' },
-  { icon: FileText, label: 'Tin tuyển dụng', path: '/hr/jobs' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/hr/dashboard' },
+  { icon: Briefcase, label: 'Tin tuyển dụng', path: '/hr/jobs' },
   { icon: Users, label: 'Ứng viên', path: '/hr/candidates' },
-  { icon: ClipboardList, label: 'Đánh giá', path: '/hr/evaluations' },
-  { icon: Video, label: 'Phỏng vấn', path: '/hr/interviews' },
-  { icon: BookOpen, label: 'Playbooks', path: '/hr/playbooks' },
-  { icon: BarChart3, label: 'Báo cáo', path: '/hr/reports' },
-  { icon: UserCog, label: 'Nhóm', path: '/hr/team' },
+  { icon: Video, label: 'Phiên phỏng vấn', path: '/hr/interviews' },
+  { icon: ClipboardCheck, label: 'Đánh giá', path: '/hr/evaluations', badge: 5 },
+  { icon: BookOpen, label: 'Playbook', path: '/hr/playbooks' },
+  { icon: UserCog, label: 'Nhóm HR', path: '/hr/team' },
   { icon: Settings, label: 'Cài đặt', path: '/hr/settings' },
-];
-
-const getInitials = (name?: string) => {
-  if (!name) return 'U';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return name.substring(0, Math.min(name.length, 2)).toUpperCase();
-};
+]
 
 export default function HrLayout() {
-  const location = useLocation();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { user } = useAuthStore();
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const { user, logout } = useAuthStore()
+  const { isDark, toggleTheme } = useThemeStore()
 
-  const toggleSidebar = () => {
-    setIsSidebarCollapsed(!isSidebarCollapsed);
-  };
+  // Sync theme class on mount and when theme changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (isDark) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+  }, [isDark])
 
   const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
-  };
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/auth/login')
+  }
 
   return (
-    <div className="min-h-screen bg-bg-primary flex">
+    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
       {/* Desktop Sidebar */}
-      <motion.aside
-        animate={{ width: isSidebarCollapsed ? 72 : 260 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-        className="hidden lg:flex flex-col bg-black/40 backdrop-blur-xl border-r border-white/5"
-      >
-        {/* Logo */}
-        <div className="h-16 flex items-center px-4 border-b border-white/5">
-          <Link to="/hr/dashboard" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center flex-shrink-0">
-              <LayoutDashboard className="w-4 h-4 text-white" />
-            </div>
-            <AnimatePresence>
-              {!isSidebarCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-base font-semibold text-white whitespace-nowrap"
-                >
-                  HR Admin
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-3 overflow-y-auto">
-          <div className="space-y-1">
-            {sidebarItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => window.location.href = item.path}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive(item.path)
-                    ? 'bg-accent-primary/20 text-accent-primary'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                <AnimatePresence>
-                  {!isSidebarCollapsed && (
-                    <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="whitespace-nowrap flex items-center gap-2"
-                    >
-                      {item.label}
-                      {item.badge && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-medium">
-                          Mới
-                        </span>
-                      )}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </button>
-            ))}
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 dark:border-white/10 bg-white dark:bg-white/5">
+        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200 dark:border-white/10">
+          <Logo />
+          <div>
+            <div className="font-display text-base font-extrabold leading-none">ARISP</div>
+            <div className="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader Workspace</div>
           </div>
-        </nav>
-
-        {/* Collapse Button */}
-        <div className="p-3 border-t border-white/5">
-          <button
-            onClick={toggleSidebar}
-            className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-1 text-sm font-medium">
+          {sidebarItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                isActive(item.path)
+                  ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
+                  : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <item.icon className="w-[18px] h-[18px]" />
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {item.badge}
+                </span>
+              )}
+            </Link>
+          ))}
+          <div className="pt-3 mt-3 border-t border-ink-100 dark:border-white/10"></div>
+          <Link
+            to="/hr/settings"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
           >
-            {isSidebarCollapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <>
-                <ChevronLeft className="w-5 h-5" />
-                <span>Thu gọn</span>
-              </>
-            )}
+            <CircleHelp className="w-[18px] h-[18px]" />
+            Trợ giúp & tài liệu
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20"
+          >
+            <LogOut className="w-[18px] h-[18px]" />
+            <span className="flex-1">Đăng xuất</span>
           </button>
-        </div>
+        </nav>
+      </aside>
 
-        {/* User */}
-        <div className="p-3 border-t border-white/5">
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
-              {getInitials(user?.name)}
-            </div>
-            <AnimatePresence>
-              {!isSidebarCollapsed && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex-1 min-w-0"
-                >
-                  <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
-                  <p className="text-xs text-accent-primary truncate">HR Admin</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      {/* Main Content */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Topbar */}
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-6 h-16">
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          {/* Search */}
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400">
+            <Search className="w-4 h-4 text-ink-400" />
+            <input
+              className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
+              placeholder="Tìm ứng viên, tin tuyển dụng..."
+            />
+            <kbd className="hidden sm:inline rounded border border-ink-200 dark:border-white/10 bg-white dark:bg-white/10 px-1.5 text-[10px] font-semibold text-ink-400">
+              ⌘K
+            </kbd>
           </div>
-          <AnimatePresence>
-            {!isSidebarCollapsed && (
-              <motion.button
+
+          <div className="ml-auto flex items-center gap-1">
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(!notifOpen)}
+                aria-label="Thông báo"
+                className="relative grid h-10 w-10 place-items-center rounded-xl text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-transparent">
+                  3
+                </span>
+              </button>
+              <AnimatePresence>
+                {notifOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl z-40"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100 dark:border-white/10">
+                      <span className="font-display font-bold text-sm text-ink-900 dark:text-white">
+                        Thông báo
+                      </span>
+                      <button className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                        Đánh dấu đã đọc
+                      </button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto divide-y divide-ink-100 dark:divide-white/10">
+                      <Link
+                        to="/hr/evaluations"
+                        className="flex gap-3 px-4 py-3 hover:bg-ink-50 dark:hover:bg-white/5"
+                      >
+                        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                          <ClipboardCheck className="w-4 h-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm text-ink-700 dark:text-ink-200">
+                            <b className="text-ink-900 dark:text-white">Trần Minh</b> hoàn tất phỏng
+                            vấn R1 — chờ bạn xác nhận
+                          </span>
+                          <span className="text-xs text-ink-400">15 phút trước</span>
+                        </span>
+                      </Link>
+                    </div>
+                    <Link
+                      to="#"
+                      className="block px-4 py-3 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5 rounded-b-2xl border-t border-ink-100 dark:border-white/10"
+                    >
+                      Xem tất cả
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              aria-label="Đổi giao diện sáng/tối"
+              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+
+            <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10"></span>
+
+            {/* Create button */}
+            <Link
+              to="/hr/jobs/create"
+              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Tạo tin</span>
+            </Link>
+
+            <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10"></span>
+
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-ink-100 dark:hover:bg-white/10"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
+                  {user?.name?.charAt(0) || 'U'}
+                </span>
+                <span className="hidden md:block text-left leading-tight">
+                  <span className="block text-sm font-semibold text-ink-900 dark:text-white">
+                    {user?.name || 'User'}
+                  </span>
+                  <span className="block text-[11px] text-ink-400">HR Leader</span>
+                </span>
+                <ChevronDown className="w-4 h-4 text-ink-400" />
+              </button>
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-60 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl z-40"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 dark:border-white/10">
+                      <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-sm font-bold text-white">
+                        {user?.name?.charAt(0) || 'U'}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-ink-900 dark:text-white">
+                          {user?.name || 'User'}
+                        </div>
+                        <div className="truncate text-xs text-ink-400">{user?.email}</div>
+                      </div>
+                    </div>
+                    <div className="p-1.5 text-sm">
+                      <Link
+                        to="/hr/settings"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-white/10"
+                      >
+                        <User className="w-4 h-4 text-ink-400" /> Tài khoản của tôi
+                      </Link>
+                      <Link
+                        to="/hr/settings"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-white/10"
+                      >
+                        <Settings className="w-4 h-4 text-ink-400" /> Cài đặt workspace
+                      </Link>
+                    </div>
+                    <div className="p-1.5 border-t border-ink-100 dark:border-white/10">
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20"
+                      >
+                        <LogOut className="w-4 h-4" /> Đăng xuất
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Sidebar */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <>
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
-                className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="lg:hidden fixed inset-0 bg-black/40 z-40"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <motion.aside
+                initial={{ x: -280 }}
+                animate={{ x: 0 }}
+                exit={{ x: -280 }}
+                className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-ink-900 z-50 flex flex-col border-r border-ink-200 dark:border-white/10"
               >
-                <LogOut className="w-5 h-5 flex-shrink-0" />
-                <span>Đăng xuất</span>
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.aside>
-
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {isMobileSidebarOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 bg-black/60 z-40"
-              onClick={() => setIsMobileSidebarOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-black/95 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col"
-            >
-              {/* Logo */}
-              <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
-                <Link to="/hr/dashboard" className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
-                    <LayoutDashboard className="w-4 h-4 text-white" />
+                <div className="flex items-center justify-between px-5 h-16 border-b border-ink-200 dark:border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <Logo />
+                    <div>
+                      <div className="font-display text-base font-extrabold leading-none text-ink-900 dark:text-white">
+                        ARISP
+                      </div>
+                      <div className="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader</div>
+                    </div>
                   </div>
-                  <span className="text-base font-semibold text-white">HR Admin</span>
-                </Link>
-                <button
-                  onClick={() => setIsMobileSidebarOpen(false)}
-                  className="p-2 rounded-lg hover:bg-white/10"
-                >
-                  <ChevronLeft className="w-5 h-5 text-white/60" />
-                </button>
-              </div>
-
-              {/* Navigation */}
-              <nav className="flex-1 p-3 overflow-y-auto">
-                <div className="space-y-1">
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-white/10"
+                  >
+                    <span className="text-2xl text-ink-400">&times;</span>
+                  </button>
+                </div>
+                <nav className="flex-1 px-3 py-4 space-y-1 text-sm font-medium overflow-y-auto">
                   {sidebarItems.map((item) => (
-                    <button
+                    <Link
                       key={item.path}
-                      onClick={() => {
-                        window.location.href = item.path;
-                        setIsMobileSidebarOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
                         isActive(item.path)
-                          ? 'bg-accent-primary/20 text-accent-primary'
-                          : 'text-white/50 hover:text-white hover:bg-white/5'
+                          ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
+                          : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
                       }`}
                     >
-                      <item.icon className="w-5 h-5" />
-                      {item.label}
-                    </button>
+                      <item.icon className="w-[18px] h-[18px]" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge && (
+                        <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-400">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
                   ))}
-                </div>
-              </nav>
-
-              {/* User */}
-              <div className="p-3 border-t border-white/5">
-                <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white">
-                    {getInitials(user?.name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
-                    <p className="text-xs text-accent-primary truncate">HR Admin</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
-                  className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                  Đăng xuất
-                </button>
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header */}
-        <header className="lg:hidden h-16 flex items-center justify-between px-4 bg-black/40 backdrop-blur-xl border-b border-white/5">
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-white/10"
-          >
-            <Menu className="w-6 h-6 text-white/80" />
-          </button>
-          <Link to="/hr/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
-              <LayoutDashboard className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-base font-semibold text-white">HR Admin</span>
-          </Link>
-          <button className="p-2 rounded-lg hover:bg-white/10 relative">
-            <Bell className="w-6 h-6 text-white/80" />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-accent-primary" />
-          </button>
-        </header>
+                </nav>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
+
+      {/* Click outside to close menus */}
+      {(userMenuOpen || notifOpen) && (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => {
+            setUserMenuOpen(false)
+            setNotifOpen(false)
+          }}
+        />
+      )}
     </div>
-  );
+  )
 }
