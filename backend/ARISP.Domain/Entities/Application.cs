@@ -19,6 +19,8 @@ namespace ARISP.Domain.Entities
         public bool PracticeSessionUsed { get; set; } = false;
         public string? DemographicData { get; set; } // JSON format
         public bool DemographicConsent { get; set; } = false;
+        public Guid? CvJdAnalysisId { get; set; }
+        public virtual CvJdAnalysis? CvJdAnalysis { get; set; } 
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? DeletedAt { get; set; }
