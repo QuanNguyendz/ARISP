@@ -41,6 +41,7 @@ namespace ARISP.Infrastructure.Data
         public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
         public DbSet<OnlineTestQuestion> OnlineTestQuestions => Set<OnlineTestQuestion>();
         public DbSet<OnlineTestSubmission> OnlineTestSubmissions => Set<OnlineTestSubmission>();
+        public DbSet<CvJdAnalysis> CvJdAnalyses => Set<CvJdAnalysis>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -153,6 +154,26 @@ namespace ARISP.Infrastructure.Data
 
             modelBuilder.Entity<MustAskTracking>()
                 .ToTable("must_ask_tracking");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .ToTable("cv_jd_analyses")
+                .Property(c => c.SkillsMatched)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.SkillsGaps)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.RedFlags)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.RawResponse)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .HasIndex(c => new { c.JobPostingId, c.CvHash });
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
