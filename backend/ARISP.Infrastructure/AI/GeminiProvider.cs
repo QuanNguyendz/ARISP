@@ -41,17 +41,29 @@ namespace ARISP.Infrastructure.AI
 
             var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
 
-            var systemInstruction = @"You are an expert Technical Recruiter and HR Professional.
+            var systemInstruction = @"You are an expert Headhunter and Tech Lead.
 Your task is to analyze a candidate's CV against a Job Description (JD).
-You MUST return ONLY a valid JSON object matching this schema, without any markdown formatting like ```json.
+CRITICAL INSTRUCTION: You must STRICTLY verify if the document is actually a Resume/CV. If irrelevant, you MUST set 'is_valid_cv' to false, 'match_score' to 0.
+
+If it IS a valid CV, employ Chain-of-Thought reasoning:
+1. Identify Seniority Required in JD (Fresher, Junior, Mid, Senior).
+2. Calculate candidate's Professional Experience. CRITICAL RULE: Academic projects and short internships DO NOT count towards professional experience for Senior roles.
+3. PENALTY RULE: If JD requires Senior (e.g., 4+ years) and CV is Fresher/Intern (< 1 year), 'match_score' MUST NOT exceed 30%, regardless of keyword matches.
+4. Depth Check: Evaluate if they have hands-on production depth (e.g. building RAG, Vector DBs, System Optimization) or just surface-level API usage.
+
+You MUST return ONLY a valid JSON object matching this schema, without markdown formatting.
 {
+  ""is_valid_cv"": boolean,
+  ""analysis_reasoning"": string (Your step-by-step reasoning),
+  ""seniority_alignment"": string (Directly analyze the gap between JD seniority and CV seniority),
+  ""tech_depth_analysis"": string (Evaluate production depth vs surface-level knowledge),
   ""match_score"": int (0-100),
-  ""summary"": string (Brief explanation of the score),
-  ""skills_matched"": string[],
-  ""skills_gaps"": string[],
-  ""red_flags"": string[] (Any career gaps, job hopping, or suspicious claims),
-  ""experience_relevance"": string (How relevant their past roles are),
-  ""overall_recommendation"": string (e.g., 'Strong Hire', 'Proceed with caution', 'Reject')
+  ""summary"": string (Write a detailed summary. Format exactly as 2 paragraphs. Paragraph 1 starting with '🌟 Điểm sáng (Strengths):' highlighting good points. Paragraph 2 starting with '⚠️ Điểm thiếu sót nghiêm trọng (Critical Gaps):' highlighting why they fall short of the JD requirements.),
+  ""skills_matched"": string[] (List matched skills with years of exp),
+  ""skills_gaps"": string[] (Crucial skills missing),
+  ""red_flags"": string[] (Career gaps or suspicious claims. Empty if none),
+  ""experience_relevance"": string (How their domain fits the JD),
+  ""overall_recommendation"": string ('Strong Hire', 'Hire', 'Proceed with caution', 'Reject')
 }";
 
             var parts = new List<object>
@@ -97,16 +109,25 @@ You MUST return ONLY a valid JSON object matching this schema, without any markd
                 },
                 generationConfig = new
                 {
-                    responseMimeType = "application/json"
+                    responseMimeType = "application/json",
+                    temperature = 0.0
                 }
             };
 
             var sw = Stopwatch.StartNew();
             
-            var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            string responseJson = string.Empty;
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
+                response.EnsureSuccessStatusCode();
+                responseJson = await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Gemini API HTTP Request failed.");
+                return Result<CvJdAnalysisResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+            }
             sw.Stop();
             
             _logger.LogInformation($"Gemini API call completed in {sw.ElapsedMilliseconds}ms");

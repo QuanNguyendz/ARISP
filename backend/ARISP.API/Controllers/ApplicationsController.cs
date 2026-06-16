@@ -28,6 +28,8 @@ namespace ARISP.API.Controllers
 
         [Required(ErrorMessage = "File CV là bắt buộc.")]
         public IFormFile CvFile { get; set; } = null!;
+
+        public Guid? CandidateAccountId { get; set; }
     }
 
     [ApiController]
@@ -123,6 +125,15 @@ namespace ARISP.API.Controllers
 
             var cvFileUrl = $"/uploads/{uniqueFileName}";
 
+            // Compute CV Hash for Match Analysis Cache
+            string cvFileHash = "";
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            {
+                using var hashStream = request.CvFile.OpenReadStream();
+                var hashBytes = md5.ComputeHash(hashStream);
+                cvFileHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+            }
+
             // Extract CV text using the real document parser service
             string cvText;
             try
@@ -147,8 +158,8 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = $"Không thể phân tích file CV: {ex.Message}" });
             }
 
-            Guid? candidateAccountId = null;
-            if (User.Identity?.IsAuthenticated == true)
+            Guid? candidateAccountId = request.CandidateAccountId;
+            if (candidateAccountId == null && User.Identity?.IsAuthenticated == true)
             {
                 var subClaim = User.FindFirst("sub")?.Value;
                 if (Guid.TryParse(subClaim, out var parsedId))
@@ -165,7 +176,8 @@ namespace ARISP.API.Controllers
                 CandidateName = request.CandidateName,
                 CandidatePhone = request.CandidatePhone,
                 CvFileUrl = cvFileUrl,
-                CvText = cvText
+                CvText = cvText,
+                CvFileHash = cvFileHash
             };
 
             var result = await _applicationService.SubmitApplicationAsync(serviceRequest, "job_board");

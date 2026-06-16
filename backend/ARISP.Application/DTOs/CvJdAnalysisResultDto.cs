@@ -5,6 +5,18 @@ namespace ARISP.Application.DTOs
 {
     public class CvJdAnalysisResultDto
     {
+        [JsonPropertyName("is_valid_cv")]
+        public bool IsValidCv { get; set; }
+
+        [JsonPropertyName("analysis_reasoning")]
+        public string AnalysisReasoning { get; set; } = string.Empty;
+
+        [JsonPropertyName("seniority_alignment")]
+        public string SeniorityAlignment { get; set; } = string.Empty;
+
+        [JsonPropertyName("tech_depth_analysis")]
+        public string TechDepthAnalysis { get; set; } = string.Empty;
+
         [JsonPropertyName("match_score")]
         public int MatchScore { get; set; }
 

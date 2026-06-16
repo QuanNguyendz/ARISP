@@ -1,4 +1,6 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace ARISP.Domain.Entities
 {
@@ -26,5 +28,17 @@ namespace ARISP.Domain.Entities
         public string RawResponse { get; set; } = "{}";      // JSONB - lưu raw để debug
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        [NotMapped]
+        [JsonPropertyName("analysis_reasoning")]
+        public string? AnalysisReasoning { get; set; }
+
+        [NotMapped]
+        [JsonPropertyName("seniority_alignment")]
+        public string? SeniorityAlignment { get; set; }
+
+        [NotMapped]
+        [JsonPropertyName("tech_depth_analysis")]
+        public string? TechDepthAnalysis { get; set; }
     }
 }

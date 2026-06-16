@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -52,7 +52,8 @@ namespace ARISP.Application.Services
                 Source = application.Source,
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
-                CreatedAt = application.CreatedAt
+                CreatedAt = application.CreatedAt,
+                CvJdAnalysisId = application.CvJdAnalysisId
             };
         }
 
@@ -80,6 +81,18 @@ namespace ARISP.Application.Services
                 Source = source,
                 Status = "cv_submitted"
             };
+
+            // Auto-link CvJdAnalysis if it exists
+            if (!string.IsNullOrEmpty(request.CvFileHash))
+            {
+                var analyses = await _unitOfWork.Repository<CvJdAnalysis>()
+                    .FindAsync(x => x.JobPostingId == request.JobPostingId && x.CvHash == request.CvFileHash, ct);
+                var analysis = System.Linq.Enumerable.FirstOrDefault(analyses);
+                if (analysis != null)
+                {
+                    application.CvJdAnalysisId = analysis.Id;
+                }
+            }
 
             await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -117,7 +130,8 @@ namespace ARISP.Application.Services
                 Source = application.Source,
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
-                CreatedAt = application.CreatedAt
+                CreatedAt = application.CreatedAt,
+                CvJdAnalysisId = application.CvJdAnalysisId
             };
 
             return Result.Success(response);
@@ -142,7 +156,8 @@ namespace ARISP.Application.Services
                 Source = app.Source,
                 Status = app.Status,
                 PracticeSessionUsed = app.PracticeSessionUsed,
-                CreatedAt = app.CreatedAt
+                CreatedAt = app.CreatedAt,
+                CvJdAnalysisId = app.CvJdAnalysisId
             }).ToList();
 
             return Result.Success(responseList);
