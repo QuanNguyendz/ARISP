@@ -195,7 +195,7 @@ namespace ARISP.API.Controllers
             return Ok(result.Value);
         }
 
-        [HttpGet("{id}/practice-eligibility")]
+        [HttpGet("practice-eligibility/{id}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetPracticeEligibility(Guid id)
         {
@@ -207,5 +207,19 @@ namespace ARISP.API.Controllers
 
             return Ok(new { eligible = result.Value });
         }
+
+        [HttpPost("{id}/send-invite")]
+        [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm gửi link mời
+        public async Task<IActionResult> SendInvite(Guid id, CancellationToken ct)
+        {
+            var result = await _applicationService.SendInterviewInviteAsync(id, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(new { message = "Gửi Magic Link mời phỏng vấn/làm bài test thành công!" });
+        }
+
     }
 }
