@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARISP — Tạo tin tuyển dụng (Mockup)</title>
+  <link rel="icon" type="image/svg+xml" href="logo-icon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter','sans-serif'], display: ['"Plus Jakarta Sans"','Inter','sans-serif'] },
+      colors: {
+        brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+        ai: { 50:'#faf5ff',100:'#f3e8ff',400:'#c084fc',500:'#a855f7',600:'#9333ea',700:'#7e22ce' },
+        ink: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' },
+      },
+      boxShadow: { card:'0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)' },
+    } } };
+  </script>
+  <style>html{scrollbar-gutter:stable}body{font-family:'Inter',sans-serif}</style>
+</head>
+<body class="bg-ink-50 text-ink-900 antialiased">
+<div class="flex min-h-screen">
+
+  <!-- Sidebar -->
+  <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white sticky top-0 h-screen">
+    <div class="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200">
+      <svg class="h-8 w-8" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ARISP">
+        <defs><linearGradient id="lg-hr" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
+        <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-hr)"/>
+        <path d="M30 70 L48 26 L66 70" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M38 56 H58" stroke="white" stroke-width="8" stroke-linecap="round"/>
+        <path d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z" fill="white" fill-opacity="0.95"/>
+      </svg>
+      <div>
+        <div class="font-display text-base font-extrabold leading-none">ARISP</div>
+        <div class="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader Workspace</div>
+      </div>
+    </div>
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
+      <a href="hr-dashboard.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="layout-dashboard" class="w-[18px] h-[18px]"></i> Dashboard</a>
+      <a href="hr-jobs.html" class="flex items-center gap-3 rounded-xl bg-brand-50 px-3 py-2.5 text-brand-700"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i> Tin tuyển dụng</a>
+      <a href="hr-candidates.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="users" class="w-[18px] h-[18px]"></i> Ứng viên</a>
+      <a href="hr-sessions.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="video" class="w-[18px] h-[18px]"></i> Phiên phỏng vấn</a>
+      <a href="hr-evaluation.html" class="flex items-center justify-between rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100">
+        <span class="flex items-center gap-3"><i data-lucide="clipboard-check" class="w-[18px] h-[18px]"></i> Đánh giá</span>
+        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">5</span>
+      </a>
+      <a href="hr-playbook.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="book-open" class="w-[18px] h-[18px]"></i> Playbook</a>
+      <div class="pt-3 mt-3 border-t border-ink-100"></div>
+      <a href="hr-team.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="user-cog" class="w-[18px] h-[18px]"></i> Nhóm HR</a>
+      <a href="hr-settings.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="settings" class="w-[18px] h-[18px]"></i> Cài đặt</a>
+    </nav>
+    <div class="p-3 border-t border-ink-200">
+      <a href="hr-settings.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100"><i data-lucide="circle-help" class="w-[18px] h-[18px]"></i> Trợ giúp &amp; tài liệu</a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 min-w-0">
+    <!-- Topbar -->
+    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 bg-white/80 backdrop-blur px-6 h-16">
+      <a href="hr-jobs.html" class="flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-brand-600"><i data-lucide="arrow-left" class="w-4 h-4"></i> Tin tuyển dụng</a>
+      <div class="ml-auto flex items-center gap-2">
+        <button class="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50">Lưu nháp</button>
+        <button class="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 flex items-center gap-2"><i data-lucide="send" class="w-4 h-4"></i> Đăng tin</button>
+      </div>
+    </header>
+
+    <main class="p-6">
+      <div class="mb-6">
+        <h1 class="font-display text-2xl font-extrabold leading-snug">Tạo tin tuyển dụng</h1>
+        <p class="mt-1 text-sm text-ink-500">Thiết lập JD, cấu hình vòng phỏng vấn AI, rubric chấm điểm &amp; persona phỏng vấn.</p>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-[1fr_320px]">
+        <!-- Form -->
+        <div class="space-y-6">
+
+          <!-- Thông tin cơ bản -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <h2 class="font-display text-lg font-bold mb-4">Thông tin cơ bản</h2>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="sm:col-span-2">
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Tên vị trí</label>
+                <input class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="VD: Senior Frontend Engineer (React/TS)" />
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Phòng ban</label>
+                <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"><option>Engineering</option><option>Data &amp; AI</option><option>QA / Testing</option></select>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Địa điểm</label>
+                <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"><option>TP. Hồ Chí Minh</option><option>Hà Nội</option><option>Đà Nẵng</option><option>Remote</option></select>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Cấp bậc</label>
+                <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"><option>Junior</option><option>Middle</option><option selected>Senior</option><option>Lead</option></select>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Mức lương (USD/tháng)</label>
+                <input class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="2000 - 3500" />
+              </div>
+            </div>
+          </section>
+
+          <!-- JD -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="font-display text-lg font-bold">Mô tả công việc (JD)</h2>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-ai-50 px-2.5 py-1 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Gemini phân tích CV theo JD này</span>
+            </div>
+            <div class="mb-4 flex items-center gap-3 rounded-xl border border-dashed border-ink-300 p-4 hover:border-brand-400">
+              <span class="grid h-10 w-10 place-items-center rounded-lg bg-red-50 text-red-600"><i data-lucide="file-up" class="w-5 h-5"></i></span>
+              <div class="flex-1">
+                <div class="text-sm font-medium text-ink-800">Tải JD gốc (PDF / DOCX)</div>
+                <div class="text-xs text-ink-400">Gemini ưu tiên file gốc, fallback sang text bên dưới</div>
+              </div>
+              <button class="rounded-lg border border-ink-200 px-3 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">Chọn tệp</button>
+            </div>
+            <textarea rows="6" class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="Mô tả công việc, yêu cầu, quyền lợi...">Chúng tôi tìm kiếm Senior Frontend Engineer giàu kinh nghiệm React/TypeScript để dẫn dắt phát triển giao diện sản phẩm...</textarea>
+          </section>
+
+          <!-- Vòng phỏng vấn -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="font-display text-lg font-bold">Cấu hình vòng phỏng vấn</h2>
+              <button class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-600 hover:bg-brand-50"><i data-lucide="plus" class="w-4 h-4"></i> Thêm vòng</button>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3 rounded-xl border border-ink-200 p-4">
+                <i data-lucide="grip-vertical" class="w-4 h-4 text-ink-300 cursor-grab"></i>
+                <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">1</span>
+                <div class="flex-1">
+                  <div class="font-semibold text-ink-900">Screening</div>
+                  <div class="text-xs text-ink-400">Sàng lọc · language-aware · ~15 phút</div>
+                </div>
+                <select class="rounded-lg border border-ink-200 px-2 py-1.5 text-xs outline-none"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select>
+                <button class="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+              <div class="flex items-center gap-3 rounded-xl border border-ink-200 p-4">
+                <i data-lucide="grip-vertical" class="w-4 h-4 text-ink-300 cursor-grab"></i>
+                <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">2</span>
+                <div class="flex-1">
+                  <div class="font-semibold text-ink-900">Technical</div>
+                  <div class="text-xs text-ink-400">Chuyên sâu kỹ thuật · chỉ mở khi Pass R1 · ~25 phút</div>
+                </div>
+                <select class="rounded-lg border border-ink-200 px-2 py-1.5 text-xs outline-none"><option>Dễ</option><option>Trung bình</option><option selected>Khó</option></select>
+                <button class="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+              <div class="flex items-center gap-3 rounded-xl border border-dashed border-ink-200 p-4 text-ink-400">
+                <i data-lucide="list-checks" class="w-4 h-4"></i>
+                <span class="flex-1 text-sm">Online Test (trắc nghiệm) — tuỳ chọn</span>
+                <button class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-600 hover:bg-ink-50">Bật</button>
+              </div>
+            </div>
+            <div class="mt-4 flex items-center gap-2 rounded-xl bg-ink-50 p-3 text-sm text-ink-500">
+              <i data-lucide="languages" class="w-4 h-4 text-brand-600"></i> Ngôn ngữ phỏng vấn được AI tự phát hiện từ JD — không cần cấu hình thủ công.
+            </div>
+          </section>
+
+          <!-- Rubric + Persona -->
+          <div class="grid gap-6 md:grid-cols-2">
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+              <h2 class="font-display text-lg font-bold mb-4">Rubric chấm điểm</h2>
+              <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between gap-3"><span class="text-ink-700">Kiến thức kỹ thuật</span><div class="flex items-center gap-2"><input type="range" value="40" class="w-24 accent-brand-600"><span class="w-8 text-right font-semibold">40%</span></div></div>
+                <div class="flex items-center justify-between gap-3"><span class="text-ink-700">Giải quyết vấn đề</span><div class="flex items-center gap-2"><input type="range" value="30" class="w-24 accent-brand-600"><span class="w-8 text-right font-semibold">30%</span></div></div>
+                <div class="flex items-center justify-between gap-3"><span class="text-ink-700">Giao tiếp</span><div class="flex items-center gap-2"><input type="range" value="20" class="w-24 accent-brand-600"><span class="w-8 text-right font-semibold">20%</span></div></div>
+                <div class="flex items-center justify-between gap-3"><span class="text-ink-700">Văn hoá / thái độ</span><div class="flex items-center gap-2"><input type="range" value="10" class="w-24 accent-brand-600"><span class="w-8 text-right font-semibold">10%</span></div></div>
+              </div>
+              <div class="mt-3 border-t border-ink-100 pt-3 text-sm font-semibold flex justify-between"><span>Tổng</span><span class="text-emerald-600">100%</span></div>
+            </section>
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+              <h2 class="font-display text-lg font-bold mb-4">Persona phỏng vấn AI</h2>
+              <label class="mb-1.5 block text-sm font-medium text-ink-600">Phong cách</label>
+              <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 mb-4"><option>Thân thiện, khích lệ</option><option>Chuyên nghiệp, trung lập</option><option>Thử thách, đào sâu</option></select>
+              <label class="mb-1.5 block text-sm font-medium text-ink-600">Độ khó thích ứng</label>
+              <label class="flex items-center gap-2 text-sm text-ink-600"><input type="checkbox" checked class="rounded border-ink-300 text-brand-600"> Tự điều chỉnh độ khó theo chất lượng câu trả lời</label>
+              <div class="mt-4">
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Playbook đính kèm</label>
+                <a href="hr-playbook.html" class="flex items-center justify-between rounded-xl border border-ink-200 px-3 py-2.5 text-sm hover:border-brand-300">
+                  <span class="flex items-center gap-2 text-ink-700"><i data-lucide="book-open" class="w-4 h-4 text-brand-600"></i> Frontend Playbook v2</span>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-ink-400"></i>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Right rail -->
+        <aside class="space-y-5 xl:sticky xl:top-24 self-start">
+          <div class="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <div class="text-sm font-semibold mb-3">Trạng thái tin</div>
+            <div class="flex items-center gap-2 text-sm"><span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"><i data-lucide="file-pen" class="w-3 h-3"></i> Bản nháp</span></div>
+            <ul class="mt-4 space-y-2 text-sm">
+              <li class="flex items-center gap-2 text-ink-500"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> Thông tin cơ bản</li>
+              <li class="flex items-center gap-2 text-ink-500"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> JD &amp; vòng phỏng vấn</li>
+              <li class="flex items-center gap-2 text-ink-700"><i data-lucide="circle" class="w-4 h-4 text-ink-300"></i> Availability slots (Practice)</li>
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-5 shadow-card">
+            <div class="flex items-center gap-2 text-sm font-semibold text-ai-700"><i data-lucide="sparkles" class="w-4 h-4"></i> Gợi ý từ AI</div>
+            <p class="mt-2 text-sm text-ink-600">JD nên nêu rõ stack &amp; năm kinh nghiệm để Gemini chấm Match chính xác hơn và AI hỏi đúng trọng tâm.</p>
+          </div>
+          <div class="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <div class="text-sm font-semibold mb-2">Availability slots (Practice)</div>
+            <p class="text-xs text-ink-400 mb-3">Khung giờ ứng viên có thể đặt phỏng vấn thử qua magic link.</p>
+            <button class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-2"><i data-lucide="calendar-plus" class="w-4 h-4"></i> Thêm khung giờ</button>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+  <!-- Prototype nav (mockup only) -->
+  <div class="group fixed bottom-0 left-1/2 z-[100] flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-2 py-1.5 shadow-xl backdrop-blur text-xs whitespace-nowrap -translate-x-1/2 translate-y-[calc(100%-14px)] hover:-translate-y-3 transition-transform duration-300 ease-out">
+    <span class="px-2 font-bold tracking-wide text-slate-400">PROTOTYPE</span>
+    <a href="job-board.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Job Board</a>
+    <a href="candidate-applications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Hồ sơ ƯT</a>
+    <a href="interview-room.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Phỏng vấn</a>
+    <a href="hr-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">HR</a>
+    <a href="recruiter-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Recruiter</a>
+    <a href="hr-jobs.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Tin tuyển dụng</a>
+    <a href="kiosk.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kiosk</a>
+    <a href="auth-login.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Login</a>
+    <a href="index.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Design</a>
+    <a href="logo.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Logo</a>
+  </div>
+
+  <script>lucide.createIcons();</script>
+</body>
+</html>

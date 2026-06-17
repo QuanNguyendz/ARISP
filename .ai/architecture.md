@@ -414,3 +414,30 @@ public interface IEmbeddingProvider
   - `cv_jd_analysis_id` (UUID FK → `cv_jd_analyses`, nullable): Link tới kết quả phân tích đã chạy.
 
 - **Index:** `(candidate_account_id, job_posting_id)` – để lookup nhanh kết quả đã phân tích (tránh chạy lại).
+
+### ADR-033: Candidate UI Localization (i18n) – VI/EN
+- **Quyết định:** Giao diện Candidate (Job Board, Job Detail, Candidate Portal) hỗ trợ chuyển ngôn ngữ **Tiếng Việt / English** qua một locale switcher trên header.
+- **Phân biệt với ADR-018:** ADR-018 nói về ngôn ngữ AI **phỏng vấn** (detect từ JD, ảnh hưởng system prompt + TTS voice + STT). ADR-033 chỉ là ngôn ngữ **hiển thị UI** cho ứng viên — hai thứ độc lập. Ví dụ: UI để Tiếng Việt nhưng phỏng vấn vẫn bằng tiếng Anh nếu JD tiếng Anh.
+- **Phạm vi:** Chỉ UI candidate-facing. Workspace nội bộ (HR/Admin) mặc định Tiếng Việt, chưa cần i18n.
+- **Lưu lựa chọn:** `localStorage` (`locale`) + tùy chọn lưu vào `candidate_accounts.preferred_locale` (nullable, default `vi`) khi đã đăng nhập.
+- **Kỹ thuật (FE):** react-i18next, default `vi`, fallback `vi`.
+
+### ADR-034: Saved Jobs (Bookmark) cho Candidate
+- **Quyết định:** Ứng viên (đã đăng nhập) có thể **lưu/bỏ lưu** Job Posting để xem lại; hiển thị số lượng trên header và trang "Việc đã lưu".
+- **Bảng mới: `saved_jobs`**
+
+  | Cột | Kiểu | Mô tả |
+  |------|------|-------|
+  | `id` | UUID PK | |
+  | `candidate_account_id` | UUID FK → `candidate_accounts` | |
+  | `job_posting_id` | UUID FK → `job_postings` | |
+  | `created_at` | timestamptz | |
+
+- **Ràng buộc:** UNIQUE `(candidate_account_id, job_posting_id)` – không lưu trùng. Soft delete không cần (bỏ lưu = hard delete row).
+- **Guest:** Khi chưa đăng nhập, nút lưu điều hướng sang đăng nhập (không lưu ẩn danh).
+
+### ADR-035: Candidate Google OAuth2 (không ràng buộc domain)
+- **Quyết định:** Bổ sung **Google Sign-In cho Candidate** trên Job Board login, **KHÔNG** áp `allowed_email_domains`.
+- **Phân biệt với ADR-023:** ADR-023 (Google OAuth nội bộ HR/Recruiter/Admin) **bắt buộc** email thuộc `allowed_email_domains` + pre-provisioning. ADR-035 dành cho ứng viên: chấp nhận **mọi** tài khoản Google cá nhân, và nếu chưa có `candidate_accounts` thì **tự tạo** (self-registration), giống đăng ký email/password tự do.
+- **Lý do:** Giảm ma sát đăng ký cho ứng viên; vẫn giữ email/password là phương thức chính.
+- **Bảo mật:** Provider validation bình thường; không có domain allowlist cho luồng candidate.

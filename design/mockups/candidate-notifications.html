@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARISP — Thông báo (Mockup)</title>
+  <link rel="icon" type="image/svg+xml" href="logo-icon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: {
+      fontFamily: { sans: ['Inter','sans-serif'], display: ['"Plus Jakarta Sans"','Inter','sans-serif'] },
+      colors: {
+        brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+        ai: { 50:'#faf5ff',100:'#f3e8ff',400:'#c084fc',500:'#a855f7',600:'#9333ea',700:'#7e22ce' },
+        ink: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' },
+      },
+      boxShadow: { card:'0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)', 'card-hover':'0 4px 24px -6px rgb(79 70 229 / 0.18)' },
+    } } };
+  </script>
+  <script>
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches))
+      document.documentElement.classList.add('dark');
+  </script>
+  <style>
+    body{font-family:'Inter',sans-serif}
+    html.dark body{background-color:#020617;color:#e2e8f0}
+    html.dark .bg-white{background-color:#0f172a !important}
+    html.dark .bg-white\/80{background-color:rgb(15 23 42 / 0.8) !important}
+    html.dark .bg-ink-50{background-color:#020617 !important}
+    html.dark .bg-ink-100{background-color:#1e293b !important}
+    html.dark .hover\:bg-ink-100:hover{background-color:#1e293b !important}
+    html.dark .hover\:bg-ink-50:hover{background-color:#0f172a !important}
+    html.dark .bg-brand-50{background-color:rgb(99 102 241 / 0.16) !important}
+    html.dark .bg-brand-50\/40{background-color:rgb(99 102 241 / 0.10) !important}
+    html.dark .bg-ai-50{background-color:rgb(168 85 247 / 0.16) !important}
+    html.dark .bg-emerald-50{background-color:rgb(16 185 129 / 0.16) !important}
+    html.dark .bg-amber-50{background-color:rgb(245 158 11 / 0.16) !important}
+    html.dark .bg-red-50{background-color:rgb(239 68 68 / 0.16) !important}
+    html.dark .border-ink-200{border-color:#1e293b !important}
+    html.dark .border-ink-100{border-color:#1e293b !important}
+    html.dark .border-brand-200{border-color:rgb(99 102 241 / 0.3) !important}
+    html.dark .divide-ink-100 > * + *{border-color:#1e293b !important}
+    html.dark .text-ink-900{color:#f1f5f9 !important}
+    html.dark .text-ink-800{color:#e2e8f0 !important}
+    html.dark .text-ink-700{color:#cbd5e1 !important}
+    html.dark .text-ink-600{color:#cbd5e1 !important}
+    html.dark .text-ink-500{color:#94a3b8 !important}
+    html.dark .text-ink-400{color:#64748b !important}
+    html.dark .text-ai-700{color:#d8b4fe !important}
+    html.dark .text-brand-700{color:#a5b4fc !important}
+  </style>
+</head>
+<body class="bg-ink-50 text-ink-900 antialiased">
+
+  <!-- Nav (candidate) -->
+  <header class="sticky top-0 z-30 border-b border-ink-200 bg-white/80 backdrop-blur">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center gap-3">
+      <button onclick="toggleDrop('mobileMenu', event)" aria-label="Menu" class="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"><i data-lucide="menu" class="w-5 h-5"></i></button>
+      <a href="job-board.html" class="flex items-center gap-2.5 shrink-0">
+        <svg class="h-9 w-9" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ARISP">
+          <defs><linearGradient id="lg-nt" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
+          <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-nt)"/>
+          <path d="M30 70 L48 26 L66 70" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M38 56 H58" stroke="white" stroke-width="8" stroke-linecap="round"/>
+          <path d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z" fill="white" fill-opacity="0.95"/>
+        </svg>
+        <span class="hidden sm:inline font-display text-lg font-extrabold">ARISP <span class="text-ink-400 font-medium">Careers</span></span>
+      </a>
+      <nav class="hidden lg:flex items-center gap-1 text-sm font-medium text-ink-600">
+        <a href="job-board.html" class="rounded-lg px-3 py-2 hover:bg-ink-100">Việc làm</a>
+        <a href="candidate-applications.html" class="flex items-center gap-1.5 rounded-lg px-3 py-2 hover:bg-ink-100">Hồ sơ ứng tuyển <span class="rounded-full bg-brand-100 px-1.5 text-xs font-bold text-brand-700">5</span></a>
+        <a href="interview-room.html" class="rounded-lg px-3 py-2 hover:bg-ink-100">Phỏng vấn thử</a>
+      </nav>
+      <div class="flex items-center gap-1 ml-auto">
+        <a href="candidate-saved-jobs.html" aria-label="Việc đã lưu" class="relative hidden sm:grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100">
+          <i data-lucide="bookmark" class="w-5 h-5"></i>
+          <span class="absolute top-1 right-1 grid h-4 w-4 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white ring-2 ring-white dark:ring-[#0f172a]">5</span>
+        </a>
+        <button onclick="toggleTheme()" aria-label="Đổi giao diện sáng/tối" class="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100">
+          <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+        </button>
+        <a href="candidate-notifications.html" aria-label="Thông báo" class="relative grid h-9 w-9 place-items-center rounded-lg text-brand-700 bg-brand-50">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-[#0f172a]">3</span>
+        </a>
+        <!-- User menu -->
+        <div class="relative">
+          <button onclick="toggleDrop('userMenu', event)" class="flex items-center gap-1.5 rounded-lg p-1 pr-1.5 hover:bg-ink-100">
+            <span class="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">LH</span>
+            <i data-lucide="chevron-down" class="hidden sm:block w-4 h-4 text-ink-400"></i>
+          </button>
+          <div id="userMenu" onclick="event.stopPropagation()" class="js-drop hidden absolute right-0 mt-2 w-64 rounded-2xl border border-ink-200 bg-white shadow-xl z-40">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-ink-100">
+              <span class="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-sm font-bold text-white">LH</span>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-ink-900">Lê Hoàng</div>
+                <div class="truncate text-xs text-ink-400">le.hoang@email.com</div>
+              </div>
+            </div>
+            <div class="p-1.5 text-sm">
+              <a href="candidate-profile.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><i data-lucide="user" class="w-4 h-4 text-ink-400"></i> Hồ sơ của tôi</a>
+              <a href="candidate-applications.html" class="flex items-center justify-between rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><span class="flex items-center gap-3"><i data-lucide="file-text" class="w-4 h-4 text-ink-400"></i> Đơn ứng tuyển</span><span class="rounded-full bg-ink-100 px-1.5 text-xs font-semibold">5</span></a>
+              <a href="candidate-saved-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><i data-lucide="bookmark" class="w-4 h-4 text-ink-400"></i> Việc đã lưu</a>
+              <a href="candidate-results.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><i data-lucide="clapperboard" class="w-4 h-4 text-ink-400"></i> Kết quả &amp; lịch phỏng vấn</a>
+              <a href="candidate-settings.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><i data-lucide="settings" class="w-4 h-4 text-ink-400"></i> Cài đặt</a>
+            </div>
+            <div class="p-1.5 border-t border-ink-100">
+              <a href="auth-login.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="mobileMenu" onclick="event.stopPropagation()" class="js-drop hidden lg:hidden border-t border-ink-100 bg-white px-4 py-3 space-y-1">
+      <a href="job-board.html" class="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100">Việc làm</a>
+      <a href="candidate-applications.html" class="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100">Hồ sơ ứng tuyển</a>
+      <a href="candidate-notifications.html" class="block rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700">Thông báo</a>
+      <a href="interview-room.html" class="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100">Phỏng vấn thử</a>
+    </div>
+  </header>
+
+  <!-- Breadcrumb -->
+  <div class="mx-auto max-w-3xl px-6 pt-6">
+    <div class="flex items-center gap-2 text-sm text-ink-400">
+      <a href="job-board.html" class="hover:text-brand-600">Trang chủ</a>
+      <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      <span class="text-ink-600 font-medium">Thông báo</span>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-3xl px-6 py-6 space-y-5">
+
+    <!-- Header row -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 class="font-display text-2xl font-extrabold flex items-center gap-2"><i data-lucide="bell" class="w-6 h-6 text-brand-600"></i> Thông báo</h1>
+        <p class="mt-1 text-sm text-ink-500">Bạn có <b class="text-ink-700">3 thông báo chưa đọc</b>.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center gap-2"><i data-lucide="check-check" class="w-4 h-4"></i> Đánh dấu tất cả đã đọc</button>
+        <a href="candidate-settings.html#notifications" class="grid h-9 w-9 place-items-center rounded-xl border border-ink-200 bg-white text-ink-600 hover:bg-ink-50" title="Cài đặt thông báo"><i data-lucide="settings" class="w-4 h-4"></i></a>
+      </div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 text-sm">
+      <button class="shrink-0 rounded-full bg-brand-600 px-4 py-1.5 font-semibold text-white">Tất cả</button>
+      <button class="shrink-0 rounded-full border border-ink-200 bg-white px-4 py-1.5 font-medium text-ink-600 hover:border-brand-300">Chưa đọc <span class="text-brand-600">3</span></button>
+      <button class="shrink-0 rounded-full border border-ink-200 bg-white px-4 py-1.5 font-medium text-ink-600 hover:border-brand-300">Phỏng vấn</button>
+      <button class="shrink-0 rounded-full border border-ink-200 bg-white px-4 py-1.5 font-medium text-ink-600 hover:border-brand-300">Kết quả</button>
+      <button class="shrink-0 rounded-full border border-ink-200 bg-white px-4 py-1.5 font-medium text-ink-600 hover:border-brand-300">Hệ thống</button>
+    </div>
+
+    <!-- Group: Hôm nay -->
+    <section>
+      <div class="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Hôm nay</div>
+      <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card divide-y divide-ink-100">
+
+        <div class="relative flex gap-3 px-4 py-3.5 bg-brand-50/40 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600"><i data-lucide="calendar-check" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-700"><b class="text-ink-900">Lời mời phỏng vấn vòng 2</b> — Senior Frontend Engineer (On-site). Mã phỏng vấn đã sẵn sàng tại Hồ sơ ứng tuyển.</div>
+            <div class="mt-1.5 flex items-center gap-3">
+              <span class="text-xs text-ink-400">2 giờ trước</span>
+              <a href="candidate-applications.html" class="text-xs font-semibold text-brand-600 hover:underline">Xem mã phỏng vấn →</a>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-col items-end gap-2">
+            <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+            <button class="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+
+        <div class="relative flex gap-3 px-4 py-3.5 bg-brand-50/40 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600"><i data-lucide="check-circle-2" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-700"><b class="text-ink-900">Kết quả vòng 1: Pass</b> — bạn đã vượt qua vòng screening với điểm 85/100.</div>
+            <div class="mt-1.5 flex items-center gap-3">
+              <span class="text-xs text-ink-400">5 giờ trước</span>
+              <a href="candidate-results.html" class="text-xs font-semibold text-brand-600 hover:underline">Xem báo cáo →</a>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-col items-end gap-2">
+            <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+            <button class="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Group: Hôm qua -->
+    <section>
+      <div class="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Hôm qua</div>
+      <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card divide-y divide-ink-100">
+
+        <div class="relative flex gap-3 px-4 py-3.5 bg-brand-50/40 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ai-50 text-ai-600"><i data-lucide="sparkles" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-700"><b class="text-ink-900">Phân tích CV–JD hoàn tất</b> — Match 87 cho vị trí Frontend. Xem điểm mạnh &amp; điểm thiếu của hồ sơ.</div>
+            <div class="mt-1.5 flex items-center gap-3">
+              <span class="text-xs text-ink-400">Hôm qua · 16:20</span>
+              <a href="job-detail.html" class="text-xs font-semibold text-brand-600 hover:underline">Xem phân tích →</a>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-col items-end gap-2">
+            <span class="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+            <button class="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+
+        <div class="relative flex gap-3 px-4 py-3.5 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-500"><i data-lucide="eye" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-600">HR đã xem hồ sơ của bạn cho vị trí <b class="text-ink-800">Fullstack Developer</b>.</div>
+            <div class="mt-1.5 text-xs text-ink-400">Hôm qua · 09:10</div>
+          </div>
+          <button class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Group: Tuần này -->
+    <section>
+      <div class="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Trước đó</div>
+      <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card divide-y divide-ink-100">
+
+        <div class="relative flex gap-3 px-4 py-3.5 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600"><i data-lucide="file-check-2" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-600">Đơn ứng tuyển <b class="text-ink-800">Backend Developer (.NET 8)</b> đã được tiếp nhận thành công.</div>
+            <div class="mt-1.5 text-xs text-ink-400">13/06/2026</div>
+          </div>
+          <button class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+        </div>
+
+        <div class="relative flex gap-3 px-4 py-3.5 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><i data-lucide="x-circle" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-600">Kết quả <b class="text-ink-800">QA Automation Engineer</b>: hồ sơ chưa phù hợp lần này. Xem feedback chi tiết.</div>
+            <div class="mt-1.5 flex items-center gap-3">
+              <span class="text-xs text-ink-400">05/06/2026</span>
+              <a href="candidate-applications.html" class="text-xs font-semibold text-brand-600 hover:underline">Xem feedback →</a>
+            </div>
+          </div>
+          <button class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+        </div>
+
+        <div class="relative flex gap-3 px-4 py-3.5 hover:bg-ink-50">
+          <span class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600"><i data-lucide="shield-check" class="w-4.5 h-4.5"></i></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-ink-600">Chào mừng bạn đến với ARISP Careers! Hoàn thiện hồ sơ để tăng cơ hội được mời phỏng vấn.</div>
+            <div class="mt-1.5 flex items-center gap-3">
+              <span class="text-xs text-ink-400">01/06/2026</span>
+              <a href="candidate-profile.html" class="text-xs font-semibold text-brand-600 hover:underline">Hoàn thiện hồ sơ →</a>
+            </div>
+          </div>
+          <button class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-ink-100" title="Thêm"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </section>
+
+    <div class="pt-1 text-center">
+      <button class="rounded-xl border border-ink-200 bg-white px-5 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50">Tải thêm thông báo cũ hơn</button>
+    </div>
+  </main>
+
+  <footer class="border-t border-ink-200 bg-white mt-6">
+    <div class="mx-auto max-w-6xl px-6 py-8 text-sm text-ink-400 flex items-center justify-between">
+      <span>© 2026 ARISP — Nền tảng tuyển dụng &amp; phỏng vấn AI</span>
+      <span class="flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4"></i> Đánh giá minh bạch</span>
+    </div>
+  </footer>
+
+  <!-- Prototype nav (mockup only) -->
+  <div class="group fixed bottom-0 left-1/2 z-[100] flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-2 py-1.5 shadow-xl backdrop-blur text-xs whitespace-nowrap -translate-x-1/2 translate-y-[calc(100%-14px)] hover:-translate-y-3 transition-transform duration-300 ease-out">
+    <span class="px-2 font-bold tracking-wide text-slate-400">PROTOTYPE</span>
+    <a href="job-board.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Job Board</a>
+    <a href="job-detail.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Chi tiết</a>
+    <a href="candidate-applications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Hồ sơ ƯT</a>
+    <a href="candidate-profile.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cá nhân</a>
+    <a href="candidate-saved-jobs.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Đã lưu</a>
+    <a href="candidate-results.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kết quả</a>
+    <a href="candidate-settings.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cài đặt</a>
+    <a href="candidate-notifications.html" class="rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700 font-semibold">Thông báo</a>
+    <a href="interview-room.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Phỏng vấn</a>
+    <a href="hr-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">HR</a>
+    <a href="recruiter-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Recruiter</a>
+    <a href="kiosk.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kiosk</a>
+    <a href="auth-login.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Login</a>
+    <a href="index.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Design</a>
+    <a href="logo.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Logo</a>
+  </div>
+
+  <script>
+    lucide.createIcons();
+    function toggleTheme() {
+      const dark = document.documentElement.classList.toggle('dark');
+      localStorage.theme = dark ? 'dark' : 'light';
+    }
+    function toggleDrop(id, e) {
+      e.stopPropagation();
+      const el = document.getElementById(id);
+      const willOpen = el.classList.contains('hidden');
+      document.querySelectorAll('.js-drop').forEach(p => p.classList.add('hidden'));
+      if (willOpen) el.classList.remove('hidden');
+    }
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.js-drop').forEach(p => p.classList.add('hidden'));
+    });
+  </script>
+</body>
+</html>
