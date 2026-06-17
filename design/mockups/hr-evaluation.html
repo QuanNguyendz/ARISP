@@ -20,13 +20,13 @@
       boxShadow: { card:'0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)' },
     } } };
   </script>
-  <style>body{font-family:'Inter',sans-serif}</style>
+  <style>html{scrollbar-gutter:stable}body{font-family:'Inter',sans-serif}</style>
 </head>
 <body class="bg-ink-50 text-ink-900 antialiased">
 <div class="flex min-h-screen">
 
   <!-- Sidebar (app shell nội bộ — dùng chung cho Super Admin / HR Leader / Recruiter) -->
-  <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white">
+  <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white sticky top-0 h-screen">
     <div class="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200">
       <svg class="h-8 w-8" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ARISP">
         <defs><linearGradient id="lg-he" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
@@ -40,19 +40,19 @@
         <div class="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader Workspace</div>
       </div>
     </div>
-    <nav class="flex-1 px-3 py-4 space-y-1 text-sm font-medium">
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
       <a href="hr-dashboard.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="layout-dashboard" class="w-[18px] h-[18px]"></i> Dashboard</a>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i> Tin tuyển dụng</a>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="users" class="w-[18px] h-[18px]"></i> Ứng viên</a>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="video" class="w-[18px] h-[18px]"></i> Phiên phỏng vấn</a>
-      <a href="#" class="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2.5 text-brand-700">
+      <a href="hr-jobs.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i> Tin tuyển dụng</a>
+      <a href="hr-candidates.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="users" class="w-[18px] h-[18px]"></i> Ứng viên</a>
+      <a href="hr-sessions.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="video" class="w-[18px] h-[18px]"></i> Phiên phỏng vấn</a>
+      <a href="hr-evaluation.html" class="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2.5 text-brand-700">
         <span class="flex items-center gap-3"><i data-lucide="clipboard-check" class="w-[18px] h-[18px]"></i> Đánh giá</span>
         <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">5</span>
       </a>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="book-open" class="w-[18px] h-[18px]"></i> Playbook</a>
+      <a href="hr-playbook.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="book-open" class="w-[18px] h-[18px]"></i> Playbook</a>
       <div class="pt-3 mt-3 border-t border-ink-100"></div>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="user-cog" class="w-[18px] h-[18px]"></i> Nhóm HR</a>
-      <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="settings" class="w-[18px] h-[18px]"></i> Cài đặt</a>
+      <a href="hr-team.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="user-cog" class="w-[18px] h-[18px]"></i> Nhóm HR</a>
+      <a href="hr-settings.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="settings" class="w-[18px] h-[18px]"></i> Cài đặt</a>
     </nav>
     <div class="p-3 border-t border-ink-200">
       <div class="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-ink-100">
@@ -239,8 +239,15 @@
     <span class="px-2 font-bold tracking-wide text-slate-400">PROTOTYPE</span>
     <a href="job-board.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Job Board</a>
     <a href="job-detail.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Chi tiết</a>
+    <a href="candidate-applications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Hồ sơ ƯT</a>
+    <a href="candidate-profile.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cá nhân</a>
+    <a href="candidate-saved-jobs.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Đã lưu</a>
+    <a href="candidate-results.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kết quả</a>
+    <a href="candidate-settings.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cài đặt</a>
+    <a href="candidate-notifications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Thông báo</a>
     <a href="interview-room.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Phỏng vấn</a>
     <a href="hr-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">HR</a>
+    <a href="recruiter-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Recruiter</a>
     <a href="kiosk.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kiosk</a>
     <a href="auth-login.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Login</a>
     <a href="index.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Design</a>
