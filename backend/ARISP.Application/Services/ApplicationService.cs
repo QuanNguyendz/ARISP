@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +14,7 @@ namespace ARISP.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEmbeddingProvider _embeddingProvider;
+        private readonly IEmailService _emailService;
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -26,10 +27,11 @@ namespace ARISP.Application.Services
             { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
-        public ApplicationService(IUnitOfWork unitOfWork, IEmbeddingProvider embeddingProvider)
+        public ApplicationService(IUnitOfWork unitOfWork, IEmbeddingProvider embeddingProvider, IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
             _embeddingProvider = embeddingProvider;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -50,7 +52,8 @@ namespace ARISP.Application.Services
                 Source = application.Source,
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
-                CreatedAt = application.CreatedAt
+                CreatedAt = application.CreatedAt,
+                CvJdAnalysisId = application.CvJdAnalysisId
             };
         }
 
@@ -78,6 +81,18 @@ namespace ARISP.Application.Services
                 Source = source,
                 Status = "cv_submitted"
             };
+
+            // Auto-link CvJdAnalysis if it exists
+            if (!string.IsNullOrEmpty(request.CvFileHash))
+            {
+                var analyses = await _unitOfWork.Repository<CvJdAnalysis>()
+                    .FindAsync(x => x.JobPostingId == request.JobPostingId && x.CvHash == request.CvFileHash, ct);
+                var analysis = System.Linq.Enumerable.FirstOrDefault(analyses);
+                if (analysis != null)
+                {
+                    application.CvJdAnalysisId = analysis.Id;
+                }
+            }
 
             await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -115,7 +130,8 @@ namespace ARISP.Application.Services
                 Source = application.Source,
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
-                CreatedAt = application.CreatedAt
+                CreatedAt = application.CreatedAt,
+                CvJdAnalysisId = application.CvJdAnalysisId
             };
 
             return Result.Success(response);
@@ -140,7 +156,8 @@ namespace ARISP.Application.Services
                 Source = app.Source,
                 Status = app.Status,
                 PracticeSessionUsed = app.PracticeSessionUsed,
-                CreatedAt = app.CreatedAt
+                CreatedAt = app.CreatedAt,
+                CvJdAnalysisId = app.CvJdAnalysisId
             }).ToList();
 
             return Result.Success(responseList);
@@ -212,6 +229,51 @@ namespace ARISP.Application.Services
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
 
             return Result.Success(MapToResponse(application, jobPosting));
+        }
+
+        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, CancellationToken ct = default)
+        {
+            // 1. Lấy thông tin đơn ứng tuyển từ DB
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            if (application == null)
+            {
+                return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
+            }
+
+            // 2. Tạo Magic Link hướng tới trang làm bài test của Frontend Portal
+            var magicLink = $"http://localhost:3000/portal/practice/{applicationId}";
+
+            // 3. Chuẩn bị nội dung HTML cho Email
+            var subject = "[ARISP] - Lời mời tham gia vòng kiểm tra năng lực";
+            var htmlMessage = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
+            <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
+            <p>Chúc mừng bạn! Hồ sơ ứng tuyển của bạn đã thông qua vòng duyệt hồ sơ (CV Review).</p>
+            <p>Chúng tôi trân trọng mời bạn tham gia vòng đánh giá tiếp theo bằng cách truy cập vào đường dẫn (Magic Link) dưới đây để tiến hành làm bài test năng lực:</p>
+            <p style='text-align: center; margin: 30px 0;'>
+                <a href='{magicLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Bắt đầu làm bài đánh giá</a>
+            </p>
+            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Đường dẫn này dành riêng cho bạn và không nên chia sẻ cho người khác.</i></p>
+            <br/>
+            <p>Trân trọng,</p>
+            <p><strong>Đội ngũ nhân sự ARISP</strong></p>
+        </div>";
+
+            // 4. Gọi Service gửi Mail có sẵn (Không lo gạch đỏ, không cần cài MailKit vào Application nữa)
+            try
+            {
+                await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
+
+                // Thêm logic cập nhật trạng thái nếu cần
+                application.Status = "Invited";
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Lỗi khi gọi dịch vụ gửi email: {ex.Message}");
+            }
         }
 
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, CancellationToken ct = default)

@@ -12,6 +12,7 @@ namespace ARISP.Application.DTOs
         public string? CandidatePhone { get; set; }
         public string? CvFileUrl { get; set; }
         public string? CvText { get; set; }
+        public string? CvFileHash { get; set; }
     }
 
     public class ApplicationResponse
@@ -28,6 +29,7 @@ namespace ARISP.Application.DTOs
         public string Status { get; set; } = string.Empty;
         public bool PracticeSessionUsed { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
+        public Guid? CvJdAnalysisId { get; set; }
     }
 
     public class UpdateApplicationStatusRequest

@@ -93,6 +93,8 @@ builder.Services.AddScoped<OpenAIProvider>();
 builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
 builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
 
+builder.Services.AddScoped<IGeminiProvider, ARISP.Infrastructure.AI.GeminiProvider>();
+
 // STT, TTS, Avatar, Notification mock stubs
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
 builder.Services.AddScoped<ITTSService, MockTTSService>();
@@ -105,6 +107,7 @@ builder.Services.AddTransient<IEmailService, EmailService>();
 // Application Services
 builder.Services.AddScoped<PlaybookService>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<CvJdAnalysisService>();
 builder.Services.AddScoped<InterviewService>();
 builder.Services.AddScoped<InterviewCodeService>();
 builder.Services.AddScoped<EvaluationService>();
@@ -223,7 +226,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 var allowedOrigins = (builder.Configuration["Authentication:AdminFrontendUrl"] ?? "https://localhost:3000")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Concat(new[] { "http://127.0.0.1:5500", "http://localhost:5500", "https://localhost:5001", "https://localhost:3000" })
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
