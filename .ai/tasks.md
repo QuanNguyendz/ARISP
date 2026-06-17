@@ -89,10 +89,10 @@ _Chưa có task nào đang thực hiện._
 
 ### Phase 2a – CV-JD Match Analysis (Gemini AI)
 - [x] Database schema: thêm `jd_file_url`, `jd_file_name`, `jd_file_format` vào `job_postings` (2026-06-15 – migration `AddJdFileFieldsToJobPosting`)
-- [ ] Database schema: tạo bảng mới `cv_jd_analyses` (match_score, summary, skills_matched, skills_gaps, experience_relevance, overall_recommendation, raw_response)
-- [ ] Database schema: thêm `cv_jd_analysis_id` vào `applications` (FK → `cv_jd_analyses`, nullable)
-- [ ] EF Core migrations
-- [ ] `IGeminiProvider` interface + `GeminiProvider` impl (Google Gemini 2.5 Flash API)
+- [x] Database schema: tạo bảng mới `cv_jd_analyses` (match_score, summary, skills_matched, skills_gaps, red_flags, experience_relevance, overall_recommendation, ai_model, status, error_message, prompt_tokens, completion_tokens, processing_time_ms, raw_response)
+- [x] Database schema: thêm `cv_jd_analysis_id` vào `applications` (FK → `cv_jd_analyses`, nullable)
+- [x] EF Core migrations
+- [x] `IGeminiProvider` interface + `GeminiProvider` impl (Google Gemini 2.5 Flash API)
   - [ ] Method: `AnalyzeCvJdMatchAsync(cvFileStream, jdFileStream/jdText)` → `CvJdAnalysisResult`
   - [ ] Hỗ trợ multimodal input: gửi file PDF/DOCX trực tiếp cho Gemini
   - [ ] Config: Gemini API key qua env var `GEMINI_API_KEY`
@@ -308,6 +308,57 @@ _Chưa có task nào đang thực hiện._
   - Header Job Board (logged-in): tìm kiếm toàn cục, hồ sơ ứng tuyển + badge, việc đã lưu, đổi ngôn ngữ UI, chuông, menu người dùng, menu mobile.
   - Ghi nhận quyết định sản phẩm mới: [ADR-033] i18n UI candidate, [ADR-034] Saved Jobs, [ADR-035] Candidate Google OAuth (no domain).
   - Backlog triển khai code: xem mục "FE UI Redesign (mới)" trong Backlog.
+
+- [x] 2026-06-15: Bổ sung mockup `candidate-applications.html` — màn Hồ sơ ứng tuyển của candidate.
+  - Profile banner, 4 stat cards, tab lọc theo trạng thái, danh sách đơn ứng tuyển với round stepper nhiều vòng.
+  - Các trạng thái: cần nhập Interview Code (On-site, có ô mã 6 ký tự + TTL), chờ HR xác nhận, mời phỏng vấn thử (Practice), HR đang xem, Not Pass.
+  - Sidebar: quản lý CV, lịch phỏng vấn sắp tới, độ hoàn thiện hồ sơ, mẹo AI.
+  - Nối link "Hồ sơ ứng tuyển"/"Đơn ứng tuyển" ở job-board & job-detail; thêm "Hồ sơ ƯT" vào prototype nav của tất cả mockup.
+
+- [x] 2026-06-15: Bổ sung mockup `candidate-profile.html` — màn Hồ sơ của tôi (xem/chỉnh sửa thông tin candidate).
+  - Section nav dính (sticky) + theo dõi cuộn: Thông tin cá nhân, CV & tài liệu, Kỹ năng, Kinh nghiệm, Học vấn, Liên kết, Tài khoản & bảo mật.
+  - Banner đổi ảnh bìa/avatar, form thông tin cá nhân (email đã xác minh, readonly), quản lý nhiều CV (mặc định/xoá/upload), skill chips + gợi ý AI, timeline kinh nghiệm, học vấn, liên kết LinkedIn/GitHub/Portfolio.
+  - Tài khoản & bảo mật: đổi mật khẩu, Google đã liên kết, toggle thông báo email, xoá tài khoản; thanh "Lưu thay đổi" dính đáy.
+  - Nối link user-menu "Hồ sơ của tôi" ở job-board/job-detail/candidate-applications; thêm "Cá nhân" vào prototype nav toàn bộ mockup.
+
+- [x] 2026-06-16: Bổ sung 3 mockup candidate còn thiếu — hoàn tất luồng user-menu candidate.
+  - `candidate-saved-jobs.html` — Việc đã lưu: grid card (bỏ lưu, match score, trạng thái còn hạn/đã đóng), sort, xoá tất cả, empty-state hint.
+  - `candidate-results.html` — Kết quả & lịch phỏng vấn (Candidate Portal): lịch sắp tới, danh sách vòng đã hoàn thành, Evaluation Report (verdict + overall, recording player, điểm theo tiêu chí, đánh giá ngôn ngữ language-aware, phân tích từng câu hỏi, bước tiếp theo, nhận xét HR).
+  - `candidate-settings.html` — Cài đặt: chọn theme sáng/tối/hệ thống, ngôn ngữ UI, ma trận thông báo Email/Đẩy, quyền riêng tư (HR xem hồ sơ, lưu bản ghi, xuất dữ liệu), phiên đăng nhập/thiết bị.
+  - Nối toàn bộ link user-menu (Việc đã lưu/Kết quả/Cài đặt) + icon bookmark header ở job-board/candidate-applications/candidate-profile; thêm "Đã lưu/Kết quả/Cài đặt" vào prototype nav của tất cả 16 mockup.
+
+- [x] 2026-06-16: Bổ sung mockup `candidate-notifications.html` — màn Tất cả thông báo.
+  - Header row (đếm chưa đọc, đánh dấu tất cả đã đọc, link sang cài đặt thông báo), tab lọc (Tất cả/Chưa đọc/Phỏng vấn/Kết quả/Hệ thống).
+  - Danh sách nhóm theo thời gian (Hôm nay/Hôm qua/Trước đó), item có icon theo loại, trạng thái chưa đọc, deep-link hành động (xem mã, xem báo cáo, feedback...), nút tải thêm.
+  - Nối link "Xem tất cả thông báo" trong bell dropdown của 7 trang candidate → trang mới; bell ở header trỏ thẳng sang khi đang ở trang này; thêm "Thông báo" vào prototype nav của toàn bộ 17 mockup.
+
+- [x] 2026-06-16: Bộ mockup HR/Admin — dựng 7 trang còn thiếu &amp; nối toàn bộ link `#`.
+  - `hr-jobs.html` — Tin tuyển dụng: stats, filter, bảng quản lý tin (đang tuyển/nháp chờ duyệt/đã đóng), số ứng viên, vòng PV, phân trang.
+  - `hr-job-edit.html` — Tạo/sửa tin (Enterprise Setup): thông tin cơ bản, upload JD PDF/DOCX + text (Gemini), cấu hình vòng PV (drag, độ khó), rubric chấm điểm có trọng số, persona AI + adaptive difficulty, đính kèm Playbook, availability slots.
+  - `hr-candidates.html` — Ứng viên: stats, bảng (match score, vòng, verdict AI), thao tác cấp Interview Code / duyệt verdict / gửi magic link, bulk select.
+  - `hr-sessions.html` — Phiên phỏng vấn: phiên LIVE (giám sát), bảng phiên Real/Practice với bản ghi + transcript + báo cáo.
+  - `hr-playbook.html` — Playbook: upload zone, lọc theo phạm vi (Công ty/Tin/Vòng), card trạng thái embed (pgvector) + chunks + must-ask.
+  - `hr-team.html` — Nhóm HR: quản lý tài khoản role-based (Super Admin/HR Leader/Recruiter), pre-provisioning + chờ kích hoạt, allowed email domains.
+  - `hr-settings.html` — Cài đặt workspace: domain &amp; bảo mật, mặc định phỏng vấn (TTL code/magic link, auto-progression), tích hợp/webhook (ATS/Slack/SendGrid), audit log.
+  - Nối toàn bộ link `#` trong hr-dashboard &amp; hr-evaluation: sidebar (6 mục), account menu, notif dropdown, panel "Cần làm", "Tạo tin", trợ giúp → 0 link `#` còn sót.
+  - Sidebar HR `sticky top-0 h-screen` + nav `overflow-y-auto` (cố định 1 màn khi cuộn); thêm `scrollbar-gutter:stable` mọi trang HR để tránh lệch chiều rộng giữa các trang.
+
+- [x] 2026-06-16: Màn quên/đặt lại mật khẩu (auth).
+  - `auth-forgot.html` — nhập email gửi liên kết đặt lại (TTL 15 phút, one-time) + trạng thái "đã gửi" (resend countdown 30s, đổi email).
+  - `auth-reset.html` — đặt mật khẩu mới: chỉ báo độ mạnh 4 mức, kiểm tra khớp xác nhận, trạng thái thành công; link yêu cầu lại khi hết hạn.
+  - Nối link "Quên mật khẩu?" ở auth-login (ứng viên) &amp; auth-admin (nội bộ) → auth-forgot; back-link dùng history.back() để về đúng cổng đăng nhập.
+
+- [x] 2026-06-16: Bộ mockup Recruiter — workspace riêng theo quyền Recruiter (tạo tin nháp, quản lý ứng viên, cấp Interview Code).
+  - `recruiter-dashboard.html` — KPI (ứng viên xử lý, cần cấp code, tin nháp chờ duyệt, on-site hôm nay), danh sách cần cấp code, tin nháp của tôi, lịch on-site, nhắc việc; sidebar rút gọn + ghi chú giới hạn quyền (không confirm verdict/Playbook).
+  - `recruiter-candidates.html` — bảng ứng viên với trạng thái On-site (đã đến/chờ check-in), thao tác cấp code / magic link / xem (không có confirm verdict).
+  - `recruiter-code.html` — màn cấp Interview Code: chọn ứng viên + vòng + TTL, mã 6 ký tự monospace + đếm ngược TTL live, QR cho Kiosk, sao chép/in/cấp lại/vô hiệu hoá, hàng chờ check-in, lịch sử mã (hiệu lực/đã dùng/hết hạn/vô hiệu).
+  - Thêm entry "Recruiter" vào prototype nav của toàn bộ mockup (29 trang).
+
+- [x] 2026-06-16: Tách workspace Recruiter khỏi trang HR (sửa link lẫn lộn sang HR Leader).
+  - `recruiter-jobs.html` — Tin tuyển dụng của Recruiter: nháp/chờ HR duyệt/đang tuyển, chỉ sửa nháp của mình, tin đã đăng read-only (HR quản lý).
+  - `recruiter-job-edit.html` — Tạo/sửa tin nháp: thông tin cơ bản + JD + đề xuất vòng, hành động "Gửi HR duyệt" (rubric/persona/Playbook do HR hoàn thiện), luồng duyệt 3 bước.
+  - `recruiter-account.html` — Tài khoản của tôi (cá nhân + giao diện + bảo mật, không có cấu hình hệ thống — Super Admin quản lý).
+  - Bỏ mục "Phiên phỏng vấn" khỏi sidebar Recruiter (phạm vi HR); trỏ lại toàn bộ link hr-jobs/hr-job-edit/hr-settings/hr-sessions trong recruiter-dashboard/candidates/code sang bản recruiter. Chỉ giữ entry "HR" ở prototype nav.
 
 - [x] 2026-06-15: Claude Code hooks (`.claude/`) cho quy ước ARISP — secret-guard, bash-guard, arch-guard, format, tasks-reminder.
 
