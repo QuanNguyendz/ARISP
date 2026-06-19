@@ -137,14 +137,7 @@ export default function InterviewSchedulePage() {
                 loading={isLoading}
                 onClick={handleVerifyCode}
                 fullWidth
-                sx={{
-                  background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
-                  color: 'white',
-                  py: 2,
-                  borderRadius: '12px',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                }}
+                className="bg-gradient-to-br from-cyan-500 to-violet-500 text-base text-white"
               >
                 Xác thực mã
               </LoadingButton>

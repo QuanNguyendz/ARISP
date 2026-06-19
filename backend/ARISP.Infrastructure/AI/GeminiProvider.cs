@@ -193,5 +193,112 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
                 return Result<CvJdAnalysisResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
             }
         }
+
+        public async Task<Result<CvReviewResultDto>> ReviewCvAsync(
+            byte[]? cvFileBytes,
+            string? cvMimeType,
+            string? fallbackCvText,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+                return Result<CvReviewResultDto>.Failure("GEMINI_API_KEY is not configured.");
+
+            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+
+            var systemInstruction = @"You are an expert technical recruiter reviewing a candidate's CV/Resume (no specific job description).
+CRITICAL: First verify the document is actually a CV/Resume. If it is not, set 'is_valid_cv' to false and 'overall_score' to 0.
+
+If it IS a valid CV, evaluate its overall quality as a professional IT resume: clarity, completeness, impact of achievements (quantified results), technical depth, and presentation.
+
+You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, without markdown formatting:
+{
+  ""is_valid_cv"": boolean,
+  ""overall_score"": int (0-100, overall CV quality),
+  ""verdict"": string (one of: ""Đạt chuẩn"", ""Khá - cần chỉnh sửa nhẹ"", ""Cần cải thiện"", ""Chưa đạt""),
+  ""summary"": string (2-3 câu nhận xét tổng quan về CV),
+  ""strengths"": string[] (3-5 điểm mạnh nổi bật của CV),
+  ""improvements"": string[] (3-6 gợi ý cụ thể để cải thiện CV),
+  ""missing_sections"": string[] (các mục quan trọng còn thiếu, ví dụ: 'Kết quả định lượng', 'Liên kết GitHub'. Để rỗng nếu đầy đủ)
+}";
+
+            var parts = new List<object>
+            {
+                new { text = "--- CANDIDATE CV ---" }
+            };
+
+            if (cvFileBytes != null && cvFileBytes.Length > 0 && cvMimeType == "application/pdf")
+            {
+                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(cvFileBytes) } });
+                if (!string.IsNullOrEmpty(fallbackCvText))
+                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackCvText });
+            }
+            else if (!string.IsNullOrEmpty(fallbackCvText))
+            {
+                parts.Add(new { text = fallbackCvText });
+            }
+            else
+            {
+                return Result<CvReviewResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
+            }
+
+            var requestBody = new
+            {
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
+                contents = new[] { new { parts = parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.2 }
+            };
+
+            string responseJson = string.Empty;
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
+                response.EnsureSuccessStatusCode();
+                responseJson = await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Gemini CV review HTTP request failed.");
+                return Result<CvReviewResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(responseJson);
+                var root = document.RootElement;
+                var rawJsonString = root.GetProperty("candidates")[0]
+                    .GetProperty("content").GetProperty("parts")[0]
+                    .GetProperty("text").GetString();
+
+                if (string.IsNullOrEmpty(rawJsonString))
+                    return Result<CvReviewResultDto>.Failure("Gemini returned empty text.");
+
+                int promptTokens = 0, completionTokens = 0;
+                if (root.TryGetProperty("usageMetadata", out var usageProp))
+                {
+                    if (usageProp.TryGetProperty("promptTokenCount", out var pCount)) promptTokens = pCount.GetInt32();
+                    if (usageProp.TryGetProperty("candidatesTokenCount", out var cCount)) completionTokens = cCount.GetInt32();
+                }
+
+                if (rawJsonString.StartsWith("```json"))
+                {
+                    rawJsonString = rawJsonString.Substring(7);
+                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
+                }
+                rawJsonString = rawJsonString.Trim();
+
+                var result = JsonSerializer.Deserialize<CvReviewResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result == null)
+                    return Result<CvReviewResultDto>.Failure("Failed to deserialize Gemini CV review output.");
+
+                result.PromptTokens = promptTokens;
+                result.CompletionTokens = completionTokens;
+                return Result<CvReviewResultDto>.Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse Gemini CV review. Raw: {RawResponse}", responseJson);
+                return Result<CvReviewResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
+            }
+        }
     }
 }

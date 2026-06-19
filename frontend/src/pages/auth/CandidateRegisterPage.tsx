@@ -77,6 +77,7 @@ export default function CandidateRegisterPage() {
     { label: 'Tối thiểu 8 ký tự', met: password.length >= 8 },
     { label: 'Có chữ hoa', met: /[A-Z]/.test(password) },
     { label: 'Có số', met: /[0-9]/.test(password) },
+    { label: 'Có ký tự đặc biệt (!@#$%^&*)', met: /[!@#$%^&*]/.test(password) },
   ]
 
   const metCount = passwordRequirements.filter((r) => r.met).length
@@ -103,7 +104,7 @@ export default function CandidateRegisterPage() {
     setIsLoading(true)
     try {
       await authService.candidateRegister({ email, password, fullName })
-      navigate('/auth/candidate-login?registered=true')
+      navigate(`/auth/candidate-login?verify=sent&email=${encodeURIComponent(email)}`)
     } catch (err: any) {
       setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.')
     } finally {
@@ -248,8 +249,13 @@ export default function CandidateRegisterPage() {
                 <span
                   className={`h-1 flex-1 rounded-full ${metCount >= 3 ? 'bg-emerald-500' : 'bg-ink-200'}`}
                 ></span>
+                <span
+                  className={`h-1 flex-1 rounded-full ${metCount >= 4 ? 'bg-emerald-500' : 'bg-ink-200'}`}
+                ></span>
               </div>
-              <p className="mt-1 text-xs text-ink-400">Tối thiểu 8 ký tự, gồm chữ và số.</p>
+              <p className="mt-1 text-xs text-ink-400">
+                Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt (!@#$%^&*).
+              </p>
             </div>
 
             <div>
@@ -292,13 +298,25 @@ export default function CandidateRegisterPage() {
               />
               <span>
                 Tôi đồng ý với{' '}
-                <a href="#" className="text-brand-600 hover:underline">
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-brand-600 hover:underline"
+                >
                   Điều khoản
-                </a>{' '}
+                </Link>{' '}
                 và{' '}
-                <a href="#" className="text-brand-600 hover:underline">
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-brand-600 hover:underline"
+                >
                   Chính sách bảo mật
-                </a>
+                </Link>
                 .
               </span>
             </label>

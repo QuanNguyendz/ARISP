@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ARISP.Domain.Entities;
+using ARISP.Domain.Constants;
 using ARISP.Application.Interfaces;
 
 namespace ARISP.Infrastructure.Data
@@ -174,6 +175,11 @@ namespace ARISP.Infrastructure.Data
 
             modelBuilder.Entity<CvJdAnalysis>()
                 .HasIndex(c => new { c.JobPostingId, c.CvHash });
+
+            // MagicLink.Audience: mặc định "candidate" để các bản ghi cũ (trước khi tách cổng staff) được hiểu là candidate
+            modelBuilder.Entity<MagicLink>()
+                .Property(m => m.Audience)
+                .HasDefaultValue(MagicLinkAudience.Candidate);
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

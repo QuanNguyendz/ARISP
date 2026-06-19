@@ -69,6 +69,15 @@ html.dark .bg-ai-50 {
 html.dark .bg-emerald-50 {
   background-color: rgb(16 185 129 / 0.16) !important;
 }
+html.dark .bg-amber-50 {
+  background-color: rgb(245 158 11 / 0.16) !important;
+}
+html.dark .bg-red-50 {
+  background-color: rgb(239 68 68 / 0.16) !important;
+}
+html.dark .bg-white\/90 {
+  background-color: rgb(15 23 42 / 0.9) !important;
+}
 html.dark .border-ink-200 {
   border-color: #1e293b !important;
 }
@@ -80,6 +89,9 @@ html.dark .divide-ink-100 > * + * {
 }
 html.dark .text-ink-900 {
   color: #f1f5f9 !important;
+}
+html.dark .text-ink-800 {
+  color: #e2e8f0 !important;
 }
 html.dark .text-ink-700 {
   color: #cbd5e1 !important;
@@ -102,6 +114,14 @@ html.dark .text-brand-700 {
 html.dark select {
   background-color: #0f172a;
   color: #e2e8f0;
+}
+/* Native date/time picker (icon lịch) theo tông tối */
+html.dark input[type='date'],
+html.dark input[type='datetime-local'],
+html.dark input[type='time'],
+html.dark input[type='month'],
+html.dark input[type='week'] {
+  color-scheme: dark;
 }
 /* Gradient nền hero -> tông tối */
 html.dark .from-brand-50 {

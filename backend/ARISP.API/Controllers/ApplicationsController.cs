@@ -38,11 +38,13 @@ namespace ARISP.API.Controllers
     {
         private readonly ApplicationService _applicationService;
         private readonly IDocumentParserService _documentParserService;
+        private readonly IFileStorageService _fileStorage;
 
-        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService)
+        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService, IFileStorageService fileStorage)
         {
             _applicationService = applicationService;
             _documentParserService = documentParserService;
+            _fileStorage = fileStorage;
         }
 
         [HttpGet("{id}")]
@@ -100,45 +102,27 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận .pdf, .docx, .txt" });
             }
 
-            // Ensure local uploads directory exists
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
-            if (!Directory.Exists(uploadsFolder))
+            // Đọc toàn bộ nội dung file 1 lần vào memory để vừa hash, parse, vừa lưu storage.
+            byte[] cvBytes;
+            using (var ms = new MemoryStream())
             {
-                Directory.CreateDirectory(uploadsFolder);
+                await request.CvFile.CopyToAsync(ms);
+                cvBytes = ms.ToArray();
             }
-
-            // Generate unique filename to avoid collision
-            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            try
-            {
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await request.CvFile.CopyToAsync(stream);
-                }
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Không thể lưu file CV: {ex.Message}" });
-            }
-
-            var cvFileUrl = $"/uploads/{uniqueFileName}";
 
             // Compute CV Hash for Match Analysis Cache
-            string cvFileHash = "";
+            string cvFileHash;
             using (var md5 = System.Security.Cryptography.MD5.Create())
             {
-                using var hashStream = request.CvFile.OpenReadStream();
-                var hashBytes = md5.ComputeHash(hashStream);
+                var hashBytes = md5.ComputeHash(cvBytes);
                 cvFileHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
             }
 
-            // Extract CV text using the real document parser service
+            // Extract CV text using the real document parser service (parse trước khi tốn công lưu).
             string cvText;
             try
             {
-                using (var stream = request.CvFile.OpenReadStream())
+                using (var stream = new MemoryStream(cvBytes))
                 {
                     cvText = await _documentParserService.ParseDocumentAsync(stream, extension);
                 }
@@ -150,12 +134,24 @@ namespace ARISP.API.Controllers
             }
             catch (Exception ex)
             {
-                // Clean up file if parsing fails
-                if (System.IO.File.Exists(filePath))
-                {
-                    try { System.IO.File.Delete(filePath); } catch { /* Ignore cleanup error */ }
-                }
                 return BadRequest(new { message = $"Không thể phân tích file CV: {ex.Message}" });
+            }
+
+            // Lưu file qua abstraction (Local cho dev / S3-compatible cho prod). DB lưu storageKey.
+            var contentType = extension switch
+            {
+                ".pdf" => "application/pdf",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                _ => "text/plain"
+            };
+            string cvFileUrl;
+            try
+            {
+                cvFileUrl = await _fileStorage.SaveAsync(cvBytes, request.CvFile.FileName, contentType);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Không thể lưu file CV: {ex.Message}" });
             }
 
             Guid? candidateAccountId = request.CandidateAccountId;
@@ -184,10 +180,7 @@ namespace ARISP.API.Controllers
             if (result.IsFailure)
             {
                 // Clean up file if db write fails
-                if (System.IO.File.Exists(filePath))
-                {
-                    try { System.IO.File.Delete(filePath); } catch { /* Ignore cleanup error */ }
-                }
+                await _fileStorage.DeleteAsync(cvFileUrl);
                 return BadRequest(new { message = result.Error });
             }
 

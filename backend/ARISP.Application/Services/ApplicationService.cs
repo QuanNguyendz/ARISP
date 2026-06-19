@@ -143,6 +143,20 @@ namespace ARISP.Application.Services
             var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
             var jobDict = jobs.ToDictionary(j => j.Id, j => j.Title);
 
+            // Lấy điểm match CV–JD theo batch (tránh N+1) cho các hồ sơ đã có phân tích
+            var analysisIds = applications
+                .Where(a => a.CvJdAnalysisId.HasValue)
+                .Select(a => a.CvJdAnalysisId!.Value)
+                .Distinct()
+                .ToList();
+            var scoreByAnalysisId = new Dictionary<Guid, int>();
+            if (analysisIds.Count > 0)
+            {
+                var analyses = await _unitOfWork.Repository<CvJdAnalysis>()
+                    .FindAsync(c => analysisIds.Contains(c.Id));
+                scoreByAnalysisId = analyses.ToDictionary(c => c.Id, c => c.MatchScore);
+            }
+
             var responseList = applications.Select(app => new ApplicationResponse
             {
                 Id = app.Id,
@@ -157,7 +171,10 @@ namespace ARISP.Application.Services
                 Status = app.Status,
                 PracticeSessionUsed = app.PracticeSessionUsed,
                 CreatedAt = app.CreatedAt,
-                CvJdAnalysisId = app.CvJdAnalysisId
+                CvJdAnalysisId = app.CvJdAnalysisId,
+                MatchScore = app.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(app.CvJdAnalysisId.Value, out var ms)
+                    ? ms
+                    : (int?)null
             }).ToList();
 
             return Result.Success(responseList);

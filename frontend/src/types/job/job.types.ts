@@ -22,7 +22,7 @@ export interface JobPosting {
   department?: string;
   jobDescription: string;
   interviewMode: 'remote' | 'onsite' | 'both';
-  status: 'draft' | 'active' | 'paused' | 'closed';
+  status: 'draft' | 'pending' | 'active' | 'paused' | 'rejected' | 'closed' | 'archived';
   isPublicListing: boolean;
   detectedLanguage?: string;
   languageRequirement?: string;
@@ -41,9 +41,16 @@ export interface JobPosting {
   jobCategory?: string;
   applicationDeadline?: string;
   isUrgent: boolean;
-  scoringRubric?: any;
+  scoringRubric?: unknown;
   rescheduleDeadlineHours?: number;
   inviteTokenTtlHours?: number;
+  /** Số ứng viên đã ứng tuyển — trả về từ GET /jobs/admin */
+  applicantCount?: number;
+  publishedAt?: string;
+  /** Tên người tạo tin (Recruiter/HR) — trả về từ GET /jobs/admin */
+  createdByName?: string;
+  /** Lý do từ chối (khi status = 'rejected') */
+  rejectionReason?: string;
 }
 
 export interface CreateJobPostingRequest {

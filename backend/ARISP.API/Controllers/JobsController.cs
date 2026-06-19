@@ -195,10 +195,29 @@ namespace ARISP.API.Controllers
         public async Task<IActionResult> GetAdminJobs(CancellationToken ct)
         {
             var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
+            var jobList = jobs.OrderByDescending(j => j.CreatedAt).ToList();
 
-            var response = jobs
-                .OrderByDescending(j => j.CreatedAt)
-                .Select(j => JobPostingListItemResponse.FromEntity(j));
+            // Đếm số ứng viên theo từng tin (batch, tránh N+1)
+            var jobIds = jobList.Select(j => j.Id).ToList();
+            var apps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .FindAsync(a => jobIds.Contains(a.JobPostingId));
+            var countByJob = apps
+                .GroupBy(a => a.JobPostingId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Tên người tạo tin (Recruiter/HR) theo batch, tránh N+1
+            var creatorIds = jobList.Select(j => j.CreatedByUserId).Distinct().ToList();
+            var creatorNameById = (await _unitOfWork.Repository<User>()
+                .FindAsync(u => creatorIds.Contains(u.Id), ct))
+                .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
+
+            var response = jobList.Select(j =>
+            {
+                var dto = JobPostingListItemResponse.FromEntity(j);
+                dto.ApplicantCount = countByJob.TryGetValue(j.Id, out var c) ? c : 0;
+                dto.CreatedByName = creatorNameById.TryGetValue(j.CreatedByUserId, out var name) ? name : null;
+                return dto;
+            });
 
             return Ok(response);
         }

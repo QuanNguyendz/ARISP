@@ -52,4 +52,27 @@ namespace ARISP.Application.DTOs
         public string Status { get; set; } = string.Empty;
         public string CandidateName { get; set; } = string.Empty;
     }
+
+    /// <summary>
+    /// Một phiên phỏng vấn hiển thị trong danh sách HR.
+    /// </summary>
+    public class HrInterviewSessionItem
+    {
+        public Guid Id { get; set; }
+        public Guid ApplicationId { get; set; }
+        public string CandidateName { get; set; } = string.Empty;
+        public string? JobTitle { get; set; }
+        public int RoundNumber { get; set; }
+        public string RoundType { get; set; } = string.Empty;
+        public string SessionType { get; set; } = string.Empty; // practice | real
+        public string Status { get; set; } = string.Empty;      // pending | active | completed | aborted | error
+        public string InterviewLanguage { get; set; } = "vi";
+        public int? DurationSeconds { get; set; }
+        public bool HasRecording { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? EndedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public Guid? EvaluationId { get; set; }
+        public string? Verdict { get; set; }
+    }
 }

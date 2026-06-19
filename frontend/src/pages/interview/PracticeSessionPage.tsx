@@ -1,21 +1,17 @@
-import { useParams } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import { ErrorAlert } from '@components/common';
+import { useParams } from 'react-router-dom'
+import { ErrorAlert } from '@components/common'
 
 export default function PracticeSessionPage() {
-  const { applicationId } = useParams<{ applicationId: string }>();
+  const { applicationId } = useParams<{ applicationId: string }>()
 
   if (!applicationId) {
-    return <ErrorAlert message="Invalid application" />;
+    return <ErrorAlert message="Invalid application" />
   }
 
   return (
-    <Box sx={{ textAlign: 'center' }}>
-      <Typography variant="h5">Phỏng vấn thử</Typography>
-      <Typography color="text.secondary" sx={{ mt: 2 }}>
-        Application ID: {applicationId}
-      </Typography>
-    </Box>
-  );
+    <div className="text-center">
+      <h2 className="text-xl font-semibold">Phỏng vấn thử</h2>
+      <p className="mt-2 text-gray-500">Application ID: {applicationId}</p>
+    </div>
+  )
 }

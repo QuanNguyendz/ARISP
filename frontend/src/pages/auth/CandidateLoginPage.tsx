@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Mail,
@@ -60,17 +60,25 @@ function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
 
 export default function CandidateLoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const verificationSent =
+    searchParams.get('verify') === 'sent' || searchParams.get('registered') === 'true'
   const { setAuthFromResponse } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(searchParams.get('email') ?? '')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsVerification, setNeedsVerification] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setNeedsVerification(false)
+    setResendMessage('')
     setIsLoading(true)
 
     try {
@@ -86,9 +94,26 @@ export default function CandidateLoginPage() {
 
       navigate('/')
     } catch (err: any) {
+      if (err.code === 'email_not_verified') {
+        setNeedsVerification(true)
+      }
       setError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    if (!email) return
+    setResending(true)
+    setResendMessage('')
+    try {
+      const res = await authService.resendVerification(email)
+      setResendMessage(res.message)
+    } catch (err: any) {
+      setResendMessage(err.message || 'Không thể gửi lại email. Vui lòng thử lại.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -190,6 +215,16 @@ export default function CandidateLoginPage() {
           </h1>
           <p className="mt-1 text-ink-500">Đăng nhập để tiếp tục ứng tuyển.</p>
 
+          {verificationSent && (
+            <div className="mt-6 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+              <p className="text-sm text-emerald-700">
+                Đăng ký thành công! Chúng tôi đã gửi email xác minh — vui lòng kiểm tra hộp thư và
+                bấm vào liên kết để kích hoạt tài khoản trước khi đăng nhập.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600">Email</label>
@@ -238,9 +273,31 @@ export default function CandidateLoginPage() {
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="text-sm text-red-600">{error}</p>
+                  {needsVerification && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resending}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline disabled:opacity-50"
+                      >
+                        {resending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                        Gửi lại email xác minh
+                      </button>
+                      {resendMessage && (
+                        <p className="mt-1 text-sm text-emerald-600">{resendMessage}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -276,7 +333,11 @@ export default function CandidateLoginPage() {
             <span className="h-px flex-1 bg-ink-200"></span>
           </div>
 
-          <button className="w-full rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => authService.candidateLoginWithGoogle()}
+            className="w-full rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-3"
+          >
             <svg className="h-5 w-5" viewBox="0 0 48 48">
               <path
                 fill="#FFC107"

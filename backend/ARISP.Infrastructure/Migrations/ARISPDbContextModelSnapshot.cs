@@ -249,13 +249,30 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("About")
+                        .HasColumnType("text")
+                        .HasColumnName("about");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CvReviewJson")
+                        .HasColumnType("text")
+                        .HasColumnName("cv_review_json");
+
+                    b.Property<string>("DateOfBirth")
+                        .HasColumnType("text")
+                        .HasColumnName("date_of_birth");
+
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
+
+                    b.Property<string>("EducationJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("education_json");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -266,10 +283,19 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("email_verified");
 
+                    b.Property<string>("ExperienceJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("experience_json");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("full_name");
+
+                    b.Property<string>("GithubUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("github_url");
 
                     b.Property<string>("Headline")
                         .HasColumnType("text")
@@ -283,6 +309,14 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
 
+                    b.Property<string>("LinkedinUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("linkedin_url");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
@@ -292,13 +326,42 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("phone");
 
+                    b.Property<string>("PortfolioUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("portfolio_url");
+
+                    b.Property<string>("ProfileCvFileName")
+                        .HasColumnType("text")
+                        .HasColumnName("profile_cv_file_name");
+
                     b.Property<string>("ProfileCvUrl")
                         .HasColumnType("text")
                         .HasColumnName("profile_cv_url");
 
+                    b.Property<int?>("ProvinceCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("province_code");
+
+                    b.Property<string>("ProvinceName")
+                        .HasColumnType("text")
+                        .HasColumnName("province_name");
+
+                    b.Property<string>("SkillsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("skills_json");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<int?>("WardCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("ward_code");
+
+                    b.Property<string>("WardName")
+                        .HasColumnType("text")
+                        .HasColumnName("ward_name");
 
                     b.HasKey("Id");
 
@@ -1009,6 +1072,13 @@ namespace ARISP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("candidate")
+                        .HasColumnName("audience");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")

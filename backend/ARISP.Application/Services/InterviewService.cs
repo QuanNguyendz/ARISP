@@ -33,6 +33,60 @@ namespace ARISP.Application.Services
             _notificationService = notificationService;
         }
 
+        /// <summary>
+        /// Danh sách phiên phỏng vấn cho HR: join Application + JobPosting + Evaluation mới nhất.
+        /// </summary>
+        public async Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(CancellationToken ct = default)
+        {
+            var sessions = (await _unitOfWork.Repository<InterviewSession>().GetAllAsync(ct)).ToList();
+            if (sessions.Count == 0) return new List<HrInterviewSessionItem>();
+
+            var appIds = sessions.Select(s => s.ApplicationId).Distinct().ToList();
+            var apps = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .FindAsync(a => appIds.Contains(a.Id), ct)).ToList();
+            var appById = apps.ToDictionary(a => a.Id);
+
+            var jobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
+            var jobTitleById = (await _unitOfWork.Repository<JobPosting>()
+                .FindAsync(j => jobIds.Contains(j.Id), ct))
+                .ToDictionary(j => j.Id, j => j.Title);
+
+            // Đánh giá mới nhất theo từng phiên (theo round trùng khớp)
+            var evaluations = (await _unitOfWork.Repository<Evaluation>()
+                .FindAsync(e => appIds.Contains(e.ApplicationId), ct)).ToList();
+            var evalByAppRound = evaluations
+                .GroupBy(e => (e.ApplicationId, e.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).First());
+
+            return sessions
+                .OrderByDescending(s => s.CreatedAt)
+                .Select(s =>
+                {
+                    appById.TryGetValue(s.ApplicationId, out var app);
+                    evalByAppRound.TryGetValue((s.ApplicationId, s.RoundNumber), out var eval);
+                    return new HrInterviewSessionItem
+                    {
+                        Id = s.Id,
+                        ApplicationId = s.ApplicationId,
+                        CandidateName = app?.CandidateName ?? "—",
+                        JobTitle = app != null && jobTitleById.TryGetValue(app.JobPostingId, out var t) ? t : null,
+                        RoundNumber = s.RoundNumber,
+                        RoundType = s.RoundType,
+                        SessionType = s.SessionType,
+                        Status = s.Status,
+                        InterviewLanguage = s.InterviewLanguage,
+                        DurationSeconds = s.DurationSeconds,
+                        HasRecording = !string.IsNullOrEmpty(s.RecordingUrl),
+                        StartedAt = s.StartedAt,
+                        EndedAt = s.EndedAt,
+                        CreatedAt = s.CreatedAt,
+                        EvaluationId = eval?.Id,
+                        Verdict = eval?.AiVerdict,
+                    };
+                })
+                .ToList();
+        }
+
         public async Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);

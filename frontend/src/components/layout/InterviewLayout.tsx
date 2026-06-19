@@ -1,27 +1,14 @@
-import { Outlet } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import { Outlet } from 'react-router-dom'
 
 export default function InterviewLayout() {
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        bgcolor: 'grey.900',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        '& .MuiBox-root': { flex: 1 },
-      }}
-    >
-      <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.light' }}>
-          ARISP - Interview Room
-        </Typography>
-      </Box>
-      <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch', minHeight: 0 }}>
+    <div className="flex min-h-screen flex-col bg-gray-900 text-white">
+      <div className="flex-shrink-0 border-b border-white/10 p-4">
+        <h1 className="text-lg font-bold text-indigo-400">ARISP - Interview Room</h1>
+      </div>
+      <div className="flex min-h-0 flex-1 items-stretch">
         <Outlet />
-      </Box>
-    </Box>
-  );
+      </div>
+    </div>
+  )
 }

@@ -23,7 +23,31 @@ interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+export interface HrInterviewSessionItem {
+  id: string;
+  applicationId: string;
+  candidateName: string;
+  jobTitle?: string | null;
+  roundNumber: number;
+  roundType: string;
+  sessionType: string; // practice | real
+  status: string; // pending | active | completed | aborted | error
+  interviewLanguage: string;
+  durationSeconds?: number | null;
+  hasRecording: boolean;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  createdAt: string;
+  evaluationId?: string | null;
+  verdict?: string | null;
+}
+
 export const interviewService = {
+  async getHrSessions(): Promise<HrInterviewSessionItem[]> {
+    const { data } = await apiClient.get<HrInterviewSessionItem[]>('/interview/sessions');
+    return data;
+  },
+
   async getSessions(filters?: SessionFilters): Promise<PaginatedResponse<InterviewSession>> {
     const { data } = await apiClient.get<PaginatedResponse<InterviewSession>>('/interview', {
       params: filters,

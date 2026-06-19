@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
   Mail,
   Lock,
@@ -9,7 +8,6 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  Sparkles,
   ShieldAlert,
 } from 'lucide-react'
 import { authService } from '@services/auth/authService'
@@ -69,7 +67,7 @@ function getRoleDashboard(role: string): string {
     case 'recruiter':
       return '/recruiter/dashboard'
     case 'candidate':
-      return '/candidate/portal'
+      return '/'
     default:
       return '/hr/dashboard'
   }
@@ -200,7 +198,7 @@ export default function LoginPage() {
                 <label className="block text-sm font-medium text-ink-600">Mật khẩu</label>
                 <button
                   type="button"
-                  onClick={() => navigate('/auth/forgot-password')}
+                  onClick={() => navigate('/auth/forgot-password?audience=staff')}
                   className="text-sm font-medium text-brand-600 hover:underline"
                 >
                   Quên mật khẩu?

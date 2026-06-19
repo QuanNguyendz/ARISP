@@ -36,6 +36,16 @@ export const jobService = {
   async addAvailabilitySlots(id: string, slots: any[]): Promise<any> {
     const { data } = await apiClient.post(`/jobs/${id}/slots`, slots);
     return data;
+  },
+
+  // HR Admin: Approve / reject / change a job posting status.
+  // status: 'active' (duyệt) | 'rejected' (từ chối, cần rejectionReason) | 'closed' | 'archived' | 'pending'
+  async updateJobStatus(
+    id: string,
+    status: JobPosting['status'],
+    rejectionReason?: string
+  ): Promise<void> {
+    await apiClient.patch(`/jobs/${id}/status`, { status, rejectionReason });
   }
 };
 export default jobService;

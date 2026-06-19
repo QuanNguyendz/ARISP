@@ -43,7 +43,7 @@ Nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Job Board IT
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 18, TypeScript, TailwindCSS, MUI |
+| **Frontend** | React 18, TypeScript, TailwindCSS |
 | **Backend** | C# ASP.NET Core .NET 8, REST API, SignalR |
 | **Database** | PostgreSQL (Supabase host), Entity Framework Core, pgvector |
 | **Auth** | JWT + Role-based, Google OAuth2 + Domain Validation (HR), Magic Link (Candidate), BCrypt |
@@ -70,7 +70,7 @@ ARISP/
 │   ├── ARISP.Application/    # Use Cases, DTOs, Interfaces, Validators
 │   ├── ARISP.Domain/         # Entities, Value Objects, Domain Events
 │   └── ARISP.Infrastructure/ # EF Core, Repositories, External Services
-├── frontend/                 # React + TypeScript + TailwindCSS / MUI
+├── frontend/                 # React + TypeScript + TailwindCSS
 ├── docker/                   # Dockerfile, docker-compose files
 ├── nginx/                    # Nginx config
 ├── docs/                     # Tài liệu đặc tả kỹ thuật

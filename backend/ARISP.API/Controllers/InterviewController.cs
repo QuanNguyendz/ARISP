@@ -114,6 +114,18 @@ namespace ARISP.API.Controllers
             return Ok(list);
         }
 
+        /// <summary>
+        /// GET /api/interview/sessions
+        /// Danh sách phiên phỏng vấn cho HR (kèm ứng viên, vị trí, verdict).
+        /// </summary>
+        [HttpGet("sessions")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetSessions(CancellationToken ct)
+        {
+            var list = await _interviewService.GetSessionsForHrAsync(ct);
+            return Ok(list);
+        }
+
         #region ================= EXISTED INTERVIEW SESSION ENDPOINTS =================
 
         [HttpPost("session/start")]

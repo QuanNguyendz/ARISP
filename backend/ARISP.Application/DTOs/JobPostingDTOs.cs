@@ -153,6 +153,20 @@ namespace ARISP.Application.DTOs
         public string? JobCategory { get; set; }
         public bool IsUrgent { get; set; }
 
+        // Lương (dùng cho màn duyệt tin & danh sách)
+        public decimal? SalaryMin { get; set; }
+        public decimal? SalaryMax { get; set; }
+        public string? SalaryCurrency { get; set; }
+        public bool SalaryIsNegotiable { get; set; }
+
+        // Người tạo tin (Recruiter) – phục vụ màn HR duyệt tin
+        public Guid CreatedByUserId { get; set; }
+        public string? CreatedByName { get; set; }
+        public string? RejectionReason { get; set; }
+
+        /// <summary>Số lượng ứng viên đã ứng tuyển vào tin này (dùng cho dashboard HR).</summary>
+        public int ApplicantCount { get; set; }
+
         public static JobPostingListItemResponse FromEntity(JobPosting job) =>
             new()
             {
@@ -170,7 +184,13 @@ namespace ARISP.Application.DTOs
                 EmploymentType = job.EmploymentType,
                 ExperienceLevel = job.ExperienceLevel,
                 JobCategory = job.JobCategory,
-                IsUrgent = job.IsUrgent ?? false
+                IsUrgent = job.IsUrgent ?? false,
+                SalaryMin = job.SalaryMin,
+                SalaryMax = job.SalaryMax,
+                SalaryCurrency = job.SalaryCurrency,
+                SalaryIsNegotiable = job.SalaryIsNegotiable ?? false,
+                CreatedByUserId = job.CreatedByUserId,
+                RejectionReason = job.RejectionReason
             };
     }
 

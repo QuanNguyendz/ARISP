@@ -372,7 +372,7 @@ function Header() {
                       </div>
                       <div className="p-1.5 text-sm">
                         <a
-                          href="/candidate/portal"
+                          href="/candidate/profile"
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"
                         >
                           <User className="w-4 h-4 text-ink-400" /> Hồ sơ của tôi

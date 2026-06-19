@@ -95,6 +95,43 @@ builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenA
 
 builder.Services.AddScoped<IGeminiProvider, ARISP.Infrastructure.AI.GeminiProvider>();
 
+// File storage — Local (dev) hoặc S3-compatible object storage như Cloudflare R2 (prod).
+// Chọn qua "Storage:Provider" = "Local" | "S3". Mặc định Local.
+var storageProvider = builder.Configuration["Storage:Provider"] ?? "Local";
+if (string.Equals(storageProvider, "S3", StringComparison.OrdinalIgnoreCase))
+{
+    var s3Options = new ARISP.Infrastructure.Storage.S3StorageOptions();
+    builder.Configuration.GetSection("Storage:S3").Bind(s3Options);
+
+    if (string.IsNullOrWhiteSpace(s3Options.Endpoint) ||
+        string.IsNullOrWhiteSpace(s3Options.AccessKeyId) ||
+        string.IsNullOrWhiteSpace(s3Options.SecretAccessKey) ||
+        string.IsNullOrWhiteSpace(s3Options.Bucket))
+    {
+        throw new InvalidOperationException(
+            "Storage:Provider=S3 nhưng thiếu cấu hình Storage:S3 (Endpoint/AccessKeyId/SecretAccessKey/Bucket). " +
+            "Cấu hình qua user-secrets hoặc biến môi trường.");
+    }
+
+    builder.Services.AddSingleton(s3Options);
+    builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ =>
+    {
+        var config = new Amazon.S3.AmazonS3Config
+        {
+            ServiceURL = s3Options.Endpoint,
+            ForcePathStyle = true,            // R2/MinIO ưu tiên path-style
+            AuthenticationRegion = s3Options.Region
+        };
+        var creds = new Amazon.Runtime.BasicAWSCredentials(s3Options.AccessKeyId, s3Options.SecretAccessKey);
+        return new Amazon.S3.AmazonS3Client(creds, config);
+    });
+    builder.Services.AddScoped<IFileStorageService, ARISP.Infrastructure.Storage.S3FileStorageService>();
+}
+else
+{
+    builder.Services.AddScoped<IFileStorageService, ARISP.Infrastructure.Storage.LocalFileStorageService>();
+}
+
 // STT, TTS, Avatar, Notification mock stubs
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
 builder.Services.AddScoped<ITTSService, MockTTSService>();
@@ -103,6 +140,10 @@ builder.Services.AddScoped<INotificationService, MockNotificationService>();
 builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
 
 builder.Services.AddTransient<IEmailService, EmailService>();
+
+// Hàng đợi email nền — enqueue không chặn request, BackgroundService gửi SMTP ở luồng nền
+builder.Services.AddSingleton<IEmailQueue, EmailBackgroundQueue>();
+builder.Services.AddHostedService<EmailQueueHostedService>();
 
 // Application Services
 builder.Services.AddScoped<PlaybookService>();
@@ -123,7 +164,23 @@ var jwtSecret =
         "JWT:Secret chưa được cấu hình.\n" +
         "Chạy: dotnet user-secrets set \"JWT:Secret\" \"<secret-key>\"");
 
-builder.Services.AddAuthentication(options =>
+// Google OAuth credentials — đọc từ user-secrets / env var, không hardcode.
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+var googleAuthConfigured = !string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleSecret);
+
+// Production/Staging: BẮT BUỘC có credentials thật — fail-fast thay vì âm thầm chạy bằng giá trị giả
+// (giá trị giả khiến app boot OK nhưng Google login fail runtime với lỗi khó debug).
+if (!googleAuthConfigured && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "Authentication:Google:ClientId/ClientSecret chưa được cấu hình.\n" +
+        "Bắt buộc ở môi trường non-Development.\n" +
+        "Chạy: dotnet user-secrets set \"Authentication:Google:ClientId\" \"<client-id>\"\n" +
+        "      dotnet user-secrets set \"Authentication:Google:ClientSecret\" \"<client-secret>\"");
+}
+
+var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
@@ -170,41 +227,33 @@ builder.Services.AddAuthentication(options =>
     // so it functions over plain HTTP in local dev. (SameSite=None would be dropped on HTTP.)
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
-})
-// Google OAuth2 (used for HR internal SSO)
-.AddGoogle("Google", options =>
-{
-    options.SignInScheme = "External";
-    options.CallbackPath = "/api/auth/external/google-callback";
-
-    // Correlation cookie defaults to SameSite=None, which the browser drops over plain HTTP.
-    // Use Lax so the OAuth round-trip works in local dev without HTTPS.
-    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-
-    var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
-    var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
-
-    // 🛡️ Nếu trống, gán chuỗi Mock để tránh crash pipeline khi chạy Local/Swagger
-    options.ClientId = string.IsNullOrEmpty(googleClientId) ? "MOCK_GOOGLE_CLIENT_ID_FOR_LOCAL" : googleClientId;
-    options.ClientSecret = string.IsNullOrEmpty(googleSecret) ? "MOCK_GOOGLE_SECRET_FOR_LOCAL" : googleSecret;
 });
-//// Azure AD / Microsoft Entra (OpenID Connect)
-//.AddOpenIdConnect("AzureAD", options =>
-//{
-//    options.SignInScheme = "External";
 
-//    var azureAuthority = builder.Configuration["Authentication:AzureAd:Authority"] ?? Environment.GetEnvironmentVariable("AZURE_AD_AUTHORITY");
-//    var azureClientId = builder.Configuration["Authentication:AzureAd:ClientId"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
-//    var azureSecret = builder.Configuration["Authentication:AzureAd:ClientSecret"] ?? Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");
+// Google OAuth2 — dùng chung cho Candidate self-service Sign-In và HR internal SSO.
+// Chỉ đăng ký provider khi đã có credentials thật:
+//   - Production/Staging: thiếu credentials đã fail-fast ở trên.
+//   - Development: thiếu credentials → bỏ qua provider + cảnh báo (tắt mềm), KHÔNG nhồi giá trị giả.
+if (googleAuthConfigured)
+{
+    authBuilder.AddGoogle("Google", options =>
+    {
+        options.SignInScheme = "External";
+        options.CallbackPath = "/api/auth/external/google-callback";
 
-//    options.Authority = string.IsNullOrEmpty(azureAuthority) ? "https://login.microsoftonline.com/common/v2.0" : azureAuthority;
-//    options.ClientId = string.IsNullOrEmpty(azureClientId) ? "00000000-0000-0000-0000-000000000000" : azureClientId;
-//    options.ClientSecret = string.IsNullOrEmpty(azureSecret) ? "MOCK_AZURE_SECRET_FOR_LOCAL" : azureSecret;
+        // Correlation cookie defaults to SameSite=None, which the browser drops over plain HTTP.
+        // Use Lax so the OAuth round-trip works in local dev without HTTPS.
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
-//    options.ResponseType = "code";
-//    options.SaveTokens = true;
-//});
+        options.ClientId = googleClientId!;
+        options.ClientSecret = googleSecret!;
+    });
+}
+else
+{
+    Log.Warning("Google OAuth provider DISABLED — Authentication:Google:ClientId/ClientSecret chưa cấu hình. " +
+                "Google Sign-In (Candidate & HR) sẽ không khả dụng. Chỉ chấp nhận ở môi trường Development.");
+}
 
 builder.Services.AddAuthorization(options =>
 {
@@ -429,9 +478,16 @@ async Task SeedDataAsync(ARISPDbContext db)
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             FullName = "John Doe Candidate",
             Phone = "0987654321",
-            Headline = "C# .NET Backend Developer | AI Enthusiast"
+            Headline = "C# .NET Backend Developer | AI Enthusiast",
+            EmailVerified = true
         };
         await db.CandidateAccounts.AddAsync(candidate);
+        await db.SaveChangesAsync();
+    }
+    else if (!candidate.EmailVerified)
+    {
+        // Đảm bảo seed candidate đã có sẵn trong DB không bị khóa login sau khi bật email verification
+        candidate.EmailVerified = true;
         await db.SaveChangesAsync();
     }
 
@@ -589,9 +645,15 @@ async Task SeedDataAsync(ARISPDbContext db)
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
             FullName = "Phong VG Candidate",
             Phone = "0999999999",
-            Headline = "AI & .NET Backend Candidate"
+            Headline = "AI & .NET Backend Candidate",
+            EmailVerified = true
         };
         await db.CandidateAccounts.AddAsync(phongCandidate);
+        await db.SaveChangesAsync();
+    }
+    else if (!phongCandidate.EmailVerified)
+    {
+        phongCandidate.EmailVerified = true;
         await db.SaveChangesAsync();
     }
 

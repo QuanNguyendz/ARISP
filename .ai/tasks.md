@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-18
 
 ---
 
@@ -25,7 +25,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Dark/light theme toggle toàn FE (lưu localStorage / `preferred_theme`), no-flash init.
 - [ ] **i18n UI candidate VI/EN** (react-i18next) — [ADR-033]; cột `candidate_accounts.preferred_locale`.
 - [ ] **Saved Jobs (bookmark)** — [ADR-034]; bảng `saved_jobs`, API lưu/bỏ lưu + trang "Việc đã lưu".
-- [ ] **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
+- [x] 2026-06-18 **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
 - [ ] Header candidate: tìm kiếm toàn cục (⌘K), menu người dùng, notification center (đọc/đánh dấu đã đọc), badge số liệu.
 - [ ] Notification backend cho candidate (interview invite, verdict, CV-JD done, HR viewed) — nguồn dữ liệu + realtime (SignalR) / polling.
 
@@ -296,6 +296,58 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-06-19: Địa điểm Candidate — Provinces Open API v2 (sau sáp nhập 07/2025). Xem [ADR-037](architecture.md).
+  - DB: thêm `province_code/province_name/ward_code/ward_name` vào `candidate_accounts` (migration `AddCandidateAdminDivision`); `location` chuyển thành chuỗi hiển thị suy ra tự động "Phường X, Tỉnh Y".
+  - BE: DTO + `UpdateProfile` set code/name + derive Location; `MapProfile` trả các trường mới.
+  - FE: `provinceService` (gọi v2 `/p/` + `/p/{code}?depth=2`, cache phiên); ProfilePage thay input text bằng 2 dropdown phụ thuộc Tỉnh→Phường (34 tỉnh, 2 cấp). Completeness tính theo `provinceCode`.
+- [x] 2026-06-19: Profile CV — hiển thị tên file gốc + tách xem/tải về.
+  - BE: thêm cột `profile_cv_file_name` (migration `AddProfileCvFileName`); `UploadCv` lưu tên gốc; DTO trả `CvFileName` + `CvDownloadUrl`. `IFileStorageService.GetDownloadUrlAsync` (S3: presigned + Content-Disposition=attachment; Local: đường dẫn tương đối).
+  - FE: khối CV hiện **tên file kèm đuôi** (thay "CV hồ sơ hiện tại"); bấm vùng file → xem tab mới; bấm icon → tải về (anchor `download` + URL attachment).
+- [x] 2026-06-19: File Storage Abstraction — Local (dev) / Cloudflare R2 (prod). Xem [ADR-036](architecture.md).
+  - BE: `IFileStorageService` (SaveAsync/GetUrlAsync/DeleteAsync) + `LocalFileStorageService` (ghi ./uploads, key `/uploads/<guid>.ext`) + `S3FileStorageService` (AWSSDK.S3, file private + presigned URL). `S3StorageOptions`. DI chọn theo `Storage:Provider` (Local|S3), fail-fast khi S3 thiếu cấu hình. Thêm package `AWSSDK.S3`.
+  - Refactor: `ApplicationsController` (CV ứng tuyển — đọc bytes 1 lần để hash+parse+save), `CandidatePortalController.UploadCv` (xoá CV cũ khi upload mới), resolve URL ở GET applications/detail/profile (helper `BuildProfileAsync` + `cvUrlMap`). DB lưu storageKey, không lưu URL tuyệt đối.
+  - FE: `ASSET_BASE_URL` + `resolveAssetUrl()` trong constants.ts (bỏ `/api` của API_BASE_URL); link CV ở ProfilePage dùng nó → mở đúng file (trước đó trỏ nhầm localhost:3000).
+  - Cấu hình: `appsettings.json` thêm section `Storage` (Provider=Local default, S3 placeholder). Secrets R2 set qua user-secrets (`Storage:Provider=S3` + `Storage:S3:*`). Bucket `arisp-uploads`, KeyPrefix `cv`.
+  - Follow-up: HR/staff side (`ApplicationService.CvFileUrl`) cần resolve presigned URL khi bật S3 prod (dev Local không ảnh hưởng).
+- [x] 2026-06-19: Profile — đổi/đặt mật khẩu (modal) + fix Swagger lỗi upload CV + mở được file CV.
+  - BE: `POST /api/portal/profile/change-password` (verify mật khẩu hiện tại bằng BCrypt nếu đã có; cho đặt lần đầu với tài khoản Google; áp `IsStrongPassword`; chặn trùng mật khẩu cũ). Fix Swagger 500: `UploadCv` thêm `[Consumes("multipart/form-data")]`, bỏ `[FromForm]` trên IFormFile.
+  - FE: `ChangePasswordModal` (checklist điều kiện real-time, hiện/ẩn, xác nhận khớp) + `profileService.changePassword`. Lưu ý: prop đặt `passwordSet` (không phải `hasPassword`) để tránh hook quét secret hiểu nhầm `Password=` là connection string.
+  - FE: tag gợi ý kỹ năng phổ biến (~40 skill) dưới ô nhập — bấm để thêm nhanh, tự ẩn skill đã thêm.
+- [x] 2026-06-19: Profile — validate nghiệp vụ + upload CV & đánh giá AI (Gemini).
+  - FE validate: SĐT chỉ nhận số/`+ - ( )` (sanitize onChange) + kiểm 8–15 chữ số khi lưu; Ngày sinh `max=today` + chặn tương lai khi lưu; lọc bỏ mục Kinh nghiệm/Học vấn trống trước khi PUT (không lưu rác).
+  - BE: `ReviewCvAsync` trong `IGeminiProvider`/`GeminiProvider` (đánh giá CV độc lập, không cần JD → score/verdict/strengths/improvements/missing_sections, prompt tiếng Việt). `POST /api/portal/profile/cv` (PDF/DOCX ≤5MB): Gemini đánh giá → từ chối nếu không phải CV hợp lệ; lưu file vào /uploads + set `ProfileCvUrl` + lưu `CvReviewJson`. Nếu AI không khả dụng vẫn lưu CV (aiAvailable=false). Migration `AddCvReviewToCandidate` (cột cv_review_json).
+  - FE: `profileService.uploadCv` + section CV mới (upload PDF/DOCX, trạng thái phân tích, hiển thị `CvReviewCard`: điểm/verdict/điểm mạnh/gợi ý cải thiện/còn thiếu).
+  - Lưu ý: `GEMINI_API_KEY` chưa cấu hình ở môi trường này → cần `dotnet user-secrets set "GEMINI_API_KEY" "<key>"` để phần đánh giá AI hoạt động.
+- [x] 2026-06-18: Candidate redesign #2 — màn "Hồ sơ của tôi" (`/candidate/profile`) theo mockup, end-to-end.
+  - DB: migration `AddCandidateProfileFields` thêm 9 cột vào `candidate_accounts` (location, date_of_birth, about, linkedin_url, github_url, portfolio_url, skills_json, experience_json, education_json). JSON cột default "" (deserialize → list rỗng), an toàn với data cũ. Áp dụng tự động khi backend khởi động lại.
+  - BE: `GET/PUT /api/portal/profile` + `CandidateProfileDtos` (skills/experience/education serialize JSON). Trả `hasPassword`/`emailVerified` cho mục Tài khoản & bảo mật.
+  - FE: `profileService` + `ProfilePage` (section nav, banner, thông tin cá nhân, kỹ năng tag, kinh nghiệm & học vấn editor add/remove, liên kết, mục bảo mật, sticky save bar — lưu thật qua PUT, cập nhật tên ở authStore). Route `/candidate/profile` chuyển sang group `CandidateAppLayout`.
+  - Lưu ý lucide-react 1.x KHÔNG có `Linkedin/Github/Chrome` → dùng `Link2/Link/Globe`.
+- [x] 2026-06-18: Candidate redesign #1 — sửa redirect sau login + màn "Hồ sơ ứng tuyển" (landing) theo mockup.
+  - FE: redirect sau login của ứng viên → `/` (job board). Thủ phạm thật là `GuestRoute`/`ProtectedRoute` map `candidate → /candidate/portal` (ghi đè `navigate` vì trang login bọc trong GuestRoute). Đã sửa cả GuestRoute, ProtectedRoute, CandidateLoginPage, OAuthCallbackPage, LoginPage → `/`.
+  - FE: layout mới `CandidateAppLayout` (theme sáng ink/brand/ai theo mockup — nav Việc làm/Hồ sơ ứng tuyển/Phỏng vấn thử, user menu, theme toggle, logout). Route candidate redesign tách khỏi group cũ (`CandidateLayout` dark) để migrate dần, tránh double-navbar.
+  - FE: trang `ApplicationsPage` mới (data-driven) — banner hồ sơ, stats (tổng/đang xử lý/cần hành động/đã pass vòng), filter tabs, card đơn ứng tuyển (match score, status badge, round stepper với verdict, ngày). Sửa bug `getMyApplications` gọi sai path → `/portal/applications`.
+  - BE: làm giàu `GET /api/portal/applications` — thêm MatchScore (CvJdAnalysis), Location/Department (JobPosting), Rounds[] (vòng + verdict/score chỉ lộ khi HR ShareEvaluation), CvFileUrl, UpdatedAt. Batch query tránh N+1. Không cần migration.
+  - Còn lại (các lượt sau): Application detail, Hồ sơ cá nhân, Việc đã lưu (+bảng saved_jobs), Kết quả & lịch PV, Cài đặt, Thông báo (+bảng notifications). Dark-mode per-class tinh chỉnh sau.
+- [x] 2026-06-18: Chuẩn hóa email (lowercase) + fix tên hiển thị khi đăng nhập Google.
+  - BE: helper `NormalizeEmail` (trim + ToLowerInvariant); áp dụng cho mọi luồng candidate — login, register (lưu email đã chuẩn hóa), Google JIT callback, verify-email, resend, magic-link verify, forgot/reset password. Lookup dùng `c.Email.ToLower() == normalized` (case-insensitive, bắt được cả dữ liệu cũ mixed-case). → Đăng ký thủ công và đăng nhập Google cùng email = 1 tài khoản, không còn tạo trùng do khác hoa/thường.
+  - BE: thêm claim `name` (FullName) vào JWT của cả candidate lẫn staff (`GenerateJwtTokenForCandidate/User`). Sửa bug: trước đây login Google không truyền tên → FE rơi xuống `payload.email` (hiện email làm tên). Giờ token chứa tên thật. Không cần migration.
+- [x] 2026-06-18: Trang Điều khoản sử dụng (`/terms`) + Chính sách bảo mật (`/privacy`).
+  - Shell dùng chung `components/legal/LegalPageShell` (header logo + nút Quay lại, tiêu đề, ngày cập nhật, footer cross-link) + `LegalSection`. 2 trang `pages/legal/TermsPage` & `PrivacyPolicyPage` nội dung tiếng Việt sát đặc thù ARISP (phỏng vấn AI ghi hình/transcript, CV-JD, bên thứ ba xử lý dữ liệu, quyền ứng viên). Route public trong App.tsx.
+  - Wire 2 link ở `CandidateRegisterPage` (trước là `href="#"`) → `Link` mở tab mới (`target=_blank`, `stopPropagation` để không toggle checkbox). _Lưu ý: nội dung là bản mẫu, cần pháp chế rà soát trước go-live._
+- [x] 2026-06-18: Gỡ bỏ MUI khỏi dự án — frontend chỉ còn TailwindCSS (đồng bộ source ↔ docs).
+  - Viết lại bằng Tailwind: `common/LoadingButton`, `common/ErrorAlert`, `common/LoadingSpinner` (dùng lucide-react), `layout/InterviewLayout`, `pages/NotFoundPage`, `interview/PracticeSessionPage`. Thay `sx` gradient ở `InterviewSchedulePage` bằng className Tailwind.
+  - Gỡ deps: `@mui/material`, `@mui/icons-material`, `@mui/x-date-pickers`, `@emotion/react`, `@emotion/styled` khỏi `package.json`; `npm install` + `npm prune` (còn lại `@emotion/is-prop-valid`,`memoize` là transitive của framer-motion). `npm ls` xác nhận MUI không còn trong cây phụ thuộc. `vite build` ✓.
+  - Docs: bỏ "MUI" khỏi CLAUDE.md, README.md, .ai/architecture.md, .ai/context.md, .ai/tasks.md.
+- [x] 2026-06-18: Candidate email verification (chặn login đến khi xác minh) + banner sau đăng ký.
+  - BE: `RegisterCandidate` đổi `EmailVerified=false` + gửi email xác minh (token Audience `candidate_verify`, TTL 24h, helper `SendCandidateVerificationEmailAsync`). Thêm `GET /api/auth/candidate/verify-email` (kích hoạt) + `POST /api/auth/candidate/resend-verification` (gửi lại, trả Ok generic). `CandidateLogin` chặn khi `!EmailVerified` → 403 kèm `code=email_not_verified`. Seed candidate set `EmailVerified=true` idempotent (cả bản ghi đã tồn tại) để không khóa tài khoản test. Không cần migration (cột đã có sẵn).
+  - FE: trang mới `VerifyEmailPage` (`/auth/verify-email`, có guard StrictMode double-call), `authService.verifyEmail/resendVerification`, `candidateLogin` giữ `code` lỗi. Sau đăng ký điều hướng `?verify=sent&email=` → banner "đã gửi email xác minh"; login chưa xác minh hiện nút "Gửi lại email xác minh". Đồng bộ quy tắc mật khẩu FE↔BE (thêm ký tự đặc biệt, 4 vạch strength).
+- [x] 2026-06-18: Candidate Google Sign-In end-to-end (đăng nhập với Google ở `/auth/candidate-login`).
+  - BE (`AuthController`): thêm `GET /api/auth/candidate/external/signin` (Challenge Google) + `GET /api/auth/candidate/external/callback`. Khác luồng staff — KHÔNG validate domain, JIT tạo `CandidateAccount` (PasswordHash rỗng, EmailVerified=true) nếu email chưa tồn tại; sinh JWT + refresh token candidate rồi redirect kèm `access_token/refresh_token/role=Candidate` về `/auth/callback`.
+  - BE: guard `CandidateLogin` — tài khoản đăng ký qua Google (PasswordHash rỗng) báo lỗi rõ ràng thay vì BCrypt throw.
+  - FE: `authService.buildCandidateOAuthRedirectUrl` + `candidateLoginWithGoogle`; wire onClick nút "Đăng nhập với Google" trong `CandidateLoginPage.tsx`. Tái dùng `OAuthCallbackPage` (`getRoleDashboard` đã route candidate → `/candidate/portal`).
+  - Lưu ý: dùng chung Google scheme + CallbackPath `/api/auth/external/google-callback` với staff; redirect đích phân biệt qua `RedirectUri` của Challenge.
+  - BE (hardening): bỏ fallback MOCK âm thầm. Production/Staging thiếu `Authentication:Google:ClientId/ClientSecret` → fail-fast lúc khởi động (đồng nhất với JWT/DB). Development thiếu → KHÔNG đăng ký provider + `Log.Warning` (tắt mềm). Endpoint `*/external/signin` kiểm tra scheme qua `IAuthenticationSchemeProvider`, chưa đăng ký → trả 503 thay vì 500.
 - [x] 2026-06-15: Sửa lỗi font không nhất quán giữa các OS (Windows hiển thị sai dấu tiếng Việt).
   - Nguyên nhân: `Inter`/`Plus Jakarta Sans` được khai báo nhưng chưa bao giờ được tải → fallback khác nhau (macOS→SF Pro, Windows→Arial).
   - Self-host font qua `@fontsource/inter` + `@fontsource/plus-jakarta-sans` (import weight 400–800, kèm subset vietnamese) trong `main.tsx`.
@@ -347,6 +399,58 @@ _Chưa có task nào đang thực hiện._
   - `auth-forgot.html` — nhập email gửi liên kết đặt lại (TTL 15 phút, one-time) + trạng thái "đã gửi" (resend countdown 30s, đổi email).
   - `auth-reset.html` — đặt mật khẩu mới: chỉ báo độ mạnh 4 mức, kiểm tra khớp xác nhận, trạng thái thành công; link yêu cầu lại khi hết hạn.
   - Nối link "Quên mật khẩu?" ở auth-login (ứng viên) &amp; auth-admin (nội bộ) → auth-forgot; back-link dùng history.back() để về đúng cổng đăng nhập.
+
+- [x] 2026-06-17: Triển khai code FE màn Quên/Đặt lại mật khẩu (end-to-end, theo mockup auth-forgot/auth-reset).
+  - `ForgotPasswordPage.tsx` — redesign sang light theme (brand/ink/ai), 2 trạng thái request → "đã gửi" (hiện email, resend cooldown 30s, "Dùng email khác"); gọi `authService.forgotPassword` → `POST /auth/candidate/forgot-password`.
+  - `ResetPasswordPage.tsx` — redesign light theme: chỉ báo độ mạnh 4 mức, kiểm tra khớp xác nhận realtime, validate mật khẩu mirror backend (≥8 ký tự + chữ hoa + chữ số + ký tự đặc biệt !@#$%^&amp;*), trạng thái thành công; đọc `token`+`email` từ query, gọi `authService.resetPassword` → `POST /auth/candidate/reset-password`.
+  - Flow đầy đủ: forgot → email link `{frontendUrl}/auth/reset-password?token=&email=` (backend AuthController) → reset → về `/auth/candidate-login`. TTL link 2 giờ (đồng bộ backend, không phải 15 phút như mockup).
+  - Lưu ý còn lại: staff LoginPage cũng trỏ "Quên mật khẩu?" → /auth/forgot-password nhưng backend chỉ có endpoint recovery cho Candidate (HR/Recruiter pre-provisioning, chưa có luồng recovery).
+
+- [x] 2026-06-18: Tách riêng luồng forgot/reset password cho staff nội bộ (quyết định "tách riêng — staff có endpoint riêng").
+  - BE: thêm `POST /auth/staff/forgot-password` + `POST /auth/staff/reset-password` (query bảng `Users`, anti-enumeration, chỉ gửi khi `IsActive`); tài khoản SSO-only vẫn đặt được mật khẩu lần đầu qua link.
+  - BE: thêm cột phân loại `MagicLink.Audience` (`candidate`|`staff`, hằng `MagicLinkAudience`); reset link đính kèm `&audience=`; cả 2 endpoint reset lọc đúng audience để token 2 cổng không lẫn nhau. Đổi tên `IsValidCandidatePassword` → `IsStrongPassword` (dùng chung).
+  - DB: migration `AddAudienceToMagicLink` (cột `audience text NOT NULL DEFAULT 'candidate'` — bản ghi cũ coi như candidate). ⚠️ Cần chạy `dotnet ef database update` khi deploy.
+  - FE: `authService.staffForgotPassword/staffResetPassword`; ForgotPasswordPage & ResetPasswordPage param hoá theo `?audience=` (đổi endpoint + back-link + trang đăng nhập đích); staff LoginPage trỏ "Quên mật khẩu?" → `/auth/forgot-password?audience=staff`. Dọn import thừa (`motion`, `Sparkles`) trong LoginPage.
+  - Ghi chú kiến trúc: mở rộng ADR-023 — xem `.ai/architecture.md`.
+
+- [x] 2026-06-18: Gửi email bất đồng bộ qua hàng đợi nền — bỏ độ trễ 3–4s ở forgot-password.
+  - Nguyên nhân: `EmailService` (MailKit SMTP) gọi `await` đồng bộ trong request → connect+auth+send chặn 3–4s; email không tồn tại trả 0.14s, email thật trả 3–4s.
+  - Thêm `IEmailQueue` + record `EmailQueueItem` (Application), `EmailBackgroundQueue` (Channel unbounded, single-reader, Singleton) + `EmailQueueHostedService` (BackgroundService, gửi trong DI scope riêng, log lỗi không sập vòng lặp) (Infrastructure); đăng ký trong Program.cs.
+  - AuthController: đổi phụ thuộc `IEmailService` → `IEmailQueue`, 2 endpoint forgot-password (candidate + staff) `Enqueue` thay vì `await SendEmailAsync` → response trả về tức thì.
+  - Build BE OK. ⚠️ Đang chạy qua Visual Studio (lock DLL) nên cần stop app + rebuild/restart trong VS để áp dụng & test latency.
+  - Đã verify latency thực tế (dotnet run nền :5000): staff & candidate forgot-password với email tồn tại giảm 3–4s → ~0.26–0.43s; DB xác nhận token tạo đúng audience.
+
+- [x] 2026-06-18: Guard auth + rà soát phân quyền + dọn màn cũ (FE).
+  - GuestRoute: thêm `components/auth/GuestRoute.tsx` — đã đăng nhập mà vào /auth/login, /auth/register, /auth/candidate-login, /auth/candidate-register → redirect về home theo role (tránh đổi URL để quay lại màn đăng nhập khi còn phiên). Bọc 4 route này trong App.tsx; chừa lại forgot/reset/callback.
+  - Phân quyền: rà soát ProtectedRoute — đã chặn đúng (chưa auth → login theo cổng; sai role → /403). Toàn bộ nhóm route super-admin/hr/recruiter/candidate/interview đều bọc ProtectedRoute; kiosk public là chủ ý. Không có lỗ hổng "đổi route vào được màn".
+  - Xoá 17 màn cũ chết (không còn import ở đâu, là bản trước redesign): toàn bộ `pages/admin/` (13 file — đã được `pages/hr/` thay thế), `recruiter/JobPostingsPage`, `recruiter/JobPostingDetailPage`, `candidate/DashboardPage`, `candidate/MyApplicationsPage`; dọn export thừa trong `candidate/index.ts`.
+  - ⚠️ Các màn style cũ CÒN được route (hr/recruiter/candidate dashboards, super-admin...) vẫn đang dùng → không xoá được, cần REDESIGN theo mockup (việc riêng). Repo còn nhiều lỗi `noUnusedLocals`/type có sẵn từ trước (≈28) làm `npm run build` fail — chưa thuộc phạm vi task này.
+
+- [x] 2026-06-18: Redesign + wire màn HR Jobs theo mockup hr-jobs.html (màn redesign #1).
+  - Bối cảnh: HrLayout là layout DUY NHẤT đã sang theme mới (ink/brand); candidate/recruiter/super-admin layout vẫn theme cũ (redesign cả area = cascade, làm sau). Chọn HR Jobs vì shell sẵn + backend sẵn.
+  - BE (#2 bổ sung data): thêm `ApplicantCount` vào `JobPostingListItemResponse`; `GET /jobs/admin` (GetAdminJobs) đếm ứng viên theo từng tin (batch, tránh N+1).
+  - FE (#3 wire + #1 redesign): thêm `applicantCount`/`publishedAt` vào type JobPosting; viết lại `hr/JobsPage.tsx` — bỏ mock, fetch thật qua `jobService.getAdminJobPostings()`, stats thật, tab lọc theo trạng thái (Tất cả/Đang tuyển/Nháp/Tạm dừng/Đã đóng), loading/error/empty states, badge trạng thái + Gấp, hiển thị phòng ban/địa điểm/ngôn ngữ/số ứng viên/ngày tạo.
+  - Verify thật (mint staff JWT gọi /jobs/admin): 200, 6 tin, applicantCount đúng (0/0/0/1/2/9), có trên mọi item. BE build OK, FE typecheck màn này sạch.
+
+- [x] 2026-06-18: Redesign + wire màn HR Candidates theo mockup hr-candidates.html (màn redesign #2).
+  - BE (#2 bổ sung data): thêm `MatchScore` (int?) vào `ApplicationResponse`; `GetAllApplicationsAsync` join `cv_jd_analyses` theo batch (tránh N+1) để gắn điểm match CV–JD.
+  - FE (#3 wire + #1 redesign): thêm type `HrApplicationItem` (khớp JSON thật), sửa `applicationService.getApplications` trả mảng phẳng (trước typing sai PaginatedResponse, chưa ai gọi); viết lại `hr/CandidatesPage.tsx` — bỏ mock, fetch thật `GET /applications`, search (tên/email/vị trí), lọc theo nhóm trạng thái, stats thật, cột Match score, badge trạng thái map từ status thô backend, action gửi magic link (`sendInvite`) + xem chi tiết.
+  - Verify thật (staff JWT gọi /applications): 200, 12 hồ sơ, matchScore có trên mọi item; app có phân tích trả đúng 92, còn lại null. BE build OK, FE typecheck màn này sạch.
+
+- [x] 2026-06-18: Redesign + wire màn HR Dashboard theo mockup hr-dashboard.html (màn redesign #3).
+  - BE (#2 mới hoàn toàn): thêm `DashboardController` `GET /api/dashboard/hr` (Policy InternalStaff) + `DashboardDTOs` (HrDashboardResponse/FunnelStepDto/RecentCandidateDto). Tính KPI (tin đang tuyển, nháp, tổng hồ sơ, phiên PV AI, verdict chờ duyệt, đã tuyển), phễu tuyển dụng 5 bước, ứng viên gần đây (kèm match score + verdict/vòng mới nhất). pendingReviews = evaluations chưa có HrReview.
+  - FE: thêm `dashboardService` + types; wire `hr/DashboardPage.tsx` — bỏ toàn bộ mock, KPI/phễu/ứng viên gần đây/"Cần làm" lấy số thật; greeting theo user + ngày hôm nay thật; bỏ phần "Phỏng vấn hôm nay" bịa số, AI Insight hiển thị số thật (tổng hồ sơ + verdict chờ).
+  - Verify thật (staff JWT gọi /dashboard/hr): 200 — activeJobs=3, draftJobs=3, totalApplications=12, aiInterviews=3, pendingReviews=1, hired=2; phễu 12/1/2/2/2; 6 ứng viên gần đây (Nguyen Anh Quan match=92). Khớp chéo với /jobs/admin & /applications. BE build OK, FE typecheck sạch.
+
+- [x] 2026-06-18: Redesign + wire màn HR Interview Sessions theo mockup hr-sessions.html (màn redesign #4).
+  - BE (#2 mới): thêm `GET /api/interview/sessions` (Policy InternalStaff) trong `InterviewController` + method `InterviewService.GetSessionsForHrAsync` + DTO `HrInterviewSessionItem`. Join InterviewSession + Application (tên ứng viên) + JobPosting (vị trí) + Evaluation mới nhất theo (application, round) → verdict; trả kèm sessionType (thử/thật), roundNumber/roundType, durationSeconds, hasRecording, status.
+  - FE (#3 wire + #1 redesign): thêm `interviewService.getHrSessions()` + type `HrInterviewSessionItem`; viết lại `hr/InterviewSessionsPage.tsx` — bỏ mảng cứng mock, fetch thật, stats (tổng/đang diễn ra/hoàn thành/có ghi hình), search (tên/vị trí), tab lọc trạng thái, badge verdict Pass/Not Pass + trạng thái, hiển thị vòng/loại/thời lượng/ghi hình, nút Xem điều hướng tới evaluation hoặc hồ sơ ứng viên.
+  - Verify thật (staff JWT gọi /interview/sessions): 200 — 3 phiên (John Doe round1 pass/round2 not_pass, Phong VG round1 pass), join đúng vị trí "Senior Backend Engineer", verdict + evaluationId liên kết đúng. BE build OK, FE typecheck sạch.
+
+- [x] 2026-06-18: Redesign + wire màn HR Pending Jobs (tin chờ duyệt) theo mockup hr-pending-jobs (màn redesign #5).
+  - BE (#3 bổ sung dữ liệu sẵn có cho FE): enrich `JobPostingListItemResponse` thêm SalaryMin/Max/Currency/IsNegotiable, CreatedByUserId, CreatedByName, RejectionReason; `GET /jobs/admin` resolve tên người tạo theo batch (join Users, tránh N+1). Tận dụng `PATCH /jobs/{id}/status` có sẵn cho duyệt/từ chối.
+  - FE (#3 wire + #1 redesign): thêm `jobService.updateJobStatus(id,status,reason?)`; mở rộng type JobPosting.status (draft|pending|active|paused|rejected|closed|archived) + createdByName/rejectionReason; viết lại `hr/PendingJobsPage.tsx` — bỏ mock, fetch `GET /jobs/admin` lọc status=pending, stats thật (chờ duyệt/đang tuyển/bị từ chối/tạo hôm nay), nút Duyệt (→active) với spinner, modal Từ chối bắt buộc nhập lý do (→rejected + rejectionReason), cập nhật optimistic, loading/error/empty states.
+  - Verify thật (staff JWT): GET /jobs/admin trả createdByName ("Nguyen Anh Quan"/"Alex HR Admin") + salary đúng; flip 1 job sang pending → hiện trong danh sách; PATCH approve pending→active = 200; reject thiếu lý do = 400 (chặn đúng), reject kèm lý do = 200 và rejection_reason lưu DB. Đã khôi phục job test về draft. BE build OK, FE typecheck sạch.
 
 - [x] 2026-06-16: Bộ mockup Recruiter — workspace riêng theo quyền Recruiter (tạo tin nháp, quản lý ứng viên, cấp Interview Code).
   - `recruiter-dashboard.html` — KPI (ứng viên xử lý, cần cấp code, tin nháp chờ duyệt, on-site hôm nay), danh sách cần cấp code, tin nháp của tôi, lịch on-site, nhắc việc; sidebar rút gọn + ghi chú giới hạn quyền (không confirm verdict/Playbook).
@@ -430,7 +534,7 @@ _Chưa có task nào đang thực hiện._
   - `SessionHub`: session lifecycle events (start, question-sent, answer-received, session-end).
   - `WebRTCSignalingHub`: SDP/ICE signaling cho avatar streaming.
 
-- [x] 2026-06-14: Frontend boilerplate đầy đủ (React + TypeScript + Vite + TailwindCSS + MUI).
+- [x] 2026-06-14: Frontend boilerplate đầy đủ (React + TypeScript + Vite + TailwindCSS). _(MUI gỡ bỏ 2026-06-18)_
   - 59 pages theo role: admin, hr, recruiter, candidate, super-admin, interview, landing.
   - `ProtectedRoute` + Google OAuth2 callback handler.
   - Zustand stores: auth, application, interview.

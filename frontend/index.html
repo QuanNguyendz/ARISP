@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="ARISP - AI-Powered Recruitment and Interview Support Platform for Enterprises" />
     <title>ARISP</title>
+    <!-- Áp theme đã lưu TRƯỚC khi React render để giữ chế độ sáng/tối qua mọi lần tải trang & điều hướng (mặc định: tối). -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          if (t === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -5,7 +5,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          Client Layer                                │
-│            React + TypeScript + TailwindCSS / MUI                   │
+│            React + TypeScript + TailwindCSS                         │
 │                                                                     │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
 │  │  HR Admin Portal│  │ Candidate Portal  │  │ On-site Kiosk    │   │
@@ -202,6 +202,11 @@ public interface IEmbeddingProvider
 - **Yêu cầu Pre-provisioning (Cấp trước tài khoản)**: Chỉ những email đã được Super Admin hoặc Admin tạo sẵn trong database mới được phép đăng nhập. Nếu đăng nhập bằng Google Sign-In mà email chưa tồn tại trong database (chưa được cấp tài khoản trước đó), hệ thống **chặn đăng nhập và tuyệt đối không tự động đăng ký/tạo tài khoản nháp**.
 - **Domain Validation:** Khi đăng nhập qua OAuth2, hệ thống bắt buộc phân tách và kiểm tra phần domain của địa chỉ email (ví dụ: `hr@fsoft.vn` -> lấy ra `fsoft.vn`). Email này phải thuộc danh sách tên miền được phép truy cập (`allowed_email_domains` được quy định trong cấu hình toàn cục `system_settings`). Mọi email domain công cộng hoặc không khớp sẽ bị chặn truy cập lập tức.
 - **Ứng viên:** Candidate Portal sử dụng Magic Link gửi qua email cá nhân có TTL ngắn, không áp dụng OAuth2.
+- **Password recovery (bổ sung 2026-06-18):** Quên/đặt lại mật khẩu **tách riêng** theo cổng đăng nhập, không dùng chung endpoint:
+  - Candidate: `POST /auth/candidate/forgot-password` + `/auth/candidate/reset-password` (bảng `candidate_accounts`).
+  - Staff nội bộ: `POST /auth/staff/forgot-password` + `/auth/staff/reset-password` (bảng `users`); chỉ gửi khi tài khoản tồn tại & `is_active`; tài khoản SSO-only vẫn đặt được mật khẩu lần đầu qua link.
+  - Token reset lưu chung bảng `magic_links` nhưng có cột phân loại **`audience`** (`candidate`|`staff`, default `candidate`); endpoint reset lọc đúng `audience` để token 2 cổng không dùng nhầm cho nhau (chống lẫn lộn khi email trùng ở cả 2 bảng). TTL 2 giờ, one-time-use.
+  - Lý do tách riêng: 2 bảng tài khoản khác nhau + staff có đặc quyền cao → ranh giới bảo mật rõ ràng, tránh account enumeration chéo.
 
 ### ADR-024: Bias Detection & Fairness
 - **Data collected:** Evaluation scores theo demographic groups (nếu Candidate cung cấp và đồng ý).
@@ -441,3 +446,25 @@ public interface IEmbeddingProvider
 - **Phân biệt với ADR-023:** ADR-023 (Google OAuth nội bộ HR/Recruiter/Admin) **bắt buộc** email thuộc `allowed_email_domains` + pre-provisioning. ADR-035 dành cho ứng viên: chấp nhận **mọi** tài khoản Google cá nhân, và nếu chưa có `candidate_accounts` thì **tự tạo** (self-registration), giống đăng ký email/password tự do.
 - **Lý do:** Giảm ma sát đăng ký cho ứng viên; vẫn giữ email/password là phương thức chính.
 - **Bảo mật:** Provider validation bình thường; không có domain allowlist cho luồng candidate.
+
+### ADR-036: File Storage Abstraction (Local / Cloudflare R2)
+- **Vấn đề:** Trước đây file upload (CV ứng tuyển, CV hồ sơ candidate) ghi thẳng vào thư mục `./uploads` trên đĩa backend. Không scale ngang (mỗi container có disk riêng), mất khi redeploy, đầy ổ VPS, không CDN/backup. (Lưu ý: `uploads/` đã `.gitignore` nên **không** làm nặng repo.)
+- **Quyết định:** Trừu tượng hoá qua **`IFileStorageService`** (cùng pattern `IAIProvider`/`IGeminiProvider`), 2 implementation chọn qua cấu hình `Storage:Provider`:
+  - **`LocalFileStorageService`** (dev): ghi `./uploads`, `storageKey` = `/uploads/<guid>.ext`, phục vụ tĩnh qua `UseStaticFiles(RequestPath="/uploads")`.
+  - **`S3FileStorageService`** (prod): upload lên **object storage S3-compatible**, file **private**, hiển thị qua **presigned URL** có thời hạn (`UrlExpiryMinutes`, mặc định 60).
+- **Nhà cung cấp prod: Cloudflare R2** (S3-compatible, dùng `AWSSDK.S3`). Lý do chọn R2 thay vì Supabase Storage:
+  1. **Egress miễn phí** – quan trọng vì recording phỏng vấn (Phase 7) bị xem lại nhiều lần.
+  2. Giữ Supabase thuần Postgres, không làm sâu lock-in.
+  3. Cùng chuẩn S3 nên code không đổi nếu sau này chuyển AWS S3/MinIO.
+- **Hợp đồng:** DB lưu **`storageKey`** (không lưu URL tuyệt đối). API gọi `GetUrlAsync(key)` khi trả response → Local trả đường dẫn tương đối, S3 trả presigned URL. Frontend `resolveAssetUrl()` xử lý cả hai (tương đối → ghép `ASSET_BASE_URL`; tuyệt đối `http` → giữ nguyên).
+- **Cấu hình:** `Storage:Provider` = `Local` | `S3`; secrets `Storage:S3:{Endpoint,AccessKeyId,SecretAccessKey,Bucket,Region,KeyPrefix,UrlExpiryMinutes}` qua **user-secrets/env** (rule #2). Khi `Provider=S3` mà thiếu cấu hình bắt buộc → **fail-fast** lúc startup.
+- **Bảo mật token R2:** API token quyền **Object Read & Write**, scope đúng 1 bucket; production siết thêm IP allowlist (IP VPS tĩnh).
+- **Đã refactor:** `ApplicationsController` (CV ứng tuyển), `CandidatePortalController` (CV hồ sơ + resolve URL ở GET applications/detail/profile). Xoá CV cũ khi upload CV mới (tránh tích rác).
+- **Follow-up (chưa làm):** Phía HR/staff (`ApplicationService` trả `CvFileUrl`) hiện trả `storageKey` thô — cần resolve presigned URL khi bật S3 cho prod. Dev (`Local`) không ảnh hưởng.
+
+### ADR-037: Địa giới hành chính VN — Provinces Open API v2 (sau sáp nhập 07/2025)
+- **Quyết định:** Trường "Địa điểm" của Candidate dùng **[Provinces Open API v2](https://provinces.open-api.vn/)** — dữ liệu **sau sáp nhập tỉnh 07/2025**: cấu trúc **2 cấp Tỉnh/Thành → Phường/Xã** (bỏ cấp Quận/Huyện), **34 tỉnh/thành**.
+- **Endpoint dùng:** `GET /api/v2/p/` (danh sách tỉnh), `GET /api/v2/p/{code}?depth=2` (tỉnh kèm phường). Field chính: `code` (int), `name`, `province_code`.
+- **Frontend:** service `provinceService` (gọi thẳng open-api, có cache trong phiên — **không** qua `apiClient` của backend). Trường địa điểm là **2 dropdown phụ thuộc** (chọn tỉnh → load phường; đổi tỉnh → reset phường).
+- **Database (`candidate_accounts`):** thêm `province_code` (int?), `province_name`, `ward_code` (int?), `ward_name`. Giữ cột cũ **`location`** nhưng chuyển thành **chuỗi hiển thị suy ra tự động** `"Phường X, Tỉnh Y"` (denormalized, tương thích ngược) — không còn nhập tay. Migration `AddCandidateAdminDivision`.
+- **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.

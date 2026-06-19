@@ -98,7 +98,7 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 
 | Layer | Technology |
 |---|---|
-| Frontend | React, TypeScript, TailwindCSS / MUI |
+| Frontend | React, TypeScript, TailwindCSS |
 | Backend | C#, ASP.NET Core .NET 8 |
 | API Style | REST API + SignalR |
 | Realtime Media | WebRTC |
@@ -112,6 +112,7 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 | TTS | ElevenLabs Flash v2.5 (streaming) |
 | Avatar | HeyGen Streaming Avatar (Hybrid Idle Strategy) |
 | Email | SendGrid / AWS SES |
+| File Storage | `IFileStorageService` – Local disk (dev) / Cloudflare R2 S3-compatible (prod) qua AWSSDK.S3 |
 | Containers | Docker + Docker Compose |
 | Servers | Ubuntu/Linux VPS + Nginx (SSL + routing) |
 | CI/CD | GitHub Actions |
@@ -281,6 +282,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-023 | Auth nội bộ: Email + Password (chính) + Google OAuth2 optional; pre-provisioning + domain validation |
 | ADR-025 | Playbook scope: Company / Job Posting / Round; RAG weighted retrieve |
 | ADR-030 | Gemini 2.5 Flash cho CV-JD Analysis; GPT-4o cho phỏng vấn AI và RAG |
+| ADR-036 | File storage abstraction `IFileStorageService`: Local (dev) / Cloudflare R2 (prod, presigned URL); DB lưu storageKey |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 

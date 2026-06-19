@@ -30,6 +30,9 @@ namespace ARISP.Application.DTOs
         public bool PracticeSessionUsed { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public Guid? CvJdAnalysisId { get; set; }
+
+        /// <summary>Điểm phù hợp CV–JD (0–100) lấy từ cv_jd_analyses nếu có. Null nếu chưa phân tích.</summary>
+        public int? MatchScore { get; set; }
     }
 
     public class UpdateApplicationStatusRequest

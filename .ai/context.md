@@ -222,7 +222,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 
 | Layer | Technology | Ghi chú |
 |---|---|---|
-| **Frontend** | React, TypeScript, TailwindCSS / MUI | |
+| **Frontend** | React, TypeScript, TailwindCSS | |
 | **Backend** | C#, ASP.NET Core (.NET 8) | Không dùng Node.js |
 | **API Style** | REST API + SignalR | SignalR cho session events |
 | **Realtime Media** | WebRTC | Audio stream + avatar video |
