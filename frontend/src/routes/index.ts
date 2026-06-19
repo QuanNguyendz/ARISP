@@ -1,29 +1,34 @@
+// 🟢 ĐÃ XÓA: Bỏ dòng import ResetPasswordPage thừa thãi ở đây đi
+
 export const routes = {
   // Public
   home: '/',
-  login: '/dang-nhap',
-  register: '/dang-ky',
-  
+  login: '/auth/login',
+  register: '/auth/register',
+  forgotPassword: '/auth/forgot-password',
+  resetPassword: '/auth/reset-password', // 🟢 Đug chuẩn: Chỉ khai báo chuỗi đường dẫn (string url) giống các route khác
+
   // HR Admin
-  dashboard: '/quan-ly',
-  jobPostings: '/quan-ly/tin-tuyen-dung',
-  jobPostingCreate: '/quan-ly/tin-tuyen-dung/tao-moi',
-  jobPostingDetail: (id: string) => `/quan-ly/tin-tuyen-dung/${id}`,
-  candidates: '/quan-ly/ung-vien',
-  candidateDetail: (id: string) => `/quan-ly/ung-vien/${id}`,
-  evaluations: '/quan-ly/danh-gia',
-  reports: '/quan-ly/bao-cao',
-  settings: '/quan-ly/cai-dat',
-  
+  dashboard: '/admin/dashboard',
+  jobPostings: '/admin/jobs',
+  jobPostingCreate: '/admin/jobs/create',
+  jobPostingDetail: (id: string) => `/admin/jobs/${id}`,
+  candidates: '/admin/candidates',
+  candidateDetail: (id: string) => `/admin/candidates/${id}`,
+  evaluations: '/admin/evaluations',
+  reports: '/admin/reports',
+  settings: '/admin/settings',
+
   // Candidate
-  candidateApply: '/ung-vien/ung-tuyen',
-  candidateInterview: '/ung-vien/phong-van',
-  candidatePortal: '/ung-vien/cong-cua',
-  candidateResult: (id: string) => `/ung-vien/ket-qua/${id}`,
-  
+  candidateApply: '/candidate/applications',
+  candidateInterview: '/candidate/interviews',
+  candidatePortal: '/candidate/portal',
+  candidateResult: (id: string) => `/candidate/results/${id}`,
+
   // Interview
-  interviewRoom: '/phong-van/:sessionId',
+  interviewRoom: '/interview/room/:sessionId',
   interviewKiosk: '/kiosk',
 } as const;
 
-export type Routes = typeof routes;
+// Đổi tên type để không trùng với thư viện react-router-dom
+export type AppRoutesType = typeof routes;

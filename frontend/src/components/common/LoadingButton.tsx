@@ -1,48 +1,37 @@
-import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
-import { SxProps, Theme } from '@mui/material/styles';
+import { type ReactNode } from 'react'
+import { Loader2 } from 'lucide-react'
 
 interface LoadingButtonProps {
-  children: React.ReactNode;
-  loading?: boolean;
-  disabled?: boolean;
-  variant?: 'text' | 'outlined' | 'contained';
-  color?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
-  size?: 'small' | 'medium' | 'large';
-  type?: 'button' | 'submit' | 'reset';
-  onClick?: () => void;
-  fullWidth?: boolean;
-  sx?: SxProps<Theme>;
-  className?: string;
+  children: ReactNode
+  loading?: boolean
+  disabled?: boolean
+  type?: 'button' | 'submit' | 'reset'
+  onClick?: () => void
+  fullWidth?: boolean
+  /** Tailwind classes điều khiển giao diện (màu nền, chữ...). Ghi đè mặc định. */
+  className?: string
 }
 
 export default function LoadingButton({
   children,
   loading = false,
   disabled = false,
-  variant = 'contained',
-  color = 'primary',
-  size = 'medium',
   type = 'button',
   onClick,
   fullWidth = false,
-  sx,
-  className,
+  className = 'bg-brand-600 text-white hover:bg-brand-700',
 }: LoadingButtonProps) {
   return (
-    <Button
+    <button
       type={type}
-      variant={variant}
-      color={color}
-      size={size}
       disabled={disabled || loading}
       onClick={onClick}
-      fullWidth={fullWidth}
-      sx={sx}
-      className={className}
-      startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        fullWidth ? 'w-full' : ''
+      } ${className}`}
     >
+      {loading && <Loader2 className="h-5 w-5 animate-spin" />}
       {children}
-    </Button>
-  );
+    </button>
+  )
 }

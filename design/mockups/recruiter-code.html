@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARISP — Cấp Interview Code (Mockup)</title>
+  <link rel="icon" type="image/svg+xml" href="logo-icon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter','sans-serif'], display: ['"Plus Jakarta Sans"','Inter','sans-serif'], mono: ['"JetBrains Mono"','monospace'] },
+      colors: {
+        brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+        ai: { 50:'#faf5ff',100:'#f3e8ff',400:'#c084fc',500:'#a855f7',600:'#9333ea',700:'#7e22ce' },
+        ink: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' },
+      },
+      boxShadow: { card:'0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)' },
+    } } };
+  </script>
+  <style>html{scrollbar-gutter:stable}body{font-family:'Inter',sans-serif}</style>
+</head>
+<body class="bg-ink-50 text-ink-900 antialiased">
+<div class="flex min-h-screen">
+
+  <!-- Sidebar -->
+  <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white sticky top-0 h-screen">
+    <div class="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200">
+      <svg class="h-8 w-8" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ARISP">
+        <defs><linearGradient id="lg-rc" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
+        <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-rc)"/>
+        <path d="M30 70 L48 26 L66 70" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M38 56 H58" stroke="white" stroke-width="8" stroke-linecap="round"/>
+        <path d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z" fill="white" fill-opacity="0.95"/>
+      </svg>
+      <div>
+        <div class="font-display text-base font-extrabold leading-none">ARISP</div>
+        <div class="text-[11px] text-ink-400 leading-none mt-0.5">Recruiter Workspace</div>
+      </div>
+    </div>
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
+      <a href="recruiter-dashboard.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="layout-dashboard" class="w-[18px] h-[18px]"></i> Dashboard</a>
+      <a href="recruiter-candidates.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="users" class="w-[18px] h-[18px]"></i> Ứng viên</a>
+      <a href="recruiter-code.html" class="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2.5 text-brand-700">
+        <span class="flex items-center gap-3"><i data-lucide="key-round" class="w-[18px] h-[18px]"></i> Cấp mã phỏng vấn</span>
+        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">3</span>
+      </a>
+      <a href="recruiter-jobs.html" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i> Tin tuyển dụng</a>
+    </nav>
+    <div class="p-3 border-t border-ink-200">
+      <div class="rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
+        <div class="flex items-center gap-1.5 font-semibold text-ink-600"><i data-lucide="shield" class="w-3.5 h-3.5"></i> Quyền Recruiter</div>
+        <p class="mt-1">Tạo tin nháp · quản lý ứng viên · cấp Interview Code. Confirm verdict &amp; Playbook do HR Leader phụ trách.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 min-w-0">
+    <!-- Topbar -->
+    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 bg-white/80 backdrop-blur px-6 h-16">
+      <div class="flex flex-1 items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 max-w-md focus-within:border-brand-400 focus-within:bg-white">
+        <i data-lucide="search" class="w-4 h-4 text-ink-400"></i>
+        <input class="w-full bg-transparent text-sm outline-none placeholder:text-ink-400" placeholder="Tìm ứng viên theo tên / email..." />
+      </div>
+      <div class="ml-auto flex items-center gap-1">
+        <button onclick="location.href='recruiter-dashboard.html'" aria-label="Thông báo" class="relative grid h-10 w-10 place-items-center rounded-xl text-ink-600 hover:bg-ink-100">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">2</span>
+        </button>
+        <span class="mx-1 h-6 w-px bg-ink-200"></span>
+        <div class="relative">
+          <button onclick="toggleDrop('accountMenu', event)" class="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-ink-100">
+            <span class="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-brand-600 text-xs font-bold text-white">HT</span>
+            <span class="hidden md:block text-left leading-tight">
+              <span class="block text-sm font-semibold text-ink-900">Hà Thu</span>
+              <span class="block text-[11px] text-ink-400">Recruiter</span>
+            </span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-ink-400"></i>
+          </button>
+          <div id="accountMenu" onclick="event.stopPropagation()" class="js-drop hidden absolute right-0 mt-2 w-60 rounded-2xl border border-ink-200 bg-white shadow-xl z-40">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-ink-100">
+              <span class="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-brand-600 text-sm font-bold text-white">HT</span>
+              <div class="min-w-0"><div class="truncate text-sm font-semibold text-ink-900">Hà Thu</div><div class="truncate text-xs text-ink-400">ha.thu@congty.com</div></div>
+            </div>
+            <div class="p-1.5 text-sm">
+              <a href="recruiter-account.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"><i data-lucide="user" class="w-4 h-4 text-ink-400"></i> Tài khoản của tôi</a>
+            </div>
+            <div class="p-1.5 border-t border-ink-100">
+              <a href="auth-admin.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-6 space-y-6">
+      <div>
+        <h1 class="font-display text-2xl font-extrabold leading-snug">Cấp Interview Code</h1>
+        <p class="mt-1 text-sm text-ink-500">Sinh mã On-site cho ứng viên check-in. Mã 6 ký tự, dùng 1 lần, TTL 2 giờ, gắn với hồ sơ ứng tuyển.</p>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <!-- Issue panel -->
+        <div class="space-y-6">
+          <!-- Selected candidate -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <h2 class="font-display text-lg font-bold mb-4">1. Ứng viên &amp; vòng</h2>
+            <div class="flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+              <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-sm font-bold text-white">LH</span>
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-ink-900">Lê Hoàng <span class="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Đã check-in</span></div>
+                <div class="text-xs text-ink-400">Senior Frontend Engineer · application #A-10293</div>
+              </div>
+              <button class="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">Đổi ứng viên</button>
+            </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Vòng phỏng vấn</label>
+                <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"><option>R2 · Technical (đề xuất)</option><option>R1 · Screening</option></select>
+                <p class="mt-1 text-xs text-emerald-600 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Đã Pass R1 — đủ điều kiện vào R2</p>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-ink-600">Thời hạn (TTL)</label>
+                <select class="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"><option>2 giờ (mặc định)</option><option>1 giờ</option><option>4 giờ</option></select>
+              </div>
+            </div>
+          </section>
+
+          <!-- Generated code -->
+          <section class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
+            <div class="flex items-center justify-between border-b border-ink-100 px-6 py-4">
+              <h2 class="font-display text-lg font-bold">2. Mã phỏng vấn</h2>
+              <span id="codeStatus" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Đang hiệu lực · chưa dùng</span>
+            </div>
+            <div class="grid gap-6 p-6 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div>
+                <div class="text-xs font-medium text-ink-400">Ứng viên nhập mã này tại Kiosk văn phòng</div>
+                <div class="mt-2 font-mono text-5xl font-extrabold tracking-[0.35em] text-ink-900">7K9X2P</div>
+                <div class="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700">
+                  <i data-lucide="clock" class="w-4 h-4"></i> Hết hạn sau <span id="countdown" class="font-mono tabular-nums">01:59:48</span>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button onclick="copyCode()" class="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 flex items-center gap-2"><i data-lucide="copy" class="w-4 h-4"></i> <span id="copyLabel">Sao chép mã</span></button>
+                  <button class="rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> In phiếu</button>
+                  <button onclick="regen()" class="rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Cấp lại</button>
+                  <button onclick="revoke()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"><i data-lucide="ban" class="w-4 h-4"></i> Vô hiệu hoá</button>
+                </div>
+              </div>
+              <!-- QR placeholder -->
+              <div class="justify-self-center text-center">
+                <div class="grid h-36 w-36 place-items-center rounded-xl border border-ink-200 bg-white p-2">
+                  <svg viewBox="0 0 100 100" class="h-full w-full text-ink-900" fill="currentColor" aria-label="QR">
+                    <rect x="4" y="4" width="26" height="26" rx="3"/><rect x="10" y="10" width="14" height="14" rx="1.5" fill="white"/><rect x="14" y="14" width="6" height="6"/>
+                    <rect x="70" y="4" width="26" height="26" rx="3"/><rect x="76" y="10" width="14" height="14" rx="1.5" fill="white"/><rect x="80" y="14" width="6" height="6"/>
+                    <rect x="4" y="70" width="26" height="26" rx="3"/><rect x="10" y="76" width="14" height="14" rx="1.5" fill="white"/><rect x="14" y="80" width="6" height="6"/>
+                    <rect x="38" y="8" width="6" height="6"/><rect x="50" y="8" width="6" height="6"/><rect x="38" y="20" width="6" height="6"/><rect x="58" y="20" width="6" height="6"/>
+                    <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/><rect x="64" y="40" width="6" height="6"/><rect x="76" y="40" width="6" height="6"/><rect x="88" y="40" width="6" height="6"/>
+                    <rect x="40" y="52" width="6" height="6"/><rect x="64" y="52" width="6" height="6"/><rect x="84" y="52" width="6" height="6"/>
+                    <rect x="40" y="64" width="6" height="6"/><rect x="52" y="64" width="6" height="6"/><rect x="76" y="64" width="6" height="6"/><rect x="88" y="64" width="6" height="6"/>
+                    <rect x="52" y="76" width="6" height="6"/><rect x="64" y="76" width="6" height="6"/><rect x="40" y="88" width="6" height="6"/><rect x="76" y="88" width="6" height="6"/><rect x="88" y="88" width="6" height="6"/>
+                  </svg>
+                </div>
+                <div class="mt-2 text-xs text-ink-400">Quét tại Kiosk</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2.5 border-t border-ink-100 bg-ink-50 px-6 py-3 text-xs text-ink-500">
+              <i data-lucide="shield-alert" class="w-4 h-4 shrink-0 text-ink-400 mt-0.5"></i>
+              <span>Mã <b>6 ký tự alphanumeric</b>, <b>dùng 1 lần</b>, gắn với <b>application #A-10293</b>. Tự vô hiệu hoá ngay khi ứng viên nhập thành công hoặc khi hết hạn.</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Right rail -->
+        <aside class="space-y-6">
+          <!-- Check-in queue -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <h3 class="font-display font-bold mb-3 flex items-center gap-2"><i data-lucide="user-check" class="w-4 h-4 text-brand-600"></i> Hàng chờ check-in</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2.5 rounded-xl border border-ink-200 p-2.5">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-brand-600 text-[11px] font-bold text-white">NV</span>
+                <div class="min-w-0 flex-1"><div class="text-sm font-semibold text-ink-800">Ngô Vy</div><div class="text-xs text-ink-400">R1 · 11:30</div></div>
+                <button class="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700">Cấp</button>
+              </div>
+              <div class="flex items-center gap-2.5 rounded-xl border border-ink-200 p-2.5">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-ai-600 to-brand-600 text-[11px] font-bold text-white">DT</span>
+                <div class="min-w-0 flex-1"><div class="text-sm font-semibold text-ink-800">Đỗ Trang</div><div class="text-xs text-ink-400">R1 · 14:00</div></div>
+                <button class="rounded-lg border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-700 hover:bg-ink-50">Cấp</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- History -->
+          <section class="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <h3 class="font-display font-bold mb-3 flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-brand-600"></i> Mã đã cấp gần đây</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center justify-between rounded-xl bg-ink-50 px-3 py-2">
+                <div><div class="font-mono font-bold tracking-wider text-ink-800">7K9X2P</div><div class="text-xs text-ink-400">Lê Hoàng · R2</div></div>
+                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Hiệu lực</span>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-ink-50 px-3 py-2">
+                <div><div class="font-mono font-bold tracking-wider text-ink-500">B3M8Q2</div><div class="text-xs text-ink-400">Trần Minh · R1</div></div>
+                <span class="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-semibold text-ink-500">Đã dùng</span>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-ink-50 px-3 py-2">
+                <div><div class="font-mono font-bold tracking-wider text-ink-500">X1P7K4</div><div class="text-xs text-ink-400">Phạm An · R1</div></div>
+                <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">Hết hạn</span>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-ink-50 px-3 py-2">
+                <div><div class="font-mono font-bold tracking-wider text-ink-500">9QW2ER</div><div class="text-xs text-ink-400">Ngô Vy · R1</div></div>
+                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Vô hiệu</span>
+              </div>
+            </div>
+            <button onclick="location.href='recruiter-candidates.html'" class="mt-3 w-full rounded-xl border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50">Xem ứng viên</button>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+  <!-- Prototype nav (mockup only) -->
+  <div class="group fixed bottom-0 left-1/2 z-[100] flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-2 py-1.5 shadow-xl backdrop-blur text-xs whitespace-nowrap -translate-x-1/2 translate-y-[calc(100%-14px)] hover:-translate-y-3 transition-transform duration-300 ease-out">
+    <span class="px-2 font-bold tracking-wide text-slate-400">PROTOTYPE</span>
+    <a href="job-board.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Job Board</a>
+    <a href="hr-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">HR</a>
+    <a href="recruiter-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Recruiter</a>
+    <a href="recruiter-candidates.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">RC Ứng viên</a>
+    <a href="recruiter-code.html" class="rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700 font-semibold">Cấp mã</a>
+    <a href="kiosk.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kiosk</a>
+    <a href="auth-admin.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Login HR</a>
+    <a href="index.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Design</a>
+  </div>
+
+  <script>
+    lucide.createIcons();
+    function toggleDrop(id, e) {
+      e.stopPropagation();
+      const el = document.getElementById(id);
+      if (!el) return;
+      const willOpen = el.classList.contains('hidden');
+      document.querySelectorAll('.js-drop').forEach(p => p.classList.add('hidden'));
+      if (willOpen) el.classList.remove('hidden');
+    }
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.js-drop').forEach(p => p.classList.add('hidden'));
+    });
+    // Countdown TTL
+    let remain = 2 * 3600 - 12;
+    const cd = document.getElementById('countdown');
+    setInterval(() => {
+      if (remain <= 0) return;
+      remain--;
+      const h = String(Math.floor(remain/3600)).padStart(2,'0');
+      const m = String(Math.floor((remain%3600)/60)).padStart(2,'0');
+      const s = String(remain%60).padStart(2,'0');
+      cd.textContent = `${h}:${m}:${s}`;
+    }, 1000);
+    function copyCode() {
+      const lbl = document.getElementById('copyLabel');
+      lbl.textContent = 'Đã sao chép!';
+      setTimeout(() => lbl.textContent = 'Sao chép mã', 1500);
+    }
+    function revoke() {
+      document.getElementById('codeStatus').outerHTML = '<span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200"><i data-lucide="ban" class="w-3.5 h-3.5"></i> Đã vô hiệu hoá</span>';
+      lucide.createIcons();
+    }
+    function regen() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let c = ''; for (let i=0;i<6;i++) c += chars[Math.floor(Math.random()*chars.length)];
+      document.querySelector('.font-mono.text-5xl').textContent = c;
+      remain = 2*3600;
+    }
+  </script>
+</body>
+</html>

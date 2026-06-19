@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, AuthTokens } from '../../types/auth';
+import type { User, AuthTokens, AuthResponse } from '../../types/auth';
+
+interface JwtPayload {
+  sub?: string;
+  email?: string;
+  name?: string;
+  unique_name?: string;
+  role?: string;
+}
 
 interface AuthState {
   user: User | null;
@@ -8,10 +16,38 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setAuth: (user: User, tokens: AuthTokens) => void;
+  setAuthFromResponse: (response: AuthResponse) => User;
   updateUser: (user: Partial<User>) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
   login: (user: User, tokens: AuthTokens) => void;
+}
+
+function parseJwtPayload(token: string): JwtPayload | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = JSON.parse(window.atob(padded)) as JwtPayload;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function authResponseToUser(response: AuthResponse): User {
+  const payload = parseJwtPayload(response.accessToken);
+
+  return {
+    id: response.userId || payload?.sub || 'unknown',
+    email: payload?.email || '',
+    name: response.fullName || payload?.name || payload?.unique_name || payload?.email || 'Unknown User',
+    role: response.role || payload?.role || '',
+  };
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -20,7 +56,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       tokens: null,
       isAuthenticated: false,
-      isLoading: true,
+      isLoading: false,
 
       setAuth: (user, tokens) =>
         set({
@@ -29,6 +65,17 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           isLoading: false,
         }),
+
+      setAuthFromResponse: (response) => {
+        const user = authResponseToUser(response);
+        const tokens: AuthTokens = {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        };
+        set({ user, tokens, isAuthenticated: true, isLoading: false });
+        return user;
+      },
 
       updateUser: (partialUser) =>
         set((state) => ({
@@ -44,7 +91,7 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setLoading: (loading) => set({ isLoading: loading }),
-      
+
       login: (user, tokens) => set({ user, tokens, isAuthenticated: true, isLoading: false }),
     }),
     {
@@ -54,6 +101,9 @@ export const useAuthStore = create<AuthState>()(
         tokens: state.tokens,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setLoading(false);
+      },
     }
   )
 );

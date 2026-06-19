@@ -1,277 +1,372 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Brain, Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, CheckCircle } from 'lucide-react';
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  Sparkles,
+  Check,
+  UploadCloud,
+  Target,
+  MessageSquare,
+} from 'lucide-react'
+import { authService } from '@services/auth/authService'
+
+// Logo component
+function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
+  const h = size === 'sm' ? 9 : 10
+  const w = size === 'sm' ? 9 : 10
+  return (
+    <svg
+      className={`h-${h} w-${w}`}
+      viewBox="0 0 96 96"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="ARISP"
+    >
+      <defs>
+        <linearGradient
+          id="lg-cand-reg"
+          x1="12"
+          y1="10"
+          x2="84"
+          y2="86"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#4f46e5" />
+          <stop offset="1" stopColor="#9333ea" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-cand-reg)" />
+      <path
+        d="M30 70 L48 26 L66 70"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
+      <path
+        d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
+        fill="white"
+        fillOpacity="0.95"
+      />
+    </svg>
+  )
+}
 
 export default function CandidateRegisterPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [agreeTerms, setAgreeTerms] = useState(false);
+  const navigate = useNavigate()
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [agreeTerms, setAgreeTerms] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const passwordRequirements = [
-    { label: 'Ít nhất 8 ký tự', met: password.length >= 8 },
+    { label: 'Tối thiểu 8 ký tự', met: password.length >= 8 },
     { label: 'Có chữ hoa', met: /[A-Z]/.test(password) },
     { label: 'Có số', met: /[0-9]/.test(password) },
-    { label: 'Có ký tự đặc biệt', met: /[!@#$%^&*]/.test(password) },
-  ];
+    { label: 'Có ký tự đặc biệt (!@#$%^&*)', met: /[!@#$%^&*]/.test(password) },
+  ]
+
+  const metCount = passwordRequirements.filter((r) => r.met).length
+  const allRequirementsMet = passwordRequirements.every((r) => r.met)
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    if (!allRequirementsMet) {
+      setError('Mật khẩu chưa đủ mạnh.')
+      return
+    }
+    if (!passwordsMatch) {
+      setError('Mật khẩu xác nhận không khớp.')
+      return
+    }
+    if (!agreeTerms) {
+      setError('Bạn cần đồng ý với điều khoản sử dụng.')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await authService.candidateRegister({ email, password, fullName })
+      navigate(`/auth/candidate-login?verify=sent&email=${encodeURIComponent(email)}`)
+    } catch (err: any) {
+      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-bg-primary flex">
-      {/* Left Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="w-full max-w-md"
-        >
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-lg font-semibold text-white">ARISP</span>
-              <span className="block text-xs text-text-tertiary">Tìm việc</span>
-            </div>
+    <div className="min-h-screen grid lg:grid-cols-2">
+      {/* Left brand panel */}
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-700 via-brand-600 to-ai-600 p-12 text-white">
+        <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-ai-400/20 blur-3xl" />
+
+        <Link to="/" className="relative flex items-center gap-2.5">
+          <svg
+            className="h-10 w-10"
+            viewBox="0 0 96 96"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-label="ARISP"
+          >
+            <rect x="4" y="4" width="88" height="88" rx="22" fill="white" fillOpacity="0.15" />
+            <path
+              d="M30 70 L48 26 L66 70"
+              stroke="white"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
+            <path
+              d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
+              fill="white"
+            />
+          </svg>
+          <span className="font-display text-2xl font-extrabold">ARISP</span>
+        </Link>
+
+        <div className="relative">
+          <h2 className="font-display text-4xl font-extrabold leading-[1.25]">
+            Tạo hồ sơ,
+            <br />
+            để AI tìm việc cho bạn.
+          </h2>
+          <p className="mt-4 max-w-md text-white/80">
+            Đăng ký miễn phí bằng email cá nhân và bắt đầu ứng tuyển ngay hôm nay.
+          </p>
+          <ul className="mt-8 space-y-3 text-white/90">
+            <li className="flex items-center gap-3">
+              <UploadCloud className="w-5 h-5" />
+              Tải CV một lần, dùng cho mọi vị trí
+            </li>
+            <li className="flex items-center gap-3">
+              <Target className="w-5 h-5" />
+              Xem điểm Match trước khi ứng tuyển
+            </li>
+            <li className="flex items-center gap-3">
+              <MessageSquare className="w-5 h-5" />
+              Luyện phỏng vấn thử với AI
+            </li>
+          </ul>
+        </div>
+
+        <div className="relative text-sm text-white/60">© 2026 ARISP</div>
+      </div>
+
+      {/* Right form */}
+      <div className="flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <Link to="/" className="lg:hidden mb-8 flex items-center gap-2.5">
+            <Logo />
+            <span className="font-display text-xl font-extrabold">ARISP</span>
           </Link>
 
-          {/* Heading */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Tạo tài khoản mới</h1>
-            <p className="text-text-secondary">
-              Đăng ký ngay để bắt đầu tìm kiếm việc làm phù hợp
-            </p>
-          </div>
+          <h1 className="font-display text-2xl font-extrabold leading-snug">
+            Tạo tài khoản ứng viên
+          </h1>
+          <p className="mt-1 text-ink-500">Miễn phí — chỉ mất chưa đến 1 phút.</p>
 
-          {/* Form */}
-          <form className="space-y-5">
-            {/* Full Name */}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Họ và tên
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">Họ và tên</label>
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <User className="w-4 h-4 text-ink-400" />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Nguyễn Văn A"
-                  className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  required
                 />
               </div>
             </div>
 
-            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">Email</label>
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <Mail className="w-4 h-4 text-ink-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  placeholder="ban@email.com"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  required
                 />
               </div>
             </div>
 
-            {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Số điện thoại
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0901 234 567"
-                  className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Mật khẩu
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">Mật khẩu</label>
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <Lock className="w-4 h-4 text-ink-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Tạo mật khẩu"
-                  className="w-full pl-12 pr-12 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="w-full bg-transparent text-sm outline-none"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-white transition-colors"
+                  className="text-ink-400 hover:text-ink-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              
-              {/* Password Strength */}
-              <div className="mt-3 space-y-2">
-                {passwordRequirements.map((req) => (
-                  <div
-                    key={req.label}
-                    className={`flex items-center gap-2 text-xs ${
-                      req.met ? 'text-emerald-400' : 'text-text-tertiary'
-                    }`}
-                  >
-                    {req.met ? (
-                      <CheckCircle className="w-3.5 h-3.5" />
-                    ) : (
-                      <div className="w-3.5 h-3.5 rounded-full border border-current" />
-                    )}
-                    {req.label}
-                  </div>
-                ))}
+
+              {/* Password strength */}
+              <div className="mt-2 flex gap-1">
+                <span
+                  className={`h-1 flex-1 rounded-full ${metCount >= 1 ? 'bg-emerald-500' : 'bg-ink-200'}`}
+                ></span>
+                <span
+                  className={`h-1 flex-1 rounded-full ${metCount >= 2 ? 'bg-emerald-500' : 'bg-ink-200'}`}
+                ></span>
+                <span
+                  className={`h-1 flex-1 rounded-full ${metCount >= 3 ? 'bg-emerald-500' : 'bg-ink-200'}`}
+                ></span>
+                <span
+                  className={`h-1 flex-1 rounded-full ${metCount >= 4 ? 'bg-emerald-500' : 'bg-ink-200'}`}
+                ></span>
               </div>
+              <p className="mt-1 text-xs text-ink-400">
+                Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt (!@#$%^&*).
+              </p>
             </div>
 
-            {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
                 Xác nhận mật khẩu
               </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+              <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                <Lock className="w-4 h-4 text-ink-400" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu"
-                  className="w-full pl-12 pr-12 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="w-full bg-transparent text-sm outline-none"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-white transition-colors"
+                  className="text-ink-400 hover:text-ink-600"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
+              {confirmPassword.length > 0 && !passwordsMatch && (
+                <p className="mt-1 text-xs text-red-500">Mật khẩu không khớp</p>
+              )}
             </div>
 
-            {/* Terms */}
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className="flex items-start gap-2 text-sm text-ink-600">
               <input
                 type="checkbox"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="w-5 h-5 mt-0.5 rounded border-white/20 bg-white/5 text-accent-primary focus:ring-accent-primary focus:ring-offset-0"
+                className="mt-0.5 rounded border-ink-300 text-brand-600"
               />
-              <span className="text-sm text-text-secondary">
+              <span>
                 Tôi đồng ý với{' '}
-                <Link to="/auth/login" className="text-accent-primary hover:underline">
-                  Điều khoản sử dụng
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-brand-600 hover:underline"
+                >
+                  Điều khoản
                 </Link>{' '}
                 và{' '}
-                <Link to="/auth/login" className="text-accent-primary hover:underline">
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-brand-600 hover:underline"
+                >
                   Chính sách bảo mật
                 </Link>
+                .
               </span>
             </label>
 
-            {/* submit */}
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={!agreeTerms}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !allRequirementsMet || !passwordsMatch || !agreeTerms}
+              className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Tạo tài khoản
-              <ArrowRight className="w-5 h-5" />
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  Tạo tài khoản
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Login Link */}
-          <p className="mt-8 text-center text-text-secondary">
-            Đã có tài khoản?{' '}
+          <p className="mt-8 text-center text-sm text-ink-500">
+            Đã có tài khoản?
             <Link
               to="/auth/candidate-login"
-              className="text-accent-primary hover:text-accent-secondary font-medium transition-colors"
+              className="font-semibold text-brand-600 hover:underline"
             >
-              Đăng nhập ngay
+              {' '}
+              Đăng nhập
             </Link>
           </p>
 
-          {/* Back to Employer */}
-          <p className="mt-4 text-center">
+          <p className="mt-3 text-center text-xs text-ink-400">
+            Bạn là HR / Recruiter?
             <Link
-              to="/auth/register"
-              className="text-sm text-text-tertiary hover:text-white transition-colors"
+              to="/auth/login"
+              className="font-medium text-ink-600 hover:text-brand-600 hover:underline"
             >
-              ← Dành cho nhà tuyển dụng
+              {' '}
+              Đăng nhập nội bộ
             </Link>
           </p>
-        </motion.div>
-      </div>
-
-      {/* Right Side - Benefits */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-accent-primary/20 via-violet/10 to-bg-primary p-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="max-w-md"
-        >
-          <h2 className="text-2xl font-bold text-white mb-8 text-center">
-            Tại sao chọn ARISP?
-          </h2>
-          
-          <div className="space-y-6">
-            {[
-              {
-                title: '10,000+ việc làm chất lượng',
-                desc: 'Cập nhật việc làm mới nhất từ các công ty hàng đầu',
-              },
-              {
-                title: 'Phỏng vấn với AI',
-                desc: 'Trải nghiệm phỏng vấn ảo, luyện tập trước khi thật sự phỏng vấn',
-              },
-              {
-                title: 'Hồ sơ nổi bật',
-                desc: 'Tạo hồ sơ chuyên nghiệp, thu hút nhà tuyển dụng',
-              },
-              {
-                title: 'Theo dõi đơn ứng tuyển',
-                desc: 'Dễ dàng quản lý và theo dõi tất cả đơn ứng tuyển',
-              },
-            ].map((benefit, index) => (
-              <motion.div
-                key={benefit.title}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + index * 0.1 }}
-                className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5"
-              >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white mb-1">{benefit.title}</h3>
-                  <p className="text-sm text-text-secondary">{benefit.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
+        </div>
       </div>
     </div>
-  );
+  )
 }

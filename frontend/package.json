@@ -14,12 +14,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@emotion/react": "^11.13.0",
-    "@emotion/styled": "^11.13.0",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@hookform/resolvers": "^3.9.0",
-    "@mui/icons-material": "^5.16.4",
-    "@mui/material": "^5.16.4",
-    "@mui/x-date-pickers": "^7.10.0",
     "@stomp/stompjs": "^7.0.0",
     "@tanstack/react-query": "^5.51.21",
     "axios": "^1.7.2",
@@ -46,6 +43,7 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
     "@typescript-eslint/parser": "^7.17.0",
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",

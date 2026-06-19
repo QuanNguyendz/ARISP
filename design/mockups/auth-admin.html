@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARISP — Đăng nhập nội bộ (Mockup)</title>
+  <link rel="icon" type="image/svg+xml" href="logo-icon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter','sans-serif'], display: ['"Plus Jakarta Sans"','Inter','sans-serif'] },
+      colors: {
+        brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+        ai: { 50:'#faf5ff',100:'#f3e8ff',400:'#c084fc',500:'#a855f7',600:'#9333ea',700:'#7e22ce' },
+        ink: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' },
+      },
+    } } };
+  </script>
+  <style>body{font-family:'Inter',sans-serif}</style>
+</head>
+<body class="min-h-screen bg-ink-100 text-ink-900 antialiased flex items-center justify-center p-6">
+  <div class="absolute inset-0 bg-gradient-to-br from-brand-50 via-ink-100 to-ai-50"></div>
+
+  <div class="relative w-full max-w-md">
+    <!-- Logo -->
+    <div class="mb-6 flex flex-col items-center text-center">
+      <svg class="h-12 w-12" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ARISP">
+        <defs><linearGradient id="lg-ad" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
+        <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-ad)"/>
+        <path d="M30 70 L48 26 L66 70" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M38 56 H58" stroke="white" stroke-width="8" stroke-linecap="round"/>
+        <path d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z" fill="white" fill-opacity="0.95"/>
+      </svg>
+      <h1 class="mt-4 font-display text-2xl font-extrabold">ARISP Workspace</h1>
+      <p class="mt-1 text-sm text-ink-500">Đăng nhập nội bộ · HR · Recruiter · Super Admin</p>
+    </div>
+
+    <!-- Card -->
+    <div class="rounded-2xl border border-ink-200 bg-white p-7 shadow-xl">
+      <!-- Google OAuth (primary cho nội bộ) -->
+      <button class="w-full rounded-xl border border-ink-200 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-3">
+        <svg class="h-5 w-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+        Đăng nhập với Google
+      </button>
+
+      <div class="my-5 flex items-center gap-3 text-xs text-ink-400">
+        <span class="h-px flex-1 bg-ink-200"></span> hoặc dùng email công ty <span class="h-px flex-1 bg-ink-200"></span>
+      </div>
+
+      <form class="space-y-4" onsubmit="return false">
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-ink-600">Email công ty</label>
+          <div class="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+            <i data-lucide="mail" class="w-4 h-4 text-ink-400"></i>
+            <input type="email" class="w-full bg-transparent text-sm outline-none placeholder:text-ink-400" placeholder="ban@congty.com" />
+          </div>
+        </div>
+        <div>
+          <div class="mb-1.5 flex items-center justify-between">
+            <label class="block text-sm font-medium text-ink-600">Mật khẩu</label>
+            <a href="auth-forgot.html" class="text-sm font-medium text-brand-600 hover:underline">Quên mật khẩu?</a>
+          </div>
+          <div class="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+            <i data-lucide="lock" class="w-4 h-4 text-ink-400"></i>
+            <input type="password" value="password" class="w-full bg-transparent text-sm outline-none" />
+            <button type="button" onclick="togglePw(this)" class="text-ink-400 hover:text-ink-600"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+        <button onclick="location.href='hr-dashboard.html'" class="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700 transition">Đăng nhập</button>
+      </form>
+
+      <!-- Pre-provisioning note -->
+      <div class="mt-5 flex gap-2.5 rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
+        <i data-lucide="shield-alert" class="w-4 h-4 shrink-0 text-ink-400 mt-0.5"></i>
+        <span>Tài khoản nội bộ do <b>Super Admin</b> cấp trước. Không hỗ trợ tự đăng ký. Chỉ email thuộc miền công ty được phép.</span>
+      </div>
+    </div>
+
+    <p class="mt-6 text-center text-sm text-ink-500">Bạn là ứng viên?
+      <a href="auth-login.html" class="font-semibold text-brand-600 hover:underline">Đăng nhập tại Job Board</a>
+    </p>
+  </div>
+
+  <!-- Prototype nav (mockup only) -->
+  <div class="group fixed bottom-0 left-1/2 z-[100] flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-2 py-1.5 shadow-xl backdrop-blur text-xs whitespace-nowrap -translate-x-1/2 translate-y-[calc(100%-14px)] hover:-translate-y-3 transition-transform duration-300 ease-out">
+    <span class="px-2 font-bold tracking-wide text-slate-400">PROTOTYPE</span>
+    <a href="job-board.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Job Board</a>
+    <a href="job-detail.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Chi tiết</a>
+    <a href="candidate-applications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Hồ sơ ƯT</a>
+    <a href="candidate-profile.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cá nhân</a>
+    <a href="candidate-saved-jobs.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Đã lưu</a>
+    <a href="candidate-results.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kết quả</a>
+    <a href="candidate-settings.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Cài đặt</a>
+    <a href="candidate-notifications.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Thông báo</a>
+    <a href="interview-room.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Phỏng vấn</a>
+    <a href="hr-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">HR</a>
+    <a href="recruiter-dashboard.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Recruiter</a>
+    <a href="kiosk.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Kiosk</a>
+    <a href="auth-login.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Login</a>
+    <a href="index.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Design</a>
+    <a href="logo.html" class="rounded-full px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-700">Logo</a>
+  </div>
+
+  <script>
+    lucide.createIcons();
+    function togglePw(btn) {
+      const input = btn.closest('div').querySelector('input');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.innerHTML = '<i data-lucide="' + (show ? 'eye-off' : 'eye') + '" class="w-4 h-4"></i>';
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

@@ -1,120 +1,636 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
+using ARISP.Application.Services;
 using ARISP.Domain.Entities;
+using ARISP.Domain.Constants;
 
 namespace ARISP.API.Controllers
 {
-    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class JobsController : ControllerBase
     {
+        private const string HrRoles = "super_admin,hr_admin,recruiter";
+
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICurrentUserService _currentUserService;
-        private readonly IAIProvider _aiProvider;
 
-        public JobsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService, IAIProvider aiProvider)
+        public JobsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
         {
             _unitOfWork = unitOfWork;
             _currentUserService = currentUserService;
-            _aiProvider = aiProvider;
         }
 
+        /// <summary>HR tạo job posting kèm cấu hình vòng phỏng vấn.</summary>
         [HttpPost]
-        public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request)
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request, CancellationToken ct)
         {
-            var orgId = _currentUserService.OrganizationId ?? Guid.Empty;
-            var userId = _currentUserService.UserId ?? Guid.Empty;
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
 
-            if (orgId == Guid.Empty)
-                return Unauthorized(new { message = "Organization scope missing." });
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return BadRequest(new { message = "Title is required." });
 
-            // Auto detect language requirement from JD
-            var detectedLang = await _aiProvider.DetectLanguageRequirementAsync(request.JobDescription, default);
+            if (string.IsNullOrWhiteSpace(request.JobDescription))
+                return BadRequest(new { message = "JobDescription is required." });
+
+            if (request.Title?.Length > 200)
+                return BadRequest(new { message = "Title cannot exceed 200 characters." });
+
+            var allowedModes = new[] { "remote", "onsite", "both" };
+            if (!allowedModes.Contains(request.InterviewMode))
+                return BadRequest(new { message = "InterviewMode must be 'remote', 'onsite', or 'both'." });
+
+            if (request.InterviewMode != "remote" && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Location is required when InterviewMode is not 'remote'." });
+
+            if (request.SalaryMin < 0 || request.SalaryMax < 0)
+                return BadRequest(new { message = "Salary cannot be negative." });
+
+            if (request.SalaryMin.HasValue && request.SalaryMax.HasValue && request.SalaryMax < request.SalaryMin)
+                return BadRequest(new { message = "SalaryMax cannot be less than SalaryMin." });
+
+            if (request.SalaryIsNegotiable)
+            {
+                if (request.SalaryMin.HasValue || request.SalaryMax.HasValue)
+                    return BadRequest(new { message = "SalaryMin and SalaryMax must be null when SalaryIsNegotiable is true." });
+            }
+
+            var allowedCategories = new[] { "backend", "frontend", "devops", "qa", "data", "ai_ml", "mobile", "pm", "designer", "other" };
+            if (!string.IsNullOrWhiteSpace(request.JobCategory) && !allowedCategories.Contains(request.JobCategory.ToLower()))
+                return BadRequest(new { message = $"JobCategory is invalid. Must be one of: {string.Join(", ", allowedCategories)}" });
+
+            if (request.ApplicationDeadline.HasValue && request.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
+                return BadRequest(new { message = "ApplicationDeadline must be in the future." });
+
+            if (request.RescheduleDeadlineHours < 0)
+                return BadRequest(new { message = "RescheduleDeadlineHours cannot be negative." });
+
+            if (request.InviteTokenTtlHours <= 0)
+                return BadRequest(new { message = "InviteTokenTtlHours must be greater than 0." });
+
+            if (request.RoundConfigs == null || request.RoundConfigs.Count == 0)
+                return BadRequest(new { message = "At least one interview round configuration is required." });
+
+            foreach (var round in request.RoundConfigs)
+            {
+                if (round.RoundNumber <= 0) return BadRequest(new { message = "RoundNumber must be > 0." });
+                if (round.MaxDurationMinutes <= 0) return BadRequest(new { message = "MaxDurationMinutes must be > 0." });
+                if (round.InterviewCodeTtlHours <= 0) return BadRequest(new { message = "InterviewCodeTtlHours must be > 0." });
+            }
+
+            var creator = await _unitOfWork.Repository<User>().GetByIdAsync(userId, ct);
+            if (creator == null)
+                return Unauthorized(new { message = "User not found for the current token." });
+
+            var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
 
             var job = new JobPosting
             {
-                OrganizationId = orgId,
                 CreatedByUserId = userId,
-                Title = request.Title,
-                Department = request.Department,
-                JobDescription = request.JobDescription,
+                Title = request.Title!.Trim(),
+                Department = request.Department?.Trim(),
+                JobDescription = request.JobDescription!.Trim(),
                 InterviewMode = request.InterviewMode,
                 Status = "draft",
                 IsPublicListing = request.IsPublicListing,
                 DetectedLanguage = detectedLang,
-                LanguageRequirement = detectedLang == "vi" ? "Tiếng Việt" : "Yêu cầu ngôn ngữ " + detectedLang,
-                ScoringRubric = request.ScoringRubric,
+                LanguageRequirement = !string.IsNullOrWhiteSpace(request.LanguageRequirement) 
+                                        ? request.LanguageRequirement 
+                                        : (detectedLang == "vi" ? "Tiếng Việt" : "Yêu cầu ngôn ngữ " + detectedLang),
+                RescheduleDeadlineHours = request.RescheduleDeadlineHours,
+                InviteTokenTtlHours = request.InviteTokenTtlHours,
+                ScoringRubric = request.ScoringRubric.HasValue ? request.ScoringRubric.Value.GetRawText() : null,
                 PersonaName = request.PersonaName,
                 PersonaVoiceId = request.PersonaVoiceId,
-                PersonaStyle = request.PersonaStyle
+                PersonaStyle = request.PersonaStyle,
+                Location = request.Location,
+                WorkMode = request.WorkMode,
+                SalaryMin = request.SalaryMin,
+                SalaryMax = request.SalaryMax,
+                SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency,
+                SalaryIsNegotiable = request.SalaryIsNegotiable,
+                EmploymentType = request.EmploymentType,
+                ExperienceLevel = request.ExperienceLevel,
+                Skills = request.Skills ?? new List<string>(),
+                JobCategory = request.JobCategory?.ToLower(),
+                ApplicationDeadline = request.ApplicationDeadline,
+                IsUrgent = request.IsUrgent
             };
 
-            await _unitOfWork.Repository<JobPosting>().AddAsync(job);
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.Repository<JobPosting>().AddAsync(job, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
 
-            // Save multi-round configuration
-            foreach (var round in request.RoundConfigs)
+            var roundDtos = new List<RoundConfigDto>();
+            foreach (var round in request.RoundConfigs.OrderBy(r => r.RoundNumber))
             {
                 var config = new InterviewRoundConfig
                 {
                     JobPostingId = job.Id,
                     RoundNumber = round.RoundNumber,
                     RoundType = round.RoundType,
-                    InterviewLanguage = round.InterviewLanguage,
+                    InterviewLanguage = round.InterviewLanguage ?? detectedLang,
                     InterviewCodeTtlHours = round.InterviewCodeTtlHours,
                     MaxDurationMinutes = round.MaxDurationMinutes
                 };
-                await _unitOfWork.Repository<InterviewRoundConfig>().AddAsync(config);
+                await _unitOfWork.Repository<InterviewRoundConfig>().AddAsync(config, ct);
+                roundDtos.Add(RoundConfigDto.FromEntity(config));
             }
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync(ct);
 
-            return Ok(job);
+            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
 
+        /// <summary>Danh sách job công khai trên Job Board (không cần đăng nhập).</summary>
         [HttpGet]
-        public async Task<IActionResult> GetJobs()
+        [AllowAnonymous]
+        public async Task<IActionResult> GetJobs(CancellationToken ct)
         {
-            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync();
-            var response = jobs.Select(j => new JobPostingResponse
+            var jobs = await _unitOfWork.Repository<JobPosting>().FindAsync(
+                j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow),
+                ct);
+
+            var response = jobs
+                .OrderByDescending(j => j.PublishedAt ?? j.CreatedAt)
+                .Select(j => JobPostingListItemResponse.FromEntity(j));
+
+            return Ok(response);
+        }
+
+        /// <summary>Chi tiết job cho trang mô tả công việc (Hỗ trợ HR xem cả draft/paused).</summary>
+        [HttpGet("{id:guid}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetJobById(Guid id, CancellationToken ct)
+        {
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Job posting not found." });
+
+            var isStaff = User.Identity?.IsAuthenticated == true &&
+                          (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.HrAdmin) || User.IsInRole(AppRoles.Recruiter));
+
+            if (!isStaff && (job.Status != "active" || !job.IsPublicListing))
+                return NotFound(new { message = "Job posting not found." });
+
+            var rounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                r => r.JobPostingId == id,
+                ct);
+
+            var roundDtos = rounds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
+            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
+        }
+
+        /// <summary>Danh sách toàn bộ job dành cho HR (bao gồm cả draft, closed...).</summary>
+        [HttpGet("admin")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetAdminJobs(CancellationToken ct)
+        {
+            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
+            var jobList = jobs.OrderByDescending(j => j.CreatedAt).ToList();
+
+            // Đếm số ứng viên theo từng tin (batch, tránh N+1)
+            var jobIds = jobList.Select(j => j.Id).ToList();
+            var apps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .FindAsync(a => jobIds.Contains(a.JobPostingId));
+            var countByJob = apps
+                .GroupBy(a => a.JobPostingId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Tên người tạo tin (Recruiter/HR) theo batch, tránh N+1
+            var creatorIds = jobList.Select(j => j.CreatedByUserId).Distinct().ToList();
+            var creatorNameById = (await _unitOfWork.Repository<User>()
+                .FindAsync(u => creatorIds.Contains(u.Id), ct))
+                .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
+
+            var response = jobList.Select(j =>
             {
-                Id = j.Id,
-                Title = j.Title,
-                Department = j.Department,
-                JobDescription = j.JobDescription,
-                InterviewMode = j.InterviewMode,
-                Status = j.Status,
-                IsPublicListing = j.IsPublicListing,
-                DetectedLanguage = j.DetectedLanguage,
-                LanguageRequirement = j.LanguageRequirement,
-                LanguageConfirmed = j.LanguageConfirmed,
-                CreatedAt = j.CreatedAt
+                var dto = JobPostingListItemResponse.FromEntity(j);
+                dto.ApplicantCount = countByJob.TryGetValue(j.Id, out var c) ? c : 0;
+                dto.CreatedByName = creatorNameById.TryGetValue(j.CreatedByUserId, out var name) ? name : null;
+                return dto;
             });
 
             return Ok(response);
         }
 
-        [HttpPost("{id}/slots")]
-        public async Task<IActionResult> AddAvailabilitySlots(Guid id, [FromBody] List<AvailabilitySlot> slots)
+        [HttpPost("{id:guid}/slots")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> AddAvailabilitySlots(Guid id, [FromBody] List<CreateAvailabilitySlotRequest> slots, CancellationToken ct)
         {
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id);
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
             if (job == null)
                 return NotFound(new { message = "Job posting not found." });
 
-            foreach (var slot in slots)
+            foreach (var slotDto in slots)
             {
-                slot.JobPostingId = job.Id;
-                await _unitOfWork.Repository<AvailabilitySlot>().AddAsync(slot);
+                var slot = new AvailabilitySlot
+                {
+                    JobPostingId = job.Id,
+                    RoundNumber = slotDto.RoundNumber,
+                    StartTime = slotDto.StartTime,
+                    EndTime = slotDto.EndTime,
+                    Timezone = slotDto.Timezone,
+                    Capacity = slotDto.Capacity,
+                    BookedCount = 0
+                };
+                await _unitOfWork.Repository<AvailabilitySlot>().AddAsync(slot, ct);
             }
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync(ct);
 
             return Ok(new { message = "Availability slots configured successfully." });
+        }
+        /// <summary>
+        /// HTTP PUT /api/jobs/{id}
+        /// HR cập nhật job posting kèm cấu hình vòng phỏng vấn.
+        /// Chỉ cho phép người tạo hoặc SuperAdmin, HrAdmin chỉnh sửa.
+        /// Không cho phép cập nhật khi status là archived.
+        /// </summary>
+        [HttpPut("{id:guid}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJob(Guid id, [FromBody] CreateJobPostingRequest request, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Không tìm thấy tin tuyển dụng." });
+
+            // 1. Validate ownership & roles
+            var isAuthorized = _currentUserService.Role == AppRoles.SuperAdmin ||
+                               _currentUserService.Role == AppRoles.HrAdmin ||
+                               job.CreatedByUserId == userId;
+            if (!isAuthorized)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền cập nhật tin tuyển dụng này." });
+            }
+
+            // 2. Không cho update nếu Status == "archived"
+            if (string.Equals(job.Status, "archived", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Không thể cập nhật tin tuyển dụng đã lưu trữ (archived)." });
+            }
+
+            // 3. Validation logic (Đồng bộ với CreateJob)
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return BadRequest(new { message = "Title is required." });
+
+            if (string.IsNullOrWhiteSpace(request.JobDescription))
+                return BadRequest(new { message = "JobDescription is required." });
+
+            if (request.Title?.Length > 200)
+                return BadRequest(new { message = "Title cannot exceed 200 characters." });
+
+            var allowedModes = new[] { "remote", "onsite", "both" };
+            if (!allowedModes.Contains(request.InterviewMode))
+                return BadRequest(new { message = "InterviewMode must be 'remote', 'onsite', or 'both'." });
+
+            if (request.InterviewMode != "remote" && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Location is required when InterviewMode is not 'remote'." });
+
+            if (request.SalaryMin < 0 || request.SalaryMax < 0)
+                return BadRequest(new { message = "Salary cannot be negative." });
+
+            if (request.SalaryMin.HasValue && request.SalaryMax.HasValue && request.SalaryMax < request.SalaryMin)
+                return BadRequest(new { message = "SalaryMax cannot be less than SalaryMin." });
+
+            if (request.SalaryIsNegotiable && (request.SalaryMin.HasValue || request.SalaryMax.HasValue))
+            {
+                return BadRequest(new { message = "SalaryMin and SalaryMax must be null when SalaryIsNegotiable is true." });
+            }
+
+            var allowedCategories = new[] { "backend", "frontend", "devops", "qa", "data", "ai_ml", "mobile", "pm", "designer", "other" };
+            if (!string.IsNullOrWhiteSpace(request.JobCategory) && !allowedCategories.Contains(request.JobCategory.ToLower()))
+                return BadRequest(new { message = $"JobCategory is invalid. Must be one of: {string.Join(", ", allowedCategories)}" });
+
+            // Chỉ check deadline trong tương lai nếu deadline bị thay đổi
+            if (request.ApplicationDeadline.HasValue &&
+                request.ApplicationDeadline.Value <= DateTimeOffset.UtcNow &&
+                request.ApplicationDeadline.Value != job.ApplicationDeadline)
+            {
+                return BadRequest(new { message = "ApplicationDeadline must be in the future." });
+            }
+
+            if (request.RescheduleDeadlineHours < 0)
+                return BadRequest(new { message = "RescheduleDeadlineHours cannot be negative." });
+
+            if (request.InviteTokenTtlHours <= 0)
+                return BadRequest(new { message = "InviteTokenTtlHours must be greater than 0." });
+
+            if (request.RoundConfigs == null || request.RoundConfigs.Count == 0)
+                return BadRequest(new { message = "At least one interview round configuration is required." });
+
+            foreach (var round in request.RoundConfigs)
+            {
+                if (round.RoundNumber <= 0) return BadRequest(new { message = "RoundNumber must be > 0." });
+                if (round.MaxDurationMinutes <= 0) return BadRequest(new { message = "MaxDurationMinutes must be > 0." });
+                if (round.InterviewCodeTtlHours <= 0) return BadRequest(new { message = "InterviewCodeTtlHours must be > 0." });
+            }
+
+            var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
+
+            // 4. Update fields
+            job.Title = request.Title.Trim();
+            job.Department = request.Department?.Trim();
+            job.JobDescription = request.JobDescription.Trim();
+            job.InterviewMode = request.InterviewMode;
+            job.IsPublicListing = request.IsPublicListing;
+            job.DetectedLanguage = detectedLang;
+            job.LanguageRequirement = !string.IsNullOrWhiteSpace(request.LanguageRequirement)
+                                        ? request.LanguageRequirement
+                                        : (detectedLang == "vi" ? "Tiếng Việt" : "Yêu cầu ngôn ngữ " + detectedLang);
+            job.RescheduleDeadlineHours = request.RescheduleDeadlineHours;
+            job.InviteTokenTtlHours = request.InviteTokenTtlHours;
+            job.ScoringRubric = request.ScoringRubric.HasValue ? request.ScoringRubric.Value.GetRawText() : null;
+            job.PersonaName = request.PersonaName;
+            job.PersonaVoiceId = request.PersonaVoiceId;
+            job.PersonaStyle = request.PersonaStyle;
+            job.Location = request.Location;
+            job.WorkMode = request.WorkMode;
+            job.SalaryMin = request.SalaryMin;
+            job.SalaryMax = request.SalaryMax;
+            job.SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency;
+            job.SalaryIsNegotiable = request.SalaryIsNegotiable;
+            job.EmploymentType = request.EmploymentType;
+            job.ExperienceLevel = request.ExperienceLevel;
+            job.Skills = request.Skills ?? new List<string>();
+            job.JobCategory = request.JobCategory?.ToLower();
+            job.ApplicationDeadline = request.ApplicationDeadline;
+            job.IsUrgent = request.IsUrgent;
+            job.UpdatedAt = DateTimeOffset.UtcNow; // Ghi nhận thời gian update nếu entity hỗ trợ
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // 5. Re-create InterviewRoundConfig nếu có sự thay đổi
+            var existingRounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
+            var existingList = existingRounds.OrderBy(r => r.RoundNumber).ToList();
+            var requestList = request.RoundConfigs.OrderBy(r => r.RoundNumber).ToList();
+
+            bool roundsChanged = existingList.Count != requestList.Count;
+            if (!roundsChanged)
+            {
+                for (int i = 0; i < existingList.Count; i++)
+                {
+                    var ext = existingList[i];
+                    var req = requestList[i];
+                    if (ext.RoundNumber != req.RoundNumber ||
+                        ext.RoundType != req.RoundType ||
+                        ext.InterviewLanguage != (req.InterviewLanguage ?? detectedLang) ||
+                        ext.InterviewCodeTtlHours != req.InterviewCodeTtlHours ||
+                        ext.MaxDurationMinutes != req.MaxDurationMinutes)
+                    {
+                        roundsChanged = true;
+                        break;
+                    }
+                }
+            }
+
+            var finalRoundDtos = new List<RoundConfigDto>();
+            if (roundsChanged)
+            {
+                // Delete các config cũ bằng cách lặp qua từng phần tử
+                foreach (var round in existingRounds)
+                {
+                    _unitOfWork.Repository<InterviewRoundConfig>().Delete(round);
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                // Add các config mới
+                foreach (var round in request.RoundConfigs.OrderBy(r => r.RoundNumber))
+                {
+                    var config = new InterviewRoundConfig
+                    {
+                        JobPostingId = job.Id,
+                        RoundNumber = round.RoundNumber,
+                        RoundType = round.RoundType,
+                        InterviewLanguage = round.InterviewLanguage ?? detectedLang,
+                        InterviewCodeTtlHours = round.InterviewCodeTtlHours,
+                        MaxDurationMinutes = round.MaxDurationMinutes
+                    };
+                    await _unitOfWork.Repository<InterviewRoundConfig>().AddAsync(config, ct);
+                    finalRoundDtos.Add(RoundConfigDto.FromEntity(config));
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            else
+            {
+                finalRoundDtos = existingList.Select(RoundConfigDto.FromEntity).ToList();
+            }
+
+            return Ok(JobPostingResponse.FromEntity(job, finalRoundDtos));
+        }
+
+        /// <summary>
+        /// HTTP DELETE /api/jobs/{id}
+        /// HR thực hiện xóa mềm (soft delete) tin tuyển dụng.
+        /// Không cho phép xóa nếu có hồ sơ ứng tuyển (Application) đang hoạt động.
+        /// </summary>
+        [HttpDelete("{id:guid}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> DeleteJob(Guid id, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Không tìm thấy tin tuyển dụng." });
+
+            // 1. Validate ownership & roles
+            var isAuthorized = _currentUserService.Role == AppRoles.SuperAdmin ||
+                               _currentUserService.Role == AppRoles.HrAdmin ||
+                               job.CreatedByUserId == userId;
+            if (!isAuthorized)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền xóa tin tuyển dụng này." });
+            }
+
+            // 2. Validate theo Spec: Loại trừ hồ sơ đã fail ("not_pass"), đã rút ("withdrawn") và đã pass hoàn toàn ("pass")
+            var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                ct);
+
+            if (activeApps.Any())
+            {
+                return BadRequest(new
+                {
+                    message = "Cannot delete job with active applications. Không thể xóa tin tuyển dụng này vì đang có hồ sơ ứng tuyển đang hoạt động."
+                });
+            }
+
+            // 3. Thực hiện XÓA MỀM (Soft Delete) theo đúng Spec thiết kế
+            job.DeletedAt = DateTimeOffset.UtcNow;
+            job.Status = "archived"; // Đồng bộ chuyển trạng thái thành lưu trữ
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
+        }
+
+        /// <summary>
+        /// Cập nhật trạng thái Job dựa trên quy trình duyệt (Approval Workflow).
+        /// </summary>
+        /// <remarks>
+        /// <b>Quy tắc chuyển trạng thái:</b>
+        /// <br/>• <b>Recruiter (Người tạo):</b> Chỉ chuyển: <c>draft</c> → <c>pending</c> (Gửi duyệt), hoặc bài đang <c>active</c> → <c>closed</c> (Đóng).
+        /// <br/>• <b>HrAdmin / SuperAdmin:</b> Được duyệt <c>pending</c> → <c>active</c> (Mở tin), từ chối → <c>rejected</c>, hoặc lưu trữ → <c>archived</c>.
+        /// <br/>• <b>Nộp lại bài:</b> Bài bị từ chối (<c>rejected</c>) sửa xong chuyển lại thành <c>pending</c> để duyệt lại.
+        /// <br/><br/>
+        /// <i>Lưu ý:</i> Bắt buộc truyền <c>RejectionReason</c> khi từ chối bài viết (<c>status = "rejected"</c>).
+        /// </remarks>
+        [HttpPatch("{id:guid}/status")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJobStatus(Guid id, [FromBody] UpdateJobStatusRequest request, CancellationToken ct)
+        {
+            // 1. Xác thực người dùng
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            if (string.IsNullOrWhiteSpace(request.Status))
+                return BadRequest(new { message = "Status is required." });
+
+            var targetStatus = request.Status.Trim().ToLowerInvariant();
+            var allowedStatuses = new[] { "draft", "pending", "active", "rejected", "closed", "archived" };
+
+            if (!allowedStatuses.Contains(targetStatus))
+                return BadRequest(new { message = $"Trạng thái không hợp lệ. Sử dụng một trong: {string.Join(", ", allowedStatuses)}." });
+
+            if (targetStatus == "draft")
+                return BadRequest(new { message = "Không thể chuyển trạng thái về 'draft'. 'draft' chỉ dùng khi tạo hoặc chỉnh sửa nháp ban đầu." });
+
+            // 2. Lấy thông tin Job tuyển dụng
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Job posting not found." });
+
+            var currentStatus = job.Status?.Trim().ToLowerInvariant();
+
+            // 3. Phân quyền kiểm tra cơ bản
+            var isSuperOrHrAdmin = _currentUserService.Role == AppRoles.SuperAdmin || _currentUserService.Role == AppRoles.HrAdmin;
+            var isOwner = job.CreatedByUserId == userId;
+
+            if (!isSuperOrHrAdmin && !isOwner)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bạn không có quyền thay đổi trạng thái tin tuyển dụng này." });
+            }
+
+            // Nếu trạng thái không thay đổi, không cần xử lý tiếp
+            if (currentStatus == targetStatus)
+            {
+                return BadRequest(new { message = $"Tin tuyển dụng hiện tại đã ở trạng thái '{targetStatus}' rồi." });
+            }
+
+            // Chặn mọi hành động nếu Job đã bị lưu trữ (archived)
+            if (currentStatus == "archived")
+            {
+                return BadRequest(new { message = "Không thể thay đổi trạng thái của tin tuyển dụng đã lưu trữ (archived)." });
+            }
+
+            // 4. --- VALIDATE STATE TRANSITIONS & ROLES WORKFLOW ---
+
+            // CASE A: Hành động từ chối (Chuyển sang 'rejected') -> Bắt buộc phải là Admin và phải có lý do
+            if (targetStatus == "rejected")
+            {
+                if (!isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ HrAdmin hoặc SuperAdmin mới có quyền từ chối duyệt bài." });
+
+                if (currentStatus != "pending")
+                    return BadRequest(new { message = "Chỉ có thể từ chối (rejected) những bài viết đang ở trạng thái chờ duyệt (pending)." });
+
+                if (string.IsNullOrWhiteSpace(request.RejectionReason))
+                    return BadRequest(new { message = "Vui lòng cung cấp lý do từ chối duyệt bài (RejectionReason)." });
+
+                job.RejectionReason = request.RejectionReason.Trim();
+            }
+
+            // CASE B: Hành động Phê duyệt public bài (Chuyển sang 'active') -> Chỉ Admin mới được duyệt
+            if (targetStatus == "active")
+            {
+                if (!isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ HrAdmin hoặc SuperAdmin mới có quyền kích hoạt/phê duyệt bài viết." });
+
+                // Admin có thể kích hoạt từ bài pending, hoặc tái kích hoạt lại bài đã closed
+                if (currentStatus != "pending" && currentStatus != "closed")
+                    return BadRequest(new { message = "Chỉ có thể kích hoạt (active) từ trạng thái chờ duyệt (pending) hoặc đã đóng (closed)." });
+
+                // Kiểm tra xem hạn nộp đã hết chưa, tránh trường hợp bài hết hạn mà kích hoạt lại bừa bãi
+                if (job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
+                {
+                    return BadRequest(new { message = "Hạn nộp hồ sơ của Job này đã ở quá khứ. Hãy cập nhật lại gia hạn Deadline trước khi chuyển sang Active." });
+                }
+
+                // Điền ngày public đầu tiên nếu chưa có
+                if (job.PublishedAt == null) job.PublishedAt = DateTimeOffset.UtcNow;
+
+                // Duyệt thành công thì xóa bỏ vết lý do từ chối cũ (nếu có trước đó)
+                job.RejectionReason = null;
+            }
+
+            // CASE C: Hành động Gửi duyệt bài (Chuyển sang 'pending') -> Thường dành cho Recruiter/Owner nộp bài
+            if (targetStatus == "pending")
+            {
+                if (!isOwner)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ Recruiter/Owner mới có quyền gửi duyệt bài." });
+
+                if (currentStatus != "draft" && currentStatus != "rejected")
+                    return BadRequest(new { message = "Chỉ có thể gửi duyệt (pending) khi bài viết đang là bản nháp (draft) hoặc bị từ chối (rejected)." });
+
+                // Khi sửa xong nộp lại, xóa tạm lý do từ chối cũ để chờ kết quả mới
+                job.RejectionReason = null;
+            }
+
+            // CASE D: Đóng bài tuyển dụng (Chuyển sang 'closed') -> Đủ người hoặc hết hạn bài
+            if (targetStatus == "closed")
+            {
+                if (!isOwner && !isSuperOrHrAdmin)
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Chỉ Recruiter/Owner hoặc HrAdmin/SuperAdmin mới có quyền đóng bài." });
+
+                if (currentStatus != "active")
+                    return BadRequest(new { message = "Chỉ có thể đóng (closed) một tin tuyển dụng đang hoạt động (active)." });
+            }
+
+            // CASE E: Lưu trữ / Xóa mềm bài tuyển dụng (Chuyển sang 'archived')
+            if (targetStatus == "archived")
+            {
+                // Kiểm tra xem có hồ sơ ứng tuyển nào đang xử lý dở dang không
+                var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                    a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                    ct);
+
+                if (activeApps.Any())
+                {
+                    return BadRequest(new { message = "Không thể chuyển tin tuyển dụng sang lưu trữ (archived) khi đang có hồ sơ ứng tuyển đang hoạt động." });
+                }
+
+                job.DeletedAt = DateTimeOffset.UtcNow;
+            }
+
+            // 5. Đồng bộ cập nhật vào database
+            job.Status = targetStatus;
+            job.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _unitOfWork.Repository<JobPosting>().Update(job);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // Lấy lại danh sách rounds trả về cho đồng bộ cấu trúc Response
+            var rds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
+            var roundDtos = rds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
+
+            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
     }
 }

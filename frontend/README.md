@@ -1,489 +1,637 @@
-# ARISP Frontend - Tài Liệu Dự Án
+# ARISP Frontend - Developer Guide
 
-> **ARISP** - AI-Powered Recruitment and Interview Support Platform
-> Nền tảng hỗ trợ tuyển dụng và phỏng vấn bằng AI
+> Nền tảng tuyển dụng thông minh tích hợp AI Interview Automation
+
+---
 
 ## Mục Lục
 
-1. [Giới Thiệu](#1-giới-thiệu)
-2. [Cấu Trúc Thư Mục](#2-cấu-trúc-thư-mục)
-3. [Routing - Điều Hướng](#3-routing---điều-hướng)
-4. [Quản Lý Trạng Thái](#4-quản-lý-trạng-thái)
-5. [Services - Giao Tiếp API](#5-services---giao-tiếp-api)
-6. [Types - Kiểu Dữ Liệu](#6-types---kiểu-dữ-liệu)
-7. [Hooks Tùy Chỉnh](#7-hooks-tùy-chỉnh)
-8. [Utils - Tiện Ích](#8-utils---tiện-ích)
-9. [Cài Đặt và Chạy](#9-cài-đặt-và-chạy)
+- [Tổng Quan](#tổng-quan)
+- [Cấu Trúc Thư Mục](#cấu-trúc-thư-mục)
+- [Design System](#design-system)
+- [Coding Rules](#coding-rules)
+- [State Management](#state-management)
+- [API Layer](#api-layer)
+- [Routing](#routing)
+- [Components](#components)
+- [Hướng Dẫn](#hướng-dẫn)
 
 ---
 
-## 1. Giới Thiệu
+## Tổng Quan
 
-### 1.1 Tổng Quan
+### Tech Stack
 
-ARISP là nền tảng tuyển dụng thông minh sử dụng AI để hỗ trợ quy trình phỏng vấn. Ứng dụng có 3 nhóm người dùng chính:
+| Tech          | Version | Purpose                       |
+| ------------- | ------- | ----------------------------- |
+| React         | 18.x    | UI Library                    |
+| TypeScript    | 5.x     | Type safety                   |
+| Vite          | 5.x     | Build tool                    |
+| Tailwind CSS  | 3.x     | Styling (`darkMode: 'class'`) |
+| React Router  | 6.x     | Routing                       |
+| Zustand       | 4.x     | State management              |
+| Lucide React  | latest  | Icons                         |
+| Axios         | 1.x     | HTTP client                   |
+| Framer Motion | 11.x    | Animations (optional)         |
 
-- **Nhà tuyển dụng (Admin/Hr)**: Quản lý tin tuyển dụng, xem ứng viên, đánh giá kết quả phỏng vấn
-- **Ứng viên (Candidate)**: Tìm việc, ứng tuyển, tham gia phỏng vấn AI, xem kết quả
-- **Phỏng vấn AI**: Phòng phỏng vấn thông minh với real-time transcription và đánh giá tự động
+### User Roles
 
-### 1.2 Công Nghệ Sử Dụng
-
-| Công nghệ | Phiên bản | Mô tả |
-|---|---|---|
-| React | 18.x | Thư viện UI chính |
-| TypeScript | 5.x | Ngôn ngữ lập trình chính |
-| Vite | 5.x | Công cụ build nhanh |
-| Tailwind CSS | 3.x | Utility-first CSS framework |
-| Framer Motion | 11.x | Animation library |
-| React Router | 6.x | Routing / điều hướng |
-| Zustand | 4.x | State management |
-| Axios | 1.x | HTTP client |
-| Lucide React | 0.x | Icon library |
-
-### 1.3 Kiến Trúc Tổng Quan
-
-```
-main.tsx (Entry point)
-    │
-    └── App.tsx (Router - tất cả routes)
-              │
-              ├── pages/landing/      → Trang chủ công khai (Home, Tìm việc)
-              ├── pages/auth/         → Đăng nhập / Đăng ký (Nhà tuyển dụng & Ứng viên)
-              ├── pages/admin/        → Dashboard quản lý (Nhà tuyển dụng)
-              ├── pages/candidate/    → Trang ứng viên (Hồ sơ, đơn ứng tuyển, lịch phỏng vấn)
-              ├── pages/interview/    → Phòng phỏng vấn AI
-              ├── pages/job-board/    → Chi tiết việc làm công khai
-              ├── pages/kiosk/        → Chế độ kiosk
-              └── pages/NotFoundPage  → Trang 404
-```
+| Role            | Path                     | Mô tả                                    |
+| --------------- | ------------------------ | ---------------------------------------- |
+| **Super Admin** | `/super-admin/*`         | System config, HR account management     |
+| **HR Leader**   | `/hr/*`                  | Dashboard, jobs, candidates, evaluations |
+| **Recruiter**   | `/recruiter/*`           | Create jobs, manage candidates           |
+| **Candidate**   | `/candidate/*`           | Applications, portal                     |
+| **Public**      | `/`, `/jobs/*`           | Job board, job detail                    |
+| **Interview**   | `/interview/*`, `/kiosk` | AI interview room (always dark)          |
 
 ---
 
-## 2. Cấu Trúc Thư Mục
+## Cấu Trúc Thư Mục
 
 ```
 frontend/src/
 │
-├── main.tsx                      # Entry point - Render App component
-├── App.tsx                       # Router chính - Định nghĩa tất cả routes
-├── vite-env.d.ts                # Type declarations cho Vite
+├── main.tsx                              # Entry point
+├── App.tsx                               # Router - định nghĩa routes + layouts
 │
-├── config/
-│   └── constants.ts             # Hằng số: API URL, ROLES, INTERVIEW_MODES
-│
-├── routes/
-│   └── index.ts                # Định nghĩa route paths dạng constant
-│
-├── contexts/
-│   └── AuthContext.tsx         # Auth context (đang phát triển)
-│
-├── components/                  # UI Components có thể tái sử dụng
+├── components/
 │   │
-│   ├── ui/                     # Components cơ bản
-│   │   ├── Button.tsx          # Button với variants (primary, secondary, ghost)
-│   │   ├── GlassCard.tsx      # Card với hiệu ứng glass morphism
-│   │   └── Container.tsx       # Layout container (Container, ContainerItem)
+│   ├── layout/                          # Layout wrappers
+│   │   ├── SuperAdminLayout.tsx         # Super Admin
+│   │   ├── HrLayout.tsx                 # HR - sidebar + topbar + dark toggle
+│   │   ├── RecruiterLayout.tsx         # Recruiter
+│   │   ├── CandidateLayout.tsx          # Candidate
+│   │   ├── InterviewLayout.tsx          # Interview (always dark, fullscreen)
+│   │   └── AuthLayout.tsx               # Auth pages
 │   │
-│   ├── layout/                 # Layout wrapper cho từng nhóm trang
-│   │   ├── AdminLayout.tsx     # Sidebar navigation cho admin
-│   │   ├── AuthLayout.tsx     # Wrapper đơn giản cho trang auth
-│   │   ├── CandidateLayout.tsx # Layout cho trang ứng viên
-│   │   ├── InterviewLayout.tsx # Layout cho phòng phỏng vấn (MUI)
-│   │   ├── Navigation.tsx      # Navigation công khai
-│   │   ├── PublicNav.tsx       # Public navigation cố định
-│   │   ├── CandidateNav.tsx    # Navigation cho ứng viên
-│   │   ├── CandidateFooter.tsx # Footer cho ứng viên
-│   │   └── Footer.tsx         # Footer công khai
+│   ├── shared/                          # Shared components
+│   │   └── index.tsx                   # PageHeader, StatsCard, EmptyState, etc.
 │   │
-│   ├── common/                 # Shared components
-│   │   ├── LoadingButton.tsx   # MUI Button với trạng thái loading
-│   │   ├── LoadingSpinner.tsx  # Spinner hiển thị loading
-│   │   └── ErrorAlert.tsx     # Alert thông báo lỗi
+│   ├── ui/                              # Base UI
+│   │   ├── Button.tsx
+│   │   ├── GlassCard.tsx
+│   │   └── Container.tsx
 │   │
-│   ├── sections/               # Section components cho landing page
-│   │   ├── Hero.tsx            # Hero section với video background
-│   │   ├── Demo.tsx           # Demo/features section
-│   │   ├── CTA.tsx            # Call to Action section
-│   │   ├── Stats.tsx          # Statistics section với animation
-│   │   └── ScrollStorytelling.tsx # Scroll-driven animation
-│   │
-│   └── three/                  # Three.js components
-│       ├── AISphereDemo.tsx   # AI Sphere demo visualization
-│       └── ThreeBackground.tsx # 3D background cho landing page
-│
-├── pages/                       # Page components - Mỗi route có 1 page
-│   │
-│   ├── landing/                # Trang công khai
-│   │   ├── index.ts           # Barrel exports
-│   │   ├── HomePage.tsx       # Trang chủ nhà tuyển dụng (/nha-tuyen-dung)
-│   │   └── FindJobPage.tsx    # Trang tìm kiếm việc làm (/)
-│   │
-│   ├── auth/                   # Trang xác thực
-│   │   ├── index.ts
-│   │   ├── LoginPage.tsx      # Đăng nhập nhà tuyển dụng (/dang-nhap)
-│   │   ├── RegisterPage.tsx    # Đăng ký nhà tuyển dụng (/dang-ky)
-│   │   ├── CandidateLoginPage.tsx  # Đăng nhập ứng viên (/dang-nhap-ung-vien)
-│   │   └── CandidateRegisterPage.tsx # Đăng ký ứng viên (/dang-ky-ung-vien)
-│   │
-│   ├── admin/                  # Dashboard quản lý (wrapped by AdminLayout)
-│   │   ├── index.ts
-│   │   ├── DashboardPage.tsx   # Tổng quan dashboard
-│   │   ├── JobPostingsPage.tsx # Danh sách tin tuyển dụng
-│   │   ├── JobPostingDetailPage.tsx # Chi tiết tin tuyển dụng
-│   │   ├── CreateJobPostingPage.tsx # Tạo mới tin tuyển dụng
-│   │   ├── CandidatesPage.tsx  # Danh sách ứng viên
-│   │   ├── CandidateDetailPage.tsx # Chi tiết hồ sơ ứng viên
-│   │   ├── InterviewSessionsPage.tsx # Các phiên phỏng vấn
-│   │   ├── EvaluationReviewPage.tsx # Xem và duyệt đánh giá
-│   │   ├── ReportsPage.tsx    # Báo cáo thống kê
-│   │   ├── PlaybooksPage.tsx  # Quản lý kịch bản phỏng vấn
-│   │   ├── SettingsPage.tsx   # Cài đặt tài khoản
-│   │   └── TeamPage.tsx       # Quản lý nhóm
-│   │
-│   ├── candidate/              # Trang dành cho ứng viên
-│   │   ├── index.ts
-│   │   ├── CandidateHome.tsx   # Trang chủ ứng viên (/ung-vien)
-│   │   ├── DashboardPage.tsx   # Dashboard ứng viên
-│   │   ├── MyApplicationsPage.tsx # Danh sách đơn ứng tuyển
-│   │   ├── InterviewSchedulePage.tsx # Lịch phỏng vấn
-│   │   ├── PortalPage.tsx      # Cổng thông tin ứng viên (/ung-vien/cong-cua)
-│   │   └── FeedbackPage.tsx    # Kết quả phỏng vấn (/ung-vien/ket-qua)
-│   │
-│   ├── interview/              # Phòng phỏng vấn AI (wrapped by InterviewLayout)
-│   │   ├── index.ts
-│   │   ├── InterviewRoomPage.tsx # Phòng phỏng vấn thực tế
-│   │   └── PracticeSessionPage.tsx # Phiên luyện tập
-│   │
-│   ├── job-board/              # Trang công khai về việc làm
-│   │   └── JobDetailPage.tsx  # Chi tiết việc làm (/jobs/:id)
-│   │
-│   ├── kiosk/                  # Chế độ kiosk
-│   │   └── KioskPage.tsx      # Trang kiosk (/kiosk)
-│   │
-│   ├── NotFoundPage.tsx        # Trang 404
-│   └── index.ts               # Barrel exports
-│
-├── services/                   # Giao tiếp API
-│   ├── index.ts              # Barrel exports
-│   ├── apiClient.ts          # Axios instance - interceptors, auth headers
-│   │
-│   ├── auth/                 # Authentication
-│   │   ├── index.ts
-│   │   └── authService.ts   # Login, register, refresh token, logout
-│   │
-│   ├── job/                  # Tin tuyển dụng
-│   │   ├── index.ts
-│   │   └── jobService.ts    # CRUD tin tuyển dụng
-│   │
-│   ├── application/          # Đơn ứng tuyển
-│   │   ├── index.ts
-│   │   └── applicationService.ts # CRUD đơn ứng tuyển
-│   │
-│   ├── interview/            # Phiên phỏng vấn
-│   │   ├── index.ts
-│   │   └── interviewService.ts # Tạo/get phiên phỏng vấn, transcription
-│   │
-│   ├── evaluation/           # Đánh giá
-│   │   ├── index.ts
-│   │   └── evaluationService.ts # Lấy báo cáo đánh giá
-│   │
-│   └── schedule/             # Lịch phỏng vấn
-│       ├── index.ts
-│       └── scheduleService.ts # Availability slots
-│
-├── types/                     # TypeScript type definitions
-│   ├── index.ts             # Barrel exports
+│   ├── common/                          # Common
+│   │   ├── LoadingButton.tsx
+│   │   ├── LoadingSpinner.tsx
+│   │   └── ErrorAlert.tsx
 │   │
 │   ├── auth/
-│   │   ├── index.ts
-│   │   └── auth.types.ts   # User, AuthTokens, LoginRequest, RegisterRequest
+│   │   └── ProtectedRoute.tsx          # Route protection
 │   │
-│   ├── job/
-│   │   ├── index.ts
-│   │   └── job.types.ts    # JobPosting, CreateJobPostingRequest, SalaryRange
-│   │
-│   ├── application/
-│   │   ├── index.ts
-│   │   └── application.types.ts # Application, ApplicationDetail
-│   │
-│   ├── interview/
-│   │   ├── index.ts
-│   │   └── interview.types.ts # InterviewRoomState, Signal, Candidate
-│   │
-│   ├── evaluation/
-│   │   ├── index.ts
-│   │   └── evaluation.types.ts # EvaluationReport, CriterionScore
-│   │
-│   └── organization/
-│       ├── index.ts
-│       └── organization.types.ts # Organization, Subscription
+│   └── sections/                        # Landing page sections
+│       ├── Hero.tsx
+│       ├── Demo.tsx
+│       └── ...
 │
-├── store/                     # Zustand state stores
-│   ├── index.ts
+├── pages/
 │   │
-│   ├── auth/                # Auth state
-│   │   ├── index.ts
-│   │   └── authStore.ts    # User, tokens, login, logout, isAuthenticated
+│   ├── super-admin/                     # Super Admin pages
+│   │   ├── DashboardPage.tsx
+│   │   ├── UsersPage.tsx
+│   │   └── ...
 │   │
-│   ├── application/         # Application state
-│   │   ├── index.ts
-│   │   └── applicationStore.ts # Applications list
+│   ├── hr/                              # HR Leader pages
+│   │   ├── DashboardPage.tsx           # KPIs, funnel, recent candidates
+│   │   ├── EvaluationReviewPage.tsx    # Review & confirm AI verdicts
+│   │   └── ...
 │   │
-│   └── interview/           # Interview room state
-│       ├── index.ts
-│       └── interviewStore.ts # Interview room signals, state
+│   ├── recruiter/                       # Recruiter pages
+│   │   ├── DashboardPage.tsx
+│   │   ├── MyJobsPage.tsx
+│   │   ├── CandidatesPage.tsx
+│   │   └── ...
+│   │
+│   ├── admin/                           # Legacy/admin pages (đang migrate)
+│   │   ├── DashboardPage.tsx
+│   │   ├── JobPostingsPage.tsx
+│   │   └── ...
+│   │
+│   ├── candidate/                       # Candidate pages
+│   │   ├── DashboardPage.tsx
+│   │   ├── MyApplicationsPage.tsx
+│   │   └── ...
+│   │
+│   ├── interview/                       # Interview room
+│   │   ├── InterviewRoomPage.tsx        # Real interview
+│   │   └── PracticeSessionPage.tsx     # Practice
+│   │
+│   ├── auth/                            # Auth pages
+│   │   ├── LoginPage.tsx
+│   │   ├── RegisterPage.tsx
+│   │   ├── CandidateLoginPage.tsx
+│   │   └── ...
+│   │
+│   ├── landing/                         # Public landing
+│   │   ├── HomePage.tsx                # Employer landing
+│   │   └── FindJobPage.tsx             # Job board (/)
+│   │
+│   └── job-board/                       # Public job pages
+│       └── JobDetailPage.tsx
 │
-├── hooks/                    # Custom React hooks
-│   ├── index.ts
-│   │
-│   ├── interview/           # Interview room hooks
-│   │   ├── index.ts
-│   │   └── useInterviewRoom.ts # Business logic cho phòng phỏng vấn
-│   │
-│   └── cheat-detection/     # Anti-cheat hooks
-│       ├── index.ts
-│       └── useCheatDetection.ts # Phát hiện tab switch, eye tracking
+├── services/                             # API layer
+│   ├── apiClient.ts                    # Axios instance + interceptors
+│   ├── auth/authService.ts
+│   ├── job/jobService.ts
+│   ├── application/applicationService.ts
+│   ├── interview/interviewService.ts
+│   ├── evaluation/evaluationService.ts
+│   └── schedule/scheduleService.ts
 │
-└── utils/                    # Tiện ích
-    ├── index.ts
-    ├── devAuth.ts          # Dev mode authentication helpers
-    └── format/
-        ├── index.ts
-        └── format.ts       # Format ngày tháng, thời gian
+├── store/                               # Zustand stores
+│   ├── auth/authStore.ts              # user, tokens, login/logout
+│   └── theme/themeStore.ts            # isDark, toggleTheme
+│
+├── hooks/                               # Custom hooks
+│   ├── interview/useInterviewRoom.ts
+│   └── cheat-detection/useCheatDetection.ts
+│
+├── types/                               # TypeScript types
+│   ├── auth/auth.types.ts
+│   ├── job/job.types.ts
+│   ├── application/application.types.ts
+│   ├── interview/interview.types.ts
+│   └── evaluation/evaluation.types.ts
+│
+├── utils/                               # Utilities
+│   ├── devAuth.ts                     # Dev mode helpers
+│   └── format/format.ts               # Date formatting
+│
+└── config/
+    └── constants.ts                    # Constants, API_URL
 ```
 
 ---
 
-## 3. Routing - Điều Hướng
+## Design System
 
-### 3.1 Route Paths
+### Color Palette
 
-Định nghĩa tại `routes/index.ts`:
-
-```typescript
-export const routes = {
-  // Public
-  home: '/',
-  login: '/dang-nhap',
-  register: '/dang-ky',
-
-  // HR Admin
-  dashboard: '/quan-ly',
-  jobPostings: '/quan-ly/tin-tuyen-dung',
-  candidates: '/quan-ly/ung-vien',
-  evaluations: '/quan-ly/danh-gia',
-  reports: '/quan-ly/bao-cao',
-
-  // Candidate
-  candidateApply: '/ung-vien/ung-tuyen',
-  candidateInterview: '/ung-vien/phong-van',
-  candidatePortal: '/ung-vien/cong-cua',
-
-  // Interview
-  interviewRoom: '/phong-van/:sessionId',
-  interviewKiosk: '/kiosk',
-} as const;
+```javascript
+// tailwind.config.js
+colors: {
+  brand: { 50, 100, 400, 500, 600, 700 },  // Primary (indigo)
+  ai: { 400, 500, 600 },                   // AI accent (purple)
+  ink: { 50, 100, 200, 400, 500, 600, 700, 800, 900, 950 }, // Text/bg scale
+}
 ```
 
-### 3.2 Tất Cả Routes trong App.tsx
+### Dark Mode Pattern
 
-| Route | Component | Layout | Mô tả |
-|---|---|---|---|
-| `/` | `FindJobPage` | - | Trang tìm việc |
-| `/nha-tuyen-dung` | `HomePage` | - | Landing page nhà tuyển dụng |
-| `/dang-nhap` | `LoginPage` | - | Đăng nhập nhà tuyển dụng |
-| `/dang-ky` | `RegisterPage` | - | Đăng ký nhà tuyển dụng |
-| `/dang-nhap-ung-vien` | `CandidateLoginPage` | - | Đăng nhập ứng viên |
-| `/dang-ky-ung-vien` | `CandidateRegisterPage` | - | Đăng ký ứng viên |
-| `/ung-vien` | `CandidateHome` | `CandidateLayout` | Trang chủ ứng viên |
-| `/ung-vien/ung-tuyen` | `CandidateApply` | - | Trang ứng tuyển |
-| `/ung-vien/phong-van` | `InterviewSchedulePage` | - | Lịch phỏng vấn |
-| `/ung-vien/cong-cua` | `PortalPage` | - | Cổng thông tin |
-| `/ung-vien/ket-qua` | `FeedbackPage` | - | Kết quả đánh giá |
-| `/quan-ly` | `DashboardPage` | `AdminLayout` | Dashboard admin |
-| `/quan-ly/tin-tuyen-dung` | `JobPostingsPage` | `AdminLayout` | Danh sách tin tuyển dụng |
-| `/quan-ly/tin-tuyen-dung/tao-moi` | `CreateJobPostingPage` | `AdminLayout` | Tạo tin tuyển dụng |
-| `/quan-ly/tin-tuyen-dung/:id` | `JobPostingDetailPage` | `AdminLayout` | Chi tiết tin |
-| `/quan-ly/ung-vien` | `CandidatesPage` | `AdminLayout` | Danh sách ứng viên |
-| `/quan-ly/ung-vien/:id` | `CandidateDetailPage` | `AdminLayout` | Chi tiết ứng viên |
-| `/quan-ly/danh-gia` | `EvaluationReviewPage` | `AdminLayout` | Duyệt đánh giá |
-| `/quan-ly/bao-cao` | `ReportsPage` | `AdminLayout` | Báo cáo |
-| `/quan-ly/cai-dat` | `SettingsPage` | `AdminLayout` | Cài đặt |
-| `/quan-ly/playbooks` | `PlaybooksPage` | `AdminLayout` | Kịch bản phỏng vấn |
-| `/quan-ly/nhom` | `TeamPage` | `AdminLayout` | Quản lý nhóm |
-| `/quan-ly/phong-van` | `InterviewSessionsPage` | `AdminLayout` | Phiên phỏng vấn |
-| `/interview/room/:sessionId` | `InterviewRoomPage` | `InterviewLayout` | Phòng phỏng vấn |
-| `/interview/practice/:applicationId` | `PracticeSessionPage` | `InterviewLayout` | Luyện tập |
-| `/kiosk` | `KioskPage` | `InterviewLayout` | Chế độ kiosk |
-| `/jobs/:id` | `JobDetailPage` | - | Chi tiết việc làm |
-| `*` | `NotFoundPage` | - | Trang 404 |
+**QUY TẮC: Mọi component phải support cả light và dark mode**
+
+```tsx
+// ✅ ĐÚNG
+<div className="bg-white dark:bg-white/5">
+  <h1 className="text-ink-900 dark:text-white">
+  <button className="border-ink-200 dark:border-white/10">
+```
+
+```tsx
+// ❌ SAI - thiếu dark mode
+<div className="bg-white">
+<h1 className="text-ink-900">
+```
+
+### Card Pattern
+
+```tsx
+<div className="rounded-2xl border border-ink-200 dark:border-white/10
+                bg-white dark:bg-white/5
+                p-6 shadow-card hover:shadow-card-hover transition-all">
+```
+
+### Status Badge
+
+```tsx
+<span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+  status === 'pass'
+    ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+    : status === 'pending'
+      ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+      : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+}`}>
+```
+
+### Text Colors
+
+| Element      | Light            | Dark                  |
+| ------------ | ---------------- | --------------------- |
+| Container bg | `bg-ink-50`      | `dark:bg-ink-950`     |
+| Card bg      | `bg-white`       | `dark:bg-white/5`     |
+| Heading      | `text-ink-900`   | `dark:text-white`     |
+| Body         | `text-ink-600`   | `dark:text-ink-400`   |
+| Muted        | `text-ink-500`   | `dark:text-ink-400`   |
+| Icon         | `text-brand-600` | `dark:text-brand-400` |
 
 ---
 
-## 4. Quản Lý Trạng Thái
+## Coding Rules
 
-### 4.1 Auth Store (Zustand)
+### 1. Dark Mode - BẮT BUỘC
 
-```typescript
-// store/auth/authStore.ts
-interface AuthState {
-  user: User | null;
-  tokens: AuthTokens | null;
-  isAuthenticated: boolean;
-  setAuth: (user: User, tokens: AuthTokens) => void;
-  clearAuth: () => void;
+Mọi component PHẢI có cả light và dark classes.
+
+```tsx
+// Page container
+<div className="bg-ink-50 dark:bg-ink-950 min-h-screen">
+
+// Text
+<h1 className="text-ink-900 dark:text-white">
+<p className="text-ink-600 dark:text-ink-400">
+
+// Icon
+<Icon className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+```
+
+### 2. Import Patterns
+
+```tsx
+// ✅ Dùng alias @
+import { useAuthStore } from '@store/auth/authStore'
+import { PageHeader } from '@components/shared'
+
+// ❌ Relative path dài
+import { useAuthStore } from '../../../store/auth/authStore'
+```
+
+### 3. Component Naming
+
+| Type    | Pattern             | Ví dụ                 |
+| ------- | ------------------- | --------------------- |
+| Page    | PascalCase          | `DashboardPage.tsx`   |
+| Layout  | PascalCase + Layout | `HrLayout.tsx`        |
+| Hook    | `use` + PascalCase  | `useInterviewRoom.ts` |
+| Service | camelCase           | `authService.ts`      |
+| Store   | camelCase + Store   | `authStore.ts`        |
+
+### 4. Store Pattern (Zustand)
+
+```tsx
+// store/example/exampleStore.ts
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+interface ExampleState {
+  items: Item[]
+  loading: boolean
+  fetchItems: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  tokens: null,
-  isAuthenticated: false,
-  setAuth: (user, tokens) => set({ user, tokens, isAuthenticated: true }),
-  clearAuth: () => set({ user: null, tokens: null, isAuthenticated: false }),
-}));
+export const useExampleStore = create<ExampleState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      loading: false,
+
+      fetchItems: async () => {
+        set({ loading: true })
+        try {
+          const items = await exampleService.getItems()
+          set({ items })
+        } finally {
+          set({ loading: false })
+        }
+      },
+    }),
+    { name: 'example-storage' }
+  )
+)
 ```
 
-Sử dụng: `const { user, isAuthenticated, setAuth, clearAuth } = useAuthStore()`
+### 5. Service Pattern
 
-### 4.2 Interview Store
+```tsx
+// services/example/exampleService.ts
+import apiClient from '../apiClient'
 
-```typescript
-// store/interview/interviewStore.ts
-// Quản lý signals, state của phòng phỏng vấn real-time
+export const exampleService = {
+  async getItems(): Promise<Item[]> {
+    const { data } = await apiClient.get<Item[]>('/items')
+    return data
+  },
+
+  async createItem(payload: CreateRequest): Promise<Item> {
+    const { data } = await apiClient.post<Item>('/items', payload)
+    return data
+  },
+
+  async updateItem(id: string, payload: UpdateRequest): Promise<Item> {
+    const { data } = await apiClient.put<Item>(`/items/${id}`, payload)
+    return data
+  },
+
+  async deleteItem(id: string): Promise<void> {
+    await apiClient.delete(`/items/${id}`)
+  },
+}
+```
+
+### 6. Error Handling
+
+```tsx
+// ✅ Pattern có error state
+const [error, setError] = useState<string | null>(null)
+
+const fetchData = async () => {
+  try {
+    setLoading(true)
+    const data = await service.getData()
+    setData(data)
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Lỗi không xác định')
+  } finally {
+    setLoading(false)
+  }
+}
+```
+
+### 7. List Rendering - KEY PROP
+
+```tsx
+// ✅ Unique key từ id
+{
+  items.map((item) => <Card key={item.id} item={item} />)
+}
+
+// ❌ Index làm key
+{
+  items.map((item, index) => <Card key={index} item={item} />)
+}
+```
+
+### 8. Props - Định nghĩa rõ ràng
+
+```tsx
+// ✅ Props interface
+interface CardProps {
+  item: Item
+  onEdit?: (id: string) => void
+  className?: string
+}
+
+export function Card({ item, onEdit, className }: CardProps) {
+  return <div className={className}>{/* content */}</div>
+}
+```
+
+### 9. Responsive
+
+```tsx
+// Mobile-first breakpoints
+<div className="p-4 md:p-6 lg:p-8">
+
+// Responsive grid
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+```
+
+### 10. Forbidden Patterns
+
+```tsx
+// ❌ any - dùng type rõ ràng
+const data: any  // ❌
+const data: Item[]  // ✅
+
+// ❌ fetch trong component
+fetch('/api/items').then(...)  // ❌
+exampleService.getItems()  // ✅
+
+// ❌ hardcode color
+className="bg-gray-800"  // ❌
+className="bg-ink-900"  // ✅
 ```
 
 ---
 
-## 5. Services - Giao Tiếp API
+## State Management
 
-### 5.1 API Client
+### Auth Store
 
-```typescript
-// services/apiClient.ts
-// Axios instance với:
-// - Base URL từ constants.ts
-// - Request interceptor: gắn auth token
-// - Response interceptor: xử lý 401, refresh token
+```tsx
+import { useAuthStore } from '@store/auth/authStore'
+
+const {
+  user, // User | null
+  isAuthenticated, // boolean
+  setAuth, // (user, tokens) => void
+  clearAuth, // () => void
+  login, // (user, tokens) => void
+  logout, // () => void
+} = useAuthStore()
 ```
 
-### 5.2 Các Service Chính
+### Theme Store
 
-| Service | File | Các hàm chính |
-|---|---|---|
-| `authService` | `auth/authService.ts` | `login`, `register`, `refreshToken`, `logout` |
-| `jobService` | `job/jobService.ts` | `getJobPostings`, `createJobPosting`, `getPublicJobPostings` |
-| `applicationService` | `application/applicationService.ts` | `createApplication`, `getApplications` |
-| `interviewService` | `interview/interviewService.ts` | `createSession`, `getSession`, `transcribe` |
-| `evaluationService` | `evaluation/evaluationService.ts` | `getEvaluations`, `getMyEvaluations` |
-| `scheduleService` | `schedule/scheduleService.ts` | `getAvailabilitySlots` |
+```tsx
+import { useThemeStore } from '@store/theme'
+
+const { isDark, toggleTheme } = useThemeStore()
+
+// HrLayout đã sync theme với DOM
+// Các component chỉ cần đọc isDark cho conditional styles
+```
 
 ---
 
-## 6. Types - Kiểu Dữ Liệu
+## API Layer
 
-| Module | File | Các interface chính |
-|---|---|---|
-| Auth | `auth/auth.types.ts` | `User`, `AuthTokens`, `LoginRequest`, `RegisterRequest` |
-| Job | `job/job.types.ts` | `JobPosting`, `CreateJobPostingRequest`, `SalaryRange` |
-| Application | `application/application.types.ts` | `Application`, `ApplicationDetail`, `ApplicationStatus` |
-| Interview | `interview/interview.types.ts` | `InterviewRoomState`, `Signal`, `Candidate`, `WebRTCSignal` |
-| Evaluation | `evaluation/evaluation.types.ts` | `EvaluationReport`, `CriterionScore` |
-| Organization | `organization/organization.types.ts` | `Organization`, `Subscription` |
+### API Client (`services/apiClient.ts`)
+
+```tsx
+// Đã config sẵn:
+// - Base URL: VITE_API_URL
+// - Request interceptor: gắn JWT token + X-User-Id
+// - Response interceptor: xử lý 401 → auto refresh token
+```
+
+### Services
+
+| Service              | Endpoints                                       |
+| -------------------- | ----------------------------------------------- |
+| `authService`        | POST /auth/login, /auth/register, /auth/refresh |
+| `jobService`         | GET/POST/PUT/DELETE /job-postings               |
+| `applicationService` | GET/POST /applications                          |
+| `interviewService`   | POST /interviews/sessions, GET /interviews/:id  |
+| `evaluationService`  | GET /evaluations, PUT /evaluations/:id/confirm  |
 
 ---
 
-## 7. Hooks Tùy Chỉnh
+## Routing
 
-### 7.1 `useInterviewRoom(sessionId: string)`
+### Structure
 
-Logic business cho phòng phỏng vấn: kết nối WebRTC, quản lý signals, transcription.
+```
+/                            → FindJobPage (job board)
+/jobs/:id                    → JobDetailPage
 
-### 7.2 `useCheatDetection(config: CheatDetectionConfig)`
+/auth/*                      → Auth pages (login, register)
+/auth/candidate/*            → Candidate auth
 
-Phát hiện gian lận:
-- Theo dõi tab switch / window blur
-- Eye tracking (nếu có camera permission)
-- Cảnh báo khi phát hiện hành vi bất thường
+/super-admin/*              → SuperAdminLayout
+/hr/*                        → HrLayout (dark toggle)
+/recruiter/*                 → RecruiterLayout
+
+/candidate/*                 → CandidateLayout
+/portal/*                   → Magic link auth
+
+/interview/room/:sessionId  → InterviewLayout (always dark)
+/kiosk                       → KioskPage
+```
+
+### Protected Route
+
+```tsx
+<ProtectedRoute allowedRoles={['hr_leader', 'recruiter']}>
+  <HrLayout>
+    <Outlet />
+  </HrLayout>
+</ProtectedRoute>
+```
 
 ---
 
-## 8. Utils - Tiện Ích
+## Components
 
-| File | Mô tả |
-|---|---|
-| `utils/devAuth.ts` | Helpers cho dev mode: `getDevAuth()`, `isDevMode` - tự động đăng nhập khi `VITE_DEV_AUTH=true` |
-| `utils/format/format.ts` | Format ngày tháng: `formatDate()`, `formatTime()`, `formatDateTime()` |
-| `config/constants.ts` | Hằng số: `API_BASE_URL`, `ROLES`, `INTERVIEW_MODES`, `DEFAULT_PAGINATION` |
+### Layouts
+
+| Layout             | Wraps                    | Dark Toggle      |
+| ------------------ | ------------------------ | ---------------- |
+| `SuperAdminLayout` | `/super-admin/*`         | ❌               |
+| `HrLayout`         | `/hr/*`                  | ✅               |
+| `RecruiterLayout`  | `/recruiter/*`           | ❌               |
+| `CandidateLayout`  | `/candidate/*`           | ❌               |
+| `InterviewLayout`  | `/interview/*`, `/kiosk` | ❌ (always dark) |
+
+### Shared Components
+
+```tsx
+// Import từ @components/shared
+import {
+  PageHeader, // Tiêu đề + description
+  StatsGrid, // Grid cho stats
+  StatsCard, // Stat card
+  EmptyState, // Empty state
+  LoadingSpinner, // Loading
+  ErrorAlert, // Error alert
+} from '@components/shared'
+```
 
 ---
 
-## 9. Cài Đặt và Chạy
+## Hướng Dẫn
 
-### 9.1 Yêu Cầu
+### Tạo Page Mới
 
-- Node.js 18+
-- npm 9+
+```tsx
+// src/pages/hr/NewPage.tsx
+import { Link } from 'react-router-dom'
+import { PageHeader } from '@components/shared'
 
-### 9.2 Cài Đặt
+export default function NewPage() {
+  return (
+    // Container - LUÔN có dark mode
+    <main className="p-6 bg-ink-50 dark:bg-ink-950">
+      {/* Page header (tùy chọn) */}
+      <PageHeader title="Tiêu đề" description="Mô tả" />
 
-```bash
-cd frontend
-npm install
+      {/* Content */}
+      <div className="space-y-4">
+        {items.map((item) => (
+          <Card key={item.id} item={item} />
+        ))}
+      </div>
+    </main>
+  )
+}
 ```
 
-### 9.3 Chạy Development Server
+### Thêm Route
 
-```bash
-npm run dev
+```tsx
+// App.tsx
+import NewPage from '@pages/hr/NewPage'
+
+<Route path="/hr/new" element={<NewPage />} />
+// Hoặc với layout:
+<Route element={<HrLayout><Outlet /></HrLayout>}>
+  <Route path="/hr/new" element={<NewPage />} />
+</Route>
 ```
 
-Ứng dụng sẽ chạy tại `http://localhost:5173`
+### Tạo Store
 
-### 9.4 Build Production
+```tsx
+// src/store/example/exampleStore.ts
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-```bash
-npm run build
+interface ExampleState {
+  items: Item[]
+  loading: boolean
+  fetchItems: () => Promise<void>
+}
+
+export const useExampleStore = create<ExampleState>()(
+  persist(
+    (set) => ({
+      items: [],
+      loading: false,
+      fetchItems: async () => {
+        set({ loading: true })
+        const items = await exampleService.getItems()
+        set({ items, loading: false })
+      },
+    }),
+    { name: 'example-storage' }
+  )
+)
 ```
 
-Output sẽ nằm trong thư mục `dist/`
+### Thêm Service
 
-### 9.5 Biến Môi Trường
+```tsx
+// src/services/example/exampleService.ts
+import apiClient from '../apiClient'
 
-Tạo file `.env` trong thư mục `frontend/`:
+export const exampleService = {
+  getItems: () => apiClient.get('/items'),
+  getItemById: (id: string) => apiClient.get(`/items/${id}`),
+  createItem: (data: CreateRequest) => apiClient.post('/items', data),
+  updateItem: (id: string, data: UpdateRequest) => apiClient.put(`/items/${id}`, data),
+  deleteItem: (id: string) => apiClient.delete(`/items/${id}`),
+}
+```
+
+---
+
+## Environment Variables
 
 ```env
+# .env trong frontend/
 VITE_API_URL=http://localhost:8080/api
 VITE_WS_URL=ws://localhost:8080/ws
-VITE_DEV_AUTH=false
+VITE_DEV_AUTH=false    # true = auto login dev user
 ```
-
-### 9.6 Dev Mode Auth
-
-Để tự động đăng nhập dev, set trong `.env`:
-
-```env
-VITE_DEV_AUTH=true
-```
-
-Điều này sẽ tự động load user và tokens từ `devAuth.ts` khi khởi động app.
 
 ---
 
-## 10. Ghi Chú Quan Trọng
+## Scripts
 
-### 10.1 MUI vs Tailwind
+```bash
+npm run dev      # Dev server (port 5173)
+npm run build    # Production build
+npm run preview  # Preview build
+```
 
-Dự án sử dụng **chủ yếu Tailwind CSS** cho styling. MUI (Material UI) chỉ được dùng cho một số components cụ thể trong `interview/` và `components/common/`. Cần thống nhất để tránh conflict CSS.
+---
 
-### 10.2 AuthLayout
+## Checklist Khi Code
 
-`AuthLayout` được định nghĩa trong codebase nhưng hiện tại **không được sử dụng** trong routes. Các trang auth (`LoginPage`, `RegisterPage`) được render trực tiếp mà không qua layout wrapper.
-
-### 10.3 API Base URL
-
-Backend API được cấu hình trong `config/constants.ts`. Đảm bảo backend chạy và URL chính xác trong file `.env`.
-
-### 10.4 WebSocket
-
-Tính năng real-time (phỏng vấn AI) sử dụng WebSocket cho transcription và signals. Cần cấu hình `VITE_WS_URL` đúng.
+- [ ] Có dark mode classes (`dark:` prefix)
+- [ ] Dùng alias `@` cho imports
+- [ ] Props có type rõ ràng (không `any`)
+- [ ] List có unique `key` prop
+- [ ] API call qua service layer
+- [ ] Error handling khi gọi API

@@ -1,168 +1,290 @@
-import type { LoginRequest, LoginResponse, MagicLinkRequest, User, AuthTokens } from '../../types/auth';
+import type { LoginRequest, AuthResponse, CandidateRegisterRequest, User } from '../../types/auth'
+import { API_BASE_URL, ROLES } from '@config/constants'
 
 export interface RegisterRequest {
-  email: string;
-  password: string;
-  name: string;
-  company?: string;
-  phone?: string;
-  role?: string;
+  email: string
+  password: string
+  name: string
+  company?: string
+  phone?: string
+  role?: string
 }
 
-// Mock users for fake authentication
-const MOCK_USERS = {
-  admin: {
-    id: 'dev-admin-001',
-    email: 'admin@arisp.com',
-    name: 'Admin User',
-    role: 'SuperAdmin' as const,
-    avatarUrl: undefined,
-    organizationId: 'dev-org-001',
-  },
-  candidate: {
-    id: 'dev-candidate-001',
-    email: 'candidate@arisp.com',
-    name: 'Nguyễn Văn An',
-    role: 'Candidate' as const,
-    avatarUrl: undefined,
-    organizationId: undefined,
-  },
-};
+const USE_FAKE_AUTH = import.meta.env.VITE_ENABLE_FAKE_AUTH === 'true'
 
-const MOCK_TOKENS: AuthTokens = {
-  accessToken: 'mock-access-token-' + Date.now(),
-  refreshToken: 'mock-refresh-token-' + Date.now(),
-  expiresAt: Date.now() + 3600000,
-};
-
-// Check if we should use fake auth (development mode)
-const USE_FAKE_AUTH = import.meta.env.DEV || !import.meta.env.VITE_API_URL;
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
+    throw new Error(error.message || `HTTP ${response.status}`)
+  }
+  return response.json()
+}
 
 export const authService = {
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    // Fake login for development - accept any credentials
+  async staffLogin(credentials: LoginRequest): Promise<AuthResponse> {
     if (USE_FAKE_AUTH) {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Determine role from email or default to candidate
-      const email = credentials.email.toLowerCase();
-      const isAdmin = email.includes('admin') || email.includes('hr') || email.includes('recruiter');
-      
-      const mockUser = isAdmin ? MOCK_USERS.admin : MOCK_USERS.candidate;
-      const user: User = {
-        ...mockUser,
-        id: 'mock-' + Date.now(),
-        email: credentials.email,
-        name: credentials.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      };
-
+      await new Promise((resolve) => setTimeout(resolve, 800))
       return {
-        user,
-        tokens: MOCK_TOKENS,
-      };
+        accessToken: 'mock-staff-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'HR Admin',
+        role: ROLES.HRAdmin,
+      }
     }
 
-    // Real API call for production
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/auth/staff/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
-    });
+    })
 
-    if (!response.ok) {
-      throw new Error('Invalid credentials');
-    }
-
-    return response.json();
+    return parseResponse<AuthResponse>(response)
   },
 
-  async register(request: RegisterRequest): Promise<LoginResponse> {
-    // Fake register for development
+  async employerLogin(_credentials: LoginRequest): Promise<AuthResponse> {
     if (USE_FAKE_AUTH) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const user: User = {
-        id: 'mock-' + Date.now(),
-        email: request.email,
-        name: request.name,
-        role: (request.role as User['role']) || 'Candidate',
-        avatarUrl: undefined,
-        organizationId: request.company ? 'mock-org-' + Date.now() : undefined,
-      };
-
+      await new Promise((resolve) => setTimeout(resolve, 800))
       return {
-        user,
-        tokens: MOCK_TOKENS,
-      };
+        accessToken: 'mock-employer-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'HR Admin',
+        role: ROLES.HRAdmin,
+      }
     }
 
-    const response = await fetch('/api/auth/register', {
+    window.location.href = authService.buildOAuthRedirectUrl(
+      'Google',
+      `${window.location.origin}/auth/login`
+    )
+    throw new Error('Redirecting to Google sign-in')
+  },
+
+  async candidateLogin(credentials: LoginRequest): Promise<AuthResponse> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return {
+        accessToken: 'mock-candidate-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'Nguyễn Văn An',
+        role: ROLES.Candidate,
+      }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'An error occurred' }))
+      const err = new Error(error.message || `HTTP ${response.status}`) as Error & { code?: string }
+      if (error.code) err.code = error.code
+      throw err
+    }
+
+    return response.json() as Promise<AuthResponse>
+  },
+
+  async candidateRegister(request: CandidateRegisterRequest): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return { message: 'Candidate registered successfully.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
-    });
+    })
 
-    if (!response.ok) {
-      throw new Error('Registration failed');
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async verifyEmail(email: string, token: string): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return { message: 'Xác minh email thành công.' }
     }
 
-    return response.json();
+    const response = await fetch(
+      `${API_BASE_URL}/auth/candidate/verify-email?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`,
+      { method: 'GET' }
+    )
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return { message: 'Email xác minh đã được gửi lại.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async resetPassword(request: {
+    email: string
+    token: string
+    newPassword: string
+  }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return { message: 'Password reset successfully.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async forgotPassword(request: { email: string }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return { message: 'If the email exists, a reset link has been sent.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/candidate/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async staffForgotPassword(request: { email: string }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return { message: 'If the email exists, a reset link has been sent.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/staff/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async staffResetPassword(request: {
+    email: string
+    token: string
+    newPassword: string
+  }): Promise<{ message: string }> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      return { message: 'Password reset successfully.' }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/staff/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+
+    return parseResponse<{ message: string }>(response)
+  },
+
+  async verifyMagicLink(email: string, token: string): Promise<AuthResponse> {
+    if (USE_FAKE_AUTH) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return {
+        accessToken: 'mock-magic-link-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        fullName: 'Nguyễn Văn An',
+        role: ROLES.Candidate,
+      }
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/auth/magic-link/verify?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`,
+      { method: 'GET' }
+    )
+
+    const data = await parseResponse<{ message: string; token: string }>(response)
+    return {
+      accessToken: data.token,
+      refreshToken: '',
+      fullName: '',
+      role: ROLES.Candidate,
+    }
   },
 
   async logout(): Promise<void> {
-    // No-op for fake auth
-    if (USE_FAKE_AUTH) {
-      return;
-    }
-    await fetch('/api/auth/logout', { method: 'POST' });
-  },
-
-  async requestMagicLink(request: MagicLinkRequest): Promise<void> {
-    if (USE_FAKE_AUTH) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return;
-    }
-    await fetch('/api/auth/magic-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-  },
-
-  async verifyMagicLink(token: string): Promise<LoginResponse> {
-    if (USE_FAKE_AUTH) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return {
-        user: MOCK_USERS.candidate,
-        tokens: MOCK_TOKENS,
-      };
-    }
-    const response = await fetch('/api/auth/magic-link/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-    return response.json();
+    if (USE_FAKE_AUTH) return
+    await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' }).catch(() => {})
   },
 
   async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
     if (USE_FAKE_AUTH) {
-      return { accessToken: 'mock-refreshed-token-' + Date.now() };
+      return { accessToken: 'mock-refreshed-token-' + Date.now() }
     }
-    const response = await fetch('/api/auth/refresh', {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
-    });
-    return response.json();
+    })
+    return parseResponse<{ accessToken: string }>(response)
   },
 
-  async getCurrentUser() {
+  async getCurrentUser(accessToken: string): Promise<User> {
     if (USE_FAKE_AUTH) {
-      return MOCK_USERS.admin;
+      return {
+        id: 'mock-user',
+        email: 'mock@arisp.com',
+        name: 'Mock User',
+        role: ROLES.Candidate,
+      }
     }
-    const response = await fetch('/api/auth/me');
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    return parseResponse<User>(response)
   },
-};
+
+  buildOAuthRedirectUrl(provider: string = 'Google', returnUrl: string = '/'): string {
+    const encodedReturnUrl = encodeURIComponent(returnUrl)
+    return `${API_BASE_URL}/auth/external/signin?provider=${encodeURIComponent(provider)}&returnUrl=${encodedReturnUrl}`
+  },
+
+  buildCandidateOAuthRedirectUrl(provider: string = 'Google', returnUrl: string = '/'): string {
+    const encodedReturnUrl = encodeURIComponent(returnUrl)
+    return `${API_BASE_URL}/auth/candidate/external/signin?provider=${encodeURIComponent(provider)}&returnUrl=${encodedReturnUrl}`
+  },
+
+  candidateLoginWithGoogle(): void {
+    window.location.href = authService.buildCandidateOAuthRedirectUrl(
+      'Google',
+      `${window.location.origin}/auth/callback`
+    )
+  },
+
+  parseOAuthCallback(url: string): {
+    accessToken?: string
+    role?: string
+    status?: string
+    message?: string
+  } {
+    const hash = url.split('#')[1] || ''
+    const params = new URLSearchParams(hash)
+    return {
+      accessToken: params.get('access_token') || undefined,
+      role: params.get('role') || undefined,
+      status: params.get('status') || undefined,
+      message: params.get('message') || undefined,
+    }
+  },
+}

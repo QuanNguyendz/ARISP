@@ -18,18 +18,48 @@ import {
 import { useAuthStore } from '@store/auth/authStore';
 
 const sidebarItems = [
-  { icon: LayoutDashboard, label: 'Tổng quan', path: '/quan-ly' },
-  { icon: FileText, label: 'Tin tuyển dụng', path: '/quan-ly/tin-tuyen-dung' },
-  { icon: Users, label: 'Ứng viên', path: '/quan-ly/ung-vien' },
-  { icon: BarChart3, label: 'Đánh giá', path: '/quan-ly/danh-gia' },
-  { icon: BarChart3, label: 'Báo cáo', path: '/quan-ly/bao-cao' },
-  { icon: Settings, label: 'Cài đặt', path: '/quan-ly/cai-dat' },
+  { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
+  { icon: FileText, label: 'Tin tuyển dụng', path: '/admin/jobs' },
+  { icon: Users, label: 'Ứng viên', path: '/admin/candidates' },
+  { icon: BarChart3, label: 'Đánh giá', path: '/admin/evaluations' },
+  { icon: BarChart3, label: 'Báo cáo', path: '/admin/reports' },
+  { icon: Settings, label: 'Cài đặt', path: '/admin/settings' },
 ];
+
+const getInitials = (name?: string) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, Math.min(name.length, 2)).toUpperCase();
+};
+
+const getDisplayRole = (role?: string) => {
+  if (!role) return 'Nhân viên';
+  const r = role.toLowerCase();
+  if (r === 'super_admin' || r === 'superadmin') return 'Super Admin';
+  if (r === 'hr_admin' || r === 'hradmin') return 'HR Admin';
+  if (r === 'recruiter') return 'Recruiter';
+  return role;
+};
 
 export default function AdminLayout() {
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { user } = useAuthStore();
+  const userRole = user?.role?.toLowerCase() || '';
+
+  const filteredItems = sidebarItems.filter((item) => {
+    // Hide Báo cáo and Cài đặt from Recruiter role
+    if (userRole === 'recruiter') {
+      if (item.path === '/admin/reports' || item.path === '/admin/settings') {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
@@ -71,7 +101,7 @@ export default function AdminLayout() {
         {/* Navigation */}
         <nav className="flex-1 p-3 overflow-y-auto">
           <div className="space-y-1">
-            {sidebarItems.map((item) => (
+            {filteredItems.map((item) => (
               <button
                 key={item.path}
                 onClick={() => window.location.href = item.path}
@@ -120,7 +150,7 @@ export default function AdminLayout() {
         <div className="p-3 border-t border-white/5">
           <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
-              MA
+              {getInitials(user?.name)}
             </div>
             <AnimatePresence>
               {!isSidebarCollapsed && (
@@ -130,8 +160,8 @@ export default function AdminLayout() {
                   exit={{ opacity: 0 }}
                   className="flex-1 min-w-0"
                 >
-                  <p className="text-sm font-medium text-white truncate">Minh Anh</p>
-                  <p className="text-xs text-white/40 truncate">HR Admin</p>
+                  <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
+                  <p className="text-xs text-white/40 truncate">{getDisplayRole(user?.role)}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -142,7 +172,7 @@ export default function AdminLayout() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => { useAuthStore.getState().logout(); window.location.href = '/dang-nhap'; }}
+                onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
                 className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <LogOut className="w-5 h-5 flex-shrink-0" />
@@ -190,7 +220,7 @@ export default function AdminLayout() {
               {/* Navigation */}
               <nav className="flex-1 p-3 overflow-y-auto">
                 <div className="space-y-1">
-                  {sidebarItems.map((item) => (
+                  {filteredItems.map((item) => (
                     <button
                       key={item.path}
                       onClick={() => {
@@ -214,15 +244,15 @@ export default function AdminLayout() {
               <div className="p-3 border-t border-white/5">
                 <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-violet/30 flex items-center justify-center text-xs font-medium text-white">
-                    MA
+                    {getInitials(user?.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">Minh Anh</p>
-                    <p className="text-xs text-white/40 truncate">HR Admin</p>
+                    <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
+                    <p className="text-xs text-white/40 truncate">{getDisplayRole(user?.role)}</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => { useAuthStore.getState().logout(); window.location.href = '/dang-nhap'; }}
+                  onClick={() => { useAuthStore.getState().logout(); window.location.href = '/auth/login'; }}
                   className="w-full mt-2 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut className="w-5 h-5" />

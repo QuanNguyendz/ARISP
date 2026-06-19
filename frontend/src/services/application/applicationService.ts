@@ -1,27 +1,16 @@
 import { apiClient } from '../apiClient';
-import type { Application, ApplicationDetail, CreateApplicationRequest } from '../../types/application';
-
-interface ApplicationFilters {
-  status?: Application['status'];
-  jobPostingId?: string;
-  search?: string;
-  page?: number;
-  pageSize?: number;
-}
-
-interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
+import type {
+  Application,
+  ApplicationDetail,
+  CreateApplicationRequest,
+  HrApplicationItem,
+  MyApplicationItem,
+} from '../../types/application';
 
 export const applicationService = {
-  async getApplications(filters?: ApplicationFilters): Promise<PaginatedResponse<Application>> {
-    const { data } = await apiClient.get<PaginatedResponse<Application>>('/applications', {
-      params: filters,
-    });
+  // HR/Recruiter: lấy toàn bộ hồ sơ ứng tuyển (GET /applications trả về mảng phẳng)
+  async getApplications(): Promise<HrApplicationItem[]> {
+    const { data } = await apiClient.get<HrApplicationItem[]>('/applications');
     return data;
   },
 
@@ -57,8 +46,9 @@ export const applicationService = {
     return data;
   },
 
-  async getMyApplications(): Promise<Application[]> {
-    const { data } = await apiClient.get<Application[]>('/candidate/applications');
+  // Candidate: danh sách hồ sơ ứng tuyển của chính mình (GET /api/portal/applications)
+  async getMyApplications(): Promise<MyApplicationItem[]> {
+    const { data } = await apiClient.get<MyApplicationItem[]>('/portal/applications');
     return data;
   },
 };

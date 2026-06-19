@@ -5,7 +5,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          Client Layer                                │
-│            React + TypeScript + TailwindCSS / MUI                   │
+│            React + TypeScript + TailwindCSS                         │
 │                                                                     │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
 │  │  HR Admin Portal│  │ Candidate Portal  │  │ On-site Kiosk    │   │
@@ -141,7 +141,7 @@ public interface IEmbeddingProvider
 - **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
 ### ADR-016: Interview Code (On-site Access Control)
-- **Format:** 6–8 ký tự alphanumeric, case-insensitive (ví dụ: `ARX-7K2P`).
+- **Format:** 6 ký tự alphanumeric, case-insensitive (ví dụ: `ARX7K2`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
 - **Binding:** Mỗi code bind với một `application_id` cụ thể.
@@ -198,9 +198,15 @@ public interface IEmbeddingProvider
 - Retry logic với exponential backoff nếu ATS endpoint lỗi.
 
 ### ADR-023: SSO & OAuth2 Corporate Domain Validation
-- **Xác thực nội bộ:** Hỗ trợ đăng nhập cho nhóm người dùng công ty (`super_admin`, `hr_admin`, `recruiter`) bằng **OAuth2 / OIDC** (Google Workspace hoặc Microsoft Entra ID). SAML 2.0 hoàn toàn bị loại bỏ.
+- **Xác thực nội bộ:** Nhóm người dùng công ty (`super_admin`, `hr_admin`, `recruiter`) đăng nhập bằng **Email + Mật khẩu**. Hỗ trợ thêm **Google OAuth2** (Google Sign-In). SAML 2.0 hoàn toàn bị loại bỏ.
+- **Yêu cầu Pre-provisioning (Cấp trước tài khoản)**: Chỉ những email đã được Super Admin hoặc Admin tạo sẵn trong database mới được phép đăng nhập. Nếu đăng nhập bằng Google Sign-In mà email chưa tồn tại trong database (chưa được cấp tài khoản trước đó), hệ thống **chặn đăng nhập và tuyệt đối không tự động đăng ký/tạo tài khoản nháp**.
 - **Domain Validation:** Khi đăng nhập qua OAuth2, hệ thống bắt buộc phân tách và kiểm tra phần domain của địa chỉ email (ví dụ: `hr@fsoft.vn` -> lấy ra `fsoft.vn`). Email này phải thuộc danh sách tên miền được phép truy cập (`allowed_email_domains` được quy định trong cấu hình toàn cục `system_settings`). Mọi email domain công cộng hoặc không khớp sẽ bị chặn truy cập lập tức.
 - **Ứng viên:** Candidate Portal sử dụng Magic Link gửi qua email cá nhân có TTL ngắn, không áp dụng OAuth2.
+- **Password recovery (bổ sung 2026-06-18):** Quên/đặt lại mật khẩu **tách riêng** theo cổng đăng nhập, không dùng chung endpoint:
+  - Candidate: `POST /auth/candidate/forgot-password` + `/auth/candidate/reset-password` (bảng `candidate_accounts`).
+  - Staff nội bộ: `POST /auth/staff/forgot-password` + `/auth/staff/reset-password` (bảng `users`); chỉ gửi khi tài khoản tồn tại & `is_active`; tài khoản SSO-only vẫn đặt được mật khẩu lần đầu qua link.
+  - Token reset lưu chung bảng `magic_links` nhưng có cột phân loại **`audience`** (`candidate`|`staff`, default `candidate`); endpoint reset lọc đúng `audience` để token 2 cổng không dùng nhầm cho nhau (chống lẫn lộn khi email trùng ở cả 2 bảng). TTL 2 giờ, one-time-use.
+  - Lý do tách riêng: 2 bảng tài khoản khác nhau + staff có đặc quyền cao → ranh giới bảo mật rõ ràng, tránh account enumeration chéo.
 
 ### ADR-024: Bias Detection & Fairness
 - **Data collected:** Evaluation scores theo demographic groups (nếu Candidate cung cấp và đồng ý).
@@ -310,8 +316,10 @@ public interface IEmbeddingProvider
 |---|---|
 | `AuthService` | JWT, role management, magic link (Candidate Portal), **OAuth2 OIDC Integration & Domain validation** |
 | `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
-| `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona |
-| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application) |
+| `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona, **JD file upload (PDF/DOCX)** |
+| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application), **đính kèm CV-JD Analysis vào Application** |
+| `CvJdAnalysisService` | **[NEW]** Nhận CV file + JD (file/text) → gọi Gemini API phân tích → trả matchScore + summary. Cache kết quả per CV hash + JobPosting |
+| `IGeminiProvider` | **[NEW]** Interface abstract cho Google Gemini API. Method: `AnalyzeCvJdMatchAsync(cvFile, jdContent, ct)` |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
 | `OnlineTestService` | Quản lý câu hỏi trắc nghiệm (`online_test_questions`), lưu kết quả nộp bài (`online_test_submissions`), tự động chấm điểm và đánh giá đạt/trượt |
 | `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow Kiosk) |
@@ -334,3 +342,129 @@ public interface IEmbeddingProvider
 | `AuditLogService` | Ghi lại mọi hành động quan trọng toàn hệ thống |
 | `WebRTCSignalingHub` | SignalR Hub: ICE candidates, SDP offer/answer |
 | `SessionHub` | SignalR Hub: session lifecycle events |
+
+---
+
+## Recent Architecture Notes
+
+### ADR-029: [DEPRECATED] Previous External Auth Bridge for Candidate Accounts
+- **Status:** DEPRECATED (Superseded by local email/password authentication and direct Google OAuth2 SSO).
+- **History:** Previously, frontend React initialized an external authentication Web SDK and the backend validated its ID tokens. This integration has been completely removed to simplify the infrastructure and rely on direct authentication.
+
+### ADR-030: Gemini CV-JD Match Analysis
+- **Quyết định:** Sử dụng **Google Gemini 2.5 Flash** để phân tích mức độ phù hợp giữa CV của ứng viên và JD của vị trí tuyển dụng.
+- **Mục đích:** Cung cấp cho candidate một **bản đánh giá nhanh** về mức độ phù hợp trước khi ứng tuyển. Dù điểm cao hay thấp, candidate vẫn có thể ứng tuyển.
+- **Reuse principle:** Kết quả phân tích được lưu vào bảng `cv_jd_analyses`. Khi candidate submit Application, hệ thống link `analysis_id` vào Application – HR nhận được kết quả y hệt mà không cần chạy lại Gemini.
+- **Auto-analysis on apply:** Nếu candidate ứng tuyển mà chưa từng chạy analysis, hệ thống tự động gọi Gemini 1 lần rồi đính kèm.
+- **Input:** CV file (PDF/DOCX) + JD file gốc (PDF/DOCX) hoặc JD text.
+- **Output (JSON):**
+  ```json
+  {
+    "matchScore": 78,
+    "summary": "Hồ sơ phù hợp tốt với yêu cầu vị trí...",
+    "skillsMatched": ["C#", ".NET Core", "PostgreSQL"],
+    "skillsGaps": ["Docker", "Kubernetes"],
+    "experienceRelevance": "3 năm kinh nghiệm backend phù hợp với yêu cầu Mid-Senior",
+    "overallRecommendation": "Phù hợp tốt. Nên bổ sung kỹ năng containerization."
+  }
+  ```
+- **Provider abstraction:** Gemini được gọi qua `IGeminiProvider` interface. Không gọi Gemini SDK trực tiếp trong business logic.
+- **Tại sao Gemini mà không GPT-4o?** Gemini 2.5 Flash hỗ trợ multimodal file input (PDF nạp trực tiếp) với chi phí thấp hơn GPT-4o cho tác vụ phân tích document. GPT-4o vẫn được dùng cho RAG + phỏng vấn AI (streaming).
+
+  ```csharp
+  public interface IGeminiProvider
+  {
+      Task<CvJdAnalysisResult> AnalyzeCvJdMatchAsync(
+          Stream cvFileStream,
+          string cvFileName,
+          Stream? jdFileStream,      // null nếu không có file JD
+          string? jdFileName,
+          string jdText,             // fallback text JD
+          CancellationToken ct);
+  }
+  ```
+
+### ADR-031: JD File Upload & Storage
+- **Quyết định:** Mở rộng `JobPosting` entity hỗ trợ upload file JD gốc (PDF/DOCX) bên cạnh trường `JobDescription` (text).
+- **Lý do:** Gemini AI phân tích từ file gốc (giữ được formatting, bảng biểu, bullet points) cho kết quả chính xác hơn so với plain text.
+- **Thêm cột mới vào `job_postings`:**
+  - `jd_file_url` (string, nullable): URL/path tới file JD gốc đã upload.
+  - `jd_file_name` (string, nullable): Tên file gốc (ví dụ: "JD_Backend_Senior.pdf").
+  - `jd_file_format` (string, nullable): Định dạng file ("pdf", "docx").
+- **Logic:** Khi HR tạo/sửa Job Posting, có thể paste text JD hoặc upload file JD, hoặc cả hai.
+- **Gemini sử dụng:** Ưu tiên file JD gốc (nếu có) → fallback sang `job_description` text.
+- **Format hỗ trợ:** PDF, DOCX (giới hạn 10MB).
+
+### ADR-032: CvJdAnalysis Entity & Database Schema
+- **Bảng mới: `cv_jd_analyses`**
+
+  | Cột | Kiểu | Mô tả |
+  |------|------|-------|
+  | `id` | UUID PK | |
+  | `candidate_account_id` | UUID FK → `candidate_accounts` | Candidate thực hiện phân tích (nullable nếu chưa login) |
+  | `job_posting_id` | UUID FK → `job_postings` | Job được phân tích |
+  | `application_id` | UUID FK → `applications`, nullable | Link với Application sau khi ứng tuyển |
+  | `cv_file_url` | string | URL tới file CV đã upload |
+  | `cv_file_name` | string | Tên file CV gốc |
+  | `match_score` | decimal (0–100) | Điểm phù hợp tổng thể |
+  | `summary` | text | Tóm tắt đánh giá tổng quan |
+  | `skills_matched` | jsonb | `["C#", ".NET", "SQL"]` |
+  | `skills_gaps` | jsonb | `["Docker", "K8s"]` |
+  | `experience_relevance` | text | Đánh giá kinh nghiệm |
+  | `overall_recommendation` | text | Khuyến nghị tổng quan |
+  | `raw_response` | jsonb | Response gốc từ Gemini (lưu để debug/audit) |
+  | `created_at` | timestamptz | |
+
+- **Thêm cột vào `applications`:**
+  - `cv_jd_analysis_id` (UUID FK → `cv_jd_analyses`, nullable): Link tới kết quả phân tích đã chạy.
+
+- **Index:** `(candidate_account_id, job_posting_id)` – để lookup nhanh kết quả đã phân tích (tránh chạy lại).
+
+### ADR-033: Candidate UI Localization (i18n) – VI/EN
+- **Quyết định:** Giao diện Candidate (Job Board, Job Detail, Candidate Portal) hỗ trợ chuyển ngôn ngữ **Tiếng Việt / English** qua một locale switcher trên header.
+- **Phân biệt với ADR-018:** ADR-018 nói về ngôn ngữ AI **phỏng vấn** (detect từ JD, ảnh hưởng system prompt + TTS voice + STT). ADR-033 chỉ là ngôn ngữ **hiển thị UI** cho ứng viên — hai thứ độc lập. Ví dụ: UI để Tiếng Việt nhưng phỏng vấn vẫn bằng tiếng Anh nếu JD tiếng Anh.
+- **Phạm vi:** Chỉ UI candidate-facing. Workspace nội bộ (HR/Admin) mặc định Tiếng Việt, chưa cần i18n.
+- **Lưu lựa chọn:** `localStorage` (`locale`) + tùy chọn lưu vào `candidate_accounts.preferred_locale` (nullable, default `vi`) khi đã đăng nhập.
+- **Kỹ thuật (FE):** react-i18next, default `vi`, fallback `vi`.
+
+### ADR-034: Saved Jobs (Bookmark) cho Candidate
+- **Quyết định:** Ứng viên (đã đăng nhập) có thể **lưu/bỏ lưu** Job Posting để xem lại; hiển thị số lượng trên header và trang "Việc đã lưu".
+- **Bảng mới: `saved_jobs`**
+
+  | Cột | Kiểu | Mô tả |
+  |------|------|-------|
+  | `id` | UUID PK | |
+  | `candidate_account_id` | UUID FK → `candidate_accounts` | |
+  | `job_posting_id` | UUID FK → `job_postings` | |
+  | `created_at` | timestamptz | |
+
+- **Ràng buộc:** UNIQUE `(candidate_account_id, job_posting_id)` – không lưu trùng. Soft delete không cần (bỏ lưu = hard delete row).
+- **Guest:** Khi chưa đăng nhập, nút lưu điều hướng sang đăng nhập (không lưu ẩn danh).
+
+### ADR-035: Candidate Google OAuth2 (không ràng buộc domain)
+- **Quyết định:** Bổ sung **Google Sign-In cho Candidate** trên Job Board login, **KHÔNG** áp `allowed_email_domains`.
+- **Phân biệt với ADR-023:** ADR-023 (Google OAuth nội bộ HR/Recruiter/Admin) **bắt buộc** email thuộc `allowed_email_domains` + pre-provisioning. ADR-035 dành cho ứng viên: chấp nhận **mọi** tài khoản Google cá nhân, và nếu chưa có `candidate_accounts` thì **tự tạo** (self-registration), giống đăng ký email/password tự do.
+- **Lý do:** Giảm ma sát đăng ký cho ứng viên; vẫn giữ email/password là phương thức chính.
+- **Bảo mật:** Provider validation bình thường; không có domain allowlist cho luồng candidate.
+
+### ADR-036: File Storage Abstraction (Local / Cloudflare R2)
+- **Vấn đề:** Trước đây file upload (CV ứng tuyển, CV hồ sơ candidate) ghi thẳng vào thư mục `./uploads` trên đĩa backend. Không scale ngang (mỗi container có disk riêng), mất khi redeploy, đầy ổ VPS, không CDN/backup. (Lưu ý: `uploads/` đã `.gitignore` nên **không** làm nặng repo.)
+- **Quyết định:** Trừu tượng hoá qua **`IFileStorageService`** (cùng pattern `IAIProvider`/`IGeminiProvider`), 2 implementation chọn qua cấu hình `Storage:Provider`:
+  - **`LocalFileStorageService`** (dev): ghi `./uploads`, `storageKey` = `/uploads/<guid>.ext`, phục vụ tĩnh qua `UseStaticFiles(RequestPath="/uploads")`.
+  - **`S3FileStorageService`** (prod): upload lên **object storage S3-compatible**, file **private**, hiển thị qua **presigned URL** có thời hạn (`UrlExpiryMinutes`, mặc định 60).
+- **Nhà cung cấp prod: Cloudflare R2** (S3-compatible, dùng `AWSSDK.S3`). Lý do chọn R2 thay vì Supabase Storage:
+  1. **Egress miễn phí** – quan trọng vì recording phỏng vấn (Phase 7) bị xem lại nhiều lần.
+  2. Giữ Supabase thuần Postgres, không làm sâu lock-in.
+  3. Cùng chuẩn S3 nên code không đổi nếu sau này chuyển AWS S3/MinIO.
+- **Hợp đồng:** DB lưu **`storageKey`** (không lưu URL tuyệt đối). API gọi `GetUrlAsync(key)` khi trả response → Local trả đường dẫn tương đối, S3 trả presigned URL. Frontend `resolveAssetUrl()` xử lý cả hai (tương đối → ghép `ASSET_BASE_URL`; tuyệt đối `http` → giữ nguyên).
+- **Cấu hình:** `Storage:Provider` = `Local` | `S3`; secrets `Storage:S3:{Endpoint,AccessKeyId,SecretAccessKey,Bucket,Region,KeyPrefix,UrlExpiryMinutes}` qua **user-secrets/env** (rule #2). Khi `Provider=S3` mà thiếu cấu hình bắt buộc → **fail-fast** lúc startup.
+- **Bảo mật token R2:** API token quyền **Object Read & Write**, scope đúng 1 bucket; production siết thêm IP allowlist (IP VPS tĩnh).
+- **Đã refactor:** `ApplicationsController` (CV ứng tuyển), `CandidatePortalController` (CV hồ sơ + resolve URL ở GET applications/detail/profile). Xoá CV cũ khi upload CV mới (tránh tích rác).
+- **Follow-up (chưa làm):** Phía HR/staff (`ApplicationService` trả `CvFileUrl`) hiện trả `storageKey` thô — cần resolve presigned URL khi bật S3 cho prod. Dev (`Local`) không ảnh hưởng.
+
+### ADR-037: Địa giới hành chính VN — Provinces Open API v2 (sau sáp nhập 07/2025)
+- **Quyết định:** Trường "Địa điểm" của Candidate dùng **[Provinces Open API v2](https://provinces.open-api.vn/)** — dữ liệu **sau sáp nhập tỉnh 07/2025**: cấu trúc **2 cấp Tỉnh/Thành → Phường/Xã** (bỏ cấp Quận/Huyện), **34 tỉnh/thành**.
+- **Endpoint dùng:** `GET /api/v2/p/` (danh sách tỉnh), `GET /api/v2/p/{code}?depth=2` (tỉnh kèm phường). Field chính: `code` (int), `name`, `province_code`.
+- **Frontend:** service `provinceService` (gọi thẳng open-api, có cache trong phiên — **không** qua `apiClient` của backend). Trường địa điểm là **2 dropdown phụ thuộc** (chọn tỉnh → load phường; đổi tỉnh → reset phường).
+- **Database (`candidate_accounts`):** thêm `province_code` (int?), `province_name`, `ward_code` (int?), `ward_name`. Giữ cột cũ **`location`** nhưng chuyển thành **chuỗi hiển thị suy ra tự động** `"Phường X, Tỉnh Y"` (denormalized, tương thích ngược) — không còn nhập tay. Migration `AddCandidateAdminDivision`.
+- **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.

@@ -1,6 +1,6 @@
 import type { User, AuthTokens } from '../types/auth';
 
-// Mock user for development
+// Mock user for development - sử dụng đúng format role với underscore
 export const DEV_CANDIDATE_USER: User = {
   id: 'dev-candidate-001',
   email: 'candidate@dev.com',
@@ -10,11 +10,29 @@ export const DEV_CANDIDATE_USER: User = {
   organizationId: undefined,
 };
 
-export const DEV_ADMIN_USER: User = {
-  id: 'dev-admin-001',
+export const DEV_HR_ADMIN_USER: User = {
+  id: 'dev-hr-admin-001',
+  email: 'hr@dev.com',
+  name: 'HR Admin Dev',
+  role: 'Hr_admin',
+  avatarUrl: undefined,
+  organizationId: 'dev-org-001',
+};
+
+export const DEV_RECRUITER_USER: User = {
+  id: 'dev-recruiter-001',
+  email: 'recruiter@dev.com',
+  name: 'Recruiter Dev',
+  role: 'Recruiter',
+  avatarUrl: undefined,
+  organizationId: 'dev-org-001',
+};
+
+export const DEV_SUPER_ADMIN_USER: User = {
+  id: 'dev-super-admin-001',
   email: 'admin@dev.com',
-  name: 'Admin Dev',
-  role: 'SuperAdmin',
+  name: 'Super Admin Dev',
+  role: 'Super_admin',
   avatarUrl: undefined,
   organizationId: 'dev-org-001',
 };
@@ -34,13 +52,23 @@ export function getDevAuth(): { user: User; tokens: AuthTokens } | null {
 
   // Check URL for dev mode
   const params = new URLSearchParams(window.location.search);
-  const devMode = params.get('dev');
+  const devRole = params.get('dev');
 
-  if (devMode === 'candidate') {
+  if (devRole === 'candidate') {
     return { user: DEV_CANDIDATE_USER, tokens: DEV_TOKENS };
   }
-  if (devMode === 'admin') {
-    return { user: DEV_ADMIN_USER, tokens: DEV_TOKENS };
+  if (devRole === 'hr') {
+    return { user: DEV_HR_ADMIN_USER, tokens: DEV_TOKENS };
+  }
+  if (devRole === 'recruiter') {
+    return { user: DEV_RECRUITER_USER, tokens: DEV_TOKENS };
+  }
+  if (devRole === 'super-admin') {
+    return { user: DEV_SUPER_ADMIN_USER, tokens: DEV_TOKENS };
+  }
+  // Default to HR admin for testing
+  if (devRole === 'admin') {
+    return { user: DEV_HR_ADMIN_USER, tokens: DEV_TOKENS };
   }
 
   return null;

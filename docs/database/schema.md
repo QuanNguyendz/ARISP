@@ -4,7 +4,7 @@
 > **DB:** PostgreSQL (Supabase hosted) + pgvector extension
 > **ORM:** EF Core – mọi thay đổi schema đi qua migration, không sửa DB trực tiếp
 > **Convention:** `snake_case` tables/columns · UUID PKs · `created_at` / `updated_at` trên mọi bảng chính · soft delete qua `deleted_at`
-> **Last updated:** 2026-05-30
+> **Last updated:** 2026-06-01
 
 ---
 
@@ -96,17 +96,46 @@ Refresh tokens riêng cho candidate_accounts.
 ## Phase 2 – Job Posting & Application
 
 ### `job_postings`
-Tin tuyển dụng và cấu hình AI Interviewer.
+Tin tuyển dụng, metadata Job Board IT và cấu hình AI Interviewer.
 
 | Cột | Kiểu | Ghi chú |
 |-----|------|---------|
+| `id` | UUID PK | |
 | `created_by_user_id` | UUID FK | Người tạo tin (`users.id`) |
-| `interview_mode` | VARCHAR | Mặc định là `onsite` (Mọi phiên phỏng vấn thật bắt buộc On-site) |
-| `status` | VARCHAR | `draft` \| `active` \| `closed` \| `archived` |
+| `title` | VARCHAR(255) | Tên vị trí hiển thị |
+| `department` | VARCHAR(255) | Phòng ban nội bộ sở hữu headcount (vd. `IT Engineering`) — optional |
+| `job_description` | TEXT | JD raw text, đưa vào RAG / AI phỏng vấn |
+| `interview_mode` | VARCHAR(20) | Mặc định `onsite` — phỏng vấn thật bắt buộc On-site |
+| `status` | VARCHAR(50) | `draft` \| `active` \| `closed` \| `archived` |
+| `rejection_reason` | TEXT | Lý do HR/Admin từ chối duyệt bài |
 | `is_public_listing` | BOOLEAN | Có hiển thị công khai trên Job Board IT không |
-| `detected_language` | VARCHAR(10) | AI tự động phát hiện ngôn ngữ yêu cầu từ JD |
+| **Job Board listing** | | |
+| `location` | VARCHAR(255) | Thành phố chính (vd. `Ho Chi Minh City`, `Ha Noi`) |
+| `work_mode` | VARCHAR(20) | `onsite` \| `remote` \| `hybrid` |
+| `salary_min` | NUMERIC(12,2) | NULL khi `salary_is_negotiable = true` |
+| `salary_max` | NUMERIC(12,2) | NULL khi `salary_is_negotiable = true` |
+| `salary_currency` | VARCHAR(3) | `VND`, `USD` — mặc định `VND` |
+| `salary_is_negotiable` | BOOLEAN | `true` → hiển thị "Thỏa thuận" |
+| `employment_type` | VARCHAR(30) | `full_time` \| `part_time` \| `contract` \| `internship` |
+| `experience_level` | VARCHAR(30) | `fresher` \| `junior` \| `mid` \| `senior` \| `lead` \| `manager` |
+| `skills` | TEXT[] | Tag kỹ năng (vd. `C#`, `PostgreSQL`) — filter qua GIN index |
+| `job_category` | VARCHAR(100) | IT expertise: `backend`, `frontend`, `devops`, `qa`, `data`, `ai_ml`, `mobile`, `pm`, … |
+| `application_deadline` | TIMESTAMPTZ | Hạn nộp hồ sơ |
+| `is_urgent` | BOOLEAN | Badge "Tuyển gấp" — mặc định `false` |
+| **AI Interview config** | | |
+| `detected_language` | VARCHAR(10) | AI tự phát hiện ngôn ngữ yêu cầu từ JD |
+| `language_requirement` | TEXT | vd. "TOEIC > 700 hoặc IELTS > 6.5" |
+| `language_confirmed` | BOOLEAN | HR đã xác nhận yêu cầu ngôn ngữ |
+| `reschedule_deadline_hours` | INT | Hạn dời lịch phỏng vấn thử (Practice) |
+| `invite_token_ttl_hours` | INT | TTL magic link mời ứng viên |
 | `scoring_rubric` | JSONB | Bộ tiêu chí đánh giá cho Job |
-| `persona_name` | VARCHAR | Tên avatar AI đại diện |
+| `persona_name` | VARCHAR(100) | Tên avatar AI |
+| `persona_voice_id` | TEXT | ElevenLabs voice ID |
+| `persona_style` | TEXT | Phong cách persona |
+| `published_at` | TIMESTAMPTZ | Thời điểm publish lên Job Board |
+| `created_at` / `updated_at` / `deleted_at` | TIMESTAMPTZ | Audit + soft delete |
+
+> **Single-tenant:** Tên công ty hiển thị trên Job Board lấy từ `system_settings` (global), không lặp trên từng tin. `department` là phòng ban nội bộ, khác `job_category` (phân loại IT cho ứng viên).
 
 ### `interview_round_configs`
 Config từng vòng phỏng vấn per Job Posting. UNIQUE(job_posting_id, round_number).
@@ -262,6 +291,7 @@ Lưu kết quả nộp bài thi trắc nghiệm của ứng viên. Hệ thống 
 | 5 | **Thay đổi** mặc định `job_postings.interview_mode` | Mặc định chuyển sang `'onsite'` do toàn bộ quy trình phỏng vấn thật bắt buộc tại công ty. |
 | 6 | **Dọn dẹp** toàn bộ indexes liên quan tới `organization_id` | Tối ưu hóa hiệu năng truy vấn, loại bỏ các index partition tenant không còn sử dụng. |
 | 7 | **Thêm** hai bảng `online_test_questions` và `online_test_submissions` | Hỗ trợ vòng thi trắc nghiệm trực tuyến (Online Test - Multiple Choice Test) độc lập, sạch sẽ, không ảnh hưởng đến dữ liệu phỏng vấn AI. |
+| 8 | **Mở rộng** `job_postings` với metadata Job Board Tier 1 | Bổ sung `location`, `work_mode`, lương, loại hình việc làm, cấp kinh nghiệm, skills, job category, hạn nộp, tuyển gấp — phục vụ Job Board IT. Không thêm `experience_years_*`. Seed mẫu tin tuyển dụng: `backend/ARISP.API/Program.cs`. |
 
 ---
 
@@ -273,4 +303,5 @@ Lưu kết quả nộp bài thi trắc nghiệm của ứng viên. Hệ thống 
 4. Trường `interview_mode` trong `job_postings` mặc định là `'onsite'`. Phân biệt phỏng vấn thử qua cột `session_type = 'practice'` trong `interview_sessions`.
 5. Tạo index `idx_webhook_deliveries_next_retry` và `idx_interview_codes_expires_at` với điều kiện lọc (partial index) để đảm bảo tốc độ vận hành cho các tác vụ nền.
 6. **Thiết lập hai bảng `online_test_questions` và `online_test_submissions` biệt lập** cho trắc nghiệm thay vì gộp chung vào bảng AI Interview để đảm bảo code gọn gàng, dữ liệu sạch và dễ quản lý dài hạn.
+7. **Job Board filters:** Dùng partial index `idx_job_postings_public_filters` và GIN index trên `skills`. Query public listing nên lọc `(application_deadline IS NULL OR application_deadline > NOW())`.
 

@@ -5,23 +5,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ARISP.Domain.Entities;
+using ARISP.Domain.Constants;
 using ARISP.Application.Interfaces;
 
 namespace ARISP.Infrastructure.Data
 {
     public class ARISPDbContext : DbContext
     {
-        private readonly ICurrentUserService _currentUserService;
-
-        public Guid TenantId => _currentUserService.OrganizationId ?? Guid.Empty;
-
-        public ARISPDbContext(DbContextOptions<ARISPDbContext> options, ICurrentUserService currentUserService)
+        public ARISPDbContext(DbContextOptions<ARISPDbContext> options)
             : base(options)
         {
-            _currentUserService = currentUserService;
         }
 
-        public DbSet<Organization> Organizations => Set<Organization>();
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<MagicLink> MagicLinks => Set<MagicLink>();
@@ -42,9 +37,12 @@ namespace ARISP.Infrastructure.Data
         public DbSet<Evaluation> Evaluations => Set<Evaluation>();
         public DbSet<HrReview> HrReviews => Set<HrReview>();
         public DbSet<CheatDetectionSignal> CheatDetectionSignals => Set<CheatDetectionSignal>();
-        public DbSet<Subscription> Subscriptions => Set<Subscription>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+        public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+        public DbSet<OnlineTestQuestion> OnlineTestQuestions => Set<OnlineTestQuestion>();
+        public DbSet<OnlineTestSubmission> OnlineTestSubmissions => Set<OnlineTestSubmission>();
+        public DbSet<CvJdAnalysis> CvJdAnalyses => Set<CvJdAnalysis>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -54,7 +52,7 @@ namespace ARISP.Infrastructure.Data
             modelBuilder.HasPostgresExtension("uuid-ossp");
             modelBuilder.HasPostgresExtension("vector");
 
-            // Define snake_case mappings and query filters for multi-tenancy & soft delete
+            // Define snake_case mappings and query filters for soft delete
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 var clrType = entityType.ClrType;
@@ -80,23 +78,6 @@ namespace ARISP.Infrastructure.Data
                     var propertyAccess = System.Linq.Expressions.Expression.Property(parameter, nameof(ISoftDelete.DeletedAt));
                     var nullCheck = System.Linq.Expressions.Expression.Equal(propertyAccess, System.Linq.Expressions.Expression.Constant(null, typeof(DateTimeOffset?)));
                     var lambda = System.Linq.Expressions.Expression.Lambda(nullCheck, parameter);
-                    
-                    modelBuilder.Entity(clrType).HasQueryFilter(lambda);
-                }
-
-                // Configure multi-tenant filter (automatic scoping)
-                if (typeof(IMultiTenant).IsAssignableFrom(clrType))
-                {
-                    // Enforce organization isolation automatically
-                    var parameter = System.Linq.Expressions.Expression.Parameter(clrType, "e");
-                    var propertyAccess = System.Linq.Expressions.Expression.Property(parameter, nameof(IMultiTenant.OrganizationId));
-                    
-                    // Filter: OrganizationId == TenantId
-                    var dbContextConst = System.Linq.Expressions.Expression.Constant(this);
-                    var tenantIdProperty = System.Linq.Expressions.Expression.Property(dbContextConst, nameof(TenantId));
-                    
-                    var equalCheck = System.Linq.Expressions.Expression.Equal(propertyAccess, tenantIdProperty);
-                    var lambda = System.Linq.Expressions.Expression.Lambda(equalCheck, parameter);
                     
                     modelBuilder.Entity(clrType).HasQueryFilter(lambda);
                 }
@@ -148,8 +129,24 @@ namespace ARISP.Infrastructure.Data
                 .Property(a => a.Metadata)
                 .HasColumnType("jsonb");
 
+            modelBuilder.Entity<AuditLog>()
+                .Property(a => a.IpAddress)
+                .HasColumnType("inet")
+                .HasConversion(
+                    v => string.IsNullOrEmpty(v) ? null : System.Net.IPAddress.Parse(v),
+                    v => v == null ? null : v.ToString()
+                );
+
             modelBuilder.Entity<WebhookDelivery>()
                 .Property(w => w.Payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OnlineTestQuestion>()
+                .Property(q => q.Options)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .Property(s => s.SelectedAnswers)
                 .HasColumnType("jsonb");
 
             modelBuilder.Entity<InterviewRoundConfig>()
@@ -158,21 +155,37 @@ namespace ARISP.Infrastructure.Data
 
             modelBuilder.Entity<MustAskTracking>()
                 .ToTable("must_ask_tracking");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .ToTable("cv_jd_analyses")
+                .Property(c => c.SkillsMatched)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.SkillsGaps)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.RedFlags)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.RawResponse)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<CvJdAnalysis>()
+                .HasIndex(c => new { c.JobPostingId, c.CvHash });
+
+            // MagicLink.Audience: mặc định "candidate" để các bản ghi cũ (trước khi tách cổng staff) được hiểu là candidate
+            modelBuilder.Entity<MagicLink>()
+                .Property(m => m.Audience)
+                .HasDefaultValue(MagicLinkAudience.Candidate);
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             foreach (var entry in ChangeTracker.Entries())
             {
-                // Auto multi-tenant assignment on Create
-                if (entry.State == EntityState.Added && entry.Entity is IMultiTenant tenantEntity)
-                {
-                    if (tenantEntity.OrganizationId == Guid.Empty && _currentUserService.OrganizationId.HasValue)
-                    {
-                        tenantEntity.OrganizationId = _currentUserService.OrganizationId.Value;
-                    }
-                }
-
                 // Auto timestamps
                 var clrType = entry.Entity.GetType();
                 var updatedAtProp = clrType.GetProperty("UpdatedAt");

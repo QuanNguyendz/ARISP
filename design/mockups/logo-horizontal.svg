@@ -1,0 +1,16 @@
+<svg width="320" height="84" viewBox="0 0 320 84" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ARISP — Recruitment and AI Interview">
+  <defs>
+    <linearGradient id="arispGradH" x1="10" y1="8" x2="68" y2="76" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#9333ea"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon -->
+  <rect x="6" y="6" width="72" height="72" rx="18" fill="url(#arispGradH)"/>
+  <path d="M27 60 L42 24 L57 60" stroke="white" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M33.5 48.5 H50.5" stroke="white" stroke-width="6.5" stroke-linecap="round"/>
+  <path d="M60 20 C61.1 25.6 62 26.5 67.6 27.6 C62 28.7 61.1 29.6 60 35.2 C58.9 29.6 58 28.7 52.4 27.6 C58 26.5 58.9 25.6 60 20 Z" fill="white" fill-opacity="0.95"/>
+  <!-- Wordmark -->
+  <text x="98" y="44" font-family="'Plus Jakarta Sans','Segoe UI',sans-serif" font-size="34" font-weight="800" letter-spacing="0.5" fill="#0f172a">ARISP</text>
+  <text x="99" y="64" font-family="Inter,'Segoe UI',sans-serif" font-size="12.5" font-weight="500" letter-spacing="1.5" fill="#64748b">RECRUITMENT · AI INTERVIEW</text>
+</svg>

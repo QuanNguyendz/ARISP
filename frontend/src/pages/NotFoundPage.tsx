@@ -1,29 +1,14 @@
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-
 export default function NotFoundPage() {
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        p: 3,
-      }}
-    >
-      <Typography variant="h1" sx={{ fontSize: { xs: '4rem', md: '8rem' }, fontWeight: 'bold', color: 'grey.300' }}>
-        404
-      </Typography>
-      <Typography variant="h4" sx={{ mb: 4 }}>
-        Trang không tìm thấy
-      </Typography>
-      <Button variant="contained" href="/">
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
+      <p className="text-7xl font-bold text-gray-300 md:text-9xl">404</p>
+      <h1 className="mt-4 text-2xl font-semibold text-gray-700">Trang không tìm thấy</h1>
+      <a
+        href="/"
+        className="mt-8 inline-flex rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+      >
         Quay về trang chủ
-      </Button>
-    </Box>
-  );
+      </a>
+    </div>
+  )
 }

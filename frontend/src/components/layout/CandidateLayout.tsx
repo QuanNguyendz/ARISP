@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Briefcase, FileText, Calendar, User, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '@store/auth/authStore';
@@ -7,7 +7,7 @@ import { useAuthStore } from '@store/auth/authStore';
 const candidateLinks = [
   { label: 'Tìm việc', href: '/jobs', icon: Briefcase },
   { label: 'Việc đã ứng tuyển', href: '/candidate/applications', icon: FileText },
-  { label: 'Phỏng vấn', href: '/candidate/interview', icon: Calendar },
+  { label: 'Phỏng vấn', href: '/candidate/interviews', icon: Calendar },
 ];
 
 export default function CandidateLayout({ children }: { children?: React.ReactNode }) {
@@ -78,7 +78,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
               {isAuthenticated && user ? (
                 <div className="flex items-center gap-3">
                   <Link
-                    to="/candidate/dashboard"
+                    to="/candidate/portal"
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
@@ -96,7 +96,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
               ) : (
                 <>
                   <Link
-                    to="/auth/candidate-login"
+                    to="/auth/login-ung-vien"
                     className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors"
                   >
                     Đăng nhập
@@ -146,7 +146,7 @@ export default function CandidateLayout({ children }: { children?: React.ReactNo
 
       {/* Main Content */}
       <main className="flex-1 pt-16">
-        {children}
+        {children ?? <Outlet />}
       </main>
 
       {/* Footer */}

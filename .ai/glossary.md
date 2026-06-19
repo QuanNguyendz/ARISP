@@ -42,6 +42,10 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Real Interview (Phỏng vấn thực)** | Phiên phỏng vấn AI chính thức, dùng JD + CV + Playbook (full RAG), chỉ mở đúng mã code thi thật, kết quả ảnh hưởng đến quyết định tuyển dụng |
 | **Self-apply** | Hành động ứng viên chủ động ứng tuyển vào Job Posting qua Job Board, không cần invite từ HR |
 | **Session Type** | Phân loại phiên phỏng vấn: `practice` (thử, JD+CV only) hoặc `real` (thực, full RAG), xác định nguồn RAG và mức độ ảnh hưởng đến kết quả tuyển dụng |
+| **CV-JD Match Analysis** | Tính năng dùng Gemini AI phân tích mức độ phù hợp giữa CV (file) và JD (file/text), trả về matchScore (0–100) + summary. Dành cho candidate xem trước khi ứng tuyển – kết quả gửi y hệt cho HR, không phân tích lại |
+| **Match Score** | Điểm phù hợp (0–100) do Gemini AI chấm khi so sánh CV với JD. Chỉ mang tính tham khảo – candidate luôn có thể ứng tuyển bất kể điểm |
+| **JD File** | File mô tả công việc gốc (PDF/DOCX) được HR upload kèm Job Posting, bên cạnh text JD. Gemini ưu tiên phân tích từ file gốc |
+| **Skills Gap** | Danh sách kỹ năng mà JD yêu cầu nhưng CV chưa thể hiện – Gemini tự động detect và liệt kê |
 
 ---
 
@@ -64,6 +68,8 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Hybrid Idle Strategy** | Chiến lược HeyGen: chỉ bật Streaming Avatar khi AI nói, phát idle video loop khi AI im để tiết kiệm cost |
 | **Bridge file** | File chỉ chứa @import references, không có nội dung trực tiếp (AGENTS.md, CLAUDE.md) |
 | **Source of truth** | `.ai/` folder – nơi duy nhất chứa thông tin chính thức, mọi tool đọc từ đây |
+| **Gemini AI** | Google Gemini 2.5 Flash – dùng cho CV-JD Match Analysis (multimodal file input). Không dùng cho phỏng vấn AI (vẫn dùng GPT-4o) |
+| **IGeminiProvider** | Interface abstract cho Google Gemini API trong backend. Method chính: `AnalyzeCvJdMatchAsync()`. Swap provider qua env var `GEMINI_PROVIDER` |
 
 ---
 

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosRequestHeaders } from 'axios';
 import { API_BASE_URL } from '@config/constants';
 import { useAuthStore } from '@store/auth';
 
@@ -13,9 +13,18 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const tokens = useAuthStore.getState().tokens;
+    const user = useAuthStore.getState().user;
+    const headers = (config.headers ?? {}) as AxiosRequestHeaders;
+
     if (tokens?.accessToken) {
-      config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+      headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
+
+    if (user?.id) {
+      headers['X-User-Id'] = user.id;
+    }
+
+    config.headers = headers;
     return config;
   },
   (error) => Promise.reject(error)
@@ -24,7 +33,9 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config as any;
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
       const refreshToken = useAuthStore.getState().tokens?.refreshToken;
       if (refreshToken) {
         try {
@@ -32,14 +43,13 @@ apiClient.interceptors.response.use(
             refreshToken,
           });
           const { accessToken } = response.data;
+          const currentTokens = useAuthStore.getState().tokens!;
           useAuthStore.getState().setAuth(useAuthStore.getState().user!, {
-            ...useAuthStore.getState().tokens!,
+            ...currentTokens,
             accessToken,
           });
-          if (error.config) {
-            error.config.headers.Authorization = `Bearer ${accessToken}`;
-            return apiClient(error.config);
-          }
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return apiClient(originalRequest);
         } catch {
           useAuthStore.getState().logout();
         }

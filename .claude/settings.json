@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/secret-guard.mjs",
+            "statusMessage": "Kiểm tra secret hardcode..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bash-guard.mjs",
+            "if": "Bash(git *)"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/arch-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/format.mjs",
+            "statusMessage": "Prettier...",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/tasks-reminder.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
