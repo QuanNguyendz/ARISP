@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ARISP.Application.Common;
@@ -78,6 +80,9 @@ namespace ARISP.Application.Services
                 CandidatePhone = request.CandidatePhone,
                 CvFileUrl = request.CvFileUrl,
                 CvText = request.CvText,
+                DesiredLocation = request.DesiredLocation,
+                CoverLetter = request.CoverLetter,
+                NoticePeriod = request.NoticePeriod,
                 Source = source,
                 Status = "cv_submitted"
             };
@@ -139,34 +144,82 @@ namespace ARISP.Application.Services
 
         public async Task<Result<List<ApplicationResponse>>> GetAllApplicationsAsync(CancellationToken ct = default)
         {
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetAllAsync(ct);
-            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
-            var jobDict = jobs.ToDictionary(j => j.Id, j => j.Title);
+            // Projection ở tầng SQL — KHÔNG kéo cột text lớn (CvText/CoverLetter/DemographicData)
+            // vốn khiến danh sách rất nặng và timeout khi đọc stream từ Postgres.
+            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .QueryAsync(q => q
+                    .OrderByDescending(a => a.CreatedAt)
+                    .Select(a => new AppListProjection
+                    {
+                        Id = a.Id,
+                        JobPostingId = a.JobPostingId,
+                        CandidateEmail = a.CandidateEmail,
+                        CandidateName = a.CandidateName,
+                        CandidatePhone = a.CandidatePhone,
+                        CvFileUrl = a.CvFileUrl,
+                        Source = a.Source,
+                        Status = a.Status,
+                        PracticeSessionUsed = a.PracticeSessionUsed,
+                        CreatedAt = a.CreatedAt,
+                        CvJdAnalysisId = a.CvJdAnalysisId,
+                    }), ct);
 
-            // Lấy điểm match CV–JD theo batch (tránh N+1) cho các hồ sơ đã có phân tích
-            var analysisIds = applications
-                .Where(a => a.CvJdAnalysisId.HasValue)
-                .Select(a => a.CvJdAnalysisId!.Value)
-                .Distinct()
-                .ToList();
-            var scoreByAnalysisId = new Dictionary<Guid, int>();
-            if (analysisIds.Count > 0)
+            return Result.Success(await MapApplicationsAsync(applications, null, ct));
+        }
+
+        /// <summary>Cột nhẹ cho danh sách ứng viên (không gồm text lớn).</summary>
+        private sealed class AppListProjection
+        {
+            public Guid Id { get; set; }
+            public Guid JobPostingId { get; set; }
+            public string CandidateEmail { get; set; } = string.Empty;
+            public string CandidateName { get; set; } = string.Empty;
+            public string? CandidatePhone { get; set; }
+            public string? CvFileUrl { get; set; }
+            public string Source { get; set; } = string.Empty;
+            public string Status { get; set; } = string.Empty;
+            public bool PracticeSessionUsed { get; set; }
+            public DateTimeOffset CreatedAt { get; set; }
+            public Guid? CvJdAnalysisId { get; set; }
+        }
+
+        /// <summary>
+        /// Map danh sách projection → ApplicationResponse (CvText = null cho list).
+        /// JobTitle lấy từ <paramref name="jobTitleOverride"/> nếu cùng 1 job, ngược lại batch query tiêu đề.
+        /// </summary>
+        private async Task<List<ApplicationResponse>> MapApplicationsAsync(
+            List<AppListProjection> apps, string? jobTitleOverride, CancellationToken ct)
+        {
+            Dictionary<Guid, string> jobDict;
+            if (jobTitleOverride != null)
             {
-                var analyses = await _unitOfWork.Repository<CvJdAnalysis>()
-                    .FindAsync(c => analysisIds.Contains(c.Id));
-                scoreByAnalysisId = analyses.ToDictionary(c => c.Id, c => c.MatchScore);
+                jobDict = new Dictionary<Guid, string>();
+            }
+            else
+            {
+                var jobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
+                jobDict = (await _unitOfWork.Repository<JobPosting>()
+                        .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct))
+                    .ToDictionary(j => j.Id, j => j.Title);
             }
 
-            var responseList = applications.Select(app => new ApplicationResponse
+            var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
+            var scoreByAnalysisId = analysisIds.Count == 0
+                ? new Dictionary<Guid, int>()
+                : (await _unitOfWork.Repository<CvJdAnalysis>()
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
+                    .ToDictionary(c => c.Id, c => c.MatchScore);
+
+            return apps.Select(app => new ApplicationResponse
             {
                 Id = app.Id,
                 JobPostingId = app.JobPostingId,
-                JobTitle = jobDict.TryGetValue(app.JobPostingId, out var title) ? title : "Unknown Job",
+                JobTitle = jobTitleOverride ?? (jobDict.TryGetValue(app.JobPostingId, out var title) ? title : "Unknown Job"),
                 CandidateEmail = app.CandidateEmail,
                 CandidateName = app.CandidateName,
                 CandidatePhone = app.CandidatePhone,
                 CvFileUrl = app.CvFileUrl,
-                CvText = app.CvText,
+                CvText = null, // danh sách không trả CvText (xem chi tiết ở GetApplicationById)
                 Source = app.Source,
                 Status = app.Status,
                 PracticeSessionUsed = app.PracticeSessionUsed,
@@ -174,10 +227,75 @@ namespace ARISP.Application.Services
                 CvJdAnalysisId = app.CvJdAnalysisId,
                 MatchScore = app.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(app.CvJdAnalysisId.Value, out var ms)
                     ? ms
-                    : (int?)null
+                    : (int?)null,
             }).ToList();
+        }
 
-            return Result.Success(responseList);
+        /// <summary>
+        /// Lấy danh sách ứng viên (Application) của MỘT job posting cụ thể, kèm điểm match CV–JD.
+        /// Dùng cho màn Recruiter "Ứng viên theo job".
+        /// </summary>
+        public async Task<Result<List<ApplicationResponse>>> GetApplicationsByJobAsync(Guid jobPostingId, CancellationToken ct = default)
+        {
+            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(jobPostingId, ct);
+            if (jobPosting == null)
+                return Result.Failure<List<ApplicationResponse>>("Job posting not found.");
+
+            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .QueryAsync(q => q
+                    .Where(a => a.JobPostingId == jobPostingId)
+                    .OrderByDescending(a => a.CreatedAt)
+                    .Select(a => new AppListProjection
+                    {
+                        Id = a.Id,
+                        JobPostingId = a.JobPostingId,
+                        CandidateEmail = a.CandidateEmail,
+                        CandidateName = a.CandidateName,
+                        CandidatePhone = a.CandidatePhone,
+                        CvFileUrl = a.CvFileUrl,
+                        Source = a.Source,
+                        Status = a.Status,
+                        PracticeSessionUsed = a.PracticeSessionUsed,
+                        CreatedAt = a.CreatedAt,
+                        CvJdAnalysisId = a.CvJdAnalysisId,
+                    }), ct);
+
+            return Result.Success(await MapApplicationsAsync(applications, jobPosting.Title, ct));
+        }
+
+        /// <summary>
+        /// Danh sách ứng viên thuộc các job do <paramref name="creatorUserId"/> tạo (Recruiter workspace).
+        /// Gộp ứng viên theo toàn bộ tin của recruiter, kèm điểm match CV–JD.
+        /// </summary>
+        public async Task<Result<List<ApplicationResponse>>> GetApplicationsForCreatorAsync(Guid creatorUserId, CancellationToken ct = default)
+        {
+            var jobIds = (await _unitOfWork.Repository<JobPosting>()
+                    .QueryAsync(q => q.Where(j => j.CreatedByUserId == creatorUserId).Select(j => j.Id), ct))
+                .ToHashSet();
+
+            if (jobIds.Count == 0)
+                return Result.Success(new List<ApplicationResponse>());
+
+            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .QueryAsync(q => q
+                    .Where(a => jobIds.Contains(a.JobPostingId))
+                    .OrderByDescending(a => a.CreatedAt)
+                    .Select(a => new AppListProjection
+                    {
+                        Id = a.Id,
+                        JobPostingId = a.JobPostingId,
+                        CandidateEmail = a.CandidateEmail,
+                        CandidateName = a.CandidateName,
+                        CandidatePhone = a.CandidatePhone,
+                        CvFileUrl = a.CvFileUrl,
+                        Source = a.Source,
+                        Status = a.Status,
+                        PracticeSessionUsed = a.PracticeSessionUsed,
+                        CreatedAt = a.CreatedAt,
+                        CvJdAnalysisId = a.CvJdAnalysisId,
+                    }), ct);
+
+            return Result.Success(await MapApplicationsAsync(applications, null, ct));
         }
 
         /// <summary>
@@ -248,41 +366,73 @@ namespace ARISP.Application.Services
             return Result.Success(MapToResponse(application, jobPosting));
         }
 
-        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, CancellationToken ct = default)
+        /// <summary>Hash token mời phỏng vấn bằng SHA256 (lưu DB an toàn). Dùng chung với controller đặt lịch.</summary>
+        public static string HashInviteToken(string token)
         {
-            // 1. Lấy thông tin đơn ứng tuyển từ DB
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes);
+        }
+
+        /// <summary>
+        /// Gửi lời mời phỏng vấn theo vòng: tạo InterviewInvite (token hoá), email link CHỌN LỊCH
+        /// trên thiết bị cá nhân của ứng viên (base URL theo môi trường, không hardcode localhost).
+        /// </summary>
+        /// <param name="frontendBaseUrl">Base URL portal ứng viên (controller truyền từ config).</param>
+        /// <param name="roundNumber">Vòng cần mời (mặc định 1).</param>
+        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default)
+        {
             var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
-            {
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
-            }
 
-            // 2. Tạo Magic Link hướng tới trang làm bài test của Frontend Portal
-            var magicLink = $"http://localhost:3000/portal/practice/{applicationId}";
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
+            var baseUrl = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
 
-            // 3. Chuẩn bị nội dung HTML cho Email
-            var subject = "[ARISP] - Lời mời tham gia vòng kiểm tra năng lực";
+            // Sinh token thật (gửi email) + lưu hash. Một invite còn hiệu lực / (application, round):
+            // vô hiệu hoá invite cũ chưa dùng của vòng này trước khi tạo mới.
+            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
+                .FindAsync(i => i.ApplicationId == applicationId && i.RoundNumber == roundNumber && i.ScheduledAt == null, ct);
+            foreach (var old in oldInvites)
+                _unitOfWork.Repository<InterviewInvite>().Delete(old);
+
+            var invite = new InterviewInvite
+            {
+                ApplicationId = applicationId,
+                RoundNumber = roundNumber,
+                TokenHash = HashInviteToken(rawToken),
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
+            };
+            await _unitOfWork.Repository<InterviewInvite>().AddAsync(invite, ct);
+
+            var scheduleLink = $"{baseUrl}/portal/schedule/{applicationId}?token={rawToken}&round={roundNumber}";
+
+            var subject = "[ARISP] - Lời mời phỏng vấn: chọn lịch hẹn";
             var htmlMessage = $@"
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
             <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
             <p>Chúc mừng bạn! Hồ sơ ứng tuyển của bạn đã thông qua vòng duyệt hồ sơ (CV Review).</p>
-            <p>Chúng tôi trân trọng mời bạn tham gia vòng đánh giá tiếp theo bằng cách truy cập vào đường dẫn (Magic Link) dưới đây để tiến hành làm bài test năng lực:</p>
+            <p>Vui lòng truy cập đường dẫn dưới đây trên thiết bị cá nhân của bạn để <strong>chọn khung giờ phỏng vấn</strong> (vòng {roundNumber}). Sau khi chọn lịch, bạn có thể luyện tập với chế độ <em>phỏng vấn thử</em> trước ngày hẹn.</p>
             <p style='text-align: center; margin: 30px 0;'>
-                <a href='{magicLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Bắt đầu làm bài đánh giá</a>
+                <a href='{scheduleLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Chọn lịch phỏng vấn</a>
             </p>
-            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Đường dẫn này dành riêng cho bạn và không nên chia sẻ cho người khác.</i></p>
+            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Buổi phỏng vấn thật diễn ra tại văn phòng — bạn sẽ nhập mã phỏng vấn (Interview Code) do nhân sự cấp tại chỗ, không cần đăng nhập email. Đường dẫn này dành riêng cho bạn, hết hạn sau {ttlHours} giờ.</i></p>
             <br/>
             <p>Trân trọng,</p>
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>
         </div>";
 
-            // 4. Gọi Service gửi Mail có sẵn (Không lo gạch đỏ, không cần cài MailKit vào Application nữa)
             try
             {
                 await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
 
-                // Thêm logic cập nhật trạng thái nếu cần
-                application.Status = "Invited";
+                // Mời phỏng vấn = đã qua CV → mở giai đoạn sơ loại/phỏng vấn (và bật phỏng vấn thử).
+                // Nâng từ invited/cv_submitted → screening để PracticeAvailable = true.
+                if (string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+                    application.Status = "screening";
+                application.UpdatedAt = DateTimeOffset.UtcNow;
                 await _unitOfWork.SaveChangesAsync(ct);
 
                 return Result<bool>.Success(true);
@@ -293,13 +443,20 @@ namespace ARISP.Application.Services
             }
         }
 
-        public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, CancellationToken ct = default)
+        /// <summary>
+        /// Còn được phỏng vấn thử cho vòng <paramref name="roundNumber"/> không (1 lượt / vòng).
+        /// Eligible = chưa có phiên practice nào của vòng này.
+        /// </summary>
+        public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result.Failure<bool>("Application not found.");
 
-            return Result.Success(!application.PracticeSessionUsed);
+            var used = await _unitOfWork.Repository<InterviewSession>().FindAsync(
+                s => s.ApplicationId == applicationId && s.SessionType == "practice" && s.RoundNumber == roundNumber, ct);
+
+            return Result.Success(!used.Any());
         }
 
         private List<string> ChunkText(string text)

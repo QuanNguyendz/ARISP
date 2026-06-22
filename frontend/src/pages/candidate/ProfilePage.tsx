@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   User,
   Briefcase,
@@ -33,9 +33,11 @@ import {
 } from 'lucide-react'
 import { profileService } from '@services/profile/profileService'
 import { provinceService } from '@services/location/provinceService'
-import type { Province, Ward } from '@services/location/provinceService'
+import type { Province } from '@services/location/provinceService'
 import ChangePasswordModal from '@components/profile/ChangePasswordModal'
 import SearchableSelect from '@components/ui/SearchableSelect'
+import { Skeleton } from '@components/ui/Skeleton'
+import { useDocumentViewer } from '@components/document/DocumentViewer'
 import { resolveAssetUrl } from '@config/constants'
 import type {
   CandidateProfile,
@@ -123,6 +125,7 @@ const cardCls = 'rounded-2xl border border-ink-200 bg-white p-6 shadow-card scro
 
 export default function ProfilePage() {
   const { updateUser } = useAuthStore()
+  const { openDocument } = useDocumentViewer()
   const [profile, setProfile] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -135,8 +138,13 @@ export default function ProfilePage() {
   const [cvNotice, setCvNotice] = useState('')
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [provinces, setProvinces] = useState<Province[]>([])
-  const [wards, setWards] = useState<Ward[]>([])
-  const [wardsLoading, setWardsLoading] = useState(false)
+
+  // Chỉ dẫn tới khu vực tải CV khi vào từ banner "Tải CV lên" (?focus=cv).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const cvSectionRef = useRef<HTMLElement | null>(null)
+  const [cvGuideMounted, setCvGuideMounted] = useState(false) // còn trong DOM (giữ trong lúc fade-out)
+  const [cvGuide, setCvGuide] = useState(false) // đang hiển thị ở opacity đầy đủ
+  const cvGuideTriggered = useRef(false)
 
   const todayStr = new Date().toISOString().slice(0, 10)
 
@@ -148,40 +156,56 @@ export default function ProfilePage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Sau khi hồ sơ đã render, nếu được dẫn từ banner (?focus=cv) → cuộn tới khối CV,
+  // bật hiệu ứng chỉ dẫn (glow + nhãn) rồi gỡ tham số khỏi URL để không lặp lại khi refresh.
+  // Dùng ref one-shot để StrictMode (double-invoke effect ở dev) không huỷ scroll/glow:
+  // không clear timeout trong cleanup, và chỉ chạy đúng một lần.
+  useEffect(() => {
+    if (loading || !profile) return
+    if (cvGuideTriggered.current) return
+    if (searchParams.get('focus') !== 'cv') return
+    cvGuideTriggered.current = true
+
+    // Gỡ tham số khỏi URL để refresh không lặp lại chỉ dẫn.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('focus')
+        return next
+      },
+      { replace: true }
+    )
+
+    // Đợi layout/route ổn định rồi cuộn + bật chỉ dẫn. Không clear ở cleanup để
+    // lần "unmount giả" của StrictMode không huỷ hiệu ứng.
+    // Vòng đời: mount → (rAF) fade-in → giữ ~4s → fade-out (700ms) → gỡ khỏi DOM.
+    window.setTimeout(() => {
+      cvSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setCvGuideMounted(true)
+      window.requestAnimationFrame(() => setCvGuide(true))
+      window.setTimeout(() => setCvGuide(false), 4200) // bắt đầu fade-out
+      window.setTimeout(() => setCvGuideMounted(false), 4200 + 800) // gỡ sau khi fade xong
+    }, 250)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, profile, searchParams])
+
   // Tải danh sách tỉnh/thành (Provinces Open API v2) 1 lần.
   useEffect(() => {
-    provinceService.getProvinces().then(setProvinces).catch(() => setProvinces([]))
-  }, [])
-
-  // Khi đã có province trong hồ sơ → tải danh sách phường tương ứng.
-  useEffect(() => {
-    const code = profile?.provinceCode
-    if (!code) {
-      setWards([])
-      return
-    }
-    setWardsLoading(true)
     provinceService
-      .getWards(code)
-      .then(setWards)
-      .catch(() => setWards([]))
-      .finally(() => setWardsLoading(false))
-  }, [profile?.provinceCode])
+      .getProvinces()
+      .then(setProvinces)
+      .catch(() => setProvinces([]))
+  }, [])
 
   function onProvinceChange(code: number) {
     const p = provinces.find((x) => x.code === code)
-    // Đổi tỉnh → reset phường đã chọn.
+    // "Nơi làm việc mong muốn" = tỉnh/thành. Xoá luôn phường/xã (không còn dùng).
     patch({
       provinceCode: p ? p.code : null,
       provinceName: p ? p.name : null,
       wardCode: null,
       wardName: null,
     })
-  }
-
-  function onWardChange(code: number) {
-    const w = wards.find((x) => x.code === code)
-    patch({ wardCode: w ? w.code : null, wardName: w ? w.name : null })
   }
 
   const completeness = useMemo(() => {
@@ -287,8 +311,9 @@ export default function ProfilePage() {
         phone: profile.phone,
         provinceCode: profile.provinceCode,
         provinceName: profile.provinceName,
-        wardCode: profile.wardCode,
-        wardName: profile.wardName,
+        // Không còn dùng phường/xã — "Nơi làm việc mong muốn" chỉ là tỉnh/thành.
+        wardCode: null,
+        wardName: null,
         dateOfBirth: profile.dateOfBirth,
         about: profile.about,
         linkedinUrl: profile.linkedinUrl,
@@ -351,11 +376,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32 text-ink-400">
-        <Loader2 className="h-6 w-6 animate-spin" />
-      </div>
-    )
+    return <ProfileSkeleton />
   }
 
   if (!profile) {
@@ -502,29 +523,13 @@ export default function ProfilePage() {
                     />
                   </div>
                 </Field>
-                <Field label="Tỉnh / Thành phố">
+                <Field label="Nơi làm việc mong muốn">
                   <SearchableSelect
                     icon={<MapPin className="h-4 w-4 shrink-0 text-ink-400" />}
                     options={provinces.map((p) => ({ value: p.code, label: p.name }))}
                     value={profile.provinceCode}
                     onChange={onProvinceChange}
                     placeholder="— Chọn tỉnh/thành —"
-                  />
-                </Field>
-                <Field label="Phường / Xã">
-                  <SearchableSelect
-                    icon={<MapPin className="h-4 w-4 shrink-0 text-ink-400" />}
-                    options={wards.map((w) => ({ value: w.code, label: w.name }))}
-                    value={profile.wardCode}
-                    onChange={onWardChange}
-                    disabled={!profile.provinceCode || wardsLoading}
-                    placeholder={
-                      !profile.provinceCode
-                        ? '— Chọn tỉnh trước —'
-                        : wardsLoading
-                          ? 'Đang tải...'
-                          : '— Chọn phường/xã —'
-                    }
                   />
                 </Field>
                 <Field label="Ngày sinh">
@@ -555,7 +560,25 @@ export default function ProfilePage() {
           </section>
 
           {/* CV */}
-          <section id="cv" className={cardCls}>
+          <section id="cv" ref={cvSectionRef} className={`${cardCls} relative`}>
+            {cvGuideMounted && (
+              <>
+                {/* Lớp phủ viền glow — fade in/out mượt (chỉ là box-shadow ở viền, không che nội dung) */}
+                <div
+                  className={`pointer-events-none absolute inset-0 z-10 rounded-2xl ring-2 ring-ai-400 transition-opacity duration-700 ${
+                    cvGuide ? 'animate-guide-glow opacity-100' : 'opacity-0'
+                  }`}
+                />
+                {/* Nhãn chỉ dẫn */}
+                <div
+                  className={`pointer-events-none absolute -top-3 left-6 z-20 inline-flex items-center gap-1.5 rounded-full bg-ai-600 px-3 py-1 text-xs font-semibold text-white shadow-lg transition-all duration-700 ${
+                    cvGuide ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> Tải CV của bạn lên tại đây
+                </div>
+              </>
+            )}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-display text-lg font-bold">
                 <FileText className="h-5 w-5 text-brand-600" /> CV & đánh giá AI
@@ -565,12 +588,13 @@ export default function ProfilePage() {
 
             {profile.profileCvUrl && (
               <div className="mb-3 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
-                {/* Vùng file — bấm để xem trong tab mới */}
-                <a
-                  href={resolveAssetUrl(profile.profileCvUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg hover:opacity-80"
+                {/* Vùng file — bấm để xem inline trong app */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openDocument(resolveAssetUrl(profile.profileCvUrl), profile.cvFileName || 'CV hồ sơ')
+                  }
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left hover:opacity-80"
                   title="Bấm để xem CV"
                 >
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-50 text-red-600">
@@ -582,7 +606,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="text-xs text-ink-400">Bấm để xem</div>
                   </div>
-                </a>
+                </button>
                 {/* Icon tải về — bấm để download */}
                 <a
                   href={resolveAssetUrl(profile.cvDownloadUrl || profile.profileCvUrl)}
@@ -948,6 +972,82 @@ export default function ProfilePage() {
           }}
         />
       )}
+    </>
+  )
+}
+
+/** Khung skeleton (shimmer) mô phỏng bố cục trang hồ sơ khi đang tải. */
+function ProfileSkeleton() {
+  return (
+    <>
+      {/* Breadcrumb */}
+      <div className="mx-auto max-w-6xl px-6 pt-6">
+        <Skeleton className="h-4 w-48" />
+      </div>
+
+      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[240px_1fr]">
+        {/* Section nav + completeness */}
+        <aside className="space-y-4 self-start">
+          <div className="rounded-2xl border border-ink-200 bg-white p-2 shadow-card">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-10" />
+            </div>
+            <Skeleton className="mt-3 h-2 w-full rounded-full" />
+            <Skeleton className="mt-3 h-3 w-40" />
+          </div>
+        </aside>
+
+        {/* Content */}
+        <div className="space-y-6">
+          {/* Personal card with banner */}
+          <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
+            <Skeleton className="h-24 rounded-none" />
+            <div className="px-6 pb-2">
+              <Skeleton className="-mt-10 h-20 w-20 rounded-2xl ring-4 ring-white dark:ring-ink-900" />
+              <div className="mt-3 space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-36" />
+              </div>
+            </div>
+            <div className="border-t border-ink-100 p-6">
+              <Skeleton className="mb-4 h-5 w-40" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-10 w-full rounded-xl" />
+                  </div>
+                ))}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-20 w-full rounded-xl" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Các section card còn lại */}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+              <Skeleton className="mb-4 h-5 w-44" />
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: 6 }).map((_, j) => (
+                  <Skeleton key={j} className="h-8 w-24 rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </>
   )
 }

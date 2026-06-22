@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
 using ARISP.Application.Services;
@@ -22,11 +25,31 @@ namespace ARISP.API.Controllers
 
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IDocumentParserService _documentParser;
+        private readonly IFileStorageService _fileStorage;
+        private readonly IGeminiProvider _geminiProvider;
+        private readonly ApplicationService _applicationService;
+        private readonly IJdStampService _jdStampService;
+        private readonly ILogger<JobsController> _logger;
 
-        public JobsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+        public JobsController(
+            IUnitOfWork unitOfWork,
+            ICurrentUserService currentUserService,
+            IDocumentParserService documentParser,
+            IFileStorageService fileStorage,
+            IGeminiProvider geminiProvider,
+            ApplicationService applicationService,
+            IJdStampService jdStampService,
+            ILogger<JobsController> logger)
         {
             _unitOfWork = unitOfWork;
             _currentUserService = currentUserService;
+            _documentParser = documentParser;
+            _fileStorage = fileStorage;
+            _geminiProvider = geminiProvider;
+            _applicationService = applicationService;
+            _jdStampService = jdStampService;
+            _logger = logger;
         }
 
         /// <summary>HR tạo job posting kèm cấu hình vòng phỏng vấn.</summary>
@@ -100,6 +123,9 @@ namespace ARISP.API.Controllers
                 Title = request.Title!.Trim(),
                 Department = request.Department?.Trim(),
                 JobDescription = request.JobDescription!.Trim(),
+                JdFileUrl = request.JdFileUrl,
+                JdFileName = request.JdFileName,
+                JdFileFormat = request.JdFileFormat,
                 InterviewMode = request.InterviewMode,
                 Status = "draft",
                 IsPublicListing = request.IsPublicListing,
@@ -124,7 +150,8 @@ namespace ARISP.API.Controllers
                 Skills = request.Skills ?? new List<string>(),
                 JobCategory = request.JobCategory?.ToLower(),
                 ApplicationDeadline = request.ApplicationDeadline,
-                IsUrgent = request.IsUrgent
+                IsUrgent = request.IsUrgent,
+                Vacancies = request.Vacancies.HasValue && request.Vacancies.Value > 0 ? request.Vacancies : null
             };
 
             await _unitOfWork.Repository<JobPosting>().AddAsync(job, ct);
@@ -166,6 +193,107 @@ namespace ARISP.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>
+        /// Bộ lọc khả dụng cho Job Board: chỉ trả về những giá trị thực sự có trong các tin
+        /// đang active &amp; public, kèm số lượng (vd: "Junior (2)"). Dùng cho sidebar bộ lọc.
+        /// </summary>
+        [HttpGet("facets")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetJobFacets(CancellationToken ct)
+        {
+            var jobs = (await _unitOfWork.Repository<JobPosting>().FindAsync(
+                j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow),
+                ct)).ToList();
+
+            var facets = new JobFacetsResponse
+            {
+                TotalJobs = jobs.Count,
+                Categories = BuildFacet(jobs.Select(j => j.JobCategory), CategoryLabels, CategoryOrder),
+                EmploymentTypes = BuildFacet(jobs.Select(j => j.EmploymentType), EmploymentTypeLabels, EmploymentTypeOrder),
+                ExperienceLevels = BuildFacet(jobs.Select(j => j.ExperienceLevel), ExperienceLevelLabels, ExperienceLevelOrder),
+                WorkModes = BuildFacet(jobs.Select(j => j.WorkMode), WorkModeLabels, WorkModeOrder),
+                Languages = BuildFacet(jobs.Select(j => j.DetectedLanguage), LanguageLabels, null),
+                Locations = BuildFacet(jobs.Select(j => j.Location), null, null),
+                Skills = BuildFacet(jobs.SelectMany(j => j.Skills ?? new List<string>()), null, null)
+            };
+
+            return Ok(facets);
+        }
+
+        // ===== Label maps & ordering cho facets (giá trị thô -> nhãn hiển thị) =====
+        private static readonly Dictionary<string, string> CategoryLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["backend"] = "Backend", ["frontend"] = "Frontend", ["devops"] = "DevOps / Infra",
+            ["qa"] = "QA / Testing", ["data"] = "Data", ["ai_ml"] = "AI / ML",
+            ["mobile"] = "Mobile", ["pm"] = "Project Manager", ["designer"] = "Designer", ["other"] = "Khác"
+        };
+        private static readonly List<string> CategoryOrder = new()
+        { "backend", "frontend", "devops", "qa", "data", "ai_ml", "mobile", "pm", "designer", "other" };
+
+        private static readonly Dictionary<string, string> EmploymentTypeLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["full_time"] = "Full-time", ["part_time"] = "Part-time",
+            ["contract"] = "Hợp đồng", ["internship"] = "Thực tập", ["freelance"] = "Freelance"
+        };
+        private static readonly List<string> EmploymentTypeOrder = new()
+        { "full_time", "part_time", "contract", "internship", "freelance" };
+
+        private static readonly Dictionary<string, string> ExperienceLevelLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["intern"] = "Intern / Fresher", ["fresher"] = "Intern / Fresher", ["junior"] = "Junior",
+            ["middle"] = "Middle", ["senior"] = "Senior", ["lead"] = "Lead / Manager", ["manager"] = "Lead / Manager"
+        };
+        private static readonly List<string> ExperienceLevelOrder = new()
+        { "intern", "fresher", "junior", "middle", "senior", "lead", "manager" };
+
+        private static readonly Dictionary<string, string> WorkModeLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["onsite"] = "Onsite", ["hybrid"] = "Hybrid", ["remote"] = "Remote"
+        };
+        private static readonly List<string> WorkModeOrder = new() { "onsite", "hybrid", "remote" };
+
+        private static readonly Dictionary<string, string> LanguageLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["vi"] = "Tiếng Việt", ["en"] = "English"
+        };
+
+        /// <summary>
+        /// Gom nhóm + đếm theo giá trị thô (bỏ rỗng/null), gắn nhãn hiển thị và sắp xếp.
+        /// Nếu có <paramref name="order"/> thì sắp theo thứ tự đó; nếu không thì sắp giảm dần theo count.
+        /// </summary>
+        private static List<JobFacetItem> BuildFacet(
+            IEnumerable<string?> values,
+            Dictionary<string, string>? labels,
+            List<string>? order)
+        {
+            var grouped = values
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v!.Trim())
+                .GroupBy(v => v, StringComparer.OrdinalIgnoreCase)
+                .Select(g => new JobFacetItem
+                {
+                    // Khi có bảng nhãn (enum thô) -> chuẩn hoá value về lowercase để FE so khớp ổn định.
+                    // Không có nhãn (location, skill) -> giữ nguyên giá trị gốc.
+                    Value = labels != null ? g.Key.ToLowerInvariant() : g.Key,
+                    Label = labels != null && labels.TryGetValue(g.Key, out var lbl) ? lbl : g.Key,
+                    Count = g.Count()
+                })
+                .ToList();
+
+            if (order != null)
+            {
+                return grouped
+                    .OrderBy(item => { var idx = order.IndexOf(item.Value); return idx < 0 ? int.MaxValue : idx; })
+                    .ThenByDescending(item => item.Count)
+                    .ToList();
+            }
+
+            return grouped
+                .OrderByDescending(item => item.Count)
+                .ThenBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         /// <summary>Chi tiết job cho trang mô tả công việc (Hỗ trợ HR xem cả draft/paused).</summary>
         [HttpGet("{id:guid}")]
         [AllowAnonymous]
@@ -186,40 +314,92 @@ namespace ARISP.API.Controllers
                 ct);
 
             var roundDtos = rounds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
-            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
+            var jobResponse = JobPostingResponse.FromEntity(job, roundDtos);
+
+            // Staff: resolve storageKey của file JD -> URL dùng được (để xem/tải file JD gốc + bản đã đóng dấu)
+            if (isStaff)
+            {
+                if (!string.IsNullOrEmpty(jobResponse.JdFileUrl))
+                    jobResponse.JdFileUrl = await _fileStorage.GetUrlAsync(jobResponse.JdFileUrl, ct);
+                if (!string.IsNullOrEmpty(jobResponse.SignedJdFileUrl))
+                    jobResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(jobResponse.SignedJdFileUrl, ct);
+            }
+
+            return Ok(jobResponse);
         }
 
-        /// <summary>Danh sách toàn bộ job dành cho HR (bao gồm cả draft, closed...).</summary>
+        /// <summary>
+        /// Danh sách job dành cho HR (bao gồm cả draft, closed...).
+        /// <paramref name="mine"/>=true: chỉ trả về tin do người đang đăng nhập tạo (dùng cho Recruiter workspace).
+        /// </summary>
         [HttpGet("admin")]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> GetAdminJobs(CancellationToken ct)
+        public async Task<IActionResult> GetAdminJobs(CancellationToken ct, [FromQuery] bool mine = false)
         {
-            var jobs = await _unitOfWork.Repository<JobPosting>().GetAllAsync(ct);
-            var jobList = jobs.OrderByDescending(j => j.CreatedAt).ToList();
+            Guid? mineUid = null;
+            if (mine)
+            {
+                if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
+                    return Unauthorized(new { message = "Không xác định được người dùng." });
+                mineUid = uid;
+            }
 
-            // Đếm số ứng viên theo từng tin (batch, tránh N+1)
+            // Projection thẳng sang DTO danh sách — KHÔNG kéo JobDescription/ScoringRubric/persona/JD file.
+            var jobList = await _unitOfWork.Repository<JobPosting>().QueryAsync(q =>
+            {
+                var query = mineUid.HasValue ? q.Where(j => j.CreatedByUserId == mineUid.Value) : q;
+                return query
+                    .OrderByDescending(j => j.CreatedAt)
+                    .Select(j => new JobPostingListItemResponse
+                    {
+                        Id = j.Id,
+                        Title = j.Title,
+                        Department = j.Department,
+                        InterviewMode = j.InterviewMode,
+                        Status = j.Status,
+                        DetectedLanguage = j.DetectedLanguage,
+                        LanguageRequirement = j.LanguageRequirement,
+                        CreatedAt = j.CreatedAt,
+                        PublishedAt = j.PublishedAt,
+                        Location = j.Location,
+                        WorkMode = j.WorkMode,
+                        EmploymentType = j.EmploymentType,
+                        ExperienceLevel = j.ExperienceLevel,
+                        JobCategory = j.JobCategory,
+                        IsUrgent = j.IsUrgent ?? false,
+                        Vacancies = j.Vacancies,
+                        Skills = j.Skills,
+                        SalaryMin = j.SalaryMin,
+                        SalaryMax = j.SalaryMax,
+                        SalaryCurrency = j.SalaryCurrency,
+                        SalaryIsNegotiable = j.SalaryIsNegotiable ?? false,
+                        CreatedByUserId = j.CreatedByUserId,
+                        RejectionReason = j.RejectionReason,
+                    });
+            }, ct);
+
+            // Đếm ứng viên theo tin bằng SQL GROUP BY (không nạp Application/CvText).
             var jobIds = jobList.Select(j => j.Id).ToList();
-            var apps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
-                .FindAsync(a => jobIds.Contains(a.JobPostingId));
-            var countByJob = apps
-                .GroupBy(a => a.JobPostingId)
-                .ToDictionary(g => g.Key, g => g.Count());
+            var countByJob = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                    .QueryAsync(q => q.Where(a => jobIds.Contains(a.JobPostingId))
+                        .GroupBy(a => a.JobPostingId)
+                        .Select(g => new { JobId = g.Key, Count = g.Count() }), ct))
+                .ToDictionary(x => x.JobId, x => x.Count);
 
-            // Tên người tạo tin (Recruiter/HR) theo batch, tránh N+1
+            // Tên người tạo tin (batch, chỉ cột cần)
             var creatorIds = jobList.Select(j => j.CreatedByUserId).Distinct().ToList();
             var creatorNameById = (await _unitOfWork.Repository<User>()
-                .FindAsync(u => creatorIds.Contains(u.Id), ct))
+                    .QueryAsync(q => q.Where(u => creatorIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email }), ct))
                 .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
 
-            var response = jobList.Select(j =>
+            foreach (var dto in jobList)
             {
-                var dto = JobPostingListItemResponse.FromEntity(j);
-                dto.ApplicantCount = countByJob.TryGetValue(j.Id, out var c) ? c : 0;
-                dto.CreatedByName = creatorNameById.TryGetValue(j.CreatedByUserId, out var name) ? name : null;
-                return dto;
-            });
+                dto.Skills ??= new List<string>();
+                dto.ApplicantCount = countByJob.TryGetValue(dto.Id, out var c) ? c : 0;
+                dto.CreatedByName = creatorNameById.TryGetValue(dto.CreatedByUserId, out var name) ? name : null;
+            }
 
-            return Ok(response);
+            return Ok(jobList);
         }
 
         [HttpPost("{id:guid}/slots")]
@@ -343,6 +523,13 @@ namespace ARISP.API.Controllers
             job.Title = request.Title.Trim();
             job.Department = request.Department?.Trim();
             job.JobDescription = request.JobDescription.Trim();
+            // Chỉ ghi đè file JD khi request có gửi (tránh xoá file cũ khi edit không đổi JD)
+            if (!string.IsNullOrWhiteSpace(request.JdFileUrl))
+            {
+                job.JdFileUrl = request.JdFileUrl;
+                job.JdFileName = request.JdFileName;
+                job.JdFileFormat = request.JdFileFormat;
+            }
             job.InterviewMode = request.InterviewMode;
             job.IsPublicListing = request.IsPublicListing;
             job.DetectedLanguage = detectedLang;
@@ -367,6 +554,7 @@ namespace ARISP.API.Controllers
             job.JobCategory = request.JobCategory?.ToLower();
             job.ApplicationDeadline = request.ApplicationDeadline;
             job.IsUrgent = request.IsUrgent;
+            job.Vacancies = request.Vacancies.HasValue && request.Vacancies.Value > 0 ? request.Vacancies : null;
             job.UpdatedAt = DateTimeOffset.UtcNow; // Ghi nhận thời gian update nếu entity hỗ trợ
 
             _unitOfWork.Repository<JobPosting>().Update(job);
@@ -578,6 +766,69 @@ namespace ARISP.API.Controllers
 
                 // Duyệt thành công thì xóa bỏ vết lý do từ chối cũ (nếu có trước đó)
                 job.RejectionReason = null;
+
+                // Ghi nhận phê duyệt + đóng dấu duyệt lên file JD — chỉ khi duyệt từ trạng thái
+                // chờ duyệt (pending → active), không áp dụng khi tái kích hoạt bài đã closed.
+                if (currentStatus == "pending")
+                {
+                    var approver = await _unitOfWork.Repository<User>().GetByIdAsync(userId, ct);
+                    var approverName = approver != null
+                        ? (string.IsNullOrWhiteSpace(approver.FullName) ? approver.Email : approver.FullName)
+                        : "HR Leader";
+
+                    job.ApprovedByUserId = userId;
+                    job.ApprovedAt = DateTimeOffset.UtcNow;
+                    job.ApproverName = approverName;
+
+                    // Đóng dấu duyệt lên file JD. PDF: vẽ dấu lên file gốc. DOCX: render nội dung JD
+                    // thành PDF mới rồi đóng dấu (mất định dạng gốc nhưng giữ nội dung + bằng chứng duyệt).
+                    // Thất bại khi đóng dấu KHÔNG được chặn việc duyệt tin.
+                    var fmt = (job.JdFileFormat ?? string.Empty).ToLowerInvariant();
+                    if (!string.IsNullOrEmpty(job.JdFileUrl) && (fmt == "pdf" || fmt == "docx"))
+                    {
+                        try
+                        {
+                            byte[]? stamped = null;
+                            var original = await _fileStorage.ReadAllBytesAsync(job.JdFileUrl, ct);
+
+                            if (fmt == "pdf")
+                            {
+                                if (original != null && original.Length > 0)
+                                    stamped = await _jdStampService.StampApprovalAsync(original, approverName, job.ApprovedAt.Value, ct);
+                            }
+                            else // docx
+                            {
+                                var bodyText = job.JobDescription ?? string.Empty;
+                                if (original != null && original.Length > 0)
+                                {
+                                    try
+                                    {
+                                        using var ms = new MemoryStream(original);
+                                        var parsed = (await _documentParser.ParseDocumentAsync(ms, ".docx"))?.Replace("\0", string.Empty);
+                                        if (!string.IsNullOrWhiteSpace(parsed)) bodyText = parsed;
+                                    }
+                                    catch (Exception exParse)
+                                    {
+                                        _logger.LogWarning(exParse, "Parse DOCX để đóng dấu thất bại, dùng JobDescription. Job {JobId}", job.Id);
+                                    }
+                                }
+                                stamped = await _jdStampService.StampApprovalFromTextAsync(job.Title, bodyText, approverName, job.ApprovedAt.Value, ct);
+                            }
+
+                            if (stamped != null && stamped.Length > 0)
+                            {
+                                // File đã đóng dấu luôn là PDF, kể cả khi gốc là DOCX.
+                                var baseName = Path.GetFileNameWithoutExtension(job.JdFileName ?? "JD") + ".pdf";
+                                var signedName = AppendSuffix(baseName, "-da-duyet");
+                                job.SignedJdFileUrl = await _fileStorage.SaveAsync(stamped, signedName, "application/pdf", ct);
+                            }
+                        }
+                        catch (Exception exStamp)
+                        {
+                            _logger.LogWarning(exStamp, "Đóng dấu duyệt JD thất bại cho job {JobId} — vẫn duyệt tin.", job.Id);
+                        }
+                    }
+                }
             }
 
             // CASE C: Hành động Gửi duyệt bài (Chuyển sang 'pending') -> Thường dành cho Recruiter/Owner nộp bài
@@ -630,7 +881,150 @@ namespace ARISP.API.Controllers
             var rds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == id, ct);
             var roundDtos = rds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
 
-            return Ok(JobPostingResponse.FromEntity(job, roundDtos));
+            var statusResponse = JobPostingResponse.FromEntity(job, roundDtos);
+            // Resolve storageKey -> URL dùng được cho file JD gốc + bản đã đóng dấu (người gọi là staff).
+            if (!string.IsNullOrEmpty(statusResponse.JdFileUrl))
+                statusResponse.JdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.JdFileUrl, ct);
+            if (!string.IsNullOrEmpty(statusResponse.SignedJdFileUrl))
+                statusResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.SignedJdFileUrl, ct);
+
+            return Ok(statusResponse);
+        }
+
+        /// <summary>Chèn hậu tố vào tên file trước phần mở rộng. VD: "JD.pdf" + "-da-duyet" => "JD-da-duyet.pdf".</summary>
+        private static string AppendSuffix(string fileName, string suffix)
+        {
+            var ext = Path.GetExtension(fileName);
+            var name = Path.GetFileNameWithoutExtension(fileName);
+            return $"{name}{suffix}{ext}";
+        }
+
+        /// <summary>
+        /// Upload file JD (PDF/DOCX), phân tích bằng Gemini để trích xuất các trường auto-fill cho form tạo tin.
+        /// File JD được lưu trữ; storageKey + metadata trả về để đính kèm khi submit job. (ADR-042)
+        /// </summary>
+        [HttpPost("analyze-jd")]
+        [Authorize(Policy = "InternalStaff")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> AnalyzeJd(IFormFile file, CancellationToken ct)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "File JD không được để trống." });
+
+            if (file.Length > 10 * 1024 * 1024)
+                return BadRequest(new { message = "Kích thước file JD không được vượt quá 10MB." });
+
+            var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
+            var allowed = new[] { ".pdf", ".docx" };
+            if (string.IsNullOrEmpty(ext) || Array.IndexOf(allowed, ext) < 0)
+                return BadRequest(new { message = "Định dạng không hợp lệ. Chỉ chấp nhận .pdf hoặc .docx" });
+
+            byte[] bytes;
+            using (var ms = new MemoryStream())
+            {
+                await file.CopyToAsync(ms, ct);
+                bytes = ms.ToArray();
+            }
+
+            // Parse text (dùng làm fallback cho Gemini, nhất là với DOCX không gửi inline được)
+            string jdText;
+            try
+            {
+                using var stream = new MemoryStream(bytes);
+                jdText = (await _documentParser.ParseDocumentAsync(stream, ext))?.Replace("\0", string.Empty) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = $"Không thể đọc nội dung file JD: {ex.Message}" });
+            }
+
+            var contentType = ext == ".pdf"
+                ? "application/pdf"
+                : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+            // Lưu file JD qua abstraction (Local dev / R2 prod). DB lưu storageKey.
+            string storageKey;
+            try
+            {
+                storageKey = await _fileStorage.SaveAsync(bytes, file.FileName, contentType, ct);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Không thể lưu file JD: {ex.Message}" });
+            }
+
+            // Gọi Gemini trích xuất (PDF gửi inline, DOCX dùng fallback text)
+            var pdfBytes = ext == ".pdf" ? bytes : null;
+            var extraction = await _geminiProvider.ExtractJobFromJdAsync(pdfBytes, ext == ".pdf" ? "application/pdf" : null, jdText, ct);
+
+            if (extraction.IsFailure)
+            {
+                // Vẫn trả file đã lưu để người dùng tạo tin thủ công, kèm cảnh báo phân tích thất bại.
+                return Ok(new AnalyzeJdResponse
+                {
+                    IsValidJd = false,
+                    JdFileUrl = storageKey,
+                    JdFileName = file.FileName,
+                    JdFileFormat = ext.TrimStart('.'),
+                    JobDescription = string.IsNullOrWhiteSpace(jdText) ? null : jdText
+                });
+            }
+
+            var data = extraction.Value;
+            var response = new AnalyzeJdResponse
+            {
+                IsValidJd = data.IsValidJd,
+                JdFileUrl = storageKey,
+                JdFileName = file.FileName,
+                JdFileFormat = ext.TrimStart('.'),
+                Title = data.Title,
+                Department = data.Department,
+                JobDescription = !string.IsNullOrWhiteSpace(data.JobDescription) ? data.JobDescription : (string.IsNullOrWhiteSpace(jdText) ? null : jdText),
+                JobCategory = data.JobCategory,
+                ExperienceLevel = data.ExperienceLevel,
+                EmploymentType = data.EmploymentType,
+                WorkMode = data.WorkMode,
+                Location = data.Location,
+                Skills = data.Skills ?? new List<string>(),
+                LanguageRequirement = data.LanguageRequirement,
+                SalaryMin = data.SalaryMin,
+                SalaryMax = data.SalaryMax
+            };
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Danh sách ứng viên (Application) của MỘT job. Recruiter chỉ xem được job mình tạo;
+        /// HrAdmin/SuperAdmin xem được mọi job. Phục vụ màn "kiểm soát ứng viên theo job".
+        /// </summary>
+        [HttpGet("{id:guid}/applications")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetJobApplications(Guid id, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(id, ct);
+            if (job == null)
+                return NotFound(new { message = "Không tìm thấy tin tuyển dụng." });
+
+            var isAdmin = _currentUserService.Role == AppRoles.SuperAdmin || _currentUserService.Role == AppRoles.HrAdmin;
+            if (!isAdmin && job.CreatedByUserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Bạn không có quyền xem ứng viên của tin tuyển dụng này." });
+
+            var result = await _applicationService.GetApplicationsByJobAsync(id, ct);
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
+
+            // Resolve storageKey -> URL client dùng được (local: relative, R2: presigned)
+            foreach (var app in result.Value!)
+            {
+                if (!string.IsNullOrEmpty(app.CvFileUrl))
+                    app.CvFileUrl = await _fileStorage.GetUrlAsync(app.CvFileUrl, ct);
+            }
+
+            return Ok(result.Value);
         }
     }
 }

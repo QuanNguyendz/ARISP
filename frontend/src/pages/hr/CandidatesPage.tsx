@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Search, Mail, Eye, Loader2 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, LoadingSpinner, ErrorAlert, NoticeAlert } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, NoticeAlert } from '@components/shared'
+import { HrStatsSkeleton, CandidatesTableSkeleton } from './_skeletons'
 import { applicationService } from '@services/application/applicationService'
 import type { HrApplicationItem } from '@/types/application'
 
@@ -17,24 +18,94 @@ interface StatusMeta {
 function statusMeta(status: string): StatusMeta {
   const s = (status || '').toLowerCase()
   const map: Record<string, StatusMeta> = {
-    invited: { label: 'Đã mời', group: 'pending', badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300' },
-    cv_submitted: { label: 'Đã nộp CV', group: 'pending', badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
-    pending: { label: 'Chờ duyệt', group: 'pending', badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
-    pending_review: { label: 'Chờ duyệt', group: 'pending', badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
-    screening: { label: 'Đang phỏng vấn', group: 'interviewing', badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-    interview: { label: 'Đang phỏng vấn', group: 'interviewing', badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-    interview_code_generated: { label: 'Đã cấp mã', group: 'interviewing', badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400' },
-    interview_code_used: { label: 'Đang phỏng vấn', group: 'interviewing', badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-    practice: { label: 'Phỏng vấn thử', group: 'interviewing', badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400' },
-    pass: { label: 'Đạt', group: 'passed', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
-    approved: { label: 'Đạt', group: 'passed', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
-    completed: { label: 'Hoàn thành', group: 'passed', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
-    not_pass: { label: 'Không đạt', group: 'rejected', badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' },
-    rejected: { label: 'Không đạt', group: 'rejected', badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' },
-    failed: { label: 'Không đạt', group: 'rejected', badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' },
-    withdrawn: { label: 'Đã rút', group: 'rejected', badge: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400' },
+    invited: {
+      label: 'Đã mời',
+      group: 'pending',
+      badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300',
+    },
+    cv_submitted: {
+      label: 'Đã nộp CV',
+      group: 'pending',
+      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+    },
+    pending: {
+      label: 'Chờ duyệt',
+      group: 'pending',
+      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+    },
+    pending_review: {
+      label: 'Chờ duyệt',
+      group: 'pending',
+      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+    },
+    screening: {
+      label: 'Đang phỏng vấn',
+      group: 'interviewing',
+      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    },
+    interview: {
+      label: 'Đang phỏng vấn',
+      group: 'interviewing',
+      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    },
+    interview_code_generated: {
+      label: 'Đã cấp mã',
+      group: 'interviewing',
+      badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
+    },
+    interview_code_used: {
+      label: 'Đang phỏng vấn',
+      group: 'interviewing',
+      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    },
+    practice: {
+      label: 'Phỏng vấn thử',
+      group: 'interviewing',
+      badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
+    },
+    pass: {
+      label: 'Đạt',
+      group: 'passed',
+      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    },
+    approved: {
+      label: 'Đạt',
+      group: 'passed',
+      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    },
+    completed: {
+      label: 'Hoàn thành',
+      group: 'passed',
+      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    },
+    not_pass: {
+      label: 'Không đạt',
+      group: 'rejected',
+      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    },
+    rejected: {
+      label: 'Không đạt',
+      group: 'rejected',
+      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    },
+    failed: {
+      label: 'Không đạt',
+      group: 'rejected',
+      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    },
+    withdrawn: {
+      label: 'Đã rút',
+      group: 'rejected',
+      badge: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400',
+    },
   }
-  return map[s] ?? { label: status || '—', group: 'other', badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300' }
+  return (
+    map[s] ?? {
+      label: status || '—',
+      group: 'other',
+      badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300',
+    }
+  )
 }
 
 const FILTERS: { key: 'all' | Group; label: string }[] = [
@@ -57,7 +128,9 @@ function initials(name: string): string {
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function scoreColor(score: number): string {
@@ -85,7 +158,8 @@ export default function CandidatesPage() {
         const data = await applicationService.getApplications()
         if (active) setApps(data)
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Không tải được danh sách ứng viên.')
+        if (active)
+          setError(err instanceof Error ? err.message : 'Không tải được danh sách ứng viên.')
       } finally {
         if (active) setLoading(false)
       }
@@ -99,8 +173,16 @@ export default function CandidatesPage() {
     const byGroup = (g: Group) => apps.filter((a) => statusMeta(a.status).group === g).length
     return [
       { label: 'Tổng ứng viên', value: apps.length, color: 'text-blue-600 dark:text-blue-400' },
-      { label: 'Chờ duyệt', value: byGroup('pending'), color: 'text-amber-600 dark:text-amber-400' },
-      { label: 'Đang phỏng vấn', value: byGroup('interviewing'), color: 'text-violet-600 dark:text-violet-400' },
+      {
+        label: 'Chờ duyệt',
+        value: byGroup('pending'),
+        color: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        label: 'Đang phỏng vấn',
+        value: byGroup('interviewing'),
+        color: 'text-violet-600 dark:text-violet-400',
+      },
       { label: 'Đạt', value: byGroup('passed'), color: 'text-emerald-600 dark:text-emerald-400' },
     ]
   }, [apps])
@@ -140,6 +222,7 @@ export default function CandidatesPage() {
       {notice && <NoticeAlert message={notice} onDismiss={() => setNotice('')} />}
       {!loading && error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
+      {loading && <HrStatsSkeleton />}
       {!loading && !error && <StatsGrid stats={stats} />}
 
       {/* Search + filter */}
@@ -178,7 +261,7 @@ export default function CandidatesPage() {
         </div>
       )}
 
-      {loading && <LoadingSpinner message="Đang tải danh sách ứng viên..." />}
+      {loading && <CandidatesTableSkeleton rows={6} />}
 
       {!loading && !error && filtered.length === 0 && (
         <EmptyState
@@ -199,11 +282,16 @@ export default function CandidatesPage() {
               <thead>
                 <tr className="border-b border-ink-200 dark:border-white/10">
                   {['Ứng viên', 'Vị trí', 'Trạng thái', 'Match', 'Ngày ứng tuyển'].map((h) => (
-                    <th key={h} className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">
+                    <th
+                      key={h}
+                      className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400"
+                    >
                       {h}
                     </th>
                   ))}
-                  <th className="text-right py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">Thao tác</th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">
+                    Thao tác
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -227,24 +315,34 @@ export default function CandidatesPage() {
                             <p className="font-medium text-ink-900 dark:text-white truncate">
                               {app.candidateName || 'Ẩn danh'}
                             </p>
-                            <p className="text-sm text-ink-600 dark:text-ink-400 truncate">{app.candidateEmail}</p>
+                            <p className="text-sm text-ink-600 dark:text-ink-400 truncate">
+                              {app.candidateEmail}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-ink-700 dark:text-ink-200">{app.jobTitle || '—'}</td>
+                      <td className="py-4 px-4 text-ink-700 dark:text-ink-200">
+                        {app.jobTitle || '—'}
+                      </td>
                       <td className="py-4 px-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${meta.badge}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${meta.badge}`}
+                        >
                           {meta.label}
                         </span>
                       </td>
                       <td className="py-4 px-4">
                         {typeof app.matchScore === 'number' ? (
-                          <span className={`font-semibold ${scoreColor(app.matchScore)}`}>{app.matchScore}</span>
+                          <span className={`font-semibold ${scoreColor(app.matchScore)}`}>
+                            {app.matchScore}
+                          </span>
                         ) : (
                           <span className="text-ink-400">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-4 text-ink-600 dark:text-ink-400">{formatDate(app.createdAt)}</td>
+                      <td className="py-4 px-4 text-ink-600 dark:text-ink-400">
+                        {formatDate(app.createdAt)}
+                      </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-end gap-2">
                           <button

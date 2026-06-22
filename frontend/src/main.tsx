@@ -17,6 +17,14 @@ import '@fontsource/plus-jakarta-sans/800.css';
 
 import './index.css';
 
+// Shim `process` cho thư viện đọc `process.env.NODE_ENV` ở runtime
+// (react-grid-layout/react-draggable) — tránh `ReferenceError: process is not defined`.
+if (typeof (globalThis as unknown as { process?: unknown }).process === 'undefined') {
+  ;(globalThis as unknown as { process: { env: Record<string, string> } }).process = {
+    env: { NODE_ENV: import.meta.env.MODE },
+  };
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -11,16 +11,19 @@ import {
   DollarSign,
   Loader2,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, LoadingSpinner, ErrorAlert } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@services/job/jobService'
 import type { JobPosting } from '@/types/job'
 
 function formatSalary(job: JobPosting): string {
   if (job.salaryIsNegotiable && !job.salaryMin && !job.salaryMax) return 'Thỏa thuận'
   const cur = job.salaryCurrency || 'USD'
-  const fmt = (n: number) => (cur === 'VND' ? `${(n / 1_000_000).toLocaleString('vi-VN')}tr` : `${n.toLocaleString('en-US')}`)
+  const fmt = (n: number) =>
+    cur === 'VND' ? `${(n / 1_000_000).toLocaleString('vi-VN')}tr` : `${n.toLocaleString('en-US')}`
   const sign = cur === 'VND' ? '' : '$'
-  if (job.salaryMin && job.salaryMax) return `${sign}${fmt(job.salaryMin)} - ${sign}${fmt(job.salaryMax)}`
+  if (job.salaryMin && job.salaryMax)
+    return `${sign}${fmt(job.salaryMin)} - ${sign}${fmt(job.salaryMax)}`
   if (job.salaryMin) return `Từ ${sign}${fmt(job.salaryMin)}`
   if (job.salaryMax) return `Đến ${sign}${fmt(job.salaryMax)}`
   return 'Chưa rõ'
@@ -78,7 +81,11 @@ export default function PendingJobsPage() {
 
   const stats = useMemo(
     () => [
-      { label: 'Chờ duyệt', value: pendingJobs.length, color: 'text-amber-600 dark:text-amber-400' },
+      {
+        label: 'Chờ duyệt',
+        value: pendingJobs.length,
+        color: 'text-amber-600 dark:text-amber-400',
+      },
       {
         label: 'Đang tuyển',
         value: jobs.filter((j) => j.status === 'active').length,
@@ -141,10 +148,10 @@ export default function PendingJobsPage() {
 
       {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
 
-      <StatsGrid stats={stats} />
+      {loading ? <HrStatsSkeleton /> : <StatsGrid stats={stats} />}
 
       {loading ? (
-        <LoadingSpinner message="Đang tải tin chờ duyệt..." />
+        <JobListSkeleton rows={4} />
       ) : pendingJobs.length === 0 ? (
         <EmptyState
           icon={<CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />}
@@ -207,7 +214,11 @@ export default function PendingJobsPage() {
                       onClick={() => approve(job)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-50 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
                     >
-                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                      {busy ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
                       Duyệt
                     </button>
                     <button
@@ -238,9 +249,12 @@ export default function PendingJobsPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover"
           >
-            <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">Từ chối tin tuyển dụng</h3>
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">
+              Từ chối tin tuyển dụng
+            </h3>
             <p className="text-sm text-ink-500 dark:text-ink-400 mb-4">
-              Nhập lý do từ chối tin "{rejectTarget.title}". Recruiter sẽ thấy lý do này để chỉnh sửa.
+              Nhập lý do từ chối tin "{rejectTarget.title}". Recruiter sẽ thấy lý do này để chỉnh
+              sửa.
             </p>
             <textarea
               value={rejectReason}

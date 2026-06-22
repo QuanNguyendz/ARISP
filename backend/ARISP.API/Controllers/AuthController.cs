@@ -177,8 +177,18 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "External provider did not return an email." });
             }
 
-            var allowed = _configuration["Authentication:AllowedDomains"] ?? _configuration["Auth:AllowedDomains"] ?? string.Empty;
-            var allowedDomains = allowed.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
+            // Ưu tiên danh sách miền do Super Admin cấu hình qua UI (bảng system_settings),
+            // fallback sang appsettings/env nếu DB chưa được set.
+            var dbDomainSetting = (await _unitOfWork.Repository<SystemSetting>()
+                .FindAsync(s => s.Key == "allowed_email_domains")).FirstOrDefault();
+            var allowed = !string.IsNullOrWhiteSpace(dbDomainSetting?.Value)
+                ? dbDomainSetting!.Value
+                : (_configuration["Authentication:AllowedDomains"] ?? _configuration["Auth:AllowedDomains"] ?? string.Empty);
+            var allowedDomains = allowed
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().TrimStart('@').ToLower())
+                .Where(s => s.Length > 0)
+                .ToList();
             var emailDomain = email.Split('@').ElementAtOrDefault(1)?.ToLower() ?? string.Empty;
 
             var isDomainAllowed = !allowedDomains.Any() || allowedDomains.Contains(emailDomain);

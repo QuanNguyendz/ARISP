@@ -7,7 +7,6 @@ using ARISP.API.Middleware;
 using ARISP.Application.Interfaces;
 using ARISP.Application.Services;
 using ARISP.Domain.Constants;
-using ARISP.Domain.Entities;
 using ARISP.Infrastructure.Data;
 using ARISP.Infrastructure.Repositories;
 using ARISP.Infrastructure.Services;
@@ -80,9 +79,28 @@ var connectionString =
         "ConnectionStrings:DefaultConnection chưa được cấu hình.\n" +
         "Chạy: dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"<connection-string>\"");
 
+// Bật connection pooling + giữ pool ấm: kết nối tới Supabase ở xa nên mỗi lần mở mới
+// phải TLS + auth (~1–1.5s). Pooling cho tái dùng connection → nhanh hơn nhiều và tránh
+// timeout auth lúc cao điểm. Override các tham số pool nhưng giữ nguyên host/credential.
+var csb = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+{
+    Pooling = true,
+    MinPoolSize = 2,            // giữ sẵn vài connection ấm
+    MaxPoolSize = 20,
+    ConnectionIdleLifetime = 300,
+    KeepAlive = 30,            // ping giữ connection sống qua idle timeout của Supabase/NAT
+    Timeout = 30,             // timeout mở connection (giây)
+    CommandTimeout = 60,      // timeout thực thi lệnh (giây)
+};
+connectionString = csb.ConnectionString;
+
 builder.Services.AddDbContext<ARISPDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
-        npgsql.MigrationsHistoryTable("ef_migrations_history")));
+    {
+        npgsql.MigrationsHistoryTable("ef_migrations_history");
+        // Tự thử lại khi gặp lỗi mạng/thoáng qua (vd timeout auth tới Supabase).
+        npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
+    }));
 
 // DI configurations
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -138,6 +156,7 @@ builder.Services.AddScoped<ITTSService, MockTTSService>();
 builder.Services.AddScoped<IAvatarService, MockAvatarService>();
 builder.Services.AddScoped<INotificationService, MockNotificationService>();
 builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
+builder.Services.AddScoped<IJdStampService, ARISP.Infrastructure.Documents.JdStampService>();
 
 builder.Services.AddTransient<IEmailService, EmailService>();
 
@@ -336,394 +355,99 @@ app.MapControllers();
 app.MapHub<SessionHub>("/hubs/session");
 app.MapHub<WebRTCSignalingHub>("/hubs/webrtc");
 
-// Auto database migration & Seed Data execution
+// Auto database migration on startup — thử lại vài lần vì kết nối Supabase đôi khi
+// chậm/timeout auth lúc khởi động (lỗi thoáng qua, không phải sai migration).
+for (var attempt = 1; attempt <= 3; attempt++)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ARISPDbContext>();
+        Console.WriteLine($"Applying EF Core migrations (attempt {attempt}/3)...");
+        await dbContext.Database.MigrateAsync();
+        Console.WriteLine("Migrations applied.");
+        break;
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Failed to apply migrations (attempt {Attempt}/3).", attempt);
+        if (attempt < 3)
+            await Task.Delay(TimeSpan.FromSeconds(3));
+    }
+}
+
+// Đảm bảo index cho các cột lọc nóng (idempotent, CREATE INDEX IF NOT EXISTS). InitialCreate
+// gần như không tạo index FK → mọi truy vấn theo candidate/application bị seq scan (gây timeout).
+// Biến seq scan → index seek. Mỗi câu chạy riêng để 1 lỗi không chặn các index còn lại.
 try
 {
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ARISPDbContext>();
-    Console.WriteLine("Applying EF Core migrations...");
-    await dbContext.Database.MigrateAsync();
-    Console.WriteLine("Migrations applied. Running seed...");
-    await SeedDataAsync(dbContext);
+    using var idxScope = app.Services.CreateScope();
+    var db = idxScope.ServiceProvider.GetRequiredService<ARISPDbContext>();
+    var indexStatements = new[]
+    {
+        "CREATE INDEX IF NOT EXISTS ix_applications_candidate_account_id ON applications (candidate_account_id)",
+        "CREATE INDEX IF NOT EXISTS ix_applications_candidate_email ON applications (candidate_email)",
+        "CREATE INDEX IF NOT EXISTS ix_applications_job_posting_id ON applications (job_posting_id)",
+        "CREATE INDEX IF NOT EXISTS ix_applications_cv_jd_analysis_id ON applications (cv_jd_analysis_id)",
+        "CREATE INDEX IF NOT EXISTS ix_notifications_candidate_account_id ON notifications (candidate_account_id)",
+        "CREATE INDEX IF NOT EXISTS ix_saved_jobs_candidate_account_id ON saved_jobs (candidate_account_id)",
+        "CREATE INDEX IF NOT EXISTS ix_interview_sessions_application_id ON interview_sessions (application_id)",
+        "CREATE INDEX IF NOT EXISTS ix_evaluations_session_id ON evaluations (session_id)",
+        "CREATE INDEX IF NOT EXISTS ix_evaluations_application_id ON evaluations (application_id)",
+        "CREATE INDEX IF NOT EXISTS ix_hr_reviews_evaluation_id ON hr_reviews (evaluation_id)",
+        "CREATE INDEX IF NOT EXISTS ix_interview_codes_application_id ON interview_codes (application_id)",
+        "CREATE INDEX IF NOT EXISTS ix_interview_bookings_application_id ON interview_bookings (application_id)",
+        "CREATE INDEX IF NOT EXISTS ix_job_postings_created_by_user_id ON job_postings (created_by_user_id)",
+    };
+    foreach (var stmt in indexStatements)
+    {
+        try { await db.Database.ExecuteSqlRawAsync(stmt); }
+        catch (Exception exIdx) { Log.Warning(exIdx, "Could not create index: {Stmt}", stmt); }
+    }
+    Console.WriteLine("Performance indexes ensured.");
+
+    // Cột phê duyệt HR Leader + file JD đã đóng dấu (idempotent ADD COLUMN IF NOT EXISTS).
+    var columnStatements = new[]
+    {
+        "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS approved_by_user_id uuid",
+        "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS approved_at timestamptz",
+        "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS approver_name text",
+        "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS signed_jd_file_url text",
+    };
+    foreach (var stmt in columnStatements)
+    {
+        try { await db.Database.ExecuteSqlRawAsync(stmt); }
+        catch (Exception exCol) { Log.Warning(exCol, "Could not add column: {Stmt}", stmt); }
+    }
+    Console.WriteLine("Job approval columns ensured.");
+
+    // Bảng lời mời phỏng vấn theo vòng (InterviewInvite) — idempotent CREATE TABLE IF NOT EXISTS.
+    var tableStatements = new[]
+    {
+        @"CREATE TABLE IF NOT EXISTS interview_invites (
+            id uuid PRIMARY KEY,
+            application_id uuid NOT NULL,
+            round_number integer NOT NULL DEFAULT 1,
+            token_hash text NOT NULL,
+            expires_at timestamptz NOT NULL,
+            scheduled_at timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        )",
+        "CREATE INDEX IF NOT EXISTS ix_interview_invites_application_id ON interview_invites (application_id)",
+        "CREATE INDEX IF NOT EXISTS ix_interview_invites_token_hash ON interview_invites (token_hash)",
+        // Chống đặt trùng: tối đa 1 booking 'scheduled' / (hồ sơ, vòng).
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_interview_bookings_app_round_scheduled ON interview_bookings (application_id, round_number) WHERE status = 'scheduled'",
+    };
+    foreach (var stmt in tableStatements)
+    {
+        try { await db.Database.ExecuteSqlRawAsync(stmt); }
+        catch (Exception exTbl) { Log.Warning(exTbl, "Could not ensure table/index: {Stmt}", stmt); }
+    }
+    Console.WriteLine("Interview invite table ensured.");
 }
 catch (Exception ex)
 {
-    Log.Error(ex, "Failed to apply migrations or seed data.");
+    Log.Warning(ex, "Could not ensure performance indexes / approval columns.");
 }
 
 app.Run();
-
-async Task SeedDataAsync(ARISPDbContext db)
-{
-    Console.WriteLine("Seeding ARISP prototype databases...");
-
-    var userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-    var jobId = Guid.Parse("33333333-3333-3333-3333-333333333333");
-    var candidateId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-    var appId = Guid.Parse("55555555-5555-5555-5555-555555555555");
-
-    // 1. Super Admin User
-    var superAdminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    var superAdmin = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == superAdminId);
-    if (superAdmin == null)
-    {
-        superAdmin = new User
-        {
-            Id = superAdminId,
-            Email = "superadmin@arisp.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
-            Role = AppRoles.SuperAdmin,
-            FullName = "Alex Super Admin",
-            Department = "Administration",
-            IsActive = true
-        };
-        await db.Users.AddAsync(superAdmin);
-        await db.SaveChangesAsync();
-    }
-
-    // 1.2. HR Admin User
-    var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId);
-    if (user == null)
-    {
-        user = new User
-        {
-            Id = userId,
-            Email = "hr@arisp.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
-            Role = AppRoles.HrAdmin,
-            FullName = "Alex HR Admin",
-            Department = "IT Recruitment",
-            IsActive = true
-        };
-        await db.Users.AddAsync(user);
-        await db.SaveChangesAsync();
-    }
-
-    // 1.3. Recruiter User
-    var recruiterId = Guid.Parse("da211fba-70ef-4ab4-8fb9-5287f3ca6960");
-    var recruiter = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == recruiterId);
-    if (recruiter == null)
-    {
-        recruiter = new User
-        {
-            Id = recruiterId,
-            Email = "recruiter@arisp.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
-            Role = AppRoles.Recruiter,
-            FullName = "Emily Recruiter",
-            Department = "IT Recruitment",
-            IsActive = true
-        };
-        await db.Users.AddAsync(recruiter);
-        await db.SaveChangesAsync();
-    }
-
-    // 2. Job Posting
-    var job = await db.JobPostings.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId);
-    if (job == null)
-    {
-        job = new JobPosting { Id = jobId };
-        await db.JobPostings.AddAsync(job);
-    }
-
-    job.CreatedByUserId = userId;
-    job.Title = "Senior Backend Engineer (.NET & AI)";
-    job.Department = "IT Engineering";
-    job.JobDescription = "We are looking for a Senior .NET Backend Engineer to build AI-driven recruiting services. Requires 5+ years of C# ASP.NET Core experience, Postgres database optimizations, and integrating with OpenAI APIs. English speaking capability is a plus.";
-    job.InterviewMode = "both";
-    job.Status = "active";
-    job.IsPublicListing = true;
-    job.DetectedLanguage = "en";
-    job.LanguageRequirement = "TOEIC > 700 hoặc IELTS > 6.5";
-    job.LanguageConfirmed = true;
-    job.Location = "Ho Chi Minh City";
-    job.WorkMode = "hybrid";
-    job.SalaryMin = 2000;
-    job.SalaryMax = 3500;
-    job.SalaryCurrency = "USD";
-    job.SalaryIsNegotiable = false;
-    job.EmploymentType = "full_time";
-    job.ExperienceLevel = "senior";
-    job.Skills = new System.Collections.Generic.List<string> { "C#", ".NET Core", "PostgreSQL", "OpenAI" };
-    job.JobCategory = "Backend";
-    job.ApplicationDeadline = DateTimeOffset.UtcNow.AddDays(30);
-    job.IsUrgent = true;
-    job.ScoringRubric = "[{\"criterion\":\"C# Knowledge\",\"weight\":40},{\"criterion\":\"System Design\",\"weight\":30},{\"criterion\":\"Communication\",\"weight\":30}]";
-
-    await db.SaveChangesAsync();
-
-    // Round Config
-    var config = await db.InterviewRoundConfigs.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.JobPostingId == jobId && r.RoundNumber == 1);
-    if (config == null)
-    {
-        config = new InterviewRoundConfig
-        {
-            JobPostingId = jobId,
-            RoundNumber = 1
-        };
-        await db.InterviewRoundConfigs.AddAsync(config);
-    }
-    config.RoundType = "screening";
-    config.MaxDurationMinutes = 30;
-    await db.SaveChangesAsync();
-
-    // 3. Candidate Account
-    var candidate = await db.CandidateAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == candidateId);
-    if (candidate == null)
-    {
-        candidate = new CandidateAccount
-        {
-            Id = candidateId,
-            Email = "candidate@example.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
-            FullName = "John Doe Candidate",
-            Phone = "0987654321",
-            Headline = "C# .NET Backend Developer | AI Enthusiast",
-            EmailVerified = true
-        };
-        await db.CandidateAccounts.AddAsync(candidate);
-        await db.SaveChangesAsync();
-    }
-    else if (!candidate.EmailVerified)
-    {
-        // Đảm bảo seed candidate đã có sẵn trong DB không bị khóa login sau khi bật email verification
-        candidate.EmailVerified = true;
-        await db.SaveChangesAsync();
-    }
-
-    // 4. Application
-    var appRecord = await db.Applications.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == appId);
-    if (appRecord == null)
-    {
-        appRecord = new Application
-        {
-            Id = appId,
-            JobPostingId = jobId,
-            CandidateAccountId = candidateId,
-            CandidateEmail = "candidate@example.com",
-            CandidateName = "John Doe Candidate",
-            CandidatePhone = "0987654321",
-            Source = "job_board",
-            Status = "cv_submitted",
-            CvText = "John Doe is a C# .NET Backend developer with 4 years experience optimizing SQL queries and developing scalable Web APIs."
-        };
-        await db.Applications.AddAsync(appRecord);
-        await db.SaveChangesAsync();
-    }
-
-    // 5. Seed InterviewSessions & Evaluations
-    var session1Id = Guid.Parse("66666666-6666-6666-6666-666666666666");
-    var session1 = await db.InterviewSessions.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == session1Id);
-    if (session1 == null)
-    {
-        session1 = new InterviewSession
-        {
-            Id = session1Id,
-            ApplicationId = appId,
-            RoundNumber = 1,
-            RoundType = "screening",
-            SessionType = "real",
-            InterviewLanguage = "en",
-            Status = "completed",
-            StartedAt = DateTimeOffset.UtcNow.AddDays(-2),
-            EndedAt = DateTimeOffset.UtcNow.AddDays(-2).AddMinutes(30),
-            DurationSeconds = 1800
-        };
-        await db.InterviewSessions.AddAsync(session1);
-        await db.SaveChangesAsync();
-    }
-
-    var eval1Id = Guid.Parse("77777777-7777-7777-7777-777777777777");
-    var eval1 = await db.Evaluations.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == eval1Id);
-    if (eval1 == null)
-    {
-        eval1 = new Evaluation
-        {
-            Id = eval1Id,
-            SessionId = session1Id,
-            ApplicationId = appId,
-            RoundNumber = 1,
-            SessionType = "real",
-            AiVerdict = "pass",
-            OverallScore = 85.0m,
-            CriterionScores = "{\"technical\":88.0,\"communication\":80.0,\"culture_fit\":85.0}",
-            Reasoning = "Candidate shows strong backend fundamentals in .NET Core, good understanding of query performance tuning, and clear communication.",
-            RecommendedNextStep = "Mời ứng viên tham gia vòng phỏng vấn chuyên sâu Technical Deep-dive.",
-            QuestionAnalyses = "[{\"Question\":\"Tại sao bạn chọn .NET?\",\"Answer\":\"Vì nó mạnh mẽ và bảo mật tốt.\",\"Score\":90.0,\"Analysis\":\"Trả lời tự tin, đúng trọng tâm.\",\"Feedback\":\"Tốt\"},{\"Question\":\"Bạn tối ưu câu lệnh SQL như thế nào?\",\"Answer\":\"Sử dụng Index và phân tích Execution Plan.\",\"Score\":80.0,\"Analysis\":\"Đưa ra phương pháp thực tế tốt.\",\"Feedback\":null}]",
-            CheatScore = 5.0m,
-            CheatSignals = "[{\"type\":\"tab_switch\",\"severity\":\"low\",\"description\":\"Ứng viên chuyển tab 1 lần\",\"timestamp\":\"2026-06-04T14:15:00Z\"}]",
-            LanguageAssessment = "{\"fluency\":8.0,\"grammar\":7.5,\"vocabulary\":8.0,\"comprehension\":8.5,\"overall_score\":8.0}",
-            CreatedAt = DateTimeOffset.UtcNow.AddDays(-2),
-            UpdatedAt = DateTimeOffset.UtcNow.AddDays(-2)
-        };
-        await db.Evaluations.AddAsync(eval1);
-        await db.SaveChangesAsync();
-    }
-
-    var review1Id = Guid.Parse("88888888-8888-8888-8888-888888888888");
-    var review1 = await db.HrReviews.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == review1Id);
-    if (review1 == null)
-    {
-        review1 = new HrReview
-        {
-            Id = review1Id,
-            EvaluationId = eval1Id,
-            ReviewedByUserId = userId,
-            FinalVerdict = "pass",
-            IsOverride = false,
-            OverrideReason = null,
-            ShareRecording = true,
-            ShareTranscript = true,
-            ShareEvaluation = true,
-            ShareFeedback = true,
-            CandidateFeedback = "Chúng tôi đánh giá cao kinh nghiệm thực chiến của bạn. Hẹn gặp bạn ở vòng sau.",
-            CreatedAt = DateTimeOffset.UtcNow.AddDays(-1),
-            UpdatedAt = DateTimeOffset.UtcNow.AddDays(-1)
-        };
-        await db.HrReviews.AddAsync(review1);
-        await db.SaveChangesAsync();
-    }
-
-    // Evaluation 2 (Pending review)
-    var session2Id = Guid.Parse("99999999-9999-9999-9999-999999999999");
-    var session2 = await db.InterviewSessions.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == session2Id);
-    if (session2 == null)
-    {
-        session2 = new InterviewSession
-        {
-            Id = session2Id,
-            ApplicationId = appId,
-            RoundNumber = 2,
-            RoundType = "technical",
-            SessionType = "real",
-            InterviewLanguage = "en",
-            Status = "completed",
-            StartedAt = DateTimeOffset.UtcNow.AddHours(-5),
-            EndedAt = DateTimeOffset.UtcNow.AddHours(-5).AddMinutes(45),
-            DurationSeconds = 2700
-        };
-        await db.InterviewSessions.AddAsync(session2);
-        await db.SaveChangesAsync();
-    }
-
-    var eval2Id = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    var eval2 = await db.Evaluations.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == eval2Id);
-    if (eval2 == null)
-    {
-        eval2 = new Evaluation
-        {
-            Id = eval2Id,
-            SessionId = session2Id,
-            ApplicationId = appId,
-            RoundNumber = 2,
-            SessionType = "real",
-            AiVerdict = "not_pass",
-            OverallScore = 55.0m,
-            CriterionScores = "{\"technical\":50.0,\"communication\":60.0,\"culture_fit\":55.0}",
-            Reasoning = "Candidate struggled with advanced microservices architectural questions and system design scenarios.",
-            RecommendedNextStep = "Từ chối ứng viên hoặc cân nhắc cho vị trí Junior.",
-            QuestionAnalyses = "[{\"Question\":\"Hãy giải thích mô hình microservices?\",\"Answer\":\"Tôi chưa có nhiều kinh nghiệm phần này.\",\"Score\":40.0,\"Analysis\":\"Thiếu kiến thức nền tảng về Microservices.\",\"Feedback\":\"Cần học thêm\"}]",
-            CheatScore = 0.0m,
-            CheatSignals = "[]",
-            LanguageAssessment = "{\"fluency\":6.0,\"grammar\":5.5,\"vocabulary\":6.0,\"comprehension\":6.5,\"overall_score\":6.0}",
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-4),
-            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-4)
-        };
-        await db.Evaluations.AddAsync(eval2);
-        await db.SaveChangesAsync();
-    }
-
-    // 6. Phong VG Candidate
-    var phongCandidateId = Guid.Parse("44444444-4444-4444-4444-555555555555");
-    var phongCandidate = await db.CandidateAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == phongCandidateId);
-    if (phongCandidate == null)
-    {
-        phongCandidate = new CandidateAccount
-        {
-            Id = phongCandidateId,
-            Email = "phongvg04@gmail.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
-            FullName = "Phong VG Candidate",
-            Phone = "0999999999",
-            Headline = "AI & .NET Backend Candidate",
-            EmailVerified = true
-        };
-        await db.CandidateAccounts.AddAsync(phongCandidate);
-        await db.SaveChangesAsync();
-    }
-    else if (!phongCandidate.EmailVerified)
-    {
-        phongCandidate.EmailVerified = true;
-        await db.SaveChangesAsync();
-    }
-
-    var phongAppId = Guid.Parse("55555555-5555-5555-5555-666666666666");
-    var phongApp = await db.Applications.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == phongAppId);
-    if (phongApp == null)
-    {
-        phongApp = new Application
-        {
-            Id = phongAppId,
-            JobPostingId = jobId,
-            CandidateAccountId = phongCandidateId,
-            CandidateEmail = "phongvg04@gmail.com",
-            CandidateName = "Phong VG Candidate",
-            CandidatePhone = "0999999999",
-            Source = "job_board",
-            Status = "cv_submitted",
-            CvText = "Phong VG is a backend developer interested in testing email notifications."
-        };
-        await db.Applications.AddAsync(phongApp);
-        await db.SaveChangesAsync();
-    }
-
-    var phongSessionId = Guid.Parse("99999999-9999-9999-9999-777777777777");
-    var phongSession = await db.InterviewSessions.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == phongSessionId);
-    if (phongSession == null)
-    {
-        phongSession = new InterviewSession
-        {
-            Id = phongSessionId,
-            ApplicationId = phongAppId,
-            RoundNumber = 1,
-            RoundType = "screening",
-            SessionType = "real",
-            InterviewLanguage = "vi",
-            Status = "completed",
-            StartedAt = DateTimeOffset.UtcNow.AddHours(-1),
-            EndedAt = DateTimeOffset.UtcNow.AddHours(-1).AddMinutes(30),
-            DurationSeconds = 1800
-        };
-        await db.InterviewSessions.AddAsync(phongSession);
-        await db.SaveChangesAsync();
-    }
-
-    var phongEvalId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-    var phongEval = await db.Evaluations.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == phongEvalId);
-    if (phongEval == null)
-    {
-        phongEval = new Evaluation
-        {
-            Id = phongEvalId,
-            SessionId = phongSessionId,
-            ApplicationId = phongAppId,
-            RoundNumber = 1,
-            SessionType = "real",
-            AiVerdict = "pass",
-            OverallScore = 89.0m,
-            CriterionScores = "{\"technical\":90.0,\"communication\":85.0,\"culture_fit\":92.0}",
-            Reasoning = "Phong VG shows excellent problem solving skills, great motivation, and is ready for technical round.",
-            RecommendedNextStep = "Mời ứng viên tham gia vòng phỏng vấn chuyên sâu Technical.",
-            QuestionAnalyses = "[]",
-            CheatScore = 0.0m,
-            CheatSignals = "[]",
-            LanguageAssessment = "{\"overall_score\":8.5}",
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
-            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1)
-        };
-        await db.Evaluations.AddAsync(phongEval);
-        await db.SaveChangesAsync();
-    }
-
-    Console.WriteLine("Database seeding completed successfully!");
-}

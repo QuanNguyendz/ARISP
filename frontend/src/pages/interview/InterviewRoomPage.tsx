@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Mic,
@@ -10,7 +10,6 @@ import {
   Wifi,
   Bot,
   MessageSquare,
-  ChevronRight,
 } from 'lucide-react'
 
 // Mock data for demo
@@ -53,14 +52,13 @@ function SpeakingIndicator() {
 }
 
 export default function InterviewRoomPage() {
-  const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const [isMuted, setIsMuted] = useState(false)
   const [isCaptionsOn, setIsCaptionsOn] = useState(true)
   const [isRecording] = useState(true)
   const [recordingTime, setRecordingTime] = useState('12:48')
-  const [currentQuestion, setCurrentQuestion] = useState(2)
-  const [conversation, setConversation] = useState(mockConversation)
+  const [currentQuestion] = useState(2)
+  const [conversation] = useState(mockConversation)
   const [isAiSpeaking, setIsAiSpeaking] = useState(false)
   const [isInterviewEnded, setIsInterviewEnded] = useState(false)
 
@@ -88,17 +86,6 @@ export default function InterviewRoomPage() {
 
   const handleEndInterview = () => {
     setIsInterviewEnded(true)
-  }
-
-  const handleNextQuestion = () => {
-    if (currentQuestion < mockQuestions.length) {
-      setIsAiSpeaking(true)
-      setTimeout(() => {
-        setConversation((prev) => [...prev, { type: 'ai', text: mockQuestions[currentQuestion] }])
-        setIsAiSpeaking(false)
-        setCurrentQuestion((prev) => prev + 1)
-      }, 2000)
-    }
   }
 
   if (isInterviewEnded) {

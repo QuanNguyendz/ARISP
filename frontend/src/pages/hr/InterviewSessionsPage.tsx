@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Search, Eye, Video, Clock, MonitorPlay } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, LoadingSpinner, ErrorAlert } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { HrStatsSkeleton, SessionListSkeleton } from './_skeletons'
 import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
 
 type StatusGroup = 'all' | 'active' | 'completed' | 'pending' | 'aborted'
@@ -135,8 +136,7 @@ export default function InterviewSessionsPage() {
       }
       if (!q) return true
       return (
-        s.candidateName.toLowerCase().includes(q) ||
-        (s.jobTitle ?? '').toLowerCase().includes(q)
+        s.candidateName.toLowerCase().includes(q) || (s.jobTitle ?? '').toLowerCase().includes(q)
       )
     })
   }, [sessions, search, tab])
@@ -150,7 +150,7 @@ export default function InterviewSessionsPage() {
 
       {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
 
-      <StatsGrid stats={stats} />
+      {loading ? <HrStatsSkeleton /> : <StatsGrid stats={stats} />}
 
       {/* Bộ lọc */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
@@ -181,7 +181,7 @@ export default function InterviewSessionsPage() {
       </div>
 
       {loading ? (
-        <LoadingSpinner message="Đang tải phiên phỏng vấn..." />
+        <SessionListSkeleton rows={4} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<MonitorPlay className="w-7 h-7 text-ink-400" />}

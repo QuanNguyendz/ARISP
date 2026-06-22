@@ -51,9 +51,11 @@ namespace ARISP.Application.Services
                 .FindAsync(j => jobIds.Contains(j.Id), ct))
                 .ToDictionary(j => j.Id, j => j.Title);
 
-            // Đánh giá mới nhất theo từng phiên (theo round trùng khớp)
-            var evaluations = (await _unitOfWork.Repository<Evaluation>()
-                .FindAsync(e => appIds.Contains(e.ApplicationId), ct)).ToList();
+            // Đánh giá mới nhất theo từng phiên — chỉ lấy cột nhẹ (bỏ JSON criterion/question/...).
+            var evaluations = await _unitOfWork.Repository<Evaluation>()
+                .QueryAsync(q => q
+                    .Where(e => appIds.Contains(e.ApplicationId))
+                    .Select(e => new { e.Id, e.ApplicationId, e.RoundNumber, e.AiVerdict, e.CreatedAt }), ct);
             var evalByAppRound = evaluations
                 .GroupBy(e => (e.ApplicationId, e.RoundNumber))
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).First());
@@ -93,12 +95,17 @@ namespace ARISP.Application.Services
             if (application == null)
                 return Result.Failure<StartSessionResponse>("Application not found.");
 
-            // Check practice session limit (1 session per application)
+            // Giới hạn phỏng vấn thử: 1 lượt / VÒNG (không phải 1 lượt / hồ sơ).
             if (request.SessionType == "practice")
             {
-                if (application.PracticeSessionUsed)
-                    return Result.Failure<StartSessionResponse>("Practice interview already used for this application.");
-                
+                var existingPractice = await _unitOfWork.Repository<InterviewSession>().FindAsync(
+                    s => s.ApplicationId == application.Id
+                         && s.SessionType == "practice"
+                         && s.RoundNumber == request.RoundNumber, ct);
+                if (existingPractice.Any())
+                    return Result.Failure<StartSessionResponse>("Bạn đã dùng lượt phỏng vấn thử cho vòng này.");
+
+                // Giữ cờ tổng để tương thích ngược (không còn dùng làm điều kiện chặn).
                 application.PracticeSessionUsed = true;
                 _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
             }
@@ -456,7 +463,7 @@ namespace ARISP.Application.Services
             await _unitOfWork.SaveChangesAsync(ct);
         }
 
-        public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, CancellationToken ct = default)
+        public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)
         {
             var evaluation = await _unitOfWork.Repository<Evaluation>().GetByIdAsync(request.EvaluationId, ct);
             if (evaluation == null)
@@ -512,7 +519,7 @@ namespace ARISP.Application.Services
                 // Auto-Progression Logic to Round N+1 (ADR-017 / ADR-014)
                 if (request.FinalVerdict == "pass" && evaluation.SessionType == "real")
                 {
-                    hasProgressed = await TriggerAutoProgressionAsync(application, evaluation.RoundNumber, ct);
+                    hasProgressed = await TriggerAutoProgressionAsync(application, evaluation.RoundNumber, frontendBaseUrl, ct);
                 }
 
                 // Auto-send email to Candidate if not progressed
@@ -584,20 +591,41 @@ namespace ARISP.Application.Services
             return Result.Success(true);
         }
 
-        private async Task<bool> TriggerAutoProgressionAsync(ARISP.Domain.Entities.Application application, int currentRoundNumber, CancellationToken ct = default)
+        private async Task<bool> TriggerAutoProgressionAsync(ARISP.Domain.Entities.Application application, int currentRoundNumber, string? frontendBaseUrl = null, CancellationToken ct = default)
         {
             var nextRoundNumber = currentRoundNumber + 1;
-            
+
             // Check if there is configured round configs for N+1
             var nextRoundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
                 .FindAsync(r => r.JobPostingId == application.JobPostingId && r.RoundNumber == nextRoundNumber, ct);
-            
+
             if (nextRoundConfigs.Any())
             {
                 var nextRound = nextRoundConfigs.First();
-                // Set status back to the next round type (e.g. "technical") or default "interview"
-                application.Status = !string.IsNullOrEmpty(nextRound.RoundType) ? nextRound.RoundType.ToLower() : "interview";
+                // Status = interview (đang trong giai đoạn phỏng vấn vòng kế); chi tiết vòng suy ra từ record.
+                application.Status = "interview";
                 _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+
+                // Tạo lời mời CHỌN LỊCH cho vòng kế (mỗi vòng cần duyệt → chỉ tạo sau khi confirm Pass).
+                var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+                var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
+                var baseUrl = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
+                var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+
+                var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
+                    .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
+                foreach (var old in oldInvites)
+                    _unitOfWork.Repository<InterviewInvite>().Delete(old);
+
+                await _unitOfWork.Repository<InterviewInvite>().AddAsync(new InterviewInvite
+                {
+                    ApplicationId = application.Id,
+                    RoundNumber = nextRoundNumber,
+                    TokenHash = ApplicationService.HashInviteToken(rawToken),
+                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
+                }, ct);
+
+                var scheduleLink = $"{baseUrl}/portal/schedule/{application.Id}?token={rawToken}&round={nextRoundNumber}";
 
                 var emailBody = $$"""
                     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
@@ -609,9 +637,9 @@ namespace ARISP.Application.Services
                             <p>Chúc mừng Anh/Chị đã hoàn thành xuất sắc vòng phỏng vấn số <strong>{{currentRoundNumber}}</strong>.</p>
                             <p>Đội ngũ tuyển dụng ARISP trân trọng kính mời Anh/Chị tiếp tục tham gia vào <strong>Vòng phỏng vấn số {{nextRoundNumber}}</strong>.</p>
                             <div style="margin: 30px 0; text-align: center;">
-                                <a href="https://arisp.portal/candidate/login" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Đặt lịch phỏng vấn ngay</a>
+                                <a href="{{scheduleLink}}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Đặt lịch phỏng vấn ngay</a>
                             </div>
-                            <p>Vui lòng đăng nhập vào <strong>Candidate Portal của ARISP</strong> bằng liên kết trên để lựa chọn khung thời gian phỏng vấn phù hợp nhất với lịch trình của Anh/Chị.</p>
+                            <p>Vui lòng mở liên kết trên (trên thiết bị cá nhân) để chọn khung giờ phỏng vấn vòng {{nextRoundNumber}}. Buổi phỏng vấn thật diễn ra tại văn phòng — bạn nhập mã phỏng vấn do nhân sự cấp tại chỗ.</p>
                             <p>Nếu gặp bất kỳ khó khăn hoặc cần hỗ trợ kỹ thuật, xin vui lòng phản hồi trực tiếp email này hoặc liên hệ bộ phận hỗ trợ tuyển dụng.</p>
                             <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
                         </div>

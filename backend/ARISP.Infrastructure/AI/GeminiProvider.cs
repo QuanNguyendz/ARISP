@@ -51,19 +51,21 @@ If it IS a valid CV, employ Chain-of-Thought reasoning:
 3. PENALTY RULE: If JD requires Senior (e.g., 4+ years) and CV is Fresher/Intern (< 1 year), 'match_score' MUST NOT exceed 30%, regardless of keyword matches.
 4. Depth Check: Evaluate if they have hands-on production depth (e.g. building RAG, Vector DBs, System Optimization) or just surface-level API usage.
 
+CRITICAL LANGUAGE RULE: EVERY text value in the JSON (summary, skills_matched, skills_gaps, red_flags, experience_relevance, analysis_reasoning, seniority_alignment, tech_depth_analysis) MUST be written in VIETNAMESE (tiếng Việt) — regardless of the language of the CV or JD. Only keep proper nouns / technical terms as-is (e.g. C#, .NET, PostgreSQL, React, RAG, Vector DB). Do NOT write these fields in English.
+
 You MUST return ONLY a valid JSON object matching this schema, without markdown formatting.
 {
   ""is_valid_cv"": boolean,
-  ""analysis_reasoning"": string (Your step-by-step reasoning),
-  ""seniority_alignment"": string (Directly analyze the gap between JD seniority and CV seniority),
-  ""tech_depth_analysis"": string (Evaluate production depth vs surface-level knowledge),
+  ""analysis_reasoning"": string (Tiếng Việt — lập luận từng bước),
+  ""seniority_alignment"": string (Tiếng Việt — phân tích khoảng cách cấp bậc giữa JD và CV),
+  ""tech_depth_analysis"": string (Tiếng Việt — đánh giá chiều sâu thực chiến vs kiến thức bề mặt),
   ""match_score"": int (0-100),
-  ""summary"": string (Write a detailed summary. Format exactly as 2 paragraphs. Paragraph 1 starting with '🌟 Điểm sáng (Strengths):' highlighting good points. Paragraph 2 starting with '⚠️ Điểm thiếu sót nghiêm trọng (Critical Gaps):' highlighting why they fall short of the JD requirements.),
-  ""skills_matched"": string[] (List matched skills with years of exp),
-  ""skills_gaps"": string[] (Crucial skills missing),
-  ""red_flags"": string[] (Career gaps or suspicious claims. Empty if none),
-  ""experience_relevance"": string (How their domain fits the JD),
-  ""overall_recommendation"": string ('Strong Hire', 'Hire', 'Proceed with caution', 'Reject')
+  ""summary"": string (Tiếng Việt. Định dạng ĐÚNG 2 đoạn, mỗi đoạn nằm trên một dòng riêng, ngăn cách bằng ký tự xuống dòng '\n'. Đoạn 1 bắt đầu bằng '🌟 Điểm sáng: ' nêu ưu điểm. Đoạn 2 bắt đầu bằng '⚠️ Điểm cần lưu ý: ' nêu vì sao chưa đạt yêu cầu của JD. Mỗi đoạn 2-4 câu, súc tích.),
+  ""skills_matched"": string[] (Tiếng Việt — mỗi phần tử là MỘT kỹ năng khớp, kèm mức độ ngắn gọn trong ngoặc, ví dụ ""C# (cơ bản, qua thực tập)"". Giữ tên công nghệ nguyên gốc.),
+  ""skills_gaps"": string[] (Tiếng Việt — mỗi phần tử là MỘT kỹ năng/kinh nghiệm còn thiếu, ngắn gọn. Giữ tên công nghệ nguyên gốc.),
+  ""red_flags"": string[] (Tiếng Việt — khoảng trống sự nghiệp hoặc điểm đáng ngờ. Để mảng rỗng nếu không có.),
+  ""experience_relevance"": string (Tiếng Việt — mức độ phù hợp lĩnh vực với JD),
+  ""overall_recommendation"": string (CHỈ chọn đúng một trong các giá trị tiếng Anh sau: 'Strong Hire', 'Hire', 'Proceed with caution', 'Reject')
 }";
 
             var parts = new List<object>
@@ -298,6 +300,131 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
             {
                 _logger.LogError(ex, "Failed to parse Gemini CV review. Raw: {RawResponse}", responseJson);
                 return Result<CvReviewResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<JdExtractionResultDto>> ExtractJobFromJdAsync(
+            byte[]? jdFileBytes,
+            string? jdMimeType,
+            string? fallbackJdText,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+                return Result<JdExtractionResultDto>.Failure("GEMINI_API_KEY is not configured.");
+
+            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+
+            var systemInstruction = @"You are an expert IT recruiter assistant. You read a Job Description (JD) document and extract structured fields to pre-fill a job posting form.
+CRITICAL: First verify the document is actually a Job Description. If it is not, set 'is_valid_jd' to false and leave the other fields empty/null.
+
+Map values to these EXACT enums (lowercase, English) when applicable, otherwise null:
+- job_category: backend | frontend | devops | qa | data | ai_ml | mobile | pm | designer | other
+- experience_level: intern | fresher | junior | middle | senior | lead | manager
+- employment_type: full_time | part_time | contract | internship | freelance
+- work_mode: onsite | hybrid | remote
+
+Rules:
+- 'title' is the job position name (e.g. ""Backend Developer (.NET)"").
+- 'job_description' MUST be a clean, well-structured plain-text version of the JD body (responsibilities + requirements). Keep the original language of the JD.
+- 'skills' is an array of concrete technical skills/tools mentioned (keep proper names: C#, .NET, React, PostgreSQL...). Max 15.
+- 'language_requirement' ONLY if the JD explicitly requires a foreign language proficiency (e.g. ""English (TOEIC > 700)""). If the JD is Vietnamese with no foreign-language requirement, set null.
+- 'salary_min'/'salary_max' as numbers ONLY if explicitly stated; otherwise null. Do not invent.
+- Only fill a field if you are confident it is in the JD; otherwise use null (or empty array for skills).
+
+You MUST return ONLY a valid JSON object matching this schema, without markdown formatting:
+{
+  ""is_valid_jd"": boolean,
+  ""title"": string|null,
+  ""department"": string|null,
+  ""job_description"": string|null,
+  ""job_category"": string|null,
+  ""experience_level"": string|null,
+  ""employment_type"": string|null,
+  ""work_mode"": string|null,
+  ""location"": string|null,
+  ""skills"": string[],
+  ""language_requirement"": string|null,
+  ""salary_min"": number|null,
+  ""salary_max"": number|null
+}";
+
+            var parts = new List<object>
+            {
+                new { text = "--- JOB DESCRIPTION DOCUMENT ---" }
+            };
+
+            if (jdFileBytes != null && jdFileBytes.Length > 0 && jdMimeType == "application/pdf")
+            {
+                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(jdFileBytes) } });
+                if (!string.IsNullOrEmpty(fallbackJdText))
+                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackJdText });
+            }
+            else if (!string.IsNullOrEmpty(fallbackJdText))
+            {
+                parts.Add(new { text = fallbackJdText });
+            }
+            else
+            {
+                return Result<JdExtractionResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
+            }
+
+            var requestBody = new
+            {
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
+                contents = new[] { new { parts = parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 }
+            };
+
+            string responseJson = string.Empty;
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
+                response.EnsureSuccessStatusCode();
+                responseJson = await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Gemini JD extraction HTTP request failed.");
+                return Result<JdExtractionResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(responseJson);
+                var root = document.RootElement;
+                var rawJsonString = root.GetProperty("candidates")[0]
+                    .GetProperty("content").GetProperty("parts")[0]
+                    .GetProperty("text").GetString();
+
+                if (string.IsNullOrEmpty(rawJsonString))
+                    return Result<JdExtractionResultDto>.Failure("Gemini returned empty text.");
+
+                int promptTokens = 0, completionTokens = 0;
+                if (root.TryGetProperty("usageMetadata", out var usageProp))
+                {
+                    if (usageProp.TryGetProperty("promptTokenCount", out var pCount)) promptTokens = pCount.GetInt32();
+                    if (usageProp.TryGetProperty("candidatesTokenCount", out var cCount)) completionTokens = cCount.GetInt32();
+                }
+
+                if (rawJsonString.StartsWith("```json"))
+                {
+                    rawJsonString = rawJsonString.Substring(7);
+                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
+                }
+                rawJsonString = rawJsonString.Trim();
+
+                var result = JsonSerializer.Deserialize<JdExtractionResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result == null)
+                    return Result<JdExtractionResultDto>.Failure("Failed to deserialize Gemini JD extraction output.");
+
+                result.PromptTokens = promptTokens;
+                result.CompletionTokens = completionTokens;
+                return Result<JdExtractionResultDto>.Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse Gemini JD extraction. Raw: {RawResponse}", responseJson);
+                return Result<JdExtractionResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
             }
         }
     }

@@ -13,6 +13,9 @@ namespace ARISP.Application.DTOs
         public string? CvFileUrl { get; set; }
         public string? CvText { get; set; }
         public string? CvFileHash { get; set; }
+        public string? DesiredLocation { get; set; }
+        public string? CoverLetter { get; set; }
+        public string? NoticePeriod { get; set; }
     }
 
     public class ApplicationResponse

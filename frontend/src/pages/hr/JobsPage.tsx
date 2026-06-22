@@ -2,13 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
-import {
-  PageHeader,
-  StatsGrid,
-  EmptyState,
-  LoadingSpinner,
-  ErrorAlert,
-} from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@services/job/jobService'
 import type { JobPosting } from '@/types/job'
 
@@ -18,8 +13,7 @@ type FilterKey = 'all' | StatusKey
 const STATUS_META: Record<StatusKey, { label: string; badge: string }> = {
   active: {
     label: 'Đang tuyển',
-    badge:
-      'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
   },
   draft: {
     label: 'Nháp',
@@ -80,7 +74,11 @@ export default function HrJobsPage() {
     const count = (s: StatusKey) => jobs.filter((j) => j.status === s).length
     return [
       { label: 'Tổng tin', value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
-      { label: 'Đang tuyển', value: count('active'), color: 'text-emerald-600 dark:text-emerald-400' },
+      {
+        label: 'Đang tuyển',
+        value: count('active'),
+        color: 'text-emerald-600 dark:text-emerald-400',
+      },
       { label: 'Nháp', value: count('draft'), color: 'text-amber-600 dark:text-amber-400' },
       { label: 'Đã đóng', value: count('closed'), color: 'text-ink-600 dark:text-ink-400' },
     ]
@@ -98,13 +96,15 @@ export default function HrJobsPage() {
         description="Quản lý tất cả tin tuyển dụng trong hệ thống"
       />
 
+      {loading && <HrStatsSkeleton />}
       {!loading && !error && <StatsGrid stats={stats} />}
 
       {/* Status filter tabs */}
       {!loading && !error && jobs.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
           {FILTERS.map((f) => {
-            const cnt = f.key === 'all' ? jobs.length : jobs.filter((j) => j.status === f.key).length
+            const cnt =
+              f.key === 'all' ? jobs.length : jobs.filter((j) => j.status === f.key).length
             const activeTab = filter === f.key
             return (
               <button
@@ -126,7 +126,7 @@ export default function HrJobsPage() {
         </div>
       )}
 
-      {loading && <LoadingSpinner message="Đang tải tin tuyển dụng..." />}
+      {loading && <JobListSkeleton rows={5} />}
       {!loading && error && <ErrorAlert message={error} />}
 
       {!loading && !error && filtered.length === 0 && (
@@ -163,7 +163,9 @@ export default function HrJobsPage() {
                         <h3 className="text-lg font-semibold text-ink-900 dark:text-white truncate">
                           {job.title}
                         </h3>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}
+                        >
                           {meta.label}
                         </span>
                         {job.isUrgent && (

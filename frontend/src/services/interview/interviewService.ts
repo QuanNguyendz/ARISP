@@ -42,9 +42,30 @@ export interface HrInterviewSessionItem {
   verdict?: string | null;
 }
 
+export interface InterviewCodeSummary {
+  code: string;
+  roundNumber: number;
+  expiresAt: string;
+  usedAt?: string | null;
+  status: string; // Active | Used | Expired
+  candidateName: string;
+}
+
 export const interviewService = {
   async getHrSessions(): Promise<HrInterviewSessionItem[]> {
     const { data } = await apiClient.get<HrInterviewSessionItem[]>('/interview/sessions');
+    return data;
+  },
+
+  // Staff: sinh Interview Code cho 1 hồ sơ (round tự suy ra nếu không truyền)
+  async generateCode(applicationId: string, roundNumber?: number): Promise<{ code: string; expiresAt: string; applicationId: string }> {
+    const { data } = await apiClient.post('/interview/generate-code', { applicationId, roundNumber });
+    return data;
+  },
+
+  // Staff: danh sách mã đã cấp cho 1 tin tuyển dụng
+  async getCodesByJob(jobPostingId: string): Promise<InterviewCodeSummary[]> {
+    const { data } = await apiClient.get<InterviewCodeSummary[]>('/interview/codes', { params: { jobPostingId } });
     return data;
   },
 

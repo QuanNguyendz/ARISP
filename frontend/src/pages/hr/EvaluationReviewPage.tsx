@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Loader2,
   Code2,
   Layers,
   Calendar,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react'
 import { evaluationService } from '@/services/evaluation/evaluationService'
 import type { EvaluationReport } from '@/types/evaluation'
+import { EvaluationListSkeleton } from './_skeletons'
 
 function formatVerdictLabel(verdict?: string) {
   if (verdict === 'pass') return 'Pass'
@@ -68,8 +68,6 @@ export default function EvaluationReviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
@@ -95,8 +93,6 @@ export default function EvaluationReviewPage() {
 
   async function handleOpenDetail(evaluationId: string) {
     try {
-      setDetailLoading(true)
-      setDetailError(null)
       setActionError(null)
       setIsOverrideMode(false)
       setOverrideReason('')
@@ -105,16 +101,12 @@ export default function EvaluationReviewPage() {
       setSelectedEvaluation(detail)
     } catch (fetchError) {
       console.error(fetchError)
-      setDetailError('Không thể tải chi tiết đánh giá.')
       setSelectedEvaluation(null)
-    } finally {
-      setDetailLoading(false)
     }
   }
 
   function closeDetail() {
     setSelectedEvaluation(null)
-    setDetailError(null)
     setActionError(null)
     setIsOverrideMode(false)
     setOverrideReason('')
@@ -221,10 +213,7 @@ export default function EvaluationReviewPage() {
 
         {/* List */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-10 h-10 text-brand-600 dark:text-brand-400 animate-spin" />
-            <p className="text-sm text-ink-500 dark:text-ink-400">Đang tải dữ liệu...</p>
-          </div>
+          <EvaluationListSkeleton rows={4} />
         ) : error ? (
           <div className="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
             {error}

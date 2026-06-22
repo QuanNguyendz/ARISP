@@ -126,7 +126,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-ink-50 text-ink-900 antialiased flex items-center justify-center p-6">
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-ink-50 to-ai-50" />
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-ink-100 to-ai-50" />
 
       <div className="relative w-full max-w-md">
         {/* Logo */}

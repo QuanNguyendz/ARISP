@@ -35,6 +35,18 @@ namespace ARISP.Infrastructure.Repositories
             return await _context.Set<T>().Where(predicate).ToListAsync(ct);
         }
 
+        public virtual async Task<List<TResult>> QueryAsync<TResult>(
+            Func<IQueryable<T>, IQueryable<TResult>> shaper,
+            CancellationToken ct = default)
+        {
+            return await shaper(_context.Set<T>().AsNoTracking()).ToListAsync(ct);
+        }
+
+        public virtual async Task<int> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        {
+            return await _context.Set<T>().CountAsync(predicate, ct);
+        }
+
         public virtual async Task AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);

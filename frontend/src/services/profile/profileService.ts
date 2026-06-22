@@ -61,6 +61,27 @@ export interface CvUploadResult {
   aiMessage?: string | null
 }
 
+export interface CvMatchAnalysis {
+  matchScore: number
+  summary: string
+  skillsMatched: string[]
+  skillsGaps: string[]
+  experienceRelevance: string
+  overallRecommendation: string
+}
+
+export interface CvMatchResult {
+  hasCv: boolean
+  cvFileName?: string | null
+  cvUrl?: string | null
+  cvDownloadUrl?: string | null
+  aiAvailable: boolean
+  message?: string | null
+  analysis?: CvMatchAnalysis | null
+  /** none | processing | completed | failed — FE poll tiếp khi "processing". */
+  status?: string
+}
+
 export interface CandidateProfileUpdate {
   fullName?: string
   headline?: string | null
@@ -107,6 +128,12 @@ export const profileService = {
       '/portal/profile/change-password',
       payload,
     )
+    return data
+  },
+
+  // Phân tích độ phù hợp CV–JD dùng CV trong hồ sơ ứng viên cho 1 tin tuyển dụng.
+  async getCvMatch(jobId: string): Promise<CvMatchResult> {
+    const { data } = await apiClient.get<CvMatchResult>(`/portal/jobs/${jobId}/cv-match`)
     return data
   },
 }

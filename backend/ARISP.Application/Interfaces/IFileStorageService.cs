@@ -34,5 +34,11 @@ namespace ARISP.Application.Interfaces
 
         /// <summary>Xoá file theo <c>storageKey</c> (best-effort, không ném lỗi nếu không tồn tại).</summary>
         Task DeleteAsync(string storageKey, CancellationToken ct = default);
+
+        /// <summary>
+        /// Đọc toàn bộ nội dung file (bytes) theo <c>storageKey</c> để xử lý phía server
+        /// (vd phân tích CV-JD). Trả về <c>null</c> nếu không tìm thấy.
+        /// </summary>
+        Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default);
     }
 }

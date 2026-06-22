@@ -42,5 +42,17 @@ namespace ARISP.Domain.Entities
         public string? JobCategory { get; set; }
         public DateTimeOffset? ApplicationDeadline { get; set; }
         public bool? IsUrgent { get; set; } = false;
+        /// <summary>Số lượng cần tuyển (chỉ tiêu/headcount). Null = không giới hạn. Tuyển đủ → có thể đóng tin.</summary>
+        public int? Vacancies { get; set; }
+
+        // ===== Phê duyệt của HR Leader (approval) =====
+        /// <summary>HR Leader/SuperAdmin đã duyệt tin (pending → active). Null = chưa duyệt.</summary>
+        public Guid? ApprovedByUserId { get; set; }
+        /// <summary>Thời điểm duyệt.</summary>
+        public DateTimeOffset? ApprovedAt { get; set; }
+        /// <summary>Tên người duyệt (snapshot tại thời điểm duyệt, để hiển thị & đóng dấu).</summary>
+        public string? ApproverName { get; set; }
+        /// <summary>storageKey của file JD đã đóng dấu duyệt (visual stamp). Chỉ tạo khi JD là PDF.</summary>
+        public string? SignedJdFileUrl { get; set; }
     }
 }

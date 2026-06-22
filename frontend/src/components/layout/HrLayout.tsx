@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -21,6 +21,7 @@ import {
   Moon,
   Sun,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useAuthStore } from '@store/auth/authStore'
 import { useThemeStore } from '@store/theme'
 
@@ -65,12 +66,12 @@ function Logo() {
   )
 }
 
-const sidebarItems = [
+const sidebarItems: { icon: LucideIcon; label: string; path: string; badge?: number }[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/hr/dashboard' },
   { icon: Briefcase, label: 'Tin tuyển dụng', path: '/hr/jobs' },
   { icon: Users, label: 'Ứng viên', path: '/hr/candidates' },
   { icon: Video, label: 'Phiên phỏng vấn', path: '/hr/interviews' },
-  { icon: ClipboardCheck, label: 'Đánh giá', path: '/hr/evaluations', badge: 5 },
+  { icon: ClipboardCheck, label: 'Đánh giá', path: '/hr/evaluations' },
   { icon: BookOpen, label: 'Playbook', path: '/hr/playbooks' },
   { icon: UserCog, label: 'Nhóm HR', path: '/hr/team' },
   { icon: Settings, label: 'Cài đặt', path: '/hr/settings' },
@@ -84,6 +85,8 @@ export default function HrLayout() {
   const [notifOpen, setNotifOpen] = useState(false)
   const { user, logout } = useAuthStore()
   const { isDark, toggleTheme } = useThemeStore()
+  const notifRef = useRef<HTMLDivElement>(null)
+  const userRef = useRef<HTMLDivElement>(null)
 
   // Sync theme class on mount and when theme changes
   useEffect(() => {
@@ -96,6 +99,17 @@ export default function HrLayout() {
     }
   }, [isDark])
 
+  // Đóng dropdown khi click ra ngoài (dùng ref thay overlay full-screen để không chặn click nút bên trong)
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (notifRef.current && !notifRef.current.contains(t)) setNotifOpen(false)
+      if (userRef.current && !userRef.current.contains(t)) setUserMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
@@ -106,9 +120,9 @@ export default function HrLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
+    <div className="flex h-screen overflow-hidden bg-ink-50 dark:bg-ink-950">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 dark:border-white/10 bg-white dark:bg-white/5">
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 h-screen">
         <div className="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200 dark:border-white/10">
           <Logo />
           <div>
@@ -116,7 +130,7 @@ export default function HrLayout() {
             <div className="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader Workspace</div>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 text-sm font-medium">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
           {sidebarItems.map((item) => (
             <Link
               key={item.path}
@@ -144,13 +158,6 @@ export default function HrLayout() {
             <CircleHelp className="w-[18px] h-[18px]" />
             Trợ giúp & tài liệu
           </Link>
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20"
-          >
-            <LogOut className="w-[18px] h-[18px]" />
-            <span className="flex-1">Đăng xuất</span>
-          </button>
         </nav>
       </aside>
 
@@ -180,7 +187,7 @@ export default function HrLayout() {
 
           <div className="ml-auto flex items-center gap-1">
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
                 aria-label="Thông báo"
@@ -259,7 +266,7 @@ export default function HrLayout() {
             <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10"></span>
 
             {/* User menu */}
-            <div className="relative">
+            <div className="relative" ref={userRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-ink-100 dark:hover:bg-white/10"
@@ -390,17 +397,6 @@ export default function HrLayout() {
           <Outlet />
         </main>
       </div>
-
-      {/* Click outside to close menus */}
-      {(userMenuOpen || notifOpen) && (
-        <div
-          className="fixed inset-0 z-30"
-          onClick={() => {
-            setUserMenuOpen(false)
-            setNotifOpen(false)
-          }}
-        />
-      )}
     </div>
   )
 }

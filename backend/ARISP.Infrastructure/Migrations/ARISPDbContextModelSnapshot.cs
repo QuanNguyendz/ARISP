@@ -26,6 +26,74 @@ namespace ARISP.Infrastructure.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ARISP.Domain.Entities.AccountRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_user_id");
+
+                    b.Property<string>("Department")
+                        .HasColumnType("text")
+                        .HasColumnName("department");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("full_name");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<string>("ReviewReason")
+                        .HasColumnType("text")
+                        .HasColumnName("review_reason");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("account_requests", (string)null);
+                });
+
             modelBuilder.Entity("ARISP.Domain.Entities.Answer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -87,6 +155,10 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("candidate_phone");
 
+                    b.Property<string>("CoverLetter")
+                        .HasColumnType("text")
+                        .HasColumnName("cover_letter");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -115,6 +187,10 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("demographic_data");
 
+                    b.Property<string>("DesiredLocation")
+                        .HasColumnType("text")
+                        .HasColumnName("desired_location");
+
                     b.Property<DateTimeOffset?>("InviteExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("invite_expires_at");
@@ -126,6 +202,10 @@ namespace ARISP.Infrastructure.Migrations
                     b.Property<Guid>("JobPostingId")
                         .HasColumnType("uuid")
                         .HasColumnName("job_posting_id");
+
+                    b.Property<string>("NoticePeriod")
+                        .HasColumnType("text")
+                        .HasColumnName("notice_period");
 
                     b.Property<bool>("PracticeSessionUsed")
                         .HasColumnType("boolean")
@@ -345,6 +425,10 @@ namespace ARISP.Infrastructure.Migrations
                     b.Property<string>("ProvinceName")
                         .HasColumnType("text")
                         .HasColumnName("province_name");
+
+                    b.Property<string>("SettingsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("settings_json");
 
                     b.Property<string>("SkillsJson")
                         .IsRequired()
@@ -729,11 +813,11 @@ namespace ARISP.Infrastructure.Migrations
 
                     b.Property<bool>("Reminder1hSent")
                         .HasColumnType("boolean")
-                        .HasColumnName("reminder1h_sent");
+                        .HasColumnName("reminder_1h_sent");
 
                     b.Property<bool>("Reminder24hSent")
                         .HasColumnType("boolean")
-                        .HasColumnName("reminder24h_sent");
+                        .HasColumnName("reminder_24h_sent");
 
                     b.Property<Guid?>("RescheduledFromId")
                         .HasColumnType("uuid")
@@ -962,6 +1046,10 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_urgent");
 
+                    b.Property<int?>("Vacancies")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacancies");
+
                     b.Property<string>("JdFileFormat")
                         .HasColumnType("text")
                         .HasColumnName("jd_file_format");
@@ -1138,6 +1226,65 @@ namespace ARISP.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("must_ask_tracking", (string)null);
+                });
+
+            modelBuilder.Entity("ARISP.Domain.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("CandidateAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DedupKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("dedup_key");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("text")
+                        .HasColumnName("link");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateAccountId", "DedupKey")
+                        .IsUnique()
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("notifications", (string)null);
                 });
 
             modelBuilder.Entity("ARISP.Domain.Entities.OnlineTestQuestion", b =>
@@ -1364,6 +1511,42 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("ARISP.Domain.Entities.SavedJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CandidateAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("JobPostingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_posting_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateAccountId", "JobPostingId")
+                        .IsUnique()
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("saved_jobs", (string)null);
+                });
+
             modelBuilder.Entity("ARISP.Domain.Entities.SystemSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1429,6 +1612,10 @@ namespace ARISP.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
+
+                    b.Property<string>("LockReason")
+                        .HasColumnType("text")
+                        .HasColumnName("lock_reason");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text")

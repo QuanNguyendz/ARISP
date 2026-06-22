@@ -46,6 +46,10 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Match Score** | Điểm phù hợp (0–100) do Gemini AI chấm khi so sánh CV với JD. Chỉ mang tính tham khảo – candidate luôn có thể ứng tuyển bất kể điểm |
 | **JD File** | File mô tả công việc gốc (PDF/DOCX) được HR upload kèm Job Posting, bên cạnh text JD. Gemini ưu tiên phân tích từ file gốc |
 | **Skills Gap** | Danh sách kỹ năng mà JD yêu cầu nhưng CV chưa thể hiện – Gemini tự động detect và liệt kê |
+| **Account Request (Yêu cầu tạo tài khoản)** | Đề xuất tạo tài khoản staff do HR Leader gửi (lẻ hoặc hàng loạt cùng `BatchId`), lưu ở bảng `account_requests` status `pending`/`approved`/`rejected`. Super Admin duyệt → tạo `User` active + email mật khẩu tạm, hoặc từ chối kèm lý do (ADR-041) |
+| **Lock Reason (Lý do khóa)** | Lý do bắt buộc nhập khi Super Admin khóa một tài khoản (`User.LockReason`); hiển thị tại "Tất cả người dùng", xóa khi mở khóa |
+| **Unlock Appeal (Kháng cáo mở khóa)** | Cơ chế cho người dùng bị khóa gửi lý do xin gỡ khóa – dự kiến triển khai phase sau |
+| **Storage Key** | Khóa định danh đối tượng file lưu trong DB thay cho URL trực tiếp; dùng để sinh presigned URL qua `IFileStorageService` (ADR-036) |
 
 ---
 
@@ -70,6 +74,8 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Source of truth** | `.ai/` folder – nơi duy nhất chứa thông tin chính thức, mọi tool đọc từ đây |
 | **Gemini AI** | Google Gemini 2.5 Flash – dùng cho CV-JD Match Analysis (multimodal file input). Không dùng cho phỏng vấn AI (vẫn dùng GPT-4o) |
 | **IGeminiProvider** | Interface abstract cho Google Gemini API trong backend. Method chính: `AnalyzeCvJdMatchAsync()`. Swap provider qua env var `GEMINI_PROVIDER` |
+| **IFileStorageService** | Interface abstract cho lưu trữ file. 2 implementation: Local disk (dev) / Cloudflare R2 S3-compatible (prod) chọn qua `Storage:Provider`. DB chỉ lưu `storageKey`, sinh presigned URL khi cần (ADR-036) |
+| **BatchId** | Mã nhóm gắn vào các `account_requests` được HR Leader gửi cùng một lần (bulk import) – để theo dõi/duyệt theo lô |
 
 ---
 

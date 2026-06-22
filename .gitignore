@@ -69,6 +69,9 @@ docker/.env
 frontend/.env
 !frontend/.env.example
 supabase/.env.keys
+
+# Google OAuth credentials for MCP (Docs/Drive) – NEVER commit
+.secrets/
 supabase/.env.local
 supabase/.env.*.local
 

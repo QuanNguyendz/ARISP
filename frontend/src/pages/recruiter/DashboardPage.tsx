@@ -1,215 +1,188 @@
-import { motion } from 'framer-motion';
-import { Users, FileText, Video, Plus, Clock, Edit3 } from 'lucide-react';
-import { PageHeader, StatsGrid } from '@components/shared';
-import { useAuthStore } from '@store/auth/authStore';
-
-const stats = [
-  { label: 'Tin của tôi', value: '5', color: 'text-amber-400' },
-  { label: 'Chờ duyệt', value: '2', color: 'text-amber-400' },
-  { label: 'Ứng viên', value: '12', color: 'text-blue-400' },
-  { label: 'Phỏng vấn tuần này', value: '4', color: 'text-violet-400' },
-];
-
-const myJobs = [
-  { id: '1', title: 'Senior Backend Developer', status: 'pending_approval', submittedAt: '2 giờ trước' },
-  { id: '2', title: 'Frontend Developer', status: 'published', submittedAt: '1 ngày trước' },
-  { id: '3', title: 'DevOps Engineer', status: 'draft', submittedAt: null },
-];
-
-const recentCandidates = [
-  { id: '1', name: 'Nguyễn Văn A', job: 'Senior Backend', appliedAt: '2 giờ trước', status: 'new' },
-  { id: '2', name: 'Trần Thị B', job: 'Frontend Developer', appliedAt: '4 giờ trước', status: 'interviewed' },
-  { id: '3', name: 'Lê Hoàng C', job: 'DevOps Engineer', appliedAt: '1 ngày trước', status: 'new' },
-];
-
-const getStatusBadge = (status: string) => {
-  if (status === 'published') return { label: 'Đã đăng', color: 'bg-emerald-500/20 text-emerald-400' };
-  if (status === 'pending_approval') return { label: 'Chờ duyệt', color: 'bg-amber-500/20 text-amber-400' };
-  if (status === 'draft') return { label: 'Bản nháp', color: 'bg-white/10 text-white/50' };
-  if (status === 'rejected') return { label: 'Bị từ chối', color: 'bg-red-500/20 text-red-400' };
-  return { label: status, color: 'bg-white/10 text-white/50' };
-};
-
-const getCandidateStatusBadge = (status: string) => {
-  if (status === 'new') return { label: 'Mới', color: 'bg-blue-500/20 text-blue-400' };
-  if (status === 'interviewed') return { label: 'Đã phỏng vấn', color: 'bg-violet-500/20 text-violet-400' };
-  return { label: status, color: 'bg-white/10 text-white/50' };
-};
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Briefcase, Plus, Users, FileText, ArrowRight, MapPin, AlertCircle, Send } from 'lucide-react'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { useAuthStore } from '@store/auth/authStore'
+import jobService from '@services/job/jobService'
+import type { JobPosting } from '@/types/job'
+import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
+import { DashboardSkeleton } from './_skeletons'
 
 export default function RecruiterDashboardPage() {
-  const { user } = useAuthStore();
+  const { user } = useAuthStore()
+  const [jobs, setJobs] = useState<JobPosting[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    ;(async () => {
+      setLoading(true)
+      setError('')
+      try {
+        setJobs(await jobService.getMyJobPostings())
+      } catch (e: any) {
+        setError(e?.response?.data?.message || 'Không tải được dữ liệu tin tuyển dụng.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const stats = useMemo(() => {
+    const by = (s: string) => jobs.filter((j) => j.status === s).length
+    const applicants = jobs.reduce((sum, j) => sum + (j.applicantCount ?? 0), 0)
+    return { total: jobs.length, active: by('active'), pending: by('pending'), rejected: by('rejected'), draft: by('draft'), applicants }
+  }, [jobs])
+
+  const rejected = useMemo(() => jobs.filter((j) => j.status === 'rejected'), [jobs])
+  const drafts = useMemo(() => jobs.filter((j) => j.status === 'draft'), [jobs])
+  const recent = useMemo(() => [...jobs].slice(0, 6), [jobs])
+
+  if (loading) return <DashboardSkeleton />
+
+  const statCards = [
+    { label: 'Tin của tôi', value: stats.total, color: 'text-brand-600' },
+    { label: 'Đang đăng', value: stats.active, color: 'text-emerald-600' },
+    { label: 'Chờ HR duyệt', value: stats.pending, color: 'text-amber-600' },
+    { label: 'Tổng ứng viên', value: stats.applicants, color: 'text-ai-600' },
+  ]
 
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
         title={`Xin chào, ${user?.name || 'Recruiter'}`}
-        description="Tổng quan công việc tuyển dụng của bạn"
-        actions={[
-          { label: 'Tạo tin mới', href: '/recruiter/jobs/create', variant: 'primary' },
-        ]}
+        description="Tổng quan tin tuyển dụng & ứng viên của bạn"
+        actions={[{ label: 'Tạo tin', href: '/recruiter/jobs/create', variant: 'primary' }]}
       />
 
-      <StatsGrid stats={stats} />
+      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* My Jobs */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-6 overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-white">Tin tuyển dụng của tôi</h2>
-                  <p className="text-xs text-white/40">Quản lý tin đã tạo</p>
-                </div>
-              </div>
-              <a href="/recruiter/my-jobs" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">Xem tất cả</a>
-            </div>
+      <StatsGrid stats={statCards} />
 
-            <div className="space-y-3">
-              {myJobs.map((job) => {
-                const statusBadge = getStatusBadge(job.status);
-                return (
-                  <div key={job.id} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/30 to-orange/30 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-amber-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-white">{job.title}</h3>
-                        <span className="flex items-center gap-1 text-xs text-white/40">
-                          {job.status === 'pending_approval' && <Clock className="w-3 h-3" />}
-                          {job.submittedAt || 'Chưa gửi duyệt'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
-                        {statusBadge.label}
+      {rejected.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4" /> {rejected.length} tin bị từ chối — chỉnh sửa và gửi lại để HR duyệt
+          </div>
+          <div className="mt-2 space-y-1">
+            {rejected.slice(0, 3).map((j) => (
+              <Link key={j.id} to={`/recruiter/my-jobs/${j.id}`} className="block text-xs text-red-600 dark:text-red-300 hover:underline">
+                {j.title}{j.rejectionReason ? ` — lý do: ${j.rejectionReason}` : ''}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
+        {/* Main: tin tuyển dụng */}
+        <div className="lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
+              <Briefcase className="h-5 w-5 text-brand-600 dark:text-brand-400" /> Tin tuyển dụng của tôi
+            </h2>
+            <Link to="/recruiter/my-jobs" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
+              Xem tất cả
+            </Link>
+          </div>
+
+          {recent.length === 0 ? (
+            <EmptyState
+              icon={<Briefcase className="h-8 w-8 text-ink-400" />}
+              title="Chưa có tin tuyển dụng"
+              description="Tạo tin đầu tiên — upload JD để hệ thống tự điền các trường giúp bạn."
+              action={{ label: 'Tạo tin', href: '/recruiter/jobs/create' }}
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {recent.map((j, i) => (
+                <motion.div
+                  key={j.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                >
+                  <Link
+                    to={`/recruiter/my-jobs/${j.id}`}
+                    className="group block h-full rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card transition-all hover:border-brand-300 dark:hover:border-brand-500/40 hover:shadow-card-hover"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
+                        <Briefcase className="h-5 w-5" />
                       </span>
-                      <a 
-                        href={`/recruiter/my-jobs/${job.id}`}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                      >
-                        <Edit3 className="w-4 h-4 text-white/50" />
-                      </a>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status)}`}>
+                        {jobStatusLabel(j.status)}
+                      </span>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-
-          {/* Recent Candidates */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-6 overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-white">Ứng viên gần đây</h2>
-                  <p className="text-xs text-white/40">Những ứng viên ứng tuyển gần đây</p>
-                </div>
-              </div>
-              <a href="/recruiter/candidates" className="text-xs text-accent-primary hover:text-accent-secondary transition-colors">Xem tất cả</a>
-            </div>
-
-            <div className="space-y-3">
-              {recentCandidates.map((candidate) => {
-                const statusBadge = getCandidateStatusBadge(candidate.status);
-                return (
-                  <div key={candidate.id} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/30 to-cyan/30 flex items-center justify-center text-xs font-medium text-white">
-                        {candidate.name.split(' ').map((n) => n[0]).join('')}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-white">{candidate.name}</h3>
-                        <p className="text-xs text-white/40">{candidate.job} • {candidate.appliedAt}</p>
-                      </div>
+                    <h3 className="truncate font-semibold text-ink-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                      {j.title}
+                    </h3>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400">
+                      {j.department || 'Chưa phân phòng ban'}
+                      {j.location ? <><span>·</span><MapPin className="h-3 w-3" />{j.location}</> : null}
+                    </p>
+                    <div className="mt-4 flex items-center justify-between border-t border-ink-100 dark:border-white/10 pt-3 text-xs">
+                      <span className="flex items-center gap-1.5 font-medium text-ink-600 dark:text-ink-300">
+                        <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0} ứng viên
+                      </span>
+                      <span className="text-ink-400">{formatSalary(j)}</span>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
-                      {statusBadge.label}
-                    </span>
-                  </div>
-                );
-              })}
+                  </Link>
+                </motion.div>
+              ))}
             </div>
-          </motion.div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-5 overflow-hidden"
-          >
-            <h2 className="text-sm font-semibold text-white mb-4">Thao tác nhanh</h2>
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
+            <h3 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">Thao tác nhanh</h3>
             <div className="space-y-2">
-              <a href="/recruiter/jobs/create" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <Plus className="w-4 h-4 text-amber-400" />
-                </div>
-                <span className="text-sm text-white">Tạo tin mới</span>
-              </a>
-              <a href="/recruiter/my-jobs" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-blue-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-blue-400" />
-                </div>
-                <span className="text-sm text-white">Xem tin của tôi</span>
-              </a>
-              <a href="/recruiter/candidates" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-violet-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-violet-400" />
-                </div>
-                <span className="text-sm text-white">Xem ứng viên</span>
-              </a>
-              <a href="/recruiter/interviews" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <Video className="w-4 h-4 text-emerald-400" />
-                </div>
-                <span className="text-sm text-white">Tạo lịch phỏng vấn</span>
-              </a>
+              {[
+                { to: '/recruiter/jobs/create', icon: Plus, label: 'Tạo tin mới', tint: 'text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-500/20' },
+                { to: '/recruiter/my-jobs', icon: Briefcase, label: 'Quản lý tin', tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20' },
+                { to: '/recruiter/candidates', icon: Users, label: 'Xem ứng viên', tint: 'text-ai-600 dark:text-ai-400 bg-ai-100 dark:bg-ai-500/20' },
+              ].map((a) => (
+                <Link
+                  key={a.to}
+                  to={a.to}
+                  className="flex items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:border-brand-300 dark:hover:border-brand-500/40 hover:bg-ink-50 dark:hover:bg-white/5"
+                >
+                  <span className={`grid h-8 w-8 place-items-center rounded-lg ${a.tint}`}>
+                    <a.icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-sm text-ink-700 dark:text-ink-200">{a.label}</span>
+                  <ArrowRight className="h-4 w-4 text-ink-400" />
+                </Link>
+              ))}
             </div>
-          </motion.div>
+          </div>
 
-          {/* Rejected Jobs with Feedback */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-red-500/20 p-5 overflow-hidden"
-          >
-            <h2 className="text-sm font-semibold text-white mb-4">Tin bị từ chối</h2>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                <p className="text-sm text-white mb-1">Senior Backend Developer</p>
-                <p className="text-xs text-white/50">Lý do: Thông tin lương chưa đầy đủ</p>
-                <a href="/recruiter/my-jobs/1" className="text-xs text-amber-400 hover:text-amber-300 mt-2 inline-block">
-                  Chỉnh sửa và gửi lại
-                </a>
+          {drafts.length > 0 && (
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+                <FileText className="h-4 w-4 text-ink-400" /> Bản nháp chờ gửi duyệt
+              </h3>
+              <div className="space-y-2">
+                {drafts.slice(0, 4).map((j) => (
+                  <Link
+                    key={j.id}
+                    to={`/recruiter/my-jobs/${j.id}`}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:bg-ink-50 dark:hover:bg-white/5"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink-700 dark:text-ink-200">{j.title}</span>
+                    <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                      <Send className="h-3 w-3" /> {timeAgo(j.createdAt)}
+                    </span>
+                  </Link>
+                ))}
               </div>
             </div>
-          </motion.div>
+          )}
         </div>
       </div>
     </div>
-  );
+  )
 }

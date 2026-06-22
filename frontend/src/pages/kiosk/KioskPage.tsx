@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { KeyRound, ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot } from 'lucide-react'
+import { ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot } from 'lucide-react'
 
 export default function KioskPage() {
   const navigate = useNavigate()

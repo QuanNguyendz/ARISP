@@ -3,12 +3,15 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using ARISP.Application.Common;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
 using ARISP.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace ARISP.API.Controllers
 {
@@ -39,13 +42,23 @@ namespace ARISP.API.Controllers
         private readonly ApplicationService _applicationService;
         private readonly IDocumentParserService _documentParserService;
         private readonly IFileStorageService _fileStorage;
+        private readonly ICurrentUserService _currentUserService;
+        private readonly IConfiguration _configuration;
 
-        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService, IFileStorageService fileStorage)
+        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService, IFileStorageService fileStorage, ICurrentUserService currentUserService, IConfiguration configuration)
         {
             _applicationService = applicationService;
             _documentParserService = documentParserService;
             _fileStorage = fileStorage;
+            _currentUserService = currentUserService;
+            _configuration = configuration;
         }
+
+        /// <summary>Base URL portal ứng viên (theo môi trường), fallback AdminFrontendUrl rồi localhost.</summary>
+        private string CandidateBaseUrl =>
+            _configuration["Frontend:CandidateBaseUrl"]
+            ?? _configuration["Authentication:AdminFrontendUrl"]
+            ?? "http://localhost:3000";
 
         [HttpGet("{id}")]
         [Authorize(Policy = "InternalStaff")]
@@ -56,6 +69,9 @@ namespace ARISP.API.Controllers
             {
                 return NotFound(new { message = result.Error });
             }
+
+            if (!string.IsNullOrEmpty(result.Value!.CvFileUrl))
+                result.Value.CvFileUrl = await _fileStorage.GetUrlAsync(result.Value.CvFileUrl, ct);
 
             return Ok(result.Value);
         }
@@ -187,14 +203,34 @@ namespace ARISP.API.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Danh sách hồ sơ ứng tuyển. <paramref name="mine"/>=true: chỉ ứng viên thuộc các tin do
+        /// người đang đăng nhập tạo (Recruiter workspace). Mặc định: toàn bộ (HR/SA).
+        /// </summary>
         [HttpGet]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> GetApplications()
+        public async Task<IActionResult> GetApplications([FromQuery] bool mine, CancellationToken ct)
         {
-            var result = await _applicationService.GetAllApplicationsAsync();
-            if (result.IsFailure)
+            Result<List<ApplicationResponse>> result;
+            if (mine)
             {
+                if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
+                    return Unauthorized(new { message = "Không xác định được người dùng." });
+                result = await _applicationService.GetApplicationsForCreatorAsync(uid, ct);
+            }
+            else
+            {
+                result = await _applicationService.GetAllApplicationsAsync(ct);
+            }
+
+            if (result.IsFailure)
                 return BadRequest(new { message = result.Error });
+
+            // Resolve storageKey -> URL client dùng được
+            foreach (var app in result.Value!)
+            {
+                if (!string.IsNullOrEmpty(app.CvFileUrl))
+                    app.CvFileUrl = await _fileStorage.GetUrlAsync(app.CvFileUrl, ct);
             }
 
             return Ok(result.Value);
@@ -202,9 +238,10 @@ namespace ARISP.API.Controllers
 
         [HttpGet("practice-eligibility/{id}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetPracticeEligibility(Guid id)
+        public async Task<IActionResult> GetPracticeEligibility(Guid id, [FromQuery] int round, CancellationToken ct)
         {
-            var result = await _applicationService.CheckPracticeEligibilityAsync(id);
+            var roundNumber = round > 0 ? round : 1;
+            var result = await _applicationService.CheckPracticeEligibilityAsync(id, roundNumber, ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -215,15 +252,16 @@ namespace ARISP.API.Controllers
 
         [HttpPost("{id}/send-invite")]
         [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm gửi link mời
-        public async Task<IActionResult> SendInvite(Guid id, CancellationToken ct)
+        public async Task<IActionResult> SendInvite(Guid id, [FromQuery] int round, CancellationToken ct)
         {
-            var result = await _applicationService.SendInterviewInviteAsync(id, ct);
+            var roundNumber = round > 0 ? round : 1;
+            var result = await _applicationService.SendInterviewInviteAsync(id, CandidateBaseUrl, roundNumber, ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
             }
 
-            return Ok(new { message = "Gửi Magic Link mời phỏng vấn/làm bài test thành công!" });
+            return Ok(new { message = "Đã gửi email mời phỏng vấn (chọn lịch) cho ứng viên." });
         }
 
     }
