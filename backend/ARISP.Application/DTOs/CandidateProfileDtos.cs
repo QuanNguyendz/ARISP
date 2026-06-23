@@ -52,6 +52,9 @@ namespace ARISP.Application.DTOs
         public List<string> SkillsGaps { get; set; } = new();
         public string ExperienceRelevance { get; set; } = string.Empty;
         public string OverallRecommendation { get; set; } = string.Empty;
+
+        /// <summary>Nhà cung cấp AI đã tạo phân tích ("Gemini" | "GPT-4o-mini") — hiển thị trên UI.</summary>
+        public string? ReviewedBy { get; set; }
     }
 
     /// <summary>

@@ -121,7 +121,6 @@ function parseMatchSummary(summary?: string): {
   }
 }
 
-
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -505,6 +504,10 @@ export default function JobDetailPage() {
                         className="h-full rounded-full bg-gradient-to-r from-brand-600 to-ai-600"
                         style={{ width: `${match.analysis.matchScore}%` }}
                       />
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-ink-400">
+                      <Sparkles className="h-3 w-3" /> Phân tích bởi AI (
+                      {match.analysis.reviewedBy ?? 'Gemini'})
                     </div>
                     {/* Kỹ năng khớp / còn thiếu — dạng chip cho dễ quét */}
                     {match.analysis.skillsMatched.length > 0 && (

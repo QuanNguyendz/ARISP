@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -18,13 +19,99 @@ namespace ARISP.Infrastructure.AI
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<GeminiProvider> _logger;
+        private readonly IAIProvider _aiProvider; // fallback khi Gemini lỗi/quá tải (OpenAI GPT-4o-mini)
         private readonly string _apiKey;
 
-        public GeminiProvider(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiProvider> logger)
+        // Không nhúng API key vào URL — sẽ bị HttpClient logging ghi ra log dạng plaintext.
+        // Key được truyền qua header x-goog-api-key trong PostToGeminiAsync.
+        private const string GeminiEndpoint =
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+        public GeminiProvider(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiProvider> logger, IAIProvider aiProvider)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _aiProvider = aiProvider;
             _apiKey = configuration["GEMINI_API_KEY"] ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Lấy JSON kết quả: thử Gemini trước; nếu lỗi (vd 503 quá tải, hết retry) thì fallback sang
+        /// OpenAI GPT-4o-mini với cùng system instruction + nội dung, rồi bọc lại theo envelope giống
+        /// Gemini (candidates[0].content.parts[0].text) để khối parse phía dưới dùng chung không cần sửa.
+        /// Nếu cả hai cùng lỗi → ném exception cho caller trả Result.Failure.
+        /// </summary>
+        private async Task<(string Json, string Provider)> GetAnalysisJsonAsync(
+            object geminiRequestBody, string systemInstruction, string userContent, CancellationToken ct)
+        {
+            try
+            {
+                var json = await PostToGeminiAsync(geminiRequestBody, ct);
+                return (json, "Gemini");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Gemini lỗi — chuyển fallback OpenAI GPT-4o-mini.");
+                var innerJson = await _aiProvider.CompleteJsonAsync(systemInstruction, userContent, ct);
+                var envelope = new
+                {
+                    candidates = new[]
+                    {
+                        new { content = new { parts = new[] { new { text = innerJson } } } },
+                    },
+                };
+                return (JsonSerializer.Serialize(envelope), "GPT-4o-mini");
+            }
+        }
+
+        /// <summary>
+        /// Gọi Gemini generateContent với API key ở header (không lộ trong URL/log) và
+        /// retry exponential backoff cho lỗi tạm thời 503 (overload) / 429 (rate limit).
+        /// Ném exception nếu thất bại sau khi hết số lần thử — caller bắt và trả Result.Failure.
+        /// </summary>
+        private async Task<string> PostToGeminiAsync(object requestBody, CancellationToken ct)
+        {
+            const int maxAttempts = 3;
+            for (int attempt = 1; ; attempt++)
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, GeminiEndpoint)
+                {
+                    Content = JsonContent.Create(requestBody),
+                };
+                request.Headers.Add("x-goog-api-key", _apiKey);
+
+                var response = await _httpClient.SendAsync(request, ct);
+                try
+                {
+                    if (response.IsSuccessStatusCode)
+                        return await response.Content.ReadAsStringAsync(ct);
+
+                    // Đọc body để lấy thông điệp lỗi thật của Gemini (vd "model is overloaded")
+                    // — EnsureSuccessStatusCode không đọc body nên trước đây ta không thấy lý do.
+                    var status = (int)response.StatusCode;
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+
+                    var transient = response.StatusCode == HttpStatusCode.ServiceUnavailable
+                        || response.StatusCode == HttpStatusCode.TooManyRequests;
+                    if (transient && attempt < maxAttempts)
+                    {
+                        var delay = TimeSpan.FromMilliseconds(500 * Math.Pow(2, attempt - 1)); // 0.5s → 1s
+                        _logger.LogWarning(
+                            "Gemini trả {Status}, thử lại lần {Next}/{Max} sau {Delay}ms. Chi tiết: {Detail}",
+                            status, attempt + 1, maxAttempts, delay.TotalMilliseconds, errorBody);
+                        await Task.Delay(delay, ct);
+                        continue;
+                    }
+
+                    // Hết retry (hoặc lỗi không phải transient) → ném exception kèm lý do từ Gemini.
+                    throw new HttpRequestException(
+                        $"Gemini trả HTTP {status}. Chi tiết: {errorBody}");
+                }
+                finally
+                {
+                    response.Dispose();
+                }
+            }
         }
 
         public async Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(
@@ -39,7 +126,6 @@ namespace ARISP.Infrastructure.AI
                 return Result<CvJdAnalysisResultDto>.Failure("GEMINI_API_KEY is not configured.");
             }
 
-            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
 
             var systemInstruction = @"You are an expert Headhunter and Tech Lead.
 Your task is to analyze a candidate's CV against a Job Description (JD).
@@ -119,16 +205,17 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             var sw = Stopwatch.StartNew();
             
             string responseJson = string.Empty;
+            string analysisProvider = "Gemini";
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
-                response.EnsureSuccessStatusCode();
-                responseJson = await response.Content.ReadAsStringAsync(ct);
+                (responseJson, analysisProvider) = await GetAnalysisJsonAsync(
+                    requestBody, systemInstruction,
+                    $"--- JOB DESCRIPTION ---\n{jdText}\n\n--- CANDIDATE CV ---\n{fallbackCvText}", ct);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Gemini API HTTP Request failed.");
-                return Result<CvJdAnalysisResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV-JD analysis).");
+                return Result<CvJdAnalysisResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
             }
             sw.Stop();
             
@@ -186,6 +273,7 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
                 result.ProcessingTimeMs = (int)sw.ElapsedMilliseconds;
                 result.PromptTokens = promptTokens;
                 result.CompletionTokens = completionTokens;
+                result.Provider = analysisProvider;
 
                 return Result<CvJdAnalysisResultDto>.Success(result);
             }
@@ -205,7 +293,6 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             if (string.IsNullOrEmpty(_apiKey))
                 return Result<CvReviewResultDto>.Failure("GEMINI_API_KEY is not configured.");
 
-            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
 
             var systemInstruction = @"You are an expert technical recruiter reviewing a candidate's CV/Resume (no specific job description).
 CRITICAL: First verify the document is actually a CV/Resume. If it is not, set 'is_valid_cv' to false and 'overall_score' to 0.
@@ -251,16 +338,17 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
             };
 
             string responseJson = string.Empty;
+            string reviewProvider = "Gemini";
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
-                response.EnsureSuccessStatusCode();
-                responseJson = await response.Content.ReadAsStringAsync(ct);
+                (responseJson, reviewProvider) = await GetAnalysisJsonAsync(
+                    requestBody, systemInstruction,
+                    $"--- CANDIDATE CV ---\n{fallbackCvText}", ct);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Gemini CV review HTTP request failed.");
-                return Result<CvReviewResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV review).");
+                return Result<CvReviewResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
             }
 
             try
@@ -294,6 +382,7 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
 
                 result.PromptTokens = promptTokens;
                 result.CompletionTokens = completionTokens;
+                result.Provider = reviewProvider;
                 return Result<CvReviewResultDto>.Success(result);
             }
             catch (Exception ex)
@@ -312,7 +401,6 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
             if (string.IsNullOrEmpty(_apiKey))
                 return Result<JdExtractionResultDto>.Failure("GEMINI_API_KEY is not configured.");
 
-            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
 
             var systemInstruction = @"You are an expert IT recruiter assistant. You read a Job Description (JD) document and extract structured fields to pre-fill a job posting form.
 CRITICAL: First verify the document is actually a Job Description. If it is not, set 'is_valid_jd' to false and leave the other fields empty/null.
@@ -378,14 +466,14 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             string responseJson = string.Empty;
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct);
-                response.EnsureSuccessStatusCode();
-                responseJson = await response.Content.ReadAsStringAsync(ct);
+                (responseJson, _) = await GetAnalysisJsonAsync(
+                    requestBody, systemInstruction,
+                    $"--- JOB DESCRIPTION ---\n{fallbackJdText}", ct);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Gemini JD extraction HTTP request failed.");
-                return Result<JdExtractionResultDto>.Failure($"Gemini API tạm thời không khả dụng: {ex.Message}");
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (JD extraction).");
+                return Result<JdExtractionResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
             }
 
             try

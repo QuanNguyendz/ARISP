@@ -7,6 +7,7 @@ using ARISP.API.Middleware;
 using ARISP.Application.Interfaces;
 using ARISP.Application.Services;
 using ARISP.Domain.Constants;
+using ARISP.Infrastructure.AI;
 using ARISP.Infrastructure.Data;
 using ARISP.Infrastructure.Repositories;
 using ARISP.Infrastructure.Services;

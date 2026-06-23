@@ -10,6 +10,17 @@
       "env": {
         "GOOGLE_DRIVE_OAUTH_CREDENTIALS": "e:/ARISP/.secrets/gcp-oauth.keys.json"
       }
+    },
+    "cloudflare-bindings": {
+      "type": "sse",
+      "url": "https://bindings.mcp.cloudflare.com/sse"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PAT}"
+      }
     }
   }
 }

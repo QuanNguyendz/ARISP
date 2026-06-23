@@ -108,7 +108,7 @@ Scoring Rubric: {jobPosting.ScoringRubric ?? "Sử dụng trọng số chuẩn: 
                     Summary = resultDto.Summary,
                     Status = "failed",
                     ErrorMessage = "File tải lên không hợp lệ hoặc không phải là CV.",
-                    AiModel = "gemini-2.5-flash",
+                    AiModel = resultDto.Provider,
                     PromptTokens = resultDto.PromptTokens,
                     CompletionTokens = resultDto.CompletionTokens
                 };
@@ -128,7 +128,7 @@ Scoring Rubric: {jobPosting.ScoringRubric ?? "Sử dụng trọng số chuẩn: 
                 RedFlags = JsonSerializer.Serialize(resultDto.RedFlags),
                 ExperienceRelevance = resultDto.ExperienceRelevance,
                 OverallRecommendation = resultDto.OverallRecommendation,
-                AiModel = "gemini-2.5-flash",
+                AiModel = resultDto.Provider,
                 Status = "completed",
                 PromptTokens = resultDto.PromptTokens,
                 CompletionTokens = resultDto.CompletionTokens,

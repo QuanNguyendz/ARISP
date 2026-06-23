@@ -29,6 +29,9 @@ namespace ARISP.Application.DTOs
 
         [JsonIgnore] public int PromptTokens { get; set; }
         [JsonIgnore] public int CompletionTokens { get; set; }
+
+        /// <summary>Nhà cung cấp AI thực sự tạo đánh giá: "Gemini" hoặc "GPT-4o-mini" (fallback). Đặt nội bộ, không từ JSON của AI.</summary>
+        [JsonIgnore] public string Provider { get; set; } = "Gemini";
     }
 
     /// <summary>Kết quả CV review trả về FE và lưu trong CandidateAccount.CvReviewJson.</summary>
@@ -42,5 +45,8 @@ namespace ARISP.Application.DTOs
         public List<string> Improvements { get; set; } = new();
         public List<string> MissingSections { get; set; } = new();
         public string? ReviewedAt { get; set; }
+
+        /// <summary>Nhà cung cấp AI đã tạo đánh giá ("Gemini" | "GPT-4o-mini") — hiển thị trên UI.</summary>
+        public string? ReviewedBy { get; set; }
     }
 }

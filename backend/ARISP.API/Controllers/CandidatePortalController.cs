@@ -129,7 +129,8 @@ namespace ARISP.API.Controllers
                     SkillsMatched = DeserializeStringList(cached.SkillsMatched),
                     SkillsGaps = DeserializeStringList(cached.SkillsGaps),
                     ExperienceRelevance = cached.ExperienceRelevance,
-                    OverallRecommendation = cached.OverallRecommendation
+                    OverallRecommendation = cached.OverallRecommendation,
+                    ReviewedBy = cached.AiModel
                 };
                 return Ok(resp);
             }
@@ -1333,7 +1334,8 @@ namespace ARISP.API.Controllers
                     Strengths = r.Strengths,
                     Improvements = r.Improvements,
                     MissingSections = r.MissingSections,
-                    ReviewedAt = DateTimeOffset.UtcNow.ToString("o")
+                    ReviewedAt = DateTimeOffset.UtcNow.ToString("o"),
+                    ReviewedBy = r.Provider
                 };
             }
             // Nếu AI không khả dụng (vd thiếu API key) vẫn lưu CV, chỉ không có đánh giá.

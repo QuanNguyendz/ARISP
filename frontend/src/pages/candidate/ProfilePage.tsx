@@ -592,7 +592,10 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() =>
-                    openDocument(resolveAssetUrl(profile.profileCvUrl), profile.cvFileName || 'CV hồ sơ')
+                    openDocument(
+                      resolveAssetUrl(profile.profileCvUrl),
+                      profile.cvFileName || 'CV hồ sơ'
+                    )
                   }
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left hover:opacity-80"
                   title="Bấm để xem CV"
@@ -1075,7 +1078,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-        <Sparkles className="h-4 w-4" /> Đánh giá CV bởi AI (Gemini)
+        <Sparkles className="h-4 w-4" /> Đánh giá CV bởi AI ({review.reviewedBy ?? 'Gemini'})
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <div className={`grid h-20 w-20 shrink-0 place-items-center rounded-2xl ring-1 ${ring}`}>

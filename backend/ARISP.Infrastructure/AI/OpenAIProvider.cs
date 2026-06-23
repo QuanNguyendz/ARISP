@@ -12,7 +12,7 @@ using ARISP.Application.Interfaces;
 using ARISP.Domain.Entities;
 using ARISP.Infrastructure.Data;
 
-namespace ARISP.Infrastructure.Services
+namespace ARISP.Infrastructure.AI
 {
     public class OpenAIProvider : IAIProvider, IEmbeddingProvider
     {
@@ -283,6 +283,37 @@ namespace ARISP.Infrastructure.Services
                 Comprehension = doc.RootElement.GetProperty("Comprehension").GetDecimal(),
                 OverallScore = doc.RootElement.GetProperty("OverallScore").GetDecimal()
             };
+        }
+
+        // Fallback structured-JSON completion (dùng khi Gemini lỗi). GPT-4o-mini rẻ + nhanh,
+        // response_format json_object đảm bảo trả JSON hợp lệ đúng schema trong systemInstruction.
+        public async Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default)
+        {
+            if (_useLocalMock)
+                throw new InvalidOperationException("OpenAI fallback chưa được cấu hình (thiếu OPENAI_API_KEY).");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+            var payload = new
+            {
+                model = "gpt-4o-mini",
+                messages = new[]
+                {
+                    new { role = "system", content = systemInstruction },
+                    new { role = "user", content = userContent },
+                },
+                temperature = 0.2,
+                response_format = new { type = "json_object" },
+            };
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
+            var responseString = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(responseString);
+            return doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
         }
 
         private async Task<string> CallOpenAIChatAsync(string prompt, CancellationToken ct, bool jsonMode = false)

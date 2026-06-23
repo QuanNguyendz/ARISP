@@ -1,5 +1,9 @@
 import { apiClient } from '../apiClient'
 
+// Timeout cho các call có phân tích Gemini đồng bộ (upload CV, CV-match): model có thể
+// mất ~18s/lượt + retry backoff khi 503/429, vượt timeout mặc định 30s của apiClient.
+const AI_REQUEST_TIMEOUT_MS = 120000
+
 export interface ExperienceItem {
   title: string
   organization: string
@@ -23,6 +27,7 @@ export interface CvReview {
   improvements: string[]
   missingSections: string[]
   reviewedAt?: string | null
+  reviewedBy?: string | null
 }
 
 export interface CandidateProfile {
@@ -68,6 +73,7 @@ export interface CvMatchAnalysis {
   skillsGaps: string[]
   experienceRelevance: string
   overallRecommendation: string
+  reviewedBy?: string | null
 }
 
 export interface CvMatchResult {
@@ -116,6 +122,8 @@ export const profileService = {
     formData.append('cvFile', file)
     const { data } = await apiClient.post<CvUploadResult>('/portal/profile/cv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // Phân tích Gemini chạy đồng bộ + retry backoff (503/429) → vượt timeout mặc định 30s.
+      timeout: AI_REQUEST_TIMEOUT_MS,
     })
     return data
   },
@@ -126,14 +134,16 @@ export const profileService = {
   }): Promise<{ message: string; hasPassword: boolean }> {
     const { data } = await apiClient.post<{ message: string; hasPassword: boolean }>(
       '/portal/profile/change-password',
-      payload,
+      payload
     )
     return data
   },
 
   // Phân tích độ phù hợp CV–JD dùng CV trong hồ sơ ứng viên cho 1 tin tuyển dụng.
   async getCvMatch(jobId: string): Promise<CvMatchResult> {
-    const { data } = await apiClient.get<CvMatchResult>(`/portal/jobs/${jobId}/cv-match`)
+    const { data } = await apiClient.get<CvMatchResult>(`/portal/jobs/${jobId}/cv-match`, {
+      timeout: AI_REQUEST_TIMEOUT_MS,
+    })
     return data
   },
 }
