@@ -18,6 +18,63 @@ namespace ARISP.Application.DTOs
         public string? Note { get; set; }
     }
 
+    /// <summary>Bật/tắt một loại thông báo theo 2 kênh.</summary>
+    public class NotificationChannelPref
+    {
+        public bool Email { get; set; } = true;
+        public bool Push { get; set; } = true;
+    }
+
+    /// <summary>Tùy chọn cá nhân của ứng viên (thông báo, quyền riêng tư, ngôn ngữ giao diện).</summary>
+    public class CandidateSettingsDto
+    {
+        // Ngôn ngữ giao diện ("vi" | "en") — không ảnh hưởng ngôn ngữ phỏng vấn.
+        public string Language { get; set; } = "vi";
+
+        // Thông báo theo loại × kênh (Email / Đẩy).
+        public NotificationChannelPref InterviewInvite { get; set; } = new();
+        public NotificationChannelPref Result { get; set; } = new();
+        public NotificationChannelPref ApplicationUpdate { get; set; } = new();
+        public NotificationChannelPref JobSuggestion { get; set; } = new() { Email = false, Push = false };
+
+        // Quyền riêng tư.
+        public bool AllowHrViewProfile { get; set; } = true;
+        public bool AllowRecording { get; set; } = true;
+        public bool MarketingEmail { get; set; } = false;
+    }
+
+    /// <summary>Kết quả phân tích độ phù hợp CV–JD (gọn) trả cho màn chi tiết tin tuyển dụng.</summary>
+    public class CvMatchAnalysisDto
+    {
+        public int MatchScore { get; set; }
+        public string Summary { get; set; } = string.Empty;
+        public List<string> SkillsMatched { get; set; } = new();
+        public List<string> SkillsGaps { get; set; } = new();
+        public string ExperienceRelevance { get; set; } = string.Empty;
+        public string OverallRecommendation { get; set; } = string.Empty;
+
+        /// <summary>Nhà cung cấp AI đã tạo phân tích ("Gemini" | "GPT-4o-mini") — hiển thị trên UI.</summary>
+        public string? ReviewedBy { get; set; }
+    }
+
+    /// <summary>
+    /// Phản hồi cho <c>GET /api/portal/jobs/{id}/cv-match</c>: trạng thái CV của ứng viên +
+    /// kết quả phân tích (nếu chạy được). <c>HasCv=false</c> → FE hiện nút tải CV.
+    /// </summary>
+    public class CvMatchResponse
+    {
+        public bool HasCv { get; set; }
+        public string? CvFileName { get; set; }
+        public string? CvUrl { get; set; }
+        public string? CvDownloadUrl { get; set; }
+        public bool AiAvailable { get; set; }
+        public string? Message { get; set; }
+        public CvMatchAnalysisDto? Analysis { get; set; }
+
+        /// <summary>none | processing | completed | failed — FE poll khi "processing".</summary>
+        public string Status { get; set; } = "none";
+    }
+
     /// <summary>Hồ sơ ứng viên trả về cho trang Profile.</summary>
     public class CandidateProfileResponse
     {

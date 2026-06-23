@@ -1,128 +1,164 @@
-import { motion } from 'framer-motion';
-import { Activity, Search, Filter, Download, Eye } from 'lucide-react';
-import { useState } from 'react';
-import { PageHeader, EmptyState } from '@components/shared';
+import { useCallback, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Activity, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PageHeader, EmptyState, ErrorAlert } from '@components/shared'
+import { adminService, type AuditLogEntry } from '@services/admin'
+import { auditActionLabel, timeAgo } from '@utils/adminLabels'
+import { LogListSkeleton } from './_skeletons'
 
-const auditLogs = [
-  { id: '1', action: 'USER_APPROVED', user: 'Super Admin', target: 'Lê Minh C', details: 'Approved recruiter request', timestamp: '2026-06-11 14:30:25' },
-  { id: '2', action: 'ROLE_CHANGED', user: 'Super Admin', target: 'Phạm Thu D', details: 'Role changed: Recruiter → HR Admin', timestamp: '2026-06-11 14:15:10' },
-  { id: '3', action: 'USER_REJECTED', user: 'Super Admin', target: 'Ngô Văn E', details: 'Rejected with reason: Invalid documents', timestamp: '2026-06-11 13:45:00' },
-  { id: '4', action: 'SETTINGS_UPDATED', user: 'Super Admin', target: 'System Config', details: 'Updated AI service endpoint', timestamp: '2026-06-11 12:00:00' },
-  { id: '5', action: 'USER_CREATED', user: 'System', target: 'user@example.com', details: 'New user registered via OAuth', timestamp: '2026-06-11 11:30:15' },
-  { id: '6', action: 'PASSWORD_RESET', user: 'Super Admin', target: 'Trần Văn F', details: 'Password reset by admin', timestamp: '2026-06-10 16:20:00' },
-  { id: '7', action: 'USER_SUSPENDED', user: 'Super Admin', target: 'Lý Thị G', details: 'Account suspended due to policy violation', timestamp: '2026-06-10 10:00:00' },
-  { id: '8', action: 'API_KEY_GENERATED', user: 'System', target: 'API Integration', details: 'New API key generated', timestamp: '2026-06-09 15:30:00' },
-];
+const PAGE_SIZE = 20
 
-const actionColors: Record<string, string> = {
-  USER_APPROVED: 'bg-emerald-500/20 text-emerald-400',
-  USER_REJECTED: 'bg-red-500/20 text-red-400',
-  ROLE_CHANGED: 'bg-violet-500/20 text-violet-400',
-  SETTINGS_UPDATED: 'bg-blue-500/20 text-blue-400',
-  USER_CREATED: 'bg-cyan-500/20 text-cyan-400',
-  PASSWORD_RESET: 'bg-amber-500/20 text-amber-400',
-  USER_SUSPENDED: 'bg-red-500/20 text-red-400',
-  API_KEY_GENERATED: 'bg-teal-500/20 text-teal-400',
-};
+const ACTION_OPTIONS = [
+  { value: 'all', label: 'Tất cả hành động' },
+  { value: 'staff_account_created', label: 'Tạo tài khoản staff' },
+  { value: 'user_approved', label: 'Duyệt tài khoản' },
+  { value: 'user_role_updated', label: 'Đổi vai trò' },
+  { value: 'user_activated', label: 'Kích hoạt tài khoản' },
+  { value: 'user_deactivated', label: 'Khóa tài khoản' },
+  { value: 'user_deleted', label: 'Xóa tài khoản' },
+  { value: 'system_settings_updated', label: 'Cập nhật cài đặt' },
+]
+
+function actionDotClass(action: string): string {
+  if (action.includes('deleted') || action.includes('deactivated')) return 'bg-red-500'
+  if (action.includes('approved') || action.includes('activated') || action.includes('created')) return 'bg-emerald-500'
+  if (action.includes('settings')) return 'bg-ai-500'
+  return 'bg-brand-500'
+}
+
+function prettyMeta(metadata?: string | null): string {
+  if (!metadata) return ''
+  try {
+    const obj = JSON.parse(metadata)
+    return Object.entries(obj)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ')
+  } catch {
+    return metadata
+  }
+}
 
 export default function AuditLogsPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [actionFilter, setActionFilter] = useState<string>('all');
+  const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [action, setAction] = useState('all')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const filteredLogs = auditLogs.filter((log) => {
-    const matchesSearch = log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          log.target.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          log.details.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
-    return matchesSearch && matchesAction;
-  });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await adminService.getAuditLogs({
+        action: action === 'all' ? undefined : action,
+        page,
+        pageSize: PAGE_SIZE,
+      })
+      setLogs(res.items)
+      setTotal(res.totalCount)
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Không tải được nhật ký hoạt động.')
+    } finally {
+      setLoading(false)
+    }
+  }, [action, page])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="p-6 lg:p-8">
-      <PageHeader
-        title="Audit Logs"
-        description="Nhật ký hoạt động hệ thống"
-        actions={[
-          { label: 'Export', href: '#', variant: 'secondary', icon: <Download className="w-4 h-4" /> },
-        ]}
-      />
+      <PageHeader title="Nhật ký hoạt động" description="Theo dõi mọi thay đổi quan trọng trong hệ thống" />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm theo user, target, chi tiết..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent-primary/50 transition-colors"
-          />
-        </div>
+      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+
+      <div className="mb-6">
         <select
-          value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-accent-primary/50 transition-colors"
+          value={action}
+          onChange={(e) => {
+            setPage(1)
+            setAction(e.target.value)
+          }}
+          className="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
         >
-          <option value="all">Tất cả actions</option>
-          <option value="USER_APPROVED">User Approved</option>
-          <option value="USER_REJECTED">User Rejected</option>
-          <option value="ROLE_CHANGED">Role Changed</option>
-          <option value="SETTINGS_UPDATED">Settings Updated</option>
-          <option value="USER_CREATED">User Created</option>
-          <option value="PASSWORD_RESET">Password Reset</option>
+          {ACTION_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* Audit Logs Table */}
-      {filteredLogs.length === 0 ? (
+      {loading ? (
+        <LogListSkeleton rows={10} />
+      ) : logs.length === 0 ? (
         <EmptyState
-          icon={<Activity className="w-8 h-8 text-white/20" />}
-          title="Không có log"
-          description="Không có nhật ký nào phù hợp với điều kiện tìm kiếm."
+          icon={<Activity className="h-8 w-8 text-ink-400" />}
+          title="Chưa có hoạt động"
+          description="Không có bản ghi nào khớp với bộ lọc."
         />
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] overflow-hidden"
+          className="overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/5">
-                  <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Timestamp</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Action</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Target</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Details</th>
-                  <th className="px-6 py-4 text-right text-xs font-medium text-white/40 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4 text-sm text-white/50 font-mono">{log.timestamp}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${actionColors[log.action] || 'bg-white/10 text-white/40'}`}>
-                        {log.action}
+          <ul className="divide-y divide-ink-100 dark:divide-white/10">
+            {logs.map((log) => (
+              <li key={log.id} className="flex items-start gap-4 px-6 py-4 hover:bg-ink-50 dark:hover:bg-white/5">
+                <span className="mt-1.5 flex h-2.5 w-2.5 shrink-0">
+                  <span className={`h-2.5 w-2.5 rounded-full ${actionDotClass(log.action)}`} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-ink-900 dark:text-white">{auditActionLabel(log.action)}</p>
+                    {log.entityType && (
+                      <span className="rounded-md bg-ink-100 dark:bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-ink-500 dark:text-ink-300">
+                        {log.entityType}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-white">{log.user}</td>
-                    <td className="px-6 py-4 text-sm text-white/70">{log.target}</td>
-                    <td className="px-6 py-4 text-sm text-white/50">{log.details}</td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-                        <Eye className="w-4 h-4 text-white/50" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    )}
+                  </div>
+                  {prettyMeta(log.metadata) && (
+                    <p className="mt-0.5 truncate text-xs text-ink-500 dark:text-ink-400">{prettyMeta(log.metadata)}</p>
+                  )}
+                  <p className="mt-0.5 text-xs text-ink-400">bởi {log.actorName}</p>
+                </div>
+                <span className="shrink-0 text-xs text-ink-400" title={new Date(log.createdAt).toLocaleString('vi-VN')}>
+                  {timeAgo(log.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-ink-100 dark:border-white/10 px-6 py-3 text-sm">
+              <span className="text-ink-500 dark:text-ink-400">
+                Trang {page}/{totalPages} · {total} bản ghi
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </div>
-  );
+  )
 }

@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   MapPin,
   DollarSign,
   Clock,
   Loader2,
-  Send,
   Languages,
   Briefcase,
   Sparkles,
@@ -20,63 +18,18 @@ import {
   BrainCircuit,
   CheckCircle2,
   Bookmark,
-  Bell,
-  Moon,
-  Sun,
-  Menu,
-  X,
-  Search,
-  Globe,
-  ChevronDown,
   ChevronRight,
-  LogOut,
-  User,
-  Settings,
+  FileText,
 } from 'lucide-react'
 import jobService from '@/services/job/jobService'
+import { savedJobService } from '@/services/job/savedJobService'
+import { profileService } from '@/services/profile/profileService'
+import type { CvMatchResult } from '@/services/profile/profileService'
+import { applicationService } from '@/services/application/applicationService'
+import { resolveAssetUrl } from '@config/constants'
 import type { JobPosting } from '@/types/job'
 import { useAuthStore } from '@store/auth/authStore'
-
-// Logo component
-function Logo() {
-  return (
-    <svg
-      className="h-9 w-9"
-      viewBox="0 0 96 96"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="ARISP"
-    >
-      <defs>
-        <linearGradient
-          id="lg-jd-fe"
-          x1="12"
-          y1="10"
-          x2="84"
-          y2="86"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#4f46e5" />
-          <stop offset="1" stopColor="#9333ea" />
-        </linearGradient>
-      </defs>
-      <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-jd-fe)" />
-      <path
-        d="M30 70 L48 26 L66 70"
-        stroke="white"
-        strokeWidth="8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
-      <path
-        d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
-        fill="white"
-        fillOpacity="0.95"
-      />
-    </svg>
-  )
-}
+import CandidateHeader from '@components/layout/CandidateHeader'
 
 function formatSalary(job: JobPosting): string {
   if (job.salaryIsNegotiable) return 'Thỏa thuận'
@@ -134,317 +87,59 @@ function getIconBg(department?: string) {
   return 'bg-brand-50 text-brand-600'
 }
 
-// Nav component - giống FindJobPage
-function Nav() {
-  const { user, isAuthenticated, logout } = useAuthStore()
-  const navigate = useNavigate()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
-  const [langMenuOpen, setLangMenuOpen] = useState(false)
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark')
-    }
-    return false
-  })
-
-  const toggleTheme = () => {
-    const newIsDark = !isDark
-    setIsDark(newIsDark)
-    if (newIsDark) {
-      document.documentElement.classList.add('dark')
-      localStorage.theme = 'dark'
+/**
+ * Tách phần `summary` của Gemini (định dạng "🌟 Điểm sáng: …\n⚠️ Điểm cần lưu ý: …")
+ * thành 2 khối riêng để hiển thị dễ nhìn. Phần không khớp marker được gom vào `rest`.
+ */
+function parseMatchSummary(summary?: string): {
+  strengths?: string
+  gaps?: string
+  rest?: string
+} {
+  if (!summary) return {}
+  const result: { strengths?: string; gaps?: string; rest: string[] } = { rest: [] }
+  // Tách theo emoji marker dù có xuống dòng hay không.
+  const parts = summary
+    .replace(/⚠️/g, '\n⚠️')
+    .replace(/🌟/g, '\n🌟')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  for (const p of parts) {
+    if (p.startsWith('🌟')) {
+      result.strengths = p.replace(/^🌟\s*(Điểm sáng\s*:?\s*)?/u, '').trim()
+    } else if (p.startsWith('⚠️')) {
+      result.gaps = p.replace(/^⚠️\s*(Điểm cần lưu ý\s*:?\s*)?/u, '').trim()
     } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.theme = 'light'
+      result.rest.push(p)
     }
   }
-
-  return (
-    <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/80 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center gap-3">
-        {/* Mobile menu */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Menu"
-          className="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 shrink-0">
-          <Logo />
-          <span className="hidden sm:inline font-display text-lg font-extrabold text-ink-900">
-            ARISP <span className="text-ink-400 font-medium">Careers</span>
-          </span>
-        </Link>
-
-        {/* Primary nav */}
-        <nav className="hidden lg:flex items-center gap-1 text-sm font-medium text-ink-600">
-          <Link to="/jobs" className="rounded-lg px-3 py-2 text-brand-700 bg-brand-50">
-            Việc làm
-          </Link>
-          <Link
-            to="/candidate/applications"
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 hover:bg-ink-100"
-          >
-            Hồ sơ ứng tuyển
-          </Link>
-          <Link to="/interview/practice/demo" className="rounded-lg px-3 py-2 hover:bg-ink-100">
-            Phỏng vấn thử
-          </Link>
-        </nav>
-
-        {/* Global search */}
-        <div className="hidden md:flex flex-1 max-w-sm items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm focus-within:border-brand-400 focus-within:bg-white">
-          <Search className="w-4 h-4 text-ink-400" />
-          <input
-            className="w-full bg-transparent outline-none placeholder:text-ink-400"
-            placeholder="Tìm việc làm, kỹ năng..."
-          />
-          <kbd className="hidden lg:inline rounded border border-ink-200 bg-white px-1.5 text-[10px] font-semibold text-ink-400">
-            ⌘K
-          </kbd>
-        </div>
-
-        {/* Right cluster */}
-        <div className="flex items-center gap-1 ml-auto">
-          {/* Saved jobs */}
-          <Link
-            to="#"
-            aria-label="Việc đã lưu"
-            className="relative hidden sm:grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
-          >
-            <Bookmark className="w-5 h-5" />
-          </Link>
-
-          {/* Language toggle */}
-          <div className="relative hidden sm:block">
-            <button
-              onClick={() => setLangMenuOpen(!langMenuOpen)}
-              className="flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
-            >
-              <Globe className="w-[18px] h-[18px]" />
-              VI <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-            <AnimatePresence>
-              {langMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 mt-2 w-40 rounded-xl border border-ink-200 bg-white shadow-xl z-40 p-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button className="flex w-full items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700">
-                    Tiếng Việt <CheckCircle2 className="w-4 h-4" />
-                  </button>
-                  <button className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-ink-600 hover:bg-ink-100">
-                    English
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            aria-label="Đổi giao diện sáng/tối"
-            className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setNotifOpen(!notifOpen)}
-              aria-label="Thông báo"
-              className="relative grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-ink-50">
-                3
-              </span>
-            </button>
-            <AnimatePresence>
-              {notifOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-200 bg-white shadow-xl z-40"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100">
-                    <span className="font-display font-bold text-sm text-ink-900">Thông báo</span>
-                    <button className="text-xs font-medium text-brand-600 hover:underline">
-                      Đánh dấu đã đọc
-                    </button>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-ink-100">
-                    <Link to="#" className="flex gap-3 px-4 py-3 hover:bg-ink-50">
-                      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600">
-                        <Sparkles className="w-4 h-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm text-ink-700">
-                          <b className="text-ink-900">Lời mời phỏng vấn</b> — Senior Frontend
-                          Engineer
-                        </span>
-                        <span className="text-xs text-ink-400">2 giờ trước</span>
-                      </span>
-                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500"></span>
-                    </Link>
-                    <Link to="#" className="flex gap-3 px-4 py-3 hover:bg-ink-50 opacity-60">
-                      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-500">
-                        <Bell className="w-4 h-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm text-ink-700">
-                          Nhà tuyển dụng đã xem hồ sơ
-                        </span>
-                        <span className="text-xs text-ink-400">1 ngày trước</span>
-                      </span>
-                    </Link>
-                  </div>
-                  <Link
-                    to="#"
-                    className="block px-4 py-3 text-center text-sm font-medium text-brand-600 hover:bg-ink-50 rounded-b-2xl border-t border-ink-100"
-                  >
-                    Xem tất cả thông báo
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <span className="mx-1 hidden sm:block h-5 w-px bg-ink-200"></span>
-
-          {isAuthenticated ? (
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-ink-100"
-              >
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
-                  {user?.name?.charAt(0) || 'U'}
-                </span>
-                <ChevronDown className="hidden sm:block w-4 h-4 text-ink-400" />
-              </button>
-              <AnimatePresence>
-                {userMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-60 rounded-2xl border border-ink-200 bg-white shadow-xl z-40"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100">
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-sm font-bold text-white">
-                        {user?.name?.charAt(0) || 'U'}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-ink-900">
-                          {user?.name || 'User'}
-                        </div>
-                        <div className="truncate text-xs text-ink-400">{user?.email}</div>
-                      </div>
-                    </div>
-                    <div className="p-1.5 text-sm">
-                      <Link
-                        to="/candidate/applications"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"
-                      >
-                        <User className="w-4 h-4 text-ink-400" /> Hồ sơ của tôi
-                      </Link>
-                      <Link
-                        to="/candidate/settings"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100"
-                      >
-                        <Settings className="w-4 h-4 text-ink-400" /> Cài đặt
-                      </Link>
-                    </div>
-                    <div className="p-1.5 border-t border-ink-100">
-                      <button
-                        onClick={() => {
-                          logout()
-                          navigate('/')
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        <LogOut className="w-4 h-4" /> Đăng xuất
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <Link
-              to="/auth/candidate-login"
-              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-            >
-              Đăng nhập
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden border-t border-ink-200 bg-white"
-          >
-            <nav className="px-4 py-3 space-y-1">
-              <Link
-                to="/jobs"
-                className="block rounded-lg px-3 py-2 text-brand-700 bg-brand-50 font-medium"
-              >
-                Việc làm
-              </Link>
-              <Link
-                to="/candidate/applications"
-                className="block rounded-lg px-3 py-2 text-ink-600 hover:bg-ink-100"
-              >
-                Hồ sơ ứng tuyển
-              </Link>
-              <Link
-                to="/interview/practice/demo"
-                className="block rounded-lg px-3 py-2 text-ink-600 hover:bg-ink-100"
-              >
-                Phỏng vấn thử
-              </Link>
-              {!isAuthenticated && (
-                <Link
-                  to="/auth/candidate-login"
-                  className="block rounded-lg px-3 py-2 text-ink-600 hover:bg-ink-100"
-                >
-                  Đăng nhập
-                </Link>
-              )}
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </header>
-  )
+  return {
+    strengths: result.strengths,
+    gaps: result.gaps,
+    rest: result.rest.length ? result.rest.join(' ') : undefined,
+  }
 }
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
   const [job, setJob] = useState<JobPosting | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Phân tích độ phù hợp CV–JD theo CV trong hồ sơ ứng viên đang đăng nhập.
+  const [match, setMatch] = useState<CvMatchResult | null>(null)
+  const [matchLoading, setMatchLoading] = useState(false)
+  const [matchAuthError, setMatchAuthError] = useState(false)
+
+  // Lưu / bỏ lưu việc làm (bookmark)
+  const [isSaved, setIsSaved] = useState(false)
+  const [savePending, setSavePending] = useState(false)
+
+  // Ứng tuyển — đã nộp hồ sơ cho tin này chưa (để đổi nút sang "Xem hồ sơ").
+  const [appliedId, setAppliedId] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadJobDetail() {
@@ -464,10 +159,126 @@ export default function JobDetailPage() {
     loadJobDetail()
   }, [id])
 
+  useEffect(() => {
+    if (!id || !isAuthenticated) return
+    let cancelled = false
+    let attempts = 0
+    const MAX_ATTEMPTS = 40 // ~100s ở mức 2.5s/lần — đủ cho Gemini (~25s)
+    const POLL_MS = 2500
+    setMatchLoading(true)
+    setMatchAuthError(false)
+
+    const poll = async () => {
+      try {
+        const data = await profileService.getCvMatch(id)
+        if (cancelled) return
+        setMatch(data)
+        // Backend phân tích ở nền — poll tiếp tới khi xong (kết quả được cache).
+        if (data.status === 'processing' && attempts < MAX_ATTEMPTS) {
+          attempts += 1
+          window.setTimeout(poll, POLL_MS)
+          return
+        }
+        setMatchLoading(false)
+      } catch (err: unknown) {
+        if (cancelled) return
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (status === 401 || status === 403) {
+          setMatchAuthError(true)
+          setMatchLoading(false)
+        } else if (attempts < MAX_ATTEMPTS) {
+          // Lỗi mạng tạm thời → thử lại (kết quả vẫn đang được tính & cache ở backend).
+          attempts += 1
+          window.setTimeout(poll, POLL_MS)
+        } else {
+          console.error('CV match failed:', err)
+          setMatchLoading(false)
+        }
+      }
+    }
+
+    poll()
+    return () => {
+      cancelled = true
+    }
+  }, [id, isAuthenticated])
+
+  // Trạng thái đã lưu của tin này (chỉ với ứng viên đã đăng nhập).
+  useEffect(() => {
+    if (!id || !isAuthenticated) {
+      setIsSaved(false)
+      return
+    }
+    let cancelled = false
+    savedJobService
+      .getSavedJobIds()
+      .then((ids) => {
+        if (!cancelled) setIsSaved(ids.includes(id))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [id, isAuthenticated])
+
+  // Đã ứng tuyển tin này chưa? (để nút đổi sang "Xem hồ sơ ứng tuyển")
+  useEffect(() => {
+    if (!id || !isAuthenticated) {
+      setAppliedId(null)
+      return
+    }
+    let cancelled = false
+    applicationService
+      .getMyApplications()
+      .then((apps) => {
+        if (cancelled) return
+        const found = apps.find((a) => a.jobPostingId === id && a.status !== 'withdrawn')
+        if (found) setAppliedId(found.id)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [id, isAuthenticated])
+
+  // Mở màn ứng tuyển. Chưa đăng nhập → trang đăng nhập; đã ứng tuyển → xem hồ sơ.
+  const handleApply = () => {
+    if (!id) return
+    if (!isAuthenticated) {
+      navigate('/auth/candidate-login')
+      return
+    }
+    if (appliedId) {
+      navigate('/candidate/applications')
+      return
+    }
+    navigate(`/jobs/${id}/apply`)
+  }
+
+  // Lưu / bỏ lưu — cập nhật lạc quan, rollback nếu lỗi. Chưa đăng nhập → tới trang đăng nhập.
+  const handleToggleSave = async () => {
+    if (!id) return
+    if (!isAuthenticated) {
+      navigate('/auth/candidate-login')
+      return
+    }
+    const wasSaved = isSaved
+    setIsSaved(!wasSaved)
+    setSavePending(true)
+    try {
+      if (wasSaved) await savedJobService.unsaveJob(id)
+      else await savedJobService.saveJob(id)
+    } catch {
+      setIsSaved(wasSaved)
+    } finally {
+      setSavePending(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-ink-50">
-        <Nav />
+        <CandidateHeader />
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
           <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
           <p className="text-sm text-ink-500">Đang tải thông tin...</p>
@@ -479,7 +290,7 @@ export default function JobDetailPage() {
   if (error || !job) {
     return (
       <div className="min-h-screen bg-ink-50">
-        <Nav />
+        <CandidateHeader />
         <div className="py-20 text-center">
           <h2 className="mb-2 text-2xl font-display font-bold text-ink-900">Đã xảy ra lỗi</h2>
           <p className="mb-6 text-ink-500">{error || 'Không tìm thấy dữ liệu.'}</p>
@@ -498,7 +309,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="min-h-screen bg-ink-50 text-ink-900 antialiased">
-      <Nav />
+      <CandidateHeader />
 
       {/* Breadcrumb */}
       <div className="mx-auto max-w-6xl px-6 pt-6">
@@ -601,46 +412,186 @@ export default function JobDetailPage() {
         <aside className="space-y-5 lg:sticky lg:top-24 self-start">
           {/* Apply card */}
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            {appliedId ? (
+              <button
+                onClick={() => navigate('/candidate/applications')}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Đã ứng tuyển · Xem hồ sơ
+              </button>
+            ) : (
+              <button
+                onClick={handleApply}
+                className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700"
+              >
+                Ứng tuyển ngay
+              </button>
+            )}
             <button
-              onClick={() => navigate(`/candidate/applications/${job.id}`)}
-              className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700"
+              onClick={handleToggleSave}
+              disabled={savePending}
+              className={`mt-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 ${
+                isSaved
+                  ? 'border-ai-200 bg-ai-50 text-ai-700 hover:bg-ai-100'
+                  : 'border-ink-200 text-ink-700 hover:bg-ink-50'
+              }`}
             >
-              Ứng tuyển ngay
-            </button>
-            <button className="mt-2 w-full rounded-xl border border-ink-200 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-ink-50 flex items-center justify-center gap-2">
-              <Bookmark className="w-4 h-4" /> Lưu việc làm
+              <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+              {isSaved ? 'Đã lưu' : 'Lưu việc làm'}
             </button>
           </div>
 
-          {/* CV-JD Match (signature AI) */}
+          {/* CV-JD Match (signature AI) — dùng CV thật trong hồ sơ ứng viên */}
           <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-6 shadow-card">
             <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
               <Sparkles className="w-4 h-4" /> Độ phù hợp CV–JD
             </div>
-            <div className="mt-3 flex items-end gap-2">
-              <div className="font-display text-5xl font-extrabold text-ai-700 leading-none">
-                87
+
+            {!isAuthenticated || matchAuthError ? (
+              <div className="mt-3">
+                <p className="text-sm text-ink-500">
+                  Đăng nhập bằng tài khoản ứng viên và tải CV lên hồ sơ để xem độ phù hợp với tin
+                  này.
+                </p>
+                <Link
+                  to="/auth/candidate-login"
+                  className="mt-3 block w-full rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
+                >
+                  Đăng nhập
+                </Link>
               </div>
-              <div className="pb-1 text-sm text-ink-500">/ 100</div>
-            </div>
-            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ai-100">
-              <div className="h-full w-[87%] rounded-full bg-gradient-to-r from-brand-600 to-ai-600"></div>
-            </div>
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" /> Khớp: React, .NET, EF Core
+            ) : matchLoading ? (
+              <div className="mt-4 flex items-start gap-2 text-sm text-ink-500">
+                <Loader2 className="w-4 h-4 mt-0.5 shrink-0 animate-spin text-ai-600" />
+                <span>Đang phân tích CV của bạn… việc này có thể mất ~20–30 giây.</span>
               </div>
-              <div className="flex items-center gap-2 text-amber-700">
-                <span className="w-4 h-4 flex items-center justify-center">⚠️</span> Thiếu: kinh
-                nghiệm WebRTC
+            ) : match && !match.hasCv ? (
+              <div className="mt-3">
+                <p className="text-sm text-ink-500">
+                  Hồ sơ của bạn chưa có CV. Tải CV lên để AI phân tích độ phù hợp với tin này.
+                </p>
+                <Link
+                  to="/candidate/profile?focus=cv"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  <FileText className="w-4 h-4" /> Tải CV lên
+                </Link>
               </div>
-            </div>
-            <p className="mt-3 text-xs text-ink-400">
-              Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo
-            </p>
-            <button className="mt-3 w-full rounded-xl border border-ai-300 bg-white px-3 py-2 text-sm font-semibold text-ai-700 hover:bg-ai-50">
-              Tải CV khác để phân tích
-            </button>
+            ) : match && match.hasCv ? (
+              <div>
+                {/* CV đã có sẵn — hiện rõ tên file, bấm để xem */}
+                <a
+                  href={resolveAssetUrl(match.cvUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-sm text-ink-700 hover:border-ai-300"
+                >
+                  <FileText className="w-4 h-4 shrink-0 text-ai-600" />
+                  <span className="flex-1 truncate">{match.cvFileName}</span>
+                  <span className="shrink-0 text-xs font-medium text-ai-700">Xem</span>
+                </a>
+
+                {match.analysis ? (
+                  <>
+                    <div className="mt-4 flex items-end gap-2">
+                      <div className="font-display text-5xl font-extrabold text-ai-700 leading-none">
+                        {match.analysis.matchScore}
+                      </div>
+                      <div className="pb-1 text-sm text-ink-500">/ 100</div>
+                    </div>
+                    <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ai-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-brand-600 to-ai-600"
+                        style={{ width: `${match.analysis.matchScore}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-ink-400">
+                      <Sparkles className="h-3 w-3" /> Phân tích bởi AI (
+                      {match.analysis.reviewedBy ?? 'Gemini'})
+                    </div>
+                    {/* Kỹ năng khớp / còn thiếu — dạng chip cho dễ quét */}
+                    {match.analysis.skillsMatched.length > 0 && (
+                      <div className="mt-4">
+                        <div className="mb-1.5 text-xs font-semibold text-ink-500">
+                          Kỹ năng khớp
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {match.analysis.skillsMatched.map((s, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {match.analysis.skillsGaps.length > 0 && (
+                      <div className="mt-3">
+                        <div className="mb-1.5 text-xs font-semibold text-ink-500">Còn thiếu</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {match.analysis.skillsGaps.map((s, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+                            >
+                              <span className="shrink-0">⚠️</span>
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tóm tắt: tách Điểm sáng / Điểm cần lưu ý thành 2 khối */}
+                    {(() => {
+                      const sum = parseMatchSummary(match.analysis.summary)
+                      return (
+                        <div className="mt-4 space-y-2.5">
+                          {sum.strengths && (
+                            <div className="rounded-xl bg-emerald-50 p-3">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                <CheckCircle2 className="h-4 w-4" /> Điểm sáng
+                              </div>
+                              <p className="mt-1 text-sm text-ink-600">{sum.strengths}</p>
+                            </div>
+                          )}
+                          {sum.gaps && (
+                            <div className="rounded-xl bg-amber-50 p-3">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                                <span>⚠️</span> Điểm cần lưu ý
+                              </div>
+                              <p className="mt-1 text-sm text-ink-600">{sum.gaps}</p>
+                            </div>
+                          )}
+                          {sum.rest && <p className="text-sm text-ink-500">{sum.rest}</p>}
+                        </div>
+                      )
+                    })()}
+
+                    <p className="mt-3 text-xs text-ink-400">
+                      Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo
+                    </p>
+                    <Link
+                      to="/candidate/profile?focus=cv"
+                      className="mt-3 block w-full rounded-xl border border-ai-300 bg-white px-3 py-2 text-center text-sm font-semibold text-ai-700 hover:bg-ai-50"
+                    >
+                      Cập nhật CV khác
+                    </Link>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm text-ink-500">
+                    {match.message || 'Chưa thể phân tích CV lúc này. Vui lòng thử lại sau.'}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-ink-500">
+                Không tải được phân tích CV. Vui lòng thử lại sau.
+              </p>
+            )}
           </div>
 
           {/* Company */}

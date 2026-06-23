@@ -78,6 +78,27 @@ export default {
         card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)',
         'card-hover': '0 8px 30px -8px rgb(79 70 229 / 0.25)',
       },
+      keyframes: {
+        // Hiệu ứng shimmer cho skeleton loading: dải sáng quét ngang (đổi background-position).
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+        // Hiệu ứng "chỉ dẫn": viền sáng tím pulse để hướng sự chú ý vào một khối.
+        'guide-glow': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgb(168 85 247 / 0)' },
+          '30%': {
+            boxShadow: '0 0 0 4px rgb(168 85 247 / 0.45), 0 0 24px 4px rgb(168 85 247 / 0.35)',
+          },
+          '65%': {
+            boxShadow: '0 0 0 6px rgb(168 85 247 / 0.2), 0 0 36px 10px rgb(168 85 247 / 0.18)',
+          },
+        },
+      },
+      animation: {
+        'guide-glow': 'guide-glow 1.6s ease-in-out 2',
+        shimmer: 'shimmer 1.4s linear infinite',
+      },
       fontFamily: {
         sans: [
           'Inter',

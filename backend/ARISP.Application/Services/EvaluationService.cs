@@ -19,22 +19,57 @@ namespace ARISP.Application.Services
             _unitOfWork = unitOfWork;
         }
 
+        // ===== Projection nhẹ cho danh sách đánh giá: KHÔNG kéo cột JSON lớn của Evaluation
+        // (criterion_scores/question_analyses/reasoning/cheat_signals/language_assessment). =====
+        private sealed class EvalLite
+        {
+            public Guid Id { get; set; }
+            public Guid SessionId { get; set; }
+            public Guid ApplicationId { get; set; }
+            public int RoundNumber { get; set; }
+            public string SessionType { get; set; } = string.Empty;
+            public string AiVerdict { get; set; } = string.Empty;
+            public decimal? OverallScore { get; set; }
+            public decimal? CheatScore { get; set; }
+            public DateTimeOffset CreatedAt { get; set; }
+        }
+        private sealed class ReviewLite
+        {
+            public Guid EvaluationId { get; set; }
+            public string FinalVerdict { get; set; } = string.Empty;
+        }
+        private sealed class EvalAppLite
+        {
+            public Guid Id { get; set; }
+            public Guid JobPostingId { get; set; }
+            public string CandidateName { get; set; } = string.Empty;
+            public string CandidateEmail { get; set; } = string.Empty;
+        }
+
         public async Task<Result<PaginatedResponse<EvaluationListItemResponse>>> GetEvaluationsAsync(
-            Guid? jobPostingId, 
-            string? status, 
-            int page, 
-            int pageSize, 
+            Guid? jobPostingId,
+            string? status,
+            int page,
+            int pageSize,
             CancellationToken ct = default)
         {
-            var evaluations = await _unitOfWork.Repository<Evaluation>().GetAllAsync(ct);
-            var hrReviews = await _unitOfWork.Repository<HrReview>().GetAllAsync(ct);
+            List<EvalLite> evaluations = await _unitOfWork.Repository<Evaluation>()
+                .QueryAsync(q => q.Select(e => new EvalLite
+                {
+                    Id = e.Id, SessionId = e.SessionId, ApplicationId = e.ApplicationId, RoundNumber = e.RoundNumber,
+                    SessionType = e.SessionType, AiVerdict = e.AiVerdict, OverallScore = e.OverallScore,
+                    CheatScore = e.CheatScore, CreatedAt = e.CreatedAt,
+                }), ct);
+            var hrReviews = await _unitOfWork.Repository<HrReview>()
+                .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct);
             var reviewedEvalIds = hrReviews.Select(r => r.EvaluationId).ToHashSet();
 
             // Filter by JobPostingId if specified
             if (jobPostingId.HasValue)
             {
-                var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(a => a.JobPostingId == jobPostingId.Value, ct);
-                var appIds = applications.Select(a => a.Id).ToHashSet();
+                var appIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                        .QueryAsync(q => q.Where(a => a.JobPostingId == jobPostingId.Value).Select(a => a.Id), ct))
+                    .ToHashSet();
                 evaluations = evaluations.Where(e => appIds.Contains(e.ApplicationId)).ToList();
             }
 
@@ -52,7 +87,7 @@ namespace ARISP.Application.Services
                 }
                 else if (statusLower == "pass" || statusLower == "not_pass")
                 {
-                    evaluations = evaluations.Where(e => 
+                    evaluations = evaluations.Where(e =>
                         (reviewedEvalIds.Contains(e.Id) && hrReviews.First(r => r.EvaluationId == e.Id).FinalVerdict.ToLower() == statusLower) ||
                         (!reviewedEvalIds.Contains(e.Id) && e.AiVerdict.ToLower() == statusLower)
                     ).ToList();
@@ -79,30 +114,44 @@ namespace ARISP.Application.Services
             }
 
             var appIdsInEvals = paginatedEvals.Select(e => e.ApplicationId).Distinct().ToList();
-            var applicationsForEvals = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(a => appIdsInEvals.Contains(a.Id), ct);
-            var appDict = applicationsForEvals.ToDictionary(a => a.Id);
+            var appDict = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                    .QueryAsync(q => q.Where(a => appIdsInEvals.Contains(a.Id)).Select(a => new EvalAppLite
+                    {
+                        Id = a.Id, JobPostingId = a.JobPostingId, CandidateName = a.CandidateName, CandidateEmail = a.CandidateEmail,
+                    }), ct))
+                .ToDictionary(a => a.Id);
 
-            var jobIds = applicationsForEvals.Select(a => a.JobPostingId).Distinct().ToList();
-            var jobs = await _unitOfWork.Repository<JobPosting>().FindAsync(j => jobIds.Contains(j.Id), ct);
-            var jobDict = jobs.ToDictionary(j => j.Id);
+            var jobIds = appDict.Values.Select(a => a.JobPostingId).Distinct().ToList();
+            var jobTitleById = (await _unitOfWork.Repository<JobPosting>()
+                    .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct))
+                .ToDictionary(j => j.Id, j => j.Title);
 
             var hrDict = hrReviews.ToDictionary(r => r.EvaluationId);
 
             var responseList = paginatedEvals.Select(e =>
             {
                 appDict.TryGetValue(e.ApplicationId, out var app);
-                JobPosting? job = null;
-                if (app != null)
-                {
-                    jobDict.TryGetValue(app.JobPostingId, out job);
-                }
+                string? jobTitle = null;
+                if (app != null) jobTitleById.TryGetValue(app.JobPostingId, out jobTitle);
                 hrDict.TryGetValue(e.Id, out var hr);
 
-                return EvaluationListItemResponse.FromEntity(
-                    e, 
-                    app ?? new ARISP.Domain.Entities.Application { CandidateName = "Unknown", CandidateEmail = "Unknown" }, 
-                    job ?? new JobPosting { Title = "Unknown Job" }, 
-                    hr);
+                return new EvaluationListItemResponse
+                {
+                    Id = e.Id,
+                    SessionId = e.SessionId,
+                    ApplicationId = e.ApplicationId,
+                    RoundNumber = e.RoundNumber,
+                    SessionType = e.SessionType,
+                    AiVerdict = e.AiVerdict,
+                    OverallScore = e.OverallScore,
+                    CheatScore = e.CheatScore,
+                    CreatedAt = e.CreatedAt,
+                    CandidateName = app?.CandidateName ?? "Unknown",
+                    CandidateEmail = app?.CandidateEmail ?? "Unknown",
+                    JobTitle = jobTitle ?? "Unknown Job",
+                    Status = hr != null ? "completed" : "pending",
+                    FinalVerdict = hr != null ? hr.FinalVerdict : e.AiVerdict,
+                };
             }).ToList();
 
             return Result.Success(new PaginatedResponse<EvaluationListItemResponse>
@@ -155,9 +204,11 @@ namespace ARISP.Application.Services
             if (job == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Job posting associated with this application was not found.");
 
-            var evaluations = await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.ApplicationId == applicationId, ct);
-            var hrReviews = await _unitOfWork.Repository<HrReview>().GetAllAsync(ct);
-            var hrDict = hrReviews.ToDictionary(r => r.EvaluationId);
+            var evaluations = (await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.ApplicationId == applicationId, ct)).ToList();
+            var evalIds = evaluations.Select(e => e.Id).ToList();
+            // Chỉ lấy HrReview của các đánh giá thuộc hồ sơ này (không quét toàn bảng).
+            var hrDict = (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId), ct))
+                .ToDictionary(r => r.EvaluationId);
 
             var responseList = evaluations.Select(e =>
             {

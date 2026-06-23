@@ -59,5 +59,14 @@ namespace ARISP.Infrastructure.Storage
             catch { /* best-effort */ }
             return Task.CompletedTask;
         }
+
+        public async Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(storageKey)) return null;
+            var fileName = Path.GetFileName(storageKey);
+            var filePath = Path.Combine(_uploadsFolder, fileName);
+            if (!File.Exists(filePath)) return null;
+            return await File.ReadAllBytesAsync(filePath, ct);
+        }
     }
 }

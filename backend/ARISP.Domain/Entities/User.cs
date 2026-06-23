@@ -11,6 +11,8 @@ namespace ARISP.Domain.Entities
         public string? FullName { get; set; }
         public string? Department { get; set; }
         public bool IsActive { get; set; } = true;
+        /// <summary>Lý do tài khoản bị khóa (set khi Super Admin khóa). Null nếu đang hoạt động.</summary>
+        public string? LockReason { get; set; }
         public DateTimeOffset? LastLoginAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

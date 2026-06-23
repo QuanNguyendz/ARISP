@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronDown, Search, Check } from 'lucide-react'
+import { ChevronDown, Search, Check, X } from 'lucide-react'
 
 export interface SelectOption {
   value: number
@@ -9,11 +9,7 @@ export interface SelectOption {
 
 /** Chuẩn hoá tiếng Việt để tìm không dấu: "Hà Nội" -> "ha noi". */
 function normalizeVi(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[đ]/g, 'd')
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đ]/g, 'd')
 }
 
 /**
@@ -28,6 +24,7 @@ export default function SearchableSelect({
   disabled = false,
   emptyText = 'Không có kết quả',
   icon,
+  onClear,
 }: {
   options: SelectOption[]
   value: number | null | undefined
@@ -36,6 +33,8 @@ export default function SearchableSelect({
   disabled?: boolean
   emptyText?: string
   icon?: ReactNode
+  /** Khi truyền vào và đang có lựa chọn → hiện nút xoá (X) để bỏ chọn. */
+  onClear?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -79,9 +78,31 @@ export default function SearchableSelect({
         <span className={`flex-1 truncate ${selected ? '' : 'text-ink-400'}`}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-ink-400 transition ${open ? 'rotate-180' : ''}`}
-        />
+        {onClear && selected ? (
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label="Xoá lựa chọn"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClear()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                onClear()
+              }
+            }}
+            className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-ink-400 hover:bg-ink-200 hover:text-ink-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </span>
+        ) : (
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-ink-400 transition ${open ? 'rotate-180' : ''}`}
+          />
+        )}
       </button>
 
       {open && (

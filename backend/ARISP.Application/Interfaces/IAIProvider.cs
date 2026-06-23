@@ -73,5 +73,11 @@ namespace ARISP.Application.Interfaces
         Task<EvaluationReport> GenerateEvaluationAsync(SessionContext ctx, CancellationToken ct);
         Task<string> DetectLanguageRequirementAsync(string jdText, CancellationToken ct);
         Task<LanguageAssessment> AssessLanguageProficiencyAsync(SessionContext ctx, CancellationToken ct);
+
+        /// <summary>
+        /// Sinh JSON có cấu trúc một lần theo schema mô tả trong <paramref name="systemInstruction"/>.
+        /// Dùng làm fallback khi nhà cung cấp chính (Gemini) lỗi/quá tải. Trả về chuỗi JSON thô.
+        /// </summary>
+        Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default);
     }
 }

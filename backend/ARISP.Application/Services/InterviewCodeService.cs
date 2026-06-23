@@ -222,20 +222,14 @@ namespace ARISP.Application.Services
 
         private string GenerateSecureRandomCode()
         {
-            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Loại bỏ ký tự dễ nhầm lẫn (I, O, 0, 1) theo đúng mẫu hướng dẫn
-            var prefixChars = new char[3];
-            var suffixChars = new char[4];
-
-            for (int i = 0; i < 3; i++)
+            // ADR-016: mã 6 ký tự alphanumeric, loại ký tự dễ nhầm (I, O, 0, 1). Không dấu gạch.
+            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            var codeChars = new char[6];
+            for (int i = 0; i < codeChars.Length; i++)
             {
-                prefixChars[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
+                codeChars[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
             }
-            for (int i = 0; i < 4; i++)
-            {
-                suffixChars[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
-            }
-
-            return $"{new string(prefixChars)}-{new string(suffixChars)}";
+            return new string(codeChars);
         }
     }
 }

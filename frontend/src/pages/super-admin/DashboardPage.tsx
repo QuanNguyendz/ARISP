@@ -1,203 +1,257 @@
-import { motion } from 'framer-motion';
-import { Users, Shield, Activity, UserCheck, Settings, Bell } from 'lucide-react';
-import { PageHeader, StatsGrid } from '@components/shared';
-import { useAuthStore } from '@store/auth/authStore';
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Users, Activity, UserCheck, Shield, UserPlus, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { PageHeader, StatsGrid, ErrorAlert } from '@components/shared'
+import { useAuthStore } from '@store/auth/authStore'
+import { adminService, type AdminStats, type AccountRequest, type AuditLogEntry } from '@services/admin'
+import { auditActionLabel, roleLabel, roleBadgeClass, timeAgo } from '@utils/adminLabels'
+import { DashboardSkeleton } from './_skeletons'
 
-const stats = [
-  { label: 'Tổng Users', value: 156, change: '+12', color: 'text-blue-400' },
-  { label: 'Users chờ duyệt', value: 8, change: '+3', color: 'text-amber-400' },
-  { label: 'HR Admins', value: 12, change: '+2', color: 'text-violet-400' },
-  { label: 'Recruiters', value: 45, change: '+5', color: 'text-emerald-400' },
-];
-
-const recentAuditLogs = [
-  { id: '1', action: 'User approved', user: 'Nguyễn Văn A', target: 'Trần Thị B', time: '5 phút trước' },
-  { id: '2', action: 'Role changed', user: 'Admin', target: 'User X → HR Admin', time: '15 phút trước' },
-  { id: '3', action: 'New user registered', user: 'System', target: 'user@example.com', time: '30 phút trước' },
-  { id: '4', action: 'Settings updated', user: 'Super Admin', target: 'System config', time: '1 giờ trước' },
-];
-
-const pendingUsers = [
-  { id: '1', name: 'Lê Minh C', email: 'minhc@example.com', role: 'Recruiter', requestedAt: '2 giờ trước' },
-  { id: '2', name: 'Phạm Thu D', email: 'thud@example.com', role: 'HR Admin', requestedAt: '4 giờ trước' },
-  { id: '3', name: 'Đỗ Hoàng E', email: 'hoange@example.com', role: 'Recruiter', requestedAt: '1 ngày trước' },
-];
+const initials = (name?: string | null) =>
+  (name || 'U')
+    .trim()
+    .split(/\s+/)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 
 export default function SuperAdminDashboardPage() {
-  const { user } = useAuthStore();
+  const { user } = useAuthStore()
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [requests, setRequests] = useState<AccountRequest[]>([])
+  const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [s, p, l] = await Promise.all([
+        adminService.getStats(),
+        adminService.getAccountRequests('pending'),
+        adminService.getAuditLogs({ page: 1, pageSize: 6 }),
+      ])
+      setStats(s)
+      setRequests(p)
+      setLogs(l.items)
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Không tải được dữ liệu tổng quan.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const handleApprove = async (id: string) => {
+    setApprovingId(id)
+    try {
+      await adminService.approveAccountRequest(id)
+      await load()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Không thể duyệt yêu cầu.')
+    } finally {
+      setApprovingId(null)
+    }
+  }
+
+  if (loading) return <DashboardSkeleton />
+
+  const statCards = [
+    { label: 'Tổng người dùng', value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
+    { label: 'YC chờ duyệt', value: stats?.pendingRequests ?? 0, color: 'text-amber-600' },
+    { label: 'Bị khóa', value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
+    { label: 'Recruiter', value: stats?.recruiters ?? 0, color: 'text-emerald-600' },
+  ]
 
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
         title={`Xin chào, ${user?.name || 'Super Admin'}`}
-        description="Tổng quan hệ thống ARISP"
-        actions={[
-          { label: 'Cài đặt', href: '/super-admin/settings', variant: 'secondary' },
-        ]}
+        description="Tổng quan quản trị hệ thống ARISP"
+        actions={[{ label: 'Cài đặt hệ thống', href: '/super-admin/settings', variant: 'secondary' }]}
       />
 
-      <StatsGrid stats={stats} />
+      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Pending Users */}
+      <StatsGrid stats={statCards} />
+
+      <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+          {/* Pending users */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                  <UserCheck className="w-5 h-5" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">Yêu cầu tạo tài khoản</h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">HR Leader gửi · chờ bạn duyệt</p>
+                </div>
+              </div>
+              <Link to="/super-admin/users/pending" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                Xem tất cả
+              </Link>
+            </div>
+
+            {requests.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <p className="text-sm text-ink-500 dark:text-ink-400">Không có yêu cầu nào chờ duyệt</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {requests.slice(0, 4).map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 bg-ink-50 dark:bg-white/5 p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
+                        {initials(r.fullName || r.email)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{r.fullName || r.email}</p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">{r.email} · bởi {r.requestedBy}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className={`hidden sm:inline rounded-full px-2.5 py-0.5 text-xs font-medium ${roleBadgeClass(r.role)}`}>
+                        {roleLabel(r.role)}
+                      </span>
+                      <button
+                        onClick={() => handleApprove(r.id)}
+                        disabled={approvingId === r.id}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {approvingId === r.id ? 'Đang duyệt...' : 'Duyệt'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Recent audit logs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-6 overflow-hidden"
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
           >
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <UserCheck className="w-5 h-5 text-amber-400" />
-                </div>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400">
+                  <Activity className="w-5 h-5" />
+                </span>
                 <div>
-                  <h2 className="text-base font-semibold text-white">Users chờ duyệt</h2>
-                  <p className="text-xs text-white/40">Cần xác minh và phê duyệt</p>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">Nhật ký hoạt động</h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">Thay đổi gần đây trong hệ thống</p>
                 </div>
               </div>
-              <a href="/super-admin/users/pending" className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">Xem tất cả</a>
+              <Link to="/super-admin/audit-logs" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                Xem tất cả
+              </Link>
             </div>
 
-            <div className="space-y-3">
-              {pendingUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/30 to-orange/30 flex items-center justify-center text-xs font-medium text-white">
-                      {user.name.split(' ').map((n) => n[0]).join('')}
+            {logs.length === 0 ? (
+              <p className="py-8 text-center text-sm text-ink-500 dark:text-ink-400">Chưa có hoạt động nào</p>
+            ) : (
+              <div className="space-y-2">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-400">
+                        <Activity className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{auditActionLabel(log.action)}</p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">bởi {log.actorName}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-white">{user.name}</h3>
-                      <p className="text-xs text-white/40">{user.email}</p>
-                    </div>
+                    <span className="shrink-0 text-xs text-ink-400">{timeAgo(log.createdAt)}</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 text-xs font-medium">
-                      {user.role}
-                    </span>
-                    <span className="text-xs text-white/30">{user.requestedAt}</span>
-                    <a href="/super-admin/users/pending" className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors">
-                      Duyệt
-                    </a>
-                  </div>
-                </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Sidebar column */}
+        <div className="space-y-6">
+          {/* Quick actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+          >
+            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">Thao tác nhanh</h2>
+            <div className="space-y-2">
+              {[
+                { to: '/super-admin/users?create=1', icon: UserPlus, label: 'Tạo tài khoản staff', tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20' },
+                { to: '/super-admin/users/pending', icon: UserCheck, label: 'Duyệt user mới', tint: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20' },
+                { to: '/super-admin/users', icon: Users, label: 'Quản lý người dùng', tint: 'text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-500/20' },
+                { to: '/super-admin/audit-logs', icon: Activity, label: 'Xem audit logs', tint: 'text-ai-600 dark:text-ai-400 bg-ai-100 dark:bg-ai-500/20' },
+              ].map((a) => (
+                <Link
+                  key={a.to}
+                  to={a.to}
+                  className="flex items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:border-brand-300 dark:hover:border-brand-500/40 hover:bg-ink-50 dark:hover:bg-white/5"
+                >
+                  <span className={`grid h-8 w-8 place-items-center rounded-lg ${a.tint}`}>
+                    <a.icon className="w-4 h-4" />
+                  </span>
+                  <span className="flex-1 text-sm text-ink-700 dark:text-ink-200">{a.label}</span>
+                  <ArrowRight className="w-4 h-4 text-ink-400" />
+                </Link>
               ))}
             </div>
           </motion.div>
 
-          {/* Recent Audit Logs */}
+          {/* System status */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-6 overflow-hidden"
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
           >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-white">Nhật ký hoạt động</h2>
-                  <p className="text-xs text-white/40">Theo dõi thay đổi hệ thống</p>
-                </div>
-              </div>
-              <a href="/super-admin/audit-logs" className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">Xem tất cả</a>
+            <div className="mb-4 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-ink-400" />
+              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Phân bổ tài khoản</h2>
             </div>
-
-            <div className="space-y-3">
-              {recentAuditLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                      <Activity className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-white">{log.action}</p>
-                      <p className="text-xs text-white/40">Target: {log.target}</p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-white/30">{log.time}</span>
+            <div className="space-y-3 text-sm">
+              {[
+                { label: 'Super Admin', value: stats?.superAdmins ?? 0 },
+                { label: 'HR Admin', value: stats?.hrAdmins ?? 0 },
+                { label: 'Recruiter', value: stats?.recruiters ?? 0 },
+                { label: 'Ứng viên', value: stats?.candidates ?? 0 },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-ink-500 dark:text-ink-400">{row.label}</span>
+                  <span className="font-semibold text-ink-900 dark:text-white">{row.value}</span>
                 </div>
               ))}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-5 overflow-hidden"
-          >
-            <h2 className="text-sm font-semibold text-white mb-4">Thao tác nhanh</h2>
-            <div className="space-y-2">
-              <a href="/super-admin/users/pending" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-emerald-400" />
-                </div>
-                <span className="text-sm text-white">Duyệt Users mới</span>
-              </a>
-              <a href="/super-admin/users" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-blue-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-blue-400" />
-                </div>
-                <span className="text-sm text-white">Quản lý Users</span>
-              </a>
-              <a href="/super-admin/audit-logs" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-violet-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                  <Activity className="w-4 h-4 text-violet-400" />
-                </div>
-                <span className="text-sm text-white">Xem Audit Logs</span>
-              </a>
-              <a href="/super-admin/settings" className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/30 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <Settings className="w-4 h-4 text-amber-400" />
-                </div>
-                <span className="text-sm text-white">Cài đặt hệ thống</span>
-              </a>
-            </div>
-          </motion.div>
-
-          {/* System Status */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-5 overflow-hidden"
-          >
-            <h2 className="text-sm font-semibold text-white mb-4">Trạng thái hệ thống</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40">Database</span>
-                <span className="flex items-center gap-2 text-xs text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  Online
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40">API Server</span>
-                <span className="flex items-center gap-2 text-xs text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  Online
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40">AI Service</span>
-                <span className="flex items-center gap-2 text-xs text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  Online
-                </span>
-              </div>
             </div>
           </motion.div>
         </div>
       </div>
     </div>
-  );
+  )
 }

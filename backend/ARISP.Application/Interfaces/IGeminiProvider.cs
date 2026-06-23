@@ -22,5 +22,15 @@ namespace ARISP.Application.Interfaces
             string? cvMimeType,
             string? fallbackCvText,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// Trích xuất thông tin có cấu trúc của Job Posting từ file JD (PDF/DOCX) để auto-fill
+        /// form tạo tin tuyển dụng. Người dùng vẫn chỉnh sửa lại được sau khi điền.
+        /// </summary>
+        Task<Result<JdExtractionResultDto>> ExtractJobFromJdAsync(
+            byte[]? jdFileBytes,
+            string? jdMimeType,
+            string? fallbackJdText,
+            CancellationToken ct = default);
     }
 }

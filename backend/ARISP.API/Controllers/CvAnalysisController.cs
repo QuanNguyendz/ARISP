@@ -33,11 +33,11 @@ namespace ARISP.API.Controllers
             if (request.CvFile == null || request.CvFile.Length == 0)
                 return BadRequest(new { message = "File CV không hợp lệ." });
 
-            var allowedExtensions = new[] { ".pdf", ".docx", ".doc", ".txt" };
+            var allowedExtensions = new[] { ".pdf", ".docx" };
             var extension = System.IO.Path.GetExtension(request.CvFile.FileName).ToLowerInvariant();
             if (!System.Linq.Enumerable.Contains(allowedExtensions, extension))
             {
-                return BadRequest(new { message = "Chỉ chấp nhận file định dạng PDF, DOC, DOCX, TXT." });
+                return BadRequest(new { message = "Chỉ chấp nhận file định dạng PDF, DOCX." });
             }
 
             using var cvStream = request.CvFile.OpenReadStream();

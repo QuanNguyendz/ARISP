@@ -14,6 +14,10 @@ namespace ARISP.Application.DTOs
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
+        // File JD gốc (PDF/DOCX) đã upload qua /jobs/analyze-jd – lưu storageKey + metadata vào job.
+        public string? JdFileUrl { get; set; }
+        public string? JdFileName { get; set; }
+        public string? JdFileFormat { get; set; } // pdf | docx
         public string InterviewMode { get; set; } = "remote"; // remote | onsite | both
         public bool IsPublicListing { get; set; } = false;
         public string? LanguageRequirement { get; set; }
@@ -36,6 +40,8 @@ namespace ARISP.Application.DTOs
         public string? JobCategory { get; set; }
         public DateTimeOffset? ApplicationDeadline { get; set; }
         public bool IsUrgent { get; set; } = false;
+        /// <summary>Số lượng cần tuyển (chỉ tiêu). Null/0 = không giới hạn.</summary>
+        public int? Vacancies { get; set; }
     }
 
     public class UpdateJobStatusRequest
@@ -78,8 +84,12 @@ namespace ARISP.Application.DTOs
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
+        public string? JdFileUrl { get; set; }
+        public string? JdFileName { get; set; }
+        public string? JdFileFormat { get; set; }
         public string InterviewMode { get; set; } = "remote";
         public string Status { get; set; } = "draft";
+        public string? RejectionReason { get; set; }
         public bool IsPublicListing { get; set; }
         public string? DetectedLanguage { get; set; }
         public string? LanguageRequirement { get; set; }
@@ -98,7 +108,15 @@ namespace ARISP.Application.DTOs
         public string? JobCategory { get; set; }
         public DateTimeOffset? ApplicationDeadline { get; set; }
         public bool IsUrgent { get; set; }
+        public int? Vacancies { get; set; }
         public JsonElement? ScoringRubric { get; set; }
+
+        // ===== Phê duyệt của HR Leader =====
+        public Guid? ApprovedByUserId { get; set; }
+        public DateTimeOffset? ApprovedAt { get; set; }
+        public string? ApproverName { get; set; }
+        /// <summary>URL file JD đã đóng dấu duyệt (đã resolve cho staff). Null nếu chưa duyệt/không phải PDF.</summary>
+        public string? SignedJdFileUrl { get; set; }
 
         public static JobPostingResponse FromEntity(JobPosting job, List<RoundConfigDto> roundConfigs) =>
             new()
@@ -108,8 +126,12 @@ namespace ARISP.Application.DTOs
                 Title = job.Title,
                 Department = job.Department,
                 JobDescription = job.JobDescription,
+                JdFileUrl = job.JdFileUrl,
+                JdFileName = job.JdFileName,
+                JdFileFormat = job.JdFileFormat,
                 InterviewMode = job.InterviewMode,
                 Status = job.Status,
+                RejectionReason = job.RejectionReason,
                 IsPublicListing = job.IsPublicListing,
                 DetectedLanguage = job.DetectedLanguage,
                 LanguageRequirement = job.LanguageRequirement,
@@ -128,7 +150,12 @@ namespace ARISP.Application.DTOs
                 JobCategory = job.JobCategory,
                 ApplicationDeadline = job.ApplicationDeadline,
                 IsUrgent = job.IsUrgent ?? false,
-                ScoringRubric = !string.IsNullOrEmpty(job.ScoringRubric) ? JsonSerializer.Deserialize<JsonElement>(job.ScoringRubric, (JsonSerializerOptions?)null) : null
+                Vacancies = job.Vacancies,
+                ScoringRubric = !string.IsNullOrEmpty(job.ScoringRubric) ? JsonSerializer.Deserialize<JsonElement>(job.ScoringRubric, (JsonSerializerOptions?)null) : null,
+                ApprovedByUserId = job.ApprovedByUserId,
+                ApprovedAt = job.ApprovedAt,
+                ApproverName = job.ApproverName,
+                SignedJdFileUrl = job.SignedJdFileUrl
             };
     }
 
@@ -152,6 +179,8 @@ namespace ARISP.Application.DTOs
         public string? ExperienceLevel { get; set; }
         public string? JobCategory { get; set; }
         public bool IsUrgent { get; set; }
+        public int? Vacancies { get; set; }
+        public List<string> Skills { get; set; } = new();
 
         // Lương (dùng cho màn duyệt tin & danh sách)
         public decimal? SalaryMin { get; set; }
@@ -185,6 +214,8 @@ namespace ARISP.Application.DTOs
                 ExperienceLevel = job.ExperienceLevel,
                 JobCategory = job.JobCategory,
                 IsUrgent = job.IsUrgent ?? false,
+                Vacancies = job.Vacancies,
+                Skills = job.Skills ?? new List<string>(),
                 SalaryMin = job.SalaryMin,
                 SalaryMax = job.SalaryMax,
                 SalaryCurrency = job.SalaryCurrency,
@@ -192,6 +223,30 @@ namespace ARISP.Application.DTOs
                 CreatedByUserId = job.CreatedByUserId,
                 RejectionReason = job.RejectionReason
             };
+    }
+
+    /// <summary>Một mục trong bộ lọc (facet): giá trị thô, nhãn hiển thị và số lượng job khớp.</summary>
+    public class JobFacetItem
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+
+    /// <summary>
+    /// Tập hợp các bộ lọc khả dụng cho Job Board – chỉ chứa những giá trị THỰC SỰ có
+    /// trong danh sách tin đang active &amp; public, kèm số lượng để hiển thị "Junior (2)".
+    /// </summary>
+    public class JobFacetsResponse
+    {
+        public List<JobFacetItem> Categories { get; set; } = new();
+        public List<JobFacetItem> EmploymentTypes { get; set; } = new();
+        public List<JobFacetItem> ExperienceLevels { get; set; } = new();
+        public List<JobFacetItem> WorkModes { get; set; } = new();
+        public List<JobFacetItem> Locations { get; set; } = new();
+        public List<JobFacetItem> Skills { get; set; } = new();
+        public List<JobFacetItem> Languages { get; set; } = new();
+        public int TotalJobs { get; set; }
     }
 
     /// <summary>

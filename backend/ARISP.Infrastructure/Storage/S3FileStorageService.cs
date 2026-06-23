@@ -100,5 +100,26 @@ namespace ARISP.Infrastructure.Storage
                 _logger.LogWarning(ex, "Không xoá được object {Key} trên S3 storage.", storageKey);
             }
         }
+
+        public async Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(storageKey)) return null;
+            try
+            {
+                using var response = await _s3.GetObjectAsync(new GetObjectRequest
+                {
+                    BucketName = _options.Bucket,
+                    Key = storageKey.TrimStart('/')
+                }, ct);
+                using var ms = new MemoryStream();
+                await response.ResponseStream.CopyToAsync(ms, ct);
+                return ms.ToArray();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Không đọc được object {Key} trên S3 storage.", storageKey);
+                return null;
+            }
+        }
     }
 }

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Settings, User, Bell, Lock } from 'lucide-react'
+import { User, Bell, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { PageHeader } from '@components/shared'
 

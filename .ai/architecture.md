@@ -135,18 +135,21 @@ public interface IEmbeddingProvider
 - Notification: email + in-app (SignalR) khi Evaluation hoàn thành.
 
 ### ADR-015: Interview Mode – Practice (Remote) vs Real (On-site)
-- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser tại nhà để làm quen hệ thống. Xác thực qua magic link.
+- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser tại nhà để làm quen hệ thống. **[Cập nhật ADR-038]** Chỉ mở cho ứng viên **đã pass vòng CV** và được HR cấp **Interview Code 6 ký tự (type=`practice`)** — không còn dùng magic link cho practice.
 - **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng, nhập **Interview Code** tại thiết bị Kiosk.
 - **On-site Kiosk:** Frontend app chạy ở chế độ kiosk (full-screen, không expose các route khác) trên thiết bị công ty.
 - **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
-### ADR-016: Interview Code (On-site Access Control)
+### ADR-016: Interview Code (Access Control — Practice & Real)
 - **Format:** 6 ký tự alphanumeric, case-insensitive (ví dụ: `ARX7K2`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
 - **Binding:** Mỗi code bind với một `application_id` cụ thể.
+- **[Cập nhật ADR-038] Phân loại:** code có `code_type` (`practice` | `real`).
+  - `practice` — mở từ **browser (remote)**, dùng cho phỏng vấn thử; chỉ cấp cho ứng viên đã pass CV.
+  - `real` — chỉ nhập tại **Kiosk on-site** cho phỏng vấn thật.
 - **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt.
-- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id` nào.
+- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id` nào, `code_type` gì.
 
 ### ADR-017: Multi-round Interview
 - HR cấu hình số vòng và loại vòng per Job Posting (ví dụ: `[{round: 1, type: "screening"}, {round: 2, type: "technical"}]`).
@@ -249,9 +252,11 @@ public interface IEmbeddingProvider
 
 ### ADR-027: Practice Interview Session (Phỏng vấn thử)
 - **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity.
-- **Truy cập:** Chỉ qua magic link sau khi Candidate xác nhận vị trí ứng tuyển. Không xuất hiện trên Job Board hay Candidate Portal công cộng.
-- **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng.
+- **Truy cập:** **[Cập nhật ADR-038]** Chỉ ứng viên **đã pass vòng CV** + HR cấp **Interview Code type=`practice`** (remote, mở từ browser). Không xuất hiện công khai trên Job Board / Portal.
+- **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng; code one-time vô hiệu sau lần dùng.
 - **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
+- **Công nghệ:** **Đầy đủ pipeline như Real** (Google STT streaming → RAG → GPT-4o → ElevenLabs TTS → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
+- **Recording:** Practice **không quay video** — chỉ lưu **transcript** + Evaluation Report (giảm storage). Real lưu đầy đủ.
 - **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
 
 ### ADR-028: Usage Tracking Model
@@ -468,3 +473,50 @@ public interface IEmbeddingProvider
 - **Frontend:** service `provinceService` (gọi thẳng open-api, có cache trong phiên — **không** qua `apiClient` của backend). Trường địa điểm là **2 dropdown phụ thuộc** (chọn tỉnh → load phường; đổi tỉnh → reset phường).
 - **Database (`candidate_accounts`):** thêm `province_code` (int?), `province_name`, `ward_code` (int?), `ward_name`. Giữ cột cũ **`location`** nhưng chuyển thành **chuỗi hiển thị suy ra tự động** `"Phường X, Tỉnh Y"` (denormalized, tương thích ngược) — không còn nhập tay. Migration `AddCandidateAdminDivision`.
 - **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.
+
+### ADR-038: Tối ưu chi phí Phỏng vấn thử — gating theo phễu, không cắt công nghệ
+- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Google STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → 1 ứng viên = 2 lượt tính phí phỏng vấn.
+- **Nguyên tắc:** Practice **không ảnh hưởng verdict** nhưng vẫn cần **đầy đủ công nghệ** để ứng viên làm quen đúng trải nghiệm thật → **không tối ưu bằng cách cắt tech**, mà tối ưu bằng cách **giảm số lượng buổi (phễu)**.
+- **Quyết định:**
+  1. **Gating:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) và được HR **cấp Interview Code 6 ký tự type=`practice`** (remote). Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ đáng phỏng vấn.
+  2. **1 lần / application**, code one-time, vô hiệu ngay sau dùng.
+  3. **Đầy đủ pipeline** cả practice & real (xem ADR-027). Practice RAG = JD + CV; Real RAG = JD + CV + Playbook.
+  4. **Hybrid Idle (ADR-011)** áp dụng cho cả 2 mode — tiết kiệm ~90% HeyGen mà UX giữ nguyên (không phải "cắt tech").
+  5. **Trần cứng** cho practice: giới hạn số câu hỏi + thời lượng để tránh đốt token/STT-phút.
+  6. **Recording practice: không quay video, chỉ transcript** + Evaluation Report.
+  7. Tái dùng embeddings JD+CV đã sinh ở bước CV-JD Analysis (không embed lại).
+- **Thay đổi liên quan:** Cập nhật ADR-015 (practice qua code thay vì magic link), ADR-016 (`code_type` practice|real), ADR-027 (truy cập + recording).
+
+### ADR-039: RAG tách thành microservice Python riêng
+- **Quyết định:** Pipeline RAG (chunk + embed + retrieve, pgvector) tách khỏi backend .NET thành **service Python độc lập** (gợi ý: FastAPI). Backend .NET gọi qua HTTP/REST nội bộ.
+- **Lý do:** Hệ sinh thái RAG/embedding/LLM-tooling phong phú hơn ở Python; tách service để scale & deploy độc lập, không nặng backend chính.
+- **Ranh giới:** .NET vẫn giữ `IAIProvider` (GPT-4o, sinh câu hỏi/đánh giá — OpenAI). Phần **retrieval/embedding** chuyển sang service Python; `IEmbeddingProvider` phía .NET trở thành **client gọi service Python** (giữ nguyên interface để business logic không đổi — tuân ADR-004).
+- **Hợp đồng (dự kiến):** `POST /embed` (text[] → vectors), `POST /retrieve` (query + scope JD/CV/Playbook + filters → chunks xếp hạng). Practice: scope JD+CV; Real: thêm Playbook (ADR-025/027).
+- **Dữ liệu:** pgvector vẫn nằm trên PostgreSQL/Supabase; service Python kết nối trực tiếp (không Supabase SDK — tuân quy tắc dự án). Cân nhắc đặt bảng `document_chunks` thuộc sở hữu service Python.
+- **Hạ tầng:** thêm container Python vào Docker Compose; biến môi trường cho endpoint nội bộ; **không** expose ra ngoài Nginx.
+- **Trạng thái:** Quyết định kiến trúc đã chốt — **chưa triển khai**. Là task backend/infra riêng (Phase 4/4b), không chặn việc dựng UI phỏng vấn.
+- **Ràng buộc:** Không vi phạm "không Node.js cho backend" (đây là Python microservice cho RAG, backend chính vẫn .NET 8).
+
+### ADR-040: Cổng kiểm tra thiết bị bắt buộc (mic + cam) trước phỏng vấn
+- **Quyết định:** Ứng viên **chỉ được vào phỏng vấn (cả thử & thật)** khi **camera và micro hoạt động**. Bắt buộc qua bước Device Check trước khi vào phòng.
+- **Triển khai FE:** component dùng chung `components/interview/DeviceCheck.tsx` — `getUserMedia({video,audio})`, preview camera + đo mức âm mic (Web Audio AnalyserNode), chặn nút "Bắt đầu" cho đến khi cả hai track `live`; xử lý từ chối quyền / thiếu thiết bị + nút Thử lại; bàn giao luôn `MediaStream` đang chạy cho phòng phỏng vấn (tránh prompt quyền lần hai).
+- **Áp dụng:** Practice (`PracticeSessionPage`) đã tích hợp; Real/Kiosk sẽ tái dùng cùng component khi dựng (Phase 7).
+
+### ADR-041: Vòng đời tài khoản staff — Yêu cầu tạo (HR→SA) tách khỏi Khóa/Mở khóa
+- **Bối cảnh:** Pre-provisioning (ADR-023) khiến không có "user mới chờ duyệt" thật; cờ `User.IsActive=false` chỉ phát sinh khi Super Admin **khóa** tài khoản. Trang "Duyệt User mới" trước đây query `!IsActive` nên hiển thị nhầm tài khoản bị khóa thành "chờ duyệt".
+- **Quyết định:** Tách 2 vòng đời độc lập:
+  1. **Yêu cầu tạo tài khoản** (entity mới `AccountRequest`, bảng `account_requests`): HR Leader gửi yêu cầu (lẻ hoặc bulk cùng `BatchId`) → Super Admin **duyệt** (tạo `User` active + email mật khẩu tạm) hoặc **từ chối** (kèm lý do). Mỗi dòng = 1 tài khoản đề xuất. Trang "Duyệt tài khoản mới" chỉ hiển thị `account_requests` status=`pending`.
+  2. **Khóa / mở khóa**: thêm `User.LockReason` (bắt buộc nhập lý do khi khóa); quản lý trong "Tất cả người dùng" (badge "Bị khóa" + lý do + nút "Mở khóa"). Khóa = `user_deactivated`, mở = `user_activated` (xóa LockReason).
+- **API:** `POST/GET /api/hr/account-requests` (policy HrManagement); `GET /api/admin/account-requests?status=`, `POST .../{id}/approve|reject` (SuperAdminOnly). Mọi hành động ghi `AuditLog`.
+- **FE (2026-06-21):** màn HR Leader **"Nhóm HR"** (`/hr/team`) đã làm: gửi yêu cầu lẻ/hàng loạt + **import CSV** (kèm tải template) + theo dõi trạng thái yêu cầu của mình (pending/approved/rejected + lý do từ chối).
+- **Chưa làm (phase sau):** cơ chế **kháng cáo mở khóa** (người bị khóa gửi lý do xin gỡ) — dự kiến `UnlockAppealReason` / bảng appeals riêng.
+
+### ADR-042: Recruiter workspace cụm Job + Gemini trích xuất JD để auto-fill (mở rộng ADR-030)
+- **Bối cảnh:** Recruiter cần (1) dashboard chỉ hiển thị tin **của chính mình**, (2) xem **ứng viên theo từng job** (không phải toàn bộ), (3) khi tạo tin phải đính kèm **file JD (PDF/DOCX)** và muốn tự động điền các trường từ JD. Workflow duyệt tin (Recruiter `draft→pending` → HR Leader `active/rejected`) đã có sẵn ở `JobsController`.
+- **Quyết định:**
+  1. **Scope theo người tạo:** `GET /api/jobs/admin?mine=true` lọc `CreatedByUserId == currentUser` (Recruiter); không có `mine` = toàn bộ (HR/SA).
+  2. **Ứng viên theo job:** `GET /api/jobs/{id}/applications` (InternalStaff) — owner-or-admin check; trả `ApplicationResponse` kèm `MatchScore`, resolve `CvFileUrl` (storageKey → URL).
+  3. **Phân tích JD (mở rộng ADR-030/rule 18):** `POST /api/jobs/analyze-jd` (multipart) → parse text (`IDocumentParserService`) + lưu file (`IFileStorageService`) + gọi **Gemini 2.5 Flash** (`IGeminiProvider.ExtractJobFromJdAsync`, PDF gửi inline / DOCX fallback text) trích xuất `title, department, jobDescription, jobCategory, experienceLevel, employmentType, workMode, location, skills, languageRequirement, salary*`. Trả `AnalyzeJdResponse` gồm storageKey file JD + dữ liệu auto-fill. Gemini từ nay dùng cho **CV-JD Analysis _và_ JD extraction** (không dùng cho phỏng vấn AI/RAG — vẫn GPT-4o).
+  4. **File JD lưu vào job:** `JobPosting.JdFileUrl/JdFileName/JdFileFormat` được điền qua Create/Update (UpdateJob chỉ ghi đè khi request gửi file mới). FE bắt buộc upload+phân tích JD trước khi **tạo** tin.
+- **FE:** `RecruiterLayout` chuyển sang `WorkspaceLayout` dùng chung (theme sáng/tối). Cụm màn: Dashboard (lưới tin của tôi), Tin tuyển dụng (list + filter trạng thái), **Job Detail mới** (`/recruiter/my-jobs/:id`: phễu ứng viên theo trạng thái + danh sách ứng viên của job + gửi magic link + đổi trạng thái tin), Create/Edit (`/recruiter/my-jobs/:id/edit`) với card upload & phân tích JD auto-fill.
+- **Chưa làm (phase sau):** màn HR Leader duyệt tin (đã có API), màn "Cấp Interview Code", redesign Candidates/Evaluations/Interviews của Recruiter.

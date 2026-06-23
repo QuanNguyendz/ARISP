@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== react-grid-layout: theming khớp giao diện sáng/tối ===== */
+/* Ô gợi ý vị trí khi kéo (mặc định là khối đỏ) → đổi sang tông brand */
+.react-grid-item.react-grid-placeholder {
+  background: rgb(99 102 241 / 0.18);
+  border: 1px dashed rgb(99 102 241 / 0.55);
+  border-radius: 1rem;
+  opacity: 1;
+}
+/* Item đang kéo nổi lên trên */
+.react-grid-item.react-draggable-dragging {
+  z-index: 30;
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.18);
+  border-radius: 1rem;
+}
+.react-grid-item.resizing {
+  z-index: 30;
+}
+/* Tay nắm đổi cỡ ở góc dưới–phải rõ hơn trong dark mode */
+.dark .react-grid-item > .react-resizable-handle::after {
+  border-right-color: rgb(148 163 184);
+  border-bottom-color: rgb(148 163 184);
+}
+
 :root {
   font-family:
     'Inter',
@@ -63,6 +86,12 @@ html.dark .hover\:bg-ink-50:hover {
 html.dark .bg-brand-50 {
   background-color: rgb(99 102 241 / 0.16) !important;
 }
+html.dark .bg-brand-50\/60 {
+  background-color: rgb(99 102 241 / 0.16) !important;
+}
+html.dark .bg-amber-50\/60 {
+  background-color: rgb(245 158 11 / 0.12) !important;
+}
 html.dark .bg-ai-50 {
   background-color: rgb(168 85 247 / 0.16) !important;
 }
@@ -115,6 +144,25 @@ html.dark select {
   background-color: #0f172a;
   color: #e2e8f0;
 }
+/* Autofill của trình duyệt (Chrome/Safari) sơn nền sáng lên input đè cả theme tối.
+   Dùng transition cực dài để giữ nền trong suốt + set màu chữ theo theme. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s !important;
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+}
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill:active {
+  -webkit-text-fill-color: #e2e8f0;
+  caret-color: #e2e8f0;
+}
 /* Native date/time picker (icon lịch) theo tông tối */
 html.dark input[type='date'],
 html.dark input[type='datetime-local'],
@@ -131,12 +179,38 @@ html.dark .via-white {
   --tw-gradient-stops:
     var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position,), var(--tw-gradient-to) !important;
 }
+html.dark .via-ink-100 {
+  --tw-gradient-stops:
+    var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position,), var(--tw-gradient-to) !important;
+}
 html.dark .to-ai-50 {
   --tw-gradient-to: #020617 var(--tw-gradient-to-position) !important;
+}
+html.dark .from-ai-50 {
+  --tw-gradient-from: rgb(168 85 247 / 0.14) var(--tw-gradient-from-position) !important;
+}
+html.dark .from-emerald-50 {
+  --tw-gradient-from: rgb(16 185 129 / 0.14) var(--tw-gradient-from-position) !important;
+}
+html.dark .from-red-50 {
+  --tw-gradient-from: rgb(239 68 68 / 0.14) var(--tw-gradient-from-position) !important;
+}
+html.dark .bg-white\/60 {
+  background-color: rgb(15 23 42 / 0.6) !important;
 }
 html.dark .from-ai-50\/70 {
   --tw-gradient-from: rgb(168 85 247 / 0.12) var(--tw-gradient-from-position) !important;
 }
+html.dark .from-ai-50\/80 {
+  --tw-gradient-from: rgb(168 85 247 / 0.14) var(--tw-gradient-from-position) !important;
+}
+html.dark .to-brand-50\/70 {
+  --tw-gradient-to: rgb(99 102 241 / 0.14) var(--tw-gradient-to-position) !important;
+}
 html.dark .to-white {
   --tw-gradient-to: #0f172a var(--tw-gradient-to-position) !important;
+}
+/* Viền accent tím nhạt -> tông tối */
+html.dark .border-ai-200 {
+  border-color: rgb(168 85 247 / 0.28) !important;
 }

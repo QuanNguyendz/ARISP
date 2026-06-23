@@ -50,5 +50,9 @@ namespace ARISP.Application.DTOs
 
         [JsonIgnore]
         public int ProcessingTimeMs { get; set; }
+
+        /// <summary>Nhà cung cấp AI thực sự tạo phân tích: "Gemini" | "GPT-4o-mini" (fallback). Đặt nội bộ, không từ JSON của AI.</summary>
+        [JsonIgnore]
+        public string Provider { get; set; } = "Gemini";
     }
 }

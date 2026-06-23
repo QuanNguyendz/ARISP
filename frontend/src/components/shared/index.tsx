@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Bell } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface ActionButton {

@@ -29,6 +29,7 @@ namespace ARISP.Domain.Entities
         public string ExperienceJson { get; set; } = "[]";   // JSON array of {title, organization, period, description}
         public string EducationJson { get; set; } = "[]";    // JSON array of {school, degree, period, note}
         public string? CvReviewJson { get; set; }            // Kết quả Gemini đánh giá CV hồ sơ (CvReviewResponse)
+        public string? SettingsJson { get; set; }            // Tùy chọn cá nhân: thông báo, quyền riêng tư, ngôn ngữ (CandidateSettingsDto)
 
         public bool IsActive { get; set; } = true;
         public bool EmailVerified { get; set; } = false;

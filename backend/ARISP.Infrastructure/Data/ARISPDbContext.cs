@@ -27,6 +27,7 @@ namespace ARISP.Infrastructure.Data
         public DbSet<ARISP.Domain.Entities.Application> Applications => Set<ARISP.Domain.Entities.Application>();
         public DbSet<AvailabilitySlot> AvailabilitySlots => Set<AvailabilitySlot>();
         public DbSet<InterviewBooking> InterviewBookings => Set<InterviewBooking>();
+        public DbSet<InterviewInvite> InterviewInvites => Set<InterviewInvite>();
         public DbSet<InterviewCode> InterviewCodes => Set<InterviewCode>();
         public DbSet<InterviewSession> InterviewSessions => Set<InterviewSession>();
         public DbSet<Question> Questions => Set<Question>();
@@ -43,6 +44,9 @@ namespace ARISP.Infrastructure.Data
         public DbSet<OnlineTestQuestion> OnlineTestQuestions => Set<OnlineTestQuestion>();
         public DbSet<OnlineTestSubmission> OnlineTestSubmissions => Set<OnlineTestSubmission>();
         public DbSet<CvJdAnalysis> CvJdAnalyses => Set<CvJdAnalysis>();
+        public DbSet<SavedJob> SavedJobs => Set<SavedJob>();
+        public DbSet<Notification> Notifications => Set<Notification>();
+        public DbSet<AccountRequest> AccountRequests => Set<AccountRequest>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -153,6 +157,14 @@ namespace ARISP.Infrastructure.Data
                 .HasIndex(r => new { r.JobPostingId, r.RoundNumber })
                 .IsUnique();
 
+            // Cột reminder của InterviewBooking trong DB dùng dạng có gạch dưới quanh số
+            // (reminder_1h_sent / reminder_24h_sent) — khác với quy ước snake_case mặc định
+            // (reminder1h_sent). Map tường minh để khớp schema thực tế.
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.Reminder1hSent).HasColumnName("reminder_1h_sent");
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.Reminder24hSent).HasColumnName("reminder_24h_sent");
+
             modelBuilder.Entity<MustAskTracking>()
                 .ToTable("must_ask_tracking");
 
@@ -175,6 +187,19 @@ namespace ARISP.Infrastructure.Data
 
             modelBuilder.Entity<CvJdAnalysis>()
                 .HasIndex(c => new { c.JobPostingId, c.CvHash });
+
+            // Mỗi ứng viên chỉ lưu một job một lần (bookmark). Partial index trên các bản ghi
+            // còn hiệu lực (deleted_at IS NULL) để có thể lưu lại sau khi đã bỏ lưu (soft delete).
+            modelBuilder.Entity<SavedJob>()
+                .HasIndex(s => new { s.CandidateAccountId, s.JobPostingId })
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL");
+
+            // Mỗi sự kiện (DedupKey) chỉ sinh 1 thông báo cho mỗi ứng viên.
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => new { n.CandidateAccountId, n.DedupKey })
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL");
 
             // MagicLink.Audience: mặc định "candidate" để các bản ghi cũ (trước khi tách cổng staff) được hiểu là candidate
             modelBuilder.Entity<MagicLink>()

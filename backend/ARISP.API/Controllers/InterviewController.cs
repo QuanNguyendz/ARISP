@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
 using ARISP.Application.DTOs;
 using ARISP.Application.Services;
 
@@ -13,12 +14,19 @@ namespace ARISP.API.Controllers
     {
         private readonly InterviewService _interviewService;
         private readonly InterviewCodeService _interviewCodeService;
+        private readonly IConfiguration _configuration;
 
-        public InterviewController(InterviewService interviewService, InterviewCodeService interviewCodeService)
+        public InterviewController(InterviewService interviewService, InterviewCodeService interviewCodeService, IConfiguration configuration)
         {
             _interviewService = interviewService;
             _interviewCodeService = interviewCodeService;
+            _configuration = configuration;
         }
+
+        private string CandidateBaseUrl =>
+            _configuration["Frontend:CandidateBaseUrl"]
+            ?? _configuration["Authentication:AdminFrontendUrl"]
+            ?? "http://localhost:3000";
 
         /// <summary>
         /// POST /api/interview/generate-code
@@ -163,7 +171,7 @@ namespace ARISP.API.Controllers
             {
                 userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
             }
-            var result = await _interviewService.SubmitHrReviewAsync(userId, request);
+            var result = await _interviewService.SubmitHrReviewAsync(userId, request, CandidateBaseUrl);
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
         }

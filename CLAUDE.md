@@ -42,12 +42,14 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 
 ### Practice (Phỏng vấn thử – Remote)
 - Chỉ dành cho luyện tập, không ảnh hưởng verdict tuyển dụng
-- Truy cập qua magic link, tối đa **1 lần per application**
+- **Chỉ mở cho ứng viên đã pass vòng CV**, HR cấp **Interview Code 6 ký tự (type=`practice`)** → mở từ browser (remote). Tối đa **1 lần per application**, code one-time
 - RAG chỉ dùng JD + CV (không load Playbook nội bộ)
+- **Đầy đủ pipeline công nghệ như Real** (STT/RAG/GPT-4o/TTS/Avatar + Hybrid Idle). **Không quay video — chỉ lưu transcript** + Evaluation Report
+- Chi phí practice **do doanh nghiệp trả** (1 ứng viên = 2 lượt phí phỏng vấn: thử + thật). Tối ưu bằng gating theo phễu, không cắt tech — xem ADR-038
 
 ### Real (Phỏng vấn thật – On-site)
 - Bắt buộc tại văn phòng công ty
-- Candidate nhập **Interview Code** tại thiết bị Kiosk
+- Candidate nhập **Interview Code (type=`real`)** tại thiết bị Kiosk
 - Code: one-time-use, TTL mặc định 2 giờ, 6 ký tự alphanumeric, bind với `application_id`
 - RAG dùng đầy đủ: JD + CV + Playbook nội bộ
 
@@ -210,7 +212,7 @@ Type: `feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `setup`
 15. OAuth2 Email Domain validation: bắt buộc xác thực domain thuộc `allowed_email_domains` khi dùng Google Sign-In
 16. CV-JD Analysis (Gemini): chạy 1 lần per CV + Job Posting, đính kèm vào Application – không phân tích lại
 17. JD File Upload: hỗ trợ PDF/DOCX – Gemini ưu tiên file gốc, fallback sang text JD
-18. Gemini AI: chỉ dùng cho CV-JD Match Analysis. Phỏng vấn AI và RAG pipeline dùng OpenAI GPT-4o
+18. Gemini AI: dùng cho CV-JD Match Analysis **và** trích xuất JD để auto-fill form tạo tin (ADR-042). Phỏng vấn AI và RAG pipeline vẫn dùng OpenAI GPT-4o
 19. **[BẮT BUỘC] Cập nhật `.ai/tasks.md` sau MỌI task hoàn thành:**
     - Đánh dấu task `[x]` + ghi ngày hoàn thành (format `YYYY-MM-DD`)
     - Nếu công việc vừa làm KHÔNG có trong `tasks.md` → tự động bổ sung vào phần Backlog tương ứng rồi đánh dấu `[x]` luôn
@@ -276,13 +278,18 @@ _Chưa có task nào đang thực hiện._
 | ADR-006 | Streaming-First latency target: ~1–1.8s (STT 300ms → RAG 0ms → LLM 400–800ms → TTS 150–300ms → Avatar 100–200ms) |
 | ADR-011 | HeyGen Hybrid Idle: chỉ bật khi AI nói, phát idle video loop khi im – tiết kiệm ~90% HeyGen cost |
 | ADR-012 | Single-tenant: xoá `organizations`, `subscriptions`, không dùng `organization_id` |
-| ADR-015 | Practice (Remote) qua magic link; Real (On-site) bắt buộc qua Interview Code tại Kiosk |
-| ADR-016 | Interview Code: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind với `application_id` |
+| ADR-015 | Practice (Remote) qua Interview Code type=`practice` (chỉ ứng viên pass CV); Real (On-site) qua code type=`real` tại Kiosk |
+| ADR-016 | Interview Code: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id`, `code_type` (practice\|real) |
+| ADR-038 | Tối ưu chi phí Practice: gating theo phễu (chỉ ứng viên pass CV được cấp code), giữ đủ tech, Hybrid Idle, không quay video practice |
+| ADR-039 | RAG tách thành microservice Python riêng (FastAPI), .NET gọi qua HTTP; `IEmbeddingProvider` thành client. pgvector vẫn trên Postgres. Chưa triển khai |
+| ADR-040 | Cổng kiểm tra mic + cam bắt buộc trước mọi phỏng vấn (thử & thật) — component `DeviceCheck` |
 | ADR-018 | Language-aware AI: detect từ JD, điều chỉnh system prompt + TTS voice + STT languageCode |
 | ADR-023 | Auth nội bộ: Email + Password (chính) + Google OAuth2 optional; pre-provisioning + domain validation |
 | ADR-025 | Playbook scope: Company / Job Posting / Round; RAG weighted retrieve |
 | ADR-030 | Gemini 2.5 Flash cho CV-JD Analysis; GPT-4o cho phỏng vấn AI và RAG |
 | ADR-036 | File storage abstraction `IFileStorageService`: Local (dev) / Cloudflare R2 (prod, presigned URL); DB lưu storageKey |
+| ADR-041 | Vòng đời tài khoản staff: yêu cầu tạo (HR→SA duyệt) tách khỏi khóa/mở khóa (`AccountRequest` + `User.LockReason`) |
+| ADR-042 | Recruiter workspace cụm Job: `mine` filter, ứng viên theo job, Gemini trích xuất JD auto-fill (mở rộng ADR-030) |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 
