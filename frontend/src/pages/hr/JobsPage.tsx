@@ -44,6 +44,21 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
+}
+
 export default function HrJobsPage() {
   const [jobs, setJobs] = useState<JobPosting[]>([])
   const [loading, setLoading] = useState(true)
@@ -197,6 +212,12 @@ export default function HrJobsPage() {
                           <Users className="w-4 h-4" />
                           {job.applicantCount ?? 0} ứng viên
                         </span>
+                        {job.applicationDeadline && (
+                          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                            <Calendar className="w-4 h-4" />
+                            Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {formatDate(job.createdAt)}

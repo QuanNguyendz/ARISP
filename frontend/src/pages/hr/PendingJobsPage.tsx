@@ -60,6 +60,21 @@ function formatDateTime(iso: string): string {
   })
 }
 
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
+}
+
 function isToday(iso?: string): boolean {
   if (!iso) return false
   const d = new Date(iso)
@@ -210,6 +225,11 @@ export default function PendingJobsPage() {
                           {formatSalary(job)}
                         </span>
                         {job.department && <span>{job.department}</span>}
+                        {job.applicationDeadline && (
+                          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                            Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                          </span>
+                        )}
                       </div>
                       <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                         <Clock className="w-3 h-3" />

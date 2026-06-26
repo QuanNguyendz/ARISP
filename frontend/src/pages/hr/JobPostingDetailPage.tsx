@@ -49,6 +49,21 @@ const STATUS_BADGE: Record<string, string> = {
   paused: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
 }
 
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return 'Không giới hạn'
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return '—'
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
+}
+
 export default function JobPostingDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -236,10 +251,7 @@ export default function JobPostingDetailPage() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-                  Hạn nộp:{' '}
-                  {job.applicationDeadline
-                    ? new Date(job.applicationDeadline).toLocaleDateString('vi-VN')
-                    : 'Không giới hạn'}
+                  Hạn nộp: {getDeadlineText(job.applicationDeadline)}
                 </span>
                 {job.vacancies != null && job.vacancies > 0 && (
                   <span className="flex items-center gap-1.5">

@@ -15,6 +15,7 @@ import {
   Bookmark,
   ChevronRight,
   FileText,
+  Calendar,
 } from 'lucide-react'
 import jobService from '@/services/job/jobService'
 import { savedJobService } from '@/services/job/savedJobService'
@@ -81,6 +82,21 @@ function formatPostedDate(dateStr?: string): string {
   } catch {
     return 'Gần đây'
   }
+}
+
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
 }
 
 function getJobIcon(department?: string) {
@@ -363,6 +379,11 @@ export default function JobDetailPage() {
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="w-4 h-4" /> Đăng {formatPostedDate(job.createdAt)}
                   </span>
+                  {job.applicationDeadline && (
+                    <span className="inline-flex items-center gap-1.5 text-amber-600 font-medium">
+                      <Calendar className="w-4 h-4" /> Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600">
