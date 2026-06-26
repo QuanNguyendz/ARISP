@@ -4,7 +4,6 @@ import {
   Bookmark,
   MapPin,
   Briefcase,
-  DollarSign,
   TrendingUp,
   Loader2,
   AlertCircle,
@@ -17,11 +16,35 @@ import { savedJobService } from '@/services/job/savedJobService'
 import type { SavedJobItem } from '@/services/job/savedJobService'
 
 function formatSalary(job: SavedJobItem): string {
-  if (job.salaryIsNegotiable) return 'Thỏa thuận'
-  if (job.salaryMin && job.salaryMax)
-    return `$${job.salaryMin.toLocaleString()} - $${job.salaryMax.toLocaleString()}`
-  if (job.salaryMin) return `Từ $${job.salaryMin.toLocaleString()}`
-  if (job.salaryMax) return `Đến $${job.salaryMax.toLocaleString()}`
+  if (job.salaryIsNegotiable || 
+      (job.salaryMin == null && job.salaryMax == null) || 
+      (job.salaryMin === 0 && job.salaryMax === 0)) {
+    return 'Thỏa thuận'
+  }
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+  
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+  
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `Từ ${formatVal(job.salaryMin)}${unit}`
+  }
+  
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `Đến ${formatVal(job.salaryMax)}${unit}`
+  }
+
   return 'Thỏa thuận'
 }
 
@@ -108,8 +131,7 @@ function SavedJobCard({
               <Briefcase className="h-3.5 w-3.5" />
               {formatWorkMode(job.workMode || job.employmentType)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
-              <DollarSign className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
               {formatSalary(job)}
             </span>
             {job.experienceLevel && (

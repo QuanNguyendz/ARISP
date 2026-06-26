@@ -2,17 +2,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   MapPin,
-  DollarSign,
   Clock,
   Loader2,
   Languages,
   Briefcase,
   Sparkles,
   Users,
-  HeartPulse,
-  Plane,
-  GraduationCap,
-  Home,
   Code2,
   Server,
   BrainCircuit,
@@ -32,12 +27,35 @@ import { useAuthStore } from '@store/auth/authStore'
 import CandidateHeader from '@components/layout/CandidateHeader'
 
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable) return 'Thỏa thuận'
-  if (job.salaryMin && job.salaryMax) {
-    return `$${job.salaryMin.toLocaleString()} - $${job.salaryMax.toLocaleString()}`
+  if (job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)) {
+    return 'Thỏa thuận'
   }
-  if (job.salaryMin) return `Từ $${job.salaryMin.toLocaleString()}`
-  if (job.salaryMax) return `Đến $${job.salaryMax.toLocaleString()}`
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `Từ ${formatVal(job.salaryMin)}${unit}`
+  }
+
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `Đến ${formatVal(job.salaryMax)}${unit}`
+  }
+
   return 'Thỏa thuận'
 }
 
@@ -215,7 +233,7 @@ export default function JobDetailPage() {
       .then((ids) => {
         if (!cancelled) setIsSaved(ids.includes(id))
       })
-      .catch(() => {})
+      .catch(() => { })
     return () => {
       cancelled = true
     }
@@ -235,7 +253,7 @@ export default function JobDetailPage() {
         const found = apps.find((a) => a.jobPostingId === id && a.status !== 'withdrawn')
         if (found) setAppliedId(found.id)
       })
-      .catch(() => {})
+      .catch(() => { })
     return () => {
       cancelled = true
     }
@@ -351,8 +369,8 @@ export default function JobDetailPage() {
                     <Briefcase className="w-3.5 h-3.5" />{' '}
                     {formatWorkMode(job.workMode || job.employmentType)}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700">
-                    <DollarSign className="w-3.5 h-3.5" /> {formatSalary(job)}
+                  <span className="inline-flex items-center rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600">
+                    {formatSalary(job)}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600 capitalize">
                     <Sparkles className="w-3.5 h-3.5" /> {job.experienceLevel || 'Không yêu cầu'}
@@ -365,46 +383,36 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {/* JD sections */}
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card space-y-6">
             <section>
-              <h2 className="font-display text-lg font-bold mb-3">Mô tả công việc</h2>
-              <p className="text-ink-600 leading-relaxed whitespace-pre-line">
-                {job.jobDescription}
-              </p>
+
+              {/<\/?[a-z][\s\S]*>/i.test(job.jobDescription || '') ? (
+                <div
+                  className="text-ink-600 leading-relaxed ql-editor-display"
+                  dangerouslySetInnerHTML={{ __html: job.jobDescription }}
+                />
+              ) : (
+                <p className="text-ink-600 leading-relaxed whitespace-pre-line">
+                  {job.jobDescription}
+                </p>
+              )}
             </section>
 
             {job.skills && job.skills.length > 0 && (
               <section>
-                <h2 className="font-display text-lg font-bold mb-3">Yêu cầu</h2>
-                <ul className="space-y-2 text-ink-600">
+                <h2 className="font-display text-lg font-bold mb-3">Kỹ năng</h2>
+                <div className="flex flex-wrap gap-2">
                   {job.skills.map((skill, i) => (
-                    <li key={i} className="flex gap-2.5">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" /> {skill}
-                    </li>
+                    <span
+                      key={i}
+                      className="px-3 py-1.5 rounded-xl border border-ink-200 bg-ink-50 text-ink-700 text-sm font-medium"
+                    >
+                      {skill}
+                    </span>
                   ))}
-                </ul>
+                </div>
               </section>
             )}
-
-            <section>
-              <h2 className="font-display text-lg font-bold mb-3">Quyền lợi</h2>
-              <div className="grid sm:grid-cols-2 gap-3 text-ink-600">
-                <div className="flex gap-2.5 rounded-xl bg-ink-50 p-3">
-                  <HeartPulse className="w-5 h-5 text-brand-600 shrink-0" /> Bảo hiểm sức khoẻ cao
-                  cấp
-                </div>
-                <div className="flex gap-2.5 rounded-xl bg-ink-50 p-3">
-                  <Plane className="w-5 h-5 text-brand-600 shrink-0" /> Du lịch & team building
-                </div>
-                <div className="flex gap-2.5 rounded-xl bg-ink-50 p-3">
-                  <GraduationCap className="w-5 h-5 text-brand-600 shrink-0" /> Ngân sách học tập
-                </div>
-                <div className="flex gap-2.5 rounded-xl bg-ink-50 p-3">
-                  <Home className="w-5 h-5 text-brand-600 shrink-0" /> Hybrid working
-                </div>
-              </div>
-            </section>
           </div>
         </div>
 
@@ -430,11 +438,10 @@ export default function JobDetailPage() {
             <button
               onClick={handleToggleSave}
               disabled={savePending}
-              className={`mt-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 ${
-                isSaved
+              className={`mt-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 ${isSaved
                   ? 'border-ai-200 bg-ai-50 text-ai-700 hover:bg-ai-100'
                   : 'border-ink-200 text-ink-700 hover:bg-ink-50'
-              }`}
+                }`}
             >
               <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
               {isSaved ? 'Đã lưu' : 'Lưu việc làm'}

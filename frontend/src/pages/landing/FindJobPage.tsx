@@ -4,7 +4,6 @@ import {
   Search,
   MapPin,
   Briefcase,
-  DollarSign,
   Bookmark,
   TrendingUp,
   Loader2,
@@ -71,12 +70,35 @@ const EMPTY_FILTERS: FiltersState = {
 
 // ============== HELPER FUNCTIONS ==============
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable) return 'Thỏa thuận'
-  if (job.salaryMin && job.salaryMax) {
-    return `$${job.salaryMin.toLocaleString()} - $${job.salaryMax.toLocaleString()}`
+  if (job.salaryIsNegotiable || 
+      (job.salaryMin == null && job.salaryMax == null) || 
+      (job.salaryMin === 0 && job.salaryMax === 0)) {
+    return 'Thỏa thuận'
   }
-  if (job.salaryMin) return `Từ $${job.salaryMin.toLocaleString()}`
-  if (job.salaryMax) return `Đến $${job.salaryMax.toLocaleString()}`
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+  
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+  
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `Từ ${formatVal(job.salaryMin)}${unit}`
+  }
+  
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `Đến ${formatVal(job.salaryMax)}${unit}`
+  }
+
   return 'Thỏa thuận'
 }
 
@@ -136,6 +158,12 @@ interface FilterSidebarProps {
   facets: JobFacets
   /** Địa điểm đã lọc về chỉ thành phố trực thuộc TW (lấy từ Province Open API) + có trong DB. */
   locationFacets: JobFacets['locations']
+  minSalary: number
+  setMinSalary: (val: number) => void
+  maxSalary: number
+  setMaxSalary: (val: number) => void
+  salaryIsNegotiable: boolean
+  setSalaryIsNegotiable: (val: boolean) => void
 }
 
 // Số mục tối đa hiển thị trước khi gập bớt một nhóm bộ lọc dài.
@@ -267,8 +295,18 @@ function FilterSidebar({
   onClearAll,
   facets,
   locationFacets,
+  minSalary,
+  setMinSalary,
+  maxSalary,
+  setMaxSalary,
+  salaryIsNegotiable,
+  setSalaryIsNegotiable,
 }: FilterSidebarProps) {
-  const hasActiveFilters = Object.values(filters).some((arr) => arr.length > 0)
+  const hasActiveFilters =
+    Object.values(filters).some((arr) => arr.length > 0) ||
+    minSalary > 0 ||
+    maxSalary < 220 ||
+    salaryIsNegotiable
 
   const toggleStringFilter = (key: FilterKey, value: string) => {
     setFilters((prev) => ({
@@ -283,24 +321,45 @@ function FilterSidebar({
   const labelOf = (items: JobFacets['categories'], value: string) =>
     items.find((i) => i.value === value)?.label ?? value
 
-  const activeChips: { key: FilterKey; value: string; label: string }[] = [
+  const activeChips: { key: string; onClick: () => void; label: string }[] = [
     ...filters.categories.map((v) => ({
-      key: 'categories' as const,
-      value: v,
+      key: `categories-${v}`,
+      onClick: () => toggleStringFilter('categories', v),
       label: labelOf(facets.categories, v),
     })),
     ...filters.experienceLevels.map((v) => ({
-      key: 'experienceLevels' as const,
-      value: v,
+      key: `experienceLevels-${v}`,
+      onClick: () => toggleStringFilter('experienceLevels', v),
       label: labelOf(facets.experienceLevels, v),
     })),
     ...filters.locations.map((v) => ({
-      key: 'locations' as const,
-      value: v,
+      key: `locations-${v}`,
+      onClick: () => toggleStringFilter('locations', v),
       label: labelOf(locationFacets, v),
     })),
-    ...filters.skills.map((v) => ({ key: 'skills' as const, value: v, label: v })),
+    ...filters.skills.map((v) => ({
+      key: `skills-${v}`,
+      onClick: () => toggleStringFilter('skills', v),
+      label: v,
+    })),
   ]
+
+  if (salaryIsNegotiable) {
+    activeChips.push({
+      key: 'salary-negotiable',
+      onClick: () => setSalaryIsNegotiable(false),
+      label: 'Lương: Thỏa thuận',
+    })
+  } else if (minSalary > 0 || maxSalary < 220) {
+    activeChips.push({
+      key: 'salary-range',
+      onClick: () => {
+        setMinSalary(0)
+        setMaxSalary(220)
+      },
+      label: `Lương: ${minSalary}tr - ${maxSalary === 220 ? '220+tr' : `${maxSalary}tr`}`,
+    })
+  }
 
   const noFacets =
     facets.categories.length === 0 &&
@@ -312,7 +371,7 @@ function FilterSidebar({
     facets.languages.length === 0
 
   return (
-    <aside className="space-y-6">
+    <aside className="space-y-6 lg:sticky lg:top-24 max-h-[calc(100vh-120px)] overflow-y-auto filter-sidebar-scroll pr-1">
       <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
         <div className="flex items-center justify-between">
           <span className="font-semibold flex items-center gap-2">
@@ -332,11 +391,11 @@ function FilterSidebar({
         {/* Active filters */}
         {activeChips.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {activeChips.map(({ key, value, label }) => (
+            {activeChips.map(({ key, onClick, label }) => (
               <span
-                key={`${key}-${value}`}
+                key={key}
                 className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 cursor-pointer hover:bg-brand-100"
-                onClick={() => toggleStringFilter(key, value)}
+                onClick={onClick}
               >
                 {label} <X className="w-3 h-3" />
               </span>
@@ -371,6 +430,70 @@ function FilterSidebar({
               selected={filters.experienceLevels}
               onToggle={(v) => toggleStringFilter('experienceLevels', v)}
             />
+
+            {/* Mức lương */}
+            <CollapsibleSection
+              title="Mức lương"
+              selectedCount={salaryIsNegotiable || minSalary > 0 || maxSalary < 220 ? 1 : 0}
+              defaultOpen={true}
+            >
+              <div className="space-y-4 pt-2 pb-1">
+                {/* Checkbox Lương thỏa thuận */}
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-ink-700">
+                  <input
+                    type="checkbox"
+                    checked={salaryIsNegotiable}
+                    onChange={(e) => setSalaryIsNegotiable(e.target.checked)}
+                    className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                  />
+                  <span>Lương thỏa thuận</span>
+                </label>
+
+                {/* Slider Lọc giá */}
+                <div className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <div className="flex items-center justify-between text-xs text-ink-500 font-medium">
+                    <span>Từ: <strong className="text-ink-800">{minSalary} triệu</strong></span>
+                    <span>Đến: <strong className="text-ink-800">{maxSalary === 220 ? '220+ triệu' : `${maxSalary} triệu`}</strong></span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[11px] text-ink-400 block mb-1">Tối thiểu (Min)</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="220"
+                        step="10"
+                        value={minSalary}
+                        disabled={salaryIsNegotiable}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value)
+                          setMinSalary(Math.min(val, maxSalary))
+                        }}
+                        className="w-full h-1 bg-ink-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-ink-400 block mb-1">Tối đa (Max)</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="220"
+                        step="10"
+                        value={maxSalary}
+                        disabled={salaryIsNegotiable}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value)
+                          setMaxSalary(Math.max(val, minSalary))
+                        }}
+                        className="w-full h-1 bg-ink-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleSection>
 
             {/* Nơi làm việc */}
             {facets.workModes.length > 0 && (
@@ -523,8 +646,7 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
               <Briefcase className="w-3.5 h-3.5" />
               {formatWorkMode(job.workMode || job.employmentType)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
-              <DollarSign className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
               {formatSalary(job)}
             </span>
             {job.experienceLevel && (
@@ -628,6 +750,7 @@ export default function FindJob() {
   const { isAuthenticated } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [jobs, setJobs] = useState<JobPosting[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
@@ -637,21 +760,51 @@ export default function FindJob() {
   const [profileHasCv, setProfileHasCv] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const locationNames = new Set(cities.map((c) => c.name))
-  const [sortBy, setSortBy] = useState<'newest' | 'match' | 'salary'>('newest')
+  const [sortBy, setSortBy] = useState<'newest' | 'salary_desc' | 'salary_asc'>('newest')
+  const [minSalary, setMinSalary] = useState<number>(0)
+  const [maxSalary, setMaxSalary] = useState<number>(220)
+  const [salaryIsNegotiable, setSalaryIsNegotiable] = useState<boolean>(false)
   const [page, setPage] = useState(1)
   const listTopRef = useRef<HTMLDivElement>(null)
 
-  // Load jobs + facets từ API
+  // Load facets từ API chỉ 1 lần khi mount
   useEffect(() => {
-    async function loadJobs() {
+    async function loadFacets() {
+      try {
+        const facetData = await jobService.getJobFacets()
+        setFacets(facetData)
+      } catch (err) {
+        console.error('Failed to load facets:', err)
+      }
+    }
+    loadFacets()
+  }, [])
+
+  // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
+  useEffect(() => {
+    async function fetchJobs() {
       try {
         setLoading(true)
-        const [data, facetData] = await Promise.all([
-          jobService.getPublicJobPostings(),
-          jobService.getJobFacets(),
-        ])
-        setJobs(data)
-        setFacets(facetData)
+        const params = {
+          search: searchQuery || undefined,
+          categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
+          employmentTypes: filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
+          experienceLevels: filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
+          workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
+          locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
+          skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
+          languages: filters.languages.length > 0 ? filters.languages.join(',') : undefined,
+          sortBy,
+          minSalary: !salaryIsNegotiable && minSalary > 0 ? minSalary * 1000000 : undefined,
+          maxSalary: !salaryIsNegotiable && maxSalary < 220 ? maxSalary * 1000000 : undefined,
+          salaryIsNegotiable: salaryIsNegotiable ? true : undefined,
+          page,
+          pageSize: JOBS_PER_PAGE,
+        }
+
+        const data = await jobService.getPublicJobPostings(params)
+        setJobs(data.items)
+        setTotalCount(data.totalCount)
       } catch (err) {
         console.error('Failed to load jobs:', err)
         setError('Không thể kết nối máy chủ để tải danh sách công việc.')
@@ -659,8 +812,18 @@ export default function FindJob() {
         setLoading(false)
       }
     }
-    loadJobs()
-  }, [])
+
+    fetchJobs()
+  }, [searchQuery, JSON.stringify(filters), sortBy, minSalary, maxSalary, salaryIsNegotiable, page])
+
+  // Khi lọc theo lương thỏa thuận thì khóa/reset sắp xếp lương
+  useEffect(() => {
+    if (salaryIsNegotiable) {
+      if (sortBy === 'salary_desc' || sortBy === 'salary_asc') {
+        setSortBy('newest')
+      }
+    }
+  }, [salaryIsNegotiable, sortBy])
 
   // Danh sách thành phố trực thuộc TW (Province Open API) — dùng để giới hạn bộ lọc Địa điểm.
   useEffect(() => {
@@ -733,75 +896,13 @@ export default function FindJob() {
   // Bộ lọc Địa điểm ở sidebar = facet location ∩ tỉnh/thành từ Province API (chỉ nơi đang có job).
   const locationFacets = facets.locations.filter((l) => locationNames.has(l.value))
 
-  // Filter jobs theo giá trị thô khớp DB
-  const filteredJobs = jobs.filter((job) => {
-    const q = searchQuery.trim().toLowerCase()
-    const matchesSearch =
-      q === '' ||
-      job.title.toLowerCase().includes(q) ||
-      (job.department || '').toLowerCase().includes(q) ||
-      (job.skills || []).some((s) => s.toLowerCase().includes(q))
-
-    const matchesCategory =
-      filters.categories.length === 0 ||
-      filters.categories.includes((job.jobCategory || '').toLowerCase())
-
-    const matchesEmployment =
-      filters.employmentTypes.length === 0 ||
-      filters.employmentTypes.includes((job.employmentType || '').toLowerCase())
-
-    const matchesExperience =
-      filters.experienceLevels.length === 0 ||
-      filters.experienceLevels.includes((job.experienceLevel || '').toLowerCase())
-
-    const matchesWorkMode =
-      filters.workModes.length === 0 ||
-      filters.workModes.includes((job.workMode || '').toLowerCase())
-
-    const matchesLocation =
-      filters.locations.length === 0 || filters.locations.includes(job.location || '')
-
-    const matchesSkills =
-      filters.skills.length === 0 ||
-      filters.skills.some((skill) => (job.skills || []).includes(skill))
-
-    const matchesLanguage =
-      filters.languages.length === 0 ||
-      filters.languages.includes((job.detectedLanguage || '').toLowerCase())
-
-    return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesEmployment &&
-      matchesExperience &&
-      matchesWorkMode &&
-      matchesLocation &&
-      matchesSkills &&
-      matchesLanguage
-    )
-  })
-
-  // Sort jobs
-  const sortedJobs = [...filteredJobs].sort((a, b) => {
-    switch (sortBy) {
-      case 'newest':
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      case 'salary':
-        return (b.salaryMax || 0) - (a.salaryMax || 0)
-      default:
-        return 0
-    }
-  })
-
-  // Phân trang client-side (toàn bộ job đã tải sẵn, lọc/sắp xếp trong bộ nhớ).
-  const totalPages = Math.max(1, Math.ceil(sortedJobs.length / JOBS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(totalCount / JOBS_PER_PAGE))
   const currentPage = Math.min(page, totalPages)
-  const pagedJobs = sortedJobs.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE)
 
   // Đổi bộ lọc / tìm kiếm / sắp xếp → quay về trang 1.
   useEffect(() => {
     setPage(1)
-  }, [filters, searchQuery, sortBy])
+  }, [JSON.stringify(filters), searchQuery, sortBy, minSalary, maxSalary, salaryIsNegotiable])
 
   const goToPage = (next: number) => {
     const clamped = Math.min(Math.max(1, next), totalPages)
@@ -813,6 +914,9 @@ export default function FindJob() {
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS)
     setSearchQuery('')
+    setMinSalary(0)
+    setMaxSalary(220)
+    setSalaryIsNegotiable(false)
   }
 
   return (
@@ -900,6 +1004,12 @@ export default function FindJob() {
           onClearAll={clearFilters}
           facets={facets}
           locationFacets={locationFacets}
+          minSalary={minSalary}
+          setMinSalary={setMinSalary}
+          maxSalary={maxSalary}
+          setMaxSalary={setMaxSalary}
+          salaryIsNegotiable={salaryIsNegotiable}
+          setSalaryIsNegotiable={setSalaryIsNegotiable}
         />
 
         {/* Job List */}
@@ -917,7 +1027,7 @@ export default function FindJob() {
           {/* Section Header */}
           <div ref={listTopRef} className="flex items-center justify-between scroll-mt-24">
             <h2 className="font-display text-lg font-bold text-ink-900">
-              {loading ? 'Đang tải...' : `${sortedJobs.length} việc làm phù hợp`}
+              {loading ? 'Đang tải...' : `${totalCount} việc làm phù hợp`}
             </h2>
             <select
               value={sortBy}
@@ -925,8 +1035,12 @@ export default function FindJob() {
               className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
             >
               <option value="newest">Mới nhất</option>
-              <option value="match">Phù hợp nhất</option>
-              <option value="salary">Lương cao</option>
+              <option value="salary_desc" disabled={salaryIsNegotiable}>
+                Lương: Cao đến Thấp {salaryIsNegotiable && '(Đang khóa)'}
+              </option>
+              <option value="salary_asc" disabled={salaryIsNegotiable}>
+                Lương: Thấp đến Cao {salaryIsNegotiable && '(Đang khóa)'}
+              </option>
             </select>
           </div>
 
@@ -943,7 +1057,7 @@ export default function FindJob() {
                 <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
                 <p className="text-sm text-ink-500">Đang tải tin tuyển dụng mới nhất...</p>
               </div>
-            ) : sortedJobs.length === 0 ? (
+            ) : totalCount === 0 ? (
               <div className="rounded-2xl border border-ink-200 bg-white p-12 text-center">
                 <p className="text-ink-500">
                   Không tìm thấy tin tuyển dụng nào phù hợp với bộ lọc tìm kiếm.
@@ -956,7 +1070,7 @@ export default function FindJob() {
                 </button>
               </div>
             ) : (
-              pagedJobs.map((job) => (
+              jobs.map((job) => (
                 <JobCard
                   key={job.id}
                   job={job}
@@ -968,7 +1082,7 @@ export default function FindJob() {
           </div>
 
           {/* Phân trang */}
-          {!loading && sortedJobs.length > 0 && (
+          {!loading && totalCount > 0 && (
             <Pagination page={currentPage} totalPages={totalPages} onChange={goToPage} />
           )}
         </section>

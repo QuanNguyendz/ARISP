@@ -19,6 +19,28 @@ export interface JobFacets {
   totalJobs: number
 }
 
+export interface GetPublicJobsParams {
+  search?: string
+  categories?: string // comma-separated values
+  employmentTypes?: string // comma-separated values
+  experienceLevels?: string // comma-separated values
+  workModes?: string // comma-separated values
+  locations?: string // comma-separated values
+  skills?: string // comma-separated values
+  languages?: string // comma-separated values
+  sortBy?: string
+  minSalary?: number
+  maxSalary?: number
+  salaryIsNegotiable?: boolean
+  page?: number
+  pageSize?: number
+}
+
+export interface PaginatedJobs {
+  items: JobPosting[]
+  totalCount: number
+}
+
 export const jobService = {
   // Public: Bộ lọc khả dụng (chỉ những giá trị có trong DB) + số lượng cho Job Board
   async getJobFacets(): Promise<JobFacets> {
@@ -54,9 +76,9 @@ export const jobService = {
     return data
   },
 
-  // Public: Get active public jobs
-  async getPublicJobPostings(): Promise<JobPosting[]> {
-    const { data } = await apiClient.get<JobPosting[]>('/jobs')
+  // Public: Get active public jobs with filtering and pagination
+  async getPublicJobPostings(params?: GetPublicJobsParams): Promise<PaginatedJobs> {
+    const { data } = await apiClient.get<PaginatedJobs>('/jobs', { params })
     return data
   },
 
