@@ -18,11 +18,33 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
+      # ADR-039: chọn RAG microservice Python. Đặt AI_PROVIDER=rag để dùng service Python.
+      - RAG_SERVICE_URL=http://rag-service:8000
     volumes:
       - ../backend:/app/src
     depends_on:
       redis:
         condition: service_healthy
+      rag-service:
+        condition: service_started
+    networks:
+      - arisp-network
+    restart: unless-stopped
+
+  # --- RAG Interview Microservice (Python / FastAPI + LangChain) — ADR-039 ---
+  # Nội bộ: KHÔNG route qua Nginx. Backend gọi qua http://rag-service:8000.
+  rag-service:
+    build:
+      context: ../rag-service
+      dockerfile: ../docker/rag/Dockerfile
+      target: development
+    container_name: arisp-rag
+    ports:
+      - "8000:8000"   # expose ra host chỉ để dev/test Swagger; prod gỡ bỏ nếu muốn
+    env_file:
+      - .env
+    volumes:
+      - ../rag-service:/app
     networks:
       - arisp-network
     restart: unless-stopped

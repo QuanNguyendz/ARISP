@@ -15,7 +15,7 @@ namespace ARISP.Application.Services
     public class ApplicationService
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly IEmbeddingProvider _embeddingProvider;
+        private readonly IRagIngestionService _ragIngestion;
         private readonly IEmailService _emailService;
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
@@ -29,10 +29,10 @@ namespace ARISP.Application.Services
             { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
-        public ApplicationService(IUnitOfWork unitOfWork, IEmbeddingProvider embeddingProvider, IEmailService emailService)
+        public ApplicationService(IUnitOfWork unitOfWork, IRagIngestionService ragIngestion, IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
-            _embeddingProvider = embeddingProvider;
+            _ragIngestion = ragIngestion;
             _emailService = emailService;
         }
 
@@ -102,24 +102,10 @@ namespace ARISP.Application.Services
             await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            // Chunk & Embed CV text for candidate personalization
+            // Chunk + embed + lưu pgvector CV — do RAG service (Python) sở hữu (ADR-039).
             if (!string.IsNullOrEmpty(request.CvText))
             {
-                var chunks = ChunkText(request.CvText);
-                int chunkIndex = 0;
-                foreach (var chunkText in chunks)
-                {
-                    var embedding = await _embeddingProvider.EmbedAsync(chunkText, ct);
-                    var embeddingString = $"[{string.Join(",", embedding)}]";
-                    var chunkId = Guid.NewGuid();
-                    var createdAt = DateTimeOffset.UtcNow;
-
-                    await _unitOfWork.ExecuteSqlRawAsync(
-                        "INSERT INTO document_chunks (id, source_type, source_id, chunk_index, chunk_text, embedding, metadata, created_at) VALUES ({0}, {1}, {2}, {3}, {4}, {5}::vector, {6}::jsonb, {7})",
-                        new object[] { chunkId, "cv", application.Id, chunkIndex++, chunkText, embeddingString, "{}", createdAt },
-                        ct
-                    );
-                }
+                await _ragIngestion.IngestAsync("cv", application.Id, request.CvText!, ct: ct);
             }
 
             var response = new ApplicationResponse
@@ -457,33 +443,6 @@ namespace ARISP.Application.Services
                 s => s.ApplicationId == applicationId && s.SessionType == "practice" && s.RoundNumber == roundNumber, ct);
 
             return Result.Success(!used.Any());
-        }
-
-        private List<string> ChunkText(string text)
-        {
-            var chunks = new List<string>();
-            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-            string currentChunk = "";
-
-            foreach (var line in lines)
-            {
-                if (currentChunk.Length + line.Length > 600)
-                {
-                    chunks.Add(currentChunk.Trim());
-                    currentChunk = line + " ";
-                }
-                else
-                {
-                    currentChunk += line + " ";
-                }
-            }
-
-            if (!string.IsNullOrEmpty(currentChunk))
-            {
-                chunks.Add(currentChunk.Trim());
-            }
-
-            return chunks;
         }
     }
 }

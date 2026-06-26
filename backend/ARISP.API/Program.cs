@@ -107,10 +107,38 @@ builder.Services.AddDbContext<ARISPDbContext>(options =>
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// AI services mappings (OpenAI implements both Provider and Embedding)
-builder.Services.AddScoped<OpenAIProvider>();
-builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
-builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
+// AI provider switch (ADR-039): "rag" -> microservice Python (RagServiceProvider);
+// "openai" | "local" -> OpenAIProvider in-process (fallback, không khoá cứng vào Python).
+var aiProvider = builder.Configuration["AI:Provider"]
+    ?? Environment.GetEnvironmentVariable("AI_PROVIDER")
+    ?? "openai";
+
+if (string.Equals(aiProvider, "rag", StringComparison.OrdinalIgnoreCase))
+{
+    var ragServiceUrl = builder.Configuration["RagService:Url"]
+        ?? Environment.GetEnvironmentVariable("RAG_SERVICE_URL")
+        ?? "http://rag-service:8000";
+
+    // Typed HttpClient tới RAG service nội bộ (không qua Nginx).
+    builder.Services.AddHttpClient<ARISP.Infrastructure.AI.RagServiceProvider>(c =>
+    {
+        c.BaseAddress = new Uri(ragServiceUrl);
+        c.Timeout = TimeSpan.FromSeconds(120); // sinh câu hỏi/đánh giá có thể lâu
+    });
+
+    builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
+    builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
+    builder.Services.AddScoped<IRagIngestionService>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
+}
+else
+{
+    // OpenAIProvider implements cả IAIProvider lẫn IEmbeddingProvider.
+    builder.Services.AddScoped<OpenAIProvider>();
+    builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
+    builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
+    // Ingestion chạy trong tiến trình (chunk+embed+INSERT) khi không dùng RAG service.
+    builder.Services.AddScoped<IRagIngestionService, LocalRagIngestionService>();
+}
 
 builder.Services.AddScoped<IGeminiProvider, ARISP.Infrastructure.AI.GeminiProvider>();
 

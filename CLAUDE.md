@@ -108,10 +108,11 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 | ORM | Entity Framework Core |
 | Auth | JWT + Role-based + Email/Password + Google OAuth2 (nội bộ, optional) |
 | Cache | Redis |
-| AI/LLM | OpenAI GPT-4o + RAG (pgvector, text-embedding-3-small) |
+| AI/LLM (phỏng vấn) | OpenAI GPT-4o (Claude là option dành sau — ADR-043) |
+| RAG Service | Python + LangChain + LangGraph + FastAPI (`rag-service/`) — Hybrid RAG: dense pgvector + sparse FTS + RRF; sở hữu chunk/embed/retrieve/sinh câu hỏi+đánh giá, .NET gọi qua HTTP/SSE (ADR-039). Vector store: pgvector + text-embedding-3-small |
 | CV-JD Analysis | Google Gemini 2.5 Flash |
-| STT | Google Speech-to-Text (streaming) |
-| TTS | ElevenLabs Flash v2.5 (streaming) |
+| STT | Deepgram Nova-3 (streaming) — gộp VAD + endpointing, không cần VAD riêng |
+| TTS | ElevenLabs Flash v2.5 (streaming, ~75ms) |
 | Avatar | HeyGen Streaming Avatar (Hybrid Idle Strategy) |
 | Email | SendGrid / AWS SES |
 | File Storage | `IFileStorageService` – Local disk (dev) / Cloudflare R2 S3-compatible (prod) qua AWSSDK.S3 |
@@ -120,7 +121,7 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 | CI/CD | GitHub Actions |
 | Monitoring | Serilog + Grafana + Health Checks |
 
-> **Streaming-First:** STT stream → RAG parallel → LLM stream → TTS stream → Avatar stream. Mục tiêu latency: **~1–1.8 giây** sau khi ứng viên dừng nói.
+> **Streaming-First:** Deepgram STT stream (+VAD) → Hybrid RAG parallel → GPT-4o stream → ElevenLabs Flash v2.5 stream → HeyGen Avatar stream. Mục tiêu latency: **~0.8–1.2 giây** sau khi ứng viên dừng nói (ADR-006/043).
 
 ---
 
@@ -274,15 +275,16 @@ _Chưa có task nào đang thực hiện._
 | ADR-002 | DB: PostgreSQL on Supabase, kết nối trực tiếp, không dùng Supabase SDK |
 | ADR-003 | SignalR cho session events; WebRTC cho media stream (không trộn lẫn) |
 | ADR-004 | AI/LLM: OpenAI GPT-4o + RAG pgvector, abstract qua `IAIProvider` + `IEmbeddingProvider` |
-| ADR-005 | TTS: ElevenLabs Flash v2.5; Avatar: HeyGen Streaming Avatar + Hybrid Idle Strategy |
-| ADR-006 | Streaming-First latency target: ~1–1.8s (STT 300ms → RAG 0ms → LLM 400–800ms → TTS 150–300ms → Avatar 100–200ms) |
+| ADR-005 | STT: **Deepgram Nova-3** (gộp VAD/endpointing, thay Google STT); TTS: ElevenLabs Flash v2.5; Avatar: HeyGen Streaming Avatar + Hybrid Idle Strategy |
+| ADR-006 | Streaming-First latency target: **~0.8–1.2s** (Deepgram STT+VAD → Hybrid RAG 0ms → LLM 400–800ms → TTS 75–150ms → Avatar 100–200ms); đòn bẩy: partial-STT→RAG song song, TTS first-sentence, prompt caching, tắt thinking, gọi thẳng OpenAI |
 | ADR-011 | HeyGen Hybrid Idle: chỉ bật khi AI nói, phát idle video loop khi im – tiết kiệm ~90% HeyGen cost |
 | ADR-012 | Single-tenant: xoá `organizations`, `subscriptions`, không dùng `organization_id` |
 | ADR-015 | Practice (Remote) qua Interview Code type=`practice` (chỉ ứng viên pass CV); Real (On-site) qua code type=`real` tại Kiosk |
 | ADR-016 | Interview Code: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id`, `code_type` (practice\|real) |
 | ADR-038 | Tối ưu chi phí Practice: gating theo phễu (chỉ ứng viên pass CV được cấp code), giữ đủ tech, Hybrid Idle, không quay video practice |
-| ADR-039 | RAG tách thành microservice Python riêng (FastAPI), .NET gọi qua HTTP; `IEmbeddingProvider` thành client. pgvector vẫn trên Postgres. Chưa triển khai |
+| ADR-039 | RAG microservice Python (`rag-service/`, FastAPI+LangChain+LangGraph) sở hữu **toàn bộ** chunk/embed/hybrid-retrieve/sinh câu hỏi+đánh giá. .NET gọi qua HTTP/SSE (`RagServiceProvider` + `IRagIngestionService`), `OpenAIProvider` là fallback qua cờ `AI:Provider`. pgvector trên Postgres (schema do EF sở hữu). **Giai đoạn 1 Hybrid RAG đã triển khai (2026-06-26)**; CRAG/Agentic còn backlog |
 | ADR-040 | Cổng kiểm tra mic + cam bắt buộc trước mọi phỏng vấn (thử & thật) — component `DeviceCheck` |
+| ADR-043 | Media stack phỏng vấn chốt: **Cascaded** (~0.8–1.2s, không speech-to-speech) — Deepgram Nova-3 (STT+VAD) + ElevenLabs Flash v2.5 + Hybrid RAG + **GPT-4o (Claude là option dành sau)** + HeyGen. TTFT là yếu tố chính; Haiku 4.5 nhanh nhất nếu cần giảm trễ |
 | ADR-018 | Language-aware AI: detect từ JD, điều chỉnh system prompt + TTS voice + STT languageCode |
 | ADR-023 | Auth nội bộ: Email + Password (chính) + Google OAuth2 optional; pre-provisioning + domain validation |
 | ADR-025 | Playbook scope: Company / Job Posting / Round; RAG weighted retrieve |

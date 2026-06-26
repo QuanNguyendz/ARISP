@@ -234,10 +234,12 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | **ORM** | Entity Framework Core | |
 | **Auth** | JWT + Role-based Authorization | BCrypt hash cho tài khoản Candidate và mật khẩu phụ; **OAuth2 / OpenID Connect + Domain validation** cho nội bộ công ty |
 | **Cache** | Redis | |
-| **AI/LLM** | OpenAI GPT-4o + RAG (pgvector) | text-embedding-3-small cho embedding |
+| **AI/LLM (phỏng vấn)** | OpenAI GPT-4o | "Bộ não" sinh câu hỏi + đánh giá; Claude là option dành sau (ADR-043) |
+| **RAG Service** | **Python + LangChain + LangGraph + FastAPI** | Microservice riêng `rag-service/`: chunk + embed (text-embedding-3-small) + **Hybrid RAG** (dense pgvector + sparse Postgres FTS + RRF + scope weighting) + sinh câu hỏi/đánh giá. .NET gọi qua HTTP/SSE nội bộ (ADR-039) |
+| **Vector store** | pgvector (PostgreSQL) | `document_chunks` vector(1536), schema do EF Core sở hữu |
 | **CV-JD Analysis** | Google Gemini 2.5 Flash | Phân tích CV vs JD, chấm điểm match, tóm tắt – dành cho candidate xem trước + HR review |
-| **STT** | Google Speech-to-Text | Streaming real-time |
-| **TTS** | ElevenLabs Flash v2.5 | Streaming |
+| **STT + VAD** | **Deepgram Nova-3** | Streaming real-time; **gộp sẵn VAD + endpointing** (`vad_events`/`endpointing`/`utterance_end`) — không cần thư viện VAD riêng |
+| **TTS** | ElevenLabs Flash v2.5 | Streaming (~75ms) |
 | **Avatar** | HeyGen Streaming Avatar | Hybrid Idle Strategy |
 | **Email** | SendGrid / AWS SES | Invite, magic link, kết quả |
 | **File Storage** | `IFileStorageService` – Local disk (dev) / Cloudflare R2 (prod) | S3-compatible qua `AWSSDK.S3`, presigned URL; DB lưu `storageKey` (ADR-036) |
@@ -250,7 +252,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | ** CDN** | Cloudflare CDN | Optional – sau MVP |
 | **Version Control** | GitHub | |
 
-> **Streaming-First:** STT stream → RAG parallel → LLM stream → TTS stream → Avatar stream. Mục tiêu: **~1–1.8 giây** latency sau khi ứng viên dừng nói.
+> **Streaming-First:** Deepgram STT stream (+VAD) → Hybrid RAG parallel → GPT-4o stream → ElevenLabs Flash v2.5 stream → HeyGen Avatar stream. Mục tiêu: **~0.8–1.2 giây** latency sau khi ứng viên dừng nói (cascaded tối ưu — ADR-006/043).
 
 ---
 
@@ -263,7 +265,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 5. **Mọi thay đổi kiến trúc** cập nhật vào `.ai/architecture.md`.
 6. **Trước khi bắt đầu task mới** – kiểm tra `.ai/tasks.md`.
 7. **Khi có quyết định mới** – ghi lại ngay vào file `.ai/` tương ứng.
-8. **AI/LLM:** Business logic không gọi trực tiếp OpenAI SDK – qua `IAIProvider` + `IEmbeddingProvider`. Swap qua env var `AI_PROVIDER=openai|local`.
+8. **AI/LLM:** Business logic không gọi trực tiếp OpenAI SDK – qua `IAIProvider` + `IEmbeddingProvider`. Swap qua cờ `AI:Provider` = `rag` (RAG microservice Python — mặc định khuyến nghị, ADR-039) | `openai` | `local`. Khi `rag`, ingestion qua `IRagIngestionService`.
 9. **WebRTC** chỉ dùng cho media stream. Session events dùng SignalR.
 10. **Streaming-First:** Không chấp nhận batch nếu có alternative streaming khả thi.
 11. **Single-tenant:** Hệ thống phục vụ cho 1 công ty duy nhất. Không sử dụng `organization_id` và không thiết kế cấu trúc multi-tenant.

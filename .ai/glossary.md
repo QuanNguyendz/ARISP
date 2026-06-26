@@ -27,7 +27,7 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Scoring Rubric** | Bộ tiêu chí đánh giá tùy chỉnh theo vị trí (technical, communication, culture fit, v.v.) |
 | **JD (Job Description)** | Mô tả công việc – AI dùng để định hướng câu hỏi sát yêu cầu doanh nghiệp |
 | **CV (Resume)** | Hồ sơ ứng viên – AI dùng để cá nhân hóa câu hỏi theo kinh nghiệm thực tế |
-| **Transcript** | Nội dung text được chuyển từ audio của ứng viên (qua Google Speech-to-Text STT) |
+| **Transcript** | Nội dung text được chuyển từ audio của ứng viên (qua Deepgram Nova-3 STT) |
 | **Adaptive Difficulty** | Cơ chế AI tự điều chỉnh độ khó câu hỏi theo chất lượng câu trả lời |
 | **Interview Playbook** | Tập hợp tài liệu phỏng vấn nội bộ của doanh nghiệp (style guide, question bank, rubric...) – đưa vào RAG để AI phỏng vấn đúng phong cách công ty |
 | **Company Knowledge Base** | Cơ sở kiến thức của Company trong pgvector – bao gồm Playbook documents được chunk và embed |
@@ -57,11 +57,15 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 
 | Thuật ngữ | Định nghĩa |
 |---|---|
-| **STT** | Speech-to-Text – chuyển giọng nói thành văn bản (Google Speech-to-Text streaming) |
-| **TTS** | Text-to-Speech – chuyển văn bản thành giọng nói (ElevenLabs Flash v2.5 streaming) |
-| **RAG** | Retrieval-Augmented Generation – AI retrieve relevant chunks từ JD/CV vector store trước khi generate câu hỏi |
-| **pgvector** | PostgreSQL extension lưu và tìm kiếm vector embeddings (dùng cho RAG) |
-| **VAD** | Voice Activity Detection – detect khi ứng viên sắp dừng nói để trigger RAG retrieval sớm |
+| **STT** | Speech-to-Text – chuyển giọng nói thành văn bản (**Deepgram Nova-3** streaming, gộp sẵn VAD/endpointing) |
+| **TTS** | Text-to-Speech – chuyển văn bản thành giọng nói (ElevenLabs Flash v2.5 streaming, ~75ms) |
+| **RAG** | Retrieval-Augmented Generation – retrieve chunks liên quan từ JD/CV/Playbook trước khi sinh câu hỏi. Do **RAG Service (Python)** sở hữu (ADR-039) |
+| **RAG Service** | Microservice Python (`rag-service/`, FastAPI + LangChain + LangGraph) sở hữu toàn bộ chunk/embed/retrieve/sinh câu hỏi+đánh giá; .NET gọi qua HTTP/SSE nội bộ (ADR-039) |
+| **Hybrid RAG** | Truy hồi kết hợp **dense** (pgvector cosine) + **sparse** (Postgres full-text) hợp nhất bằng **RRF** + weighting theo scope (ADR-025). Giai đoạn 1; sau là CRAG → Agentic |
+| **RRF** | Reciprocal Rank Fusion – thuật toán hợp nhất 2 danh sách xếp hạng (dense + sparse) trong Hybrid RAG |
+| **LangGraph** | Framework dựng pipeline RAG dạng StateGraph (retrieve→generate) trong RAG Service; điểm mở rộng cho CRAG/Agentic |
+| **pgvector** | PostgreSQL extension lưu và tìm kiếm vector embeddings (bảng `document_chunks`, dùng cho RAG) |
+| **VAD** | Voice Activity Detection – detect khi ứng viên bắt đầu/sắp dừng nói (barge-in + trigger RAG sớm). **Tích hợp sẵn trong Deepgram Nova-3** (`vad_events`/`endpointing`/`utterance_end`) — không cần thư viện riêng |
 | **SignalR Hub** | Endpoint realtime ASP.NET Core, quản lý session lifecycle events |
 | **ADR** | Architecture Decision Record – tài liệu ghi lại quyết định kiến trúc và lý do |
 | **Clean Architecture** | Pattern tổ chức code: Domain → Application → Infrastructure → API |

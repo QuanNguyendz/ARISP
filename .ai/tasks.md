@@ -155,9 +155,10 @@ _Chưa có task nào đang thực hiện._
 - [x] Database schema: `interview_sessions`, `questions`, `answers`, `document_chunks`
 - [x] Bật pgvector extension trên PostgreSQL (configured trong DbContext)
 - [x] `IEmbeddingProvider` interface + `OpenAIEmbeddingProvider` impl (`text-embedding-3-small`)
-- [ ] `RagService`: chunk JD/CV, embed, lưu pgvector, retrieve context khi sinh câu hỏi
+- [x] `RagService`: chunk JD/CV, embed, lưu pgvector, retrieve context khi sinh câu hỏi — **chuyển sang RAG microservice Python** (`rag-service/`, ADR-039 Giai đoạn 1) ✅ 2026-06-26
 - [x] `IAIProvider` interface + `OpenAIProvider` impl (GPT-4o streaming)
-- [ ] AI question generation với RAG context + adaptive difficulty (interface có nhưng full pipeline chưa hoàn chỉnh)
+- [x] AI question generation với RAG context + adaptive difficulty — Hybrid RAG (LangGraph) trong RAG service, .NET gọi qua `RagServiceProvider` (SSE) ✅ 2026-06-26
+- [x] **RAG microservice Python (ADR-039 Giai đoạn 1):** FastAPI+LangChain+LangGraph; endpoints `/ingest` `/retrieve` `/next-question`(SSE) `/analyze-answer` `/evaluate` `/detect-language` `/assess-language` `/complete-json` `/embed`; hybrid dense(pgvector)+sparse(FTS)+RRF+scope weighting; `IRagIngestionService` + `LocalRagIngestionService` fallback; EF migration GIN index FTS ✅ 2026-06-26
 - [ ] Interview session flow: start → question loop → adaptive difficulty → end
 - [x] **Language-aware:** `JobDescriptionLanguageDetector` service phát hiện ngôn ngữ từ JD
 - [ ] **Language-aware:** TTS voice selection theo ngôn ngữ (ElevenLabs multilingual)
@@ -172,10 +173,10 @@ _Chưa có task nào đang thực hiện._
 - [ ] EF Core migrations
 - [ ] Document upload endpoint (PDF, DOCX, TXT, Markdown, JSON)
 - [x] `DocumentParserService`: extract text từ PDF/DOCX
-- [x] `PlaybookService`: chunk, embed (qua `IEmbeddingProvider`), lưu vào pgvector với scope tag
+- [x] `PlaybookService`: chunk, embed, lưu vào pgvector với scope tag — **đẩy sang RAG service qua `IRagIngestionService` (/ingest)** ✅ 2026-06-26
 - [x] `PlaybookService`: track must-ask questions đã hỏi trong session (`MustAskTracking` entity)
 - [x] `InterviewService`: nhận signal must-ask chưa xong trước khi kết thúc session
-- [ ] `RagService`: cập nhật retrieve logic – merge JD/CV chunks + Playbook chunks theo weighted scope
+- [x] `RagService`: retrieve logic – merge JD/CV chunks + Playbook chunks theo weighted scope — **Hybrid retriever (RRF + scope weight) trong RAG service Python** ✅ 2026-06-26
 - [ ] HR Admin UI: quản lý Playbook documents (upload, preview, xóa) per Job Posting/Round
 - [ ] Validation: file size limit, format check, virus scan (optional)
 
@@ -296,6 +297,13 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-06-26: **RAG Interview Microservice (Python) — Giai đoạn 1: Hybrid RAG (ADR-039 mở rộng).**
+  - **Service mới `rag-service/`** (FastAPI + LangChain + LangGraph, Python 3.11): sở hữu toàn bộ pipeline chunk/embed/retrieve/sinh câu hỏi+đánh giá. Backend .NET chỉ orchestrate session/SignalR/persistence, gọi qua HTTP/SSE nội bộ (`http://rag-service:8000`, không expose Nginx).
+  - **Hybrid retriever:** dense (pgvector cosine `<=>`) + sparse (Postgres full-text `ts_rank`/`plainto_tsquery`) → hợp nhất Reciprocal Rank Fusion + weighting theo scope (ADR-025: JD/CV & job_posting/round playbook cao, company playbook trung bình). `LangGraph StateGraph` retrieve→generate, để mở rộng CRAG (Giai đoạn 2) & Agentic (Giai đoạn 3).
+  - **Endpoints:** `/ingest` (idempotent theo source), `/retrieve`, `/next-question` (SSE stream token), `/analyze-answer`, `/evaluate`, `/detect-language`, `/assess-language`, `/complete-json`, `/embed`, `/health`. Wire JSON camelCase. Mock mode khi thiếu `OPENAI_API_KEY` để test pipeline không cần key.
+  - **.NET:** `RagServiceProvider` (impl `IAIProvider`+`IEmbeddingProvider`+`IRagIngestionService`, SSE client); `IRagIngestionService` + `LocalRagIngestionService` fallback in-process; chuyển ingest CV (ApplicationService), Playbook (PlaybookService), JD (JobsController) sang `/ingest`; DI chọn provider theo cờ `AI:Provider` (`rag`|`openai`|`local`). EF migration `AddDocumentChunksFtsIndex` (GIN FTS). `document_chunks` vẫn do EF sở hữu schema.
+  - **Hạ tầng:** service `rag-service` trong docker-compose dev/prod; `docker/rag/Dockerfile` (multi-stage); `RAG_SERVICE_URL` + biến `DATABASE_*` dùng chung. pytest: chunker, retriever (RRF/scope weight), schemas, embeddings mock.
 
 - [x] 2026-06-23: **Bảo mật + ổn định GeminiProvider — API key ra khỏi URL/log + retry backoff.**
   - **Lỗi rò rỉ secret:** key Gemini bị nhét vào URL `?key={_apiKey}` ở cả 3 endpoint (CV-JD analyze, CV review, JD extraction) → `HttpClient` logging in nguyên key ra log INF (lộ trong file log/Grafana). Chuyển sang truyền qua header **`x-goog-api-key`**; URL trong log không còn chứa key.
