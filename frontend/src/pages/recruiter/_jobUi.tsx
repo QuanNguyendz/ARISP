@@ -50,13 +50,36 @@ export const appStatusBadge = (s: string): string =>
 
 // ===== Format lương =====
 export function formatSalary(job: Pick<JobPosting, 'salaryIsNegotiable' | 'salaryMin' | 'salaryMax' | 'salaryCurrency'>): string {
-  if (job.salaryIsNegotiable || (job.salaryMin == null && job.salaryMax == null)) return 'Thỏa thuận'
-  const cur = job.salaryCurrency || 'VND'
-  const fmt = (n: number) => (cur === 'VND' ? `${(n / 1_000_000).toLocaleString('vi-VN')}tr` : n.toLocaleString('en-US'))
-  const sym = cur === 'USD' ? '$' : cur === 'VND' ? '' : cur + ' '
-  if (job.salaryMin != null && job.salaryMax != null) return `${sym}${fmt(job.salaryMin)} - ${sym}${fmt(job.salaryMax)}`
-  if (job.salaryMin != null) return `Từ ${sym}${fmt(job.salaryMin)}`
-  return `Đến ${sym}${fmt(job.salaryMax!)}`
+  if (job.salaryIsNegotiable || 
+      (job.salaryMin == null && job.salaryMax == null) || 
+      (job.salaryMin === 0 && job.salaryMax === 0)) {
+    return 'Thỏa thuận'
+  }
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+  
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+  
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `Từ ${formatVal(job.salaryMin)}${unit}`
+  }
+  
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `Đến ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  return 'Thỏa thuận'
 }
 
 // ===== Verdict đánh giá (pass | not_pass) =====

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
 } from 'lucide-react'
@@ -168,7 +170,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !jobDescription.trim()) {
+    const cleanDesc = jobDescription.replace(/<[^>]*>/g, '').trim()
+    if (!title.trim() || !cleanDesc) {
       setError('Tiêu đề và Mô tả công việc là bắt buộc.')
       return
     }
@@ -327,7 +330,22 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
             <div>
               <label className={label}>Mô tả công việc *</label>
-              <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={8} placeholder="Mô tả nhiệm vụ, trách nhiệm, yêu cầu..." className={`${input} resize-none`} required />
+              <div className="quill-editor-wrapper">
+                <ReactQuill
+                  theme="snow"
+                  value={jobDescription}
+                  onChange={setJobDescription}
+                  placeholder="Mô tả nhiệm vụ, trách nhiệm, yêu cầu..."
+                  modules={{
+                    toolbar: [
+                      [{ header: [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
             </div>
 
             <div>

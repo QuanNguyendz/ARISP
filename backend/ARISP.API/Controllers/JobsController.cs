@@ -194,20 +194,220 @@ namespace ARISP.API.Controllers
             return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
 
-        /// <summary>Danh sách job công khai trên Job Board (không cần đăng nhập).</summary>
+        private static List<string> ParseCsv(string? csv)
+        {
+            if (string.IsNullOrWhiteSpace(csv)) return new List<string>();
+            return csv.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                      .Select(x => x.Trim())
+                      .ToList();
+        }
+
+        /// <summary>Danh sách job công khai trên Job Board kèm lọc, phân trang, và sắp xếp.</summary>
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetJobs(CancellationToken ct)
+        public async Task<IActionResult> GetJobs(
+            [FromQuery] string? search,
+            [FromQuery] string? categories,
+            [FromQuery] string? employmentTypes,
+            [FromQuery] string? experienceLevels,
+            [FromQuery] string? workModes,
+            [FromQuery] string? locations,
+            [FromQuery] string? skills,
+            [FromQuery] string? languages,
+            [FromQuery] string? sortBy,
+            [FromQuery] int? minSalary,
+            [FromQuery] int? maxSalary,
+            [FromQuery] bool? salaryIsNegotiable,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 8,
+            CancellationToken ct = default)
         {
-            var jobs = await _unitOfWork.Repository<JobPosting>().FindAsync(
-                j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow),
-                ct);
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 8;
 
-            var response = jobs
-                .OrderByDescending(j => j.PublishedAt ?? j.CreatedAt)
-                .Select(j => JobPostingListItemResponse.FromEntity(j));
+            var catList = ParseCsv(categories);
+            var empList = ParseCsv(employmentTypes);
+            var expList = ParseCsv(experienceLevels);
+            var wmList = ParseCsv(workModes);
+            var locList = ParseCsv(locations);
+            var skillList = ParseCsv(skills);
+            var langList = ParseCsv(languages);
 
-            return Ok(response);
+            // 1. Lọc và lấy total count
+            var totalCount = (await _unitOfWork.Repository<JobPosting>().QueryAsync<Guid>(q =>
+            {
+                var query = q.Where(j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow));
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var s = search.Trim().ToLower();
+                    query = query.Where(j => j.Title.ToLower().Contains(s) ||
+                                         (j.Department != null && j.Department.ToLower().Contains(s)) ||
+                                         (j.Skills != null && j.Skills.Any(sk => sk.ToLower().Contains(s))));
+                }
+
+                if (catList.Any())
+                {
+                    var cats = catList.Select(c => c.ToLower()).ToList();
+                    query = query.Where(j => j.JobCategory != null && cats.Contains(j.JobCategory.ToLower()));
+                }
+
+                if (empList.Any())
+                {
+                    var emps = empList.Select(e => e.ToLower()).ToList();
+                    query = query.Where(j => j.EmploymentType != null && emps.Contains(j.EmploymentType.ToLower()));
+                }
+
+                if (expList.Any())
+                {
+                    var exps = expList.Select(e => e.ToLower()).ToList();
+                    query = query.Where(j => j.ExperienceLevel != null && exps.Contains(j.ExperienceLevel.ToLower()));
+                }
+
+                if (wmList.Any())
+                {
+                    var wms = wmList.Select(w => w.ToLower()).ToList();
+                    query = query.Where(j => j.WorkMode != null && wms.Contains(j.WorkMode.ToLower()));
+                }
+
+                if (locList.Any())
+                {
+                    var locs = locList.Select(l => l.ToLower()).ToList();
+                    query = query.Where(j => j.Location != null && locs.Contains(j.Location.ToLower()));
+                }
+
+                if (skillList.Any())
+                {
+                    var sks = skillList.Select(s => s.ToLower()).ToList();
+                    query = query.Where(j => j.Skills != null && j.Skills.Any(s => sks.Contains(s.ToLower())));
+                }
+
+                if (langList.Any())
+                {
+                    var langs = langList.Select(l => l.ToLower()).ToList();
+                    query = query.Where(j => j.DetectedLanguage != null && langs.Contains(j.DetectedLanguage.ToLower()));
+                }
+
+                if (salaryIsNegotiable == true)
+                {
+                    query = query.Where(j => j.SalaryIsNegotiable == true || ((j.SalaryMin ?? 0) == 0 && (j.SalaryMax ?? 0) == 0));
+                }
+                else if (minSalary.HasValue || maxSalary.HasValue)
+                {
+                    query = query.Where(j => j.SalaryIsNegotiable != true && (j.SalaryMin != null || j.SalaryMax != null));
+                    if (minSalary.HasValue)
+                    {
+                        query = query.Where(j => (j.SalaryCurrency == "USD" ? (j.SalaryMax ?? 0) * 25000 : (j.SalaryMax ?? 0)) >= minSalary.Value);
+                    }
+                    if (maxSalary.HasValue)
+                    {
+                        query = query.Where(j => (j.SalaryCurrency == "USD" ? (j.SalaryMin ?? 0) * 25000 : (j.SalaryMin ?? 0)) <= maxSalary.Value);
+                    }
+                }
+
+                return query.Select(j => j.Id);
+            }, ct)).Count;
+
+            // 2. Lấy dữ liệu phân trang và sắp xếp
+            var items = await _unitOfWork.Repository<JobPosting>().QueryAsync(q =>
+            {
+                var query = q.Where(j => j.IsPublicListing && j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow));
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var s = search.Trim().ToLower();
+                    query = query.Where(j => j.Title.ToLower().Contains(s) ||
+                                         (j.Department != null && j.Department.ToLower().Contains(s)) ||
+                                         (j.Skills != null && j.Skills.Any(sk => sk.ToLower().Contains(s))));
+                }
+
+                if (catList.Any())
+                {
+                    var cats = catList.Select(c => c.ToLower()).ToList();
+                    query = query.Where(j => j.JobCategory != null && cats.Contains(j.JobCategory.ToLower()));
+                }
+
+                if (empList.Any())
+                {
+                    var emps = empList.Select(e => e.ToLower()).ToList();
+                    query = query.Where(j => j.EmploymentType != null && emps.Contains(j.EmploymentType.ToLower()));
+                }
+
+                if (expList.Any())
+                {
+                    var exps = expList.Select(e => e.ToLower()).ToList();
+                    query = query.Where(j => j.ExperienceLevel != null && exps.Contains(j.ExperienceLevel.ToLower()));
+                }
+
+                if (wmList.Any())
+                {
+                    var wms = wmList.Select(w => w.ToLower()).ToList();
+                    query = query.Where(j => j.WorkMode != null && wms.Contains(j.WorkMode.ToLower()));
+                }
+
+                if (locList.Any())
+                {
+                    var locs = locList.Select(l => l.ToLower()).ToList();
+                    query = query.Where(j => j.Location != null && locs.Contains(j.Location.ToLower()));
+                }
+
+                if (skillList.Any())
+                {
+                    var sks = skillList.Select(s => s.ToLower()).ToList();
+                    query = query.Where(j => j.Skills != null && j.Skills.Any(s => sks.Contains(s.ToLower())));
+                }
+
+                if (langList.Any())
+                {
+                    var langs = langList.Select(l => l.ToLower()).ToList();
+                    query = query.Where(j => j.DetectedLanguage != null && langs.Contains(j.DetectedLanguage.ToLower()));
+                }
+
+                if (salaryIsNegotiable == true)
+                {
+                    query = query.Where(j => j.SalaryIsNegotiable == true || ((j.SalaryMin ?? 0) == 0 && (j.SalaryMax ?? 0) == 0));
+                }
+                else if (minSalary.HasValue || maxSalary.HasValue)
+                {
+                    query = query.Where(j => j.SalaryIsNegotiable != true && (j.SalaryMin != null || j.SalaryMax != null));
+                    if (minSalary.HasValue)
+                    {
+                        query = query.Where(j => (j.SalaryCurrency == "USD" ? (j.SalaryMax ?? 0) * 25000 : (j.SalaryMax ?? 0)) >= minSalary.Value);
+                    }
+                    if (maxSalary.HasValue)
+                    {
+                        query = query.Where(j => (j.SalaryCurrency == "USD" ? (j.SalaryMin ?? 0) * 25000 : (j.SalaryMin ?? 0)) <= maxSalary.Value);
+                    }
+                }
+
+                // Sắp xếp
+                if (string.Equals(sortBy, "salary_desc", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(sortBy, "salary", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query
+                        .OrderBy(j => (j.SalaryIsNegotiable == true || ((j.SalaryMin ?? 0) == 0 && (j.SalaryMax ?? 0) == 0)) ? 1 : 0)
+                        .ThenByDescending(j => j.SalaryCurrency == "USD" ? (j.SalaryMax ?? 0) * 25000 : (j.SalaryMax ?? 0))
+                        .ThenByDescending(j => j.SalaryCurrency == "USD" ? (j.SalaryMin ?? 0) * 25000 : (j.SalaryMin ?? 0));
+                }
+                else if (string.Equals(sortBy, "salary_asc", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query
+                        .OrderBy(j => (j.SalaryIsNegotiable == true || ((j.SalaryMin ?? 0) == 0 && (j.SalaryMax ?? 0) == 0)) ? 1 : 0)
+                        .ThenBy(j => j.SalaryCurrency == "USD" ? (j.SalaryMin ?? 0) * 25000 : (j.SalaryMin ?? 0))
+                        .ThenBy(j => j.SalaryCurrency == "USD" ? (j.SalaryMax ?? 0) * 25000 : (j.SalaryMax ?? 0));
+                }
+                else
+                {
+                    query = query.OrderByDescending(j => j.PublishedAt ?? j.CreatedAt);
+                }
+
+                // Phân trang
+                query = query.Skip((page - 1) * pageSize).Take(pageSize);
+
+                return query.Select(j => JobPostingListItemResponse.FromEntity(j));
+            }, ct);
+
+            return Ok(new { items, totalCount });
         }
 
         /// <summary>
@@ -294,18 +494,36 @@ namespace ARISP.API.Controllers
                     Value = labels != null ? g.Key.ToLowerInvariant() : g.Key,
                     Label = labels != null && labels.TryGetValue(g.Key, out var lbl) ? lbl : g.Key,
                     Count = g.Count()
-                })
-                .ToList();
+                });
+
+            // Gom nhóm theo Label hiển thị để tránh bị lặp (vd: "Intern / Fresher" cho cả 'intern' và 'fresher')
+            if (labels != null)
+            {
+                grouped = grouped
+                    .GroupBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => new JobFacetItem
+                    {
+                        Value = string.Join(",", g.Select(x => x.Value).Distinct()),
+                        Label = g.Key,
+                        Count = g.Sum(x => x.Count)
+                    });
+            }
+
+            var list = grouped.ToList();
 
             if (order != null)
             {
-                return grouped
-                    .OrderBy(item => { var idx = order.IndexOf(item.Value); return idx < 0 ? int.MaxValue : idx; })
+                return list
+                    .OrderBy(item => {
+                        var firstVal = item.Value.Split(',')[0];
+                        var idx = order.IndexOf(firstVal);
+                        return idx < 0 ? int.MaxValue : idx;
+                    })
                     .ThenByDescending(item => item.Count)
                     .ToList();
             }
 
-            return grouped
+            return list
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
                 .ToList();

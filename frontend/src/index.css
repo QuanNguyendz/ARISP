@@ -10,17 +10,20 @@
   border-radius: 1rem;
   opacity: 1;
 }
+
 /* Item đang kéo nổi lên trên */
 .react-grid-item.react-draggable-dragging {
   z-index: 30;
   box-shadow: 0 18px 40px rgb(15 23 42 / 0.18);
   border-radius: 1rem;
 }
+
 .react-grid-item.resizing {
   z-index: 30;
 }
+
 /* Tay nắm đổi cỡ ở góc dưới–phải rõ hơn trong dark mode */
-.dark .react-grid-item > .react-resizable-handle::after {
+.dark .react-grid-item>.react-resizable-handle::after {
   border-right-color: rgb(148 163 184);
   border-bottom-color: rgb(148 163 184);
 }
@@ -65,85 +68,112 @@ html.dark body {
   background-color: #020617;
   color: #e2e8f0;
 }
+
 html.dark .bg-white {
   background-color: #0f172a !important;
 }
+
 html.dark .bg-white\/80 {
   background-color: rgb(15 23 42 / 0.8) !important;
 }
+
 html.dark .bg-ink-50 {
   background-color: #020617 !important;
 }
+
 html.dark .bg-ink-100 {
   background-color: #1e293b !important;
 }
+
 html.dark .hover\:bg-ink-100:hover {
   background-color: #1e293b !important;
 }
+
 html.dark .hover\:bg-ink-50:hover {
   background-color: #0f172a !important;
 }
+
 html.dark .bg-brand-50 {
   background-color: rgb(99 102 241 / 0.16) !important;
 }
+
 html.dark .bg-brand-50\/60 {
   background-color: rgb(99 102 241 / 0.16) !important;
 }
+
 html.dark .bg-amber-50\/60 {
   background-color: rgb(245 158 11 / 0.12) !important;
 }
+
 html.dark .bg-ai-50 {
   background-color: rgb(168 85 247 / 0.16) !important;
 }
+
 html.dark .bg-emerald-50 {
   background-color: rgb(16 185 129 / 0.16) !important;
 }
+
 html.dark .bg-amber-50 {
   background-color: rgb(245 158 11 / 0.16) !important;
 }
+
 html.dark .bg-red-50 {
   background-color: rgb(239 68 68 / 0.16) !important;
 }
+
 html.dark .bg-white\/90 {
   background-color: rgb(15 23 42 / 0.9) !important;
 }
+
 html.dark .border-ink-200 {
   border-color: #1e293b !important;
 }
+
 html.dark .border-ink-100 {
   border-color: #1e293b !important;
 }
-html.dark .divide-ink-100 > * + * {
+
+html.dark .divide-ink-100>*+* {
   border-color: #1e293b !important;
 }
+
 html.dark .text-ink-900 {
   color: #f1f5f9 !important;
 }
+
 html.dark .text-ink-800 {
   color: #e2e8f0 !important;
 }
+
 html.dark .text-ink-700 {
   color: #cbd5e1 !important;
 }
+
 html.dark .text-ink-600 {
   color: #cbd5e1 !important;
 }
+
 html.dark .text-ink-500 {
   color: #94a3b8 !important;
 }
+
 html.dark .text-ink-400 {
   color: #64748b !important;
 }
+
 html.dark .text-ai-700 {
   color: #d8b4fe !important;
 }
+
 html.dark .text-brand-700 {
   color: #a5b4fc !important;
 }
+
 html.dark select {
   background-color: #0f172a;
   color: #e2e8f0;
 }
+
 /* Autofill của trình duyệt (Chrome/Safari) sơn nền sáng lên input đè cả theme tối.
    Dùng transition cực dài để giữ nền trong suốt + set màu chữ theo theme. */
 input:-webkit-autofill,
@@ -156,6 +186,7 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: #0f172a;
   caret-color: #0f172a;
 }
+
 html.dark input:-webkit-autofill,
 html.dark input:-webkit-autofill:hover,
 html.dark input:-webkit-autofill:focus,
@@ -163,6 +194,7 @@ html.dark input:-webkit-autofill:active {
   -webkit-text-fill-color: #e2e8f0;
   caret-color: #e2e8f0;
 }
+
 /* Native date/time picker (icon lịch) theo tông tối */
 html.dark input[type='date'],
 html.dark input[type='datetime-local'],
@@ -171,46 +203,202 @@ html.dark input[type='month'],
 html.dark input[type='week'] {
   color-scheme: dark;
 }
+
 /* Gradient nền hero -> tông tối */
 html.dark .from-brand-50 {
   --tw-gradient-from: #020617 var(--tw-gradient-from-position) !important;
 }
+
 html.dark .via-white {
   --tw-gradient-stops:
-    var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position,), var(--tw-gradient-to) !important;
+    var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position, ), var(--tw-gradient-to) !important;
 }
+
 html.dark .via-ink-100 {
   --tw-gradient-stops:
-    var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position,), var(--tw-gradient-to) !important;
+    var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position, ), var(--tw-gradient-to) !important;
 }
+
 html.dark .to-ai-50 {
   --tw-gradient-to: #020617 var(--tw-gradient-to-position) !important;
 }
+
 html.dark .from-ai-50 {
   --tw-gradient-from: rgb(168 85 247 / 0.14) var(--tw-gradient-from-position) !important;
 }
+
 html.dark .from-emerald-50 {
   --tw-gradient-from: rgb(16 185 129 / 0.14) var(--tw-gradient-from-position) !important;
 }
+
 html.dark .from-red-50 {
   --tw-gradient-from: rgb(239 68 68 / 0.14) var(--tw-gradient-from-position) !important;
 }
+
 html.dark .bg-white\/60 {
   background-color: rgb(15 23 42 / 0.6) !important;
 }
+
 html.dark .from-ai-50\/70 {
   --tw-gradient-from: rgb(168 85 247 / 0.12) var(--tw-gradient-from-position) !important;
 }
+
 html.dark .from-ai-50\/80 {
   --tw-gradient-from: rgb(168 85 247 / 0.14) var(--tw-gradient-from-position) !important;
 }
+
 html.dark .to-brand-50\/70 {
   --tw-gradient-to: rgb(99 102 241 / 0.14) var(--tw-gradient-to-position) !important;
 }
+
 html.dark .to-white {
   --tw-gradient-to: #0f172a var(--tw-gradient-to-position) !important;
 }
+
 /* Viền accent tím nhạt -> tông tối */
 html.dark .border-ai-200 {
   border-color: rgb(168 85 247 / 0.28) !important;
+}
+
+/* Sidebar filter scrollbar only visible on hover */
+.filter-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s;
+}
+
+.filter-sidebar-scroll:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* For WebKit browsers (Chrome, Safari, Edge) */
+.filter-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.3s;
+}
+
+.filter-sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.dark .filter-sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* ===== React Quill custom styles for Light/Dark Mode ===== */
+.quill-editor-wrapper {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+}
+
+html.dark .quill-editor-wrapper {
+  border-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.quill-editor-wrapper .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+html.dark .quill-editor-wrapper .ql-toolbar.ql-snow {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.quill-editor-wrapper .ql-container.ql-snow {
+  border: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  min-height: 12rem;
+}
+
+.quill-editor-wrapper .ql-editor {
+  color: #1e293b;
+}
+
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  color: #94a3b8;
+  font-style: normal;
+}
+
+html.dark .quill-editor-wrapper .ql-editor {
+  color: #f8fafc;
+}
+
+html.dark .quill-editor-wrapper .ql-editor.ql-blank::before {
+  color: #64748b;
+}
+
+/* Fix text and SVG icons of Quill toolbar in dark mode */
+html.dark .quill-editor-wrapper .ql-snow .ql-stroke {
+  stroke: #cbd5e1;
+}
+html.dark .quill-editor-wrapper .ql-snow .ql-fill {
+  fill: #cbd5e1;
+}
+html.dark .quill-editor-wrapper .ql-snow .ql-picker {
+  color: #cbd5e1;
+}
+html.dark .quill-editor-wrapper .ql-snow .ql-picker-options {
+  background-color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+html.dark .quill-editor-wrapper .ql-snow .ql-picker-item {
+  color: #cbd5e1;
+}
+html.dark .quill-editor-wrapper .ql-snow .ql-picker-item:hover,
+html.dark .quill-editor-wrapper .ql-snow .ql-picker-item.ql-selected {
+  color: rgb(99 102 241);
+}
+
+/* Styling for displaying Rich Text HTML in candidate view */
+.ql-editor-display h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.ql-editor-display h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.ql-editor-display h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+.ql-editor-display p {
+  margin-bottom: 0.5rem;
+}
+.ql-editor-display ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.ql-editor-display ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.ql-editor-display li {
+  margin-bottom: 0.25rem;
+}
+.ql-editor-display strong {
+  font-weight: 700;
 }

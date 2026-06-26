@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   MapPin,
-  DollarSign,
   Clock,
   Calendar,
   ArrowLeft,
@@ -119,13 +118,36 @@ export default function JobPostingDetailPage() {
     }
   }
 
-  function formatSalary(j: JobPosting): string {
-    if (j.salaryIsNegotiable) return 'Thỏa thuận'
-    if (j.salaryMin && j.salaryMax) {
-      return `$${j.salaryMin.toLocaleString()} - $${j.salaryMax.toLocaleString()}`
+  function formatSalary(job: JobPosting): string {
+    if (job.salaryIsNegotiable || 
+        (job.salaryMin == null && job.salaryMax == null) || 
+        (job.salaryMin === 0 && job.salaryMax === 0)) {
+      return 'Thỏa thuận'
     }
-    if (j.salaryMin) return `Từ $${j.salaryMin.toLocaleString()}`
-    if (j.salaryMax) return `Đến $${j.salaryMax.toLocaleString()}`
+
+    const cur = (job.salaryCurrency || 'VND').toUpperCase()
+    
+    const formatVal = (n: number) => {
+      if (cur === 'VND') {
+        return n.toLocaleString('vi-VN')
+      }
+      return n.toLocaleString('en-US')
+    }
+
+    const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+    if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+      return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+    }
+    
+    if (job.salaryMin != null && job.salaryMin !== 0) {
+      return `Từ ${formatVal(job.salaryMin)}${unit}`
+    }
+    
+    if (job.salaryMax != null && job.salaryMax !== 0) {
+      return `Đến ${formatVal(job.salaryMax)}${unit}`
+    }
+
     return 'Thỏa thuận'
   }
 
@@ -206,7 +228,6 @@ export default function JobPostingDetailPage() {
                   {job.location || 'Chưa cấu hình'}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                   {formatSalary(job)}
                 </span>
                 <span className="flex items-center gap-1.5">
@@ -382,9 +403,10 @@ export default function JobPostingDetailPage() {
               <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4">
                 Mô tả công việc
               </h2>
-              <div className="text-ink-600 dark:text-ink-400 leading-relaxed whitespace-pre-line">
-                {job.jobDescription}
-              </div>
+              <div 
+                className="text-ink-600 dark:text-ink-400 leading-relaxed ql-editor-display"
+                dangerouslySetInnerHTML={{ __html: job.jobDescription }}
+              />
             </motion.div>
 
             {/* Skills */}

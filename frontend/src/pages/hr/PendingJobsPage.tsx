@@ -8,7 +8,6 @@ import {
   Eye,
   FileText,
   MapPin,
-  DollarSign,
   Loader2,
 } from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
@@ -17,16 +16,36 @@ import { jobService } from '@services/job/jobService'
 import type { JobPosting } from '@/types/job'
 
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable && !job.salaryMin && !job.salaryMax) return 'Thỏa thuận'
-  const cur = job.salaryCurrency || 'USD'
-  const fmt = (n: number) =>
-    cur === 'VND' ? `${(n / 1_000_000).toLocaleString('vi-VN')}tr` : `${n.toLocaleString('en-US')}`
-  const sign = cur === 'VND' ? '' : '$'
-  if (job.salaryMin && job.salaryMax)
-    return `${sign}${fmt(job.salaryMin)} - ${sign}${fmt(job.salaryMax)}`
-  if (job.salaryMin) return `Từ ${sign}${fmt(job.salaryMin)}`
-  if (job.salaryMax) return `Đến ${sign}${fmt(job.salaryMax)}`
-  return 'Chưa rõ'
+  if (job.salaryIsNegotiable || 
+      (job.salaryMin == null && job.salaryMax == null) || 
+      (job.salaryMin === 0 && job.salaryMax === 0)) {
+    return 'Thỏa thuận'
+  }
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+  
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+  
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `Từ ${formatVal(job.salaryMin)}${unit}`
+  }
+  
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `Đến ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  return 'Thỏa thuận'
 }
 
 function formatDateTime(iso: string): string {
@@ -187,8 +206,7 @@ export default function PendingJobsPage() {
                             {job.location}
                           </span>
                         )}
-                        <span className="flex items-center gap-1">
-                          <DollarSign className="w-3 h-3" />
+                        <span className="flex items-center">
                           {formatSalary(job)}
                         </span>
                         {job.department && <span>{job.department}</span>}

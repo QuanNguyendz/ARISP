@@ -413,10 +413,13 @@ Map values to these EXACT enums (lowercase, English) when applicable, otherwise 
 
 Rules:
 - 'title' is the job position name (e.g. ""Backend Developer (.NET)"").
-- 'job_description' MUST be a clean, well-structured plain-text version of the JD body (responsibilities + requirements). Keep the original language of the JD.
+- 'job_description' MUST be a clean, well-structured HTML version of the JD body, structured clearly into logical sections depending on the JD (e.g. <strong>Mô tả công việc</strong>, <strong>Yêu cầu công việc</strong>, <strong>Quyền lợi</strong>). You MUST format all section headers inside <strong> tags (e.g. <strong>Mô tả công việc</strong>) and format lists using standard HTML tags: <ul> and <li> (e.g. <ul><li>Thiết kế phát triển...</li></ul>). Use <p> and <br /> tags for clean spacing and paragraphs. Do NOT use markdown symbols like **, *, or - for formatting. Keep the original language of the JD.
+  CRITICAL CONTACT RULE: You MUST EXCLUDE any company contact information (such as candidate application submission emails, HR contact names, phone numbers, mail subject formats, or call-to-actions like ""Liên hệ nộp hồ sơ qua email...""). If this contact section is at the end of the JD, stop extracting before it.
 - 'skills' is an array of concrete technical skills/tools mentioned (keep proper names: C#, .NET, React, PostgreSQL...). Max 15.
 - 'language_requirement' ONLY if the JD explicitly requires a foreign language proficiency (e.g. ""English (TOEIC > 700)""). If the JD is Vietnamese with no foreign-language requirement, set null.
-- 'salary_min'/'salary_max' as numbers ONLY if explicitly stated; otherwise null. Do not invent.
+- 'salary_min'/'salary_max': Extract the salary range. 
+  CRITICAL SALARY RULE: If the JD mentions an active starting/training salary/allowance (e.g. ""Trợ cấp đào tạo 6,000,000 – 8,000,000 VNĐ/tháng"") AND a prospective/potential future salary after contract/training (e.g. ""cơ hội ký hợp đồng chính thức với mức thu nhập trung bình từ 12.000.000 VNĐ - 15.000.000 VNĐ/tháng""), you MUST extract the active starting/training salary (e.g., min: 6000000, max: 8000000). Do NOT extract the potential/future contract salary.
+  If the original JD states the salary in USD or other currencies, you MUST automatically convert it to VND (Vietnamese Dong) using the current approximate rate (e.g. 1 USD = 25,000 VND). Round the final converted value to the nearest million VND (e.g. 37,500,000 VND should be rounded to 38,000,000 VND, 15,300,000 VND should be rounded to 15,000,000 VND) and output it as a plain number (e.g. 38000000). If the original JD is in VND, keep it in VND but still round it to the nearest million VND. If no salary is explicitly stated, set them to null. Do not invent.
 - Only fill a field if you are confident it is in the JD; otherwise use null (or empty array for skills).
 
 You MUST return ONLY a valid JSON object matching this schema, without markdown formatting:
