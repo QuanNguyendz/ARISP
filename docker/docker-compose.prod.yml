@@ -28,6 +28,18 @@ services:
           memory: 256M
           cpus: "0.5"
 
+  # --- RAG Interview Microservice: production build (nội bộ, không expose) ---
+  rag-service:
+    build:
+      target: production
+    ports: []        # không expose ra host ở prod (chỉ truy cập nội bộ qua arisp-network)
+    volumes: []      # không mount source ở prod
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
   # --- Redis ---
   redis:
     deploy:

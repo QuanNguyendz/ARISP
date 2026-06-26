@@ -44,7 +44,7 @@
        │ EF Core          │ Redis / External APIs
 ┌──────▼──────┐  ┌────────▼──────┐  ┌──────────────────────────────┐
 │ PostgreSQL  │  │  Redis Cache  │  │ OpenAI (GPT-4o + Embeddings) │
-│ (Supabase)  │  └───────────────┘  │ Google STT / ElevenLabs TTS  │
+│ (Supabase)  │  └───────────────┘  │ Deepgram STT / ElevenLabs TTS│
 │ + pgvector  │                     │ HeyGen Avatar / SendGrid     │
 │ (No tenant) │                     │ ATS Webhooks / OAuth2 / Slack│
 └─────────────┘                     └──────────────────────────────┘
@@ -73,20 +73,23 @@
 - **RAG Flow:** JD + CV → chunk → embed → pgvector → retrieve khi sinh câu hỏi → GPT-4o.
 - **Ràng buộc:** abstract qua `IAIProvider` + `IEmbeddingProvider`. Swap qua `AI_PROVIDER=openai|local`.
 
-### ADR-005: TTS & Avatar
-- **Quyết định:** ElevenLabs Flash v2.5 + HeyGen Streaming Avatar với Hybrid Idle Strategy.
-- **Thay thế đã loại:** Azure TTS, D-ID, HeyGen Batch API, ElevenLabs Multilingual v2.
+### ADR-005: STT, TTS & Avatar
+- **Quyết định:** **Deepgram Nova-3** (STT streaming) + **ElevenLabs Flash v2.5** (TTS, ~75ms realtime) + **HeyGen Streaming Avatar** với Hybrid Idle Strategy.
+- **STT:** Deepgram Nova-3 thay Google Speech-to-Text — **gộp luôn VAD + endpointing** (`vad_events`/`endpointing`/`utterance_end`) nên **không cần thư viện VAD riêng** (Silero/WebRTC). Cấu hình live: `interim_results=true`, `vad_events=true`, `endpointing=300`, `utterance_end_ms=1000`.
+- **Thay thế đã loại:** Google STT (chuyển Deepgram), Azure TTS, D-ID, HeyGen Batch API, ElevenLabs Multilingual v2, **ElevenLabs v3** (biểu cảm hơn nhưng trễ cao hơn Flash v2.5 — không hợp live), VAD library rời.
 
 ### ADR-006: Streaming-First Latency Strategy
-- **Mục tiêu:** Ứng viên dừng nói → avatar bắt đầu nói trong **~1–1.8 giây**.
+- **Mục tiêu (đã siết):** Ứng viên dừng nói → avatar bắt đầu nói trong **~0.8–1.2 giây** (cascaded tối ưu — xem ADR-043).
 
   | Bước | Công nghệ | Target latency |
   |------|-----------|---------------|
-  | STT | Google Speech-to-Text streaming | ~300ms sau dừng nói |
-  | RAG | pgvector (parallel với STT) | ~0ms additional |
-  | LLM | GPT-4o streaming | TTFT ~400–800ms |
-  | TTS | ElevenLabs Flash v2.5 streaming | ~150–300ms |
+  | VAD + endpointing | **Deepgram Nova-3** (tích hợp sẵn — `vad_events`/`endpointing`/`utterance_end`) | ~100–300ms |
+  | STT | **Deepgram Nova-3 streaming** (`interim_results` → retrieve sớm) | ~150–300ms sau dừng nói |
+  | RAG | Hybrid RAG service Python (parallel với STT, ADR-039) | ~0ms additional |
+  | LLM | GPT-4o streaming (Claude là option — ADR-043) | TTFT ~400–800ms |
+  | TTS | ElevenLabs Flash v2.5 streaming | ~75–150ms |
   | Avatar | HeyGen Streaming (WebRTC) | ~100–200ms |
+- **Đòn bẩy độ trễ (bất kể chọn LLM nào):** (1) **partial-STT → RAG song song** (bắt đầu retrieve khi VAD báo sắp dứt câu, không đợi final); (2) **TTS first-sentence** — phát audio ngay câu đầu LLM stream ra; (3) **prompt caching** prefix ổn định (JD+CV+Playbook+system) cắt prefill → giảm TTFT mỗi lượt; (4) **TẮT thinking** ở model sinh câu hỏi live (adaptive/extended thinking cộng vài giây vào TTFT); (5) gọi thẳng OpenAI, **không qua Azure** (TTFT GPT-4o Azure ~2.4s vs OpenAI ~0.76s).
 
 ### ADR-007: Containerization
 - **Quyết định:** Docker + Docker Compose.
@@ -168,7 +171,7 @@ public interface IEmbeddingProvider
 - **Interview language:** Nếu language requirement được confirm → Round 1 phỏng vấn bằng ngôn ngữ đó.
 - **AI System Prompt:** Tự động điều chỉnh system prompt sang ngôn ngữ tương ứng.
 - **TTS Language:** ElevenLabs hỗ trợ multilingual – chọn voice phù hợp ngôn ngữ.
-- **STT Language:** Google Speech-to-Text config `languageCode` tương ứng.
+- **STT Language:** Deepgram Nova-3 config `language` tương ứng.
 - **Language Assessment:** `IAIProvider.AssessLanguageProficiencyAsync()` đánh giá riêng:
   - Fluency, Grammar accuracy, Vocabulary range, Comprehension score.
   - Được đưa vào Evaluation Report như một criterion độc lập.
@@ -255,7 +258,7 @@ public interface IEmbeddingProvider
 - **Truy cập:** **[Cập nhật ADR-038]** Chỉ ứng viên **đã pass vòng CV** + HR cấp **Interview Code type=`practice`** (remote, mở từ browser). Không xuất hiện công khai trên Job Board / Portal.
 - **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng; code one-time vô hiệu sau lần dùng.
 - **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
-- **Công nghệ:** **Đầy đủ pipeline như Real** (Google STT streaming → RAG → GPT-4o → ElevenLabs TTS → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
+- **Công nghệ:** **Đầy đủ pipeline như Real** (Deepgram Nova-3 STT+VAD → Hybrid RAG → GPT-4o → ElevenLabs Flash v2.5 → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
 - **Recording:** Practice **không quay video** — chỉ lưu **transcript** + Evaluation Report (giảm storage). Real lưu đầy đủ.
 - **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
 
@@ -271,20 +274,20 @@ public interface IEmbeddingProvider
 [Ứng viên ĐANG NÓI]
       │ audio chunks (WebSocket stream)
       ▼
-[Google Speech Streaming STT (language-configured)]
-      │ partial transcripts
-      │ (VAD near-end) → [RAG: retrieve từ JD + CV + Playbook]
-      │ (final transcript ~300ms sau dừng)
+[Deepgram Nova-3 Streaming STT + VAD/endpointing (language-configured)]
+      │ partial transcripts (interim_results)
+      │ (VAD/SpeechStarted near-end) → [Hybrid RAG service: retrieve JD + CV + Playbook]
+      │ (speech_final / UtteranceEnd ~150–300ms sau dừng)
       ▼
-[GPT-4o Streaming] ◄── context + retrieved chunks (JD/CV/Playbook) + system prompt
-      │ token stream
+[GPT-4o Streaming (thinking OFF, prompt-cached)] ◄── context + retrieved chunks + system prompt
+      │ token stream (first-sentence → TTS ngay)
       ▼
-[ElevenLabs Flash Streaming TTS (language voice)]
+[ElevenLabs Flash v2.5 Streaming TTS (language voice)]
       │ audio stream
       ▼
 [HeyGen Streaming Avatar via WebRTC]
       ▼
-[Ứng viên nghe + thấy avatar] ← ~1–1.8 giây sau khi dừng nói
+[Ứng viên nghe + thấy avatar] ← ~0.8–1.2 giây sau khi dừng nói
 ```
 
 ---
@@ -333,7 +336,7 @@ public interface IEmbeddingProvider
 | `PlaybookService` | Upload, parse, chunk, embed tài liệu Playbook per scope (Company/Job Posting/Round); track must-ask questions đã hỏi |
 | `IAIProvider` | Stream question, analyze answer, generate evaluation, detect language, assess language |
 | `IEmbeddingProvider` | Embed + retrieve từ pgvector (JD/CV/Playbook chunks) - không dùng organization_id |
-| `ISTTProvider` | Google Speech streaming (primary), Whisper (fallback) |
+| `ISTTProvider` | Deepgram Nova-3 streaming + VAD/endpointing (primary), Whisper (fallback) |
 | `RagService` | Chunk JD/CV/Playbook, embed, store, retrieve context theo weighted scope |
 | `LanguageDetectionService` | Gọi AI detect ngôn ngữ từ JD, lưu kết quả vào Job Posting |
 | `TTSService` | ElevenLabs Flash streaming, hỗ trợ multilingual voice |
@@ -475,7 +478,7 @@ public interface IEmbeddingProvider
 - **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.
 
 ### ADR-038: Tối ưu chi phí Phỏng vấn thử — gating theo phễu, không cắt công nghệ
-- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Google STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → 1 ứng viên = 2 lượt tính phí phỏng vấn.
+- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Deepgram STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → 1 ứng viên = 2 lượt tính phí phỏng vấn.
 - **Nguyên tắc:** Practice **không ảnh hưởng verdict** nhưng vẫn cần **đầy đủ công nghệ** để ứng viên làm quen đúng trải nghiệm thật → **không tối ưu bằng cách cắt tech**, mà tối ưu bằng cách **giảm số lượng buổi (phễu)**.
 - **Quyết định:**
   1. **Gating:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) và được HR **cấp Interview Code 6 ký tự type=`practice`** (remote). Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ đáng phỏng vấn.
@@ -487,15 +490,19 @@ public interface IEmbeddingProvider
   7. Tái dùng embeddings JD+CV đã sinh ở bước CV-JD Analysis (không embed lại).
 - **Thay đổi liên quan:** Cập nhật ADR-015 (practice qua code thay vì magic link), ADR-016 (`code_type` practice|real), ADR-027 (truy cập + recording).
 
-### ADR-039: RAG tách thành microservice Python riêng
-- **Quyết định:** Pipeline RAG (chunk + embed + retrieve, pgvector) tách khỏi backend .NET thành **service Python độc lập** (gợi ý: FastAPI). Backend .NET gọi qua HTTP/REST nội bộ.
+### ADR-039: RAG tách thành microservice Python riêng (đã MỞ RỘNG ranh giới)
+- **Quyết định:** Pipeline RAG tách khỏi backend .NET thành **service Python độc lập** (FastAPI + LangChain + LangGraph), ở thư mục `rag-service/`. Backend .NET gọi qua HTTP/REST nội bộ.
 - **Lý do:** Hệ sinh thái RAG/embedding/LLM-tooling phong phú hơn ở Python; tách service để scale & deploy độc lập, không nặng backend chính.
-- **Ranh giới:** .NET vẫn giữ `IAIProvider` (GPT-4o, sinh câu hỏi/đánh giá — OpenAI). Phần **retrieval/embedding** chuyển sang service Python; `IEmbeddingProvider` phía .NET trở thành **client gọi service Python** (giữ nguyên interface để business logic không đổi — tuân ADR-004).
-- **Hợp đồng (dự kiến):** `POST /embed` (text[] → vectors), `POST /retrieve` (query + scope JD/CV/Playbook + filters → chunks xếp hạng). Practice: scope JD+CV; Real: thêm Playbook (ADR-025/027).
-- **Dữ liệu:** pgvector vẫn nằm trên PostgreSQL/Supabase; service Python kết nối trực tiếp (không Supabase SDK — tuân quy tắc dự án). Cân nhắc đặt bảng `document_chunks` thuộc sở hữu service Python.
-- **Hạ tầng:** thêm container Python vào Docker Compose; biến môi trường cho endpoint nội bộ; **không** expose ra ngoài Nginx.
-- **Trạng thái:** Quyết định kiến trúc đã chốt — **chưa triển khai**. Là task backend/infra riêng (Phase 4/4b), không chặn việc dựng UI phỏng vấn.
-- **Ràng buộc:** Không vi phạm "không Node.js cho backend" (đây là Python microservice cho RAG, backend chính vẫn .NET 8).
+- **Ranh giới (MỞ RỘNG 2026-06-26):** Python sở hữu **TOÀN BỘ** pipeline: chunk + embed + **hybrid retrieve** + **sinh câu hỏi/đánh giá/đánh giá ngôn ngữ** (không chỉ retrieval/embedding như bản gốc). .NET chỉ orchestrate session/SignalR/persistence. Giữ nguyên abstraction `IAIProvider` + `IEmbeddingProvider` (ADR-004, rule #8): thêm impl `RagServiceProvider` (HTTP/SSE client → Python) + interface mới `IRagIngestionService`. `OpenAIProvider` giữ làm fallback in-process qua cờ `AI:Provider` (`rag` | `openai` | `local`); khi không dùng rag, ingestion chạy in-process qua `LocalRagIngestionService`. Gemini (CV-JD/JD-extract, ADR-030/042) **không đổi**, vẫn ở .NET.
+- **Lộ trình (3 giai đoạn, cùng 1 LangGraph StateGraph):**
+  - **Giai đoạn 1 (đã làm):** Hybrid RAG = dense (pgvector cosine `<=>`) + sparse (Postgres full-text `ts_rank`) → hợp nhất Reciprocal Rank Fusion + weighting theo scope (ADR-025).
+  - **Giai đoạn 2:** CRAG — chèn node `grade_documents` + corrective (rewrite query / re-retrieve).
+  - **Giai đoạn 3:** Agentic — router/tool nodes (agent quyết định bước tiếp theo).
+- **Hợp đồng (đã triển khai):** `POST /ingest` (chunk+embed+lưu, idempotent theo (source_type, source_id)), `POST /retrieve` (query text + scope → chunks xếp hạng), `POST /next-question` (**SSE stream** token, chạy LangGraph), `POST /analyze-answer` · `/evaluate` · `/detect-language` · `/assess-language` · `/complete-json` · `/embed`. Practice: scope JD+CV; Real: thêm Playbook (ADR-025/027). Wire JSON camelCase.
+- **Dữ liệu:** pgvector vẫn trên PostgreSQL/Supabase; service Python kết nối trực tiếp qua asyncpg (không Supabase SDK). Bảng `document_chunks` **vẫn do EF Core (.NET) sở hữu schema**; Python đọc/ghi dữ liệu. Sparse cần GIN index FTS → migration `20260626000000_AddDocumentChunksFtsIndex` (`to_tsvector('simple', chunk_text)`).
+- **Hạ tầng:** container `rag-service` (port 8000) trong Docker Compose, mạng `arisp-network`; biến `RAG_SERVICE_URL`; **không** expose ra Nginx (chỉ nội bộ).
+- **Trạng thái:** **Giai đoạn 1 đã triển khai** (2026-06-26). Giai đoạn 2 (CRAG) & 3 (Agentic) còn backlog.
+- **Ràng buộc:** Không vi phạm "không Node.js cho backend" (Python microservice cho RAG; backend chính vẫn .NET 8). Mock mode (thiếu `OPENAI_API_KEY`) để test pipeline không cần key.
 
 ### ADR-040: Cổng kiểm tra thiết bị bắt buộc (mic + cam) trước phỏng vấn
 - **Quyết định:** Ứng viên **chỉ được vào phỏng vấn (cả thử & thật)** khi **camera và micro hoạt động**. Bắt buộc qua bước Device Check trước khi vào phòng.
@@ -520,3 +527,23 @@ public interface IEmbeddingProvider
   4. **File JD lưu vào job:** `JobPosting.JdFileUrl/JdFileName/JdFileFormat` được điền qua Create/Update (UpdateJob chỉ ghi đè khi request gửi file mới). FE bắt buộc upload+phân tích JD trước khi **tạo** tin.
 - **FE:** `RecruiterLayout` chuyển sang `WorkspaceLayout` dùng chung (theme sáng/tối). Cụm màn: Dashboard (lưới tin của tôi), Tin tuyển dụng (list + filter trạng thái), **Job Detail mới** (`/recruiter/my-jobs/:id`: phễu ứng viên theo trạng thái + danh sách ứng viên của job + gửi magic link + đổi trạng thái tin), Create/Edit (`/recruiter/my-jobs/:id/edit`) với card upload & phân tích JD auto-fill.
 - **Chưa làm (phase sau):** màn HR Leader duyệt tin (đã có API), màn "Cấp Interview Code", redesign Candidates/Evaluations/Interviews của Recruiter.
+
+### ADR-043: Chốt media stack phỏng vấn realtime — Cascaded, Deepgram Nova-3, Flash v2.5, LLM GPT-4o (Claude là option)
+- **Bối cảnh:** Ứng viên phỏng vấn **trực tiếp** với AI → cần chất lượng + độ trễ càng gần realtime càng tốt. Cân nhắc 2 kiến trúc: **(A) Cascaded** (STT→RAG→LLM→TTS→Avatar, rời) vs **(B) Speech-to-Speech realtime** (OpenAI Realtime / Gemini Live, audio-in→audio-out, ~0.3–0.8s).
+- **Quyết định — chọn (A) Cascaded tối ưu** (~0.8–1.2s), KHÔNG dùng speech-to-speech. Lý do: bảo toàn **kiểm soát RAG/must-ask/đánh giá/language assessment/transcript** và avatar HeyGen — vốn là lõi bài toán phỏng vấn; tận dụng hạ tầng đã có (HeyGen, Hybrid RAG service). Để dành (B) cho thử nghiệm Practice mode sau.
+- **Stack chốt:**
+  - **STT + VAD/endpointing:** **Deepgram Nova-3** — gộp 1 dịch vụ (VAD/endpointing tích hợp sẵn), bỏ thư viện VAD rời (xem ADR-005).
+  - **TTS:** **ElevenLabs Flash v2.5** (~75ms, tối ưu realtime). Loại v3 (trễ cao hơn).
+  - **RAG:** Hybrid RAG microservice Python (ADR-039).
+  - **LLM "bộ não":** **giữ GPT-4o** (ADR-004). **Claude là option chiến lược dành sau** nếu cần cải thiện độ trễ/chất lượng.
+  - **Avatar:** HeyGen Hybrid Idle (ADR-011).
+- **So sánh độ trễ LLM (benchmark 2026, median TTFT — soi theo voice nên TTFT là yếu tố chính, throughput KHÔNG phải nút thắt vì tốc độ nói ~5–8 token/s):**
+
+  | Model | TTFT | Vai trò |
+  |---|---|---|
+  | GPT-4o (hiện tại) | ~0.4–0.8s | Live |
+  | Claude Haiku 4.5 | **~0.28–0.6s** (thấp nhất) | Option live nếu cần TTFT thấp nhất + rẻ |
+  | Claude Sonnet 4.6 | ~0.5–0.8s (≈ GPT-4o) | Option live cân bằng chất lượng |
+  | Claude Opus 4.8 | ~0.8–1.2s+ (×2.5 Fast Mode) | Option cho đánh giá cuối vòng |
+- **Kết luận:** GPT-4o ≈ Claude Sonnet 4.6 về độ trễ → giữ GPT-4o hợp lý. Muốn **giảm trễ thật** → đường nhanh nhất là **Haiku 4.5** (không phải Sonnet/Opus). Lợi thế ẩn của Claude: **tail-latency ổn định** (P50≈P99, ít "đứng hình" giữa buổi) + prompt caching mạnh. Swap-point đã sẵn ở RAG service (`graph.py`/`llm.py` đổi `ChatOpenAI`→`ChatAnthropic`) + .NET `IAIProvider`/`RagServiceProvider`.
+- **Đòn bẩy độ trễ chung (làm trước, không phụ thuộc LLM):** partial-STT→RAG song song; TTS first-sentence; prompt caching prefix ổn định; **TẮT thinking** ở model live; gọi thẳng OpenAI (không Azure). Xem ADR-006.

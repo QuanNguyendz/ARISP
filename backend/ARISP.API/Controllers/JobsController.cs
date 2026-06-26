@@ -30,6 +30,7 @@ namespace ARISP.API.Controllers
         private readonly IGeminiProvider _geminiProvider;
         private readonly ApplicationService _applicationService;
         private readonly IJdStampService _jdStampService;
+        private readonly IRagIngestionService _ragIngestion;
         private readonly ILogger<JobsController> _logger;
 
         public JobsController(
@@ -40,6 +41,7 @@ namespace ARISP.API.Controllers
             IGeminiProvider geminiProvider,
             ApplicationService applicationService,
             IJdStampService jdStampService,
+            IRagIngestionService ragIngestion,
             ILogger<JobsController> logger)
         {
             _unitOfWork = unitOfWork;
@@ -49,6 +51,7 @@ namespace ARISP.API.Controllers
             _geminiProvider = geminiProvider;
             _applicationService = applicationService;
             _jdStampService = jdStampService;
+            _ragIngestion = ragIngestion;
             _logger = logger;
         }
 
@@ -156,6 +159,20 @@ namespace ARISP.API.Controllers
 
             await _unitOfWork.Repository<JobPosting>().AddAsync(job, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Ingest JD vào RAG (chunk+embed+pgvector) để retrieve khi phỏng vấn. Không chặn
+            // tạo job nếu RAG service lỗi — chỉ ghi log (có thể re-ingest sau).
+            if (!string.IsNullOrWhiteSpace(job.JobDescription))
+            {
+                try
+                {
+                    await _ragIngestion.IngestAsync("jd", job.Id, job.JobDescription, ct: ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "RAG ingest JD thất bại cho job {JobId} — bỏ qua, có thể re-ingest sau.", job.Id);
+                }
+            }
 
             var roundDtos = new List<RoundConfigDto>();
             foreach (var round in request.RoundConfigs.OrderBy(r => r.RoundNumber))
