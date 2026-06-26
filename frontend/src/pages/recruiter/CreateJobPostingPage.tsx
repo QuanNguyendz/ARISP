@@ -57,6 +57,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const [languageRequirement, setLanguageRequirement] = useState('')
   const [skillInput, setSkillInput] = useState('')
   const [skills, setSkills] = useState<string[]>([])
+  const [applicationDeadline, setApplicationDeadline] = useState('')
   const [rounds, setRounds] = useState<RoundConfig[]>([
     { roundNumber: 1, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 30 },
   ])
@@ -94,6 +95,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setSkills(job.skills || [])
           setJdFileName(job.jdFileName)
           setJdFileFormat(job.jdFileFormat)
+          setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           // Không set jdFileUrl ở edit để tránh ghi đè file cũ trừ khi upload mới
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
         } catch (err) {
@@ -210,6 +212,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         skills,
         roundConfigs: rounds,
         languageRequirement: languageRequirement.trim() || undefined,
+        applicationDeadline: applicationDeadline ? new Date(applicationDeadline).toISOString() : undefined,
       }
 
       let saved: JobPosting
@@ -490,6 +493,15 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             <div>
               <label className={label}>Yêu cầu ngôn ngữ</label>
               <input value={languageRequirement} onChange={(e) => setLanguageRequirement(e.target.value)} placeholder="VD: Tiếng Anh (IELTS 6.5)" className={input} />
+            </div>
+            <div>
+              <label className={label}>Hạn nộp hồ sơ</label>
+              <input
+                type="date"
+                value={applicationDeadline}
+                onChange={(e) => setApplicationDeadline(e.target.value)}
+                className={input}
+              />
             </div>
             <label className="flex cursor-pointer items-center gap-3 text-sm text-ink-700 dark:text-ink-200">
               <input type="checkbox" checked={isPublicListing} onChange={(e) => setIsPublicListing(e.target.checked)} className="accent-brand-600" />

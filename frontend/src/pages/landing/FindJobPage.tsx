@@ -147,6 +147,21 @@ function getIconColor(department?: string) {
   return 'bg-brand-50 text-brand-600'
 }
 
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
+}
+
 
 // ============== FILTER SIDEBAR COMPONENT ==============
 type FilterKey = keyof FiltersState
@@ -657,7 +672,14 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
             )}
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-ink-400">Đăng {formatPostedDate(job.createdAt)}</span>
+            <span className="text-xs text-ink-400 font-medium">
+              Đăng {formatPostedDate(job.createdAt)}
+              {job.applicationDeadline && (
+                <span className="text-amber-600 font-medium">
+                  {' · Hạn nộp: '}{getDeadlineText(job.applicationDeadline)}
+                </span>
+              )}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation()

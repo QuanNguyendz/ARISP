@@ -8,6 +8,21 @@ import type { JobPosting } from '@/types/job'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { JobsGridSkeleton, StatsGridSkeleton } from './_skeletons'
 
+function getDeadlineText(deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
+  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
+  return `${formattedDate} (Còn ${diffDays} ngày)`
+}
+
 const FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
   { value: 'active', label: 'Đang đăng' },
@@ -119,9 +134,17 @@ export default function RecruiterMyJobsPage() {
                     <h3 className="truncate font-semibold text-ink-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
                       {j.title}
                     </h3>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400">
-                      {j.department || 'Chưa phân phòng ban'}
-                      {j.location ? <><span>·</span><MapPin className="h-3 w-3" />{j.location}</> : null}
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500 dark:text-ink-400">
+                      <span>{j.department || 'Chưa phân phòng ban'}</span>
+                      {j.location ? <><span>·</span><span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{j.location}</span></> : null}
+                      {j.applicationDeadline ? (
+                        <>
+                          <span>·</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">
+                            Hạn nộp: {getDeadlineText(j.applicationDeadline)}
+                          </span>
+                        </>
+                      ) : null}
                     </p>
 
                     {j.status === 'rejected' && j.rejectionReason && (
