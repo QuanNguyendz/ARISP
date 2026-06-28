@@ -38,7 +38,7 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Technical Scenario** | Bài toán / case study cụ thể HR chuẩn bị – AI dẫn dắt ứng viên qua scenario trong session |
 | **Playbook Scope** | Phạm vi áp dụng của tài liệu Playbook: Company (toàn doanh nghiệp), Job Posting (vị trí cụ thể), Round (vòng cụ thể) |
 | **Job Board** | Tính năng cho phép ứng viên tự tìm kiếm và ứng tuyển việc làm IT trên ARISP, không cần được HR mời trước |
-| **Practice Interview (Phỏng vấn thử)** | Phiên phỏng vấn AI giới hạn 1 lần per Application, dùng JD + CV (không có Playbook), giúp ứng viên làm quen format. HR có thể xem kết quả nhưng không ảnh hưởng verdict |
+| **Practice Interview (Phỏng vấn thử)** | Phiên phỏng vấn AI giới hạn **1 lượt / vòng** (mở sau khi pass CV + đặt lịch buổi thật của vòng đó, vào qua Portal không cần code), dùng JD + CV (không có Playbook), giúp ứng viên làm quen format. HR có thể xem kết quả nhưng không ảnh hưởng verdict |
 | **Real Interview (Phỏng vấn thực)** | Phiên phỏng vấn AI chính thức, dùng JD + CV + Playbook (full RAG), chỉ mở đúng mã code thi thật, kết quả ảnh hưởng đến quyết định tuyển dụng |
 | **Self-apply** | Hành động ứng viên chủ động ứng tuyển vào Job Posting qua Job Board, không cần invite từ HR |
 | **Session Type** | Phân loại phiên phỏng vấn: `practice` (thử, JD+CV only) hoặc `real` (thực, full RAG), xác định nguồn RAG và mức độ ảnh hưởng đến kết quả tuyển dụng |

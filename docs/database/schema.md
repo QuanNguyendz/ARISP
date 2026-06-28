@@ -155,7 +155,7 @@ Hồ sơ Candidate ứng tuyển cho một Job Posting.
 | `candidate_account_id` | FK → `candidate_accounts.id`; NULL nếu HR tạo thủ công ứng viên |
 | `source` | `job_board` (ứng viên tự apply) \| `invited` (HR chủ động mời) |
 | `status` | Trạng thái ứng tuyển: `invited` → `cv_submitted` → `screening` → `interview` → `pass` / `not_pass` |
-| `practice_session_used` | Flag đánh dấu đã dùng lượt phỏng vấn thử (tối đa 1 lần per Application) |
+| `practice_session_used` | **[Legacy — giữ tương thích ngược]** Flag tổng đã dùng phỏng vấn thử. Điều kiện chặn thật sự đã chuyển sang **1 lượt / VÒNG** (theo `InterviewSession` `session_type='practice'` + `round_number`, ADR-027) — cột này không còn dùng làm gate |
 | `cv_text` | Văn bản trích xuất từ CV để đưa vào RAG pipeline |
 
 ---

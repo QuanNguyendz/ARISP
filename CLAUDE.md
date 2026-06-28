@@ -42,15 +42,16 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 
 ### Practice (Phỏng vấn thử – Remote)
 - Chỉ dành cho luyện tập, không ảnh hưởng verdict tuyển dụng
-- **Chỉ mở cho ứng viên đã pass vòng CV**, HR cấp **Interview Code 6 ký tự (type=`practice`)** → mở từ browser (remote). Tối đa **1 lần per application**, code one-time
+- **Mở tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng route Portal (`/practice/:applicationId`) — **KHÔNG cần Interview Code, không cần magic link riêng**. Giới hạn **1 lượt / VÒNG**; cửa sổ dùng = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng — xem ADR-020/027
+- **Practice giống hệt buổi thật sắp tới của vòng:** cùng `round_type` (technical → technical, sơ loại/ngôn ngữ → sơ loại/ngôn ngữ) + cùng ngôn ngữ (chung `InterviewRoundConfig` theo `RoundNumber`)
 - RAG chỉ dùng JD + CV (không load Playbook nội bộ)
 - **Đầy đủ pipeline công nghệ như Real** (STT/RAG/GPT-4o/TTS/Avatar + Hybrid Idle). **Không quay video — chỉ lưu transcript** + Evaluation Report
-- Chi phí practice **do doanh nghiệp trả** (1 ứng viên = 2 lượt phí phỏng vấn: thử + thật). Tối ưu bằng gating theo phễu, không cắt tech — xem ADR-038
+- Chi phí practice **do doanh nghiệp trả** (mỗi vòng = 1 lượt thử + 1 lượt thật). Tối ưu bằng gating theo phễu, không cắt tech — xem ADR-038
 
 ### Real (Phỏng vấn thật – On-site)
-- Bắt buộc tại văn phòng công ty
-- Candidate nhập **Interview Code (type=`real`)** tại thiết bị Kiosk
-- Code: one-time-use, TTL mặc định 2 giờ, 6 ký tự alphanumeric, bind với `application_id`
+- Bắt buộc tại văn phòng công ty, đến đúng khung giờ đã đặt lịch (Availability Slot của vòng)
+- Candidate nhập **Interview Code** tại thiết bị Kiosk (code chỉ dùng cho real — không có `code_type`)
+- Code: one-time-use, TTL mặc định 2 giờ, 6 ký tự alphanumeric, bind với `application_id` + vòng
 - RAG dùng đầy đủ: JD + CV + Playbook nội bộ
 
 ---
@@ -58,16 +59,16 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 ## Recruitment Flow
 
 ### Phase 1 – Enterprise Setup
-HR tạo Job Posting với: tên vị trí, JD (text + file PDF/DOCX), cấu hình vòng phỏng vấn (screening / technical / online_test), ngôn ngữ, availability slots (practice), scoring rubric, interview persona, playbook.
+HR tạo Job Posting với: tên vị trí, JD (text + file PDF/DOCX), cấu hình vòng phỏng vấn (screening / technical / online_test), ngôn ngữ, availability slots (khung giờ phỏng vấn thật per vòng — đặt lịch xong mở phỏng vấn thử), scoring rubric, interview persona, playbook.
 
 ### Phase 2 – Candidate Application
 1. Candidate xem Job Detail trên Job Board
 2. *(Tùy chọn)* Upload CV → Gemini phân tích → hiển thị Match Score + Summary
 3. Bấm "Ứng tuyển" → submit CV + thông tin → tạo Application kèm kết quả CV-JD Analysis
-4. HR review CV + matchScore → gửi magic link cho ứng viên đã chọn
+4. HR review CV + matchScore → gửi magic link cho ứng viên đã chọn → ứng viên vào Portal **đặt lịch buổi phỏng vấn thật của vòng** → mở 1 lượt phỏng vấn thử cho vòng đó
 
 ### Phase 3 – On-site Access
-Candidate đến văn phòng → Recruiter cấp Interview Code (6 ký tự) → nhập tại Kiosk → vào phỏng vấn thật.
+Candidate đến văn phòng **đúng khung giờ đã đặt lịch** → Recruiter cấp Interview Code (6 ký tự, chỉ cho real) → nhập tại Kiosk → vào phỏng vấn thật.
 
 ### Phase 4 – Multi-round AI Interview
 - **Round 1 (Screening):** Language-aware – AI detect ngôn ngữ từ JD, phỏng vấn bằng ngôn ngữ đó, đánh giá cả nội dung lẫn language proficiency
@@ -279,9 +280,9 @@ _Chưa có task nào đang thực hiện._
 | ADR-006 | Streaming-First latency target: **~0.8–1.2s** (Deepgram STT+VAD → Hybrid RAG 0ms → LLM 400–800ms → TTS 75–150ms → Avatar 100–200ms); đòn bẩy: partial-STT→RAG song song, TTS first-sentence, prompt caching, tắt thinking, gọi thẳng OpenAI |
 | ADR-011 | HeyGen Hybrid Idle: chỉ bật khi AI nói, phát idle video loop khi im – tiết kiệm ~90% HeyGen cost |
 | ADR-012 | Single-tenant: xoá `organizations`, `subscriptions`, không dùng `organization_id` |
-| ADR-015 | Practice (Remote) qua Interview Code type=`practice` (chỉ ứng viên pass CV); Real (On-site) qua code type=`real` tại Kiosk |
-| ADR-016 | Interview Code: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id`, `code_type` (practice\|real) |
-| ADR-038 | Tối ưu chi phí Practice: gating theo phễu (chỉ ứng viên pass CV được cấp code), giữ đủ tech, Hybrid Idle, không quay video practice |
+| ADR-015 | Practice (Remote) mở qua **Portal** sau khi pass CV + đặt lịch buổi thật của vòng (1 lượt/vòng, không cần code); Real (On-site) qua Interview Code tại Kiosk |
+| ADR-016 | Interview Code: **chỉ cho phỏng vấn thật/Kiosk** (đã bỏ `code_type`); 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id` + vòng |
+| ADR-038 | Tối ưu chi phí Practice: gating theo phễu (pass CV + đã đặt lịch buổi thật của vòng mới mở thử, 1 lượt/vòng), giữ đủ tech, Hybrid Idle, không quay video practice |
 | ADR-039 | RAG microservice Python (`rag-service/`, FastAPI+LangChain+LangGraph) sở hữu **toàn bộ** chunk/embed/hybrid-retrieve/sinh câu hỏi+đánh giá. .NET gọi qua HTTP/SSE (`RagServiceProvider` + `IRagIngestionService`), `OpenAIProvider` là fallback qua cờ `AI:Provider`. pgvector trên Postgres (schema do EF sở hữu). **Giai đoạn 1 Hybrid RAG đã triển khai (2026-06-26)**; CRAG/Agentic còn backlog |
 | ADR-040 | Cổng kiểm tra mic + cam bắt buộc trước mọi phỏng vấn (thử & thật) — component `DeviceCheck` |
 | ADR-043 | Media stack phỏng vấn chốt: **Cascaded** (~0.8–1.2s, không speech-to-speech) — Deepgram Nova-3 (STT+VAD) + ElevenLabs Flash v2.5 + Hybrid RAG + **GPT-4o (Claude là option dành sau)** + HeyGen. TTFT là yếu tố chính; Haiku 4.5 nhanh nhất nếu cần giảm trễ |
@@ -309,7 +310,7 @@ _Chưa có task nào đang thực hiện._
 | Magic Link | Link xác thực email không cần mật khẩu, TTL 15 phút, one-time-use |
 | Playbook | Tài liệu phỏng vấn nội bộ doanh nghiệp (style, question bank, rubric...) đưa vào RAG |
 | RAG | Retrieval-Augmented Generation – retrieve chunks từ JD/CV/Playbook trước khi generate câu hỏi |
-| Practice Session | Phỏng vấn thử 1 lần per application, JD+CV only, không ảnh hưởng verdict |
+| Practice Session | Phỏng vấn thử 1 lượt / vòng (mở sau khi đặt lịch buổi thật của vòng, vào qua Portal không cần code), JD+CV only, không ảnh hưởng verdict |
 | Real Session | Phỏng vấn thật On-site, full RAG, kết quả ảnh hưởng tuyển dụng |
 | Match Score | Điểm phù hợp CV-JD (0–100) do Gemini chấm – chỉ tham khảo |
 | Must-ask | Câu hỏi bắt buộc phải hỏi trước khi kết thúc session (định nghĩa trong Playbook) |
