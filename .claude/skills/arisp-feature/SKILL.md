@@ -73,9 +73,9 @@ Frontend (React) ──HTTP/SignalR──▶ API
    - Commit `tasks.md` CÙNG commit code — không tách. Không kết thúc task nếu chưa cập nhật.
 
 ## Hằng số nghiệp vụ hay quên
-- **Interview Code**: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id`, `code_type` ∈ {`practice`, `real`} (ADR-016).
+- **Interview Code**: 6 ký tự alphanumeric, one-time-use, TTL 2h, bind `application_id` + vòng; **chỉ dùng cho phỏng vấn thật/Kiosk** (đã bỏ `code_type` — practice không dùng code) (ADR-016).
 - **Magic Link**: TTL 15 phút, one-time-use.
-- **Practice**: chỉ ứng viên đã pass CV; tối đa 1 lần/application; RAG chỉ JD+CV, không quay video. **Real**: on-site Kiosk, full RAG (JD+CV+Playbook).
+- **Practice**: mở **1 lượt / VÒNG** sau khi pass CV + đặt lịch buổi thật của vòng (qua Portal `/practice/:applicationId`, không cần code); RAG chỉ JD+CV, không quay video. **Real**: on-site Kiosk + Interview Code, full RAG (JD+CV+Playbook).
 - **Roles**: Super Admin | HR Leader | Recruiter | Candidate. Staff không self-register (pre-provisioning). Candidate đăng ký tự do.
 - **Language**: AI detect từ JD — không hardcode mapping ngôn ngữ (rule #13).
 

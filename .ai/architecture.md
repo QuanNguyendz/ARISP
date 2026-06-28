@@ -129,8 +129,9 @@ public interface IEmbeddingProvider
 - **Global Config:** Các cấu hình toàn doanh nghiệp (tên miền cho phép đăng nhập, webhook ATS, Slack/Teams) được lưu tại bảng `system_settings` hoặc file cấu hình ứng dụng (`appsettings.json`).
 
 ### ADR-013: Candidate Invite Flow
-- HR tạo Job Posting → duyệt CV → gửi magic link cho ứng viên làm quen phỏng vấn thử (Practice Remote).
-- Ứng viên đến văn phòng theo lịch hẹn → HR cấp Interview Code (On-site) cho phỏng vấn thật.
+- HR tạo Job Posting → duyệt CV → gửi **magic link/invite token** mời ứng viên vào Portal **chọn khung giờ (Availability Slot) cho buổi phỏng vấn thật của vòng đó**.
+- **Đặt lịch xong sẽ mở cho ứng viên 1 lượt phỏng vấn thử (Practice Remote) cho vòng đó** — dùng được trong cửa sổ từ lúc đặt lịch đến giờ phỏng vấn thật (xem ADR-020/027).
+- Ứng viên đến văn phòng đúng lịch đã đặt → HR cấp Interview Code (On-site) cho phỏng vấn thật.
 
 ### ADR-014: AI Evaluation & HR Confirm Flow
 - AI generate Evaluation Report sau mỗi Round.
@@ -138,21 +139,19 @@ public interface IEmbeddingProvider
 - Notification: email + in-app (SignalR) khi Evaluation hoàn thành.
 
 ### ADR-015: Interview Mode – Practice (Remote) vs Real (On-site)
-- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser tại nhà để làm quen hệ thống. **[Cập nhật ADR-038]** Chỉ mở cho ứng viên **đã pass vòng CV** và được HR cấp **Interview Code 6 ký tự (type=`practice`)** — không còn dùng magic link cho practice.
-- **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng, nhập **Interview Code** tại thiết bị Kiosk.
+- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser để làm quen hệ thống. **[Cập nhật ADR-020/027/038]** Mở **tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng bằng route Portal (`/practice/:applicationId`) — **KHÔNG cần Interview Code, không cần magic link riêng**. Giới hạn **1 lượt / VÒNG**; cửa sổ dùng: từ lúc đặt lịch đến giờ phỏng vấn thật của vòng.
+- **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng đúng lịch đã đặt, nhập **Interview Code** tại thiết bị Kiosk.
 - **On-site Kiosk:** Frontend app chạy ở chế độ kiosk (full-screen, không expose các route khác) trên thiết bị công ty.
 - **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
-### ADR-016: Interview Code (Access Control — Practice & Real)
+### ADR-016: Interview Code (Access Control — Real On-site only)
+- **Phạm vi:** Interview Code **CHỈ dùng cho phỏng vấn thật tại Kiosk**. Phỏng vấn thử (Practice) **không dùng code** — vào qua Portal sau khi đặt lịch (ADR-015/020/027). Entity `InterviewCode` **không có** trường `code_type` (đã bỏ — practice là Portal-driven).
 - **Format:** 6 ký tự alphanumeric, case-insensitive (ví dụ: `ARX7K2`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
-- **Binding:** Mỗi code bind với một `application_id` cụ thể.
-- **[Cập nhật ADR-038] Phân loại:** code có `code_type` (`practice` | `real`).
-  - `practice` — mở từ **browser (remote)**, dùng cho phỏng vấn thử; chỉ cấp cho ứng viên đã pass CV.
-  - `real` — chỉ nhập tại **Kiosk on-site** cho phỏng vấn thật.
-- **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt.
-- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id` nào, `code_type` gì.
+- **Binding:** Mỗi code bind với một `application_id` + `round_number` cụ thể.
+- **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt khi ứng viên đến văn phòng.
+- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id`/vòng nào.
 
 ### ADR-017: Multi-round Interview
 - HR cấu hình số vòng và loại vòng per Job Posting (ví dụ: `[{round: 1, type: "screening"}, {round: 2, type: "technical"}]`).
@@ -187,11 +186,14 @@ public interface IEmbeddingProvider
 - **Integration:** CheatScore và CheatSignals xuất hiện trong Evaluation Report (section riêng) cho HR xem xét.
 - **Policy:** ARISP không tự động fail ứng viên chỉ dựa trên CheatScore – HR quyết định cuối.
 
-### ADR-020: Scheduling Service (Practice Session Only)
-- HR cấu hình `AvailabilitySlots` per Job Posting: danh sách khung giờ trống để ứng viên làm Phỏng vấn thử (Remote).
-- Candidate chọn slot trên Portal → slot bị giảm capacity → khi hết slot không cho chọn nữa.
-- Reminder email 24h và 1h trước giờ phỏng vấn thử.
-- Đối với Phỏng vấn thật (On-site), tính năng này KHÔNG áp dụng. HR tự điều phối lịch trực tiếp với ứng viên.
+### ADR-020: Scheduling Service (Real Interview per round → unlocks Practice)
+- **[Sửa 2026-06-27 — bản cũ "Practice Session Only" SAI so với code]**
+- HR cấu hình `AvailabilitySlots` **per Job Posting + per `round_number`**: khung giờ trống cho buổi **phỏng vấn thật** của từng vòng (`AvailabilitySlot.RoundNumber`).
+- Sau khi pass CV, ứng viên được mời (magic link/invite token) vào Portal **chọn 1 slot cho buổi phỏng vấn thật của vòng đó**; `InterviewBooking` (cũng có `RoundNumber`) ghi nhận lịch. Chốt chỗ nguyên tử chống overbooking (UPDATE `booked_count` có điều kiện `booked_count < capacity`).
+- **Đặt lịch thành công sẽ MỞ 1 lượt phỏng vấn thử (Practice) cho vòng đó.** Cửa sổ dùng thử = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng (xem ADR-027).
+- **Lặp theo từng vòng:** pass vòng N → mời chọn lịch vòng N+1 → mở 1 lượt thử vòng N+1 → … đến khi được nhận.
+- Reminder email 24h và 1h trước giờ phỏng vấn thật.
+- Buổi phỏng vấn thật vẫn diễn ra **on-site tại Kiosk**: đến đúng lịch đã đặt, HR cấp Interview Code (ADR-016). Lịch đặt qua Portal thay cho điều phối thủ công.
 
 ### ADR-021: Candidate Portal
 - **Auth:** Magic link qua email (không cần password). Magic link có TTL 15 phút, one-time-use.
@@ -254,10 +256,11 @@ public interface IEmbeddingProvider
 - **Thị trường:** Chỉ tập trung IT (không phải job board tổng quát).
 
 ### ADR-027: Practice Interview Session (Phỏng vấn thử)
-- **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity.
-- **Truy cập:** **[Cập nhật ADR-038]** Chỉ ứng viên **đã pass vòng CV** + HR cấp **Interview Code type=`practice`** (remote, mở từ browser). Không xuất hiện công khai trên Job Board / Portal.
-- **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng; code one-time vô hiệu sau lần dùng.
-- **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
+- **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity (`InterviewSession.SessionType`, `RoundNumber`).
+- **Truy cập:** **[Cập nhật ADR-020 — 2026-06-27]** Mở **tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (ADR-020). Vào qua **Portal** (route `/practice/:applicationId`) — **KHÔNG cần Interview Code**. Không xuất hiện công khai trên Job Board.
+- **Lượt dùng:** **1 lượt / VÒNG** (không phải 1 lượt / hồ sơ). Điều kiện chặn = đã tồn tại `InterviewSession` `session_type='practice'` cho `(application_id, round_number)` (`CheckPracticeEligibilityAsync` / `StartSessionAsync`). Cờ cũ `Application.PracticeSessionUsed` chỉ giữ cho tương thích ngược, **không còn dùng làm điều kiện chặn**.
+- **Cấu hình vòng — practice GIỐNG HỆT buổi thật sắp tới của vòng đó:** practice và real của cùng vòng dùng chung `RoundNumber` → cùng `InterviewRoundConfig`, nên **cùng `round_type`** (vòng thật là `technical` thì practice cũng `technical`; vòng thật là sơ loại/ngôn ngữ thì practice cũng sơ loại/ngôn ngữ) **và cùng ngôn ngữ phỏng vấn**. Mục đích: ứng viên luyện đúng dạng vòng + đúng ngôn ngữ sắp phải thi thật (`StartSessionAsync` set `RoundType`/`InterviewLanguage` theo cùng round).
+- **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook). (Khác biệt duy nhất giữa practice & real cùng vòng là **nguồn RAG** + **không quay video**; loại vòng và ngôn ngữ thì y hệt.)
 - **Công nghệ:** **Đầy đủ pipeline như Real** (Deepgram Nova-3 STT+VAD → Hybrid RAG → GPT-4o → ElevenLabs Flash v2.5 → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
 - **Recording:** Practice **không quay video** — chỉ lưu **transcript** + Evaluation Report (giảm storage). Real lưu đầy đủ.
 - **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
@@ -325,7 +328,7 @@ public interface IEmbeddingProvider
 | `AuthService` | JWT, role management, magic link (Candidate Portal), **OAuth2 OIDC Integration & Domain validation** |
 | `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
 | `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona, **JD file upload (PDF/DOCX)** |
-| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application), **đính kèm CV-JD Analysis vào Application** |
+| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (**1 lượt / vòng**, theo `(application_id, round_number)`), **đính kèm CV-JD Analysis vào Application** |
 | `CvJdAnalysisService` | **[NEW]** Nhận CV file + JD (file/text) → gọi Gemini API phân tích → trả matchScore + summary. Cache kết quả per CV hash + JobPosting |
 | `IGeminiProvider` | **[NEW]** Interface abstract cho Google Gemini API. Method: `AnalyzeCvJdMatchAsync(cvFile, jdContent, ct)` |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
@@ -478,17 +481,17 @@ public interface IEmbeddingProvider
 - **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.
 
 ### ADR-038: Tối ưu chi phí Phỏng vấn thử — gating theo phễu, không cắt công nghệ
-- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Deepgram STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → 1 ứng viên = 2 lượt tính phí phỏng vấn.
+- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Deepgram STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → **mỗi vòng = 1 lượt thử + 1 lượt thật** (multi-round thì nhân theo số vòng ứng viên đi qua).
 - **Nguyên tắc:** Practice **không ảnh hưởng verdict** nhưng vẫn cần **đầy đủ công nghệ** để ứng viên làm quen đúng trải nghiệm thật → **không tối ưu bằng cách cắt tech**, mà tối ưu bằng cách **giảm số lượng buổi (phễu)**.
 - **Quyết định:**
-  1. **Gating:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) và được HR **cấp Interview Code 6 ký tự type=`practice`** (remote). Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ đáng phỏng vấn.
-  2. **1 lần / application**, code one-time, vô hiệu ngay sau dùng.
+  1. **Gating theo phễu:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) **và đã đặt lịch buổi phỏng vấn thật của vòng đó** (ADR-020). Vào qua **Portal, không cấp Interview Code** cho practice. Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ thật sự đi tiếp.
+  2. **1 lượt / VÒNG** (mở lại mỗi khi pass vòng + đặt lịch vòng kế); điều kiện chặn theo `(application_id, round_number)` (ADR-027).
   3. **Đầy đủ pipeline** cả practice & real (xem ADR-027). Practice RAG = JD + CV; Real RAG = JD + CV + Playbook.
   4. **Hybrid Idle (ADR-011)** áp dụng cho cả 2 mode — tiết kiệm ~90% HeyGen mà UX giữ nguyên (không phải "cắt tech").
   5. **Trần cứng** cho practice: giới hạn số câu hỏi + thời lượng để tránh đốt token/STT-phút.
   6. **Recording practice: không quay video, chỉ transcript** + Evaluation Report.
   7. Tái dùng embeddings JD+CV đã sinh ở bước CV-JD Analysis (không embed lại).
-- **Thay đổi liên quan:** Cập nhật ADR-015 (practice qua code thay vì magic link), ADR-016 (`code_type` practice|real), ADR-027 (truy cập + recording).
+- **Thay đổi liên quan:** Cập nhật ADR-013/015/020 (scheduling = phỏng vấn thật theo vòng, đặt lịch mở practice), ADR-016 (bỏ `code_type`; Interview Code chỉ cho real), ADR-027 (truy cập Portal + 1 lượt/vòng + recording).
 
 ### ADR-039: RAG tách thành microservice Python riêng (đã MỞ RỘNG ranh giới)
 - **Quyết định:** Pipeline RAG tách khỏi backend .NET thành **service Python độc lập** (FastAPI + LangChain + LangGraph), ở thư mục `rag-service/`. Backend .NET gọi qua HTTP/REST nội bộ.

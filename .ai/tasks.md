@@ -298,6 +298,13 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-06-27: **Đồng bộ tài liệu `.ai/` + CLAUDE.md về mô hình Scheduling/Practice thật trong code (sửa lệch ADR-020).**
+  - Phát hiện docs lỗi thời so với code (Phase B2/B3 đã ship 2026-06-22 nhưng ADR chưa sync): scheduling là cho **phỏng vấn thật per vòng** (`AvailabilitySlot.RoundNumber`, `InterviewBooking`), **đặt lịch xong mở 1 lượt phỏng vấn thử cho vòng đó**; practice **1 lượt/VÒNG** vào qua **Portal** (`/practice/:applicationId`), **không cần Interview Code**; `InterviewCode` **không có** `code_type` (chỉ dùng cho real/Kiosk).
+  - **architecture.md:** viết lại ADR-020 (Practice-only → Real per vòng + mở practice), ADR-027 (1 lượt/vòng + Portal), ADR-015 (truy cập practice), ADR-016 (bỏ `code_type`, real-only), ADR-038 (gating + chi phí mỗi vòng=1 thử+1 thật), ADR-013, dòng `ApplicationService` trong Service Boundaries.
+  - **context.md:** Remote/On-site interview mode, Availability Slots, flow Phase 2–3, mục Practice Interview. **glossary.md:** mục Practice Interview. **CLAUDE.md:** Interview Modes, Recruitment Flow Phase 1–3, bảng ADR-015/016/038.
+  - Làm rõ thêm: **practice giống hệt buổi thật của cùng vòng** — cùng `round_type` + ngôn ngữ (chung `InterviewRoundConfig` theo `RoundNumber`); khác biệt duy nhất là nguồn RAG (JD+CV) + không quay video (ADR-027, context.md, CLAUDE.md).
+  - Không đổi code — chỉ tài liệu (code đã đúng từ B3).
+
 - [x] 2026-06-26: **RAG Interview Microservice (Python) — Giai đoạn 1: Hybrid RAG (ADR-039 mở rộng).**
   - **Service mới `rag-service/`** (FastAPI + LangChain + LangGraph, Python 3.11): sở hữu toàn bộ pipeline chunk/embed/retrieve/sinh câu hỏi+đánh giá. Backend .NET chỉ orchestrate session/SignalR/persistence, gọi qua HTTP/SSE nội bộ (`http://rag-service:8000`, không expose Nginx).
   - **Hybrid retriever:** dense (pgvector cosine `<=>`) + sparse (Postgres full-text `ts_rank`/`plainto_tsquery`) → hợp nhất Reciprocal Rank Fusion + weighting theo scope (ADR-025: JD/CV & job_posting/round playbook cao, company playbook trung bình). `LangGraph StateGraph` retrieve→generate, để mở rộng CRAG (Giai đoạn 2) & Agentic (Giai đoạn 3).
