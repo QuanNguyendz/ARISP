@@ -40,6 +40,7 @@ namespace ARISP.API.Controllers
         private readonly CvJdAnalysisService _cvJdAnalysisService;
         private readonly ApplicationService _applicationService;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly INotificationService _notificationService;
 
         // Trạng thái phân tích CV-JD đang chạy nền (key = "{jobId}:{cvHash}"). Dùng cho lỗi AI
         // (không ghi row vào DB) để poll biết được kết quả thất bại. Kết quả thành công nằm ở DB cache.
@@ -57,7 +58,8 @@ namespace ARISP.API.Controllers
             IFileStorageService fileStorage,
             CvJdAnalysisService cvJdAnalysisService,
             ApplicationService applicationService,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _geminiProvider = geminiProvider;
@@ -66,6 +68,7 @@ namespace ARISP.API.Controllers
             _cvJdAnalysisService = cvJdAnalysisService;
             _applicationService = applicationService;
             _scopeFactory = scopeFactory;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -169,12 +172,38 @@ namespace ARISP.API.Controllers
                     {
                         using var scope = _scopeFactory.CreateScope();
                         var svc = scope.ServiceProvider.GetRequiredService<CvJdAnalysisService>();
+                        var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
                         using var bgStream = new System.IO.MemoryStream(bytesCopy);
                         var r = await svc.AnalyzeAndCacheAsync(jobPostingId, bgStream, fileNameCopy, CancellationToken.None);
                         if (!r.IsFailure)
                         {
                             // Thành công → đã nằm trong DB cache, bỏ trạng thái nền.
                             _matchJobs.TryRemove(key, out _);
+                            
+                            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                            var notifRepo = uow.Repository<ARISP.Domain.Entities.Notification>();
+                            var dedupKey = $"ai_analysis:{jobPostingId}";
+                            
+                            var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == candidateId && n.DedupKey == dedupKey, CancellationToken.None);
+                            var existingNotif = existingNotifs.FirstOrDefault();
+                            if (existingNotif == null)
+                            {
+                                var newNotif = new ARISP.Domain.Entities.Notification
+                                {
+                                    CandidateAccountId = candidateId,
+                                    DedupKey = dedupKey,
+                                    Type = "system",
+                                    Title = "Phân tích CV hoàn tất",
+                                    Body = $"AI đã hoàn tất phân tích CV của bạn. Vui lòng bấm vào để xem kết quả.",
+                                    Link = $"/candidate/find-jobs/{jobPostingId}/apply",
+                                    IsRead = false
+                                };
+                                await notifRepo.AddAsync(newNotif, CancellationToken.None);
+                                await uow.SaveChangesAsync(CancellationToken.None);
+                            }
+
+                            // Notify candidate
+                            await notifSvc.PublishUserEventAsync(candidateId, "ReceiveUserNotification", new { Type = "AiAnalysisComplete" }, CancellationToken.None);
                         }
                         else if (_matchJobs.TryGetValue(key, out var s))
                         {

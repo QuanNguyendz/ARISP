@@ -22,6 +22,7 @@ import { useAuthStore } from '@store/auth'
 import { authService } from '@services/auth/authService'
 import { notificationService } from '@/services/notification/notificationService'
 import type { NotificationItem } from '@/services/notification/notificationService'
+import { useQuery } from '@tanstack/react-query'
 
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
@@ -130,9 +131,16 @@ export default function CandidateHeader() {
   const { user, isAuthenticated, logout } = useAuthStore()
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
-  const [notifs, setNotifs] = useState<NotificationItem[]>([])
-  const [unread, setUnread] = useState(0)
   const rootRef = useRef<HTMLElement>(null)
+
+  const { data: notifData, refetch } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationService.list(),
+    enabled: !!isAuthenticated,
+  })
+
+  const notifs = notifData?.items || []
+  const unread = notifData?.unreadCount || 0
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -145,42 +153,18 @@ export default function CandidateHeader() {
   // Đóng dropdown khi đổi trang.
   useEffect(() => setOpen(null), [pathname])
 
-  // Tải thông báo (chỉ khi đã đăng nhập ứng viên).
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setNotifs([])
-      setUnread(0)
-      return
-    }
-    let active = true
-    notificationService
-      .list()
-      .then((d) => {
-        if (!active) return
-        setNotifs(d.items)
-        setUnread(d.unreadCount)
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [isAuthenticated, pathname])
-
   const markAllRead = async () => {
-    setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })))
-    setUnread(0)
     try {
       await notificationService.markAllRead()
+      refetch()
     } catch {
-      /* nuốt lỗi — đã cập nhật lạc quan */
+      /* ignore */
     }
   }
 
   const openNotif = (n: NotificationItem) => {
     if (!n.isRead) {
-      setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
-      setUnread((u) => Math.max(0, u - 1))
-      notificationService.markRead(n.id).catch(() => {})
+      notificationService.markRead(n.id).then(() => refetch()).catch(() => {})
     }
     setOpen(null)
     navigate(n.link || '/candidate/notifications')

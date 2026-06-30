@@ -461,6 +461,13 @@ namespace ARISP.Application.Services
             _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
 
             await _unitOfWork.SaveChangesAsync(ct);
+            
+            // Notify HR Admin that there is a new evaluation to review
+            await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveSystemEvent", new { 
+                Type = "AiEvaluationComplete", 
+                EvaluationId = evaluation.Id,
+                ApplicationId = application.Id
+            }, ct);
         }
 
         public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)
@@ -573,6 +580,41 @@ namespace ARISP.Application.Services
                     }
 
                     await _notificationService.SendEmailAsync(application.CandidateEmail, subject, emailBody, ct);
+                }
+
+                // Notify candidate in real-time
+                if (application.CandidateAccountId.HasValue)
+                {
+                    await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", new { 
+                        Id = application.Id, 
+                        JobPostingId = application.JobPostingId, 
+                        Status = application.Status 
+                    }, ct);
+
+                    // Add Notification record
+                    var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                    var dedupKey = $"hr_review:{evaluation.Id}";
+                    var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                    if (existingNotifs.FirstOrDefault() == null)
+                    {
+                        var verdict = isOverride ? request.FinalVerdict : evaluation.AiVerdict;
+                        var isPass = verdict == "pass";
+                        var newNotif = new ARISP.Domain.Entities.Notification
+                        {
+                            CandidateAccountId = application.CandidateAccountId.Value,
+                            DedupKey = dedupKey,
+                            Type = "result",
+                            Title = "Kết quả phỏng vấn",
+                            Body = isPass ? "Chúc mừng bạn đã vượt qua vòng phỏng vấn!" : "Rất tiếc, bạn chưa phù hợp với vị trí này.",
+                            Link = $"/candidate/applications",
+                            IsRead = false
+                        };
+                        await notifRepo.AddAsync(newNotif, ct);
+                        await _unitOfWork.SaveChangesAsync(ct);
+                    }
+
+                    // Trigger bell update
+                    await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "InterviewResult" }, ct);
                 }
             }
 

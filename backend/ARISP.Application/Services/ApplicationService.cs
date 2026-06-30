@@ -17,6 +17,8 @@ namespace ARISP.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IRagIngestionService _ragIngestion;
         private readonly IEmailService _emailService;
+        private readonly INotificationService _notificationService;
+        
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -29,11 +31,12 @@ namespace ARISP.Application.Services
             { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
-        public ApplicationService(IUnitOfWork unitOfWork, IRagIngestionService ragIngestion, IEmailService emailService)
+        public ApplicationService(IUnitOfWork unitOfWork, IRagIngestionService ragIngestion, IEmailService emailService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
             _emailService = emailService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -124,6 +127,41 @@ namespace ARISP.Application.Services
                 CreatedAt = application.CreatedAt,
                 CvJdAnalysisId = application.CvJdAnalysisId
             };
+
+            // Trigger Realtime Notifications
+            // Notify specific recruiter (creator of job posting) and hr_admins
+            await _notificationService.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveNewApplication", response, ct);
+            await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveNewApplication", response, ct);
+            
+            // Notify the candidate themselves if they are logged in (self-applied)
+            if (request.CandidateAccountId.HasValue)
+            {
+                // Trigger application status update
+                await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
+                
+                // Add a Notification record so it shows up in the bell
+                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var dedupKey = $"applied:{application.Id}";
+                var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == request.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                if (existingNotifs.FirstOrDefault() == null)
+                {
+                    var newNotif = new ARISP.Domain.Entities.Notification
+                    {
+                        CandidateAccountId = request.CandidateAccountId.Value,
+                        DedupKey = dedupKey,
+                        Type = "applied",
+                        Title = "Ứng tuyển thành công",
+                        Body = $"Bạn đã nộp hồ sơ thành công vào vị trí {jobPosting?.Title}.",
+                        Link = $"/candidate/applications",
+                        IsRead = false
+                    };
+                    await notifRepo.AddAsync(newNotif, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+
+                // Trigger bell update
+                await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "ApplicationSubmitted" }, ct);
+            }
 
             return Result.Success(response);
         }
@@ -348,8 +386,14 @@ namespace ARISP.Application.Services
 
             // Get job info for the response
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var response = MapToResponse(application, jobPosting);
+            
+            if (application.CandidateAccountId.HasValue)
+            {
+                await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
+            }
 
-            return Result.Success(MapToResponse(application, jobPosting));
+            return Result.Success(response);
         }
 
         /// <summary>Hash token mời phỏng vấn bằng SHA256 (lưu DB an toàn). Dùng chung với controller đặt lịch.</summary>
