@@ -1,109 +1,127 @@
-import { useEffect, useRef } from 'react';
-import * as signalR from '@microsoft/signalr';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../store/auth/authStore';
+import { useEffect, useRef } from 'react'
+import * as signalR from '@microsoft/signalr'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAuthStore } from '../store/auth/authStore'
+import { STAFF_NOTIF_REFRESH_EVENT } from '../services/notification/notificationService'
 
-import { API_BASE_URL } from '@config/constants';
+import { API_BASE_URL } from '@config/constants'
+
+/** Yêu cầu layout nhân sự tải lại chuông thông báo tức thời. */
+const refreshStaffBell = () => window.dispatchEvent(new Event(STAFF_NOTIF_REFRESH_EVENT))
 
 // Remove trailing "/api" if present and append hub path
-const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications';
+const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications'
 
 export const useAppNotifications = () => {
-  const queryClient = useQueryClient();
-  const token = useAuthStore(state => state.tokens?.accessToken);
-  const connectionRef = useRef<signalR.HubConnection | null>(null);
+  const queryClient = useQueryClient()
+  const token = useAuthStore((state) => state.tokens?.accessToken)
+  const connectionRef = useRef<signalR.HubConnection | null>(null)
   useEffect(() => {
+    // Hub yêu cầu [Authorize] — chưa đăng nhập thì không kết nối (tránh 401 + reconnect spam
+    // trên các trang public như Job Board).
+    if (!token) return
+
     // Create SignalR connection
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(HUB_URL, token ? { accessTokenFactory: () => token } : {})
+      .withUrl(HUB_URL, { accessTokenFactory: () => token })
       .withAutomaticReconnect()
-      .build();
+      .build()
 
-    connectionRef.current = connection;
+    connectionRef.current = connection
 
     // Start connection
-    connection.start()
+    connection
+      .start()
       .then(() => {
-        console.log('[SignalR] Connected to AppNotifications hub');
+        console.log('[SignalR] Connected to AppNotifications hub')
       })
-      .catch(err => {
-        console.error('[SignalR] Connection error:', err);
-      });
+      .catch((err) => {
+        console.error('[SignalR] Connection error:', err)
+      })
 
     // Listen to SystemEvents
     connection.on('ReceiveSystemEvent', (eventType: string, payload: any) => {
-      console.log(`[SignalR] Received Event: ${eventType}`, payload);
+      console.log(`[SignalR] Received Event: ${eventType}`, payload)
 
       switch (eventType) {
         case 'ReceiveNewApplication':
           // Refresh applications list
-          queryClient.invalidateQueries({ queryKey: ['applications'] });
-          queryClient.invalidateQueries({ queryKey: ['job', payload?.jobPostingId, 'applications'] });
-          queryClient.invalidateQueries({ queryKey: ['my-jobs'] }); // Update applicant count on dashboards
-          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] });
-          break;
-          
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({
+            queryKey: ['job', payload?.jobPostingId, 'applications'],
+          })
+          queryClient.invalidateQueries({ queryKey: ['my-jobs'] }) // Update applicant count on dashboards
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          refreshStaffBell() // Chuông nhân sự: ứng viên mới ứng tuyển
+          break
+
         case 'ReceivePublicJobUpdate':
           // A job was approved/closed/archived, refresh public job board
-          queryClient.invalidateQueries({ queryKey: ['public-jobs'] });
-          break;
+          queryClient.invalidateQueries({ queryKey: ['public-jobs'] })
+          break
 
         case 'ReceiveJobPostingUpdate':
           // Job status was updated (approved, rejected, pending, closed)
-          queryClient.invalidateQueries({ queryKey: ['admin-jobs'] });
-          queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
-          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
+          queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
           if (payload?.jobId || payload?.JobId) {
-            queryClient.invalidateQueries({ queryKey: ['job', payload?.jobId || payload?.JobId] });
+            queryClient.invalidateQueries({ queryKey: ['job', payload?.jobId || payload?.JobId] })
           }
-          break;
-          
+          refreshStaffBell() // Chuông nhân sự: tin được duyệt/từ chối/chờ duyệt
+          break
+
         case 'ReceiveApplicationStatusUpdate':
           // Refresh candidate's application details
-          queryClient.invalidateQueries({ queryKey: ['applications'] });
-          queryClient.invalidateQueries({ queryKey: ['application', payload?.id] });
-          break;
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({ queryKey: ['application', payload?.id] })
+          break
 
         case 'ReceiveNewAccountRequest':
         case 'ReceiveAccountRequest':
         case 'ReceiveAccountRequestUpdate':
           // Refresh the pending users list for Super Admins and HR Leader's team page
-          queryClient.invalidateQueries({ queryKey: ['pending-users'] });
-          queryClient.invalidateQueries({ queryKey: ['pending-account-requests'] });
-          queryClient.invalidateQueries({ queryKey: ['my-account-requests'] });
-          break;
+          queryClient.invalidateQueries({ queryKey: ['pending-users'] })
+          queryClient.invalidateQueries({ queryKey: ['pending-account-requests'] })
+          queryClient.invalidateQueries({ queryKey: ['my-account-requests'] })
+          break
 
         case 'ReceiveUserNotification':
           // Refresh user's bell notifications
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          break;
+          queryClient.invalidateQueries({ queryKey: ['notifications'] })
+          break
 
         case 'ReceiveSystemEvent':
           // Generic system events (e.g. Schedule Slot Booked, AI Evaluation Complete)
           if (payload?.type === 'SlotBooked' || payload?.Type === 'SlotBooked') {
-            queryClient.invalidateQueries({ queryKey: ['open-slots', payload?.applicationId || payload?.ApplicationId] });
-            queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] });
+            queryClient.invalidateQueries({
+              queryKey: ['open-slots', payload?.applicationId || payload?.ApplicationId],
+            })
+            queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] })
             // Notification for Recruiter
-            queryClient.invalidateQueries({ queryKey: ['notifications'] }); 
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
+          } else if (
+            payload?.type === 'AiEvaluationComplete' ||
+            payload?.Type === 'AiEvaluationComplete'
+          ) {
+            // Notification for HR Admin
+            queryClient.invalidateQueries({ queryKey: ['evaluations'] })
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
+            refreshStaffBell() // Chuông nhân sự: có đánh giá AI chờ xác nhận
           }
-          else if (payload?.type === 'AiEvaluationComplete' || payload?.Type === 'AiEvaluationComplete') {
-             // Notification for HR Admin
-             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
-             queryClient.invalidateQueries({ queryKey: ['notifications'] }); 
-          }
-          break;
-          
+          break
+
         default:
-          console.warn(`[SignalR] Unknown event type: ${eventType}`);
+          console.warn(`[SignalR] Unknown event type: ${eventType}`)
       }
-    });
+    })
 
     return () => {
       if (connectionRef.current) {
         connectionRef.current.stop().then(() => {
-            console.log('[SignalR] Disconnected from AppNotifications hub');
-        });
+          console.log('[SignalR] Disconnected from AppNotifications hub')
+        })
       }
-    };
-  }, [token, queryClient]);
-};
+    }
+  }, [token, queryClient])
+}

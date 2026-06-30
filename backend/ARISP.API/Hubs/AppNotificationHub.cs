@@ -7,6 +7,7 @@ using ARISP.Application.Hubs;
 
 namespace ARISP.API.Hubs
 {
+    [Authorize]
     public class AppNotificationHub : Hub<IAppNotificationClient>
     {
         public override async Task OnConnectedAsync()
