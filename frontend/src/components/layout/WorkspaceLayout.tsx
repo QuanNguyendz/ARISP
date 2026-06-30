@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ComponentType } from 'react'
+import { useState, useEffect, useRef, useCallback, type ComponentType } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -21,7 +21,10 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@store/auth/authStore'
 import { useThemeStore } from '@store/theme'
-import { staffNotificationService } from '@services/notification/notificationService'
+import {
+  staffNotificationService,
+  STAFF_NOTIF_REFRESH_EVENT,
+} from '@services/notification/notificationService'
 import type { NotificationItem } from '@services/notification/notificationService'
 
 // Thời gian tương đối ngắn gọn (vd "15 phút trước").
@@ -140,21 +143,27 @@ export default function WorkspaceLayout({
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
 
-  // Tải thông báo nhân sự khi vào trang / đổi route.
-  useEffect(() => {
-    let active = true
+  // Tải thông báo nhân sự (sync sự kiện thực ở backend).
+  const loadNotifs = useCallback(() => {
     staffNotificationService
       .list()
       .then((d) => {
-        if (!active) return
         setNotifs(d.items)
         setUnread(d.unreadCount)
       })
       .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [location.pathname])
+  }, [])
+
+  // Tải khi vào trang / đổi route.
+  useEffect(() => {
+    loadNotifs()
+  }, [location.pathname, loadNotifs])
+
+  // Tải lại tức thời khi có push SignalR liên quan nhân sự (real-time).
+  useEffect(() => {
+    window.addEventListener(STAFF_NOTIF_REFRESH_EVENT, loadNotifs)
+    return () => window.removeEventListener(STAFF_NOTIF_REFRESH_EVENT, loadNotifs)
+  }, [loadNotifs])
 
   const markAllRead = async () => {
     setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })))

@@ -1,9 +1,11 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using ARISP.Application.Interfaces;
 
 namespace ARISP.API.Hubs
 {
+    [Authorize]
     public class WebRTCSignalingHub : Hub
     {
         private readonly IAvatarService _avatarService;
