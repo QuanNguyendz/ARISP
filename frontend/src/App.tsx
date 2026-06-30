@@ -14,6 +14,7 @@ import HrLayout from '@components/layout/HrLayout'
 import RecruiterLayout from '@components/layout/RecruiterLayout'
 import CandidateAppLayout from '@components/layout/CandidateAppLayout'
 import { DocumentViewerProvider } from '@components/document/DocumentViewer'
+import { useAppNotifications } from '@hooks/useAppNotifications'
 
 // Pages: lazy-load → mỗi page thành 1 chunk riêng, chỉ tải khi vào route đó
 // (tách cả dep nặng như react-grid-layout ra khỏi bundle chính).
@@ -100,6 +101,8 @@ function RouteFallback() {
 function App() {
   const setAuth = useAuthStore((state) => state.setAuth)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  
+  useAppNotifications()
 
   useEffect(() => {
     if (isDevMode && !isAuthenticated) {

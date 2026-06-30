@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Briefcase, Plus, Users, FileText, ArrowRight, MapPin, AlertCircle, Send } from 'lucide-react'
@@ -11,23 +12,14 @@ import { DashboardSkeleton } from './_skeletons'
 
 export default function RecruiterDashboardPage() {
   const { user } = useAuthStore()
-  const [jobs, setJobs] = useState<JobPosting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ['my-jobs'],
+    queryFn: () => jobService.getMyJobPostings(),
+    refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        setJobs(await jobService.getMyJobPostings())
-      } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được dữ liệu tin tuyển dụng.')
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
+  const jobs = jobsData || []
+  const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được dữ liệu tin tuyển dụng.' : '')
 
   const stats = useMemo(() => {
     const by = (s: string) => jobs.filter((j) => j.status === s).length
@@ -56,7 +48,7 @@ export default function RecruiterDashboardPage() {
         actions={[{ label: 'Tạo tin', href: '/recruiter/jobs/create', variant: 'primary' }]}
       />
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+      {error && <ErrorAlert message={error} />}
 
       <StatsGrid stats={statCards} />
 

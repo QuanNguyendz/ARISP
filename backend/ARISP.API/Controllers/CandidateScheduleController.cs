@@ -30,10 +30,12 @@ namespace ARISP.API.Controllers
     public class CandidateScheduleController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
 
-        public CandidateScheduleController(IUnitOfWork unitOfWork)
+        public CandidateScheduleController(IUnitOfWork unitOfWork, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
         }
 
         /// <summary>Xác thực quyền truy cập hồ sơ: token lời mời hợp lệ hoặc candidate đăng nhập sở hữu hồ sơ.</summary>
@@ -176,6 +178,25 @@ namespace ARISP.API.Controllers
             // DTO phản ánh lần đặt vừa rồi (DTO độc lập, không bị EF theo dõi).
             var slotDto = AvailabilitySlotResponse.FromEntity(slot);
             slotDto.BookedCount += 1;
+
+            // Notify Recruiter
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+            if (job != null)
+            {
+                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveSystemEvent", new { 
+                    Type = "SlotBooked", 
+                    ApplicationId = applicationId, 
+                    JobId = job.Id, 
+                    SlotId = slot.Id 
+                }, ct);
+
+                // Notify all candidates viewing the schedule to refresh their open slots
+                await _notificationService.PublishGroupEventAsync("candidate", "ReceiveSystemEvent", new { 
+                    Type = "SlotBooked", 
+                    ApplicationId = applicationId,
+                    SlotId = request.SlotId 
+                }, ct);
+            }
 
             return Ok(new
             {

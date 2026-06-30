@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   UserPlus,
@@ -53,27 +54,18 @@ const initials = (n: string) =>
     .toUpperCase()
 
 export default function HrTeamPage() {
-  const [requests, setRequests] = useState<MyAccountRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [notice, setNotice] = useState('')
 
-  const load = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      setRequests(await accountRequestService.getMine())
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách yêu cầu.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: requestsData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['my-account-requests'],
+    queryFn: () => accountRequestService.getMine(),
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60,
+  })
 
-  useEffect(() => {
-    load()
-  }, [])
+  const requests = requestsData || []
+  const errorMsg = queryError instanceof Error ? queryError.message : ''
 
   const stats = useMemo(() => {
     const by = (s: string) => requests.filter((r) => r.status === s).length
@@ -106,7 +98,7 @@ export default function HrTeamPage() {
         ]}
       />
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+      {errorMsg && <ErrorAlert message={errorMsg} onDismiss={() => {}} />}
       {notice && (
         <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
           <CheckCircle2 className="h-4 w-4" /> {notice}
@@ -179,7 +171,7 @@ export default function HrTeamPage() {
           onDone={(count) => {
             setShowModal(false)
             setNotice(`Đã gửi ${count} yêu cầu tạo tài khoản chờ Super Admin duyệt.`)
-            load()
+            refetch()
           }}
         />
       )}

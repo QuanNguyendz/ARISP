@@ -183,7 +183,7 @@ else
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
 builder.Services.AddScoped<ITTSService, MockTTSService>();
 builder.Services.AddScoped<IAvatarService, MockAvatarService>();
-builder.Services.AddScoped<INotificationService, MockNotificationService>();
+builder.Services.AddScoped<INotificationService, ARISP.API.Services.SignalRNotificationService>();
 builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
 builder.Services.AddScoped<IJdStampService, ARISP.Infrastructure.Documents.JdStampService>();
 
@@ -262,6 +262,17 @@ var authBuilder = builder.Services.AddAuthentication(options =>
             var logger = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
             var claims = context.Principal?.Claims?.Select(c => $"{c.Type}={c.Value}") ?? Enumerable.Empty<string>();
             logger.LogInformation("JWT Token Validated. Claims: [{Claims}]", string.Join(", ", claims));
+            return Task.CompletedTask;
+        },
+        // Support SignalR authentication via token in query string
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
             return Task.CompletedTask;
         }
     };
@@ -383,6 +394,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SessionHub>("/hubs/session");
 app.MapHub<WebRTCSignalingHub>("/hubs/webrtc");
+app.MapHub<AppNotificationHub>("/hubs/app-notifications");
 
 // Auto database migration on startup — thử lại vài lần vì kết nối Supabase đôi khi
 // chậm/timeout auth lúc khởi động (lỗi thoáng qua, không phải sai migration).

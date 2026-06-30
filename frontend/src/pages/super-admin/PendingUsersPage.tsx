@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Clock, XCircle, CheckCircle, Loader2, X, Mail } from 'lucide-react'
 import { PageHeader, EmptyState, ErrorAlert } from '@components/shared'
@@ -16,36 +17,27 @@ const initials = (name?: string | null) =>
     .toUpperCase()
 
 export default function PendingUsersPage() {
-  const [requests, setRequests] = useState<AccountRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { data: requestsData, isLoading: loading, error: fetchError, refetch } = useQuery({
+    queryKey: ['pending-account-requests'],
+    queryFn: () => adminService.getAccountRequests('pending'),
+    refetchOnWindowFocus: false,
+  })
+
+  const [mutationError, setMutationError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<AccountRequest | null>(null)
 
-  const load = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      setRequests(await adminService.getAccountRequests('pending'))
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách yêu cầu.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
+  const error = mutationError || (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách yêu cầu.' : '')
+  const requests = requestsData || []
 
   const handleApprove = async (r: AccountRequest) => {
     setBusyId(r.id)
-    setError('')
+    setMutationError('')
     try {
       await adminService.approveAccountRequest(r.id)
-      setRequests((prev) => prev.filter((x) => x.id !== r.id))
+      refetch()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể duyệt yêu cầu.')
+      setMutationError(e?.response?.data?.message || 'Không thể duyệt yêu cầu.')
     } finally {
       setBusyId(null)
     }
@@ -55,13 +47,13 @@ export default function PendingUsersPage() {
     if (!rejectTarget) return
     const r = rejectTarget
     setBusyId(r.id)
-    setError('')
+    setMutationError('')
     try {
       await adminService.rejectAccountRequest(r.id, reason)
-      setRequests((prev) => prev.filter((x) => x.id !== r.id))
+      refetch()
       setRejectTarget(null)
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể từ chối yêu cầu.')
+      setMutationError(e?.response?.data?.message || 'Không thể từ chối yêu cầu.')
     } finally {
       setBusyId(null)
     }
@@ -74,7 +66,7 @@ export default function PendingUsersPage() {
         description="Yêu cầu tạo tài khoản do HR Leader gửi — duyệt để tạo tài khoản hoạt động"
       />
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+      {error && <ErrorAlert message={error} onDismiss={() => setMutationError('')} />}
 
       {loading ? (
         <CardListSkeleton count={4} />
