@@ -17,6 +17,7 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@hookform/resolvers": "^3.9.0",
+    "@microsoft/signalr": "^10.0.0",
     "@stomp/stompjs": "^7.0.0",
     "@tanstack/react-query": "^5.51.21",
     "axios": "^1.7.2",

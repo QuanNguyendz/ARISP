@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Briefcase, Users, MapPin, Clock, ChevronRight } from 'lucide-react'
@@ -33,24 +34,15 @@ const FILTERS: { value: string; label: string }[] = [
 ]
 
 export default function RecruiterMyJobsPage() {
-  const [jobs, setJobs] = useState<JobPosting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
+  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ['my-jobs'],
+    queryFn: () => jobService.getMyJobPostings(),
+    refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        setJobs(await jobService.getMyJobPostings())
-      } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được danh sách tin tuyển dụng.')
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
+  const jobs = jobsData || []
+  const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
+  const [filter, setFilter] = useState('all')
 
   const counts = useMemo(() => {
     const by = (s: string) => jobs.filter((j) => j.status === s).length
@@ -77,7 +69,7 @@ export default function RecruiterMyJobsPage() {
         actions={[{ label: 'Tạo tin', href: '/recruiter/jobs/create', variant: 'primary' }]}
       />
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+      {error && <ErrorAlert message={error} />}
 
       {loading ? (
         <>

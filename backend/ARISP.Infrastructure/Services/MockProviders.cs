@@ -101,5 +101,23 @@ namespace ARISP.Infrastructure.Services
             Console.WriteLine($"[SignalR EVENT] Session: {sessionId} | Event: {eventType}");
             return Task.CompletedTask;
         }
+
+        public Task PublishUserEventAsync(Guid userId, string eventType, object payload, CancellationToken ct = default)
+        {
+            Console.WriteLine($"[SignalR USER EVENT] User: {userId} | Event: {eventType}");
+            return Task.CompletedTask;
+        }
+
+        public Task PublishGroupEventAsync(string groupName, string eventType, object payload, CancellationToken ct = default)
+        {
+            Console.WriteLine($"[SignalR GROUP EVENT] Group: {groupName} | Event: {eventType}");
+            return Task.CompletedTask;
+        }
+
+        public Task PublishAllEventAsync(string eventType, object payload, CancellationToken ct = default)
+        {
+            Console.WriteLine($"[SignalR GLOBAL EVENT] Event: {eventType}");
+            return Task.CompletedTask;
+        }
     }
 }

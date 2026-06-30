@@ -31,6 +31,7 @@ namespace ARISP.API.Controllers
         private readonly ApplicationService _applicationService;
         private readonly IJdStampService _jdStampService;
         private readonly IRagIngestionService _ragIngestion;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<JobsController> _logger;
 
         public JobsController(
@@ -42,6 +43,7 @@ namespace ARISP.API.Controllers
             ApplicationService applicationService,
             IJdStampService jdStampService,
             IRagIngestionService ragIngestion,
+            INotificationService notificationService,
             ILogger<JobsController> logger)
         {
             _unitOfWork = unitOfWork;
@@ -52,6 +54,7 @@ namespace ARISP.API.Controllers
             _applicationService = applicationService;
             _jdStampService = jdStampService;
             _ragIngestion = ragIngestion;
+            _notificationService = notificationService;
             _logger = logger;
         }
 
@@ -190,6 +193,9 @@ namespace ARISP.API.Controllers
                 roundDtos.Add(RoundConfigDto.FromEntity(config));
             }
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Gửi thông báo SignalR cho Recruiter vừa tạo job
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
 
             return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
@@ -851,6 +857,15 @@ namespace ARISP.API.Controllers
                 finalRoundDtos = existingList.Select(RoundConfigDto.FromEntity).ToList();
             }
 
+            // Gửi thông báo SignalR cho Recruiter vừa update job (nếu có)
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
+
+            // Nếu Job đang active (đang hiển thị công khai), thì thông báo cho tất cả ứng viên để cập nhật Job Board
+            if (job.Status == "active")
+            {
+                await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = job.Status }, ct);
+            }
+
             return Ok(JobPostingResponse.FromEntity(job, finalRoundDtos));
         }
 
@@ -899,6 +914,12 @@ namespace ARISP.API.Controllers
 
             _unitOfWork.Repository<JobPosting>().Update(job);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Gửi thông báo SignalR cho Recruiter vừa xóa job
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
+
+            // Thông báo cập nhật danh sách Job công khai cho Candidates
+            await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = "archived" }, ct);
 
             return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
         }
@@ -1128,6 +1149,24 @@ namespace ARISP.API.Controllers
                 statusResponse.JdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.JdFileUrl, ct);
             if (!string.IsNullOrEmpty(statusResponse.SignedJdFileUrl))
                 statusResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.SignedJdFileUrl, ct);
+
+            // Gửi thông báo SignalR tương ứng
+            if (targetStatus == "pending")
+            {
+                // Thông báo cho HR Admin biết có tin chờ duyệt
+                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = "pending", Title = job.Title }, ct);
+            }
+            else if (targetStatus == "active" || targetStatus == "rejected")
+            {
+                // Thông báo cho người tạo tin (Recruiter) biết kết quả duyệt
+                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = targetStatus, Title = job.Title }, ct);
+            }
+
+            // Nếu trạng thái ảnh hưởng đến trang Candidate Public Job Board (active, closed, archived) thì broadcast
+            if (targetStatus == "active" || targetStatus == "closed" || targetStatus == "archived")
+            {
+                await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = targetStatus }, ct);
+            }
 
             return Ok(statusResponse);
         }
