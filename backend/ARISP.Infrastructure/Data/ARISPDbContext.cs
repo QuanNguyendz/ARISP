@@ -201,6 +201,12 @@ namespace ARISP.Infrastructure.Data
                 .IsUnique()
                 .HasFilter("deleted_at IS NULL");
 
+            // Tương tự cho người nhận là nhân sự nội bộ (HR Admin / Recruiter / Super Admin).
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => new { n.RecipientUserId, n.DedupKey })
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL");
+
             // MagicLink.Audience: mặc định "candidate" để các bản ghi cũ (trước khi tách cổng staff) được hiểu là candidate
             modelBuilder.Entity<MagicLink>()
                 .Property(m => m.Audience)

@@ -20,10 +20,35 @@ import {
   User,
   Moon,
   Sun,
+  CheckCircle2,
+  XCircle,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuthStore } from '@store/auth/authStore'
 import { useThemeStore } from '@store/theme'
+import { staffNotificationService } from '@services/notification/notificationService'
+import type { NotificationItem } from '@services/notification/notificationService'
+
+// Thời gian tương đối ngắn gọn (vd "15 phút trước").
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'Vừa xong'
+  if (m < 60) return `${m} phút trước`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} giờ trước`
+  return `${Math.floor(h / 24)} ngày trước`
+}
+
+// Icon nền theo loại thông báo.
+const notifIcon: Record<string, LucideIcon> = {
+  applied: Users,
+  pending: ClipboardCheck,
+  approval: Briefcase,
+  approved: CheckCircle2,
+  rejected: XCircle,
+}
 
 // Logo component
 function Logo() {
@@ -83,10 +108,64 @@ export default function HrLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [notifs, setNotifs] = useState<NotificationItem[]>([])
+  const [unread, setUnread] = useState(0)
   const { user, logout } = useAuthStore()
   const { isDark, toggleTheme } = useThemeStore()
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
+
+  // Tải thông báo nhân sự (sync sự kiện thực ở backend) khi vào trang / đổi route.
+  useEffect(() => {
+    let active = true
+    staffNotificationService
+      .list()
+      .then((d) => {
+        if (!active) return
+        setNotifs(d.items)
+        setUnread(d.unreadCount)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [location.pathname])
+
+  const markAllRead = async () => {
+    setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })))
+    setUnread(0)
+    try {
+      await staffNotificationService.markAllRead()
+    } catch {
+      /* nuốt lỗi — đã cập nhật lạc quan */
+    }
+  }
+
+  const openNotif = (n: NotificationItem) => {
+    if (!n.isRead) {
+      setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
+      setUnread((u) => Math.max(0, u - 1))
+      staffNotificationService.markRead(n.id).catch(() => {})
+    }
+    setNotifOpen(false)
+    if (n.link) navigate(n.link)
+  }
+
+  const removeNotif = (n: NotificationItem) => {
+    setNotifs((prev) => prev.filter((x) => x.id !== n.id))
+    if (!n.isRead) setUnread((u) => Math.max(0, u - 1))
+    staffNotificationService.remove(n.id).catch(() => {})
+  }
+
+  const clearAll = async () => {
+    setNotifs([])
+    setUnread(0)
+    try {
+      await staffNotificationService.clearAll()
+    } catch {
+      /* nuốt lỗi — đã cập nhật lạc quan */
+    }
+  }
 
   // Sync theme class on mount and when theme changes
   useEffect(() => {
@@ -194,9 +273,11 @@ export default function HrLayout() {
                 className="relative grid h-10 w-10 place-items-center rounded-xl text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-transparent">
-                  3
-                </span>
+                {unread > 0 && (
+                  <span className="absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-transparent">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
               </button>
               <AnimatePresence>
                 {notifOpen && (
@@ -207,37 +288,80 @@ export default function HrLayout() {
                     className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl z-40"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100 dark:border-white/10">
+                    <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 dark:border-white/10">
                       <span className="font-display font-bold text-sm text-ink-900 dark:text-white">
                         Thông báo
                       </span>
-                      <button className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                        Đánh dấu đã đọc
-                      </button>
+                      <div className="flex items-center gap-3">
+                        {unread > 0 && (
+                          <button
+                            onClick={markAllRead}
+                            className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+                          >
+                            Đánh dấu đã đọc
+                          </button>
+                        )}
+                        {notifs.length > 0 && (
+                          <button
+                            onClick={clearAll}
+                            className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
+                          >
+                            Xóa tất cả
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="max-h-80 overflow-y-auto divide-y divide-ink-100 dark:divide-white/10">
-                      <Link
-                        to="/hr/evaluations"
-                        className="flex gap-3 px-4 py-3 hover:bg-ink-50 dark:hover:bg-white/5"
-                      >
-                        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                          <ClipboardCheck className="w-4 h-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm text-ink-700 dark:text-ink-200">
-                            <b className="text-ink-900 dark:text-white">Trần Minh</b> hoàn tất phỏng
-                            vấn R1 — chờ bạn xác nhận
-                          </span>
-                          <span className="text-xs text-ink-400">15 phút trước</span>
-                        </span>
-                      </Link>
+                      {notifs.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-ink-400">
+                          Không có thông báo mới
+                        </div>
+                      ) : (
+                        notifs.map((n) => {
+                          const Icon = notifIcon[n.type] ?? Bell
+                          return (
+                            <div
+                              key={n.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openNotif(n)}
+                              onKeyDown={(e) => e.key === 'Enter' && openNotif(n)}
+                              className={`group relative flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 dark:hover:bg-white/5 ${
+                                n.isRead ? '' : 'bg-brand-50/40 dark:bg-brand-500/10'
+                              }`}
+                            >
+                              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                <Icon className="w-4 h-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm text-ink-900 dark:text-white font-medium">
+                                  {n.title}
+                                </span>
+                                {n.body && (
+                                  <span className="block text-sm text-ink-600 dark:text-ink-300 truncate">
+                                    {n.body}
+                                  </span>
+                                )}
+                                <span className="text-xs text-ink-400">{timeAgo(n.createdAt)}</span>
+                              </span>
+                              {!n.isRead && (
+                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500 group-hover:hidden" />
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeNotif(n)
+                                }}
+                                aria-label="Xóa thông báo"
+                                className="absolute right-2 top-2 hidden h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-ink-200 hover:text-red-600 dark:hover:bg-white/10 dark:hover:text-red-400 group-hover:grid"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )
+                        })
+                      )}
                     </div>
-                    <Link
-                      to="#"
-                      className="block px-4 py-3 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5 rounded-b-2xl border-t border-ink-100 dark:border-white/10"
-                    >
-                      Xem tất cả
-                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>

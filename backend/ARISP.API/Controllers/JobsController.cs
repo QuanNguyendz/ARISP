@@ -999,6 +999,9 @@ namespace ARISP.API.Controllers
                     return BadRequest(new { message = "Vui lòng cung cấp lý do từ chối duyệt bài (RejectionReason)." });
 
                 job.RejectionReason = request.RejectionReason.Trim();
+
+                // Thông báo kết quả TỪ CHỐI về người tạo tin (thường là Recruiter).
+                await AddJobDecisionNotificationAsync(job, userId, reviewerName: null, approved: false, reason: job.RejectionReason, ct);
             }
 
             // CASE B: Hành động Phê duyệt public bài (Chuyển sang 'active') -> Chỉ Admin mới được duyệt
@@ -1035,6 +1038,9 @@ namespace ARISP.API.Controllers
                     job.ApprovedByUserId = userId;
                     job.ApprovedAt = DateTimeOffset.UtcNow;
                     job.ApproverName = approverName;
+
+                    // Thông báo kết quả ĐƯỢC DUYỆT về người tạo tin (thường là Recruiter).
+                    await AddJobDecisionNotificationAsync(job, userId, approverName, approved: true, reason: null, ct);
 
                     // Đóng dấu duyệt lên file JD. PDF: vẽ dấu lên file gốc. DOCX: render nội dung JD
                     // thành PDF mới rồi đóng dấu (mất định dạng gốc nhưng giữ nội dung + bằng chứng duyệt).
@@ -1163,6 +1169,48 @@ namespace ARISP.API.Controllers
             }
 
             return Ok(statusResponse);
+        }
+
+        /// <summary>
+        /// Gửi thông báo kết quả duyệt/từ chối tin về cho NGƯỜI TẠO tin (thường là Recruiter).
+        /// Bỏ qua nếu người duyệt cũng chính là người tạo. Chỉ stage qua AddAsync — được persist
+        /// CÙNG transaction với cập nhật trạng thái tin tại <see cref="UpdateJobStatus"/> (1 SaveChanges).
+        /// </summary>
+        private async Task AddJobDecisionNotificationAsync(
+            JobPosting job, Guid actorUserId, string? reviewerName, bool approved, string? reason, CancellationToken ct)
+        {
+            if (job.CreatedByUserId == actorUserId) return; // người duyệt cũng là người tạo → không tự thông báo
+
+            var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+            if (creator == null) return;
+
+            if (string.IsNullOrWhiteSpace(reviewerName))
+            {
+                var actor = await _unitOfWork.Repository<User>().GetByIdAsync(actorUserId, ct);
+                reviewerName = actor != null
+                    ? (string.IsNullOrWhiteSpace(actor.FullName) ? actor.Email : actor.FullName)
+                    : "HR Admin";
+            }
+
+            // Link tới trang chi tiết tin theo workspace của người tạo.
+            var isRecruiter = string.Equals(creator.Role, "recruiter", StringComparison.OrdinalIgnoreCase);
+            var link = isRecruiter ? $"/recruiter/my-jobs/{job.Id}" : $"/hr/jobs/{job.Id}";
+            var now = DateTimeOffset.UtcNow;
+
+            await _unitOfWork.Repository<Notification>().AddAsync(new Notification
+            {
+                RecipientUserId = job.CreatedByUserId,
+                // Ticks ở khóa chống trùng → mỗi lần duyệt/từ chối là một sự kiện riêng, hỗ trợ nhiều vòng nộp lại.
+                DedupKey = $"{(approved ? "job_approved" : "job_rejected")}:{job.Id}:{now.Ticks}",
+                Type = approved ? "approved" : "rejected",
+                Title = approved ? "Tin tuyển dụng đã được duyệt" : "Tin tuyển dụng bị từ chối",
+                Body = approved
+                    ? $"\"{job.Title}\" đã được {reviewerName} phê duyệt và đăng công khai."
+                    : $"\"{job.Title}\" bị {reviewerName} từ chối. Lý do: {reason}",
+                Link = link,
+                CreatedAt = now,
+                UpdatedAt = now,
+            }, ct);
         }
 
         /// <summary>Chèn hậu tố vào tên file trước phần mở rộng. VD: "JD.pdf" + "-da-duyet" => "JD-da-duyet.pdf".</summary>
