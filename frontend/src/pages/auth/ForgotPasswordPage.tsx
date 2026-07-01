@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Mail, KeyRound, MailCheck, Clock, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { authService } from '@services/auth/authService'
@@ -47,6 +48,7 @@ function Logo() {
 }
 
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation('auth')
   const [searchParams] = useSearchParams()
   // Cùng 1 màn dùng cho 2 cổng tách biệt: candidate (mặc định) vs staff nội bộ
   const isStaff = searchParams.get('audience') === 'staff'
@@ -82,7 +84,7 @@ export default function ForgotPasswordPage() {
   const requestReset = async () => {
     setError('')
     if (!email.trim()) {
-      setError('Vui lòng nhập email của bạn.')
+      setError(t('forgotPassword.emailRequired'))
       return
     }
 
@@ -95,9 +97,7 @@ export default function ForgotPasswordPage() {
       setSent(true)
       startCooldown()
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.'
-      )
+      setError(err instanceof Error ? err.message : t('forgotPassword.sendError'))
     } finally {
       setLoading(false)
     }
@@ -140,22 +140,22 @@ export default function ForgotPasswordPage() {
               <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                 <KeyRound className="w-6 h-6" />
               </span>
-              <h1 className="font-display text-xl font-extrabold">Quên mật khẩu?</h1>
-              <p className="mt-1.5 text-sm text-ink-500">
-                Nhập email tài khoản của bạn. Chúng tôi sẽ gửi liên kết đặt lại mật khẩu.
-              </p>
+              <h1 className="font-display text-xl font-extrabold">{t('forgotPassword.title')}</h1>
+              <p className="mt-1.5 text-sm text-ink-500">{t('forgotPassword.subtitle')}</p>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-600">Email</label>
+                <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                  {t('forgotPassword.emailLabel')}
+                </label>
                 <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                   <Mail className="w-4 h-4 text-ink-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ban@email.com"
+                    placeholder={t('forgotPassword.emailPlaceholder')}
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                     required
                   />
@@ -174,16 +174,17 @@ export default function ForgotPasswordPage() {
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Gửi liên kết đặt lại'}
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  t('forgotPassword.submit')
+                )}
               </button>
             </form>
 
             <div className="mt-5 flex gap-2.5 rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
               <Clock className="mt-0.5 w-4 h-4 shrink-0 text-ink-400" />
-              <span>
-                Liên kết đặt lại có hiệu lực <b>2 giờ</b> và chỉ dùng được <b>1 lần</b>. Nếu email
-                tồn tại trong hệ thống, bạn sẽ nhận được thư.
-              </span>
+              <span>{t('forgotPassword.linkNote')}</span>
             </div>
           </div>
         ) : (
@@ -192,18 +193,20 @@ export default function ForgotPasswordPage() {
             <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
               <MailCheck className="w-7 h-7" />
             </span>
-            <h1 className="font-display text-xl font-extrabold">Kiểm tra email của bạn</h1>
+            <h1 className="font-display text-xl font-extrabold">
+              {t('forgotPassword.checkEmail')}
+            </h1>
             <p className="mt-2 text-sm text-ink-500">
-              Chúng tôi đã gửi liên kết đặt lại mật khẩu đến
+              {t('forgotPassword.sentMessage')}
               <br />
               <b className="text-ink-800">{email}</b>
             </p>
 
             <div className="mt-5 text-sm text-ink-500">
-              Không nhận được thư?{' '}
+              {t('forgotPassword.noEmail')}
               {cooldown > 0 ? (
                 <span className="text-ink-400">
-                  Gửi lại sau <b>{cooldown}s</b>
+                  {t('forgotPassword.resendCooldown', { seconds: cooldown })}
                 </span>
               ) : (
                 <button
@@ -211,7 +214,7 @@ export default function ForgotPasswordPage() {
                   disabled={loading}
                   className="font-semibold text-brand-600 hover:underline disabled:opacity-50"
                 >
-                  {loading ? 'Đang gửi…' : 'Gửi lại'}
+                  {loading ? t('forgotPassword.sending') : t('forgotPassword.resend')}
                 </button>
               )}
             </div>
@@ -227,7 +230,7 @@ export default function ForgotPasswordPage() {
               onClick={useAnotherEmail}
               className="mt-3 text-sm font-medium text-ink-500 hover:text-brand-600"
             >
-              Dùng email khác
+              {t('forgotPassword.useAnotherEmail')}
             </button>
           </div>
         )}
@@ -238,7 +241,7 @@ export default function ForgotPasswordPage() {
             to={loginPath}
             className="inline-flex items-center gap-1.5 font-semibold text-brand-600 hover:underline"
           >
-            <ArrowLeft className="w-4 h-4" /> Quay lại đăng nhập
+            <ArrowLeft className="w-4 h-4" /> {t('forgotPassword.backToLogin')}
           </Link>
         </p>
       </motion.div>

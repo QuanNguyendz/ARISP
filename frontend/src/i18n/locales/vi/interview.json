@@ -1,0 +1,75 @@
+{
+  "title": "Phỏng vấn",
+  "practice": {
+    "title": "Phỏng vấn thử",
+    "subtitle": "Luyện tập trước buổi phỏng vấn thật",
+    "description": "Phỏng vấn thử giúp bạn làm quen với format, câu hỏi và cách AI đánh giá. Kết quả không ảnh hưởng đến quá trình tuyển dụng.",
+    "available": "Bạn có 1 lượt phỏng vấn thử cho vòng này",
+    "notAvailable": "Phỏng vấn thử sẽ mở sau khi bạn đặt lịch phỏng vấn thật",
+    "used": "Bạn đã sử dụng lượt phỏng vấn thử cho vòng này",
+    "beforeReal": "Phải đặt lịch phỏng vấn thật trước khi mở phỏng vấn thử",
+    "start": "Bắt đầu phỏng vấn thử",
+    "result": "Kết quả phỏng vấn thử"
+  },
+  "real": {
+    "title": "Phỏng vấn thật",
+    "subtitle": "Buổi phỏng vấn chính thức",
+    "enterCode": "Nhập mã phỏng vấn",
+    "codePlaceholder": "Nhập mã 6 ký tự",
+    "start": "Bắt đầu",
+    "invalidCode": "Mã phỏng vấn không hợp lệ hoặc đã hết hạn"
+  },
+  "room": {
+    "connecting": "Đang kết nối...",
+    "connected": "Đã kết nối",
+    "disconnected": "Mất kết nối",
+    "reconnecting": "Đang kết nối lại...",
+    "waiting": "Chờ AI bắt đầu...",
+    "recording": "Đang ghi hình",
+    "processing": "Đang xử lý...",
+    "completed": "Hoàn thành"
+  },
+  "device": {
+    "title": "Kiểm tra thiết bị",
+    "camera": "Camera",
+    "microphone": "Microphone",
+    "speaker": "Loa",
+    "check": "Kiểm tra",
+    "permissionDenied": "Không có quyền truy cập thiết bị",
+    "notFound": "Không tìm thấy thiết bị",
+    "ready": "Thiết bị sẵn sàng"
+  },
+  "question": {
+    "listening": "AI đang nghe...",
+    "processing": "AI đang xử lý...",
+    "answering": "Trả lời câu hỏi...",
+    "next": "Câu hỏi tiếp theo",
+    "finish": "Kết thúc phỏng vấn"
+  },
+  "result": {
+    "title": "Kết quả phỏng vấn",
+    "overall": "Điểm tổng thể",
+    "verdict": "Kết quả",
+    "pass": "Đạt",
+    "notPass": "Không đạt",
+    "waiting": "Đang chờ HR xác nhận",
+    "confirmed": "Đã được HR xác nhận",
+    "criteria": "Điểm theo tiêu chí",
+    "feedback": "Phản hồi từ AI",
+    "viewRecording": "Xem bản ghi",
+    "viewTranscript": "Xem transcript"
+  },
+  "error": {
+    "connectionFailed": "Kết nối thất bại",
+    "sessionExpired": "Phiên phỏng vấn đã hết hạn",
+    "deviceError": "Lỗi thiết bị",
+    "serverError": "Lỗi máy chủ"
+  },
+  "kiosk": {
+    "title": "Màn hình phỏng vấn",
+    "subtitle": "Nhập mã để bắt đầu",
+    "codeLabel": "Mã phỏng vấn",
+    "submit": "Bắt đầu",
+    "invalidCode": "Mã không hợp lệ"
+  }
+}

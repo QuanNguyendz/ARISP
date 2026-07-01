@@ -1,0 +1,68 @@
+{
+  "hero": {
+    "badge": "AI-Powered Internal Recruitment Platform",
+    "title": "Hire the right people, with AI by your side",
+    "subtitle": "ARISP automates your entire IT recruitment process — from job posting, CV screening, multi-round AI interviews to evaluation — so HR can focus on the final decision.",
+    "cta": {
+      "primary": "Post jobs for free",
+      "secondary": "See how it works"
+    },
+    "stats": {
+      "rounds": "AI Interview Rounds",
+      "time": "Average Response Time",
+      "languages": "Supported Languages",
+      "availability": "24/7 System Availability"
+    }
+  },
+  "features": {
+    "title": "Everything HR needs, in one platform",
+    "subtitle": "No more juggling dozens of tools — ARISP consolidates your entire recruitment workflow.",
+    "items": {
+      "jobBoard": {
+        "title": "Internal IT Job Board",
+        "desc": "Candidates search and apply directly on your platform — no third-party intermediaries."
+      },
+      "aiInterview": {
+        "title": "Multi-round AI Interviews",
+        "desc": "Screening, technical, case-based — AI handles every round with consistent evaluation quality."
+      },
+      "autoEvaluate": {
+        "title": "Automated Evaluation",
+        "desc": "Pass/Not Pass reports with detailed per-criteria analysis — HR just needs to confirm."
+      },
+      "playbook": {
+        "title": "Company Playbook",
+        "desc": "Integrate internal interview documents into RAG — questions always align with company standards."
+      },
+      "multiLang": {
+        "title": "Multi-language",
+        "desc": "Automatically detects language from JD — interview in Vietnamese, English, and more."
+      },
+      "codeOnsite": {
+        "title": "On-site Interview Codes",
+        "desc": "Candidates arrive on-site, enter a 6-character code to start — fast, secure, no installation."
+      }
+    }
+  },
+  "demo": {
+    "title": "Experience AI Interview in Minutes",
+    "subtitle": "See how AI interviews and evaluates candidates — no registration required.",
+    "cta": "Start now"
+  },
+  "cta": {
+    "title": "Ready to revolutionize your recruitment?",
+    "subtitle": "Explore ARISP and discover how AI helps your HR team focus on what matters most — people.",
+    "primary": "Schedule a demo",
+    "secondary": "Contact us"
+  },
+  "trust": {
+    "title": "Trusted by Modern HR Teams",
+    "subtitle": "5000+ candidates have been interviewed by ARISP"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — AI-Powered Recruitment & Interview Platform",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "contact": "Contact Us"
+  }
+}

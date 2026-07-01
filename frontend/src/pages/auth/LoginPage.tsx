@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Mail,
   Lock,
@@ -74,6 +75,9 @@ function getRoleDashboard(role: string): string {
 }
 
 export default function LoginPage() {
+  const { t } = useTranslation('auth')
+  const { t: tCommon } = useTranslation('common')
+  const { t: tErrors } = useTranslation('errors')
   const navigate = useNavigate()
   const location = useLocation()
   const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse)
@@ -117,7 +121,7 @@ export default function LoginPage() {
       const from = (location.state as any)?.from?.pathname
       navigate(from || dashboard, { replace: true })
     } catch (err: any) {
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.')
+      setError(err.message || tErrors('auth.invalidCredentials'))
       setOauthLoading(false)
     } finally {
       setIsLoading(false)
@@ -132,10 +136,8 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="mb-6 flex flex-col items-center text-center">
           <Logo />
-          <h1 className="mt-4 font-display text-2xl font-extrabold">ARISP Workspace</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            Đăng nhập nội bộ · HR · Recruiter · Super Admin
-          </p>
+          <h1 className="mt-4 font-display text-2xl font-extrabold">{tCommon('appName')}</h1>
+          <p className="mt-1 text-sm text-ink-500">{t('login.subtitle')}</p>
         </div>
 
         {/* Card */}
@@ -168,25 +170,27 @@ export default function LoginPage() {
                 />
               </svg>
             )}
-            Đăng nhập với Google
+            {t('login.signInWithGoogle')}
           </button>
 
           <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
             <span className="h-px flex-1 bg-ink-200"></span>
-            hoặc dùng email công ty
+            {t('login.orContinueWith')}
             <span className="h-px flex-1 bg-ink-200"></span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600">Email công ty</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                {t('login.emailLabel')}
+              </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <Mail className="w-4 h-4 text-ink-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ban@congty.com"
+                  placeholder={t('login.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                   required
                 />
@@ -195,13 +199,15 @@ export default function LoginPage() {
 
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-sm font-medium text-ink-600">Mật khẩu</label>
+                <label className="block text-sm font-medium text-ink-600">
+                  {t('login.passwordLabel')}
+                </label>
                 <button
                   type="button"
                   onClick={() => navigate('/auth/forgot-password?audience=staff')}
                   className="text-sm font-medium text-brand-600 hover:underline"
                 >
-                  Quên mật khẩu?
+                  {t('login.forgotPassword')}
                 </button>
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
@@ -210,7 +216,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('login.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
                   required
                 />
@@ -240,7 +246,7 @@ export default function LoginPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Đăng nhập
+                  {t('login.submit')}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -250,18 +256,14 @@ export default function LoginPage() {
           {/* Pre-provisioning note */}
           <div className="mt-5 flex gap-2.5 rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
             <ShieldAlert className="w-4 h-4 shrink-0 text-ink-400 mt-0.5" />
-            <span>
-              Tài khoản nội bộ do <b>Super Admin</b> cấp trước. Không hỗ trợ tự đăng ký. Chỉ email
-              thuộc miền công ty được phép.
-            </span>
+            <span>{t('login.provisioningNote')}</span>
           </div>
         </div>
 
         <p className="mt-6 text-center text-sm text-ink-500">
-          Bạn là ứng viên?
+          {t('login.candidatePrompt')}
           <Link to="/auth/candidate-login" className="font-semibold text-brand-600 hover:underline">
-            {' '}
-            Đăng nhập tại Job Board
+            {t('login.jobBoardLink')}
           </Link>
         </p>
       </div>

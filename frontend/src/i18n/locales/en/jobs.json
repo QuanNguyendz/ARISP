@@ -1,0 +1,72 @@
+{
+  "findJob": {
+    "title": "IT Jobs for You",
+    "subtitle": "Explore hundreds of opportunities from top companies",
+    "searchPlaceholder": "Search by position, company, skills...",
+    "locationPlaceholder": "Location",
+    "filterButton": "Filter",
+    "sortBy": "Sort by",
+    "sortOptions": {
+      "newest": "Newest",
+      "deadline": "Deadline",
+      "salary": "Salary",
+      "relevance": "Relevance"
+    },
+    "noJobs": "No matching jobs found",
+    "showingCount": "Showing {{count}} jobs"
+  },
+  "jobDetail": {
+    "backToList": "Back to list",
+    "saveJob": "Save job",
+    "saved": "Saved",
+    "shareJob": "Share",
+    "applyNow": "Apply now",
+    "applied": "Applied",
+    "overview": "Overview",
+    "description": "Job Description",
+    "requirements": "Requirements",
+    "benefits": "Benefits",
+    "skills": "Skills",
+    "company": "Company",
+    "location": "Location",
+    "salary": "Salary",
+    "salaryNegotiable": "Negotiable",
+    "deadline": "Deadline",
+    "jobType": "Job Type",
+    "experience": "Experience",
+    "level": "Level",
+    "postedAt": "Posted {{date}}",
+    "interviewRounds": "{{count}} interview rounds",
+    "interviewRoundsWithType": "{{count}} rounds: {{types}}",
+    "matchScore": "Match Score",
+    "matchAnalysis": "CV-JD Analysis",
+    "skillsMatched": "Matched Skills",
+    "skillsGaps": "Skills Gaps",
+    "experienceRelevance": "Experience Relevance",
+    "overallRecommendation": "Overall Recommendation",
+    "recommendationStrong": "Highly Suitable",
+    "recommendationModerate": "Moderately Suitable",
+    "recommendationWeak": "Low Suitability",
+    "analyzing": "Analyzing CV...",
+    "uploadCv": "Upload CV to see match score",
+    "viewJob": "View details"
+  },
+  "apply": {
+    "title": "Apply for {{jobTitle}}",
+    "fullName": "Full Name",
+    "email": "Email",
+    "phone": "Phone Number",
+    "cvUpload": "CV (PDF/DOCX)",
+    "coverLetter": "Cover Letter (optional)",
+    "submit": "Submit application",
+    "success": "Application submitted successfully",
+    "alreadyApplied": "You have already applied for this position",
+    "loginRequired": "Please sign in to apply"
+  },
+  "savedJobs": {
+    "title": "Saved Jobs",
+    "empty": "You haven't saved any jobs yet",
+    "browseJobs": "Browse jobs",
+    "removeSaved": "Remove"
+  }
+}

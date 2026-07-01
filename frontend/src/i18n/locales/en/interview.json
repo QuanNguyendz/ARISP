@@ -1,0 +1,75 @@
+{
+  "title": "Interview",
+  "practice": {
+    "title": "Practice Interview",
+    "subtitle": "Practice before your real interview",
+    "description": "Practice interviews help you get familiar with the format, questions, and how AI evaluates. Results do not affect the recruitment process.",
+    "available": "You have 1 practice attempt for this round",
+    "notAvailable": "Practice interview will open after you schedule your real interview",
+    "used": "You have used your practice attempt for this round",
+    "beforeReal": "You must schedule your real interview first",
+    "start": "Start practice interview",
+    "result": "Practice interview result"
+  },
+  "real": {
+    "title": "Real Interview",
+    "subtitle": "Official interview session",
+    "enterCode": "Enter interview code",
+    "codePlaceholder": "Enter 6-character code",
+    "start": "Start",
+    "invalidCode": "Invalid or expired interview code"
+  },
+  "room": {
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "reconnecting": "Reconnecting...",
+    "waiting": "Waiting for AI to start...",
+    "recording": "Recording",
+    "processing": "Processing...",
+    "completed": "Completed"
+  },
+  "device": {
+    "title": "Check devices",
+    "camera": "Camera",
+    "microphone": "Microphone",
+    "speaker": "Speaker",
+    "check": "Check",
+    "permissionDenied": "Device access denied",
+    "notFound": "Device not found",
+    "ready": "Device ready"
+  },
+  "question": {
+    "listening": "AI is listening...",
+    "processing": "AI is processing...",
+    "answering": "Answering question...",
+    "next": "Next question",
+    "finish": "End interview"
+  },
+  "result": {
+    "title": "Interview Result",
+    "overall": "Overall Score",
+    "verdict": "Result",
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "waiting": "Waiting for HR confirmation",
+    "confirmed": "Confirmed by HR",
+    "criteria": "Scores by Criteria",
+    "feedback": "AI Feedback",
+    "viewRecording": "View recording",
+    "viewTranscript": "View transcript"
+  },
+  "error": {
+    "connectionFailed": "Connection failed",
+    "sessionExpired": "Interview session expired",
+    "deviceError": "Device error",
+    "serverError": "Server error"
+  },
+  "kiosk": {
+    "title": "Interview Screen",
+    "subtitle": "Enter code to start",
+    "codeLabel": "Interview Code",
+    "submit": "Start",
+    "invalidCode": "Invalid code"
+  }
+}

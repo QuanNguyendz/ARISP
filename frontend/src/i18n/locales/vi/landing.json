@@ -1,0 +1,68 @@
+{
+  "hero": {
+    "badge": "AI tuyển dụng nội bộ doanh nghiệp",
+    "title": "Tuyển đúng người, với AI đồng hành",
+    "subtitle": "ARISP tự động hoá toàn bộ quy trình tuyển dụng IT — từ đăng tin, sàng lọc CV, phỏng vấn AI đa vòng đến đánh giá — giúp HR tập trung vào quyết định cuối cùng.",
+    "cta": {
+      "primary": "Đăng tuyển miễn phí",
+      "secondary": "Xem cách hoạt động"
+    },
+    "stats": {
+      "rounds": "Vòng phỏng vấn AI tự động",
+      "time": "Thời gian phản hồi trung bình",
+      "languages": "Ngôn ngữ phỏng vấn được hỗ trợ",
+      "availability": "Hệ thống chạy 24/7"
+    }
+  },
+  "features": {
+    "title": "Mọi thứ HR cần, trong một nền tảng",
+    "subtitle": "Không còn chắp vá hàng chục công cụ — ARISP gói gọn quy trình tuyển dụng của bạn.",
+    "items": {
+      "jobBoard": {
+        "title": "Job Board IT nội bộ",
+        "desc": "Ứng viên tự tìm và ứng tuyển trực tiếp trên nền tảng của bạn — không qua bên thứ ba."
+      },
+      "aiInterview": {
+        "title": "Phỏng vấn AI đa vòng",
+        "desc": "Sàng lọc, kỹ thuật, vấn đáp — AI đảm nhận mọi vòng với chất lượng đánh giá nhất quán."
+      },
+      "autoEvaluate": {
+        "title": "Đánh giá tự động",
+        "desc": "Báo cáo Pass/Not Pass kèm phân tích chi tiết theo từng tiêu chí — HR chỉ cần xác nhận."
+      },
+      "playbook": {
+        "title": "Playbook doanh nghiệp",
+        "desc": "Tích hợp tài liệu phỏng vấn nội bộ vào RAG — câu hỏi luôn bám sát tiêu chuẩn công ty."
+      },
+      "multiLang": {
+        "title": "Đa ngôn ngữ",
+        "desc": "Tự động nhận diện ngôn ngữ từ JD — phỏng vấn tiếng Việt, tiếng Anh, và nhiều hơn nữa."
+      },
+      "codeOnsite": {
+        "title": "Mã phỏng vấn tại văn phòng",
+        "desc": "Ứng viên đến on-site nhập mã 6 ký tự để bắt đầu — nhanh, an toàn, không cần cài đặt."
+      }
+    }
+  },
+  "demo": {
+    "title": "Trải nghiệm phỏng vấn AI trong vài phút",
+    "subtitle": "Xem AI phỏng vấn và đánh giá ứng viên như thế nào — không cần đăng ký.",
+    "cta": "Bắt đầu ngay"
+  },
+  "cta": {
+    "title": "Sẵn sàng cách mạng hoá tuyển dụng của bạn?",
+    "subtitle": "Khám phá ARISP và tìm hiểu cách AI giúp đội ngũ HR của bạn tập trung vào điều quan trọng nhất — con người.",
+    "primary": "Đặt lịch demo",
+    "secondary": "Liên hệ tư vấn"
+  },
+  "trust": {
+    "title": "Được tin dùng bởi các đội ngũ HR hiện đại",
+    "subtitle": "Hơn 5000+ ứng viên đã được phỏng vấn bởi ARISP"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — Nền tảng tuyển dụng & phỏng vấn AI",
+    "privacy": "Chính sách bảo mật",
+    "terms": "Điều khoản sử dụng",
+    "contact": "Liên hệ"
+  }
+}

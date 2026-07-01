@@ -1,10 +1,24 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Brain, Mail, Lock, User, Building2, Phone, ArrowRight, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { motion } from 'framer-motion'
+import {
+  Brain,
+  Mail,
+  Lock,
+  User,
+  Building2,
+  Phone,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  CheckCircle,
+} from 'lucide-react'
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
+  const { t } = useTranslation('auth')
+  const { t: tCommon } = useTranslation('common')
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -13,27 +27,27 @@ export default function RegisterPage() {
     company: '',
     phone: '',
     acceptTerms: false,
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState(1);
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [step, setStep] = useState(1)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    const { name, value, type, checked } = e.target
+    setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
+    }))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    e.preventDefault()
+    setIsLoading(true)
     setTimeout(() => {
-      setIsLoading(false);
-      navigate('/auth/login');
-    }, 2000);
-  };
+      setIsLoading(false)
+      navigate('/auth/login')
+    }, 2000)
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary flex">
@@ -55,21 +69,23 @@ export default function RegisterPage() {
 
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-white mb-3">Tạo tài khoản mới</h1>
-            <p className="text-text-secondary">Bắt đầu hành trình tuyển dụng thông minh</p>
+            <h1 className="text-3xl font-semibold text-white mb-3">{t('register.title')}</h1>
+            <p className="text-text-secondary">{t('register.subtitle')}</p>
           </div>
 
           {/* Progress Steps */}
           <div className="flex items-center gap-4 mb-8">
             {[1, 2].map((s) => (
               <div key={s} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  step >= s ? 'bg-accent-primary text-white' : 'bg-white/10 text-text-tertiary'
-                }`}>
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    step >= s ? 'bg-accent-primary text-white' : 'bg-white/10 text-text-tertiary'
+                  }`}
+                >
                   {step > s ? <CheckCircle className="w-4 h-4" /> : s}
                 </div>
                 <span className={`text-sm ${step >= s ? 'text-white' : 'text-text-tertiary'}`}>
-                  {s === 1 ? 'Thông tin' : 'Công ty'}
+                  {s === 1 ? t('register.step1') : t('register.step2')}
                 </span>
                 {s < 2 && (
                   <div className={`w-12 h-px ${step > s ? 'bg-accent-primary' : 'bg-white/10'}`} />
@@ -84,7 +100,7 @@ export default function RegisterPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Họ và tên
+                    {t('register.fullNameLabel')}
                   </label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
@@ -93,7 +109,7 @@ export default function RegisterPage() {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="Nguyễn Văn A"
+                      placeholder={t('register.fullNamePlaceholder')}
                       className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
                       required
                     />
@@ -102,7 +118,7 @@ export default function RegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Email
+                    {t('register.emailLabel')}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
@@ -111,7 +127,7 @@ export default function RegisterPage() {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      placeholder="you@company.com"
+                      placeholder={t('register.emailPlaceholder')}
                       className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
                       required
                     />
@@ -120,7 +136,7 @@ export default function RegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Mật khẩu
+                    {t('register.passwordLabel')}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
@@ -129,7 +145,7 @@ export default function RegisterPage() {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      placeholder="Tối thiểu 8 ký tự"
+                      placeholder={t('register.passwordPlaceholder')}
                       className="w-full pl-12 pr-12 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
                       required
                       minLength={8}
@@ -151,7 +167,7 @@ export default function RegisterPage() {
                   whileTap={{ scale: 0.98 }}
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium flex items-center justify-center gap-2"
                 >
-                  Tiếp tục
+                  {tCommon('button.next')}
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </>
@@ -159,7 +175,7 @@ export default function RegisterPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Tên công ty
+                    {t('register.companyLabel')}
                   </label>
                   <div className="relative">
                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
@@ -168,7 +184,7 @@ export default function RegisterPage() {
                       name="company"
                       value={formData.company}
                       onChange={handleChange}
-                      placeholder="Công ty ABC"
+                      placeholder={t('register.companyPlaceholder')}
                       className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
                       required
                     />
@@ -177,7 +193,7 @@ export default function RegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Số điện thoại
+                    {t('register.phoneLabel')}
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
@@ -186,7 +202,7 @@ export default function RegisterPage() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      placeholder="0912 345 678"
+                      placeholder={t('register.phonePlaceholder')}
                       className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/50 transition-colors"
                       required
                     />
@@ -204,14 +220,10 @@ export default function RegisterPage() {
                     required
                   />
                   <label htmlFor="acceptTerms" className="text-sm text-text-secondary">
-                    Tôi đồng ý với{' '}
-                    <button type="button" className="text-accent-primary hover:underline">
-                      Điều khoản sử dụng
-                    </button>{' '}
-                    và{' '}
-                    <button type="button" className="text-accent-primary hover:underline">
-                      Chính sách bảo mật
-                    </button>
+                    {t('register.agreeTerms', {
+                      terms: t('register.terms'),
+                      privacy: t('register.privacy'),
+                    })}
                   </label>
                 </div>
 
@@ -223,7 +235,7 @@ export default function RegisterPage() {
                     whileTap={{ scale: 0.98 }}
                     className="flex-1 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-colors"
                   >
-                    Quay lại
+                    {tCommon('button.back')}
                   </motion.button>
                   <motion.button
                     type="submit"
@@ -236,7 +248,7 @@ export default function RegisterPage() {
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
-                        Tạo tài khoản
+                        {t('register.submit')}
                         <ArrowRight className="w-5 h-5" />
                       </>
                     )}
@@ -248,12 +260,12 @@ export default function RegisterPage() {
 
           {/* Login */}
           <p className="text-center mt-8 text-text-secondary">
-            Đã có tài khoản?{' '}
+            {t('register.haveAccount')}{' '}
             <button
               onClick={() => navigate('/auth/login')}
               className="text-accent-primary hover:text-accent-secondary transition-colors font-medium"
             >
-              Đăng nhập ngay
+              {t('register.signIn')}
             </button>
           </p>
         </motion.div>
@@ -274,7 +286,9 @@ export default function RegisterPage() {
         >
           <h2 className="text-4xl font-semibold text-white mb-6">
             Tham gia cùng{' '}
-            <span className="bg-gradient-to-r from-accent-primary to-violet bg-clip-text text-transparent">500+ doanh nghiệp</span>
+            <span className="bg-gradient-to-r from-accent-primary to-violet bg-clip-text text-transparent">
+              500+ doanh nghiệp
+            </span>
           </h2>
           <p className="text-text-secondary text-lg mb-8">
             Tăng 60% hiệu suất tuyển dụng với AI thông minh
@@ -286,8 +300,13 @@ export default function RegisterPage() {
               { value: '94%', label: 'Độ chính xác' },
               { value: '60%', label: 'Tiết kiệm' },
             ].map((stat) => (
-              <div key={stat.label} className="p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
-                <div className="text-2xl font-semibold bg-gradient-to-r from-accent-primary to-violet bg-clip-text text-transparent mb-1">{stat.value}</div>
+              <div
+                key={stat.label}
+                className="p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10"
+              >
+                <div className="text-2xl font-semibold bg-gradient-to-r from-accent-primary to-violet bg-clip-text text-transparent mb-1">
+                  {stat.value}
+                </div>
                 <div className="text-xs text-text-secondary">{stat.label}</div>
               </div>
             ))}
@@ -295,5 +314,5 @@ export default function RegisterPage() {
         </motion.div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,0 +1,72 @@
+{
+  "findJob": {
+    "title": "Tìm việc IT",
+    "subtitle": "Khám phá cơ hội việc làm từ các công ty hàng đầu",
+    "searchPlaceholder": "Tìm theo vị trí, công ty, kỹ năng...",
+    "locationPlaceholder": "Địa điểm",
+    "filterButton": "Bộ lọc",
+    "sortBy": "Sắp xếp theo",
+    "sortOptions": {
+      "newest": "Mới nhất",
+      "deadline": "Hạn nộp",
+      "salary": "Mức lương",
+      "relevance": "Liên quan"
+    },
+    "noJobs": "Không tìm thấy việc làm phù hợp",
+    "showingCount": "Hiển thị {{count}} việc làm"
+  },
+  "jobDetail": {
+    "backToList": "Quay lại danh sách",
+    "saveJob": "Lưu việc",
+    "saved": "Đã lưu",
+    "shareJob": "Chia sẻ",
+    "applyNow": "Ứng tuyển ngay",
+    "applied": "Đã ứng tuyển",
+    "overview": "Tổng quan",
+    "description": "Mô tả công việc",
+    "requirements": "Yêu cầu",
+    "benefits": "Quyền lợi",
+    "skills": "Kỹ năng",
+    "company": "Công ty",
+    "location": "Địa điểm",
+    "salary": "Mức lương",
+    "salaryNegotiable": "Thoả thuận",
+    "deadline": "Hạn nộp",
+    "jobType": "Loại hình",
+    "experience": "Kinh nghiệm",
+    "level": "Cấp bậc",
+    "postedAt": "Đăng {{date}}",
+    "interviewRounds": "{{count}} vòng phỏng vấn",
+    "interviewRoundsWithType": "{{count}} vòng: {{types}}",
+    "matchScore": "Điểm phù hợp",
+    "matchAnalysis": "Phân tích CV-JD",
+    "skillsMatched": "Kỹ năng phù hợp",
+    "skillsGaps": "Kỹ năng còn thiếu",
+    "experienceRelevance": "Mức độ phù hợp kinh nghiệm",
+    "overallRecommendation": "Khuyến nghị tổng thể",
+    "recommendationStrong": "Phù hợp cao",
+    "recommendationModerate": "Phù hợp trung bình",
+    "recommendationWeak": "Phù hợp thấp",
+    "analyzing": "Đang phân tích CV...",
+    "uploadCv": "Tải lên CV để xem điểm phù hợp",
+    "viewJob": "Xem chi tiết"
+  },
+  "apply": {
+    "title": "Ứng tuyển {{jobTitle}}",
+    "fullName": "Họ và tên",
+    "email": "Email",
+    "phone": "Số điện thoại",
+    "cvUpload": "CV (PDF/DOCX)",
+    "coverLetter": "Thư xin việc (tuỳ chọn)",
+    "submit": "Gửi đơn ứng tuyển",
+    "success": "Đơn ứng tuyển đã được gửi thành công",
+    "alreadyApplied": "Bạn đã ứng tuyển vị trí này",
+    "loginRequired": "Vui lòng đăng nhập để ứng tuyển"
+  },
+  "savedJobs": {
+    "title": "Việc đã lưu",
+    "empty": "Bạn chưa lưu việc làm nào",
+    "browseJobs": "Khám phá việc làm",
+    "removeSaved": "Bỏ lưu"
+  }
+}
