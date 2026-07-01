@@ -24,6 +24,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Áp design system + logo ARISP vào `frontend` thật (token màu brand/ai/ink, font Plus Jakarta Sans/Inter).
 - [ ] Dark/light theme toggle toàn FE (lưu localStorage / `preferred_theme`), no-flash init.
 - [ ] **i18n UI candidate VI/EN** (react-i18next) — [ADR-033]; cột `candidate_accounts.preferred_locale`.
+  - [x] 2026-07-01 **Thiết lập hạ tầng i18n + translate toàn bộ Auth pages** — Setup react-i18next, LanguageSwitcher component, locale files (vi/en), translate 8 auth pages (LoginPage, CandidateLoginPage, RegisterPage, CandidateRegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, OAuthCallbackPage).
 - [ ] **Saved Jobs (bookmark)** — [ADR-034]; bảng `saved_jobs`, API lưu/bỏ lưu + trang "Việc đã lưu".
 - [x] 2026-06-18 **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
 - [ ] Header candidate: tìm kiếm toàn cục (⌘K), menu người dùng, notification center (đọc/đánh dấu đã đọc), badge số liệu.
@@ -297,6 +298,12 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-07-01: **Thiết lập hạ tầng i18n + translate toàn bộ Auth pages (PR: feature/EN-VI-language-v2).**
+  - Setup react-i18next, i18n configuration (index.ts), LanguageSwitcher component (VI/EN toggle).
+  - Tạo locale files: common.json, auth.json, errors.json, candidate.json, landing.json, interview.json, jobs.json (cho cả vi và en).
+  - Translate 8 auth pages: LoginPage, CandidateLoginPage, RegisterPage, CandidateRegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, OAuthCallbackPage.
+  - Translation keys: labels, placeholders, buttons, error messages, success messages, all UI text.
 
 - [x] 2026-06-30: **Thông báo (Notifications) cho nhân sự nội bộ (HR Admin / Recruiter) — tách endpoint riêng, end-to-end FE + BE + DB.**
   - **Bối cảnh:** nút chuông trên header HR (`HrLayout`) hiển thị badge "3" + 1 thông báo giả hardcode, nút "Đánh dấu đã đọc"/"Xem tất cả" không hoạt động; header Recruiter/Super Admin (`WorkspaceLayout`) chỉ là dropdown rỗng tĩnh. Trước đó chỉ Candidate có thông báo thật.
