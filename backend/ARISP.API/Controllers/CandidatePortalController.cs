@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
@@ -590,6 +591,37 @@ namespace ARISP.API.Controllers
             return Ok(new { read = true });
         }
 
+        /// <summary>DELETE /api/portal/notifications/{id} — xóa (soft delete) một thông báo.</summary>
+        [HttpDelete("notifications/{id:guid}")]
+        public async Task<IActionResult> DeleteNotification(Guid id, CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var n = await _unitOfWork.Repository<Notification>().GetByIdAsync(id, ct);
+            if (n == null || n.CandidateAccountId != candidateId)
+                return NotFound(new { message = "Không tìm thấy thông báo." });
+
+            _unitOfWork.Repository<Notification>().Delete(n);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(new { deleted = true });
+        }
+
+        /// <summary>DELETE /api/portal/notifications — xóa (soft delete) toàn bộ thông báo của ứng viên.</summary>
+        [HttpDelete("notifications")]
+        public async Task<IActionResult> DeleteAllNotifications(CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var list = (await _unitOfWork.Repository<Notification>()
+                .FindAsync(n => n.CandidateAccountId == candidateId, ct)).ToList();
+            foreach (var n in list)
+                _unitOfWork.Repository<Notification>().Delete(n);
+            if (list.Count > 0) await _unitOfWork.SaveChangesAsync();
+            return Ok(new { deleted = list.Count });
+        }
+
         // ==================== CÀI ĐẶT (Settings) ====================
 
         /// <summary>GET /api/portal/settings — tùy chọn cá nhân (thông báo, quyền riêng tư, ngôn ngữ). Trả mặc định nếu chưa lưu.</summary>
@@ -723,9 +755,13 @@ namespace ARISP.API.Controllers
             string JobTitle(Guid jid) => jobs.TryGetValue(jid, out var t) ? t : "Vị trí tuyển dụng";
 
             var nowUtc = DateTimeOffset.UtcNow;
+            // Tính cả bản đã soft-delete (IgnoreQueryFilters) để thông báo người dùng đã xóa
+            // KHÔNG bị sync tạo lại ở lần mở sau.
             var existing = (await _unitOfWork.Repository<Notification>()
-                .FindAsync(n => n.CandidateAccountId == candidateId, ct))
-                .Select(n => n.DedupKey).ToHashSet();
+                .QueryAsync(q => q.IgnoreQueryFilters()
+                    .Where(n => n.CandidateAccountId == candidateId)
+                    .Select(n => n.DedupKey), ct))
+                .ToHashSet();
             var toAdd = new List<Notification>();
 
             void Add(string key, string type, string title, string? body, string? link, DateTimeOffset createdAt)
