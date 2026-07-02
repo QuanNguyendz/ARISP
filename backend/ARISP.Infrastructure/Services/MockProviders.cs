@@ -27,6 +27,10 @@ namespace ARISP.Infrastructure.Services
             memoryStream.Position = 0;
             return Task.FromResult<Stream>(memoryStream);
         }
+
+        // Chưa cấu hình ElevenLabs → trả rỗng để FE fallback browser TTS.
+        public Task<string> TextToSpeechBase64PcmAsync(string text, string voiceId, CancellationToken ct = default)
+            => Task.FromResult(string.Empty);
     }
 
     public class MockAvatarService : IAvatarService
@@ -58,6 +62,21 @@ namespace ARISP.Infrastructure.Services
         public Task<bool> StopSessionAsync(string sessionId, CancellationToken ct = default)
         {
             return Task.FromResult(true);
+        }
+
+        // Chưa cấu hình HeyGen key → trả null để FE fallback avatar tĩnh.
+        public Task<AvatarStreamingToken?> CreateStreamingTokenAsync(string? avatarId, string? voiceId, CancellationToken ct = default)
+        {
+            return Task.FromResult<AvatarStreamingToken?>(null);
+        }
+    }
+
+    /// <summary>Chưa cấu hình Deepgram key → trả null để FE fallback (Web Speech API hoặc nhập tay).</summary>
+    public class MockDeepgramTokenService : IDeepgramTokenService
+    {
+        public Task<DeepgramToken?> CreateTemporaryTokenAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult<DeepgramToken?>(null);
         }
     }
 

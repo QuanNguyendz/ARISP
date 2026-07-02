@@ -179,11 +179,32 @@ else
     builder.Services.AddScoped<IFileStorageService, ARISP.Infrastructure.Storage.LocalFileStorageService>();
 }
 
-// STT, TTS, Avatar, Notification mock stubs
-builder.Services.AddScoped<ISTTProvider, MockSTTProvider>();
-builder.Services.AddScoped<ITTSService, MockTTSService>();
-builder.Services.AddScoped<IAvatarService, MockAvatarService>();
-builder.Services.AddScoped<INotificationService, MockNotificationService>();
+// === Media stack phỏng vấn realtime (ADR-043/044): real provider nếu có API key, else Mock ===
+var mediaOptions = new ARISP.Infrastructure.Media.MediaOptions();
+builder.Configuration.GetSection("Media").Bind(mediaOptions);
+builder.Services.AddSingleton(mediaOptions);
+
+// STT (Deepgram): BE mint ephemeral token cho FE live STT.
+builder.Services.AddScoped<ISTTProvider, MockSTTProvider>(); // server-side STT chưa dùng (FE stream trực tiếp)
+if (!string.IsNullOrWhiteSpace(mediaOptions.Deepgram.ApiKey))
+    builder.Services.AddHttpClient<IDeepgramTokenService, ARISP.Infrastructure.Media.DeepgramTokenService>();
+else
+    builder.Services.AddScoped<IDeepgramTokenService, MockDeepgramTokenService>();
+
+// TTS (ElevenLabs Flash v2.5).
+if (!string.IsNullOrWhiteSpace(mediaOptions.ElevenLabs.ApiKey))
+    builder.Services.AddHttpClient<ITTSService, ARISP.Infrastructure.Media.ElevenLabsTTSService>();
+else
+    builder.Services.AddScoped<ITTSService, MockTTSService>();
+
+// Avatar (HeyGen Streaming): BE mint session token; FE chạy @heygen/streaming-avatar.
+if (!string.IsNullOrWhiteSpace(mediaOptions.HeyGen.ApiKey))
+    builder.Services.AddHttpClient<IAvatarService, ARISP.Infrastructure.Media.HeyGenAvatarService>();
+else
+    builder.Services.AddScoped<IAvatarService, MockAvatarService>();
+
+// Notification: SignalR thật (đẩy ReceiveQuestion/... tới SessionHub) + email qua IEmailService.
+builder.Services.AddScoped<INotificationService, ARISP.API.Services.SignalRNotificationService>();
 builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
 builder.Services.AddScoped<IJdStampService, ARISP.Infrastructure.Documents.JdStampService>();
 

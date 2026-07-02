@@ -19,6 +19,36 @@ namespace ARISP.Application.DTOs
         public string? HeyGenSessionId { get; set; }
     }
 
+    /// <summary>Cấu hình media trả cho FE khi vào phòng phỏng vấn (token Deepgram + HeyGen).</summary>
+    public class PracticeMediaConfigResponse
+    {
+        public Guid SessionId { get; set; }
+        public string Language { get; set; } = "vi";
+        public string SessionType { get; set; } = "practice";
+        public DeepgramConfigDto? Deepgram { get; set; }
+        public HeyGenConfigDto? HeyGen { get; set; }
+    }
+
+    public class DeepgramConfigDto
+    {
+        public string Token { get; set; } = string.Empty;
+        public int ExpiresInSeconds { get; set; }
+        public string Model { get; set; } = "nova-3";
+    }
+
+    public class HeyGenConfigDto
+    {
+        public string Token { get; set; } = string.Empty;
+        public string ServerUrl { get; set; } = string.Empty;
+        public string? AvatarId { get; set; }
+        public string? VoiceId { get; set; }
+    }
+
+    public class TtsRequest
+    {
+        public string Text { get; set; } = string.Empty;
+    }
+
     public class SubmitAnswerRequest
     {
         public Guid QuestionId { get; set; }

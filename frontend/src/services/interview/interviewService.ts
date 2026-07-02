@@ -51,7 +51,27 @@ export interface InterviewCodeSummary {
   candidateName: string;
 }
 
+export interface PracticeMediaConfig {
+  sessionId: string;
+  language: string;
+  sessionType: string;
+  deepgram?: { token: string; expiresInSeconds: number; model: string } | null;
+  heyGen?: { token: string; serverUrl: string; avatarId?: string | null; voiceId?: string | null } | null;
+}
+
 export const interviewService = {
+  // Token Deepgram (STT) + LiveAvatar (avatar) cho FE vào phòng phỏng vấn.
+  async getMediaConfig(sessionId: string): Promise<PracticeMediaConfig> {
+    const { data } = await apiClient.get<PracticeMediaConfig>(`/interview/session/${sessionId}/media-config`);
+    return data;
+  },
+
+  // TTS câu hỏi → base64 PCM 24k để đẩy vào LiveAvatar repeatAudio. Rỗng nếu chưa cấu hình ElevenLabs.
+  async getTtsAudio(sessionId: string, text: string): Promise<string> {
+    const { data } = await apiClient.post<{ audio: string }>(`/interview/session/${sessionId}/tts`, { text });
+    return data?.audio ?? '';
+  },
+
   async getHrSessions(): Promise<HrInterviewSessionItem[]> {
     const { data } = await apiClient.get<HrInterviewSessionItem[]>('/interview/sessions');
     return data;

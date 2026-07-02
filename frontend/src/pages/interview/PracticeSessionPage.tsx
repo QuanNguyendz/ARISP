@@ -11,8 +11,12 @@ import {
   FileText,
   GraduationCap,
   Info,
+  Send,
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react'
 import DeviceCheck from '@components/interview/DeviceCheck'
+import { usePracticeSession } from '@hooks/interview/usePracticeSession'
 
 type Phase = 'intro' | 'live' | 'ended'
 
@@ -46,12 +50,22 @@ export default function PracticeSessionPage() {
   const streamRef = useRef<MediaStream | null>(null)
   const selfVideoRef = useRef<HTMLVideoElement>(null)
 
+  const practice = usePracticeSession(applicationId ?? '', 1)
+
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
   }, [])
 
   useEffect(() => () => stopStream(), [stopStream])
+
+  // Buổi kết thúc do server báo (hết câu hỏi) → chuyển màn kết thúc.
+  useEffect(() => {
+    if (practice.status === 'ended' && phase === 'live') {
+      stopStream()
+      setPhase('ended')
+    }
+  }, [practice.status, phase, stopStream])
 
   // Gắn stream (đã qua kiểm tra thiết bị) vào ô tự xem khi vào phòng.
   useEffect(() => {
@@ -65,6 +79,7 @@ export default function PracticeSessionPage() {
     streamRef.current = stream
     setIsMuted(false)
     setPhase('live')
+    void practice.start(stream)
   }
 
   const toggleMute = () => {
@@ -74,7 +89,8 @@ export default function PracticeSessionPage() {
     setIsMuted(!track.enabled)
   }
 
-  const endSession = () => {
+  const endSession = async () => {
+    await practice.end()
     stopStream()
     setPhase('ended')
   }
@@ -109,7 +125,7 @@ export default function PracticeSessionPage() {
                 <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> AI hỏi dựa trên JD của vị trí và CV của bạn.
               </li>
               <li className="flex items-start gap-2">
-                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Chỉ làm được 1 lần để làm quen hệ thống.
+                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Cùng dạng vòng &amp; ngôn ngữ với buổi thật sắp tới.
               </li>
               <li className="flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> Không ghi hình — chỉ lưu transcript &amp; nhận xét tham khảo.
@@ -169,6 +185,7 @@ export default function PracticeSessionPage() {
   }
 
   // ===== LIVE ROOM =====
+  const starting = practice.status === 'starting'
   return (
     <div className="flex min-h-screen flex-col bg-ink-950 text-slate-100">
       {/* Top bar */}
@@ -190,19 +207,55 @@ export default function PracticeSessionPage() {
         {/* Avatar */}
         <section className="relative flex flex-col items-center justify-center p-8">
           <div className="absolute inset-0 bg-gradient-to-b from-brand-600/10 via-transparent to-ai-600/10" />
+
+          {/* HeyGen avatar video (hiện khi sẵn sàng); nếu không có → bot tĩnh */}
           <div className="relative">
-            <div className="absolute -inset-6 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 opacity-30 blur-xl" />
-            <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
-              <Bot className="h-20 w-20 text-white" />
-            </div>
+            <div
+              className={`absolute -inset-6 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 blur-xl transition-opacity ${
+                practice.aiSpeaking ? 'opacity-60' : 'opacity-25'
+              }`}
+            />
+            <video
+              ref={practice.videoRef}
+              autoPlay
+              playsInline
+              className={`relative h-80 w-80 rounded-2xl bg-black object-cover ring-1 ring-white/10 ${
+                practice.avatarReady ? 'block' : 'hidden'
+              }`}
+            />
+            {!practice.avatarReady && (
+              <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
+                <Bot className="h-20 w-20 text-white" />
+              </div>
+            )}
           </div>
+
           <div className="relative mt-8 max-w-xl text-center">
-            <p className="font-display text-xl font-bold leading-relaxed text-white">
-              Sẵn sàng cho buổi phỏng vấn thử.
-            </p>
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-slate-400">
-              <Info className="h-4 w-4" /> AI phỏng vấn sẽ kết nối qua pipeline phỏng vấn (đang phát triển).
-            </p>
+            {starting ? (
+              <p className="flex items-center justify-center gap-2 text-sm text-slate-300">
+                <Loader2 className="h-4 w-4 animate-spin" /> Đang kết nối phỏng vấn AI…
+              </p>
+            ) : practice.status === 'error' ? (
+              <p className="flex items-center justify-center gap-2 text-sm text-red-300">
+                <AlertTriangle className="h-4 w-4" /> {practice.error}
+              </p>
+            ) : (
+              <p className="flex items-center justify-center gap-1.5 text-sm text-slate-400">
+                {practice.aiSpeaking ? (
+                  <>
+                    <Sparkles className="h-4 w-4 text-ai-300" /> AI đang nói…
+                  </>
+                ) : practice.listening ? (
+                  <>
+                    <Mic className="h-4 w-4 text-emerald-300" /> Đang nghe câu trả lời của bạn…
+                  </>
+                ) : (
+                  <>
+                    <Info className="h-4 w-4" /> Sẵn sàng — hãy trả lời khi AI hỏi xong.
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Self view */}
@@ -222,8 +275,32 @@ export default function PracticeSessionPage() {
             <span className="font-display font-bold text-white">Transcript</span>
             <span className="text-xs text-slate-400">JD + CV</span>
           </div>
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-slate-500">
-            Cuộc trò chuyện sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.
+          <div className="flex-1 space-y-3 overflow-y-auto p-5">
+            {practice.messages.length === 0 && !practice.interim && (
+              <p className="pt-6 text-center text-sm text-slate-500">
+                Cuộc trò chuyện sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.
+              </p>
+            )}
+            {practice.messages.map((m, i) => (
+              <div
+                key={i}
+                className={`rounded-xl px-3.5 py-2.5 text-sm ${
+                  m.role === 'ai'
+                    ? 'bg-brand-600/15 text-slate-100'
+                    : 'ml-6 bg-white/5 text-slate-300'
+                }`}
+              >
+                <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  {m.role === 'ai' ? 'AI phỏng vấn' : 'Bạn'}
+                </span>
+                {m.text}
+              </div>
+            ))}
+            {practice.interim && (
+              <div className="ml-6 rounded-xl bg-white/5 px-3.5 py-2.5 text-sm italic text-slate-400">
+                {practice.interim}…
+              </div>
+            )}
           </div>
         </aside>
       </main>
@@ -239,6 +316,14 @@ export default function PracticeSessionPage() {
             {isMuted ? <MicOff className="h-5 w-5 text-red-400" /> : <Mic className="h-5 w-5 text-white" />}
           </button>
           <button
+            onClick={practice.submitAnswer}
+            disabled={starting}
+            className="flex h-12 items-center gap-2 rounded-full bg-white/10 px-5 font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
+            title="Gửi câu trả lời hiện tại cho AI"
+          >
+            <Send className="h-4 w-4" /> Gửi trả lời
+          </button>
+          <button
             onClick={endSession}
             className="flex h-12 items-center gap-2 rounded-full bg-red-600 px-6 font-semibold text-white transition hover:bg-red-700"
           >
@@ -246,7 +331,9 @@ export default function PracticeSessionPage() {
           </button>
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">
-          Buổi thử chỉ để luyện tập — không ảnh hưởng đến kết quả tuyển dụng.
+          {practice.sttEnabled
+            ? 'Mẹo: dừng nói ~1 giây để AI tự nhận câu trả lời, hoặc bấm “Gửi trả lời”.'
+            : 'Buổi thử chỉ để luyện tập — không ảnh hưởng đến kết quả tuyển dụng.'}
         </p>
       </footer>
     </div>
