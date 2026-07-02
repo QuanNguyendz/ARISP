@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -88,28 +89,25 @@ function isToday(iso?: string): boolean {
 
 export default function PendingJobsPage() {
   const navigate = useNavigate()
-  const [jobs, setJobs] = useState<JobPosting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ['admin-jobs'],
+    queryFn: () => jobService.getAdminJobPostings(),
+    refetchOnWindowFocus: false,
+  })
+
+  const jobs = jobsData || []
+  const errorMsg = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : null)
+  
+  const [error, setError] = useState<string | null>(errorMsg)
+  
+  // Update internal error state when fetch error changes
+  useEffect(() => {
+    if (errorMsg) setError(errorMsg)
+  }, [errorMsg])
+
   const [actionId, setActionId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<JobPosting | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-
-  const load = async () => {
-    try {
-      setLoading(true)
-      const data = await jobService.getAdminJobPostings()
-      setJobs(data)
-    } catch {
-      setError('Không tải được danh sách tin tuyển dụng. Vui lòng thử lại.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void load()
-  }, [])
 
   const pendingJobs = useMemo(() => jobs.filter((j) => j.status === 'pending'), [jobs])
 
@@ -139,12 +137,14 @@ export default function PendingJobsPage() {
     [jobs, pendingJobs]
   )
 
+  const queryClient = useQueryClient()
+
   const approve = async (job: JobPosting) => {
     setActionId(job.id)
     setError(null)
     try {
       await jobService.updateJobStatus(job.id, 'active')
-      setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, status: 'active' } : j)))
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
     } catch {
       setError(`Không thể duyệt tin "${job.title}". Vui lòng thử lại.`)
     } finally {
@@ -159,11 +159,7 @@ export default function PendingJobsPage() {
     setError(null)
     try {
       await jobService.updateJobStatus(job.id, 'rejected', rejectReason.trim())
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id ? { ...j, status: 'rejected', rejectionReason: rejectReason.trim() } : j
-        )
-      )
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
       setRejectTarget(null)
       setRejectReason('')
     } catch {

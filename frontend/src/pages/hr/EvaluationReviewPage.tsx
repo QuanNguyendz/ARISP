@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -19,6 +19,7 @@ import {
 import { evaluationService } from '@/services/evaluation/evaluationService'
 import type { EvaluationReport } from '@/types/evaluation'
 import { EvaluationListSkeleton } from './_skeletons'
+import { useQuery } from '@tanstack/react-query'
 
 function formatVerdictLabel(verdict?: string) {
   if (verdict === 'pass') return 'Pass'
@@ -64,32 +65,20 @@ function getScoreBgColor(score: number) {
 }
 
 export default function EvaluationReviewPage() {
-  const [evaluations, setEvaluations] = useState<EvaluationReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchEvaluations() {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await evaluationService.getEvaluations({ page: 1, pageSize: 10 })
-        setEvaluations(response.items)
-      } catch (fetchError) {
-        console.error(fetchError)
-        setError('Không thể tải danh sách đánh giá từ máy chủ.')
-      } finally {
-        setLoading(false)
-      }
-    }
+  const { data: evaluationsResponse, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['evaluations', 1, 10], // Assuming page 1, pageSize 10 for now
+    queryFn: () => evaluationService.getEvaluations({ page: 1, pageSize: 10 }),
+    refetchOnWindowFocus: false,
+  })
 
-    fetchEvaluations()
-  }, [])
+  const evaluations = evaluationsResponse?.items || []
+  const displayError = error ? 'Không thể tải danh sách đánh giá từ máy chủ.' : null
 
   async function handleOpenDetail(evaluationId: string) {
     try {
@@ -114,12 +103,8 @@ export default function EvaluationReviewPage() {
   }
 
   async function refreshListAndSelection(evaluationId: string) {
-    const [listResponse, detailResponse] = await Promise.all([
-      evaluationService.getEvaluations({ page: 1, pageSize: 10 }),
-      evaluationService.getEvaluationById(evaluationId),
-    ])
-
-    setEvaluations(listResponse.items)
+    await refetch()
+    const detailResponse = await evaluationService.getEvaluationById(evaluationId)
     setSelectedEvaluation(detailResponse)
   }
 
@@ -214,9 +199,9 @@ export default function EvaluationReviewPage() {
         {/* List */}
         {loading ? (
           <EvaluationListSkeleton rows={4} />
-        ) : error ? (
+        ) : displayError ? (
           <div className="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
-            {error}
+            {displayError}
           </div>
         ) : evaluations.length === 0 ? (
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-10 text-center text-ink-500 dark:text-ink-400">

@@ -31,6 +31,7 @@ namespace ARISP.API.Controllers
         private readonly ApplicationService _applicationService;
         private readonly IJdStampService _jdStampService;
         private readonly IRagIngestionService _ragIngestion;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<JobsController> _logger;
 
         public JobsController(
@@ -42,6 +43,7 @@ namespace ARISP.API.Controllers
             ApplicationService applicationService,
             IJdStampService jdStampService,
             IRagIngestionService ragIngestion,
+            INotificationService notificationService,
             ILogger<JobsController> logger)
         {
             _unitOfWork = unitOfWork;
@@ -52,6 +54,7 @@ namespace ARISP.API.Controllers
             _applicationService = applicationService;
             _jdStampService = jdStampService;
             _ragIngestion = ragIngestion;
+            _notificationService = notificationService;
             _logger = logger;
         }
 
@@ -190,6 +193,9 @@ namespace ARISP.API.Controllers
                 roundDtos.Add(RoundConfigDto.FromEntity(config));
             }
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Gửi thông báo SignalR cho Recruiter vừa tạo job
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
 
             return Ok(JobPostingResponse.FromEntity(job, roundDtos));
         }
@@ -851,6 +857,15 @@ namespace ARISP.API.Controllers
                 finalRoundDtos = existingList.Select(RoundConfigDto.FromEntity).ToList();
             }
 
+            // Gửi thông báo SignalR cho Recruiter vừa update job (nếu có)
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
+
+            // Nếu Job đang active (đang hiển thị công khai), thì thông báo cho tất cả ứng viên để cập nhật Job Board
+            if (job.Status == "active")
+            {
+                await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = job.Status }, ct);
+            }
+
             return Ok(JobPostingResponse.FromEntity(job, finalRoundDtos));
         }
 
@@ -899,6 +914,12 @@ namespace ARISP.API.Controllers
 
             _unitOfWork.Repository<JobPosting>().Update(job);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Gửi thông báo SignalR cho Recruiter vừa xóa job
+            await _notificationService.PublishUserEventAsync(userId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = job.Status, Title = job.Title }, ct);
+
+            // Thông báo cập nhật danh sách Job công khai cho Candidates
+            await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = "archived" }, ct);
 
             return Ok(new { message = "Job posting soft-deleted successfully.", jobId = id });
         }
@@ -978,6 +999,9 @@ namespace ARISP.API.Controllers
                     return BadRequest(new { message = "Vui lòng cung cấp lý do từ chối duyệt bài (RejectionReason)." });
 
                 job.RejectionReason = request.RejectionReason.Trim();
+
+                // Thông báo kết quả TỪ CHỐI về người tạo tin (thường là Recruiter).
+                await AddJobDecisionNotificationAsync(job, userId, reviewerName: null, approved: false, reason: job.RejectionReason, ct);
             }
 
             // CASE B: Hành động Phê duyệt public bài (Chuyển sang 'active') -> Chỉ Admin mới được duyệt
@@ -1014,6 +1038,9 @@ namespace ARISP.API.Controllers
                     job.ApprovedByUserId = userId;
                     job.ApprovedAt = DateTimeOffset.UtcNow;
                     job.ApproverName = approverName;
+
+                    // Thông báo kết quả ĐƯỢC DUYỆT về người tạo tin (thường là Recruiter).
+                    await AddJobDecisionNotificationAsync(job, userId, approverName, approved: true, reason: null, ct);
 
                     // Đóng dấu duyệt lên file JD. PDF: vẽ dấu lên file gốc. DOCX: render nội dung JD
                     // thành PDF mới rồi đóng dấu (mất định dạng gốc nhưng giữ nội dung + bằng chứng duyệt).
@@ -1123,7 +1150,67 @@ namespace ARISP.API.Controllers
             if (!string.IsNullOrEmpty(statusResponse.SignedJdFileUrl))
                 statusResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.SignedJdFileUrl, ct);
 
+            // Gửi thông báo SignalR tương ứng
+            if (targetStatus == "pending")
+            {
+                // Thông báo cho HR Admin biết có tin chờ duyệt
+                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = "pending", Title = job.Title }, ct);
+            }
+            else if (targetStatus == "active" || targetStatus == "rejected")
+            {
+                // Thông báo cho người tạo tin (Recruiter) biết kết quả duyệt
+                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = targetStatus, Title = job.Title }, ct);
+            }
+
+            // Nếu trạng thái ảnh hưởng đến trang Candidate Public Job Board (active, closed, archived) thì broadcast
+            if (targetStatus == "active" || targetStatus == "closed" || targetStatus == "archived")
+            {
+                await _notificationService.PublishAllEventAsync("ReceivePublicJobUpdate", new { JobId = job.Id, Status = targetStatus }, ct);
+            }
+
             return Ok(statusResponse);
+        }
+
+        /// <summary>
+        /// Gửi thông báo kết quả duyệt/từ chối tin về cho NGƯỜI TẠO tin (thường là Recruiter).
+        /// Bỏ qua nếu người duyệt cũng chính là người tạo. Chỉ stage qua AddAsync — được persist
+        /// CÙNG transaction với cập nhật trạng thái tin tại <see cref="UpdateJobStatus"/> (1 SaveChanges).
+        /// </summary>
+        private async Task AddJobDecisionNotificationAsync(
+            JobPosting job, Guid actorUserId, string? reviewerName, bool approved, string? reason, CancellationToken ct)
+        {
+            if (job.CreatedByUserId == actorUserId) return; // người duyệt cũng là người tạo → không tự thông báo
+
+            var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+            if (creator == null) return;
+
+            if (string.IsNullOrWhiteSpace(reviewerName))
+            {
+                var actor = await _unitOfWork.Repository<User>().GetByIdAsync(actorUserId, ct);
+                reviewerName = actor != null
+                    ? (string.IsNullOrWhiteSpace(actor.FullName) ? actor.Email : actor.FullName)
+                    : "HR Admin";
+            }
+
+            // Link tới trang chi tiết tin theo workspace của người tạo.
+            var isRecruiter = string.Equals(creator.Role, "recruiter", StringComparison.OrdinalIgnoreCase);
+            var link = isRecruiter ? $"/recruiter/my-jobs/{job.Id}" : $"/hr/jobs/{job.Id}";
+            var now = DateTimeOffset.UtcNow;
+
+            await _unitOfWork.Repository<Notification>().AddAsync(new Notification
+            {
+                RecipientUserId = job.CreatedByUserId,
+                // Ticks ở khóa chống trùng → mỗi lần duyệt/từ chối là một sự kiện riêng, hỗ trợ nhiều vòng nộp lại.
+                DedupKey = $"{(approved ? "job_approved" : "job_rejected")}:{job.Id}:{now.Ticks}",
+                Type = approved ? "approved" : "rejected",
+                Title = approved ? "Tin tuyển dụng đã được duyệt" : "Tin tuyển dụng bị từ chối",
+                Body = approved
+                    ? $"\"{job.Title}\" đã được {reviewerName} phê duyệt và đăng công khai."
+                    : $"\"{job.Title}\" bị {reviewerName} từ chối. Lý do: {reason}",
+                Link = link,
+                CreatedAt = now,
+                UpdatedAt = now,
+            }, ct);
         }
 
         /// <summary>Chèn hậu tố vào tên file trước phần mở rộng. VD: "JD.pdf" + "-da-duyet" => "JD-da-duyet.pdf".</summary>

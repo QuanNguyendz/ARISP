@@ -19,11 +19,13 @@ namespace ARISP.API.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEmailService _emailService;
+        private readonly INotificationService _notificationService;
 
-        public AdminController(IUnitOfWork unitOfWork, IEmailService emailService)
+        public AdminController(IUnitOfWork unitOfWork, IEmailService emailService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _emailService = emailService;
+            _notificationService = notificationService;
         }
 
         [HttpGet("users/pending")]
@@ -593,6 +595,9 @@ namespace ARISP.API.Controllers
 
             await SendStaffWelcomeEmailAsync(newUser, tempPw);
 
+            // Notify HR Leader (requester)
+            await _notificationService.PublishUserEventAsync(req.RequestedByUserId, "ReceiveAccountRequestUpdate", new { RequestId = req.Id, Status = "approved", Email = req.Email });
+
             return Ok(new { message = "Đã duyệt yêu cầu và tạo tài khoản." });
         }
 
@@ -620,6 +625,9 @@ namespace ARISP.API.Controllers
             await WriteAuditAsync("account_request_rejected", "AccountRequest", req.Id,
                 $"{{\"email\":\"{req.Email}\",\"reason\":{System.Text.Json.JsonSerializer.Serialize(reason)}}}");
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify HR Leader (requester)
+            await _notificationService.PublishUserEventAsync(req.RequestedByUserId, "ReceiveAccountRequestUpdate", new { RequestId = req.Id, Status = "rejected", Email = req.Email, Reason = reason });
 
             return Ok(new { message = "Đã từ chối yêu cầu." });
         }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   Search,
   MapPin,
@@ -771,10 +772,6 @@ export default function FindJob() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
-  const [jobs, setJobs] = useState<JobPosting[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
   const [facets, setFacets] = useState<JobFacets>(EMPTY_FACETS)
   const [cities, setCities] = useState<City[]>([])
@@ -803,40 +800,32 @@ export default function FindJob() {
   }, [])
 
   // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
-  useEffect(() => {
-    async function fetchJobs() {
-      try {
-        setLoading(true)
-        const params = {
-          search: searchQuery || undefined,
-          categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
-          employmentTypes: filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
-          experienceLevels: filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
-          workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
-          locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
-          skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
-          languages: filters.languages.length > 0 ? filters.languages.join(',') : undefined,
-          sortBy,
-          minSalary: !salaryIsNegotiable && minSalary > 0 ? minSalary * 1000000 : undefined,
-          maxSalary: !salaryIsNegotiable && maxSalary < 220 ? maxSalary * 1000000 : undefined,
-          salaryIsNegotiable: salaryIsNegotiable ? true : undefined,
-          page,
-          pageSize: JOBS_PER_PAGE,
-        }
+  const queryParams = {
+    search: searchQuery || undefined,
+    categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
+    employmentTypes: filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
+    experienceLevels: filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
+    workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
+    locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
+    skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
+    languages: filters.languages.length > 0 ? filters.languages.join(',') : undefined,
+    sortBy,
+    minSalary: !salaryIsNegotiable && minSalary > 0 ? minSalary * 1000000 : undefined,
+    maxSalary: !salaryIsNegotiable && maxSalary < 220 ? maxSalary * 1000000 : undefined,
+    salaryIsNegotiable: salaryIsNegotiable ? true : undefined,
+    page,
+    pageSize: JOBS_PER_PAGE,
+  }
 
-        const data = await jobService.getPublicJobPostings(params)
-        setJobs(data.items)
-        setTotalCount(data.totalCount)
-      } catch (err) {
-        console.error('Failed to load jobs:', err)
-        setError('Không thể kết nối máy chủ để tải danh sách công việc.')
-      } finally {
-        setLoading(false)
-      }
-    }
+  const { data: jobsData, isLoading: loading, error } = useQuery({
+    queryKey: ['public-jobs', queryParams],
+    queryFn: () => jobService.getPublicJobPostings(queryParams),
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60, // 1 minute
+  })
 
-    fetchJobs()
-  }, [searchQuery, JSON.stringify(filters), sortBy, minSalary, maxSalary, salaryIsNegotiable, page])
+  const jobs = jobsData?.items || []
+  const totalCount = jobsData?.totalCount || 0
 
   // Khi lọc theo lương thỏa thuận thì khóa/reset sắp xếp lương
   useEffect(() => {
@@ -1068,7 +1057,7 @@ export default function FindJob() {
 
           {error && (
             <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-              {error}
+              {error instanceof Error ? error.message : 'Đã có lỗi xảy ra'}
             </div>
           )}
 

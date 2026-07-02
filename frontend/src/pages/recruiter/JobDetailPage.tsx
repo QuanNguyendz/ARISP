@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -69,36 +70,31 @@ const matchColor = (s?: number | null) =>
 export default function RecruiterJobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
-  const [job, setJob] = useState<JobPosting | null>(null)
-  const [apps, setApps] = useState<HrApplicationItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { data: job, isLoading: loadingJob, error: jobError } = useQuery({
+    queryKey: ['job', id],
+    queryFn: () => jobService.getJobPostingById(id!),
+    enabled: !!id,
+    retry: false
+  })
+
+  const { data: appsData, isLoading: loadingApps, refetch: refetchApps } = useQuery({
+    queryKey: ['job', id, 'applications'],
+    queryFn: () => jobService.getJobApplications(id!).catch(() => [] as HrApplicationItem[]),
+    enabled: !!id,
+  })
+
+  const apps = appsData || []
+  const loading = loadingJob || loadingApps
+  
+  // Keep error state for mutations like status change
+  const [mutationError, setMutationError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [invitingId, setInvitingId] = useState<string | null>(null)
+  
+  const error = mutationError || (jobError as any)?.response?.data?.message || (jobError ? 'Không tải được chi tiết tin tuyển dụng.' : '')
 
-  const load = async () => {
-    if (!id) return
-    setLoading(true)
-    setError('')
-    try {
-      const [j, a] = await Promise.all([
-        jobService.getJobPostingById(id),
-        jobService.getJobApplications(id).catch(() => [] as HrApplicationItem[]),
-      ])
-      setJob(j)
-      setApps(a)
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết tin tuyển dụng.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  const load = refetchApps
 
   const funnel = useMemo(() => {
     const by = (s: string) => apps.filter((a) => a.status === s).length
@@ -111,7 +107,7 @@ export default function RecruiterJobDetailPage() {
   const changeStatus = async (status: JobPosting['status']) => {
     if (!id) return
     setBusy(true)
-    setError('')
+    setMutationError('')
     setNotice('')
     try {
       await jobService.updateJobStatus(id, status)
@@ -124,7 +120,7 @@ export default function RecruiterJobDetailPage() {
       )
       await load()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể cập nhật trạng thái tin.')
+      setMutationError(e?.response?.data?.message || 'Không thể cập nhật trạng thái tin.')
     } finally {
       setBusy(false)
     }
@@ -132,13 +128,13 @@ export default function RecruiterJobDetailPage() {
 
   const sendInvite = async (appId: string) => {
     setInvitingId(appId)
-    setError('')
+    setMutationError('')
     setNotice('')
     try {
       await applicationService.sendInvite(appId)
       setNotice('Đã gửi lời mời (magic link) cho ứng viên.')
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể gửi lời mời.')
+      setMutationError(e?.response?.data?.message || 'Không thể gửi lời mời.')
     } finally {
       setInvitingId(null)
     }
@@ -172,7 +168,7 @@ export default function RecruiterJobDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Quay lại danh sách
       </Link>
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+      {error && <ErrorAlert message={error} onDismiss={() => setMutationError('')} />}
       {notice && (
         <div className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-400">
           <span className="flex items-center gap-2">

@@ -20,10 +20,12 @@ namespace ARISP.API.Controllers
     public class AccountRequestsController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
 
-        public AccountRequestsController(IUnitOfWork unitOfWork)
+        public AccountRequestsController(IUnitOfWork unitOfWork, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
         }
 
         /// <summary>Danh sách yêu cầu do chính HR Leader hiện tại đã gửi (theo dõi trạng thái).</summary>
@@ -136,7 +138,13 @@ namespace ARISP.API.Controllers
                 CreatedAt = now
             }, ct);
 
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync(ct);
+            
+            // Notify Super Admin
+            await _notificationService.PublishGroupEventAsync("super_admin", "ReceiveAccountRequest", new { BatchId = batchId, Count = cleaned.Count }, ct);
+
+            // Real-time Notification for super admin
+            await _notificationService.PublishGroupEventAsync("super_admin", "ReceiveNewAccountRequest", new { Count = cleaned.Count, BatchId = batchId }, ct);
 
             return Ok(new { message = $"Đã gửi {cleaned.Count} yêu cầu tạo tài khoản chờ Super Admin duyệt.", count = cleaned.Count, batchId });
         }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
   CalendarCheck,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { scheduleService } from '@services/schedule'
 import type { AvailabilitySlot } from '@/types/job'
+import { useQuery } from '@tanstack/react-query'
 
 function errMsg(e: unknown, fallback: string): string {
   const x = e as { response?: { data?: { message?: string }; status?: number } }
@@ -37,30 +38,19 @@ export default function CandidateSchedulePage() {
   const token = params.get('token') || undefined
   const round = Number(params.get('round')) || 1
 
-  const [slots, setSlots] = useState<AvailabilitySlot[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [booking, setBooking] = useState(false)
   const [done, setDone] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const load = useCallback(async () => {
-    if (!applicationId) return
-    setLoading(true)
-    setError('')
-    try {
-      const data = await scheduleService.getOpenSlots(applicationId, round, token)
-      setSlots(data)
-    } catch (e) {
-      setError(errMsg(e, 'Không tải được khung giờ. Liên kết có thể đã hết hạn.'))
-    } finally {
-      setLoading(false)
-    }
-  }, [applicationId, round, token])
+  const { data: slots = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['open-slots', applicationId, round, token],
+    queryFn: () => scheduleService.getOpenSlots(applicationId!, round, token),
+    enabled: !!applicationId,
+    retry: false,
+  })
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  const displayError = errorMsg || (error ? errMsg(error, 'Không tải được khung giờ. Liên kết có thể đã hết hạn.') : '')
 
   const grouped = useMemo(() => {
     const map = new Map<string, AvailabilitySlot[]>()
@@ -75,14 +65,14 @@ export default function CandidateSchedulePage() {
   const confirm = async () => {
     if (!applicationId || !selected) return
     setBooking(true)
-    setError('')
+    setErrorMsg('')
     try {
       await scheduleService.book(applicationId, { slotId: selected, round, token })
       setDone(true)
     } catch (e) {
-      setError(errMsg(e, 'Không thể đặt lịch. Vui lòng thử lại.'))
+      setErrorMsg(errMsg(e, 'Không thể đặt lịch. Vui lòng thử lại.'))
       // tải lại để cập nhật slot đã đầy
-      void load()
+      void refetch()
     } finally {
       setBooking(false)
     }
@@ -124,9 +114,9 @@ export default function CandidateSchedulePage() {
           </div>
         ) : (
           <>
-            {error && (
+            {displayError && (
               <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {displayError}
               </div>
             )}
 

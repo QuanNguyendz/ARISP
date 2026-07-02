@@ -1,11 +1,13 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using ARISP.Application.Hubs;
 using ARISP.Application.Services;
 
 namespace ARISP.API.Hubs
 {
+    [Authorize]
     public class SessionHub : Hub<ISessionClient>
     {
         private readonly InterviewService _interviewService;

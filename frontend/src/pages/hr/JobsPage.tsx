@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
@@ -60,30 +61,15 @@ function getDeadlineText(deadlineStr?: string | null): string {
 }
 
 export default function HrJobsPage() {
-  const [jobs, setJobs] = useState<JobPosting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ['admin-jobs'],
+    queryFn: () => jobService.getAdminJobPostings(),
+    refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    let active = true
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const data = await jobService.getAdminJobPostings()
-        if (active) setJobs(data)
-      } catch (err) {
-        if (active)
-          setError(err instanceof Error ? err.message : 'Không tải được danh sách tin tuyển dụng.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    })()
-    return () => {
-      active = false
-    }
-  }, [])
+  const jobs = jobsData || []
+  const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
+  const [filter, setFilter] = useState<FilterKey>('all')
 
   const stats = useMemo(() => {
     const count = (s: StatusKey) => jobs.filter((j) => j.status === s).length

@@ -1239,7 +1239,7 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("body");
 
-                    b.Property<Guid>("CandidateAccountId")
+                    b.Property<Guid?>("CandidateAccountId")
                         .HasColumnType("uuid")
                         .HasColumnName("candidate_account_id");
 
@@ -1264,6 +1264,10 @@ namespace ARISP.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("link");
 
+                    b.Property<Guid?>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1281,6 +1285,10 @@ namespace ARISP.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CandidateAccountId", "DedupKey")
+                        .IsUnique()
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("RecipientUserId", "DedupKey")
                         .IsUnique()
                         .HasFilter("deleted_at IS NULL");
 
