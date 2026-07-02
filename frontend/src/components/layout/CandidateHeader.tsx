@@ -17,6 +17,7 @@ import {
   Clapperboard,
   Settings,
   LogOut,
+  Trash2,
 } from 'lucide-react'
 import { useAuthStore } from '@store/auth'
 import { authService } from '@services/auth/authService'
@@ -162,9 +163,30 @@ export default function CandidateHeader() {
     }
   }
 
+  const removeNotif = async (id: string) => {
+    try {
+      await notificationService.remove(id)
+      refetch()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const clearAllNotifs = async () => {
+    try {
+      await notificationService.clearAll()
+      refetch()
+    } catch {
+      /* ignore */
+    }
+  }
+
   const openNotif = (n: NotificationItem) => {
     if (!n.isRead) {
-      notificationService.markRead(n.id).then(() => refetch()).catch(() => {})
+      notificationService
+        .markRead(n.id)
+        .then(() => refetch())
+        .catch(() => {})
     }
     setOpen(null)
     navigate(n.link || '/candidate/notifications')
@@ -313,14 +335,24 @@ export default function CandidateHeader() {
                 >
                   <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
                     <span className="font-display text-sm font-bold text-ink-900">Thông báo</span>
-                    {unread > 0 && (
-                      <button
-                        onClick={markAllRead}
-                        className="text-xs font-medium text-brand-600 hover:underline"
-                      >
-                        Đánh dấu đã đọc
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {unread > 0 && (
+                        <button
+                          onClick={markAllRead}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          Đánh dấu đã đọc
+                        </button>
+                      )}
+                      {notifs.length > 0 && (
+                        <button
+                          onClick={clearAllNotifs}
+                          className="text-xs font-medium text-red-500 hover:underline"
+                        >
+                          Xóa tất cả
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="max-h-80 divide-y divide-ink-100 overflow-y-auto">
                     {notifs.length === 0 ? (
@@ -331,10 +363,15 @@ export default function CandidateHeader() {
                       notifs.slice(0, 6).map((n) => {
                         const { Icon, cls } = notifStyle(n.type)
                         return (
-                          <button
+                          <div
                             key={n.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => openNotif(n)}
-                            className={`flex w-full gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') openNotif(n)
+                            }}
+                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
                               !n.isRead ? 'bg-brand-50/40' : ''
                             }`}
                           >
@@ -353,7 +390,19 @@ export default function CandidateHeader() {
                             {!n.isRead && (
                               <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
                             )}
-                          </button>
+                            <button
+                              type="button"
+                              aria-label="Xóa thông báo"
+                              title="Xóa thông báo"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeNotif(n.id)
+                              }}
+                              className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 focus:opacity-100 group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         )
                       })
                     )}

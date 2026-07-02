@@ -298,6 +298,10 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-02: **Xóa thông báo cho Candidate (bell dropdown) — end-to-end FE + BE.**
+  - **Bối cảnh:** chuông thông báo của ứng viên (`CandidateHeader`) chỉ có "Đánh dấu đã đọc", chưa có chức năng xóa — trong khi phía staff (`StaffNotificationsController`) đã có sẵn xóa từng cái + xóa tất cả.
+  - BE (`CandidatePortalController`): thêm `DELETE /api/portal/notifications/{id}` (soft delete 1 thông báo) và `DELETE /api/portal/notifications` (xóa tất cả của ứng viên) — đối xứng với endpoint staff. Sửa `SyncNotificationsAsync` dùng `IgnoreQueryFilters()` khi dựng tập `existing` (theo DedupKey) để thông báo đã xóa **không bị sync tạo lại** ở lần mở sau (giống cách staff đã xử lý). Thêm `using Microsoft.EntityFrameworkCore`.
+  - FE: `notificationService` thêm `remove(id)` + `clearAll()` (→ `/portal/notifications`). `CandidateHeader` bell dropdown: nút "Xóa tất cả" ở header dropdown + nút xóa (icon Trash2) từng thông báo hiện khi hover; đổi row từ `<button>` sang `<div role="button">` để nhúng được nút xóa lồng bên trong, `stopPropagation` để không kích hoạt điều hướng khi xóa; refetch sau khi xóa.
 - [x] 2026-06-30: **Thông báo (Notifications) cho nhân sự nội bộ (HR Admin / Recruiter) — tách endpoint riêng, end-to-end FE + BE + DB.**
   - **Bối cảnh:** nút chuông trên header HR (`HrLayout`) hiển thị badge "3" + 1 thông báo giả hardcode, nút "Đánh dấu đã đọc"/"Xem tất cả" không hoạt động; header Recruiter/Super Admin (`WorkspaceLayout`) chỉ là dropdown rỗng tĩnh. Trước đó chỉ Candidate có thông báo thật.
   - **Quyết định kiến trúc:** **tách controller riêng** thay vì mở rộng `CandidatePortalController` (policy `CandidateOnly` + logic sync khác hẳn). Dùng **chung bảng `notifications`**, người nhận staff qua cột mới `recipient_user_id`.
