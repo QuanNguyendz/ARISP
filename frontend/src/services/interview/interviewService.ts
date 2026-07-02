@@ -66,7 +66,8 @@ export const interviewService = {
     return data;
   },
 
-  // TTS câu hỏi → base64 PCM 24k để đẩy vào LiveAvatar repeatAudio. Rỗng nếu chưa cấu hình ElevenLabs.
+  // TTS câu hỏi → base64 PCM 24k (LiveAvatar repeatAudio / WebAudio). Chỉ là FALLBACK —
+  // đường chính là BE tự đẩy ReceiveQuestionAudio qua SignalR ngay sau ReceiveQuestion.
   async getTtsAudio(sessionId: string, text: string): Promise<string> {
     const { data } = await apiClient.post<{ audio: string }>(`/interview/session/${sessionId}/tts`, { text });
     return data?.audio ?? '';

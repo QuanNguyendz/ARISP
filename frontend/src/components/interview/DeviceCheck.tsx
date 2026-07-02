@@ -89,7 +89,12 @@ export default function DeviceCheck({
     setCamDark(false)
     darkStreakRef.current = 0
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      // AEC/NS bắt buộc: giọng avatar phát ra loa sẽ dội vào mic — không khử echo thì
+      // STT chép lại chính câu hỏi của AI thành "câu trả lời" của ứng viên.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
       streamRef.current = stream
       const vt = stream.getVideoTracks()[0]
       const at = stream.getAudioTracks()[0]

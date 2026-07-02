@@ -5,19 +5,21 @@ Luồng phỏng vấn thử đã được nối **end-to-end**. Code không ch�
 ## Pipeline thực tế (ADR-043/044)
 
 ```
-Mic (FE) ──> Deepgram live STT ──> transcript
+Mic (FE) ──> Deepgram live STT (WebSocket trực tiếp, auth subprotocol ['bearer', token]) ──> transcript
                                       │ (SubmitAnswerText qua SignalR)
                                       ▼
                        Backend InterviewService ──> LLM/RAG (OpenAI GPT-4o)
-                                      │ ReceiveQuestion (SignalR /hubs/session)
+                                      │ ①ReceiveQuestion (text, ngay) ②ReceiveQuestionAudio (PCM 24k, BE TTS xong đẩy)
                                       ▼
-   FE nhận câu hỏi ──> BE TTS ElevenLabs (PCM 24k base64) ──> LiveAvatar repeatAudio()
-                                      ▼
-                 HeyGen LiveAvatar (LITE) lip-sync audio → video stream (attach <video>)
+             FE nhận audio ──> LiveAvatar repeatAudio() lip-sync → video stream (attach <video>)
+                              (không avatar → phát PCM qua WebAudio; không audio → browser TTS)
 ```
 
-- **STT/Avatar chạy client-side** qua SDK chính thức; **BE giữ API key thật và chỉ mint token ngắn hạn** (`GET /api/interview/session/{id}/media-config`).
-- Mọi nhánh media **fallback mềm**: thiếu HeyGen → browser TTS + bot tĩnh; thiếu Deepgram → nút "Gửi trả lời" (nhập tay). Để test **đúng trải nghiệm thật** cần đủ 4 key.
+- **STT dùng WebSocket Deepgram trực tiếp** (không dùng `@deepgram/sdk` — v3 không hỗ trợ access token ngắn hạn, đây từng là nguyên nhân STT chết ngay khi vào phòng). **BE giữ API key thật và chỉ mint token ngắn hạn** (`GET /api/interview/session/{id}/media-config`, TTL 300s — token chỉ dùng lúc handshake).
+- **TTS do BE chủ động đẩy** qua SignalR `ReceiveQuestionAudio` ngay sau `ReceiveQuestion` — FE không còn round-trip `POST /tts` trên critical path (endpoint vẫn giữ làm fallback).
+- **Chống echo:** mic xin `echoCancellation/noiseSuppression` + FE bỏ mọi transcript khi AI đang nói và xả buffer khi AI nói xong (không thì STT chép lại giọng avatar thành "câu trả lời").
+- Mọi nhánh media **fallback mềm**: thiếu LiveAvatar → phát audio ElevenLabs qua WebAudio; thiếu cả TTS → browser TTS + bot tĩnh; thiếu Deepgram → nút "Gửi trả lời" (nhập tay). Để test **đúng trải nghiệm thật** cần đủ 4 key.
+- **Giảm trễ giữa các lượt:** hub lưu answer nhanh (không LLM) → sinh + gửi câu hỏi kế **ngay** → phân tích adaptive difficulty chạy sau; chat history load 1 query (hết N+1 trên Supabase remote).
 
 ## 4 API key cần điền
 
@@ -70,15 +72,15 @@ dotnet user-secrets set "Media:ElevenLabs:DefaultVoiceId" "<voice_id>"
 ```bash
 dotnet user-secrets set "Media:HeyGen:ApiKey"          "<liveavatar_api_key>"
 dotnet user-secrets set "Media:HeyGen:DefaultAvatarId" "dd73ea75-1218-4ef3-92ce-606d5f7fbc0a"   # avatar UUID
-# IsSandbox mặc định true (test miễn phí); set false khi chạy thật:
-# dotnet user-secrets set "Media:HeyGen:IsSandbox" "false"
+# IsSandbox mặc định FALSE (production — chất lượng thật, tính phí). Muốn test miễn phí:
+# dotnet user-secrets set "Media:HeyGen:IsSandbox" "true"
 ```
 
 > **Lưu ý LiveAvatar (ADR-044):**
 > - Chế độ **LITE**: avatar chỉ **lip-sync audio ElevenLabs** do BE cấp (giữ não RAG/GPT-4o), không dùng agent built-in. Vì vậy **bắt buộc có ElevenLabs key + voice** để avatar nói.
 > - `DefaultAvatarId` phải là **UUID LiveAvatar**. Avatar id Streaming cũ không dùng được nữa.
-> - `Media:HeyGen:IsSandbox=true` (mặc định) để test không tốn phí. Đổi `false` khi production.
-> - Thiếu LiveAvatar key/avatar (hoặc API lỗi) → media-config trả `heyGen=null`, FE **fallback browser TTS + bot tĩnh**; STT/LLM vẫn chạy. Không làm sập phòng phỏng vấn.
+> - `Media:HeyGen:IsSandbox=false` (mặc định — production). Đặt `true` nếu chỉ muốn test không tốn phí (có watermark/giới hạn).
+> - Thiếu LiveAvatar key/avatar (hoặc API lỗi) → media-config trả `heyGen=null`, FE **fallback WebAudio/browser TTS + bot tĩnh**; STT/LLM vẫn chạy. Không làm sập phòng phỏng vấn.
 
 > **LLM qua RAG service (tuỳ chọn):** mặc định `AI:Provider=openai` chạy in-process, **không cần** chạy Python. Nếu muốn dùng Hybrid RAG (ADR-039): đặt `AI:Provider=rag`, chạy `rag-service` và set `OPENAI_API_KEY` trong `rag-service/.env`.
 
@@ -104,5 +106,5 @@ Vào phòng → qua cổng kiểm tra mic/cam (ADR-040) → AI hỏi (avatar nó
 ## Endpoint/Hub liên quan
 - `POST /api/interview/session/start` (CandidateOnly) — tạo phiên practice.
 - `GET /api/interview/session/{id}/media-config` (CandidateOnly) — token Deepgram + HeyGen.
-- SignalR `/hubs/session`: `JoinSession`, `StartInterview`, `SubmitAnswerText`; nhận `ReceiveQuestion` / `ReceiveSessionStatus`.
+- SignalR `/hubs/session`: `JoinSession`, `StartInterview`, `SubmitAnswerText`; nhận `ReceiveQuestion` / `ReceiveQuestionAudio` / `ReceiveSessionStatus`.
 - `POST /api/interview/session/{id}/end` — kết thúc + tự sinh Evaluation.

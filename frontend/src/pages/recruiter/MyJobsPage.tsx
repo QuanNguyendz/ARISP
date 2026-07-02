@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 import { Briefcase, Users, MapPin, Clock, ChevronRight } from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
 import jobService from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { JobsGridSkeleton, StatsGridSkeleton } from './_skeletons'
 

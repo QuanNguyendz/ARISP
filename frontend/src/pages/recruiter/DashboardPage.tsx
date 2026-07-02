@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -6,7 +6,6 @@ import { Briefcase, Plus, Users, FileText, ArrowRight, MapPin, AlertCircle, Send
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
 import { useAuthStore } from '@store/auth/authStore'
 import jobService from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { DashboardSkeleton } from './_skeletons'
 

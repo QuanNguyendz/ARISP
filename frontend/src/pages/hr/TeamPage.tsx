@@ -19,7 +19,6 @@ import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/share
 import { RequestListSkeleton } from './_skeletons'
 import {
   accountRequestService,
-  type MyAccountRequest,
   type NewAccountRequestItem,
 } from '@services/hr/accountRequestService'
 

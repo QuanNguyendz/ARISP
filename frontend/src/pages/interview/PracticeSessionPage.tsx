@@ -204,62 +204,72 @@ export default function PracticeSessionPage() {
 
       {/* Main */}
       <main className="grid flex-1 lg:grid-cols-[1fr_380px]">
-        {/* Avatar */}
-        <section className="relative flex flex-col items-center justify-center p-8">
-          <div className="absolute inset-0 bg-gradient-to-b from-brand-600/10 via-transparent to-ai-600/10" />
+        {/* Avatar — video phủ kín toàn khung (object-cover), không còn ô nhỏ giữa màn */}
+        <section className="relative min-h-[60vh] overflow-hidden bg-black lg:min-h-0">
+          <video
+            ref={practice.videoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+              practice.avatarReady ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
 
-          {/* HeyGen avatar video (hiện khi sẵn sàng); nếu không có → bot tĩnh */}
-          <div className="relative">
-            <div
-              className={`absolute -inset-6 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 blur-xl transition-opacity ${
-                practice.aiSpeaking ? 'opacity-60' : 'opacity-25'
-              }`}
-            />
-            <video
-              ref={practice.videoRef}
-              autoPlay
-              playsInline
-              className={`relative h-80 w-80 rounded-2xl bg-black object-cover ring-1 ring-white/10 ${
-                practice.avatarReady ? 'block' : 'hidden'
-              }`}
-            />
-            {!practice.avatarReady && (
-              <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
-                <Bot className="h-20 w-20 text-white" />
+          {/* Chưa có avatar (đang kết nối / thiếu cấu hình) → nền gradient + bot tĩnh */}
+          {!practice.avatarReady && (
+            <div className="absolute inset-0 grid place-items-center bg-gradient-to-b from-brand-600/15 via-ink-950 to-ai-600/15">
+              <div className="relative">
+                <div
+                  className={`absolute -inset-8 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 blur-2xl transition-opacity ${
+                    practice.aiSpeaking ? 'opacity-60' : 'opacity-25'
+                  }`}
+                />
+                <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
+                  <Bot className="h-20 w-20 text-white" />
+                </div>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Trạng thái nổi trên video */}
+          <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
+            <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-4 py-2 text-sm text-slate-200 backdrop-blur">
+              {starting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Đang kết nối phỏng vấn AI…
+                </>
+              ) : practice.status === 'error' ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  <span className="text-red-300">{practice.error}</span>
+                </>
+              ) : practice.aiSpeaking ? (
+                <>
+                  <Sparkles className="h-4 w-4 text-ai-300" /> AI đang nói…
+                </>
+              ) : practice.listening ? (
+                <>
+                  <Mic className="h-4 w-4 text-emerald-300" /> Đang nghe câu trả lời của bạn…
+                </>
+              ) : (
+                <>
+                  <Info className="h-4 w-4" /> Sẵn sàng — hãy trả lời khi AI hỏi xong.
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="relative mt-8 max-w-xl text-center">
-            {starting ? (
-              <p className="flex items-center justify-center gap-2 text-sm text-slate-300">
-                <Loader2 className="h-4 w-4 animate-spin" /> Đang kết nối phỏng vấn AI…
+          {/* Câu hỏi hiện tại nổi phía trên (đọc được ngay cả khi không nhìn transcript) */}
+          {practice.messages.length > 0 && (
+            <div className="absolute inset-x-0 top-4 z-10 flex justify-center px-4">
+              <p className="max-w-2xl rounded-2xl bg-black/55 px-5 py-3 text-center text-sm leading-relaxed text-white backdrop-blur">
+                {[...practice.messages].reverse().find((m) => m.role === 'ai')?.text}
               </p>
-            ) : practice.status === 'error' ? (
-              <p className="flex items-center justify-center gap-2 text-sm text-red-300">
-                <AlertTriangle className="h-4 w-4" /> {practice.error}
-              </p>
-            ) : (
-              <p className="flex items-center justify-center gap-1.5 text-sm text-slate-400">
-                {practice.aiSpeaking ? (
-                  <>
-                    <Sparkles className="h-4 w-4 text-ai-300" /> AI đang nói…
-                  </>
-                ) : practice.listening ? (
-                  <>
-                    <Mic className="h-4 w-4 text-emerald-300" /> Đang nghe câu trả lời của bạn…
-                  </>
-                ) : (
-                  <>
-                    <Info className="h-4 w-4" /> Sẵn sàng — hãy trả lời khi AI hỏi xong.
-                  </>
-                )}
-              </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Self view */}
-          <div className="absolute bottom-4 right-4 aspect-video w-44 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+          <div className="absolute bottom-4 right-4 z-10 aspect-video w-40 overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-white/15 sm:w-52">
             <video ref={selfVideoRef} muted playsInline className="h-full w-full -scale-x-100 object-cover" />
             {isMuted && (
               <span className="absolute bottom-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-500/80">

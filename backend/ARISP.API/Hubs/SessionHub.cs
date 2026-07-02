@@ -39,11 +39,13 @@ namespace ARISP.API.Hubs
         {
             if (Guid.TryParse(sessionIdStr, out var sessionId) && Guid.TryParse(questionIdStr, out var questionId))
             {
-                // Save answer and analyze adaptively
-                await _interviewService.SubmitAnswerAsync(sessionId, questionId, transcript, responseTimeMs);
-                
-                // Generate next question
+                // Lưu answer nhanh (không LLM) → sinh & gửi câu hỏi kế NGAY (critical path latency),
+                // phân tích adaptive difficulty chạy sau khi ứng viên đã nhận câu hỏi mới.
+                await _interviewService.SaveAnswerAsync(sessionId, questionId, transcript, responseTimeMs);
+
                 await _interviewService.GenerateAndSendNextQuestionAsync(sessionId);
+
+                await _interviewService.AnalyzeAnswerAndAdaptAsync(sessionId, questionId, transcript);
             }
         }
 

@@ -13,8 +13,11 @@ namespace ARISP.Infrastructure.Media
         public string ApiKey { get; set; } = string.Empty;
         // nova-2 hỗ trợ đầy đủ 36 ngôn ngữ gồm tiếng Việt + Anh (ổn định cho streaming đa ngôn ngữ).
         public string Model { get; set; } = "nova-2";
-        /// <summary>TTL token ngắn hạn cấp cho FE (giây).</summary>
-        public int TokenTtlSeconds { get; set; } = 60;
+        /// <summary>
+        /// TTL token ngắn hạn cấp cho FE (giây). Phải đủ dài để FE khởi tạo avatar/SignalR song song
+        /// rồi mới mở WebSocket STT (token chỉ dùng lúc handshake — phiên STT không bị cắt khi token hết hạn).
+        /// </summary>
+        public int TokenTtlSeconds { get; set; } = 300;
         public string ApiBaseUrl { get; set; } = "https://api.deepgram.com";
     }
 
@@ -42,7 +45,7 @@ namespace ARISP.Infrastructure.Media
         public string DefaultAvatarId { get; set; } = string.Empty;
         /// <summary>Voice ElevenLabs dùng cho TTS (lip-sync). Trùng Media:ElevenLabs:DefaultVoiceId.</summary>
         public string DefaultVoiceId { get; set; } = string.Empty;
-        /// <summary>Sandbox mode LiveAvatar — true cho dev/test (không tính phí thật).</summary>
-        public bool IsSandbox { get; set; } = true;
+        /// <summary>Sandbox mode LiveAvatar — mặc định false (production, chất lượng thật, tính phí).</summary>
+        public bool IsSandbox { get; set; } = false;
     }
 }

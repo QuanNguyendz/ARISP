@@ -6,7 +6,6 @@ import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'l
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
 
 type StatusKey = 'draft' | 'active' | 'paused' | 'closed'
 type FilterKey = 'all' | StatusKey

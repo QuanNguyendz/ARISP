@@ -66,8 +66,9 @@ namespace ARISP.Infrastructure.Media
             if (string.IsNullOrWhiteSpace(voice))
                 throw new InvalidOperationException("ElevenLabs voiceId chưa được cấu hình (Media:ElevenLabs:DefaultVoiceId).");
 
-            // PCM 24kHz + with-timestamps → response JSON có audio_base64 (định dạng repeatAudio của LiveAvatar cần).
-            var url = $"{_options.ApiBaseUrl.TrimEnd('/')}/v1/text-to-speech/{voice}/with-timestamps?output_format=pcm_24000";
+            // PCM 24kHz raw (định dạng repeatAudio của LiveAvatar cần) qua endpoint thường —
+            // nhanh hơn with-timestamps (không phải chờ tính alignment) + optimize_streaming_latency.
+            var url = $"{_options.ApiBaseUrl.TrimEnd('/')}/v1/text-to-speech/{voice}?output_format=pcm_24000&optimize_streaming_latency=3";
             var payload = new { text, model_id = _options.ModelId };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url)
@@ -77,13 +78,14 @@ namespace ARISP.Infrastructure.Media
             req.Headers.Add("xi-api-key", _options.ApiKey);
 
             var resp = await _http.SendAsync(req, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(ct);
                 throw new InvalidOperationException($"ElevenLabs TTS (pcm) lỗi {(int)resp.StatusCode}: {body}");
+            }
 
-            using var doc = JsonDocument.Parse(body);
-            var audio = doc.RootElement.TryGetProperty("audio_base64", out var a) ? a.GetString() : null;
-            return audio ?? string.Empty;
+            var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
+            return Convert.ToBase64String(bytes);
         }
     }
 }
