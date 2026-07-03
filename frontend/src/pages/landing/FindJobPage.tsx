@@ -22,7 +22,7 @@ import {
 import { useAuthStore } from '@store/auth'
 import CandidateHeader from '@components/layout/CandidateHeader'
 import jobService from '@/services/job/jobService'
-import type { JobFacets } from '@/services/job/jobService'
+import type { JobFacets, RecommendedJob } from '@/services/job/jobService'
 import { savedJobService } from '@/services/job/savedJobService'
 import { provinceService } from '@/services/location/provinceService'
 import type { City } from '@/services/location/provinceService'
@@ -621,10 +621,13 @@ interface JobCardProps {
   job: JobPosting
   isSaved?: boolean
   onToggleSave?: (jobId: string) => void
+  /** Kỹ năng khớp với hồ sơ ứng viên — có giá trị thì hiển thị badge "gợi ý theo CV". */
+  matchedSkills?: string[]
 }
 
-function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
+function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardProps) {
   const navigate = useNavigate()
+  const hasMatch = !!matchedSkills && matchedSkills.length > 0
 
   return (
     <article
@@ -639,8 +642,19 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">{job.title}</h3>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">{job.title}</h3>
+                {hasMatch && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
+                    title={`Khớp kỹ năng: ${matchedSkills!.join(', ')}`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Khớp {matchedSkills!.length} kỹ năng
+                  </span>
+                )}
+              </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
                 <MapPin className="w-3.5 h-3.5" />
                 {job.location || 'Remote'} · {job.department || 'Engineering'}
@@ -778,6 +792,7 @@ export default function FindJob() {
   const [profileSkills, setProfileSkills] = useState<string[]>([])
   const [profileHasCv, setProfileHasCv] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [recommended, setRecommended] = useState<RecommendedJob[]>([])
   const locationNames = new Set(cities.map((c) => c.name))
   const [sortBy, setSortBy] = useState<'newest' | 'salary_desc' | 'salary_asc'>('newest')
   const [minSalary, setMinSalary] = useState<number>(0)
@@ -851,6 +866,7 @@ export default function FindJob() {
       setProfileSkills([])
       setProfileHasCv(false)
       setSavedIds(new Set())
+      setRecommended([])
       return
     }
     profileService
@@ -867,6 +883,11 @@ export default function FindJob() {
       .getSavedJobIds()
       .then((ids) => setSavedIds(new Set(ids)))
       .catch(() => setSavedIds(new Set()))
+    // Gợi ý theo CV — BE rank theo kỹ năng hồ sơ. Không có kỹ năng/không phải ứng viên → mảng rỗng.
+    jobService
+      .getRecommendedJobs(6)
+      .then(setRecommended)
+      .catch(() => setRecommended([]))
   }, [isAuthenticated])
 
   // Lưu / bỏ lưu việc làm. Cập nhật lạc quan (optimistic), rollback nếu API lỗi.
@@ -1033,6 +1054,30 @@ export default function FindJob() {
                 navigate(isAuthenticated ? '/candidate/profile?focus=cv' : '/auth/candidate-login')
               }
             />
+          )}
+
+          {/* Gợi ý theo CV — chỉ hiện khi ứng viên đã có kỹ năng trong hồ sơ + có tin khớp */}
+          {recommended.length > 0 && (
+            <div className="mb-8">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-ai-50 text-ai-600 ring-1 ring-ai-200">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <h2 className="font-display text-lg font-bold text-ink-900">Việc phù hợp với bạn</h2>
+                <span className="text-sm text-ink-400">· gợi ý theo CV của bạn</span>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {recommended.map((r) => (
+                  <JobCard
+                    key={r.job.id}
+                    job={r.job}
+                    isSaved={savedIds.has(r.job.id)}
+                    onToggleSave={handleToggleSave}
+                    matchedSkills={r.matchedSkills}
+                  />
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Section Header */}
