@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface ActionButton {
@@ -225,6 +225,58 @@ export function NoticeAlert({ message, onDismiss }: NoticeAlertProps) {
           Đóng
         </button>
       )}
+    </div>
+  )
+}
+
+interface PaginationProps {
+  page: number
+  totalPages: number
+  total?: number
+  /** Danh từ hiển thị cạnh tổng số, ví dụ "ứng viên", "tin". */
+  label?: string
+  onPageChange: (page: number) => void
+  className?: string
+}
+
+/** Thanh phân trang dùng chung — ẩn khi chỉ có 1 trang. */
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  label = 'mục',
+  onPageChange,
+  className = '',
+}: PaginationProps) {
+  if (totalPages <= 1) return null
+  return (
+    <div
+      className={`mt-6 flex items-center justify-between rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3 text-sm shadow-card ${className}`}
+    >
+      <span className="text-ink-500 dark:text-ink-400">
+        Trang {page}/{totalPages}
+        {typeof total === 'number' ? ` · ${total} ${label}` : ''}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          aria-label="Trang trước"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          aria-label="Trang sau"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   )
 }

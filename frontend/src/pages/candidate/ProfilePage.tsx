@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   User,
   Briefcase,
@@ -46,16 +47,6 @@ import type {
   CvReview,
 } from '@services/profile/profileService'
 import { useAuthStore } from '@store/auth/authStore'
-
-const SECTIONS = [
-  { id: 'personal', label: 'Thông tin cá nhân', icon: User },
-  { id: 'cv', label: 'CV & tài liệu', icon: FileText },
-  { id: 'skills', label: 'Kỹ năng', icon: Sparkles },
-  { id: 'experience', label: 'Kinh nghiệm', icon: Briefcase },
-  { id: 'education', label: 'Học vấn', icon: GraduationCap },
-  { id: 'links', label: 'Liên kết', icon: LinkIcon },
-  { id: 'account', label: 'Tài khoản & bảo mật', icon: Shield },
-]
 
 // Kỹ năng & công nghệ phổ biến hiện nay (gợi ý nhanh để ứng viên thêm bằng 1 cú nhấp)
 const SUGGESTED_SKILLS = [
@@ -124,8 +115,19 @@ const inputWrap =
 const cardCls = 'rounded-2xl border border-ink-200 bg-white p-6 shadow-card scroll-mt-24'
 
 export default function ProfilePage() {
+  const { t } = useTranslation('candidate')
   const { updateUser } = useAuthStore()
   const { openDocument } = useDocumentViewer()
+
+  const SECTIONS = [
+    { id: 'personal', label: t('profile.personalInfo'), icon: User },
+    { id: 'cv', label: t('profile.cvAndAi'), icon: FileText },
+    { id: 'skills', label: t('profile.skillsAndTech'), icon: Sparkles },
+    { id: 'experience', label: t('profile.experience'), icon: Briefcase },
+    { id: 'education', label: t('profile.education'), icon: GraduationCap },
+    { id: 'links', label: t('profile.links'), icon: LinkIcon },
+    { id: 'account', label: t('profile.accountSecurity'), icon: Shield },
+  ]
   const [profile, setProfile] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -152,9 +154,9 @@ export default function ProfilePage() {
     profileService
       .getProfile()
       .then(setProfile)
-      .catch((e: any) => setError(e?.message || 'Không tải được hồ sơ.'))
+      .catch((e: any) => setError(e?.message || t('profile.saveFailed')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [t])
 
   // Sau khi hồ sơ đã render, nếu được dẫn từ banner (?focus=cv) → cuộn tới khối CV,
   // bật hiệu ứng chỉ dẫn (glow + nhãn) rồi gỡ tham số khỏi URL để không lặp lại khi refresh.
@@ -284,16 +286,16 @@ export default function ProfilePage() {
 
     // Validate nghiệp vụ
     if (!profile.fullName?.trim()) {
-      setError('Vui lòng nhập họ và tên.')
+      setError(t('profile.nameRequired'))
       return
     }
     const phoneDigits = (profile.phone || '').replace(/\D/g, '')
     if (profile.phone?.trim() && (phoneDigits.length < 8 || phoneDigits.length > 15)) {
-      setError('Số điện thoại không hợp lệ (chỉ chứa 8–15 chữ số).')
+      setError(t('profile.phoneInvalid'))
       return
     }
     if (profile.dateOfBirth && profile.dateOfBirth > todayStr) {
-      setError('Ngày sinh không được ở tương lai.')
+      setError(t('profile.dobFutureError'))
       return
     }
 
@@ -328,7 +330,7 @@ export default function ProfilePage() {
       setDirty(false)
       setSavedAt(Date.now())
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Lưu hồ sơ thất bại.')
+      setError(e?.response?.data?.message || e?.message || t('profile.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -337,11 +339,11 @@ export default function ProfilePage() {
   async function handleCvUpload(file: File) {
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
     if (ext !== '.pdf' && ext !== '.docx') {
-      setCvError('Chỉ chấp nhận file PDF hoặc DOCX.')
+      setCvError(t('profile.cvFileTypeError'))
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      setCvError('Kích thước file tối đa 5MB.')
+      setCvError(t('profile.cvFileSizeError'))
       return
     }
     setCvUploading(true)
@@ -361,15 +363,12 @@ export default function ProfilePage() {
           : prev
       )
       if (!res.aiAvailable) {
-        setCvNotice(
-          'Đã lưu CV. Phân tích AI tạm thời không khả dụng' +
-            (res.aiMessage ? `: ${res.aiMessage}` : '.')
-        )
+        setCvNotice(t('profile.cvAiTempUnavailable') + (res.aiMessage ? `: ${res.aiMessage}` : '.'))
       } else {
-        setCvNotice('Đã tải lên và phân tích CV bằng AI.')
+        setCvNotice(t('profile.cvUploadedAndAnalyzed'))
       }
     } catch (e: any) {
-      setCvError(e?.response?.data?.message || e?.message || 'Tải lên CV thất bại.')
+      setCvError(e?.response?.data?.message || e?.message || t('profile.cvUploadFailed'))
     } finally {
       setCvUploading(false)
     }
@@ -383,7 +382,7 @@ export default function ProfilePage() {
     return (
       <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4" /> {error || 'Không tải được hồ sơ.'}
+          <AlertCircle className="h-4 w-4" /> {error || t('profile.saveFailed')}
         </div>
       </div>
     )
@@ -397,10 +396,10 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-6xl px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/" className="hover:text-brand-600">
-            Trang chủ
+            {t('profile.home')}
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span className="font-medium text-ink-600">Hồ sơ của tôi</span>
+          <span className="font-medium text-ink-600">{t('profile.myProfile')}</span>
         </div>
       </div>
 
@@ -424,7 +423,7 @@ export default function ProfilePage() {
           <div className="mt-4 rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="flex items-center gap-2">
-                <BadgeCheck className="h-4 w-4 text-brand-600" /> Độ hoàn thiện
+                <BadgeCheck className="h-4 w-4 text-brand-600" /> {t('profile.completeness')}
               </span>
               <span className="text-brand-600">{completeness}%</span>
             </div>
@@ -434,9 +433,7 @@ export default function ProfilePage() {
                 style={{ width: `${completeness}%` }}
               />
             </div>
-            <p className="mt-2 text-xs text-ink-400">
-              Thêm kỹ năng, kinh nghiệm và liên kết để đạt 100%.
-            </p>
+            <p className="mt-2 text-xs text-ink-400">{t('profile.completeHint')}</p>
           </div>
         </aside>
 
@@ -462,20 +459,20 @@ export default function ProfilePage() {
               </div>
               <div className="mt-3">
                 <h1 className="font-display text-2xl font-extrabold leading-tight">
-                  {profile.fullName || 'Ứng viên'}
+                  {profile.fullName || t('profile.candidate')}
                 </h1>
                 <p className="text-sm text-ink-500">
-                  {profile.headline || 'Chưa cập nhật chức danh'}
+                  {profile.headline || t('profile.notUpdatedYet')}
                 </p>
               </div>
             </div>
             <div className="border-t border-ink-100 p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-lg font-bold">Thông tin cá nhân</h2>
-                <span className="text-xs text-ink-400">Hiển thị với HR khi bạn ứng tuyển</span>
+                <h2 className="font-display text-lg font-bold">{t('profile.personalInfo')}</h2>
+                <span className="text-xs text-ink-400">{t('profile.showingToHr')}</span>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Họ và tên">
+                <Field label={t('profile.fullName')}>
                   <div className={inputWrap}>
                     <User className="h-4 w-4 text-ink-400" />
                     <input
@@ -485,18 +482,18 @@ export default function ProfilePage() {
                     />
                   </div>
                 </Field>
-                <Field label="Chức danh hiện tại">
+                <Field label={t('profile.headline')}>
                   <div className={inputWrap}>
                     <Briefcase className="h-4 w-4 text-ink-400" />
                     <input
                       className="w-full bg-transparent text-sm outline-none"
-                      placeholder="VD: Frontend Engineer"
+                      placeholder={t('profile.headlinePlaceholder')}
                       value={profile.headline || ''}
                       onChange={(e) => patch({ headline: e.target.value })}
                     />
                   </div>
                 </Field>
-                <Field label="Email">
+                <Field label={t('profile.email')}>
                   <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5">
                     <Mail className="h-4 w-4 shrink-0 text-ink-400" />
                     <input
@@ -506,33 +503,33 @@ export default function ProfilePage() {
                     />
                     {profile.emailVerified && (
                       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        <Check className="h-3 w-3 shrink-0" /> Đã xác minh
+                        <Check className="h-3 w-3 shrink-0" /> {t('profile.verified')}
                       </span>
                     )}
                   </div>
                 </Field>
-                <Field label="Số điện thoại">
+                <Field label={t('profile.phone')}>
                   <div className={inputWrap}>
                     <Phone className="h-4 w-4 text-ink-400" />
                     <input
                       inputMode="tel"
                       className="w-full bg-transparent text-sm outline-none"
-                      placeholder="VD: 0901 234 567"
+                      placeholder={t('profile.headlinePlaceholder')}
                       value={profile.phone || ''}
                       onChange={(e) => patch({ phone: e.target.value.replace(/[^\d+\-() ]/g, '') })}
                     />
                   </div>
                 </Field>
-                <Field label="Nơi làm việc mong muốn">
+                <Field label={t('profile.desiredLocation')}>
                   <SearchableSelect
                     icon={<MapPin className="h-4 w-4 shrink-0 text-ink-400" />}
                     options={provinces.map((p) => ({ value: p.code, label: p.name }))}
                     value={profile.provinceCode}
                     onChange={onProvinceChange}
-                    placeholder="— Chọn tỉnh/thành —"
+                    placeholder={t('profile.selectProvince')}
                   />
                 </Field>
-                <Field label="Ngày sinh">
+                <Field label={t('profile.dateOfBirth')}>
                   <div className={inputWrap}>
                     <Calendar className="h-4 w-4 text-ink-400" />
                     <input
@@ -545,11 +542,11 @@ export default function ProfilePage() {
                   </div>
                 </Field>
                 <div className="sm:col-span-2">
-                  <Field label="Giới thiệu bản thân">
+                  <Field label={t('profile.about')}>
                     <textarea
                       rows={3}
                       className="w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-800 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                      placeholder="Vài dòng về kinh nghiệm, thế mạnh và định hướng của bạn..."
+                      placeholder={t('profile.aboutPlaceholder')}
                       value={profile.about || ''}
                       onChange={(e) => patch({ about: e.target.value })}
                     />
@@ -559,7 +556,7 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          {/* CV */}
+          {/* CV section */}
           <section id="cv" ref={cvSectionRef} className={`${cardCls} relative`}>
             {cvGuideMounted && (
               <>
@@ -575,15 +572,15 @@ export default function ProfilePage() {
                     cvGuide ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'
                   }`}
                 >
-                  <Sparkles className="h-3.5 w-3.5" /> Tải CV của bạn lên tại đây
+                  <Sparkles className="h-3.5 w-3.5" /> {t('profile.uploadCvGuide')}
                 </div>
               </>
             )}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-                <FileText className="h-5 w-5 text-brand-600" /> CV & đánh giá AI
+                <FileText className="h-5 w-5 text-brand-600" /> {t('profile.cvAndAi')}
               </h2>
-              <span className="text-xs text-ink-400">PDF / DOCX · tối đa 5MB</span>
+              <span className="text-xs text-ink-400">{t('profile.pdfDocxMax5mb')}</span>
             </div>
 
             {profile.profileCvUrl && (
@@ -594,20 +591,20 @@ export default function ProfilePage() {
                   onClick={() =>
                     openDocument(
                       resolveAssetUrl(profile.profileCvUrl),
-                      profile.cvFileName || 'CV hồ sơ'
+                      profile.cvFileName || t('profile.cv')
                     )
                   }
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left hover:opacity-80"
-                  title="Bấm để xem CV"
+                  title={t('profile.clickToView')}
                 >
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-50 text-red-600">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-ink-800">
-                      {profile.cvFileName || 'CV hồ sơ'}
+                      {profile.cvFileName || t('profile.cv')}
                     </div>
-                    <div className="text-xs text-ink-400">Bấm để xem</div>
+                    <div className="text-xs text-ink-400">{t('profile.clickToView')}</div>
                   </div>
                 </button>
                 {/* Icon tải về — bấm để download */}
@@ -615,8 +612,8 @@ export default function ProfilePage() {
                   href={resolveAssetUrl(profile.cvDownloadUrl || profile.profileCvUrl)}
                   download={profile.cvFileName || true}
                   className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-white hover:text-brand-600"
-                  title="Tải về"
-                  aria-label="Tải CV về"
+                  title={t('profile.download')}
+                  aria-label={t('profile.download')}
                 >
                   <Download className="h-4 w-4" />
                 </a>
@@ -633,11 +630,11 @@ export default function ProfilePage() {
             >
               {cvUploading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" /> AI đang phân tích CV...
+                  <Loader2 className="h-5 w-5 animate-spin" /> {t('profile.aiAnalyzing')}
                 </>
               ) : (
                 <>
-                  <UploadCloud className="h-5 w-5" /> Tải lên CV để AI đánh giá (PDF, DOCX)
+                  <UploadCloud className="h-5 w-5" /> {t('profile.uploadToAiEvaluate')}
                 </>
               )}
               <input
@@ -671,7 +668,7 @@ export default function ProfilePage() {
           {/* Skills */}
           <section id="skills" className={cardCls}>
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-              <Sparkles className="h-5 w-5 text-brand-600" /> Kỹ năng & công nghệ
+              <Sparkles className="h-5 w-5 text-brand-600" /> {t('profile.skillsAndTech')}
             </h2>
             <div className="flex flex-wrap gap-2">
               {profile.skills.map((s) => (
@@ -688,7 +685,7 @@ export default function ProfilePage() {
               <div className="inline-flex items-center gap-1 rounded-lg border border-dashed border-ink-300 px-2 py-1">
                 <input
                   className="w-28 bg-transparent px-1 text-sm outline-none placeholder:text-ink-400"
-                  placeholder="Thêm kỹ năng"
+                  placeholder={t('profile.skillPlaceholder')}
                   value={skillInput}
                   onChange={(e) => setSkillInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -701,7 +698,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => addSkill()}
                   className="text-ink-500 hover:text-brand-700"
-                  aria-label="Thêm kỹ năng"
+                  aria-label={t('profile.addSkill')}
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -717,7 +714,7 @@ export default function ProfilePage() {
               return (
                 <div className="mt-4 border-t border-ink-100 pt-4">
                   <p className="mb-2 text-xs font-medium text-ink-400">
-                    Gợi ý phổ biến — bấm để thêm
+                    {t('profile.suggestionsPopular')}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {available.map((s) => (
@@ -741,17 +738,17 @@ export default function ProfilePage() {
           <section id="experience" className={cardCls}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-                <Briefcase className="h-5 w-5 text-brand-600" /> Kinh nghiệm làm việc
+                <Briefcase className="h-5 w-5 text-brand-600" /> {t('profile.experience')}
               </h2>
               <button
                 onClick={addExp}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-600 hover:bg-brand-50"
               >
-                <Plus className="h-4 w-4" /> Thêm
+                <Plus className="h-4 w-4" /> {t('profile.add')}
               </button>
             </div>
             {profile.experience.length === 0 ? (
-              <p className="text-sm text-ink-400">Chưa có kinh nghiệm. Bấm "Thêm" để bổ sung.</p>
+              <p className="text-sm text-ink-400">{t('profile.noExperience')}</p>
             ) : (
               <div className="space-y-4">
                 {profile.experience.map((exp, i) => (
@@ -759,19 +756,19 @@ export default function ProfilePage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <input
                         className={`${inputWrap} text-sm`}
-                        placeholder="Chức danh"
+                        placeholder={t('profile.jobTitle')}
                         value={exp.title}
                         onChange={(e) => updateExp(i, 'title', e.target.value)}
                       />
                       <input
                         className={`${inputWrap} text-sm`}
-                        placeholder="Công ty / tổ chức"
+                        placeholder={t('profile.companyOrg')}
                         value={exp.organization}
                         onChange={(e) => updateExp(i, 'organization', e.target.value)}
                       />
                       <input
                         className={`${inputWrap} text-sm`}
-                        placeholder="Thời gian (VD: 06/2022 – Hiện tại)"
+                        placeholder={t('profile.timePeriodPlaceholder')}
                         value={exp.period}
                         onChange={(e) => updateExp(i, 'period', e.target.value)}
                       />
@@ -779,13 +776,13 @@ export default function ProfilePage() {
                         onClick={() => removeExp(i)}
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 sm:w-auto"
                       >
-                        <Trash2 className="h-4 w-4" /> Xoá
+                        <Trash2 className="h-4 w-4" /> {t('profile.delete')}
                       </button>
                     </div>
                     <textarea
                       rows={2}
                       className="mt-3 w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                      placeholder="Mô tả công việc, thành tựu..."
+                      placeholder={t('profile.jobDescription')}
                       value={exp.description || ''}
                       onChange={(e) => updateExp(i, 'description', e.target.value)}
                     />
@@ -799,17 +796,17 @@ export default function ProfilePage() {
           <section id="education" className={cardCls}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-                <GraduationCap className="h-5 w-5 text-brand-600" /> Học vấn
+                <GraduationCap className="h-5 w-5 text-brand-600" /> {t('profile.education')}
               </h2>
               <button
                 onClick={addEdu}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-600 hover:bg-brand-50"
               >
-                <Plus className="h-4 w-4" /> Thêm
+                <Plus className="h-4 w-4" /> {t('profile.add')}
               </button>
             </div>
             {profile.education.length === 0 ? (
-              <p className="text-sm text-ink-400">Chưa có học vấn. Bấm "Thêm" để bổ sung.</p>
+              <p className="text-sm text-ink-400">{t('profile.noEducation')}</p>
             ) : (
               <div className="space-y-4">
                 {profile.education.map((edu, i) => (
@@ -819,33 +816,33 @@ export default function ProfilePage() {
                   >
                     <input
                       className={`${inputWrap} text-sm`}
-                      placeholder="Trường"
+                      placeholder={t('profile.school')}
                       value={edu.school}
                       onChange={(e) => updateEdu(i, 'school', e.target.value)}
                     />
                     <input
                       className={`${inputWrap} text-sm`}
-                      placeholder="Bằng cấp / chuyên ngành"
+                      placeholder={t('profile.degreeMajor')}
                       value={edu.degree}
                       onChange={(e) => updateEdu(i, 'degree', e.target.value)}
                     />
                     <input
                       className={`${inputWrap} text-sm`}
-                      placeholder="Thời gian (VD: 2016 – 2020)"
+                      placeholder={t('profile.periodPlaceholder')}
                       value={edu.period}
                       onChange={(e) => updateEdu(i, 'period', e.target.value)}
                     />
                     <div className="flex gap-2">
                       <input
                         className={`${inputWrap} flex-1 text-sm`}
-                        placeholder="Ghi chú (GPA...)"
+                        placeholder={t('profile.notes')}
                         value={edu.note || ''}
                         onChange={(e) => updateEdu(i, 'note', e.target.value)}
                       />
                       <button
                         onClick={() => removeEdu(i)}
                         className="grid w-10 shrink-0 place-items-center rounded-xl border border-red-200 text-red-600 hover:bg-red-50"
-                        aria-label="Xoá"
+                        aria-label={t('profile.delete')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -859,38 +856,38 @@ export default function ProfilePage() {
           {/* Links */}
           <section id="links" className={cardCls}>
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-              <LinkIcon className="h-5 w-5 text-brand-600" /> Liên kết
+              <LinkIcon className="h-5 w-5 text-brand-600" /> {t('profile.links')}
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="LinkedIn">
+              <Field label={t('profile.linkedin')}>
                 <div className={inputWrap}>
                   <Link2 className="h-4 w-4 text-ink-400" />
                   <input
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
-                    placeholder="linkedin.com/in/..."
+                    placeholder={t('profile.linkedinPlaceholder')}
                     value={profile.linkedinUrl || ''}
                     onChange={(e) => patch({ linkedinUrl: e.target.value })}
                   />
                 </div>
               </Field>
-              <Field label="GitHub">
+              <Field label={t('profile.github')}>
                 <div className={inputWrap}>
                   <LinkIcon className="h-4 w-4 text-ink-400" />
                   <input
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
-                    placeholder="github.com/..."
+                    placeholder={t('profile.githubPlaceholder')}
                     value={profile.githubUrl || ''}
                     onChange={(e) => patch({ githubUrl: e.target.value })}
                   />
                 </div>
               </Field>
               <div className="sm:col-span-2">
-                <Field label="Portfolio / Website">
+                <Field label={t('profile.portfolio')}>
                   <div className={inputWrap}>
                     <Globe className="h-4 w-4 text-ink-400" />
                     <input
                       className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
-                      placeholder="your-site.dev"
+                      placeholder={t('profile.portfolioPlaceholder')}
                       value={profile.portfolioUrl || ''}
                       onChange={(e) => patch({ portfolioUrl: e.target.value })}
                     />
@@ -903,23 +900,23 @@ export default function ProfilePage() {
           {/* Account */}
           <section id="account" className={cardCls}>
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-              <Shield className="h-5 w-5 text-brand-600" /> Tài khoản & bảo mật
+              <Shield className="h-5 w-5 text-brand-600" /> {t('profile.accountSecurity')}
             </h2>
             <div className="divide-y divide-ink-100">
               <div className="flex items-center justify-between py-3">
                 <div>
-                  <div className="text-sm font-semibold text-ink-800">Mật khẩu</div>
+                  <div className="text-sm font-semibold text-ink-800">{t('profile.password')}</div>
                   <div className="text-xs text-ink-400">
                     {profile.hasPassword
-                      ? 'Đổi mật khẩu đăng nhập'
-                      : 'Tài khoản Google — chưa đặt mật khẩu'}
+                      ? t('profile.changeLoginPassword')
+                      : t('profile.noPasswordSet')}
                   </div>
                 </div>
                 <button
                   onClick={() => setPwdModalOpen(true)}
                   className="rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                 >
-                  {profile.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
+                  {profile.hasPassword ? t('profile.changePassword') : t('profile.setPassword')}
                 </button>
               </div>
               {!profile.hasPassword && (
@@ -929,12 +926,14 @@ export default function ProfilePage() {
                       <Globe className="h-4 w-4 text-ink-600" />
                     </span>
                     <div>
-                      <div className="text-sm font-semibold text-ink-800">Google</div>
+                      <div className="text-sm font-semibold text-ink-800">
+                        {t('profile.googleLinked')}
+                      </div>
                       <div className="text-xs text-ink-400">{profile.email}</div>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                    <Check className="h-3.5 w-3.5" /> Đã liên kết
+                    <Check className="h-3.5 w-3.5" /> {t('profile.linked')}
                   </span>
                 </div>
               )}
@@ -947,7 +946,7 @@ export default function ProfilePage() {
       {dirty && (
         <div className="sticky bottom-4 z-20 mx-auto flex max-w-6xl items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white/90 px-5 py-3 shadow-card backdrop-blur">
           <span className="flex items-center gap-2 text-sm text-ink-500">
-            <Info className="h-4 w-4 text-amber-500" /> Thay đổi chưa được lưu
+            <Info className="h-4 w-4 text-amber-500" /> {t('profile.unsavedChanges')}
           </span>
           <button
             onClick={handleSave}
@@ -955,13 +954,13 @@ export default function ProfilePage() {
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Lưu thay đổi
+            {t('profile.saveChanges')}
           </button>
         </div>
       )}
       {savedAt && !dirty && (
         <div className="sticky bottom-4 z-20 mx-auto flex max-w-6xl items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 shadow-card">
-          <Check className="h-4 w-4" /> Đã lưu hồ sơ
+          <Check className="h-4 w-4" /> {t('profile.saved')}
         </div>
       )}
 
@@ -1065,6 +1064,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function CvReviewCard({ review }: { review: CvReview }) {
+  const { t } = useTranslation('candidate')
   const score = review.overallScore
   const scoreColor =
     score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-red-600'
@@ -1078,7 +1078,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-        <Sparkles className="h-4 w-4" /> Đánh giá CV bởi AI ({review.reviewedBy ?? 'Gemini'})
+        <Sparkles className="h-4 w-4" /> {t('profile.aiReviewBy')} ({review.reviewedBy ?? 'Gemini'})
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <div className={`grid h-20 w-20 shrink-0 place-items-center rounded-2xl ring-1 ${ring}`}>
@@ -1098,7 +1098,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       {review.strengths.length > 0 && (
         <div className="mt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
-            <CheckCircle2 className="h-4 w-4" /> Điểm mạnh
+            <CheckCircle2 className="h-4 w-4" /> {t('profile.strengths')}
           </div>
           <ul className="space-y-1.5">
             {review.strengths.map((s, i) => (
@@ -1113,7 +1113,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       {review.improvements.length > 0 && (
         <div className="mt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-700">
-            <Lightbulb className="h-4 w-4" /> Gợi ý cải thiện
+            <Lightbulb className="h-4 w-4" /> {t('profile.suggestions')}
           </div>
           <ul className="space-y-1.5">
             {review.improvements.map((s, i) => (
@@ -1128,7 +1128,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       {review.missingSections.length > 0 && (
         <div className="mt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-            <AlertTriangle className="h-4 w-4" /> Còn thiếu
+            <AlertTriangle className="h-4 w-4" /> {t('profile.missing')}
           </div>
           <div className="flex flex-wrap gap-2">
             {review.missingSections.map((s, i) => (
@@ -1145,7 +1145,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
 
       {review.reviewedAt && (
         <p className="mt-4 text-xs text-ink-400">
-          Phân tích lúc {new Date(review.reviewedAt).toLocaleString('vi-VN')}
+          {t('profile.analyzedAt')} {new Date(review.reviewedAt).toLocaleString('vi-VN')}
         </p>
       )}
     </div>

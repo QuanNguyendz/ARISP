@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   Search,
   MapPin,
@@ -22,7 +23,7 @@ import {
 import { useAuthStore } from '@store/auth'
 import CandidateHeader from '@components/layout/CandidateHeader'
 import jobService from '@/services/job/jobService'
-import type { JobFacets } from '@/services/job/jobService'
+import type { JobFacets, RecommendedJob } from '@/services/job/jobService'
 import { savedJobService } from '@/services/job/savedJobService'
 import { provinceService } from '@/services/location/provinceService'
 import type { City } from '@/services/location/provinceService'
@@ -71,14 +72,16 @@ const EMPTY_FILTERS: FiltersState = {
 
 // ============== HELPER FUNCTIONS ==============
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable || 
-      (job.salaryMin == null && job.salaryMax == null) || 
-      (job.salaryMin === 0 && job.salaryMax === 0)) {
+  if (
+    job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
     return 'Thỏa thuận'
   }
 
   const cur = (job.salaryCurrency || 'VND').toUpperCase()
-  
+
   const formatVal = (n: number) => {
     if (cur === 'VND') {
       return n.toLocaleString('vi-VN')
@@ -88,14 +91,19 @@ function formatSalary(job: JobPosting): string {
 
   const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
 
-  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
     return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
   }
-  
+
   if (job.salaryMin != null && job.salaryMin !== 0) {
     return `Từ ${formatVal(job.salaryMin)}${unit}`
   }
-  
+
   if (job.salaryMax != null && job.salaryMax !== 0) {
     return `Đến ${formatVal(job.salaryMax)}${unit}`
   }
@@ -152,7 +160,11 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
@@ -162,7 +174,6 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
   return `${formattedDate} (Còn ${diffDays} ngày)`
 }
-
 
 // ============== FILTER SIDEBAR COMPONENT ==============
 type FilterKey = keyof FiltersState
@@ -241,6 +252,7 @@ function TruncatedList<T>({
   limit?: number
   wrapperClassName?: string
 }) {
+  const { t } = useTranslation('landing')
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? items : items.slice(0, limit)
   return (
@@ -252,7 +264,9 @@ function TruncatedList<T>({
           onClick={() => setExpanded((e) => !e)}
           className="mt-1.5 text-xs font-medium text-brand-600 hover:underline"
         >
-          {expanded ? 'Thu gọn' : `Xem thêm ${items.length - limit}`}
+          {expanded
+            ? t('jobs.filters.collapse')
+            : t('jobs.filters.viewMore', { count: items.length - limit })}
         </button>
       )}
     </>
@@ -318,6 +332,7 @@ function FilterSidebar({
   salaryIsNegotiable,
   setSalaryIsNegotiable,
 }: FilterSidebarProps) {
+  const { t } = useTranslation('landing')
   const hasActiveFilters =
     Object.values(filters).some((arr) => arr.length > 0) ||
     minSalary > 0 ||
@@ -364,7 +379,7 @@ function FilterSidebar({
     activeChips.push({
       key: 'salary-negotiable',
       onClick: () => setSalaryIsNegotiable(false),
-      label: 'Lương: Thỏa thuận',
+      label: t('jobs.filters.salaryNegotiable'),
     })
   } else if (minSalary > 0 || maxSalary < 220) {
     activeChips.push({
@@ -373,7 +388,7 @@ function FilterSidebar({
         setMinSalary(0)
         setMaxSalary(220)
       },
-      label: `Lương: ${minSalary}tr - ${maxSalary === 220 ? '220+tr' : `${maxSalary}tr`}`,
+      label: `${t('jobs.filters.salaryRange')}: ${minSalary}tr - ${maxSalary === 220 ? '220+tr' : `${maxSalary}tr`}`,
     })
   }
 
@@ -392,14 +407,14 @@ function FilterSidebar({
         <div className="flex items-center justify-between">
           <span className="font-semibold flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-brand-600" />
-            Bộ lọc
+            {t('jobs.filters.title')}
           </span>
           {hasActiveFilters && (
             <button
               onClick={onClearAll}
               className="text-xs font-medium text-brand-600 hover:underline"
             >
-              Xoá tất cả
+              {t('jobs.filters.clearAll')}
             </button>
           )}
         </div>
@@ -420,12 +435,12 @@ function FilterSidebar({
         )}
 
         {noFacets ? (
-          <p className="mt-5 text-sm text-ink-400">Chưa có dữ liệu để lọc.</p>
+          <p className="mt-5 text-sm text-ink-400">{t('jobs.filters.noData')}</p>
         ) : (
           <div className="mt-5 divide-y divide-ink-100 text-sm">
             {/* Lĩnh vực */}
             <FacetCheckboxGroup
-              title="Lĩnh vực"
+              title={t('jobs.filters.category')}
               items={facets.categories}
               selected={filters.categories}
               onToggle={(v) => toggleStringFilter('categories', v)}
@@ -433,7 +448,7 @@ function FilterSidebar({
 
             {/* Hình thức */}
             <FacetCheckboxGroup
-              title="Hình thức"
+              title={t('jobs.filters.employmentType')}
               items={facets.employmentTypes}
               selected={filters.employmentTypes}
               onToggle={(v) => toggleStringFilter('employmentTypes', v)}
@@ -441,7 +456,7 @@ function FilterSidebar({
 
             {/* Cấp bậc */}
             <FacetCheckboxGroup
-              title="Cấp bậc"
+              title={t('jobs.filters.experienceLevel')}
               items={facets.experienceLevels}
               selected={filters.experienceLevels}
               onToggle={(v) => toggleStringFilter('experienceLevels', v)}
@@ -449,7 +464,7 @@ function FilterSidebar({
 
             {/* Mức lương */}
             <CollapsibleSection
-              title="Mức lương"
+              title={t('jobs.filters.salaryRange')}
               selectedCount={salaryIsNegotiable || minSalary > 0 || maxSalary < 220 ? 1 : 0}
               defaultOpen={true}
             >
@@ -462,19 +477,35 @@ function FilterSidebar({
                     onChange={(e) => setSalaryIsNegotiable(e.target.checked)}
                     className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                   />
-                  <span>Lương thỏa thuận</span>
+                  <span>{t('jobs.filters.salaryNegotiable')}</span>
                 </label>
 
                 {/* Slider Lọc giá */}
-                <div className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div
+                  className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}
+                >
                   <div className="flex items-center justify-between text-xs text-ink-500 font-medium">
-                    <span>Từ: <strong className="text-ink-800">{minSalary} triệu</strong></span>
-                    <span>Đến: <strong className="text-ink-800">{maxSalary === 220 ? '220+ triệu' : `${maxSalary} triệu`}</strong></span>
+                    <span>
+                      {t('jobs.filters.salaryFrom')}:{' '}
+                      <strong className="text-ink-800">
+                        {minSalary} {t('jobs.filters.salaryMillion')}
+                      </strong>
+                    </span>
+                    <span>
+                      {t('jobs.filters.salaryTo')}:{' '}
+                      <strong className="text-ink-800">
+                        {maxSalary === 220
+                          ? t('jobs.filters.salaryPlus')
+                          : `${maxSalary} ${t('jobs.filters.salaryMillion')}`}
+                      </strong>
+                    </span>
                   </div>
 
                   <div className="space-y-2">
                     <div>
-                      <span className="text-[11px] text-ink-400 block mb-1">Tối thiểu (Min)</span>
+                      <span className="text-[11px] text-ink-400 block mb-1">
+                        {t('jobs.filters.salaryMin')}
+                      </span>
                       <input
                         type="range"
                         min="0"
@@ -491,7 +522,9 @@ function FilterSidebar({
                     </div>
 
                     <div>
-                      <span className="text-[11px] text-ink-400 block mb-1">Tối đa (Max)</span>
+                      <span className="text-[11px] text-ink-400 block mb-1">
+                        {t('jobs.filters.salaryMax')}
+                      </span>
                       <input
                         type="range"
                         min="0"
@@ -513,7 +546,10 @@ function FilterSidebar({
 
             {/* Nơi làm việc */}
             {facets.workModes.length > 0 && (
-              <CollapsibleSection title="Nơi làm việc" selectedCount={filters.workModes.length}>
+              <CollapsibleSection
+                title={t('jobs.filters.workLocation')}
+                selectedCount={filters.workModes.length}
+              >
                 <div className="grid grid-cols-3 gap-1.5">
                   {facets.workModes.map((mode) => (
                     <button
@@ -534,7 +570,7 @@ function FilterSidebar({
 
             {/* Địa điểm (tỉnh/thành lấy từ Province Open API, chỉ nơi có job) */}
             <FacetCheckboxGroup
-              title="Địa điểm"
+              title={t('jobs.filters.location')}
               items={locationFacets}
               selected={filters.locations}
               onToggle={(v) => toggleStringFilter('locations', v)}
@@ -543,7 +579,7 @@ function FilterSidebar({
             {/* Kỹ năng / Công nghệ — mặc định thu gọn vì có thể rất nhiều */}
             {facets.skills.length > 0 && (
               <CollapsibleSection
-                title="Kỹ năng / Công nghệ"
+                title={t('jobs.filters.skills')}
                 selectedCount={filters.skills.length}
                 defaultOpen={filters.skills.length > 0}
               >
@@ -569,8 +605,8 @@ function FilterSidebar({
 
             {/* Ngôn ngữ phỏng vấn — mặc định thu gọn */}
             <FacetCheckboxGroup
-              title="Ngôn ngữ phỏng vấn"
-              description="AI phỏng vấn theo ngôn ngữ của JD"
+              title={t('jobs.filters.interviewLanguage')}
+              description={t('jobs.filters.interviewLanguageHint')}
               items={facets.languages}
               selected={filters.languages}
               onToggle={(v) => toggleStringFilter('languages', v)}
@@ -591,6 +627,7 @@ function CvTipBanner({
   isAuthenticated: boolean
   onAction: () => void
 }) {
+  const { t } = useTranslation('landing')
   return (
     <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-ai-200 bg-gradient-to-r from-ai-50/80 to-brand-50/70 p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
@@ -598,11 +635,9 @@ function CvTipBanner({
           <Sparkles className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <div className="font-display font-bold text-ink-900">Mẹo — Tải CV để xem độ phù hợp</div>
+          <div className="font-display font-bold text-ink-900">{t('jobs.cvTip.title')}</div>
           <p className="text-sm text-ink-500">
-            {isAuthenticated
-              ? 'Tải CV lên hồ sơ để AI chấm điểm phù hợp CV–JD và gợi ý việc khớp nhất với bạn.'
-              : 'Đăng nhập và tải CV lên để AI chấm điểm phù hợp CV–JD và gợi ý việc khớp nhất với bạn.'}
+            {isAuthenticated ? t('jobs.cvTip.authenticated') : t('jobs.cvTip.unauthenticated')}
           </p>
         </div>
       </div>
@@ -610,7 +645,7 @@ function CvTipBanner({
         onClick={onAction}
         className="shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
       >
-        {isAuthenticated ? 'Tải CV lên' : 'Đăng nhập'}
+        {isAuthenticated ? t('jobs.cvTip.uploadCv') : t('jobs.cvTip.login')}
       </button>
     </div>
   )
@@ -621,10 +656,14 @@ interface JobCardProps {
   job: JobPosting
   isSaved?: boolean
   onToggleSave?: (jobId: string) => void
+  /** Kỹ năng khớp với hồ sơ ứng viên — có giá trị thì hiển thị badge "gợi ý theo CV". */
+  matchedSkills?: string[]
 }
 
-function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
+function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardProps) {
+  const { t } = useTranslation('landing')
   const navigate = useNavigate()
+  const hasMatch = !!matchedSkills && matchedSkills.length > 0
 
   return (
     <article
@@ -639,11 +678,24 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">{job.title}</h3>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">
+                  {job.title}
+                </h3>
+                {hasMatch && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
+                    title={`Khớp kỹ năng: ${matchedSkills!.join(', ')}`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {t('jobs.skillMatch', { count: matchedSkills!.length })}
+                  </span>
+                )}
+              </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
                 <MapPin className="w-3.5 h-3.5" />
-                {job.location || 'Remote'} · {job.department || 'Engineering'}
+                {job.location || t('jobs.noLocation')} · {job.department || t('jobs.noDepartment')}
               </div>
             </div>
             <button
@@ -651,7 +703,7 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
                 e.stopPropagation()
                 onToggleSave?.(job.id)
               }}
-              title={isSaved ? 'Bỏ lưu việc làm' : 'Lưu việc làm'}
+              title={isSaved ? t('jobs.unsave') : t('jobs.saved')}
               className={`shrink-0 p-2 rounded-lg transition-colors ${isSaved ? 'text-ai-600' : 'text-ink-300 hover:text-ai-600'}`}
             >
               <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
@@ -674,10 +726,11 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
           </div>
           <div className="mt-3 flex items-center justify-between">
             <span className="text-xs text-ink-400 font-medium">
-              Đăng {formatPostedDate(job.createdAt)}
+              {t('jobs.postedOn', { date: formatPostedDate(job.createdAt) })}
               {job.applicationDeadline && (
                 <span className="text-amber-600 font-medium">
-                  {' · Hạn nộp: '}{getDeadlineText(job.applicationDeadline)}
+                  {' · '}
+                  {t('jobs.deadline', { text: getDeadlineText(job.applicationDeadline) })}
                 </span>
               )}
             </span>
@@ -688,7 +741,7 @@ function JobCard({ job, isSaved = false, onToggleSave }: JobCardProps) {
               }}
               className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
             >
-              Ứng tuyển
+              {t('jobs.apply')}
             </button>
           </div>
         </div>
@@ -769,6 +822,7 @@ function Pagination({
 
 // ============== MAIN PAGE COMPONENT ==============
 export default function FindJob() {
+  const { t } = useTranslation('landing')
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -778,6 +832,7 @@ export default function FindJob() {
   const [profileSkills, setProfileSkills] = useState<string[]>([])
   const [profileHasCv, setProfileHasCv] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [recommended, setRecommended] = useState<RecommendedJob[]>([])
   const locationNames = new Set(cities.map((c) => c.name))
   const [sortBy, setSortBy] = useState<'newest' | 'salary_desc' | 'salary_asc'>('newest')
   const [minSalary, setMinSalary] = useState<number>(0)
@@ -803,8 +858,10 @@ export default function FindJob() {
   const queryParams = {
     search: searchQuery || undefined,
     categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
-    employmentTypes: filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
-    experienceLevels: filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
+    employmentTypes:
+      filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
+    experienceLevels:
+      filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
     workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
     locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
     skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
@@ -817,7 +874,11 @@ export default function FindJob() {
     pageSize: JOBS_PER_PAGE,
   }
 
-  const { data: jobsData, isLoading: loading, error } = useQuery({
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error,
+  } = useQuery({
     queryKey: ['public-jobs', queryParams],
     queryFn: () => jobService.getPublicJobPostings(queryParams),
     refetchOnWindowFocus: false,
@@ -851,6 +912,7 @@ export default function FindJob() {
       setProfileSkills([])
       setProfileHasCv(false)
       setSavedIds(new Set())
+      setRecommended([])
       return
     }
     profileService
@@ -867,6 +929,11 @@ export default function FindJob() {
       .getSavedJobIds()
       .then((ids) => setSavedIds(new Set(ids)))
       .catch(() => setSavedIds(new Set()))
+    // Gợi ý theo CV — BE rank theo kỹ năng hồ sơ. Không có kỹ năng/không phải ứng viên → mảng rỗng.
+    jobService
+      .getRecommendedJobs(6)
+      .then(setRecommended)
+      .catch(() => setRecommended([]))
   }, [isAuthenticated])
 
   // Lưu / bỏ lưu việc làm. Cập nhật lạc quan (optimistic), rollback nếu API lỗi.
@@ -940,18 +1007,12 @@ export default function FindJob() {
         <div className="relative mx-auto max-w-6xl px-6 py-14">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-ai-50 px-3 py-1 text-xs font-semibold text-ai-700 ring-1 ring-ai-200">
             <Sparkles className="w-3.5 h-3.5" />
-            Phỏng vấn AI tự động · Đánh giá khách quan
+            {t('jobs.aiInterviewing')}
           </span>
           <h1 className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-[1.4] max-w-2xl text-ink-900">
-            Tìm công việc IT phù hợp với{' '}
-            <span className="inline-block pb-1 bg-gradient-to-r from-brand-600 to-ai-600 bg-clip-text text-transparent">
-              bạn nhất
-            </span>
+            {t('jobs.findJobTitle')}
           </h1>
-          <p className="mt-3 max-w-xl text-ink-500">
-            Ứng tuyển trực tiếp, AI phân tích độ phù hợp CV–JD và phỏng vấn bạn qua nhiều vòng —
-            minh bạch, không thiên vị.
-          </p>
+          <p className="mt-3 max-w-xl text-ink-500">{t('jobs.findJobSubtitle')}</p>
 
           {/* Search bar */}
           <div className="mt-7 rounded-2xl border border-ink-200 bg-white p-2 shadow-card flex flex-col gap-2 sm:flex-row">
@@ -959,7 +1020,7 @@ export default function FindJob() {
               <Search className="w-5 h-5 text-ink-400" />
               <input
                 className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
-                placeholder="Chức danh, kỹ năng (React, .NET...)"
+                placeholder={t('jobs.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -976,14 +1037,14 @@ export default function FindJob() {
                     locations: city ? [city.name] : [],
                   }))
                 }}
-                placeholder="Địa điểm"
+                placeholder={t('jobs.locationPlaceholder')}
                 emptyText="Không tìm thấy tỉnh/thành"
                 icon={<MapPin className="w-5 h-5 shrink-0 text-ink-400" />}
                 onClear={() => setFilters((prev) => ({ ...prev, locations: [] }))}
               />
             </div>
             <button className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-              Tìm kiếm
+              {t('jobs.searchButton')}
             </button>
           </div>
 
@@ -991,7 +1052,7 @@ export default function FindJob() {
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-500">
             <span className="inline-flex items-center gap-1.5">
               {suggestionsArePersonalized && <Sparkles className="w-3.5 h-3.5 text-ai-600" />}
-              Gợi ý cho bạn:
+              {t('jobs.suggestions')}
             </span>
             {suggestions.map((keyword) => (
               <button
@@ -1035,22 +1096,48 @@ export default function FindJob() {
             />
           )}
 
+          {/* Gợi ý theo CV — chỉ hiện khi ứng viên đã có kỹ năng trong hồ sơ + có tin khớp */}
+          {recommended.length > 0 && (
+            <div className="mb-8">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-ai-50 text-ai-600 ring-1 ring-ai-200">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <h2 className="font-display text-lg font-bold text-ink-900">
+                  Việc phù hợp với bạn
+                </h2>
+                <span className="text-sm text-ink-400">· gợi ý theo CV của bạn</span>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {recommended.map((r) => (
+                  <JobCard
+                    key={r.job.id}
+                    job={r.job}
+                    isSaved={savedIds.has(r.job.id)}
+                    onToggleSave={handleToggleSave}
+                    matchedSkills={r.matchedSkills}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Section Header */}
           <div ref={listTopRef} className="flex items-center justify-between scroll-mt-24">
             <h2 className="font-display text-lg font-bold text-ink-900">
-              {loading ? 'Đang tải...' : `${totalCount} việc làm phù hợp`}
+              {loading ? t('jobs.loading') : t('jobs.jobCount', { count: totalCount })}
             </h2>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
             >
-              <option value="newest">Mới nhất</option>
+              <option value="newest">{t('jobs.sortNewest')}</option>
               <option value="salary_desc" disabled={salaryIsNegotiable}>
-                Lương: Cao đến Thấp {salaryIsNegotiable && '(Đang khóa)'}
+                {salaryIsNegotiable ? t('jobs.sortSalaryHighDisabled') : t('jobs.sortSalaryHigh')}
               </option>
               <option value="salary_asc" disabled={salaryIsNegotiable}>
-                Lương: Thấp đến Cao {salaryIsNegotiable && '(Đang khóa)'}
+                {salaryIsNegotiable ? t('jobs.sortSalaryLowDisabled') : t('jobs.sortSalaryLow')}
               </option>
             </select>
           </div>
@@ -1066,18 +1153,16 @@ export default function FindJob() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
-                <p className="text-sm text-ink-500">Đang tải tin tuyển dụng mới nhất...</p>
+                <p className="text-sm text-ink-500">{t('jobs.loadingJobs')}</p>
               </div>
             ) : totalCount === 0 ? (
               <div className="rounded-2xl border border-ink-200 bg-white p-12 text-center">
-                <p className="text-ink-500">
-                  Không tìm thấy tin tuyển dụng nào phù hợp với bộ lọc tìm kiếm.
-                </p>
+                <p className="text-ink-500">{t('jobs.noJobs')}</p>
                 <button
                   onClick={clearFilters}
                   className="mt-4 px-4 py-2 rounded-lg bg-brand-600 text-sm font-semibold text-white hover:bg-brand-700"
                 >
-                  Xóa bộ lọc
+                  {t('jobs.clearFilters')}
                 </button>
               </div>
             ) : (
@@ -1102,10 +1187,10 @@ export default function FindJob() {
       {/* Footer */}
       <footer className="border-t border-ink-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-ink-400 flex items-center justify-between">
-          <span>© 2026 ARISP — Nền tảng tuyển dụng & phỏng vấn AI</span>
+          <span>{t('footer.copyright', { year: new Date().getFullYear() })}</span>
           <span className="flex items-center gap-1.5">
             <Check className="w-4 h-4" />
-            Đánh giá minh bạch
+            {t('footer.transparentEvaluation')}
           </span>
         </div>
       </footer>

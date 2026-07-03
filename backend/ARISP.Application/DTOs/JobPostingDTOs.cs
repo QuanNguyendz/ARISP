@@ -225,6 +225,17 @@ namespace ARISP.Application.DTOs
             };
     }
 
+    /// <summary>
+    /// Một tin được gợi ý cho ứng viên dựa trên độ trùng kỹ năng giữa CV/hồ sơ và tin.
+    /// <see cref="MatchedSkills"/> là các kỹ năng khớp (theo casing của tin) để hiển thị badge "gợi ý theo CV".
+    /// </summary>
+    public class RecommendedJobResponse
+    {
+        public JobPostingListItemResponse Job { get; set; } = new();
+        public List<string> MatchedSkills { get; set; } = new();
+        public int MatchCount { get; set; }
+    }
+
     /// <summary>Một mục trong bộ lọc (facet): giá trị thô, nhãn hiển thị và số lượng job khớp.</summary>
     public class JobFacetItem
     {

@@ -24,7 +24,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Áp design system + logo ARISP vào `frontend` thật (token màu brand/ai/ink, font Plus Jakarta Sans/Inter).
 - [ ] Dark/light theme toggle toàn FE (lưu localStorage / `preferred_theme`), no-flash init.
 - [ ] **i18n UI candidate VI/EN** (react-i18next) — [ADR-033]; cột `candidate_accounts.preferred_locale`.
-  - [x] 2026-07-01 **Thiết lập hạ tầng i18n + translate toàn bộ Auth pages** — Setup react-i18next, LanguageSwitcher component, locale files (vi/en), translate 8 auth pages (LoginPage, CandidateLoginPage, RegisterPage, CandidateRegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, OAuthCallbackPage).
+  - [x] 2026-07-03 **Cập nhật Candidate pages sử dụng i18n** — Translate ProfilePage, ApplicationsPage, SchedulePage, FeedbackPage, SettingsPage, SavedJobsPage sử dụng react-i18next với candidate.json (vi/en).
 - [ ] **Saved Jobs (bookmark)** — [ADR-034]; bảng `saved_jobs`, API lưu/bỏ lưu + trang "Việc đã lưu".
 - [x] 2026-06-18 **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
 - [ ] Header candidate: tìm kiếm toàn cục (⌘K), menu người dùng, notification center (đọc/đánh dấu đã đọc), badge số liệu.
@@ -299,12 +299,27 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
-- [x] 2026-07-01: **Thiết lập hạ tầng i18n + translate toàn bộ Auth pages (PR: feature/EN-VI-language-v2).**
-  - Setup react-i18next, i18n configuration (index.ts), LanguageSwitcher component (VI/EN toggle).
-  - Tạo locale files: common.json, auth.json, errors.json, candidate.json, landing.json, interview.json, jobs.json (cho cả vi và en).
-  - Translate 8 auth pages: LoginPage, CandidateLoginPage, RegisterPage, CandidateRegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, OAuthCallbackPage.
-  - Translation keys: labels, placeholders, buttons, error messages, success messages, all UI text.
-
+- [x] 2026-07-03: **Cập nhật Candidate pages sử dụng i18n** — Translate 6 candidate pages (ProfilePage, ApplicationsPage, SchedulePage, FeedbackPage, SettingsPage, SavedJobsPage) sử dụng react-i18next với candidate.json (vi/en). Bổ sung ~200 keys mới vào candidate.json cho cả tiếng Việt và tiếng Anh.
+- [x] 2026-07-03: **Gợi ý việc làm theo CV cho ứng viên (skills-overlap, không tốn AI) — BE + FE.**
+  - **Mục tiêu:** ứng viên thấy danh sách tin "phù hợp với bạn" xếp theo độ trùng kỹ năng, không phát sinh chi phí Gemini (khác với chấm điểm CV-JD per-application).
+  - BE: DTO `RecommendedJobResponse` (`JobPostingDTOs.cs`) gồm `Job` (JobPostingListItemResponse) + `MatchedSkills` + `MatchCount`. Endpoint `GET /api/portal/jobs/recommended?limit=6` trong `CandidatePortalController` (policy `CandidateOnly`): đọc `CandidateAccount.SkillsJson`, lọc ở SQL các tin active/public còn hạn có ≥1 kỹ năng trùng (`j.Skills.Any(s => skillsLower.Contains(...))` — dùng lại pattern GET /jobs), loại tin đã ứng tuyển, chấm điểm + rank ở bộ nhớ theo `MatchCount` desc rồi `PublishedAt/CreatedAt` desc, cắt `limit` (clamp 1..20). Chưa có kỹ năng → trả mảng rỗng. Build API: 0 error.
+  - FE: `jobService.getRecommendedJobs(limit)` + type `RecommendedJob` (→ `/portal/jobs/recommended`). `FindJobPage`: state `recommended`, fetch trong effect theo `isAuthenticated`; thêm section **"Việc phù hợp với bạn"** phía trên danh sách chính, **tái sử dụng `JobCard`** (grid 2 cột), truyền `matchedSkills`. `JobCard` thêm prop optional `matchedSkills` → badge "✨ Khớp N kỹ năng" cạnh tiêu đề (tooltip liệt kê kỹ năng). Không thêm page/route/store mới. `tsc --noEmit`: exit 0.
+  - Ghi chú: nguồn kỹ năng là hồ sơ ứng viên (trích từ CV hoặc tự nhập); banner mời tải CV (`CvTipBanner`) và chips "Gợi ý cho bạn" (từ khoá) đã có sẵn từ trước, độc lập với section mới.
+- [x] 2026-07-03: **Phân trang (10 dòng/trang) cho các màn danh sách bên Recruiter — FE.**
+  - Tiếp nối task phân trang HR, dùng lại component chung `Pagination`. Tất cả client-side (dữ liệu đã tải sẵn, cắt theo trang, `PAGE_SIZE = 10`, tự về trang 1 khi đổi từ khóa/bộ lọc, kẹp trang khi danh sách co lại):
+  - `recruiter/CandidatesPage` (ứng viên), `recruiter/InterviewSessionsPage` (phiên), `recruiter/MyJobsPage` (tin — grid), `recruiter/EvaluationReviewPage` (đánh giá), `recruiter/InterviewCodePage` (ứng viên cấp mã), `recruiter/JobDetailPage` (danh sách ứng viên trong tin).
+  - Bỏ qua: `recruiter/DashboardPage` (chỉ widget preview `slice(0,3/4)`), `recruiter/CandidateDetailPage` + `recruiter/JobScheduleConfigPage` (màn chi tiết/cấu hình per-item, không phải màn duyệt danh sách).
+  - Dọn nốt import thừa tồn đọng (`JobPosting` ở MyJobsPage + DashboardPage, `useState` ở DashboardPage) → `tsc --noEmit` toàn FE sạch (exit 0).
+- [x] 2026-07-03: **Phân trang (10 dòng/trang) cho các màn danh sách bên HR — FE.**
+  - **Bối cảnh:** các màn HR liệt kê dữ liệu nhưng render toàn bộ danh sách không giới hạn; chỉ `EvaluationReviewPage` gọi server-side nhưng cố định `page:1` (câm lặng chỉ hiện 10 dòng, không có nút chuyển trang).
+  - Thêm component dùng chung `Pagination` vào `components/shared/index.tsx` (nút trước/sau + "Trang x/y · N <label>", tự ẩn khi chỉ 1 trang, hỗ trợ light/dark).
+  - **Client-side (dữ liệu đã tải sẵn, cắt theo trang):** `CandidatesPage` (ứng viên), `JobsPage` (tin), `InterviewSessionsPage` (phiên), `PlaybooksPage` (tài liệu), `PendingJobsPage` (tin chờ duyệt), `TeamPage` (yêu cầu) — `PAGE_SIZE = 10`, cắt danh sách đã lọc theo trang, tự về trang 1 khi đổi từ khóa/bộ lọc, kẹp trang khi danh sách co lại (sau duyệt/từ chối/xóa).
+  - **Server-side:** `EvaluationReviewPage` — đưa `page` vào `queryKey`/`queryFn` (`pageSize:10`), dùng `totalPages`/`total` từ response, `keepPreviousData` để không nháy khi chuyển trang.
+  - Dọn 2 import thừa sẵn có trong file đã sửa (`JobPosting` ở JobsPage, `MyAccountRequest` ở TeamPage) để `tsc` sạch. Còn lại lỗi TS6133 tồn đọng ở `recruiter/DashboardPage` + `recruiter/MyJobsPage` (ngoài phạm vi).
+- [x] 2026-07-02: **Xóa thông báo cho Candidate (bell dropdown) — end-to-end FE + BE.**
+  - **Bối cảnh:** chuông thông báo của ứng viên (`CandidateHeader`) chỉ có "Đánh dấu đã đọc", chưa có chức năng xóa — trong khi phía staff (`StaffNotificationsController`) đã có sẵn xóa từng cái + xóa tất cả.
+  - BE (`CandidatePortalController`): thêm `DELETE /api/portal/notifications/{id}` (soft delete 1 thông báo) và `DELETE /api/portal/notifications` (xóa tất cả của ứng viên) — đối xứng với endpoint staff. Sửa `SyncNotificationsAsync` dùng `IgnoreQueryFilters()` khi dựng tập `existing` (theo DedupKey) để thông báo đã xóa **không bị sync tạo lại** ở lần mở sau (giống cách staff đã xử lý). Thêm `using Microsoft.EntityFrameworkCore`.
+  - FE: `notificationService` thêm `remove(id)` + `clearAll()` (→ `/portal/notifications`). `CandidateHeader` bell dropdown: nút "Xóa tất cả" ở header dropdown + nút xóa (icon Trash2) từng thông báo hiện khi hover; đổi row từ `<button>` sang `<div role="button">` để nhúng được nút xóa lồng bên trong, `stopPropagation` để không kích hoạt điều hướng khi xóa; refetch sau khi xóa.
 - [x] 2026-06-30: **Thông báo (Notifications) cho nhân sự nội bộ (HR Admin / Recruiter) — tách endpoint riêng, end-to-end FE + BE + DB.**
   - **Bối cảnh:** nút chuông trên header HR (`HrLayout`) hiển thị badge "3" + 1 thông báo giả hardcode, nút "Đánh dấu đã đọc"/"Xem tất cả" không hoạt động; header Recruiter/Super Admin (`WorkspaceLayout`) chỉ là dropdown rỗng tĩnh. Trước đó chỉ Candidate có thông báo thật.
   - **Quyết định kiến trúc:** **tách controller riêng** thay vì mở rộng `CandidatePortalController` (policy `CandidateOnly` + logic sync khác hẳn). Dùng **chung bảng `notifications`**, người nhận staff qua cột mới `recipient_user_id`.

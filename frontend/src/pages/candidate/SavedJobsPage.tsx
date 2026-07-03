@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
   MapPin,
@@ -15,15 +16,17 @@ import {
 import { savedJobService } from '@/services/job/savedJobService'
 import type { SavedJobItem } from '@/services/job/savedJobService'
 
-function formatSalary(job: SavedJobItem): string {
-  if (job.salaryIsNegotiable || 
-      (job.salaryMin == null && job.salaryMax == null) || 
-      (job.salaryMin === 0 && job.salaryMax === 0)) {
-    return 'Thỏa thuận'
+function formatSalary(job: SavedJobItem, t: (key: string) => string): string {
+  if (
+    job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
+    return t('savedJobs.salaryNegotiable')
   }
 
   const cur = (job.salaryCurrency || 'VND').toUpperCase()
-  
+
   const formatVal = (n: number) => {
     if (cur === 'VND') {
       return n.toLocaleString('vi-VN')
@@ -33,42 +36,47 @@ function formatSalary(job: SavedJobItem): string {
 
   const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
 
-  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
     return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
   }
-  
+
   if (job.salaryMin != null && job.salaryMin !== 0) {
-    return `Từ ${formatVal(job.salaryMin)}${unit}`
-  }
-  
-  if (job.salaryMax != null && job.salaryMax !== 0) {
-    return `Đến ${formatVal(job.salaryMax)}${unit}`
+    return `${t('savedJobs.salaryFrom')} ${formatVal(job.salaryMin)}${unit}`
   }
 
-  return 'Thỏa thuận'
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `${t('savedJobs.salaryTo')} ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  return t('savedJobs.salaryNegotiable')
 }
 
-function formatWorkMode(mode?: string): string {
-  if (!mode) return 'Full-time'
+function formatWorkMode(t: (key: string) => string, mode?: string): string {
+  if (!mode) return t('savedJobs.fulltime')
   const mappings: Record<string, string> = {
-    fulltime: 'Full-time',
-    parttime: 'Part-time',
-    contract: 'Hợp đồng',
-    internship: 'Thực tập',
+    fulltime: t('savedJobs.fulltime'),
+    parttime: t('savedJobs.parttime'),
+    contract: t('savedJobs.contract'),
+    internship: t('savedJobs.internship'),
   }
   return mappings[mode.toLowerCase()] || mode
 }
 
-function formatSavedDate(dateStr: string): string {
+function formatSavedDate(t: (key: string) => string, dateStr: string): string {
   try {
     const diffDays = Math.ceil(
       Math.abs(new Date().getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)
     )
-    if (diffDays <= 1) return 'Hôm nay'
-    if (diffDays <= 2) return 'Hôm qua'
-    return `${diffDays} ngày trước`
+    if (diffDays <= 1) return t('savedJobs.savedToday')
+    if (diffDays <= 2) return t('savedJobs.savedYesterday')
+    return t('savedJobs.savedDaysAgo', { days: diffDays })
   } catch {
-    return 'Gần đây'
+    return t('savedJobs.savedRecent')
   }
 }
 
@@ -88,9 +96,11 @@ function getIconColor(department?: string) {
 }
 
 function SavedJobCard({
+  t,
   job,
   onUnsave,
 }: {
+  t: (key: string) => string
   job: SavedJobItem
   onUnsave: (jobId: string) => void
 }) {
@@ -120,7 +130,7 @@ function SavedJobCard({
                 e.stopPropagation()
                 onUnsave(job.id)
               }}
-              title="Bỏ lưu việc làm"
+              title={t('savedJobs.unsave')}
               className="shrink-0 rounded-lg p-2 text-ai-600 transition-colors hover:text-red-500"
             >
               <Bookmark className="h-5 w-5 fill-current" />
@@ -129,10 +139,10 @@ function SavedJobCard({
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
               <Briefcase className="h-3.5 w-3.5" />
-              {formatWorkMode(job.workMode || job.employmentType)}
+              {formatWorkMode(t, job.workMode || job.employmentType)}
             </span>
             <span className="inline-flex items-center rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
-              {formatSalary(job)}
+              {formatSalary(job, t)}
             </span>
             {job.experienceLevel && (
               <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
@@ -142,7 +152,9 @@ function SavedJobCard({
             )}
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-ink-400">Đã lưu {formatSavedDate(job.savedAt)}</span>
+            <span className="text-xs text-ink-400">
+              {t('savedJobs.savedAt')} {formatSavedDate(t, job.savedAt)}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -150,7 +162,7 @@ function SavedJobCard({
               }}
               className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
             >
-              Ứng tuyển
+              {t('savedJobs.apply')}
             </button>
           </div>
         </div>
@@ -160,6 +172,7 @@ function SavedJobCard({
 }
 
 export default function SavedJobsPage() {
+  const { t } = useTranslation('candidate')
   const [jobs, setJobs] = useState<SavedJobItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -170,12 +183,12 @@ export default function SavedJobsPage() {
     savedJobService
       .getSavedJobs()
       .then((data) => active && setJobs(data))
-      .catch((err: any) => active && setError(err?.message || 'Không tải được danh sách việc đã lưu.'))
+      .catch((err: any) => active && setError(err?.message || t('savedJobs.loadError')))
       .finally(() => active && setLoading(false))
     return () => {
       active = false
     }
-  }, [])
+  }, [t])
 
   // Bỏ lưu — cập nhật lạc quan, rollback nếu API lỗi.
   const handleUnsave = (jobId: string) => {
@@ -190,26 +203,28 @@ export default function SavedJobsPage() {
       <div className="mx-auto max-w-6xl px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
-            Trang chủ
+            {t('profile.home')}
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span className="font-medium text-ink-600">Việc đã lưu</span>
+          <span className="font-medium text-ink-600">{t('savedJobs.title')}</span>
         </div>
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-6">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-2xl font-extrabold leading-tight">Việc đã lưu</h1>
+            <h1 className="font-display text-2xl font-extrabold leading-tight">
+              {t('savedJobs.title')}
+            </h1>
             <p className="mt-1 text-sm text-ink-500">
-              {loading ? 'Đang tải…' : `${jobs.length} việc làm bạn đã lưu để xem lại sau.`}
+              {loading ? t('savedJobs.loading') : `${jobs.length} ${t('savedJobs.jobsSaved')}`}
             </p>
           </div>
           <Link
             to="/jobs"
             className="shrink-0 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
           >
-            Tìm việc làm
+            {t('savedJobs.findJobs')}
           </Link>
         </div>
 
@@ -226,22 +241,21 @@ export default function SavedJobsPage() {
             <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-ai-50 text-ai-600">
               <Bookmark className="h-6 w-6" />
             </span>
-            <h3 className="mt-4 font-semibold text-ink-900">Chưa có việc làm nào được lưu</h3>
+            <h3 className="mt-4 font-semibold text-ink-900">{t('savedJobs.empty')}</h3>
             <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-              Bấm biểu tượng <Bookmark className="mb-0.5 inline h-3.5 w-3.5" /> trên thẻ việc làm để
-              lưu lại và xem nhanh tại đây.
+              {t('savedJobs.savedJobsHint')}
             </p>
             <Link
               to="/jobs"
               className="mt-4 inline-block rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
             >
-              Khám phá việc làm
+              {t('savedJobs.exploreJobs')}
             </Link>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {jobs.map((job) => (
-              <SavedJobCard key={job.id} job={job} onUnsave={handleUnsave} />
+              <SavedJobCard key={job.id} t={t} job={job} onUnsave={handleUnsave} />
             ))}
           </div>
         )}

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
@@ -230,6 +231,71 @@ namespace ARISP.API.Controllers
         private static string ComputeHash(byte[] bytes)
         {
             return Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
+        }
+
+        // ============================================================
+        // GỢI Ý VIỆC LÀM THEO CV (skills-overlap, không tốn AI)
+        // ============================================================
+
+        /// <summary>
+        /// GET /api/portal/jobs/recommended — gợi ý tin tuyển dụng cho ứng viên dựa trên độ trùng
+        /// kỹ năng giữa hồ sơ/CV (<c>CandidateAccount.SkillsJson</c>) và <c>Job.Skills</c>.
+        /// Chỉ xét tin active + public còn hạn, loại các tin đã ứng tuyển, xếp theo số kỹ năng khớp
+        /// giảm dần rồi tới tin mới nhất. Không gọi Gemini/AI. Chưa có kỹ năng → trả danh sách rỗng
+        /// (FE ẩn section, đã có sẵn banner mời tải CV).
+        /// </summary>
+        [HttpGet("jobs/recommended")]
+        public async Task<IActionResult> GetRecommendedJobs([FromQuery] int limit = 6, CancellationToken ct = default)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            if (limit < 1) limit = 1;
+            if (limit > 20) limit = 20;
+
+            var acc = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateId, ct);
+            if (acc == null)
+                return Unauthorized(new { message = "Không tìm thấy tài khoản ứng viên." });
+
+            // Kỹ năng lấy từ hồ sơ (trích từ CV hoặc tự nhập). Không có → không đủ dữ liệu để gợi ý.
+            var skills = DeserializeOrEmpty<List<string>>(acc.SkillsJson)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .ToList();
+            if (skills.Count == 0)
+                return Ok(new List<RecommendedJobResponse>());
+
+            var skillSet = new HashSet<string>(skills.Select(s => s.ToLowerInvariant()));
+            var skillsLower = skillSet.ToList();
+
+            // Tin đã ứng tuyển → loại khỏi gợi ý.
+            var appliedJobIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .QueryAsync(q => q.Where(a => a.CandidateAccountId == candidateId).Select(a => a.JobPostingId), ct))
+                .ToHashSet();
+
+            // Ứng viên tiềm năng: tin active/public còn hạn, có ít nhất 1 kỹ năng trùng (lọc ở SQL).
+            var potential = await _unitOfWork.Repository<JobPosting>().QueryAsync(q =>
+                q.Where(j => j.IsPublicListing && j.Status == "active"
+                             && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow)
+                             && j.Skills != null
+                             && j.Skills.Any(s => skillsLower.Contains(s.ToLower())))
+                 .Select(j => JobPostingListItemResponse.FromEntity(j)), ct);
+
+            // Chấm điểm + xếp hạng ở bộ nhớ (tập tin active của 1 doanh nghiệp là nhỏ).
+            var items = potential
+                .Where(job => !appliedJobIds.Contains(job.Id))
+                .Select(job =>
+                {
+                    var matched = job.Skills.Where(s => skillSet.Contains(s.ToLowerInvariant())).ToList();
+                    return new RecommendedJobResponse { Job = job, MatchedSkills = matched, MatchCount = matched.Count };
+                })
+                .Where(r => r.MatchCount > 0)
+                .OrderByDescending(r => r.MatchCount)
+                .ThenByDescending(r => r.Job.PublishedAt ?? r.Job.CreatedAt)
+                .Take(limit)
+                .ToList();
+
+            return Ok(items);
         }
 
         // ============================================================
@@ -590,6 +656,37 @@ namespace ARISP.API.Controllers
             return Ok(new { read = true });
         }
 
+        /// <summary>DELETE /api/portal/notifications/{id} — xóa (soft delete) một thông báo.</summary>
+        [HttpDelete("notifications/{id:guid}")]
+        public async Task<IActionResult> DeleteNotification(Guid id, CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var n = await _unitOfWork.Repository<Notification>().GetByIdAsync(id, ct);
+            if (n == null || n.CandidateAccountId != candidateId)
+                return NotFound(new { message = "Không tìm thấy thông báo." });
+
+            _unitOfWork.Repository<Notification>().Delete(n);
+            await _unitOfWork.SaveChangesAsync();
+            return Ok(new { deleted = true });
+        }
+
+        /// <summary>DELETE /api/portal/notifications — xóa (soft delete) toàn bộ thông báo của ứng viên.</summary>
+        [HttpDelete("notifications")]
+        public async Task<IActionResult> DeleteAllNotifications(CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var list = (await _unitOfWork.Repository<Notification>()
+                .FindAsync(n => n.CandidateAccountId == candidateId, ct)).ToList();
+            foreach (var n in list)
+                _unitOfWork.Repository<Notification>().Delete(n);
+            if (list.Count > 0) await _unitOfWork.SaveChangesAsync();
+            return Ok(new { deleted = list.Count });
+        }
+
         // ==================== CÀI ĐẶT (Settings) ====================
 
         /// <summary>GET /api/portal/settings — tùy chọn cá nhân (thông báo, quyền riêng tư, ngôn ngữ). Trả mặc định nếu chưa lưu.</summary>
@@ -723,9 +820,13 @@ namespace ARISP.API.Controllers
             string JobTitle(Guid jid) => jobs.TryGetValue(jid, out var t) ? t : "Vị trí tuyển dụng";
 
             var nowUtc = DateTimeOffset.UtcNow;
+            // Tính cả bản đã soft-delete (IgnoreQueryFilters) để thông báo người dùng đã xóa
+            // KHÔNG bị sync tạo lại ở lần mở sau.
             var existing = (await _unitOfWork.Repository<Notification>()
-                .FindAsync(n => n.CandidateAccountId == candidateId, ct))
-                .Select(n => n.DedupKey).ToHashSet();
+                .QueryAsync(q => q.IgnoreQueryFilters()
+                    .Where(n => n.CandidateAccountId == candidateId)
+                    .Select(n => n.DedupKey), ct))
+                .ToHashSet();
             var toAdd = new List<Notification>();
 
             void Add(string key, string type, string title, string? body, string? link, DateTimeOffset createdAt)

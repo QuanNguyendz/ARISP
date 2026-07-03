@@ -33,6 +33,12 @@ export const notificationService = {
   async markRead(id: string): Promise<void> {
     await apiClient.post(`/portal/notifications/${id}/read`)
   },
+  async remove(id: string): Promise<void> {
+    await apiClient.delete(`/portal/notifications/${id}`)
+  },
+  async clearAll(): Promise<void> {
+    await apiClient.delete('/portal/notifications')
+  },
 }
 
 /** Thông báo cho nhân sự nội bộ (HR Admin / Recruiter / Super Admin) — endpoint tách riêng. */
