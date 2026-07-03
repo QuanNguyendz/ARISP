@@ -234,6 +234,71 @@ namespace ARISP.API.Controllers
         }
 
         // ============================================================
+        // GỢI Ý VIỆC LÀM THEO CV (skills-overlap, không tốn AI)
+        // ============================================================
+
+        /// <summary>
+        /// GET /api/portal/jobs/recommended — gợi ý tin tuyển dụng cho ứng viên dựa trên độ trùng
+        /// kỹ năng giữa hồ sơ/CV (<c>CandidateAccount.SkillsJson</c>) và <c>Job.Skills</c>.
+        /// Chỉ xét tin active + public còn hạn, loại các tin đã ứng tuyển, xếp theo số kỹ năng khớp
+        /// giảm dần rồi tới tin mới nhất. Không gọi Gemini/AI. Chưa có kỹ năng → trả danh sách rỗng
+        /// (FE ẩn section, đã có sẵn banner mời tải CV).
+        /// </summary>
+        [HttpGet("jobs/recommended")]
+        public async Task<IActionResult> GetRecommendedJobs([FromQuery] int limit = 6, CancellationToken ct = default)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            if (limit < 1) limit = 1;
+            if (limit > 20) limit = 20;
+
+            var acc = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateId, ct);
+            if (acc == null)
+                return Unauthorized(new { message = "Không tìm thấy tài khoản ứng viên." });
+
+            // Kỹ năng lấy từ hồ sơ (trích từ CV hoặc tự nhập). Không có → không đủ dữ liệu để gợi ý.
+            var skills = DeserializeOrEmpty<List<string>>(acc.SkillsJson)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .ToList();
+            if (skills.Count == 0)
+                return Ok(new List<RecommendedJobResponse>());
+
+            var skillSet = new HashSet<string>(skills.Select(s => s.ToLowerInvariant()));
+            var skillsLower = skillSet.ToList();
+
+            // Tin đã ứng tuyển → loại khỏi gợi ý.
+            var appliedJobIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                .QueryAsync(q => q.Where(a => a.CandidateAccountId == candidateId).Select(a => a.JobPostingId), ct))
+                .ToHashSet();
+
+            // Ứng viên tiềm năng: tin active/public còn hạn, có ít nhất 1 kỹ năng trùng (lọc ở SQL).
+            var potential = await _unitOfWork.Repository<JobPosting>().QueryAsync(q =>
+                q.Where(j => j.IsPublicListing && j.Status == "active"
+                             && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow)
+                             && j.Skills != null
+                             && j.Skills.Any(s => skillsLower.Contains(s.ToLower())))
+                 .Select(j => JobPostingListItemResponse.FromEntity(j)), ct);
+
+            // Chấm điểm + xếp hạng ở bộ nhớ (tập tin active của 1 doanh nghiệp là nhỏ).
+            var items = potential
+                .Where(job => !appliedJobIds.Contains(job.Id))
+                .Select(job =>
+                {
+                    var matched = job.Skills.Where(s => skillSet.Contains(s.ToLowerInvariant())).ToList();
+                    return new RecommendedJobResponse { Job = job, MatchedSkills = matched, MatchCount = matched.Count };
+                })
+                .Where(r => r.MatchCount > 0)
+                .OrderByDescending(r => r.MatchCount)
+                .ThenByDescending(r => r.Job.PublishedAt ?? r.Job.CreatedAt)
+                .Take(limit)
+                .ToList();
+
+            return Ok(items);
+        }
+
+        // ============================================================
         // SAVED JOBS (Việc đã lưu / bookmark)
         // ============================================================
 

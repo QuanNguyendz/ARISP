@@ -298,6 +298,11 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-03: **Gợi ý việc làm theo CV cho ứng viên (skills-overlap, không tốn AI) — BE + FE.**
+  - **Mục tiêu:** ứng viên thấy danh sách tin "phù hợp với bạn" xếp theo độ trùng kỹ năng, không phát sinh chi phí Gemini (khác với chấm điểm CV-JD per-application).
+  - BE: DTO `RecommendedJobResponse` (`JobPostingDTOs.cs`) gồm `Job` (JobPostingListItemResponse) + `MatchedSkills` + `MatchCount`. Endpoint `GET /api/portal/jobs/recommended?limit=6` trong `CandidatePortalController` (policy `CandidateOnly`): đọc `CandidateAccount.SkillsJson`, lọc ở SQL các tin active/public còn hạn có ≥1 kỹ năng trùng (`j.Skills.Any(s => skillsLower.Contains(...))` — dùng lại pattern GET /jobs), loại tin đã ứng tuyển, chấm điểm + rank ở bộ nhớ theo `MatchCount` desc rồi `PublishedAt/CreatedAt` desc, cắt `limit` (clamp 1..20). Chưa có kỹ năng → trả mảng rỗng. Build API: 0 error.
+  - FE: `jobService.getRecommendedJobs(limit)` + type `RecommendedJob` (→ `/portal/jobs/recommended`). `FindJobPage`: state `recommended`, fetch trong effect theo `isAuthenticated`; thêm section **"Việc phù hợp với bạn"** phía trên danh sách chính, **tái sử dụng `JobCard`** (grid 2 cột), truyền `matchedSkills`. `JobCard` thêm prop optional `matchedSkills` → badge "✨ Khớp N kỹ năng" cạnh tiêu đề (tooltip liệt kê kỹ năng). Không thêm page/route/store mới. `tsc --noEmit`: exit 0.
+  - Ghi chú: nguồn kỹ năng là hồ sơ ứng viên (trích từ CV hoặc tự nhập); banner mời tải CV (`CvTipBanner`) và chips "Gợi ý cho bạn" (từ khoá) đã có sẵn từ trước, độc lập với section mới.
 - [x] 2026-07-03: **Phân trang (10 dòng/trang) cho các màn danh sách bên Recruiter — FE.**
   - Tiếp nối task phân trang HR, dùng lại component chung `Pagination`. Tất cả client-side (dữ liệu đã tải sẵn, cắt theo trang, `PAGE_SIZE = 10`, tự về trang 1 khi đổi từ khóa/bộ lọc, kẹp trang khi danh sách co lại):
   - `recruiter/CandidatesPage` (ứng viên), `recruiter/InterviewSessionsPage` (phiên), `recruiter/MyJobsPage` (tin — grid), `recruiter/EvaluationReviewPage` (đánh giá), `recruiter/InterviewCodePage` (ứng viên cấp mã), `recruiter/JobDetailPage` (danh sách ứng viên trong tin).
