@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -22,7 +22,7 @@ import {
 import { useAuthStore } from '@store/auth'
 import CandidateHeader from '@components/layout/CandidateHeader'
 import jobService from '@/services/job/jobService'
-import type { JobFacets, RecommendedJob } from '@/services/job/jobService'
+import type { JobFacets } from '@/services/job/jobService'
 import { savedJobService } from '@/services/job/savedJobService'
 import { provinceService } from '@/services/location/provinceService'
 import type { City } from '@/services/location/provinceService'
@@ -71,14 +71,16 @@ const EMPTY_FILTERS: FiltersState = {
 
 // ============== HELPER FUNCTIONS ==============
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable || 
-      (job.salaryMin == null && job.salaryMax == null) || 
-      (job.salaryMin === 0 && job.salaryMax === 0)) {
+  if (
+    job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
     return 'Thỏa thuận'
   }
 
   const cur = (job.salaryCurrency || 'VND').toUpperCase()
-  
+
   const formatVal = (n: number) => {
     if (cur === 'VND') {
       return n.toLocaleString('vi-VN')
@@ -88,14 +90,19 @@ function formatSalary(job: JobPosting): string {
 
   const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
 
-  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
     return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
   }
-  
+
   if (job.salaryMin != null && job.salaryMin !== 0) {
     return `Từ ${formatVal(job.salaryMin)}${unit}`
   }
-  
+
   if (job.salaryMax != null && job.salaryMax !== 0) {
     return `Đến ${formatVal(job.salaryMax)}${unit}`
   }
@@ -152,7 +159,11 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
@@ -162,7 +173,6 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
   return `${formattedDate} (Còn ${diffDays} ngày)`
 }
-
 
 // ============== FILTER SIDEBAR COMPONENT ==============
 type FilterKey = keyof FiltersState
@@ -466,10 +476,19 @@ function FilterSidebar({
                 </label>
 
                 {/* Slider Lọc giá */}
-                <div className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div
+                  className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}
+                >
                   <div className="flex items-center justify-between text-xs text-ink-500 font-medium">
-                    <span>Từ: <strong className="text-ink-800">{minSalary} triệu</strong></span>
-                    <span>Đến: <strong className="text-ink-800">{maxSalary === 220 ? '220+ triệu' : `${maxSalary} triệu`}</strong></span>
+                    <span>
+                      Từ: <strong className="text-ink-800">{minSalary} triệu</strong>
+                    </span>
+                    <span>
+                      Đến:{' '}
+                      <strong className="text-ink-800">
+                        {maxSalary === 220 ? '220+ triệu' : `${maxSalary} triệu`}
+                      </strong>
+                    </span>
                   </div>
 
                   <div className="space-y-2">
@@ -519,11 +538,10 @@ function FilterSidebar({
                     <button
                       key={mode.value}
                       onClick={() => toggleStringFilter('workModes', mode.value)}
-                      className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
-                        filters.workModes.includes(mode.value)
+                      className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${filters.workModes.includes(mode.value)
                           ? 'border-brand-300 bg-brand-50 text-brand-700'
                           : 'border-ink-200 text-ink-600 hover:border-brand-300'
-                      }`}
+                        }`}
                     >
                       {mode.label} ({mode.count})
                     </button>
@@ -554,11 +572,10 @@ function FilterSidebar({
                     <button
                       key={skill.value}
                       onClick={() => toggleStringFilter('skills', skill.value)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                        filters.skills.includes(skill.value)
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${filters.skills.includes(skill.value)
                           ? 'bg-brand-600 text-white'
                           : 'border border-ink-200 text-ink-600 hover:border-brand-300'
-                      }`}
+                        }`}
                     >
                       {skill.label} ({skill.count})
                     </button>
@@ -644,7 +661,9 @@ function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardP
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">{job.title}</h3>
+                <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">
+                  {job.title}
+                </h3>
                 {hasMatch && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
@@ -691,7 +710,8 @@ function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardP
               Đăng {formatPostedDate(job.createdAt)}
               {job.applicationDeadline && (
                 <span className="text-amber-600 font-medium">
-                  {' · Hạn nộp: '}{getDeadlineText(job.applicationDeadline)}
+                  {' · Hạn nộp: '}
+                  {getDeadlineText(job.applicationDeadline)}
                 </span>
               )}
             </span>
@@ -758,11 +778,10 @@ function Pagination({
             key={p}
             onClick={() => onChange(p)}
             aria-current={p === page ? 'page' : undefined}
-            className={`grid h-9 min-w-[36px] place-items-center rounded-lg px-2 text-sm font-semibold transition ${
-              p === page
+            className={`grid h-9 min-w-[36px] place-items-center rounded-lg px-2 text-sm font-semibold transition ${p === page
                 ? 'bg-brand-600 text-white'
                 : 'border border-ink-200 bg-white text-ink-600 hover:border-brand-300 hover:text-brand-700'
-            }`}
+              }`}
           >
             {p}
           </button>
@@ -792,9 +811,15 @@ export default function FindJob() {
   const [profileSkills, setProfileSkills] = useState<string[]>([])
   const [profileHasCv, setProfileHasCv] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
-  const [recommended, setRecommended] = useState<RecommendedJob[]>([])
   const locationNames = new Set(cities.map((c) => c.name))
-  const [sortBy, setSortBy] = useState<'newest' | 'salary_desc' | 'salary_asc'>('newest')
+  // Kỹ năng hồ sơ (lowercase) — dùng gắn badge "Khớp N kỹ năng" khi sắp xếp theo độ phù hợp CV.
+  const profileSkillsLower = useMemo(
+    () => new Set(profileSkills.map((s) => s.toLowerCase())),
+    [profileSkills]
+  )
+  const [sortBy, setSortBy] = useState<'newest' | 'relevance' | 'salary_desc' | 'salary_asc'>(
+    'newest'
+  )
   const [minSalary, setMinSalary] = useState<number>(0)
   const [maxSalary, setMaxSalary] = useState<number>(220)
   const [salaryIsNegotiable, setSalaryIsNegotiable] = useState<boolean>(false)
@@ -818,8 +843,10 @@ export default function FindJob() {
   const queryParams = {
     search: searchQuery || undefined,
     categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
-    employmentTypes: filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
-    experienceLevels: filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
+    employmentTypes:
+      filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
+    experienceLevels:
+      filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
     workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
     locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
     skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
@@ -832,7 +859,11 @@ export default function FindJob() {
     pageSize: JOBS_PER_PAGE,
   }
 
-  const { data: jobsData, isLoading: loading, error } = useQuery({
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error,
+  } = useQuery({
     queryKey: ['public-jobs', queryParams],
     queryFn: () => jobService.getPublicJobPostings(queryParams),
     refetchOnWindowFocus: false,
@@ -851,6 +882,12 @@ export default function FindJob() {
     }
   }, [salaryIsNegotiable, sortBy])
 
+  // Bỏ chọn "Độ phù hợp (theo CV)" khi không còn kỹ năng (đăng xuất / xoá hết skill) — tránh
+  // giữ lựa chọn sort không còn khả dụng trong dropdown.
+  useEffect(() => {
+    if (sortBy === 'relevance' && profileSkills.length === 0) setSortBy('newest')
+  }, [sortBy, profileSkills])
+
   // Danh sách thành phố trực thuộc TW (Province Open API) — dùng để giới hạn bộ lọc Địa điểm.
   useEffect(() => {
     provinceService
@@ -866,7 +903,6 @@ export default function FindJob() {
       setProfileSkills([])
       setProfileHasCv(false)
       setSavedIds(new Set())
-      setRecommended([])
       return
     }
     profileService
@@ -883,11 +919,6 @@ export default function FindJob() {
       .getSavedJobIds()
       .then((ids) => setSavedIds(new Set(ids)))
       .catch(() => setSavedIds(new Set()))
-    // Gợi ý theo CV — BE rank theo kỹ năng hồ sơ. Không có kỹ năng/không phải ứng viên → mảng rỗng.
-    jobService
-      .getRecommendedJobs(6)
-      .then(setRecommended)
-      .catch(() => setRecommended([]))
   }, [isAuthenticated])
 
   // Lưu / bỏ lưu việc làm. Cập nhật lạc quan (optimistic), rollback nếu API lỗi.
@@ -1056,48 +1087,28 @@ export default function FindJob() {
             />
           )}
 
-          {/* Gợi ý theo CV — chỉ hiện khi ứng viên đã có kỹ năng trong hồ sơ + có tin khớp */}
-          {recommended.length > 0 && (
-            <div className="mb-8">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-lg bg-ai-50 text-ai-600 ring-1 ring-ai-200">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <h2 className="font-display text-lg font-bold text-ink-900">Việc phù hợp với bạn</h2>
-                <span className="text-sm text-ink-400">· gợi ý theo CV của bạn</span>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {recommended.map((r) => (
-                  <JobCard
-                    key={r.job.id}
-                    job={r.job}
-                    isSaved={savedIds.has(r.job.id)}
-                    onToggleSave={handleToggleSave}
-                    matchedSkills={r.matchedSkills}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Section Header */}
           <div ref={listTopRef} className="flex items-center justify-between scroll-mt-24">
             <h2 className="font-display text-lg font-bold text-ink-900">
               {loading ? 'Đang tải...' : `${totalCount} việc làm phù hợp`}
             </h2>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
-            >
-              <option value="newest">Mới nhất</option>
-              <option value="salary_desc" disabled={salaryIsNegotiable}>
-                Lương: Cao đến Thấp {salaryIsNegotiable && '(Đang khóa)'}
-              </option>
-              <option value="salary_asc" disabled={salaryIsNegotiable}>
-                Lương: Thấp đến Cao {salaryIsNegotiable && '(Đang khóa)'}
-              </option>
-            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-600 font-medium">Sắp xếp theo:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
+              >
+                <option value="newest">Mới nhất</option>
+                {profileSkills.length > 0 && <option value="relevance">Độ phù hợp (theo CV)</option>}
+                <option value="salary_desc" disabled={salaryIsNegotiable}>
+                  Lương: Cao đến Thấp {salaryIsNegotiable && '(Đang khóa)'}
+                </option>
+                <option value="salary_asc" disabled={salaryIsNegotiable}>
+                  Lương: Thấp đến Cao {salaryIsNegotiable && '(Đang khóa)'}
+                </option>
+              </select>
+            </div>
           </div>
 
           {error && (
@@ -1132,6 +1143,11 @@ export default function FindJob() {
                   job={job}
                   isSaved={savedIds.has(job.id)}
                   onToggleSave={handleToggleSave}
+                  matchedSkills={
+                    sortBy === 'relevance'
+                      ? (job.skills ?? []).filter((s) => profileSkillsLower.has(s.toLowerCase()))
+                      : undefined
+                  }
                 />
               ))
             )}
