@@ -2,29 +2,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import {
-  Clock,
-  CheckCircle,
-  XCircle,
-  Eye,
-  FileText,
-  MapPin,
-  Loader2,
-} from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { Clock, CheckCircle, XCircle, Eye, FileText, MapPin, Loader2 } from 'lucide-react'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@services/job/jobService'
 import type { JobPosting } from '@/types/job'
 
 function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable || 
-      (job.salaryMin == null && job.salaryMax == null) || 
-      (job.salaryMin === 0 && job.salaryMax === 0)) {
+  if (
+    job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
     return 'Thỏa thuận'
   }
 
   const cur = (job.salaryCurrency || 'VND').toUpperCase()
-  
+
   const formatVal = (n: number) => {
     if (cur === 'VND') {
       return n.toLocaleString('vi-VN')
@@ -34,14 +28,19 @@ function formatSalary(job: JobPosting): string {
 
   const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
 
-  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
     return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
   }
-  
+
   if (job.salaryMin != null && job.salaryMin !== 0) {
     return `Từ ${formatVal(job.salaryMin)}${unit}`
   }
-  
+
   if (job.salaryMax != null && job.salaryMax !== 0) {
     return `Đến ${formatVal(job.salaryMax)}${unit}`
   }
@@ -65,7 +64,11 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
@@ -89,17 +92,23 @@ function isToday(iso?: string): boolean {
 
 export default function PendingJobsPage() {
   const navigate = useNavigate()
-  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
     queryKey: ['admin-jobs'],
     queryFn: () => jobService.getAdminJobPostings(),
     refetchOnWindowFocus: false,
   })
 
   const jobs = jobsData || []
-  const errorMsg = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : null)
-  
+  const errorMsg =
+    (fetchError as any)?.response?.data?.message ||
+    (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : null)
+
   const [error, setError] = useState<string | null>(errorMsg)
-  
+
   // Update internal error state when fetch error changes
   useEffect(() => {
     if (errorMsg) setError(errorMsg)
@@ -108,8 +117,21 @@ export default function PendingJobsPage() {
   const [actionId, setActionId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<JobPosting | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [page, setPage] = useState(1)
 
   const pendingJobs = useMemo(() => jobs.filter((j) => j.status === 'pending'), [jobs])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(pendingJobs.length / PAGE_SIZE))
+  const pagedJobs = useMemo(
+    () => pendingJobs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [pendingJobs, page]
+  )
+
+  // Trở về trang hợp lệ khi danh sách co lại (vd sau khi duyệt/từ chối)
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const stats = useMemo(
     () => [
@@ -190,7 +212,7 @@ export default function PendingJobsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {pendingJobs.map((job, index) => {
+          {pagedJobs.map((job, index) => {
             const busy = actionId === job.id
             return (
               <motion.div
@@ -217,9 +239,7 @@ export default function PendingJobsPage() {
                             {job.location}
                           </span>
                         )}
-                        <span className="flex items-center">
-                          {formatSalary(job)}
-                        </span>
+                        <span className="flex items-center">{formatSalary(job)}</span>
                         {job.department && <span>{job.department}</span>}
                         {job.applicationDeadline && (
                           <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
@@ -273,6 +293,16 @@ export default function PendingJobsPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && pendingJobs.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={pendingJobs.length}
+          label="tin"
+          onPageChange={setPage}
+        />
       )}
 
       {/* Modal từ chối */}

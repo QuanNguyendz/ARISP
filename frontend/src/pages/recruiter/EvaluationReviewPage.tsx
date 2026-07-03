@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ClipboardList, Search, X, Loader2, Lock } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { evaluationService } from '@services/evaluation/evaluationService'
 import { applicationService } from '@services/application/applicationService'
 import type { EvaluationReport } from '@/types/evaluation'
@@ -19,6 +19,7 @@ export default function RecruiterEvaluationReviewPage() {
   const [filter, setFilter] = useState('all')
   const [detail, setDetail] = useState<EvaluationReport | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     ;(async () => {
@@ -61,6 +62,18 @@ export default function RecruiterEvaluationReviewPage() {
         t ? ((e.candidateName || '') + (e.jobTitle || '')).toLowerCase().includes(t) : true
       )
   }, [evals, q, filter])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [q, filter])
 
   const openDetail = async (id: string) => {
     setDetailLoading(true)
@@ -138,7 +151,7 @@ export default function RecruiterEvaluationReviewPage() {
             />
           ) : (
             <div className="space-y-3">
-              {filtered.map((ev, i) => (
+              {paged.map((ev, i) => (
                 <motion.button
                   key={ev.id}
                   initial={{ opacity: 0, y: 8 }}
@@ -176,6 +189,16 @@ export default function RecruiterEvaluationReviewPage() {
                 </motion.button>
               ))}
             </div>
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={filtered.length}
+              label="đánh giá"
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

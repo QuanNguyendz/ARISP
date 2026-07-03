@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Search, Users, Mail, FileText, ChevronRight } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
 import { applicationService } from '@services/application/applicationService'
 import type { HrApplicationItem } from '@/types/application'
@@ -26,6 +26,7 @@ export default function RecruiterCandidatesPage() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     ;(async () => {
@@ -52,6 +53,18 @@ export default function RecruiterCandidatesPage() {
       .filter((a) => (filter === 'all' ? true : a.status === filter))
       .filter((a) => (t ? (a.candidateName + a.candidateEmail + (a.jobTitle || '')).toLowerCase().includes(t) : true))
   }, [apps, q, filter])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [q, filter])
 
   const statCards = [
     { label: 'Tổng ứng viên', value: counts.total, color: 'text-brand-600' },
@@ -107,7 +120,7 @@ export default function RecruiterCandidatesPage() {
           ) : (
             <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
               <div className="divide-y divide-ink-100 dark:divide-white/10">
-                {filtered.map((a, i) => (
+                {paged.map((a, i) => (
                   <motion.div
                     key={a.id}
                     initial={{ opacity: 0, y: 8 }}
@@ -148,6 +161,16 @@ export default function RecruiterCandidatesPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={filtered.length}
+              label="ứng viên"
+              onPageChange={setPage}
+            />
           )}
         </>
       )}
