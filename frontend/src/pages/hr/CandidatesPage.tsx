@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Search, Mail, Eye, Loader2 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert, NoticeAlert } from '@components/shared'
+import {
+  PageHeader,
+  StatsGrid,
+  EmptyState,
+  ErrorAlert,
+  NoticeAlert,
+  Pagination,
+} from '@components/shared'
 import { HrStatsSkeleton, CandidatesTableSkeleton } from './_skeletons'
 import { applicationService } from '@services/application/applicationService'
 import type { HrApplicationItem } from '@/types/application'
@@ -148,6 +155,7 @@ export default function CandidatesPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | Group>('all')
   const [invitingId, setInvitingId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     let active = true
@@ -199,6 +207,18 @@ export default function CandidatesPage() {
       return matchesFilter && matchesSearch
     })
   }, [apps, search, filter])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [search, filter])
 
   const handleInvite = async (e: React.MouseEvent, app: HrApplicationItem) => {
     e.stopPropagation()
@@ -295,7 +315,7 @@ export default function CandidatesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((app, index) => {
+                {paged.map((app, index) => {
                   const meta = statusMeta(app.status)
                   return (
                     <motion.tr
@@ -376,6 +396,16 @@ export default function CandidatesPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {!loading && !error && filtered.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={filtered.length}
+          label="ứng viên"
+          onPageChange={setPage}
+        />
       )}
     </div>
   )

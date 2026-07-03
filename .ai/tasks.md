@@ -298,6 +298,17 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-03: **Phân trang (10 dòng/trang) cho các màn danh sách bên Recruiter — FE.**
+  - Tiếp nối task phân trang HR, dùng lại component chung `Pagination`. Tất cả client-side (dữ liệu đã tải sẵn, cắt theo trang, `PAGE_SIZE = 10`, tự về trang 1 khi đổi từ khóa/bộ lọc, kẹp trang khi danh sách co lại):
+  - `recruiter/CandidatesPage` (ứng viên), `recruiter/InterviewSessionsPage` (phiên), `recruiter/MyJobsPage` (tin — grid), `recruiter/EvaluationReviewPage` (đánh giá), `recruiter/InterviewCodePage` (ứng viên cấp mã), `recruiter/JobDetailPage` (danh sách ứng viên trong tin).
+  - Bỏ qua: `recruiter/DashboardPage` (chỉ widget preview `slice(0,3/4)`), `recruiter/CandidateDetailPage` + `recruiter/JobScheduleConfigPage` (màn chi tiết/cấu hình per-item, không phải màn duyệt danh sách).
+  - Dọn nốt import thừa tồn đọng (`JobPosting` ở MyJobsPage + DashboardPage, `useState` ở DashboardPage) → `tsc --noEmit` toàn FE sạch (exit 0).
+- [x] 2026-07-03: **Phân trang (10 dòng/trang) cho các màn danh sách bên HR — FE.**
+  - **Bối cảnh:** các màn HR liệt kê dữ liệu nhưng render toàn bộ danh sách không giới hạn; chỉ `EvaluationReviewPage` gọi server-side nhưng cố định `page:1` (câm lặng chỉ hiện 10 dòng, không có nút chuyển trang).
+  - Thêm component dùng chung `Pagination` vào `components/shared/index.tsx` (nút trước/sau + "Trang x/y · N <label>", tự ẩn khi chỉ 1 trang, hỗ trợ light/dark).
+  - **Client-side (dữ liệu đã tải sẵn, cắt theo trang):** `CandidatesPage` (ứng viên), `JobsPage` (tin), `InterviewSessionsPage` (phiên), `PlaybooksPage` (tài liệu), `PendingJobsPage` (tin chờ duyệt), `TeamPage` (yêu cầu) — `PAGE_SIZE = 10`, cắt danh sách đã lọc theo trang, tự về trang 1 khi đổi từ khóa/bộ lọc, kẹp trang khi danh sách co lại (sau duyệt/từ chối/xóa).
+  - **Server-side:** `EvaluationReviewPage` — đưa `page` vào `queryKey`/`queryFn` (`pageSize:10`), dùng `totalPages`/`total` từ response, `keepPreviousData` để không nháy khi chuyển trang.
+  - Dọn 2 import thừa sẵn có trong file đã sửa (`JobPosting` ở JobsPage, `MyAccountRequest` ở TeamPage) để `tsc` sạch. Còn lại lỗi TS6133 tồn đọng ở `recruiter/DashboardPage` + `recruiter/MyJobsPage` (ngoài phạm vi).
 - [x] 2026-07-02: **Xóa thông báo cho Candidate (bell dropdown) — end-to-end FE + BE.**
   - **Bối cảnh:** chuông thông báo của ứng viên (`CandidateHeader`) chỉ có "Đánh dấu đã đọc", chưa có chức năng xóa — trong khi phía staff (`StaffNotificationsController`) đã có sẵn xóa từng cái + xóa tất cả.
   - BE (`CandidatePortalController`): thêm `DELETE /api/portal/notifications/{id}` (soft delete 1 thông báo) và `DELETE /api/portal/notifications` (xóa tất cả của ứng viên) — đối xứng với endpoint staff. Sửa `SyncNotificationsAsync` dùng `IgnoreQueryFilters()` khi dựng tập `existing` (theo DedupKey) để thông báo đã xóa **không bị sync tạo lại** ở lần mở sau (giống cách staff đã xử lý). Thêm `using Microsoft.EntityFrameworkCore`.

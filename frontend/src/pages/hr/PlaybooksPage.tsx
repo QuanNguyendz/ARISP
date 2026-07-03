@@ -14,7 +14,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeader, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { CardGridSkeleton } from './_skeletons'
 import { playbookService, type PlaybookItem } from '@services/playbook/playbookService'
 import jobService from '@services/job/jobService'
@@ -59,6 +59,7 @@ export default function HrPlaybooksPage() {
   const [filter, setFilter] = useState('all')
   const [showUpload, setShowUpload] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const load = async () => {
     setLoading(true)
@@ -80,6 +81,18 @@ export default function HrPlaybooksPage() {
     () => (filter === 'all' ? docs : docs.filter((d) => d.scope === filter)),
     [docs, filter]
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [filter])
 
   const remove = async (id: string) => {
     setDeletingId(id)
@@ -132,7 +145,7 @@ export default function HrPlaybooksPage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((d, i) => {
+          {paged.map((d, i) => {
             const Icon = scopeIcon(d.scope)
             return (
               <motion.div
@@ -184,6 +197,16 @@ export default function HrPlaybooksPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={filtered.length}
+          label="tài liệu"
+          onPageChange={setPage}
+        />
       )}
 
       {showUpload && (

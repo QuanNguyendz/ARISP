@@ -1,12 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
 
 type StatusKey = 'draft' | 'active' | 'paused' | 'closed'
 type FilterKey = 'all' | StatusKey
@@ -49,7 +48,11 @@ function getDeadlineText(deadlineStr?: string | null): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
@@ -61,15 +64,22 @@ function getDeadlineText(deadlineStr?: string | null): string {
 }
 
 export default function HrJobsPage() {
-  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
     queryKey: ['admin-jobs'],
     queryFn: () => jobService.getAdminJobPostings(),
     refetchOnWindowFocus: false,
   })
 
   const jobs = jobsData || []
-  const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
+  const error =
+    (fetchError as any)?.response?.data?.message ||
+    (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [page, setPage] = useState(1)
 
   const stats = useMemo(() => {
     const count = (s: StatusKey) => jobs.filter((j) => j.status === s).length
@@ -89,6 +99,18 @@ export default function HrJobsPage() {
     () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
     [jobs, filter]
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [filter])
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
@@ -144,7 +166,7 @@ export default function HrJobsPage() {
 
       {!loading && !error && filtered.length > 0 && (
         <div className="space-y-4">
-          {filtered.map((job, index) => {
+          {paged.map((job, index) => {
             const meta = STATUS_META[job.status as StatusKey] ?? STATUS_META.draft
             return (
               <motion.div
@@ -224,6 +246,16 @@ export default function HrJobsPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && !error && filtered.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={filtered.length}
+          label="tin"
+          onPageChange={setPage}
+        />
       )}
     </div>
   )

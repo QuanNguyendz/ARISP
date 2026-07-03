@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -15,11 +15,10 @@ import {
   XCircle,
   AlertCircle,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { RequestListSkeleton } from './_skeletons'
 import {
   accountRequestService,
-  type MyAccountRequest,
   type NewAccountRequestItem,
 } from '@services/hr/accountRequestService'
 
@@ -56,8 +55,14 @@ const initials = (n: string) =>
 export default function HrTeamPage() {
   const [showModal, setShowModal] = useState(false)
   const [notice, setNotice] = useState('')
+  const [page, setPage] = useState(1)
 
-  const { data: requestsData, isLoading: loading, error: queryError, refetch } = useQuery({
+  const {
+    data: requestsData,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
     queryKey: ['my-account-requests'],
     queryFn: () => accountRequestService.getMine(),
     refetchOnWindowFocus: false,
@@ -83,6 +88,18 @@ export default function HrTeamPage() {
     { label: 'Đã duyệt', value: stats.approved, color: 'text-emerald-600' },
     { label: 'Bị từ chối', value: stats.rejected, color: 'text-red-600' },
   ]
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE))
+  const pagedRequests = useMemo(
+    () => requests.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [requests, page]
+  )
+
+  // Trở về trang hợp lệ khi danh sách thay đổi
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   return (
     <div className="min-h-screen bg-ink-50 p-6 dark:bg-ink-950 lg:p-8">
@@ -118,7 +135,7 @@ export default function HrTeamPage() {
         />
       ) : (
         <div className="space-y-3">
-          {requests.map((r, i) => {
+          {pagedRequests.map((r, i) => {
             const meta = statusMeta(r.status)
             return (
               <motion.div
@@ -163,6 +180,16 @@ export default function HrTeamPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && requests.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={requests.length}
+          label="yêu cầu"
+          onPageChange={setPage}
+        />
       )}
 
       {showModal && (

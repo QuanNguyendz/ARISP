@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Video, Search, Clock, FileVideo } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
 import { applicationService } from '@services/application/applicationService'
 import {
@@ -27,6 +27,7 @@ export default function RecruiterInterviewSessionsPage() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     ;(async () => {
@@ -63,6 +64,18 @@ export default function RecruiterInterviewSessionsPage() {
       .filter((s) => (filter === 'all' ? true : s.status === filter))
       .filter((s) => (t ? (s.candidateName + (s.jobTitle || '')).toLowerCase().includes(t) : true))
   }, [sessions, q, filter])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [q, filter])
 
   const statCards = [
     { label: 'Tổng phiên', value: counts.total, color: 'text-brand-600' },
@@ -125,7 +138,7 @@ export default function RecruiterInterviewSessionsPage() {
           ) : (
             <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
               <div className="divide-y divide-ink-100 dark:divide-white/10">
-                {filtered.map((s, i) => (
+                {paged.map((s, i) => (
                   <motion.div
                     key={s.id}
                     initial={{ opacity: 0, y: 8 }}
@@ -171,6 +184,16 @@ export default function RecruiterInterviewSessionsPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={filtered.length}
+              label="phiên"
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

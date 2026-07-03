@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -19,7 +19,7 @@ import {
   Target,
   CalendarClock,
 } from 'lucide-react'
-import { ErrorAlert } from '@components/shared'
+import { ErrorAlert, Pagination } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
 import jobService from '@services/job/jobService'
 import { applicationService } from '@services/application/applicationService'
@@ -91,7 +91,8 @@ export default function RecruiterJobDetailPage() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [invitingId, setInvitingId] = useState<string | null>(null)
-  
+  const [page, setPage] = useState(1)
+
   const error = mutationError || (jobError as any)?.response?.data?.message || (jobError ? 'Không tải được chi tiết tin tuyển dụng.' : '')
 
   const load = refetchApps
@@ -103,6 +104,18 @@ export default function RecruiterJobDetailPage() {
 
   const hired = useMemo(() => apps.filter((a) => a.status === 'pass').length, [apps])
   const isFull = job?.vacancies != null && job.vacancies > 0 && hired >= job.vacancies
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(apps.length / PAGE_SIZE))
+  const pagedApps = useMemo(
+    () => apps.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [apps, page]
+  )
+
+  // Kẹp trang khi danh sách ứng viên thay đổi
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const changeStatus = async (status: JobPosting['status']) => {
     if (!id) return
@@ -364,7 +377,7 @@ export default function RecruiterJobDetailPage() {
           </div>
         ) : (
           <div className="divide-y divide-ink-100 dark:divide-white/10">
-            {apps.map((a) => (
+            {pagedApps.map((a) => (
               <div
                 key={a.id}
                 className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
@@ -425,6 +438,16 @@ export default function RecruiterJobDetailPage() {
           </div>
         )}
       </div>
+
+      {apps.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={apps.length}
+          label="ứng viên"
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }
