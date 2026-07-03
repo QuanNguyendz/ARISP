@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Search,
   Bookmark,
@@ -126,12 +127,15 @@ const USER_MENU = [
 type Drop = 'user' | 'notif' | 'lang' | 'mobile' | null
 
 export default function CandidateHeader() {
+  const { i18n } = useTranslation()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user, isAuthenticated, logout } = useAuthStore()
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
   const rootRef = useRef<HTMLElement>(null)
+
+  const langMap: Record<string, string> = { vi: 'VI', en: 'EN' }
 
   const { data: notifData, refetch } = useQuery({
     queryKey: ['notifications'],
@@ -164,7 +168,10 @@ export default function CandidateHeader() {
 
   const openNotif = (n: NotificationItem) => {
     if (!n.isRead) {
-      notificationService.markRead(n.id).then(() => refetch()).catch(() => {})
+      notificationService
+        .markRead(n.id)
+        .then(() => refetch())
+        .catch(() => {})
     }
     setOpen(null)
     navigate(n.link || '/candidate/notifications')
@@ -265,18 +272,39 @@ export default function CandidateHeader() {
               className="flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
             >
               <Globe className="h-[18px] w-[18px]" />
-              VI <ChevronDown className="h-3.5 w-3.5" />
+              {langMap[i18n.language] || 'VI'} <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {open === 'lang' && (
               <div
                 className="absolute right-0 mt-2 w-40 rounded-xl border border-ink-200 bg-white p-1 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <button className="flex w-full items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700">
-                  Tiếng Việt <Check className="h-4 w-4" />
+                <button
+                  onClick={() => {
+                    i18n.changeLanguage('vi')
+                    setOpen(null)
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'vi' || !i18n.language
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
+                >
+                  Tiếng Việt{' '}
+                  {i18n.language === 'vi' || !i18n.language ? <Check className="h-4 w-4" /> : null}
                 </button>
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-ink-600 hover:bg-ink-100">
-                  English
+                <button
+                  onClick={() => {
+                    i18n.changeLanguage('en')
+                    setOpen(null)
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'en'
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
+                >
+                  English {i18n.language === 'en' ? <Check className="h-4 w-4" /> : null}
                 </button>
               </div>
             )}
