@@ -1,4 +1,13 @@
-import { LayoutDashboard, Briefcase, Users, KeyRound, ClipboardList, Video, Settings, Plus } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Briefcase,
+  Users,
+  KeyRound,
+  ClipboardList,
+  Video,
+  Settings,
+  Plus,
+} from 'lucide-react'
 import WorkspaceLayout, { type WorkspaceNavItem } from './WorkspaceLayout'
 
 const navItems: WorkspaceNavItem[] = [
@@ -20,6 +29,7 @@ export default function RecruiterLayout() {
       homePath="/recruiter/dashboard"
       searchPlaceholder="Tìm tin tuyển dụng, ứng viên..."
       settingsPath="/recruiter/settings"
+      notificationsPath="/recruiter/notifications"
       primaryAction={{ label: 'Tạo tin', to: '/recruiter/jobs/create', icon: Plus }}
     />
   )

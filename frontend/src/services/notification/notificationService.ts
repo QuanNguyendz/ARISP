@@ -22,6 +22,17 @@ export interface NotificationListResult {
  */
 export const STAFF_NOTIF_REFRESH_EVENT = 'staff-notifications:refresh'
 
+/**
+ * Chuẩn hoá link thông báo về route hiện hành. Xử lý dữ liệu tồn đọng: thông báo "Phân tích CV
+ * hoàn tất" cũ trỏ tới `/candidate/find-jobs/{id}/apply` (route không tồn tại) → map về `/jobs/{id}/apply`.
+ */
+export function resolveNotifLink(link?: string | null): string | undefined {
+  if (!link) return undefined
+  const legacy = link.match(/^\/candidate\/find-jobs\/([^/]+)\/apply$/)
+  if (legacy) return `/jobs/${legacy[1]}/apply`
+  return link
+}
+
 export const notificationService = {
   async list(): Promise<NotificationListResult> {
     const { data } = await apiClient.get<NotificationListResult>('/portal/notifications')

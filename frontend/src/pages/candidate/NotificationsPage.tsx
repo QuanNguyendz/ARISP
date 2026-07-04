@@ -10,7 +10,7 @@ import {
   Settings,
   ChevronRight,
 } from 'lucide-react'
-import { notificationService } from '@services/notification/notificationService'
+import { notificationService, resolveNotifLink } from '@services/notification/notificationService'
 import type { NotificationItem } from '@services/notification/notificationService'
 import { Skeleton } from '@components/ui/Skeleton'
 
@@ -87,13 +87,7 @@ const GROUP_LABEL: Record<string, string> = {
   older: 'Trước đó',
 }
 
-function NotifRow({
-  n,
-  onOpen,
-}: {
-  n: NotificationItem
-  onOpen: (n: NotificationItem) => void
-}) {
+function NotifRow({ n, onOpen }: { n: NotificationItem; onOpen: (n: NotificationItem) => void }) {
   const { Icon, cls } = notifStyle(n.type)
   return (
     <button
@@ -171,7 +165,7 @@ export default function NotificationsPage() {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
       notificationService.markRead(n.id).catch(() => {})
     }
-    navigate(n.link || '/candidate/applications')
+    navigate(resolveNotifLink(n.link) || '/candidate/applications')
   }
 
   return (
@@ -190,7 +184,9 @@ export default function NotificationsPage() {
         <div>
           <h1 className="font-display text-2xl font-extrabold text-ink-900">Thông báo</h1>
           <p className="text-sm text-ink-500">
-            {unreadCount > 0 ? `Bạn có ${unreadCount} thông báo chưa đọc` : 'Bạn đã đọc hết thông báo'}
+            {unreadCount > 0
+              ? `Bạn có ${unreadCount} thông báo chưa đọc`
+              : 'Bạn đã đọc hết thông báo'}
           </p>
         </div>
         <div className="flex items-center gap-2">
