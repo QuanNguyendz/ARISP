@@ -298,6 +298,13 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-03: **Sửa link "Xem chi tiết" của thông báo "Phân tích CV hoàn tất" (candidate) — BE + FE.**
+  - BE (`CandidatePortalController`): thông báo AI phân tích CV xong tạo `Link = "/candidate/find-jobs/{id}/apply"` — **route không tồn tại** (đúng phải là `/jobs/{id}/apply`) → bấm bị 404. Sửa link về `/jobs/{jobPostingId}/apply`.
+  - FE (chống dữ liệu tồn đọng — thông báo cũ đã lưu vẫn giữ link sai do `DedupKey` chặn tạo lại): thêm `resolveNotifLink()` trong `notificationService` map legacy `/candidate/find-jobs/{id}/apply` → `/jobs/{id}/apply`; áp dụng ở `candidate/NotificationsPage` và `CandidateHeader` khi điều hướng. FE `tsc`: exit 0; BE build: 0 error.
+- [x] 2026-07-03: **Trang thông báo đầy đủ cho HR Admin & Recruiter — FE.**
+  - Trước đó staff chỉ có chuông dropdown (`HrLayout`/`WorkspaceLayout`), chưa có trang danh sách đầy đủ. Nay thêm màn `/hr/notifications` + `/recruiter/notifications`.
+  - Component dùng chung `components/notifications/StaffNotificationsView.tsx` (role-agnostic — `n.link` từ BE đã đúng khu vực role): tái sử dụng `staffNotificationService` (list/markAllRead/markRead/remove/clearAll), lọc theo tab (Tất cả/Chưa đọc/Ứng viên/Đánh giá/Tin tuyển dụng/Hệ thống), phân trang **10/trang** (shared `Pagination`), đánh dấu đã đọc + xoá từng cái + "Xóa tất cả" (có confirm), cập nhật lạc quan, skeleton + `EmptyState`/`ErrorAlert`. Style light+dark theo design system (PageHeader, token ink/brand/ai, motion). 2 page mỏng `pages/hr/NotificationsPage.tsx` + `pages/recruiter/NotificationsPage.tsx` bọc view.
+  - Điều hướng: thêm link **"Xem tất cả thông báo"** ở cuối dropdown chuông — `HrLayout` (→ `/hr/notifications`) và `WorkspaceLayout` (prop mới `notificationsPath`, `RecruiterLayout` truyền `/recruiter/notifications`; SuperAdmin không truyền nên không hiện link). Routes lazy-load trong `App.tsx` trong đúng ProtectedRoute từng role. Không đổi backend (endpoint `/staff/notifications` đã có). `tsc --noEmit`: exit 0.
 - [x] 2026-07-03: **Bỏ dropdown lọc "Mọi cấp bậc" ở đầu danh sách Job Board (theo yêu cầu user) — FE.**
   - Gỡ `<select>` lọc cấp bậc vừa thêm cạnh dropdown sort trên `FindJobPage`; giữ nguyên dropdown sort (gồm option "Độ phù hợp (theo CV)"). Bộ lọc "Kinh nghiệm" ở sidebar không đụng tới. `tsc`: exit 0.
 - [x] 2026-07-03: **Gộp gợi ý CV vào bộ lọc — bỏ section "Việc phù hợp với bạn" riêng, dùng sort "Độ phù hợp (theo CV)" — BE + FE.**
