@@ -41,14 +41,6 @@ export interface PaginatedJobs {
   totalCount: number
 }
 
-/** Một tin được gợi ý cho ứng viên (rank theo độ trùng kỹ năng CV/hồ sơ ở backend). */
-export interface RecommendedJob {
-  job: JobPosting
-  /** Các kỹ năng của tin trùng với hồ sơ ứng viên — dùng hiển thị badge "gợi ý theo CV". */
-  matchedSkills: string[]
-  matchCount: number
-}
-
 export const jobService = {
   // Public: Bộ lọc khả dụng (chỉ những giá trị có trong DB) + số lượng cho Job Board
   async getJobFacets(): Promise<JobFacets> {
@@ -93,15 +85,6 @@ export const jobService = {
   // Get job detail by ID (Supports both public candidates and HR staff)
   async getJobPostingById(id: string): Promise<JobPosting> {
     const { data } = await apiClient.get<JobPosting>(`/jobs/${id}`)
-    return data
-  },
-
-  // Candidate: tin gợi ý theo độ trùng kỹ năng CV/hồ sơ (rank ở backend). Cần đăng nhập ứng viên;
-  // chưa có kỹ năng trong hồ sơ → trả mảng rỗng.
-  async getRecommendedJobs(limit = 6): Promise<RecommendedJob[]> {
-    const { data } = await apiClient.get<RecommendedJob[]>('/portal/jobs/recommended', {
-      params: { limit },
-    })
     return data
   },
 
