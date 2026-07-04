@@ -41,8 +41,10 @@ namespace ARISP.Application.Services
             int finalRoundNumber = roundNumber ?? 1;
             if (!roundNumber.HasValue)
             {
+                // Dùng ToLower() thay vì string.Equals(..., StringComparison) — EF Core/Npgsql
+                // KHÔNG dịch được overload có StringComparison sang SQL (gây lỗi 500 khi cấp mã).
                 var sessions = await _unitOfWork.Repository<InterviewSession>().FindAsync(
-                    s => s.ApplicationId == applicationId && string.Equals(s.Status, "completed", StringComparison.OrdinalIgnoreCase), ct);
+                    s => s.ApplicationId == applicationId && s.Status != null && s.Status.ToLower() == "completed", ct);
                 finalRoundNumber = sessions.Any() ? sessions.Max(s => s.RoundNumber) + 1 : 1;
             }
 

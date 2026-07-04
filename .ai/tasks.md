@@ -298,6 +298,10 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-04: **Fix lỗi 500 khi Recruiter cấp mã phỏng vấn (`POST /api/interview/generate-code`) — BE.**
+  - Triệu chứng: FE hiện "Không thể cấp mã phỏng vấn" (fallback). Log API: `InvalidOperationException: The LINQ expression ... could not be translated` tại `InterviewCodeService.GenerateCodeAsync` line 44.
+  - Nguyên nhân: khi gọi **không truyền `roundNumber`** (FE `generateCode(appId)` luôn vậy) → nhánh tính round dùng `string.Equals(s.Status, "completed", StringComparison.OrdinalIgnoreCase)` trong predicate `FindAsync` (Expression → dịch SQL). Overload `string.Equals(..., StringComparison)` **EF Core/Npgsql không dịch được** → 500. Không liên quan role (trang cấp mã của Recruiter là nơi duy nhất gọi endpoint này nên chỉ thấy ở Recruiter).
+  - Fix: đổi sang `s.Status != null && s.Status.ToLower() == "completed"` (EF dịch được `lower()`). Quét toàn `Application/Services`: không còn chỗ nào dùng `StringComparison` trong predicate EF. Build API: 0 error. **Cần restart API** để có hiệu lực.
 - [x] 2026-07-03: **Sửa link "Xem chi tiết" của thông báo "Phân tích CV hoàn tất" (candidate) — BE + FE.**
   - BE (`CandidatePortalController`): thông báo AI phân tích CV xong tạo `Link = "/candidate/find-jobs/{id}/apply"` — **route không tồn tại** (đúng phải là `/jobs/{id}/apply`) → bấm bị 404. Sửa link về `/jobs/{jobPostingId}/apply`.
   - FE (chống dữ liệu tồn đọng — thông báo cũ đã lưu vẫn giữ link sai do `DedupKey` chặn tạo lại): thêm `resolveNotifLink()` trong `notificationService` map legacy `/candidate/find-jobs/{id}/apply` → `/jobs/{id}/apply`; áp dụng ở `candidate/NotificationsPage` và `CandidateHeader` khi điều hướng. FE `tsc`: exit 0; BE build: 0 error.
