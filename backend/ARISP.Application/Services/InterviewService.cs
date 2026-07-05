@@ -18,19 +18,144 @@ namespace ARISP.Application.Services
         private readonly IEmbeddingProvider _embeddingProvider;
         private readonly IAvatarService _avatarService;
         private readonly INotificationService _notificationService;
+        private readonly IDeepgramTokenService _deepgramTokenService;
+        private readonly IRagIngestionService _ragIngestion;
+        private readonly ITTSService _ttsService;
 
         public InterviewService(
             IUnitOfWork unitOfWork,
             IAIProvider aiProvider,
             IEmbeddingProvider embeddingProvider,
             IAvatarService avatarService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IDeepgramTokenService deepgramTokenService,
+            IRagIngestionService ragIngestion,
+            ITTSService ttsService)
         {
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
             _embeddingProvider = embeddingProvider;
             _avatarService = avatarService;
             _notificationService = notificationService;
+            _deepgramTokenService = deepgramTokenService;
+            _ragIngestion = ragIngestion;
+            _ttsService = ttsService;
+        }
+
+        /// <summary>
+        /// TTS cho 1 câu hỏi (base64 PCM 24k) để FE đẩy vào LiveAvatar repeatAudio (ADR-044).
+        /// Xác thực ứng viên sở hữu phiên. Rỗng nếu chưa cấu hình ElevenLabs → FE fallback browser TTS.
+        /// </summary>
+        public async Task<Result<string>> GetSpeechAudioAsync(
+            Guid sessionId, string text, Guid? candidateAccountId, string? candidateEmail, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return Result.Success(string.Empty);
+
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<string>("Không tìm thấy phiên phỏng vấn.");
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
+            if (application == null)
+                return Result.Failure<string>("Không tìm thấy hồ sơ ứng tuyển.");
+            var owns = (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
+                       || (!string.IsNullOrEmpty(candidateEmail)
+                           && string.Equals(application.CandidateEmail, candidateEmail, StringComparison.OrdinalIgnoreCase));
+            if (!owns)
+                return Result.Failure<string>("Bạn không có quyền truy cập phiên phỏng vấn này.");
+
+            try
+            {
+                var audio = await _ttsService.TextToSpeechBase64PcmAsync(text, string.Empty, ct);
+                return Result.Success(audio);
+            }
+            catch
+            {
+                return Result.Success(string.Empty); // FE fallback browser TTS
+            }
+        }
+
+        /// <summary>
+        /// Đảm bảo CV (theo application) + JD (theo job) đã được ingest vào document_chunks để
+        /// RAG (hybrid retrieve hoặc in-process) có ngữ cảnh khi sinh câu hỏi. Chỉ ingest khi THIẾU
+        /// (idempotent, tránh re-embed mỗi lần vào phòng). An toàn nếu RAG service tạm lỗi (nuốt lỗi).
+        /// </summary>
+        private async Task EnsureSourcesIngestedAsync(ARISP.Domain.Entities.Application application, JobPosting? jobPosting, CancellationToken ct)
+        {
+            try
+            {
+                var cvExists = (await _unitOfWork.Repository<DocumentChunk>()
+                    .QueryAsync(q => q.Where(c => c.SourceType == "cv" && c.SourceId == application.Id).Select(c => c.Id).Take(1), ct)).Any();
+                if (!cvExists && !string.IsNullOrWhiteSpace(application.CvText))
+                    await _ragIngestion.IngestAsync("cv", application.Id, application.CvText!, ct: ct);
+
+                if (jobPosting != null && !string.IsNullOrWhiteSpace(jobPosting.JobDescription))
+                {
+                    var jdExists = (await _unitOfWork.Repository<DocumentChunk>()
+                        .QueryAsync(q => q.Where(c => c.SourceType == "jd" && c.SourceId == jobPosting.Id).Select(c => c.Id).Take(1), ct)).Any();
+                    if (!jdExists)
+                        await _ragIngestion.IngestAsync("jd", jobPosting.Id, jobPosting.JobDescription, ct: ct);
+                }
+            }
+            catch
+            {
+                // RAG service/embedding tạm lỗi → vẫn vào phỏng vấn (openai path dùng full-text JD/CV trực tiếp).
+            }
+        }
+
+        /// <summary>
+        /// Cấu hình media cho FE vào phòng phỏng vấn: mint token Deepgram (STT) + HeyGen (avatar),
+        /// kèm ngôn ngữ + voice. Xác thực ứng viên sở hữu phiên. Token nào chưa cấu hình key → null
+        /// (FE tự fallback).
+        /// </summary>
+        public async Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(
+            Guid sessionId, Guid? candidateAccountId, string? candidateEmail, CancellationToken ct = default)
+        {
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<PracticeMediaConfigResponse>("Không tìm thấy phiên phỏng vấn.");
+
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
+            if (application == null)
+                return Result.Failure<PracticeMediaConfigResponse>("Không tìm thấy hồ sơ ứng tuyển.");
+
+            var owns = (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
+                       || (!string.IsNullOrEmpty(candidateEmail)
+                           && string.Equals(application.CandidateEmail, candidateEmail, StringComparison.OrdinalIgnoreCase));
+            if (!owns)
+                return Result.Failure<PracticeMediaConfigResponse>("Bạn không có quyền truy cập phiên phỏng vấn này.");
+
+            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+
+            // Token media là BEST-EFFORT: provider lỗi (hết key/sunset/transient) → null để FE
+            // fallback mềm (browser TTS / nhập tay), KHÔNG được làm sập cả phòng phỏng vấn.
+            DeepgramToken? deepgram = null;
+            try { deepgram = await _deepgramTokenService.CreateTemporaryTokenAsync(ct); }
+            catch { /* STT tuỳ chọn */ }
+
+            AvatarStreamingToken? avatar = null;
+            try { avatar = await _avatarService.CreateStreamingTokenAsync(null, jobPosting?.PersonaVoiceId, ct); }
+            catch { /* avatar tuỳ chọn — FE fallback browser TTS + bot tĩnh */ }
+
+            return Result.Success(new PracticeMediaConfigResponse
+            {
+                SessionId = session.Id,
+                Language = session.InterviewLanguage,
+                SessionType = session.SessionType,
+                Deepgram = deepgram == null ? null : new DeepgramConfigDto
+                {
+                    Token = deepgram.AccessToken,
+                    ExpiresInSeconds = deepgram.ExpiresInSeconds,
+                    Model = deepgram.Model
+                },
+                HeyGen = avatar == null ? null : new HeyGenConfigDto
+                {
+                    Token = avatar.Token,
+                    ServerUrl = avatar.ServerUrl,
+                    AvatarId = avatar.AvatarId,
+                    VoiceId = avatar.VoiceId
+                }
+            });
         }
 
         /// <summary>
@@ -137,6 +262,9 @@ namespace ARISP.Application.Services
             await _unitOfWork.Repository<InterviewSession>().AddAsync(session, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
+            // Đảm bảo CV + JD đã ingest vào RAG (practice = JD+CV; playbook chỉ cho real) trước câu hỏi đầu.
+            await EnsureSourcesIngestedAsync(application, jobPosting, ct);
+
             // Seed Must-Ask questions from Playbook into tracking if it's a real session
             if (request.SessionType == "real")
             {
@@ -212,21 +340,23 @@ namespace ARISP.Application.Services
                 return Result.Success("Interview completed.");
             }
 
-            // 1. Gather Weighted RAG Context
+            // 1. Gather Weighted RAG Context.
+            // CHỈ project ChunkText — KHÔNG load full entity (cột `embedding` kiểu pgvector không
+            // materialize được qua Npgsql/EF khi chưa bật UseVector → InvalidCastException).
             var ragContext = new List<string>();
             var cvChunks = await _unitOfWork.Repository<DocumentChunk>()
-                .FindAsync(c => c.SourceType == "cv" && c.SourceId == application.Id, ct);
-            ragContext.AddRange(cvChunks.Select(c => $"[CV Chunk] {c.ChunkText}"));
+                .QueryAsync(q => q.Where(c => c.SourceType == "cv" && c.SourceId == application.Id).Select(c => c.ChunkText), ct);
+            ragContext.AddRange(cvChunks.Select(t => $"[CV Chunk] {t}"));
 
             var jdChunks = await _unitOfWork.Repository<DocumentChunk>()
-                .FindAsync(c => c.SourceType == "jd" && c.SourceId == jobPosting!.Id, ct);
-            ragContext.AddRange(jdChunks.Select(c => $"[JD Chunk] {c.ChunkText}"));
+                .QueryAsync(q => q.Where(c => c.SourceType == "jd" && c.SourceId == jobPosting!.Id).Select(c => c.ChunkText), ct);
+            ragContext.AddRange(jdChunks.Select(t => $"[JD Chunk] {t}"));
 
             if (session.SessionType == "real")
             {
                 var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
-                    .FindAsync(c => c.SourceType == "playbook", ct);
-                ragContext.AddRange(playbookChunks.Select(c => $"[Org Playbook] {c.ChunkText}"));
+                    .QueryAsync(q => q.Where(c => c.SourceType == "playbook").Select(c => c.ChunkText), ct);
+                ragContext.AddRange(playbookChunks.Select(t => $"[Org Playbook] {t}"));
             }
 
             // 2. Select Next Question Strategy
@@ -245,17 +375,20 @@ namespace ARISP.Application.Services
             }
 
             // 3. Assemble Prompt & Generate via AI
-            var chatHistory = new List<QuestionAnswerDto>();
-            foreach (var q in questions.OrderBy(x => x.SequenceNumber))
-            {
-                var answers = await _unitOfWork.Repository<Answer>().FindAsync(a => a.QuestionId == q.Id, ct);
-                chatHistory.Add(new QuestionAnswerDto
+            // Load toàn bộ answer của phiên trong 1 query (tránh N+1 — DB remote, mỗi round-trip đắt).
+            var sessionAnswers = await _unitOfWork.Repository<Answer>().FindAsync(a => a.SessionId == sessionId, ct);
+            var answerByQuestionId = sessionAnswers
+                .GroupBy(a => a.QuestionId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.CreatedAt).First());
+            var chatHistory = questions
+                .OrderBy(x => x.SequenceNumber)
+                .Select(q => new QuestionAnswerDto
                 {
                     SequenceNumber = q.SequenceNumber,
                     QuestionText = q.QuestionText,
-                    AnswerText = answers.FirstOrDefault()?.Transcript ?? "[No response]"
-                });
-            }
+                    AnswerText = answerByQuestionId.TryGetValue(q.Id, out var a) ? a.Transcript : "[No response]"
+                })
+                .ToList();
 
             var aiContext = new QuestionContext
             {
@@ -303,19 +436,53 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.SaveChangesAsync(ct);
 
-            // 5. Notify SignalR Clients
+            // 5. Notify SignalR Clients — đẩy text ngay để FE hiển thị không chờ TTS.
             await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveQuestion", new
             {
+                questionId = question.Id,
                 sequenceNumber = question.SequenceNumber,
                 questionText = question.QuestionText,
                 questionType = question.QuestionType,
                 difficultyLevel = question.DifficultyLevel
             }, ct);
 
+            // 6. TTS server-side rồi đẩy audio qua SignalR (ReceiveQuestionAudio) — bỏ round-trip
+            // FE→BE /tts (kèm 2 query xác thực) khỏi critical path. Lỗi TTS → FE tự fallback.
+            try
+            {
+                var audio = await _ttsService.TextToSpeechBase64PcmAsync(question.QuestionText, string.Empty, ct);
+                if (!string.IsNullOrEmpty(audio))
+                {
+                    await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveQuestionAudio", new
+                    {
+                        questionId = question.Id,
+                        audio
+                    }, ct);
+                }
+            }
+            catch
+            {
+                // TTS best-effort — FE fallback browser TTS khi không nhận được audio.
+            }
+
             return Result.Success(question.QuestionText);
         }
 
         public async Task<Result<Answer>> SubmitAnswerAsync(Guid sessionId, Guid questionId, string transcript, int? responseTimeMs, CancellationToken ct = default)
+        {
+            var saved = await SaveAnswerAsync(sessionId, questionId, transcript, responseTimeMs, ct);
+            if (saved.IsFailure)
+                return saved;
+
+            await AnalyzeAnswerAndAdaptAsync(sessionId, questionId, transcript, ct);
+            return saved;
+        }
+
+        /// <summary>
+        /// Lưu answer NHANH (không gọi LLM) — dùng ở SessionHub để câu hỏi kế tiếp được sinh ngay,
+        /// phân tích adaptive chạy sau (AnalyzeAnswerAndAdaptAsync) ngoài critical path latency.
+        /// </summary>
+        public async Task<Result<Answer>> SaveAnswerAsync(Guid sessionId, Guid questionId, string transcript, int? responseTimeMs, CancellationToken ct = default)
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
@@ -332,36 +499,41 @@ namespace ARISP.Application.Services
             };
 
             await _unitOfWork.Repository<Answer>().AddAsync(answer, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result.Success(answer);
+        }
 
-            // Analyze answer for adaptive difficulty adjustment
+        /// <summary>
+        /// Phân tích answer để điều chỉnh độ khó (adaptive difficulty) + đẩy ReceiveAnswerAnalysis.
+        /// Best-effort: lỗi LLM không ảnh hưởng luồng phỏng vấn.
+        /// </summary>
+        public async Task AnalyzeAnswerAndAdaptAsync(Guid sessionId, Guid questionId, string transcript, CancellationToken ct = default)
+        {
             try
             {
                 var question = await _unitOfWork.Repository<Question>().GetByIdAsync(questionId, ct);
-                if (question != null)
+                if (question == null) return;
+
+                var analysis = await _aiProvider.AnalyzeAnswerAsync(new AnswerContext
                 {
-                    var analysis = await _aiProvider.AnalyzeAnswerAsync(new AnswerContext
-                    {
-                        QuestionText = question.QuestionText,
-                        AnswerTranscript = transcript
-                    }, ct);
+                    QuestionText = question.QuestionText,
+                    AnswerTranscript = transcript
+                }, ct);
 
-                    // Update question difficulty level adaptively
-                    question.DifficultyLevel = analysis.DifficultyLevel;
-                    _unitOfWork.Repository<Question>().Update(question);
+                // Update question difficulty level adaptively
+                question.DifficultyLevel = analysis.DifficultyLevel;
+                _unitOfWork.Repository<Question>().Update(question);
+                await _unitOfWork.SaveChangesAsync(ct);
 
-                    await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveAnswerAnalysis", new
-                    {
-                        feedback = analysis.Feedback
-                    }, ct);
-                }
+                await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveAnswerAnalysis", new
+                {
+                    feedback = analysis.Feedback
+                }, ct);
             }
             catch
             {
                 // Fallback if AI analysis fails
             }
-
-            await _unitOfWork.SaveChangesAsync(ct);
-            return Result.Success(answer);
         }
 
         public async Task<Result<bool>> EndSessionAsync(Guid sessionId, string status = "completed", CancellationToken ct = default)

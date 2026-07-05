@@ -286,6 +286,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-039 | RAG microservice Python (`rag-service/`, FastAPI+LangChain+LangGraph) sở hữu **toàn bộ** chunk/embed/hybrid-retrieve/sinh câu hỏi+đánh giá. .NET gọi qua HTTP/SSE (`RagServiceProvider` + `IRagIngestionService`), `OpenAIProvider` là fallback qua cờ `AI:Provider`. pgvector trên Postgres (schema do EF sở hữu). **Giai đoạn 1 Hybrid RAG đã triển khai (2026-06-26)**; CRAG/Agentic còn backlog |
 | ADR-040 | Cổng kiểm tra mic + cam bắt buộc trước mọi phỏng vấn (thử & thật) — component `DeviceCheck` |
 | ADR-043 | Media stack phỏng vấn chốt: **Cascaded** (~0.8–1.2s, không speech-to-speech) — Deepgram Nova-3 (STT+VAD) + ElevenLabs Flash v2.5 + Hybrid RAG + **GPT-4o (Claude là option dành sau)** + HeyGen. TTFT là yếu tố chính; Haiku 4.5 nhanh nhất nếu cần giảm trễ |
+| ADR-044 | Nối media thực tế: **client-SDK + BE mint token** (`/session/{id}/media-config`). Deepgram live (FE) + HeyGen Streaming Avatar (FE `speak`) + ElevenLabs voice route qua HeyGen; `SignalRNotificationService` đẩy `ReceiveQuestion`. Fallback mềm khi thiếu key. BE giữ key, không relay media |
 | ADR-018 | Language-aware AI: detect từ JD, điều chỉnh system prompt + TTS voice + STT languageCode |
 | ADR-023 | Auth nội bộ: Email + Password (chính) + Google OAuth2 optional; pre-provisioning + domain validation |
 | ADR-025 | Playbook scope: Company / Job Posting / Round; RAG weighted retrieve |
