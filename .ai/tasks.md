@@ -298,6 +298,21 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-05: **Real-time bảng candidate/applications khi cấp mã mới — FE.**
+  - Triệu chứng: sau khi HR cấp mã, chuông đã real-time nhưng **bảng hồ sơ ứng tuyển** (mã On-site, đếm ngược, trạng thái) chưa cập nhật cho tới khi F5.
+  - Nguyên nhân: `candidate/ApplicationsPage` fetch **1 lần lúc mount bằng `useState`+`useEffect`** (không qua react-query) → invalidate `['notifications']` không chạm tới nó.
+  - Fix: thêm hằng `CANDIDATE_DATA_REFRESH_EVENT` (notificationService); `useAppNotifications` khi nhận `ReceiveUserNotification` giờ invalidate thêm `['applications']` **và** phát DOM event này; `ApplicationsPage` tách fetch thành `loadData(silent)` + lắng nghe event để **refetch nền** (không bật lại skeleton). Bỏ `any` (FE rule). `tsc`: exit 0. FE-only, hot-reload.
+- [x] 2026-07-05: **Real-time chuông candidate khi HR/Recruiter cấp mã phỏng vấn — BE.**
+  - Triệu chứng: HR cấp mã cho candidate nhưng chuông trên header candidate không cập nhật tức thời (phải F5/mở lại trang).
+  - Nguyên nhân: `InterviewController.generate-code` → `InterviewCodeService.GenerateCodeAsync` chỉ tạo `InterviewCode` + `AuditLog`, **không đẩy SignalR** cho candidate. Notification `invite:{codeId}` vốn được `SyncNotificationsAsync` sinh ra, nhưng chỉ khi candidate gọi `/portal/notifications` (load/refetch) → không real-time.
+  - Fix: inject `INotificationService` vào `InterviewCodeService`; sau khi lưu mã, nếu `Application.CandidateAccountId` có giá trị thì `PublishUserEventAsync(candidateAccountId, "ReceiveUserNotification", …)`. FE `useAppNotifications` nhận event → invalidate `['notifications']` → refetch → `SyncNotificationsAsync` tạo notification → chuông cập nhật tức thì. Push bọc try/catch (best-effort, không làm hỏng việc cấp mã). Áp dụng cho cả `GenerateBatchAsync` (gọi lại `GenerateCodeAsync`). Build `ARISP.Application`: 0 error. **Cần restart API.**
+- [x] 2026-07-05: **Đồng bộ thiết kế bảng ứng viên trang Recruiter theo trang HR — FE.**
+  - `recruiter/CandidatesPage`: chuyển từ list `divide-y` sang `<table>` với cột **Ứng viên · Vị trí · Trạng thái · Match · Ngày ứng tuyển · Thao tác** (khớp `hr/CandidatesPage`).
+  - Match hiển thị dạng số (không `%`), ngày dạng `dd/mm/yyyy` (`toLocaleDateString('vi-VN')`), thao tác là icon xem CV (`FileText`) + xem chi tiết (`Eye`). Không thêm nút mời phỏng vấn (magic link là quyền HR). Giữ nguyên data/filter/phân trang của Recruiter. Bỏ `catch (e: any)` (FE rule). `tsc`: exit 0.
+- [x] 2026-07-04: **Link thông báo "Phân tích CV hoàn tất" trỏ về `/jobs/{id}` thay vì trang nộp đơn — BE + FE.**
+  - Kết quả phân tích CV-JD hiển thị ở **trang chi tiết tin `/jobs/{id}`** (`job-board/JobDetailPage` — `getCvMatch` + `matchScore`), không phải `/jobs/{id}/apply` (chỉ là form nộp đơn). Link cũ trỏ `/apply` → sai đích.
+  - BE (`CandidatePortalController` ~L199): link thông báo = `/jobs/{jobPostingId}`.
+  - FE `resolveNotifLink`: mở rộng regex để đưa **cả** `/candidate/find-jobs/{id}/apply` **và** `/jobs/{id}/apply` (dữ liệu tồn đọng trong DB, `DedupKey` chặn tạo lại) → `/jobs/{id}`. Nhờ vậy thông báo cũ lẫn mới đều vào đúng trang chi tiết. FE hot-reload, không cần restart. `tsc`: exit 0.
 - [x] 2026-07-04: **Fix lỗi 500 khi Recruiter cấp mã phỏng vấn (`POST /api/interview/generate-code`) — BE.**
   - Triệu chứng: FE hiện "Không thể cấp mã phỏng vấn" (fallback). Log API: `InvalidOperationException: The LINQ expression ... could not be translated` tại `InterviewCodeService.GenerateCodeAsync` line 44.
   - Nguyên nhân: khi gọi **không truyền `roundNumber`** (FE `generateCode(appId)` luôn vậy) → nhánh tính round dùng `string.Equals(s.Status, "completed", StringComparison.OrdinalIgnoreCase)` trong predicate `FindAsync` (Expression → dịch SQL). Overload `string.Equals(..., StringComparison)` **EF Core/Npgsql không dịch được** → 500. Không liên quan role (trang cấp mã của Recruiter là nơi duy nhất gọi endpoint này nên chỉ thấy ở Recruiter).

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Sparkles,
@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { applicationService } from '@services/application/applicationService'
 import { profileService } from '@services/profile/profileService'
+import { CANDIDATE_DATA_REFRESH_EVENT } from '@services/notification/notificationService'
 import type { CandidateProfile } from '@services/profile/profileService'
 import { resolveAssetUrl } from '@config/constants'
 import { useAuthStore } from '@store/auth/authStore'
@@ -530,24 +531,34 @@ export default function ApplicationsPage() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [now, setNow] = useState(() => Date.now()) // tick để cập nhật lịch/đếm ngược realtime
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    Promise.all([
-      applicationService.getMyApplications(),
-      profileService.getProfile().catch(() => null),
-    ])
-      .then(([data, prof]) => {
-        if (!active) return
-        setApps(data)
-        setProfile(prof)
-      })
-      .catch((err: any) => active && setError(err?.message || 'Không tải được danh sách hồ sơ.'))
-      .finally(() => active && setLoading(false))
-    return () => {
-      active = false
+  // silent = refetch nền (không bật skeleton) khi có push SignalR — giữ nguyên UI, chỉ đổi dữ liệu.
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const [data, prof] = await Promise.all([
+        applicationService.getMyApplications(),
+        profileService.getProfile().catch(() => null),
+      ])
+      setApps(data)
+      setProfile(prof)
+    } catch (err) {
+      if (!silent) setError(err instanceof Error ? err.message : 'Không tải được danh sách hồ sơ.')
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Cấp mã phỏng vấn / đổi trạng thái → useAppNotifications phát event này → refetch nền để
+  // bảng hiển thị mã mới tức thời, không cần F5.
+  useEffect(() => {
+    const handler = () => loadData(true)
+    window.addEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+    return () => window.removeEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+  }, [loadData])
 
   const counts = useMemo(() => {
     const c = { all: apps.length, action: 0, processing: 0, done: 0 }

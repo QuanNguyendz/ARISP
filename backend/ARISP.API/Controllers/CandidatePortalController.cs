@@ -196,7 +196,7 @@ namespace ARISP.API.Controllers
                                     Type = "system",
                                     Title = "Phân tích CV hoàn tất",
                                     Body = $"AI đã hoàn tất phân tích CV của bạn. Vui lòng bấm vào để xem kết quả.",
-                                    Link = $"/jobs/{jobPostingId}/apply",
+                                    Link = $"/jobs/{jobPostingId}",
                                     IsRead = false
                                 };
                                 await notifRepo.AddAsync(newNotif, CancellationToken.None);
