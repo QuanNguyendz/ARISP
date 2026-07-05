@@ -36,6 +36,12 @@ namespace ARISP.Application.DTOs
 
         /// <summary>Điểm phù hợp CV–JD (0–100) lấy từ cv_jd_analyses nếu có. Null nếu chưa phân tích.</summary>
         public int? MatchScore { get; set; }
+
+        /// <summary>
+        /// True nếu ứng viên đã đặt lịch buổi phỏng vấn thật (InterviewBooking "scheduled") — điều kiện
+        /// để Recruiter cấp Interview Code On-site (ADR-015/016). Sàng lọc/chưa đặt lịch → false.
+        /// </summary>
+        public bool HasScheduledInterview { get; set; }
     }
 
     public class UpdateApplicationStatusRequest

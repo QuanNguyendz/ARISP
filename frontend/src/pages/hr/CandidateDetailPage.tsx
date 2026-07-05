@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, FileText, ExternalLink, Send, KeyRound, Loader2, Mail, Phone, Briefcase,
-  ClipboardList, Video, Copy, Check, CheckCircle2, Clock,
+  ClipboardList, Video, Copy, Check, CheckCircle2, Clock, CalendarClock,
 } from 'lucide-react'
 import { ErrorAlert } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
@@ -209,9 +209,19 @@ export default function HrCandidateDetailPage() {
               <button onClick={sendInvite} disabled={inviting} className="flex w-full items-center gap-3 rounded-xl bg-brand-600 px-3 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
                 {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Gửi magic link
               </button>
-              <button onClick={genCode} disabled={coding} className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50">
+              <button
+                onClick={genCode}
+                disabled={coding || !app.hasScheduledInterview}
+                title={app.hasScheduledInterview ? undefined : 'Ứng viên chưa đặt lịch phỏng vấn thật. Chỉ cấp mã sau khi ứng viên đã đặt lịch buổi phỏng vấn thật của vòng.'}
+                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {coding ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />} Cấp Interview Code
               </button>
+              {!app.hasScheduledInterview && (
+                <p className="-mt-1 flex items-center gap-1.5 text-xs text-ink-400">
+                  <CalendarClock className="h-3.5 w-3.5" /> Chờ ứng viên đặt lịch phỏng vấn thật mới cấp được mã.
+                </p>
+              )}
               {code && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                   <p className="mb-1 text-xs text-emerald-700 dark:text-emerald-400">Mã On-site (1 lần):</p>

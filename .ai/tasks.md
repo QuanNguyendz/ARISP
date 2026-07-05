@@ -298,6 +298,15 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-05: **Chuyển status "screening" → "interview" khi đặt lịch/cấp mã — không còn "sàng lọc" khi đã có mã — BE.**
+  - Vấn đề: hồ sơ có Interview Code nhưng badge vẫn "Đang sàng lọc" (mâu thuẫn). Do đặt lịch (`CandidateScheduleController.Book`) tạo booking nhưng **không đổi status**; status `"interview"` chỉ set ở auto-progression (vòng 2+) → vòng 1 kẹt ở `screening` suốt.
+  - Fix: (1) `Book` — sau khi tạo booking, nếu status `screening` → nâng `interview` (transition hợp lệ; `PracticeEligible` vẫn true nên không phá phỏng vấn thử). (2) `InterviewCodeService.GenerateCodeAsync` — khi cấp mã cũng nâng `screening → interview` (bất biến "có mã ⇒ không sàng lọc"; tự chữa dữ liệu cũ ở lần cấp kế). Nhãn candidate: `interview` = "Đang phỏng vấn". Build API 0 error. **Cần restart API.**
+- [x] 2026-07-05: **Chặn cấp Interview Code khi ứng viên chưa đặt lịch phỏng vấn thật (ADR-015/016) — BE + FE.**
+  - Yêu cầu: ứng viên đang sàng lọc / chưa vào phỏng vấn thật thì **không** được cấp mã; chỉ cấp khi "được vào phỏng vấn thật".
+  - Phân tích: đặt lịch tạo `InterviewBooking` "scheduled" nhưng **không** đổi status; status `"interview"` chỉ set bởi auto-progression (vòng 2+) → vòng 1 vẫn ở `screening` khi đã đặt lịch. Không thể gate theo status thô → gate đúng theo **tồn tại booking scheduled cho vòng** (đúng ADR-015 = "được vào phỏng vấn thật").
+  - BE (authoritative): `InterviewCodeService.GenerateCodeAsync` từ chối nếu không có `InterviewBooking` scheduled cho `applicationId` + vòng đang cấp → trả message rõ ràng. Bao trùm cả `GenerateBatchAsync`.
+  - BE (DTO): thêm `ApplicationResponse.HasScheduledInterview`; populate trong `MapApplicationsAsync` (batch query booking cho list HR + Recruiter) và `GetApplicationByIdAsync` (query đơn cho trang chi tiết).
+  - FE: type `HrApplicationItem.hasScheduledInterview`. `recruiter/InterviewCodePage`: nút "Cấp mã" chỉ hiện khi đủ điều kiện, chưa đặt lịch → badge "Chưa đặt lịch" + tooltip; ưu tiên ứng viên đã đặt lịch lên đầu; sửa banner. `recruiter/CandidateDetailPage` + `hr/CandidateDetailPage`: disable nút "Cấp Interview Code" + dòng gợi ý khi chưa đặt lịch. Build BE 0 error, `tsc` exit 0. **Cần restart API.**
 - [x] 2026-07-05: **Real-time bảng candidate/applications khi cấp mã mới — FE.**
   - Triệu chứng: sau khi HR cấp mã, chuông đã real-time nhưng **bảng hồ sơ ứng tuyển** (mã On-site, đếm ngược, trạng thái) chưa cập nhật cho tới khi F5.
   - Nguyên nhân: `candidate/ApplicationsPage` fetch **1 lần lúc mount bằng `useState`+`useEffect`** (không qua react-query) → invalidate `['notifications']` không chạm tới nó.

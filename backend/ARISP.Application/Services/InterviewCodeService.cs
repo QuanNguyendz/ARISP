@@ -50,6 +50,18 @@ namespace ARISP.Application.Services
                 finalRoundNumber = sessions.Any() ? sessions.Max(s => s.RoundNumber) + 1 : 1;
             }
 
+            // ADR-015/016: mã On-site chỉ cấp khi ứng viên ĐÃ ĐẶT LỊCH buổi phỏng vấn thật của vòng
+            // (InterviewBooking "scheduled"). Ứng viên đang sàng lọc / chưa đặt lịch thì CHƯA được cấp mã.
+            var bookings = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                b => b.ApplicationId == applicationId
+                     && b.RoundNumber == finalRoundNumber
+                     && b.Status != null && b.Status.ToLower() == "scheduled", ct);
+            if (!bookings.Any())
+            {
+                return Result.Failure<InterviewCode>(
+                    $"Ứng viên chưa đặt lịch phỏng vấn thật cho vòng {finalRoundNumber} — chưa thể cấp mã. Mã On-site chỉ cấp sau khi ứng viên đã đặt lịch buổi phỏng vấn thật.");
+            }
+
             var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
                 r => r.JobPostingId == jobPosting.Id && r.RoundNumber == finalRoundNumber, ct);
             var roundConfig = roundConfigs.FirstOrDefault();
@@ -87,6 +99,15 @@ namespace ARISP.Application.Services
             };
 
             await _unitOfWork.Repository<InterviewCode>().AddAsync(interviewCode, ct);
+
+            // Đã cấp mã = ứng viên chắc chắn vào phỏng vấn thật → không còn "sàng lọc".
+            // Đảm bảo bất biến: hồ sơ có mã thì status không phải "screening" (đồng bộ với việc
+            // đặt lịch cũng nâng screening→interview). Tự chữa dữ liệu cũ ở lần cấp mã kế tiếp.
+            if (string.Equals(application.Status, "screening", StringComparison.OrdinalIgnoreCase))
+            {
+                application.Status = "interview";
+                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+            }
 
             var auditLog = new AuditLog
             {
