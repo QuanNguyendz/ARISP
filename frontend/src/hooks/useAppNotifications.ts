@@ -2,12 +2,18 @@ import { useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth/authStore'
-import { STAFF_NOTIF_REFRESH_EVENT } from '../services/notification/notificationService'
+import {
+  STAFF_NOTIF_REFRESH_EVENT,
+  CANDIDATE_DATA_REFRESH_EVENT,
+} from '../services/notification/notificationService'
 
 import { API_BASE_URL } from '@config/constants'
 
 /** Yêu cầu layout nhân sự tải lại chuông thông báo tức thời. */
 const refreshStaffBell = () => window.dispatchEvent(new Event(STAFF_NOTIF_REFRESH_EVENT))
+
+/** Yêu cầu các trang candidate dùng state cục bộ (ApplicationsPage...) refetch nền. */
+const refreshCandidateData = () => window.dispatchEvent(new Event(CANDIDATE_DATA_REFRESH_EVENT))
 
 // Remove trailing "/api" if present and append hub path
 const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications'
@@ -89,6 +95,10 @@ export const useAppNotifications = () => {
         case 'ReceiveUserNotification':
           // Refresh user's bell notifications
           queryClient.invalidateQueries({ queryKey: ['notifications'] })
+          // Đồng thời cập nhật dữ liệu hồ sơ ứng tuyển (mã phỏng vấn mới, đổi trạng thái...):
+          // react-query cho trang dùng cache + DOM event cho trang dùng state cục bộ.
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          refreshCandidateData()
           break
 
         case 'ReceiveSystemEvent':

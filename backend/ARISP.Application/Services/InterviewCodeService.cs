@@ -17,11 +17,13 @@ namespace ARISP.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly InterviewService _interviewService;
+        private readonly INotificationService _notificationService;
 
-        public InterviewCodeService(IUnitOfWork unitOfWork, InterviewService interviewService)
+        public InterviewCodeService(IUnitOfWork unitOfWork, InterviewService interviewService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _interviewService = interviewService;
+            _notificationService = notificationService;
         }
 
         public async Task<Result<InterviewCode>> GenerateCodeAsync(Guid applicationId, int? roundNumber, Guid createdByUserId, CancellationToken ct = default)
@@ -99,6 +101,26 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.Repository<AuditLog>().AddAsync(auditLog, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Đẩy SignalR để chuông thông báo của candidate cập nhật TỨC THÌ (real-time). FE
+            // (useAppNotifications) nhận "ReceiveUserNotification" → invalidate ['notifications']
+            // → refetch /portal/notifications → SyncNotificationsAsync tạo notification "invite:{codeId}".
+            // Chỉ push khi ứng viên có tài khoản (candidate on-site không tài khoản thì bỏ qua).
+            if (application.CandidateAccountId.HasValue)
+            {
+                try
+                {
+                    await _notificationService.PublishUserEventAsync(
+                        application.CandidateAccountId.Value,
+                        "ReceiveUserNotification",
+                        new { Type = "InterviewCodeIssued", applicationId = applicationId, roundNumber = finalRoundNumber },
+                        ct);
+                }
+                catch
+                {
+                    // Push real-time là best-effort — lỗi SignalR không được làm hỏng việc cấp mã (đã lưu DB).
+                }
+            }
 
             return Result.Success(interviewCode);
         }

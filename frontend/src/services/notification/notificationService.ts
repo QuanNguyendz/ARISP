@@ -23,13 +23,22 @@ export interface NotificationListResult {
 export const STAFF_NOTIF_REFRESH_EVENT = 'staff-notifications:refresh'
 
 /**
- * Chuẩn hoá link thông báo về route hiện hành. Xử lý dữ liệu tồn đọng: thông báo "Phân tích CV
- * hoàn tất" cũ trỏ tới `/candidate/find-jobs/{id}/apply` (route không tồn tại) → map về `/jobs/{id}/apply`.
+ * Sự kiện DOM phát khi ứng viên nhận push SignalR (`ReceiveUserNotification`) — ví dụ HR cấp mã
+ * phỏng vấn, đặt lịch, kết quả vòng. Các trang candidate dùng state cục bộ (không qua react-query,
+ * ví dụ `candidate/ApplicationsPage`) lắng nghe để refetch nền, cập nhật bảng tức thời.
+ */
+export const CANDIDATE_DATA_REFRESH_EVENT = 'candidate-data:refresh'
+
+/**
+ * Chuẩn hoá link thông báo về route hiện hành. Xử lý dữ liệu tồn đọng của thông báo "Phân tích CV
+ * hoàn tất": các link cũ `/candidate/find-jobs/{id}/apply` (route không tồn tại) và `/jobs/{id}/apply`
+ * (trang nộp đơn — không hiển thị kết quả phân tích) → đưa về `/jobs/{id}` (trang chi tiết tin, nơi
+ * hiện kết quả CV-JD).
  */
 export function resolveNotifLink(link?: string | null): string | undefined {
   if (!link) return undefined
-  const legacy = link.match(/^\/candidate\/find-jobs\/([^/]+)\/apply$/)
-  if (legacy) return `/jobs/${legacy[1]}/apply`
+  const cvAnalysis = link.match(/^\/(?:candidate\/find-jobs|jobs)\/([^/]+)\/apply$/)
+  if (cvAnalysis) return `/jobs/${cvAnalysis[1]}`
   return link
 }
 
