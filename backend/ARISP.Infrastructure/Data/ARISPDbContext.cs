@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using ARISP.Domain.Entities;
 using ARISP.Domain.Constants;
 using ARISP.Application.Interfaces;
@@ -87,14 +88,21 @@ namespace ARISP.Infrastructure.Data
                 }
             }
 
-            // Custom configuration for pgvector columns
-            modelBuilder.Entity<DocumentChunk>()
+            // Custom configuration for pgvector columns.
+            // Value comparer cho float[] để EF so sánh phần tử đúng (bỏ warning "no value comparer").
+            var embeddingComparer = new ValueComparer<float[]?>(
+                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+                v => v == null ? 0 : v.Aggregate(0, (acc, f) => HashCode.Combine(acc, f)),
+                v => v == null ? null : v.ToArray());
+
+            var embeddingProperty = modelBuilder.Entity<DocumentChunk>()
                 .Property(c => c.Embedding)
                 .HasColumnType("vector(1536)")
                 .HasConversion(
                     v => v == null ? null : $"[{string.Join(",", v)}]",
                     v => v == null ? Array.Empty<float>() : Array.ConvertAll(v.Trim('[', ']').Split(new char[] { ',' }, StringSplitOptions.None), float.Parse)
                 );
+            embeddingProperty.Metadata.SetValueComparer(embeddingComparer);
 
             // Custom configuration for JSONB columns
             modelBuilder.Entity<JobPosting>()

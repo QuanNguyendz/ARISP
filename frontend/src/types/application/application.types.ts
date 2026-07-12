@@ -198,4 +198,6 @@ export interface HrApplicationItem {
   createdAt: string
   cvJdAnalysisId?: string
   matchScore?: number | null
+  /** Ứng viên đã đặt lịch phỏng vấn thật → đủ điều kiện cấp Interview Code On-site (ADR-015/016). */
+  hasScheduledInterview?: boolean
 }
