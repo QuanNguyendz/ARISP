@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { applicationService } from '@services/application/applicationService'
 import { profileService } from '@services/profile/profileService'
+import { CANDIDATE_DATA_REFRESH_EVENT } from '@services/notification/notificationService'
 import type { CandidateProfile } from '@services/profile/profileService'
 import { resolveAssetUrl } from '@config/constants'
 import { useAuthStore } from '@store/auth/authStore'
@@ -41,8 +42,9 @@ import { useDocumentViewer } from '@components/document/DocumentViewer'
 import type { MyApplicationItem, MyApplicationRound } from '../../types/application'
 
 type FilterKey = 'all' | 'action' | 'processing' | 'done'
+type TFunction = (key: string, options?: Record<string, unknown>) => string
 
-function metaOf(t: (key: string) => string, status: string) {
+function metaOf(t: TFunction, status: string) {
   const labels: Record<
     string,
     { label: string; group: Exclude<FilterKey, 'all'>; icon: typeof Clock }
@@ -69,7 +71,7 @@ function metaOf(t: (key: string) => string, status: string) {
  * có việc cần ứng viên làm (mã phỏng vấn còn hiệu lực, hoặc đã qua CV và còn lượt phỏng vấn thử)
  * → "Cần hành động"; còn lại theo trạng thái gốc (HR xem hồ sơ → Đang xử lý; pass/not_pass → Đã hoàn tất).
  */
-function groupOf(t: (key: string) => string, app: MyApplicationItem): Exclude<FilterKey, 'all'> {
+function groupOf(t: TFunction, app: MyApplicationItem): Exclude<FilterKey, 'all'> {
   if (app.interviewCode) return 'action'
   if (app.practiceAvailable) return 'action'
   return metaOf(t, app.status).group
@@ -82,7 +84,7 @@ function formatDate(iso?: string | null): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function formatRelative(t: (key: string) => string, iso?: string | null): string {
+function formatRelative(t: TFunction, iso?: string | null): string {
   if (!iso) return ''
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.round(diffMs / 60000)
@@ -96,7 +98,7 @@ function formatRelative(t: (key: string) => string, iso?: string | null): string
 }
 
 /** Đếm ngược tới thời điểm hết hạn → "1g 48p" / "Đã hết hạn". */
-function formatCountdown(t: (key: string) => string, iso: string): string {
+function formatCountdown(t: TFunction, iso: string): string {
   const diff = new Date(iso).getTime() - Date.now()
   if (diff <= 0) return t('applications.countdownExpired')
   const totalMin = Math.floor(diff / 60000)
@@ -107,20 +109,26 @@ function formatCountdown(t: (key: string) => string, iso: string): string {
 }
 
 /** Thông tin hiển thị lịch phỏng vấn: ngày đầy đủ (thứ, dd/mm/yyyy), giờ và nhãn tương đối. */
-function scheduleInfo(iso: string, now: number) {
+function scheduleInfo(t: TFunction, iso: string, now: number) {
   const d = new Date(iso)
   const diff = d.getTime() - now
   const mins = Math.round(diff / 60000)
   let rel: string
-  if (diff <= 0) rel = 'Đang diễn ra'
-  else if (mins < 60) rel = `Còn ${mins} phút`
+  if (diff <= 0) rel = t('applications.scheduleRel.inProgress')
+  else if (mins < 60) rel = t('applications.scheduleRel.minutesLeft', { count: mins })
   else if (mins < 24 * 60) {
     const h = Math.floor(mins / 60)
     const m = mins % 60
-    rel = `Còn ${h}g${m ? ` ${m}p` : ''}`
+    rel =
+      m > 0
+        ? t('applications.scheduleRel.minutesLeft', { count: h * 60 + m })
+        : t('applications.scheduleRel.minutesLeft', { count: h * 60 })
   } else {
     const days = Math.round(mins / (24 * 60))
-    rel = days === 1 ? 'Ngày mai' : `Còn ${days} ngày`
+    rel =
+      days === 1
+        ? t('applications.scheduleRel.tomorrow')
+        : t('applications.scheduleRel.daysLeft', { count: days })
   }
   return {
     day: d.getDate(),
@@ -152,14 +160,14 @@ function deptIcon(department?: string | null) {
   return Code2
 }
 
-function roundTypeLabel(t?: string): string {
+function roundTypeLabel(t: TFunction, type?: string): string {
   const map: Record<string, string> = {
-    screening: 'Screening',
-    technical: 'Technical',
-    online_test: 'Online Test',
-    final: 'Final',
+    screening: t('applications.roundType.screening'),
+    technical: t('applications.roundType.technical'),
+    online_test: t('applications.roundType.online_test'),
+    final: t('applications.roundType.final'),
   }
-  return map[(t || '').toLowerCase()] || t || ''
+  return map[(type || '').toLowerCase()] || type || ''
 }
 
 function RoundStepper({ t, rounds }: { t: (key: string) => string; rounds: MyApplicationRound[] }) {
@@ -181,7 +189,7 @@ function RoundStepper({ t, rounds }: { t: (key: string) => string; rounds: MyApp
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${cls}`}
             >
               {done && <Check className="h-3.5 w-3.5" />}V{r.roundNumber}{' '}
-              {roundTypeLabel(r.roundType)}
+              {roundTypeLabel(t, r.roundType)}
               {r.verdict && (
                 <span className={r.verdict === 'pass' ? 'text-emerald-700' : 'text-red-600'}>
                   ·{' '}
@@ -212,7 +220,7 @@ function CardFooter({
   app,
   action,
 }: {
-  t: (key: string) => string
+  t: TFunction
   app: MyApplicationItem
   action?: React.ReactNode
 }) {
@@ -236,7 +244,7 @@ function CardFooter({
   )
 }
 
-function ApplicationCard({ t, app }: { t: (key: string) => string; app: MyApplicationItem }) {
+function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
   const meta = metaOf(t, app.status)
   const statusCls: Record<string, string> = {
     invited: 'bg-brand-50 text-brand-700 ring-brand-200',
@@ -412,13 +420,6 @@ function ApplicationCard({ t, app }: { t: (key: string) => string; app: MyApplic
   )
 }
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'action', label: 'Cần hành động' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'done', label: 'Đã hoàn tất' },
-]
-
 /** Khung skeleton (shimmer) mô phỏng bố cục trang khi đang tải. */
 function ApplicationsSkeleton() {
   return (
@@ -523,24 +524,37 @@ export default function ApplicationsPage() {
     { key: 'done', label: t('applications.done') },
   ]
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    Promise.all([
-      applicationService.getMyApplications(),
-      profileService.getProfile().catch(() => null),
-    ])
-      .then(([data, prof]) => {
-        if (!active) return
+  // silent = refetch nền (không bật skeleton) khi có push SignalR — giữ nguyên UI, chỉ đổi dữ liệu.
+  const loadData = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true)
+      try {
+        const [data, prof] = await Promise.all([
+          applicationService.getMyApplications(),
+          profileService.getProfile().catch(() => null),
+        ])
         setApps(data)
         setProfile(prof)
-      })
-      .catch((err: any) => active && setError(err?.message || t('applications.noApplications')))
-      .finally(() => active && setLoading(false))
-    return () => {
-      active = false
-    }
-  }, [t])
+      } catch (err) {
+        if (!silent) setError(err instanceof Error ? err.message : t('applications.error'))
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [t]
+  )
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Cấp mã phỏng vấn / đổi trạng thái → useAppNotifications phát event này → refetch nền để
+  // bảng hiển thị mã mới tức thời, không cần F5.
+  useEffect(() => {
+    const handler = () => loadData(true)
+    window.addEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+    return () => window.removeEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+  }, [loadData])
 
   const counts = useMemo(() => {
     const c = { all: apps.length, action: 0, processing: 0, done: 0 }
@@ -765,11 +779,11 @@ export default function ApplicationsPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-ink-800">
-                        {profile.cvFileName || 'CV hồ sơ'}
+                        {profile.cvFileName || t('applications.cv.profileCv')}
                       </div>
                       <div className="text-xs text-ink-400">
-                        {(profile.cvFileName?.split('.').pop() || 'CV').toUpperCase()} · Tài liệu hồ
-                        sơ
+                        {(profile.cvFileName?.split('.').pop() || 'CV').toUpperCase()} ·{' '}
+                        {t('applications.cv.profileDocument')}
                       </div>
                     </div>
                     <button
@@ -777,12 +791,12 @@ export default function ApplicationsPage() {
                       onClick={() =>
                         openDocument(
                           resolveAssetUrl(profile.profileCvUrl),
-                          profile.cvFileName || 'CV hồ sơ'
+                          profile.cvFileName || t('applications.cv.profileCv')
                         )
                       }
                       className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-600"
-                      title="Xem CV"
-                      aria-label="Xem CV"
+                      title={t('applications.cv.viewCv')}
+                      aria-label={t('applications.cv.viewCv')}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -790,8 +804,8 @@ export default function ApplicationsPage() {
                       href={resolveAssetUrl(profile.cvDownloadUrl || profile.profileCvUrl)}
                       download={profile.cvFileName || true}
                       className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-600"
-                      title="Tải về"
-                      aria-label="Tải CV về"
+                      title={t('applications.cv.downloadCv')}
+                      aria-label={t('applications.cv.downloadCvAria')}
                     >
                       <Download className="h-4 w-4" />
                     </a>
@@ -824,7 +838,7 @@ export default function ApplicationsPage() {
                   {t('applications.upcomingSchedule')}
                 </div>
                 {(() => {
-                  const info = scheduleInfo(nextSchedule.slot.startTime, now)
+                  const info = scheduleInfo(t, nextSchedule.slot.startTime, now)
                   return (
                     <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3">
                       <div className="flex items-start gap-3">

@@ -145,6 +145,44 @@ namespace ARISP.API.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// GET /api/interview/session/{id}/media-config
+        /// Token Deepgram (STT) + HeyGen (avatar) + ngôn ngữ/voice để FE vào phòng phỏng vấn.
+        /// </summary>
+        [HttpGet("session/{id}/media-config")]
+        [Authorize(Policy = "CandidateOnly")]
+        public async Task<IActionResult> GetMediaConfig(Guid id, CancellationToken ct)
+        {
+            var subClaim = User.FindFirst("sub")?.Value
+                           ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst("email")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            Guid? accountId = Guid.TryParse(subClaim, out var aid) ? aid : null;
+
+            var result = await _interviewService.GetMediaConfigAsync(id, accountId, email, ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// POST /api/interview/session/{id}/tts  body { text }
+        /// TTS câu hỏi → base64 PCM 24k cho FE đẩy vào LiveAvatar repeatAudio (ADR-044).
+        /// </summary>
+        [HttpPost("session/{id}/tts")]
+        [Authorize(Policy = "CandidateOnly")]
+        public async Task<IActionResult> GetSpeechAudio(Guid id, [FromBody] TtsRequest request, CancellationToken ct)
+        {
+            var subClaim = User.FindFirst("sub")?.Value
+                           ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst("email")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            Guid? accountId = Guid.TryParse(subClaim, out var aid) ? aid : null;
+
+            var result = await _interviewService.GetSpeechAudioAsync(id, request?.Text ?? string.Empty, accountId, email, ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(new { audio = result.Value });
+        }
+
         [HttpPost("session/{id}/answer")]
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> SubmitAnswer(Guid id, [FromBody] SubmitAnswerRequest request)

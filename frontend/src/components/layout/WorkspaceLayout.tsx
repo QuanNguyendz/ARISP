@@ -79,6 +79,8 @@ interface WorkspaceLayoutProps {
   primaryAction?: WorkspacePrimaryAction
   /** Đường dẫn trang cài đặt (hiện ở cuối sidebar + menu user) */
   settingsPath?: string
+  /** Đường dẫn trang thông báo đầy đủ (link "Xem tất cả" ở cuối dropdown chuông) */
+  notificationsPath?: string
 }
 
 // Logo ARISP gradient
@@ -130,6 +132,7 @@ export default function WorkspaceLayout({
   searchPlaceholder = 'Tìm kiếm...',
   primaryAction,
   settingsPath,
+  notificationsPath,
 }: WorkspaceLayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -501,6 +504,15 @@ export default function WorkspaceLayout({
                           )
                         })}
                       </div>
+                    )}
+                    {notificationsPath && (
+                      <Link
+                        to={notificationsPath}
+                        onClick={() => setNotifOpen(false)}
+                        className="block border-t border-ink-100 dark:border-white/10 px-4 py-2.5 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5"
+                      >
+                        Xem tất cả thông báo
+                      </Link>
                     )}
                   </motion.div>
                 )}

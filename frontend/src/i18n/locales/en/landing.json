@@ -145,7 +145,15 @@
       "collapse": "Collapse"
     },
     "noLocation": "Remote",
-    "noDepartment": "Engineering"
+    "noDepartment": "Engineering",
+    "sortBy": "Sort by",
+    "sortRelevance": "Relevance (by CV)",
+    "error": "An error occurred",
+    "locationNotFound": "No provinces/cities found",
+    "salaryNegotiableShort": "Negotiable",
+    "salaryFromShort": "From",
+    "salaryToShort": "To",
+    "salaryMillionShort": "million"
   },
   "header": {
     "savedJobs": "Saved Jobs",
@@ -178,7 +186,59 @@
     "transparentEvaluation": "Transparent Evaluation"
   },
   "pagination": {
+    "label": "Pagination",
     "previous": "Previous page",
     "next": "Next page"
+  },
+  "jobDetail": {
+    "breadcrumb": "Jobs",
+    "loading": "Loading...",
+    "error": {
+      "title": "An error occurred",
+      "message": "Job not found or no longer accepting applications.",
+      "noData": "No data found."
+    },
+    "browseOther": "Browse other jobs",
+    "header": {
+      "department": "Department",
+      "posted": "Posted {{date}}",
+      "deadline": "Deadline: {{text}}"
+    },
+    "tags": {
+      "experienceNotRequired": "No experience required",
+      "languageDefault": "Vietnamese"
+    },
+    "sections": {
+      "skills": "Skills",
+      "aboutDepartment": "About the Department"
+    },
+    "company": {
+      "teamSize": "{{count}} engineers · Hybrid"
+    },
+    "apply": {
+      "applyNow": "Apply now",
+      "applied": "Applied · View application",
+      "saveJob": "Save job",
+      "saved": "Saved"
+    },
+    "match": {
+      "title": "CV-JD Match Score",
+      "loginRequired": "Log in with your candidate account and upload a CV to your profile to see how well you match this job.",
+      "login": "Log in",
+      "analyzing": "Analyzing your CV... this may take ~20–30 seconds.",
+      "noCv": "Your profile doesn't have a CV yet. Upload one so AI can analyze how well you match this job.",
+      "uploadCv": "Upload CV",
+      "viewCv": "View",
+      "scoreLabel": "/ 100",
+      "aiAnalysis": "AI Analysis by {{name}}",
+      "skillsMatched": "Matched Skills",
+      "skillsMissing": "Missing Skills",
+      "strengths": "Strengths",
+      "considerations": "Considerations",
+      "geminiNote": "Analyzed by Gemini 2.5 Flash · for reference only",
+      "updateCv": "Update CV",
+      "cannotAnalyze": "Unable to analyze CV at this time. Please try again later.",
+      "loadError": "Unable to load CV analysis. Please try again later."
+    }
   }
 }

@@ -179,7 +179,27 @@
     "countdownRemaining": "{{hours}}h {{minutes}}m",
     "minutesRemaining": "{{minutes}}m",
     "locationUnknown": "Location unknown",
-    "jobPosting": "Job Position"
+    "jobPosting": "Job Position",
+    "error": "Unable to load applications list.",
+    "scheduleRel": {
+      "inProgress": "In progress",
+      "minutesLeft": "{{count}} min",
+      "tomorrow": "Tomorrow",
+      "daysLeft": "{{count}} days"
+    },
+    "roundType": {
+      "screening": "Screening",
+      "technical": "Technical",
+      "online_test": "Online Test",
+      "final": "Final"
+    },
+    "cv": {
+      "profileCv": "Profile CV",
+      "profileDocument": "Profile document",
+      "viewCv": "View CV",
+      "downloadCv": "Download",
+      "downloadCvAria": "Download CV"
+    }
   },
   "applicationDetail": {
     "title": "Application Details",

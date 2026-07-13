@@ -153,6 +153,15 @@ namespace ARISP.API.Controllers
             };
             await _unitOfWork.Repository<InterviewBooking>().AddAsync(booking, ct);
 
+            // Đặt lịch buổi phỏng vấn thật = ứng viên đã vào giai đoạn phỏng vấn thật → chuyển
+            // "screening" (đang sàng lọc) sang "interview" (đang phỏng vấn). Nhờ vậy status KHÔNG
+            // còn là "sàng lọc" khi đã có lịch/mã On-site (ADR-015). Vòng 2+ vốn đã ở "interview".
+            if (string.Equals(app.Status, "screening", StringComparison.OrdinalIgnoreCase))
+            {
+                app.Status = "interview";
+                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(app);
+            }
+
             var invites = await _unitOfWork.Repository<InterviewInvite>().FindAsync(
                 i => i.ApplicationId == applicationId && i.RoundNumber == roundNumber && i.ScheduledAt == null, ct);
             foreach (var inv in invites)

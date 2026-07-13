@@ -179,7 +179,27 @@
     "countdownRemaining": "{{hours}}g {{minutes}}p",
     "minutesRemaining": "{{minutes}}p",
     "locationUnknown": "Không rõ địa điểm",
-    "jobPosting": "Vị trí tuyển dụng"
+    "jobPosting": "Vị trí tuyển dụng",
+    "error": "Không tải được danh sách hồ sơ.",
+    "scheduleRel": {
+      "inProgress": "Đang diễn ra",
+      "minutesLeft": "{{count}}p",
+      "tomorrow": "Ngày mai",
+      "daysLeft": "{{count}} ngày"
+    },
+    "roundType": {
+      "screening": "Sàng lọc",
+      "technical": "Kỹ thuật",
+      "online_test": "Test online",
+      "final": "Vòng cuối"
+    },
+    "cv": {
+      "profileCv": "CV hồ sơ",
+      "profileDocument": "Tài liệu hồ sơ",
+      "viewCv": "Xem CV",
+      "downloadCv": "Tải về",
+      "downloadCvAria": "Tải CV về"
+    }
   },
   "applicationDetail": {
     "title": "Chi tiết đơn ứng tuyển",

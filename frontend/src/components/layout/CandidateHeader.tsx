@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@store/auth'
 import { authService } from '@services/auth/authService'
-import { notificationService } from '@/services/notification/notificationService'
+import { notificationService, resolveNotifLink } from '@/services/notification/notificationService'
 import type { NotificationItem } from '@/services/notification/notificationService'
 import { useQuery } from '@tanstack/react-query'
 
@@ -195,7 +195,7 @@ export default function CandidateHeader() {
         .catch(() => {})
     }
     setOpen(null)
-    navigate(n.link || '/candidate/notifications')
+    navigate(resolveNotifLink(n.link) || '/candidate/notifications')
   }
 
   const toggle = (d: Drop) => (e: React.MouseEvent) => {

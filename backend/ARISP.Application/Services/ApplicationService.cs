@@ -234,6 +234,16 @@ namespace ARISP.Application.Services
                         .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
                     .ToDictionary(c => c.Id, c => c.MatchScore);
 
+            // Ứng viên đã đặt lịch phỏng vấn thật (booking "scheduled") → đủ điều kiện cấp Interview Code.
+            var appIds = apps.Select(a => a.Id).ToList();
+            var bookedAppIds = appIds.Count == 0
+                ? new HashSet<Guid>()
+                : (await _unitOfWork.Repository<InterviewBooking>()
+                        .QueryAsync(q => q
+                            .Where(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled")
+                            .Select(b => b.ApplicationId), ct))
+                    .ToHashSet();
+
             return apps.Select(app => new ApplicationResponse
             {
                 Id = app.Id,
@@ -252,6 +262,7 @@ namespace ARISP.Application.Services
                 MatchScore = app.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(app.CvJdAnalysisId.Value, out var ms)
                     ? ms
                     : (int?)null,
+                HasScheduledInterview = bookedAppIds.Contains(app.Id),
             }).ToList();
         }
 
@@ -333,7 +344,12 @@ namespace ARISP.Application.Services
 
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
 
-            return Result.Success(MapToResponse(application, jobPosting));
+            var response = MapToResponse(application, jobPosting);
+            // Cờ đủ điều kiện cấp Interview Code: đã đặt lịch phỏng vấn thật (booking "scheduled").
+            var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                b => b.ApplicationId == id && b.Status != null && b.Status.ToLower() == "scheduled", ct);
+            response.HasScheduledInterview = scheduled.Any();
+            return Result.Success(response);
         }
 
         /// <summary>

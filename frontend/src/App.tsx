@@ -52,6 +52,7 @@ const HrTeamPage = lazy(() => import('@pages/hr/TeamPage'))
 const HrInterviewsPage = lazy(() => import('@pages/hr/InterviewSessionsPage'))
 const HrJobDetailPage = lazy(() => import('@pages/hr/JobPostingDetailPage'))
 const HrSettingsPage = lazy(() => import('@pages/hr/SettingsPage'))
+const HrNotificationsPage = lazy(() => import('@pages/hr/NotificationsPage'))
 
 // Recruiter
 const RecruiterDashboardPage = lazy(() => import('@pages/recruiter/DashboardPage'))
@@ -65,6 +66,7 @@ const RecruiterCandidateDetailPage = lazy(() => import('@pages/recruiter/Candida
 const RecruiterEvaluationsPage = lazy(() => import('@pages/recruiter/EvaluationReviewPage'))
 const RecruiterInterviewsPage = lazy(() => import('@pages/recruiter/InterviewSessionsPage'))
 const RecruiterSettingsPage = lazy(() => import('@pages/recruiter/SettingsPage'))
+const RecruiterNotificationsPage = lazy(() => import('@pages/recruiter/NotificationsPage'))
 
 // Candidate
 const CandidateApplicationsPage = lazy(() => import('@pages/candidate/ApplicationsPage'))
@@ -101,7 +103,7 @@ function RouteFallback() {
 function App() {
   const setAuth = useAuthStore((state) => state.setAuth)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  
+
   useAppNotifications()
 
   useEffect(() => {
@@ -269,6 +271,7 @@ function App() {
             <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
             <Route path="/hr/team" element={<HrTeamPage />} />
             <Route path="/hr/interviews" element={<HrInterviewsPage />} />
+            <Route path="/hr/notifications" element={<HrNotificationsPage />} />
             <Route path="/hr/settings" element={<HrSettingsPage />} />
           </Route>
 
@@ -297,6 +300,7 @@ function App() {
             <Route path="/recruiter/code" element={<RecruiterInterviewCodePage />} />
             <Route path="/recruiter/evaluations" element={<RecruiterEvaluationsPage />} />
             <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
+            <Route path="/recruiter/notifications" element={<RecruiterNotificationsPage />} />
             <Route path="/recruiter/settings" element={<RecruiterSettingsPage />} />
           </Route>
 

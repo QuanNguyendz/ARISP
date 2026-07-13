@@ -145,7 +145,15 @@
       "collapse": "Thu gọn"
     },
     "noLocation": "Remote",
-    "noDepartment": "Engineering"
+    "noDepartment": "Engineering",
+    "sortBy": "Sắp xếp theo",
+    "sortRelevance": "Độ phù hợp (theo CV)",
+    "error": "Đã có lỗi xảy ra",
+    "locationNotFound": "Không tìm thấy tỉnh/thành",
+    "salaryNegotiableShort": "Thỏa thuận",
+    "salaryFromShort": "Từ",
+    "salaryToShort": "Đến",
+    "salaryMillionShort": "triệu"
   },
   "header": {
     "savedJobs": "Việc đã lưu",
@@ -178,7 +186,59 @@
     "transparentEvaluation": "Đánh giá minh bạch"
   },
   "pagination": {
+    "label": "Phân trang",
     "previous": "Trang trước",
     "next": "Trang sau"
+  },
+  "jobDetail": {
+    "breadcrumb": "Việc làm",
+    "loading": "Đang tải...",
+    "error": {
+      "title": "Đã xảy ra lỗi",
+      "message": "Không tìm thấy tin tuyển dụng này hoặc tin tuyển dụng đã ngừng nhận hồ sơ.",
+      "noData": "Không tìm thấy dữ liệu."
+    },
+    "browseOther": "Xem việc làm khác",
+    "header": {
+      "department": "Phòng ban",
+      "posted": "Đăng {{date}}",
+      "deadline": "Hạn nộp: {{text}}"
+    },
+    "tags": {
+      "experienceNotRequired": "Không yêu cầu kinh nghiệm",
+      "languageDefault": "Tiếng Việt"
+    },
+    "sections": {
+      "skills": "Kỹ năng",
+      "aboutDepartment": "Về phòng ban"
+    },
+    "company": {
+      "teamSize": "Đội ngũ ~{{count}} kỹ sư · Hybrid"
+    },
+    "apply": {
+      "applyNow": "Ứng tuyển ngay",
+      "applied": "Đã ứng tuyển · Xem hồ sơ",
+      "saveJob": "Lưu việc làm",
+      "saved": "Đã lưu"
+    },
+    "match": {
+      "title": "Độ phù hợp CV–JD",
+      "loginRequired": "Đăng nhập bằng tài khoản ứng viên và tải CV lên hồ sơ để xem độ phù hợp với tin này.",
+      "login": "Đăng nhập",
+      "analyzing": "Đang phân tích CV của bạn… việc này có thể mất ~20–30 giây.",
+      "noCv": "Hồ sơ của bạn chưa có CV. Tải CV lên để AI phân tích độ phù hợp với tin này.",
+      "uploadCv": "Tải CV lên",
+      "viewCv": "Xem",
+      "scoreLabel": "/ 100",
+      "aiAnalysis": "Phân tích bởi AI ({{name}})",
+      "skillsMatched": "Kỹ năng khớp",
+      "skillsMissing": "Còn thiếu",
+      "strengths": "Điểm sáng",
+      "considerations": "Điểm cần lưu ý",
+      "geminiNote": "Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo",
+      "updateCv": "Cập nhật CV khác",
+      "cannotAnalyze": "Chưa thể phân tích CV lúc này. Vui lòng thử lại sau.",
+      "loadError": "Không tải được phân tích CV. Vui lòng thử lại sau."
+    }
   }
 }

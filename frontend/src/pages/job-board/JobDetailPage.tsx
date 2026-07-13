@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   MapPin,
   Clock,
@@ -27,11 +28,16 @@ import type { JobPosting } from '@/types/job'
 import { useAuthStore } from '@store/auth/authStore'
 import CandidateHeader from '@components/layout/CandidateHeader'
 
-function formatSalary(job: JobPosting): string {
-  if (job.salaryIsNegotiable ||
+// ============== HELPER FUNCTIONS ==============
+type TFunction = (key: string, options?: Record<string, unknown>) => string
+
+function formatSalary(t: TFunction, job: JobPosting): string {
+  if (
+    job.salaryIsNegotiable ||
     (job.salaryMin == null && job.salaryMax == null) ||
-    (job.salaryMin === 0 && job.salaryMax === 0)) {
-    return 'Thỏa thuận'
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
+    return t('jobs.salaryNegotiable')
   }
 
   const cur = (job.salaryCurrency || 'VND').toUpperCase()
@@ -45,58 +51,67 @@ function formatSalary(job: JobPosting): string {
 
   const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
 
-  if (job.salaryMin != null && job.salaryMax != null && job.salaryMin !== 0 && job.salaryMax !== 0) {
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
     return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
   }
 
   if (job.salaryMin != null && job.salaryMin !== 0) {
-    return `Từ ${formatVal(job.salaryMin)}${unit}`
+    return t('jobs.salaryFrom', { value: formatVal(job.salaryMin) + unit })
   }
 
   if (job.salaryMax != null && job.salaryMax !== 0) {
-    return `Đến ${formatVal(job.salaryMax)}${unit}`
+    return t('jobs.salaryTo', { value: formatVal(job.salaryMax) + unit })
   }
 
-  return 'Thỏa thuận'
+  return t('jobs.salaryNegotiable')
 }
 
-function formatWorkMode(mode?: string): string {
-  if (!mode) return 'Full-time'
+function formatWorkMode(t: TFunction, mode?: string): string {
+  if (!mode) return t('jobs.workModeFulltime')
   const mappings: Record<string, string> = {
-    fulltime: 'Full-time',
-    parttime: 'Part-time',
-    contract: 'Hợp đồng',
-    internship: 'Thực tập',
+    fulltime: t('jobs.workModeFulltime'),
+    parttime: t('jobs.workModeParttime'),
+    contract: t('jobs.workModeContract'),
+    internship: t('jobs.workModeInternship'),
   }
   return mappings[mode.toLowerCase()] || mode
 }
 
-function formatPostedDate(dateStr?: string): string {
-  if (!dateStr) return 'Mới đăng'
+function formatPostedDate(t: TFunction, dateStr?: string): string {
+  if (!dateStr) return t('jobs.recentlyPosted')
   try {
     const diff = Math.abs(new Date().getTime() - new Date(dateStr).getTime())
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
-    if (days <= 1) return 'Hôm nay'
-    if (days <= 2) return 'Hôm qua'
-    return `${days} ngày trước`
+    if (days <= 1) return t('jobs.recentlyPosted')
+    if (days <= 2) return t('jobs.yesterday')
+    return t('jobs.daysAgo', { count: days })
   } catch {
-    return 'Gần đây'
+    return t('jobs.nearby')
   }
 }
 
-function getDeadlineText(deadlineStr?: string | null): string {
+function getDeadlineText(t: TFunction, deadlineStr?: string | null): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
-  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
-  return `${formattedDate} (Còn ${diffDays} ngày)`
+  if (diffDays < 0) return t('jobs.expired', { date: formattedDate })
+  if (diffDays === 0) return t('jobs.expireToday', { date: formattedDate })
+  return t('jobs.expireSoon', { date: formattedDate, days: diffDays })
 }
 
 function getJobIcon(department?: string) {
@@ -156,6 +171,7 @@ function parseMatchSummary(summary?: string): {
 }
 
 export default function JobDetailPage() {
+  const { t } = useTranslation('landing')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
@@ -184,7 +200,7 @@ export default function JobDetailPage() {
         setJob(data)
       } catch (err) {
         console.error(err)
-        setError('Không tìm thấy tin tuyển dụng này hoặc tin tuyển dụng đã ngừng nhận hồ sơ.')
+        setError(t('jobDetail.error.message'))
       } finally {
         setLoading(false)
       }
@@ -249,7 +265,7 @@ export default function JobDetailPage() {
       .then((ids) => {
         if (!cancelled) setIsSaved(ids.includes(id))
       })
-      .catch(() => { })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -269,7 +285,7 @@ export default function JobDetailPage() {
         const found = apps.find((a) => a.jobPostingId === id && a.status !== 'withdrawn')
         if (found) setAppliedId(found.id)
       })
-      .catch(() => { })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -315,7 +331,7 @@ export default function JobDetailPage() {
         <CandidateHeader />
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
           <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
-          <p className="text-sm text-ink-500">Đang tải thông tin...</p>
+          <p className="text-sm text-ink-500">{t('jobDetail.loading')}</p>
         </div>
       </div>
     )
@@ -326,15 +342,17 @@ export default function JobDetailPage() {
       <div className="min-h-screen bg-ink-50">
         <CandidateHeader />
         <div className="py-20 text-center">
-          <h2 className="mb-2 text-2xl font-display font-bold text-ink-900">Đã xảy ra lỗi</h2>
-          <p className="mb-6 text-ink-500">{error || 'Không tìm thấy dữ liệu.'}</p>
+          <h2 className="mb-2 text-2xl font-display font-bold text-ink-900">
+            {t('jobDetail.error.title')}
+          </h2>
+          <p className="mb-6 text-ink-500">{error || t('jobDetail.error.noData')}</p>
           <button
             type="button"
             onClick={() => navigate('/jobs')}
             className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-6 py-3 font-medium text-ink-700 hover:bg-ink-50"
           >
             <ChevronRight className="w-4 h-4 rotate-180" />
-            Xem việc làm khác
+            {t('jobDetail.browseOther')}
           </button>
         </div>
       </div>
@@ -349,7 +367,7 @@ export default function JobDetailPage() {
       <div className="mx-auto max-w-6xl px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
-            Việc làm
+            {t('jobDetail.breadcrumb')}
           </Link>
           <ChevronRight className="w-4 h-4" />
           <span className="text-ink-600 font-medium">{job.title}</span>
@@ -371,33 +389,40 @@ export default function JobDetailPage() {
                 <h1 className="font-display text-2xl font-extrabold leading-snug">{job.title}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
                   <span className="inline-flex items-center gap-1.5">
-                    <Users className="w-4 h-4" /> {job.department || 'Phòng ban'}
+                    <Users className="w-4 h-4" />{' '}
+                    {job.department || t('jobDetail.header.department')}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" /> {job.location || 'Remote'}
+                    <MapPin className="w-4 h-4" /> {job.location || t('jobs.noLocation')}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" /> Đăng {formatPostedDate(job.createdAt)}
+                    <Clock className="w-4 h-4" />{' '}
+                    {t('jobDetail.header.posted', { date: formatPostedDate(t, job.createdAt) })}
                   </span>
                   {job.applicationDeadline && (
                     <span className="inline-flex items-center gap-1.5 text-amber-600 font-medium">
-                      <Calendar className="w-4 h-4" /> Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                      <Calendar className="w-4 h-4" />{' '}
+                      {t('jobDetail.header.deadline', {
+                        text: getDeadlineText(t, job.applicationDeadline),
+                      })}
                     </span>
                   )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600">
                     <Briefcase className="w-3.5 h-3.5" />{' '}
-                    {formatWorkMode(job.workMode || job.employmentType)}
+                    {formatWorkMode(t, job.workMode || job.employmentType)}
                   </span>
                   <span className="inline-flex items-center rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600">
-                    {formatSalary(job)}
+                    {formatSalary(t, job)}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600 capitalize">
-                    <Sparkles className="w-3.5 h-3.5" /> {job.experienceLevel || 'Không yêu cầu'}
+                    <Sparkles className="w-3.5 h-3.5" />{' '}
+                    {job.experienceLevel || t('jobDetail.tags.experienceNotRequired')}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1 text-brand-700">
-                    <Languages className="w-3.5 h-3.5" /> {job.languageRequirement || 'Tiếng Việt'}
+                    <Languages className="w-3.5 h-3.5" />{' '}
+                    {job.languageRequirement || t('jobDetail.tags.languageDefault')}
                   </span>
                 </div>
               </div>
@@ -406,7 +431,6 @@ export default function JobDetailPage() {
 
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card space-y-6">
             <section>
-
               {/<\/?[a-z][\s\S]*>/i.test(job.jobDescription || '') ? (
                 <div
                   className="text-ink-600 leading-relaxed ql-editor-display"
@@ -421,7 +445,9 @@ export default function JobDetailPage() {
 
             {job.skills && job.skills.length > 0 && (
               <section>
-                <h2 className="font-display text-lg font-bold mb-3">Kỹ năng</h2>
+                <h2 className="font-display text-lg font-bold mb-3">
+                  {t('jobDetail.sections.skills')}
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {job.skills.map((skill, i) => (
                     <span
@@ -446,63 +472,59 @@ export default function JobDetailPage() {
                 onClick={() => navigate('/candidate/applications')}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
               >
-                <CheckCircle2 className="h-4 w-4" /> Đã ứng tuyển · Xem hồ sơ
+                <CheckCircle2 className="h-4 w-4" /> {t('jobDetail.apply.applied')}
               </button>
             ) : (
               <button
                 onClick={handleApply}
                 className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700"
               >
-                Ứng tuyển ngay
+                {t('jobDetail.apply.applyNow')}
               </button>
             )}
             <button
               onClick={handleToggleSave}
               disabled={savePending}
-              className={`mt-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 ${isSaved
+              className={`mt-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 ${
+                isSaved
                   ? 'border-ai-200 bg-ai-50 text-ai-700 hover:bg-ai-100'
                   : 'border-ink-200 text-ink-700 hover:bg-ink-50'
-                }`}
+              }`}
             >
               <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-              {isSaved ? 'Đã lưu' : 'Lưu việc làm'}
+              {isSaved ? t('jobDetail.apply.saved') : t('jobDetail.apply.saveJob')}
             </button>
           </div>
 
           {/* CV-JD Match (signature AI) — dùng CV thật trong hồ sơ ứng viên */}
           <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-6 shadow-card">
             <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-              <Sparkles className="w-4 h-4" /> Độ phù hợp CV–JD
+              <Sparkles className="w-4 h-4" /> {t('jobDetail.match.title')}
             </div>
 
             {!isAuthenticated || matchAuthError ? (
               <div className="mt-3">
-                <p className="text-sm text-ink-500">
-                  Đăng nhập bằng tài khoản ứng viên và tải CV lên hồ sơ để xem độ phù hợp với tin
-                  này.
-                </p>
+                <p className="text-sm text-ink-500">{t('jobDetail.match.loginRequired')}</p>
                 <Link
                   to="/auth/candidate-login"
                   className="mt-3 block w-full rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
                 >
-                  Đăng nhập
+                  {t('jobDetail.match.login')}
                 </Link>
               </div>
             ) : matchLoading ? (
               <div className="mt-4 flex items-start gap-2 text-sm text-ink-500">
                 <Loader2 className="w-4 h-4 mt-0.5 shrink-0 animate-spin text-ai-600" />
-                <span>Đang phân tích CV của bạn… việc này có thể mất ~20–30 giây.</span>
+                <span>{t('jobDetail.match.analyzing')}</span>
               </div>
             ) : match && !match.hasCv ? (
               <div className="mt-3">
-                <p className="text-sm text-ink-500">
-                  Hồ sơ của bạn chưa có CV. Tải CV lên để AI phân tích độ phù hợp với tin này.
-                </p>
+                <p className="text-sm text-ink-500">{t('jobDetail.match.noCv')}</p>
                 <Link
                   to="/candidate/profile?focus=cv"
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
                 >
-                  <FileText className="w-4 h-4" /> Tải CV lên
+                  <FileText className="w-4 h-4" /> {t('jobDetail.match.uploadCv')}
                 </Link>
               </div>
             ) : match && match.hasCv ? (
@@ -516,7 +538,9 @@ export default function JobDetailPage() {
                 >
                   <FileText className="w-4 h-4 shrink-0 text-ai-600" />
                   <span className="flex-1 truncate">{match.cvFileName}</span>
-                  <span className="shrink-0 text-xs font-medium text-ai-700">Xem</span>
+                  <span className="shrink-0 text-xs font-medium text-ai-700">
+                    {t('jobDetail.match.viewCv')}
+                  </span>
                 </a>
 
                 {match.analysis ? (
@@ -525,7 +549,9 @@ export default function JobDetailPage() {
                       <div className="font-display text-5xl font-extrabold text-ai-700 leading-none">
                         {match.analysis.matchScore}
                       </div>
-                      <div className="pb-1 text-sm text-ink-500">/ 100</div>
+                      <div className="pb-1 text-sm text-ink-500">
+                        {t('jobDetail.match.scoreLabel')}
+                      </div>
                     </div>
                     <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ai-100">
                       <div
@@ -534,14 +560,16 @@ export default function JobDetailPage() {
                       />
                     </div>
                     <div className="mt-2 flex items-center gap-1 text-xs text-ink-400">
-                      <Sparkles className="h-3 w-3" /> Phân tích bởi AI (
-                      {match.analysis.reviewedBy ?? 'Gemini'})
+                      <Sparkles className="h-3 w-3" />{' '}
+                      {t('jobDetail.match.aiAnalysis', {
+                        name: match.analysis.reviewedBy ?? 'Gemini',
+                      })}
                     </div>
                     {/* Kỹ năng khớp / còn thiếu — dạng chip cho dễ quét */}
                     {match.analysis.skillsMatched.length > 0 && (
                       <div className="mt-4">
                         <div className="mb-1.5 text-xs font-semibold text-ink-500">
-                          Kỹ năng khớp
+                          {t('jobDetail.match.skillsMatched')}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {match.analysis.skillsMatched.map((s, i) => (
@@ -558,7 +586,9 @@ export default function JobDetailPage() {
                     )}
                     {match.analysis.skillsGaps.length > 0 && (
                       <div className="mt-3">
-                        <div className="mb-1.5 text-xs font-semibold text-ink-500">Còn thiếu</div>
+                        <div className="mb-1.5 text-xs font-semibold text-ink-500">
+                          {t('jobDetail.match.skillsMissing')}
+                        </div>
                         <div className="flex flex-wrap gap-1.5">
                           {match.analysis.skillsGaps.map((s, i) => (
                             <span
@@ -581,7 +611,8 @@ export default function JobDetailPage() {
                           {sum.strengths && (
                             <div className="rounded-xl bg-emerald-50 p-3">
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                                <CheckCircle2 className="h-4 w-4" /> Điểm sáng
+                                <CheckCircle2 className="h-4 w-4" />{' '}
+                                {t('jobDetail.match.strengths')}
                               </div>
                               <p className="mt-1 text-sm text-ink-600">{sum.strengths}</p>
                             </div>
@@ -589,7 +620,7 @@ export default function JobDetailPage() {
                           {sum.gaps && (
                             <div className="rounded-xl bg-amber-50 p-3">
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                                <span>⚠️</span> Điểm cần lưu ý
+                                <span>⚠️</span> {t('jobDetail.match.considerations')}
                               </div>
                               <p className="mt-1 text-sm text-ink-600">{sum.gaps}</p>
                             </div>
@@ -599,39 +630,41 @@ export default function JobDetailPage() {
                       )
                     })()}
 
-                    <p className="mt-3 text-xs text-ink-400">
-                      Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo
-                    </p>
+                    <p className="mt-3 text-xs text-ink-400">{t('jobDetail.match.geminiNote')}</p>
                     <Link
                       to="/candidate/profile?focus=cv"
                       className="mt-3 block w-full rounded-xl border border-ai-300 bg-white px-3 py-2 text-center text-sm font-semibold text-ai-700 hover:bg-ai-50"
                     >
-                      Cập nhật CV khác
+                      {t('jobDetail.match.updateCv')}
                     </Link>
                   </>
                 ) : (
                   <p className="mt-4 text-sm text-ink-500">
-                    {match.message || 'Chưa thể phân tích CV lúc này. Vui lòng thử lại sau.'}
+                    {match.message || t('jobDetail.match.cannotAnalyze')}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-ink-500">
-                Không tải được phân tích CV. Vui lòng thử lại sau.
-              </p>
+              <p className="mt-4 text-sm text-ink-500">{t('jobDetail.match.loadError')}</p>
             )}
           </div>
 
           {/* Company */}
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
-            <div className="text-sm font-semibold mb-3">Về phòng ban</div>
+            <div className="text-sm font-semibold mb-3">
+              {t('jobDetail.sections.aboutDepartment')}
+            </div>
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <div className="font-semibold text-sm">{job.department || 'Engineering'}</div>
-                <div className="text-xs text-ink-400">Đội ngũ ~40 kỹ sư · Hybrid</div>
+                <div className="font-semibold text-sm">
+                  {job.department || t('jobDetail.header.department')}
+                </div>
+                <div className="text-xs text-ink-400">
+                  {t('jobDetail.company.teamSize', { count: 40 })}
+                </div>
               </div>
             </div>
           </div>

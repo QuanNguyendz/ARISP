@@ -301,7 +301,7 @@ export default function CandidatesPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-ink-200 dark:border-white/10">
-                  {['Ứng viên', 'Vị trí', 'Trạng thái', 'Match', 'Ngày ứng tuyển'].map((h) => (
+                  {['Ứng viên', 'Vị trí', 'Trạng thái', 'Điểm CV', 'Ngày ứng tuyển'].map((h) => (
                     <th
                       key={h}
                       className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400"

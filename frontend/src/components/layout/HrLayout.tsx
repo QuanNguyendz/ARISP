@@ -371,6 +371,13 @@ export default function HrLayout() {
                         })
                       )}
                     </div>
+                    <Link
+                      to="/hr/notifications"
+                      onClick={() => setNotifOpen(false)}
+                      className="block border-t border-ink-100 dark:border-white/10 px-4 py-2.5 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5"
+                    >
+                      Xem tất cả thông báo
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>

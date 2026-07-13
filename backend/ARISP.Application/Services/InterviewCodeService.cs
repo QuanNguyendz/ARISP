@@ -17,11 +17,13 @@ namespace ARISP.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly InterviewService _interviewService;
+        private readonly INotificationService _notificationService;
 
-        public InterviewCodeService(IUnitOfWork unitOfWork, InterviewService interviewService)
+        public InterviewCodeService(IUnitOfWork unitOfWork, InterviewService interviewService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _interviewService = interviewService;
+            _notificationService = notificationService;
         }
 
         public async Task<Result<InterviewCode>> GenerateCodeAsync(Guid applicationId, int? roundNumber, Guid createdByUserId, CancellationToken ct = default)
@@ -41,9 +43,23 @@ namespace ARISP.Application.Services
             int finalRoundNumber = roundNumber ?? 1;
             if (!roundNumber.HasValue)
             {
+                // Dùng ToLower() thay vì string.Equals(..., StringComparison) — EF Core/Npgsql
+                // KHÔNG dịch được overload có StringComparison sang SQL (gây lỗi 500 khi cấp mã).
                 var sessions = await _unitOfWork.Repository<InterviewSession>().FindAsync(
-                    s => s.ApplicationId == applicationId && string.Equals(s.Status, "completed", StringComparison.OrdinalIgnoreCase), ct);
+                    s => s.ApplicationId == applicationId && s.Status != null && s.Status.ToLower() == "completed", ct);
                 finalRoundNumber = sessions.Any() ? sessions.Max(s => s.RoundNumber) + 1 : 1;
+            }
+
+            // ADR-015/016: mã On-site chỉ cấp khi ứng viên ĐÃ ĐẶT LỊCH buổi phỏng vấn thật của vòng
+            // (InterviewBooking "scheduled"). Ứng viên đang sàng lọc / chưa đặt lịch thì CHƯA được cấp mã.
+            var bookings = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                b => b.ApplicationId == applicationId
+                     && b.RoundNumber == finalRoundNumber
+                     && b.Status != null && b.Status.ToLower() == "scheduled", ct);
+            if (!bookings.Any())
+            {
+                return Result.Failure<InterviewCode>(
+                    $"Ứng viên chưa đặt lịch phỏng vấn thật cho vòng {finalRoundNumber} — chưa thể cấp mã. Mã On-site chỉ cấp sau khi ứng viên đã đặt lịch buổi phỏng vấn thật.");
             }
 
             var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
@@ -84,6 +100,15 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.Repository<InterviewCode>().AddAsync(interviewCode, ct);
 
+            // Đã cấp mã = ứng viên chắc chắn vào phỏng vấn thật → không còn "sàng lọc".
+            // Đảm bảo bất biến: hồ sơ có mã thì status không phải "screening" (đồng bộ với việc
+            // đặt lịch cũng nâng screening→interview). Tự chữa dữ liệu cũ ở lần cấp mã kế tiếp.
+            if (string.Equals(application.Status, "screening", StringComparison.OrdinalIgnoreCase))
+            {
+                application.Status = "interview";
+                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+            }
+
             var auditLog = new AuditLog
             {
                 Id = Guid.NewGuid(),
@@ -97,6 +122,26 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.Repository<AuditLog>().AddAsync(auditLog, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Đẩy SignalR để chuông thông báo của candidate cập nhật TỨC THÌ (real-time). FE
+            // (useAppNotifications) nhận "ReceiveUserNotification" → invalidate ['notifications']
+            // → refetch /portal/notifications → SyncNotificationsAsync tạo notification "invite:{codeId}".
+            // Chỉ push khi ứng viên có tài khoản (candidate on-site không tài khoản thì bỏ qua).
+            if (application.CandidateAccountId.HasValue)
+            {
+                try
+                {
+                    await _notificationService.PublishUserEventAsync(
+                        application.CandidateAccountId.Value,
+                        "ReceiveUserNotification",
+                        new { Type = "InterviewCodeIssued", applicationId = applicationId, roundNumber = finalRoundNumber },
+                        ct);
+                }
+                catch
+                {
+                    // Push real-time là best-effort — lỗi SignalR không được làm hỏng việc cấp mã (đã lưu DB).
+                }
+            }
 
             return Result.Success(interviewCode);
         }
