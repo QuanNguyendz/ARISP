@@ -13,7 +13,6 @@ namespace ARISP.Application.DTOs
         public string? CvFileUrl { get; set; }
         public string? CvText { get; set; }
         public string? CvFileHash { get; set; }
-        public string? DesiredLocation { get; set; }
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }
     }
@@ -36,6 +35,9 @@ namespace ARISP.Application.DTOs
 
         /// <summary>Điểm phù hợp CV–JD (0–100) lấy từ cv_jd_analyses nếu có. Null nếu chưa phân tích.</summary>
         public int? MatchScore { get; set; }
+
+        /// <summary>Tóm tắt CV từ kết quả phân tích CV-JD</summary>
+        public string? CvJdSummary { get; set; }
 
         /// <summary>
         /// True nếu ứng viên đã đặt lịch buổi phỏng vấn thật (InterviewBooking "scheduled") — điều kiện

@@ -97,7 +97,16 @@ export default function JobPostingDetailPage() {
   const [invitingId, setInvitingId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<string>('cv_review')
   const [page, setPage] = useState<number>(1)
-  const [selectedCoverLetter, setSelectedCoverLetter] = useState<{ candidateName: string; text: string } | null>(null)
+  const [selectedCoverLetter, setSelectedCoverLetter] = useState<{
+    candidateName: string
+    text: string
+    email: string
+    phone?: string
+    noticePeriod?: string
+    cvJdSummary?: string
+    matchScore?: number | null
+    cvFileUrl?: string | null
+  } | null>(null)
 
   // Trạng thái lọc & sắp xếp cho Duyệt Hồ Sơ
   const [cvDateFilter, setCvDateFilter] = useState<string>('')
@@ -1259,17 +1268,24 @@ export default function JobPostingDetailPage() {
                             <div className="w-8 h-8 shrink-0" />
                           )}
 
-                          {a.coverLetter ? (
-                            <button
-                              onClick={() => setSelectedCoverLetter({ candidateName: a.candidateName, text: a.coverLetter! })}
-                              title="Xem Cover Letter"
-                              className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                            >
-                              <ScrollText className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <div className="w-8 h-8 shrink-0" />
-                          )}
+                          <button
+                            onClick={() =>
+                              setSelectedCoverLetter({
+                                candidateName: a.candidateName,
+                                text: a.coverLetter || '',
+                                email: a.candidateEmail,
+                                phone: a.candidatePhone,
+                                noticePeriod: a.noticePeriod,
+                                cvJdSummary: a.cvJdSummary,
+                                matchScore: a.matchScore,
+                                cvFileUrl: a.cvFileUrl,
+                              })
+                            }
+                            title="Xem thông tin ứng tuyển & Thư giới thiệu"
+                            className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                          >
+                            <ScrollText className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1349,11 +1365,11 @@ export default function JobPostingDetailPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-lg rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover text-left"
+            className="w-full max-w-lg rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover text-left flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-ink-100 dark:border-white/10 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-ink-100 dark:border-white/10 pb-3 mb-4 shrink-0">
               <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                Thư giới thiệu - {selectedCoverLetter.candidateName}
+                Thông tin hồ sơ - {selectedCoverLetter.candidateName}
               </h3>
               <button
                 onClick={() => setSelectedCoverLetter(null)}
@@ -1362,10 +1378,72 @@ export default function JobPostingDetailPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="text-sm text-ink-700 dark:text-ink-300 max-h-96 overflow-y-auto whitespace-pre-line bg-ink-50 dark:bg-white/5 p-4 rounded-xl border border-ink-100 dark:border-white/10">
-              {selectedCoverLetter.text || 'Không có nội dung thư giới thiệu.'}
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {selectedCoverLetter.cvJdSummary ? (
+                <div className="rounded-xl border border-ai-100 bg-ai-50/50 p-4 dark:border-ai-500/20 dark:bg-ai-500/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-ai-700 dark:text-ai-400 uppercase tracking-wider">
+                      <Sparkles className="h-3.5 w-3.5 text-ai-500 animate-pulse" /> Tóm tắt CV & Đánh giá AI
+                    </span>
+                    {selectedCoverLetter.matchScore != null && (
+                      <span className="rounded-full bg-ai-100 px-2 py-0.5 text-xs font-bold text-ai-800 dark:bg-ai-500/30 dark:text-ai-300">
+                        Độ phù hợp: {selectedCoverLetter.matchScore}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-ai-900 dark:text-ai-100 leading-relaxed whitespace-pre-line">
+                    {selectedCoverLetter.cvJdSummary}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Không có dữ liệu đánh giá AI
+                  </span>
+                  <p className="mt-1 text-xs text-amber-900 dark:text-amber-100 leading-relaxed">
+                    Hồ sơ này chưa có kết quả đánh giá AI (do là hồ sơ thử nghiệm hoặc không có tệp CV hợp lệ).
+                  </p>
+                </div>
+              )}
+
+              {/* 2. Thông tin liên hệ */}
+              <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 dark:border-white/10 dark:bg-white/5">
+                <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
+                  Thông tin liên hệ
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">Họ và tên</span>
+                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.candidateName}</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">Số điện thoại</span>
+                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.phone || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">Email</span>
+                    <span className="font-medium text-ink-950 dark:text-white truncate block" title={selectedCoverLetter.email}>{selectedCoverLetter.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">Báo trước khi nghỉ việc</span>
+                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.noticePeriod || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Thư giới thiệu */}
+              <div className="rounded-xl border border-ink-100 bg-ink-50/20 p-4 dark:border-white/5 dark:bg-white-[0.02]">
+                <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
+                  Thư giới thiệu
+                </h4>
+                <p className="text-xs text-ink-700 dark:text-ink-300 leading-relaxed whitespace-pre-line">
+                  {selectedCoverLetter.text || 'Ứng viên không gửi thư giới thiệu.'}
+                </p>
+              </div>
             </div>
-            <div className="flex justify-end mt-4">
+
+            <div className="flex justify-end mt-4 pt-3 border-t border-ink-100 dark:border-white/10 shrink-0">
               <button
                 onClick={() => setSelectedCoverLetter(null)}
                 className="px-4 py-2 text-sm font-semibold text-ink-700 dark:text-ink-200 bg-ink-100 dark:bg-white/10 hover:bg-ink-200 dark:hover:bg-white/20 rounded-xl transition-colors"

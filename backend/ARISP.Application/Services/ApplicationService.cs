@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using ARISP.Application.Common;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using ARISP.Domain.Entities;
 
 namespace ARISP.Application.Services
@@ -18,6 +19,7 @@ namespace ARISP.Application.Services
         private readonly IRagIngestionService _ragIngestion;
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
+        private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
@@ -31,12 +33,18 @@ namespace ARISP.Application.Services
             { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
-        public ApplicationService(IUnitOfWork unitOfWork, IRagIngestionService ragIngestion, IEmailService emailService, INotificationService notificationService)
+        public ApplicationService(
+            IUnitOfWork unitOfWork,
+            IRagIngestionService ragIngestion,
+            IEmailService emailService,
+            INotificationService notificationService,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
             _emailService = emailService;
             _notificationService = notificationService;
+            _scopeFactory = scopeFactory;
         }
 
         /// <summary>
@@ -63,7 +71,9 @@ namespace ARISP.Application.Services
                 CoverLetter = application.CoverLetter,
                 NoticePeriod = application.NoticePeriod,
                 InterviewScore = interviewScore,
-                InterviewDate = interviewDate
+                InterviewDate = interviewDate,
+                MatchScore = application.CvJdAnalysis?.MatchScore,
+                CvJdSummary = application.CvJdAnalysis?.Summary
             };
         }
 
@@ -88,7 +98,6 @@ namespace ARISP.Application.Services
                 CandidatePhone = request.CandidatePhone,
                 CvFileUrl = request.CvFileUrl,
                 CvText = request.CvText,
-                DesiredLocation = request.DesiredLocation,
                 CoverLetter = request.CoverLetter,
                 NoticePeriod = request.NoticePeriod,
                 Source = source,
@@ -109,6 +118,72 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Auto-trigger background CV-JD analysis if it does not already exist
+            if (application.CvJdAnalysisId == null && !string.IsNullOrEmpty(application.CvFileUrl))
+            {
+                var fileUrl = application.CvFileUrl;
+                var extension = System.IO.Path.GetExtension(fileUrl).ToLower();
+                var isTestOrDummy = fileUrl.Contains("test", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("dummy", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("mock", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("example", StringComparison.OrdinalIgnoreCase);
+                var isValidExtension = extension == ".pdf" || extension == ".docx" || extension == ".doc";
+
+                if (!isTestOrDummy && isValidExtension)
+                {
+                    var appId = application.Id;
+                    var jobId = application.JobPostingId;
+                    var hash = request.CvFileHash;
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                        using var scope = _scopeFactory.CreateScope();
+                        var storage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+                        var cvJdSvc = scope.ServiceProvider.GetRequiredService<CvJdAnalysisService>();
+                        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                        
+                        var bytes = await storage.ReadAllBytesAsync(fileUrl);
+                        if (bytes != null && bytes.Length > 0)
+                        {
+                            using var ms = new System.IO.MemoryStream(bytes);
+                            var fileName = System.IO.Path.GetFileName(fileUrl);
+                            var analysisResult = await cvJdSvc.AnalyzeAndCacheAsync(jobId, ms, fileName, CancellationToken.None);
+                            if (!analysisResult.IsFailure)
+                            {
+                                var appRepo = uow.Repository<ARISP.Domain.Entities.Application>();
+                                var app = await appRepo.GetByIdAsync(appId);
+                                if (app != null)
+                                {
+                                    app.CvJdAnalysisId = analysisResult.Value.Id;
+                                    await uow.SaveChangesAsync();
+                                    
+                                    // Notify candidate and recruiters that background analysis completed
+                                    var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                                    if (app.CandidateAccountId.HasValue)
+                                    {
+                                        await notifSvc.PublishUserEventAsync(app.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "AiAnalysisComplete" }, CancellationToken.None);
+                                    }
+                                    
+                                    if (jobPosting != null)
+                                    {
+                                        var responseDto = MapToResponse(app, jobPosting);
+                                        await notifSvc.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
+                                        await notifSvc.PublishGroupEventAsync("hr_admin", "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Background task must not crash
+                    }
+                });
+            }
+        }
 
             // Chunk + embed + lưu pgvector CV — do RAG service (Python) sở hữu (ADR-039).
             if (!string.IsNullOrEmpty(request.CvText))
@@ -237,11 +312,11 @@ namespace ARISP.Application.Services
             }
 
             var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
-            var scoreByAnalysisId = analysisIds.Count == 0
-                ? new Dictionary<Guid, int>()
+            var analysisDataById = analysisIds.Count == 0
+                ? new Dictionary<Guid, (int MatchScore, string Summary)>()
                 : (await _unitOfWork.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
-                    .ToDictionary(c => c.Id, c => c.MatchScore);
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Summary }), ct))
+                    .ToDictionary(c => c.Id, c => (c.MatchScore, c.Summary));
 
             // Ứng viên đã đặt lịch phỏng vấn thật (booking "scheduled") → đủ điều kiện cấp Interview Code.
             var appIds = apps.Select(a => a.Id).ToList();
@@ -340,9 +415,12 @@ namespace ARISP.Application.Services
                     PracticeSessionUsed = app.PracticeSessionUsed,
                     CreatedAt = app.CreatedAt,
                     CvJdAnalysisId = app.CvJdAnalysisId,
-                    MatchScore = app.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(app.CvJdAnalysisId.Value, out var ms)
-                        ? ms
+                    MatchScore = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val)
+                        ? val.MatchScore
                         : (int?)null,
+                    CvJdSummary = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val2)
+                        ? val2.Summary
+                        : null,
                     HasScheduledInterview = bookedAppIds.Contains(app.Id),
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
@@ -432,6 +510,11 @@ namespace ARISP.Application.Services
             var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(id, ct);
             if (application == null)
                 return Result.Failure<ApplicationResponse>("Application not found.");
+
+            if (application.CvJdAnalysisId.HasValue && application.CvJdAnalysis == null)
+            {
+                application.CvJdAnalysis = await _unitOfWork.Repository<CvJdAnalysis>().GetByIdAsync(application.CvJdAnalysisId.Value, ct);
+            }
 
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
 

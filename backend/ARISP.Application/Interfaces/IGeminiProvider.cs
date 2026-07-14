@@ -32,5 +32,17 @@ namespace ARISP.Application.Interfaces
             string? jdMimeType,
             string? fallbackJdText,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// So sánh thông tin liên hệ và nội dung trong CV bằng AI.
+        /// </summary>
+        Task<Result<CvContactVerificationResultDto>> VerifyCvContactInfoAsync(
+            byte[]? cvFileBytes,
+            string? cvMimeType,
+            string? fallbackCvText,
+            string formName,
+            string formPhone,
+            string formEmail,
+            CancellationToken ct = default);
     }
 }

@@ -23,9 +23,15 @@ namespace ARISP.API.Controllers
     {
         public string? CandidateName { get; set; }
         public string? CandidatePhone { get; set; }
-        public string? DesiredLocation { get; set; }
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }
+        public Microsoft.AspNetCore.Http.IFormFile? CvFile { get; set; }
+    }
+
+    public class VerifyCvInfoRequest
+    {
+        public string? CandidateName { get; set; }
+        public string? CandidatePhone { get; set; }
         public Microsoft.AspNetCore.Http.IFormFile? CvFile { get; set; }
     }
 
@@ -402,10 +408,85 @@ namespace ARISP.API.Controllers
         }
 
         /// <summary>
+        /// POST /api/portal/applications/verify-cv-info
+        /// So sánh thông tin liên hệ và nội dung trong CV bằng AI.
+        /// </summary>
+        [HttpPost("applications/verify-cv-info")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(11 * 1024 * 1024)]
+        public async Task<IActionResult> VerifyCvInfo([FromForm] VerifyCvInfoRequest form, CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var acc = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateId, ct);
+            if (acc == null)
+                return Unauthorized(new { message = "Không tìm thấy tài khoản ứng viên." });
+
+            if (string.IsNullOrWhiteSpace(form.CandidateName))
+                return BadRequest(new { message = "Vui lòng nhập họ và tên." });
+            if (string.IsNullOrWhiteSpace(form.CandidatePhone))
+                return BadRequest(new { message = "Vui lòng nhập số điện thoại." });
+
+            // Nguồn CV: ưu tiên file đính kèm; nếu không có dùng CV hồ sơ.
+            byte[] bytes;
+            string fileName;
+            string ext;
+            if (form.CvFile != null && form.CvFile.Length > 0)
+            {
+                ext = System.IO.Path.GetExtension(form.CvFile.FileName).ToLowerInvariant();
+                if (ext != ".pdf" && ext != ".docx")
+                    return BadRequest(new { message = "Chỉ chấp nhận CV định dạng PDF hoặc DOCX.", code = "bad_format" });
+                if (form.CvFile.Length > 10 * 1024 * 1024)
+                    return BadRequest(new { message = "Kích thước CV tối đa 10MB.", code = "too_large" });
+                using var ms = new System.IO.MemoryStream();
+                await form.CvFile.CopyToAsync(ms, ct);
+                bytes = ms.ToArray();
+                fileName = System.IO.Path.GetFileName(form.CvFile.FileName);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(acc.ProfileCvUrl))
+                    return BadRequest(new { message = "Bạn cần tải CV lên hồ sơ hoặc đính kèm CV.", code = "no_cv" });
+                bytes = await _fileStorage.ReadAllBytesAsync(acc.ProfileCvUrl, ct);
+                if (bytes == null || bytes.Length == 0)
+                    return BadRequest(new { message = "Không đọc được file CV trong hồ sơ. Vui lòng tải lại CV.", code = "cv_unreadable" });
+                ext = System.IO.Path.GetExtension(acc.ProfileCvFileName ?? acc.ProfileCvUrl).ToLowerInvariant();
+                fileName = string.IsNullOrWhiteSpace(acc.ProfileCvFileName) ? $"cv{ext}" : acc.ProfileCvFileName;
+            }
+
+            var mime = ext switch
+            {
+                ".pdf" => "application/pdf",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                _ => "application/octet-stream"
+            };
+
+            string cvText = string.Empty;
+            try
+            {
+                using var s = new System.IO.MemoryStream(bytes);
+                cvText = (await _documentParserService.ParseDocumentAsync(s, ext))?.Replace("\0", string.Empty) ?? string.Empty;
+            }
+            catch { /* best-effort */ }
+
+            var verifyResult = await _geminiProvider.VerifyCvContactInfoAsync(
+                bytes, mime, cvText,
+                form.CandidateName, form.CandidatePhone, acc.Email, ct);
+
+            if (verifyResult.IsFailure)
+            {
+                return BadRequest(new { message = verifyResult.Error });
+            }
+
+            return Ok(verifyResult.Value);
+        }
+
+        /// <summary>
         /// POST /api/portal/applications/{jobPostingId}/apply
         /// Nộp hồ sơ ứng tuyển qua Job Board — gửi về cho bộ phận nhân sự.
         /// CV mặc định lấy từ hồ sơ; ứng viên có thể đính kèm CV khác cho riêng tin này (CvFile).
-        /// Kèm xác nhận họ tên/SĐT, nơi làm việc mong muốn, thư giới thiệu + notice period.
+        /// Kèm xác nhận họ tên/SĐT, thư giới thiệu + notice period.
         /// Tự đính kèm kết quả phân tích CV–JD đã cache (nếu có) và embed CV cho cá nhân hoá.
         /// </summary>
         [HttpPost("applications/{jobPostingId:guid}/apply")]
@@ -429,10 +510,6 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Vui lòng nhập họ và tên." });
             if (string.IsNullOrWhiteSpace(form.CandidatePhone))
                 return BadRequest(new { message = "Vui lòng nhập số điện thoại." });
-            if (string.IsNullOrWhiteSpace(form.DesiredLocation))
-                return BadRequest(new { message = "Vui lòng nhập nơi làm việc mong muốn." });
-            if (string.IsNullOrWhiteSpace(form.CoverLetter))
-                return BadRequest(new { message = "Vui lòng trả lời câu hỏi giới thiệu bản thân." });
             if (string.IsNullOrWhiteSpace(form.NoticePeriod))
                 return BadRequest(new { message = "Vui lòng nhập thời gian báo trước khi nghỉ việc." });
 
@@ -512,8 +589,7 @@ namespace ARISP.API.Controllers
                 CvFileUrl = cvFileUrl,
                 CvText = cvText,
                 CvFileHash = cvHash,
-                DesiredLocation = form.DesiredLocation!.Trim(),
-                CoverLetter = form.CoverLetter!.Trim(),
+                CoverLetter = form.CoverLetter?.Trim(),
                 NoticePeriod = form.NoticePeriod!.Trim()
             };
 
@@ -1396,6 +1472,7 @@ namespace ARISP.API.Controllers
                     OverallScore = r.OverallScore,
                     Verdict = r.Verdict,
                     Summary = r.Summary,
+                    SuggestedPositions = r.SuggestedPositions,
                     Strengths = r.Strengths,
                     Improvements = r.Improvements,
                     MissingSections = r.MissingSections,
