@@ -298,6 +298,12 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-14: **Overhaul quy trình duyệt hồ sơ & hiển thị ứng viên theo tab phân chia vòng — BE + FE.**
+  - Yêu cầu: Hiển thị danh sách ứng viên phân loại theo tab trạng thái/vòng tuyển dụng trong màn xem chi tiết tin tuyển dụng của HR (JobPostingDetailPage) và Recruiter (JobDetailPage) để dễ theo dõi khi số lượng ứng viên lớn (giống kiểu chia tab trạng thái tin ở Ảnh 1). Thêm tính năng duyệt (Accept) và từ chối (Reject) hồ sơ CV mới nộp. Khi duyệt hồ sơ, hệ thống tự động mời phỏng vấn vòng 1 (đặt lịch và gửi email chúc mừng). Khi từ chối, gửi thư cảm ơn.
+  - BE: Cập nhật `AcceptApplicationAsync` trong `ApplicationService` để tự động tích hợp gửi lời mời phỏng vấn Vòng 1 (`SendInterviewInviteAsync`). Xử lý cấu hình `CandidateBaseUrl` từ controller `ApplicationsController.Accept`.
+  - FE: Expose hàm `acceptApplication` và `rejectApplication` ở `applicationService.ts`. Cập nhật interface `HrApplicationItem` thêm `currentRound`. Thay thế dạng danh sách trải dài (hoặc bảng Kanban cũ cồng kềnh) ở cả HR (`JobPostingDetailPage.tsx`) và Recruiter (`JobDetailPage.tsx`) bằng tập hợp các tab-chips trên đầu: `[Tất cả] [Duyệt Hồ Sơ] [Vòng 1] [Vòng 2] ... [Trúng Tuyển] [Không Đạt]` chứa tổng số ứng viên tương ứng. Nhấp tab nào hiển thị danh sách ứng viên lọc riêng cho tab đó theo dạng lưới/danh sách sạch sẽ và thêm phân trang `Pagination` riêng cho từng tab. Sửa lỗi hiển thị tài liệu CV bằng helper `resolveAssetUrl`.
+  - Kết quả: Build frontend/backend thành công, không còn lỗi TypeScript/C#.
+
 - [x] 2026-07-05: **Chuyển status "screening" → "interview" khi đặt lịch/cấp mã — không còn "sàng lọc" khi đã có mã — BE.**
   - Vấn đề: hồ sơ có Interview Code nhưng badge vẫn "Đang sàng lọc" (mâu thuẫn). Do đặt lịch (`CandidateScheduleController.Book`) tạo booking nhưng **không đổi status**; status `"interview"` chỉ set ở auto-progression (vòng 2+) → vòng 1 kẹt ở `screening` suốt.
   - Fix: (1) `Book` — sau khi tạo booking, nếu status `screening` → nâng `interview` (transition hợp lệ; `PracticeEligible` vẫn true nên không phá phỏng vấn thử). (2) `InterviewCodeService.GenerateCodeAsync` — khi cấp mã cũng nâng `screening → interview` (bất biến "có mã ⇒ không sàng lọc"; tự chữa dữ liệu cũ ở lần cấp kế). Nhãn candidate: `interview` = "Đang phỏng vấn". Build API 0 error. **Cần restart API.**

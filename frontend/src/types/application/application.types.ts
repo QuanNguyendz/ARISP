@@ -200,4 +200,9 @@ export interface HrApplicationItem {
   matchScore?: number | null
   /** Ứng viên đã đặt lịch phỏng vấn thật → đủ điều kiện cấp Interview Code On-site (ADR-015/016). */
   hasScheduledInterview?: boolean
+  currentRound?: number | null
+  coverLetter?: string
+  noticePeriod?: string
+  interviewScore?: number | null
+  interviewDate?: string
 }

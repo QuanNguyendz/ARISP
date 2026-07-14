@@ -51,6 +51,14 @@ export const applicationService = {
     await apiClient.post(`/applications/${applicationId}/send-invite`)
   },
 
+  async acceptApplication(applicationId: string): Promise<void> {
+    await apiClient.post(`/applications/${applicationId}/accept`)
+  },
+
+  async rejectApplication(applicationId: string): Promise<void> {
+    await apiClient.post(`/applications/${applicationId}/reject`)
+  },
+
   async hasPracticeSession(applicationId: string): Promise<{ available: boolean }> {
     const { data } = await apiClient.get<{ available: boolean }>(
       `/applications/${applicationId}/practice`

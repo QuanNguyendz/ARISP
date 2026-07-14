@@ -42,6 +42,14 @@ namespace ARISP.Application.DTOs
         /// để Recruiter cấp Interview Code On-site (ADR-015/016). Sàng lọc/chưa đặt lịch → false.
         /// </summary>
         public bool HasScheduledInterview { get; set; }
+
+        /// <summary>Vòng hiện tại của ứng viên (null nếu ở giai đoạn CV ứng tuyển)</summary>
+        public int? CurrentRound { get; set; }
+
+        public string? CoverLetter { get; set; }
+        public string? NoticePeriod { get; set; }
+        public decimal? InterviewScore { get; set; }
+        public DateTimeOffset? InterviewDate { get; set; }
     }
 
     public class UpdateApplicationStatusRequest

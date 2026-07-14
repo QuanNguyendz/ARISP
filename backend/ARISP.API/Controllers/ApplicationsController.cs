@@ -264,5 +264,30 @@ namespace ARISP.API.Controllers
             return Ok(new { message = "Đã gửi email mời phỏng vấn (chọn lịch) cho ứng viên." });
         }
 
+        [HttpPost("{id}/accept")]
+        [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm duyệt hồ sơ
+        public async Task<IActionResult> Accept(Guid id, CancellationToken ct)
+        {
+            var result = await _applicationService.AcceptApplicationAsync(id, CandidateBaseUrl, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(new { message = "Đã duyệt hồ sơ ứng tuyển thành công và chuyển sang vòng 1." });
+        }
+
+        [HttpPost("{id}/reject")]
+        [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm từ chối
+        public async Task<IActionResult> Reject(Guid id, CancellationToken ct)
+        {
+            var result = await _applicationService.RejectApplicationAsync(id, ct);
+            if (result.IsFailure)
+            {
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(new { message = "Đã từ chối hồ sơ ứng tuyển và gửi thư cảm ơn cho ứng viên." });
+        }
     }
 }
