@@ -34,6 +34,7 @@ export const appStatusLabel = (s: string): string =>
     interview: 'Đang phỏng vấn',
     pass: 'Đạt',
     not_pass: 'Không đạt',
+    cv_rejected: 'Từ chối (CV)',
     withdrawn: 'Đã rút',
   } as Record<string, string>)[s] || s
 
@@ -45,6 +46,7 @@ export const appStatusBadge = (s: string): string =>
     interview: 'bg-ai-100 dark:bg-ai-500/20 text-ai-700 dark:text-ai-400',
     pass: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
     not_pass: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    cv_rejected: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
     withdrawn: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400',
   } as Record<string, string>)[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
 

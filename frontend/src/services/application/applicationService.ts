@@ -51,6 +51,14 @@ export const applicationService = {
     await apiClient.post(`/applications/${applicationId}/send-invite`)
   },
 
+  async acceptApplication(applicationId: string): Promise<void> {
+    await apiClient.post(`/applications/${applicationId}/accept`)
+  },
+
+  async rejectApplication(applicationId: string): Promise<void> {
+    await apiClient.post(`/applications/${applicationId}/reject`)
+  },
+
   async hasPracticeSession(applicationId: string): Promise<{ available: boolean }> {
     const { data } = await apiClient.get<{ available: boolean }>(
       `/applications/${applicationId}/practice`
@@ -77,7 +85,6 @@ export const applicationService = {
     payload: {
       candidateName: string
       candidatePhone: string
-      desiredLocation: string
       coverLetter: string
       noticePeriod: string
       cvFile?: File | null
@@ -86,7 +93,6 @@ export const applicationService = {
     const formData = new FormData()
     formData.append('candidateName', payload.candidateName)
     formData.append('candidatePhone', payload.candidatePhone)
-    formData.append('desiredLocation', payload.desiredLocation)
     formData.append('coverLetter', payload.coverLetter)
     formData.append('noticePeriod', payload.noticePeriod)
     if (payload.cvFile) formData.append('cvFile', payload.cvFile)
@@ -97,5 +103,27 @@ export const applicationService = {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
     return data
+  },
+
+  // Candidate: So sánh thông tin liên hệ và nội dung trong CV bằng AI.
+  async verifyCvContactInfo(payload: {
+    candidateName: string
+    candidatePhone: string
+    cvFile?: File | null
+  }): Promise<{ isMatch: boolean; mismatchDetails: string | null }> {
+    const formData = new FormData()
+    formData.append('candidateName', payload.candidateName)
+    formData.append('candidatePhone', payload.candidatePhone)
+    if (payload.cvFile) formData.append('cvFile', payload.cvFile)
+
+    const { data } = await apiClient.post<{ is_match: boolean; mismatch_details: string | null }>(
+      '/portal/applications/verify-cv-info',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return {
+      isMatch: data.is_match,
+      mismatchDetails: data.mismatch_details
+    }
   },
 }

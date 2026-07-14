@@ -8,6 +8,7 @@ import { applicationService } from '@services/application/applicationService'
 import type { HrApplicationItem } from '@/types/application'
 import { appStatusBadge, appStatusLabel, initials, scoreColor } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
+import { resolveAssetUrl } from '@/config/constants'
 
 const FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -212,7 +213,7 @@ export default function RecruiterCandidatesPage() {
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   openDocument(
-                                    a.cvFileUrl!,
+                                    resolveAssetUrl(a.cvFileUrl),
                                     `${a.candidateName || 'Ứng viên'} - CV`
                                   )
                                 }}
