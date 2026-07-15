@@ -36,7 +36,12 @@ _MOCK_QUESTIONS = [
 
 async def mock_question_tokens(ctx: QuestionContext):
     """Sinh token mock (mirror OpenAIProvider.local) để stream khi không có API key."""
-    if ctx.must_ask_questions:
+    if ctx.force_closing:
+        text = (
+            "[END_INTERVIEW] Cảm ơn bạn đã dành thời gian tham gia buổi phỏng vấn hôm nay. "
+            "Kết quả sẽ được gửi tới bạn sớm. Chúc bạn một ngày tốt lành!"
+        )
+    elif ctx.must_ask_questions:
         text = f"[Must Ask] {ctx.must_ask_questions[0]}"
     else:
         idx = len(ctx.chat_history) % len(_MOCK_QUESTIONS)
@@ -85,7 +90,8 @@ async def generate_evaluation(ctx: SessionContext) -> EvaluationReport:
 async def assess_language(ctx: SessionContext) -> LanguageAssessment:
     if get_settings().use_mock:
         return LanguageAssessment(
-            fluency=8.0, grammar=7.5, vocabulary=8.0, comprehension=8.5, overall_score=8.0
+            fluency=8.0, grammar=7.5, vocabulary=8.0, comprehension=8.5, overall_score=8.0,
+            language_adherence="Ứng viên trả lời nhất quán bằng ngôn ngữ phỏng vấn yêu cầu.",
         )
     system, user = assess_language_prompt(ctx)
     data = await complete_json(system, user)
@@ -95,6 +101,7 @@ async def assess_language(ctx: SessionContext) -> LanguageAssessment:
         vocabulary=float(data.get("vocabulary", 0)),
         comprehension=float(data.get("comprehension", 0)),
         overall_score=float(data.get("overall_score", 0)),
+        language_adherence=str(data.get("language_adherence", "")),
     )
 
 

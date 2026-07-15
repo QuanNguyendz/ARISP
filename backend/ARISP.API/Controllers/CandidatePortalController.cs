@@ -48,6 +48,7 @@ namespace ARISP.API.Controllers
         private readonly ApplicationService _applicationService;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly INotificationService _notificationService;
+        private readonly ARISP.Application.Options.InterviewOptions _interviewOptions;
 
         // Trạng thái phân tích CV-JD đang chạy nền (key = "{jobId}:{cvHash}"). Dùng cho lỗi AI
         // (không ghi row vào DB) để poll biết được kết quả thất bại. Kết quả thành công nằm ở DB cache.
@@ -66,7 +67,8 @@ namespace ARISP.API.Controllers
             CvJdAnalysisService cvJdAnalysisService,
             ApplicationService applicationService,
             IServiceScopeFactory scopeFactory,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            ARISP.Application.Options.InterviewOptions? interviewOptions = null)
         {
             _unitOfWork = unitOfWork;
             _geminiProvider = geminiProvider;
@@ -76,6 +78,7 @@ namespace ARISP.API.Controllers
             _applicationService = applicationService;
             _scopeFactory = scopeFactory;
             _notificationService = notificationService;
+            _interviewOptions = interviewOptions ?? new ARISP.Application.Options.InterviewOptions();
         }
 
         /// <summary>
@@ -1017,9 +1020,12 @@ namespace ARISP.API.Controllers
                     // Vòng đang hoạt động = vòng được mời mới nhất (mỗi vòng có 1 invite). Mặc định 1.
                     var inviteRounds = invites.Where(i => i.ApplicationId == a.Id).Select(i => i.RoundNumber).ToList();
                     int activeRound = inviteRounds.Count > 0 ? inviteRounds.Max() : 1;
-                    // Phỏng vấn thử theo VÒNG: còn lượt nếu chưa có phiên practice của vòng này và
-                    // chưa làm phỏng vấn thật của vòng này.
-                    bool practiceUsedForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound);
+                    // Phỏng vấn thử theo VÒNG: còn lượt nếu số phiên practice của vòng này chưa chạm
+                    // giới hạn (Interview:PracticeAttemptsPerRound, <= 0 = không giới hạn — dev/test)
+                    // và chưa làm phỏng vấn thật của vòng này.
+                    var maxPractice = _interviewOptions.PracticeAttemptsPerRound;
+                    bool practiceUsedForRound = maxPractice > 0
+                        && allSessions.Count(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound) >= maxPractice;
                     bool realDoneForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real" && s.RoundNumber == activeRound);
 
                     bool pendingHrReview = false; // có vòng đã xong + AI đã chấm nhưng HR chưa xác nhận/chia sẻ

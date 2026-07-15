@@ -13,9 +13,23 @@ export interface TranscriptItem {
 
 export type PracticeStatus = 'idle' | 'starting' | 'live' | 'ended' | 'error'
 
+/** Payload SignalR từ SessionHub (ISessionClient phía BE). */
+interface QuestionPayload {
+  questionId: string
+  questionText: string
+  sequenceNumber?: number
+}
+interface QuestionAudioPayload {
+  questionId?: string
+  audio?: string // PCM 16-bit mono 24kHz, base64
+}
+type SessionStatusPayload = string | { status?: string }
+
 const DEEPGRAM_WS_URL = 'wss://api.deepgram.com/v1/listen'
 /** Số lần tự nối lại STT khi WebSocket rớt giữa phiên (mint token mới mỗi lần). */
 const MAX_STT_RECONNECT = 3
+/** Số lần tự dựng lại LiveAvatar khi session rớt giữa buổi (LITE hay idle-timeout). */
+const MAX_AVATAR_RECONNECT = 2
 /** Quá hạn chờ ReceiveQuestionAudio (BE TTS đẩy qua SignalR) → tự fetch /tts rồi browser TTS. */
 const QUESTION_AUDIO_TIMEOUT_MS = 6000
 
@@ -29,6 +43,11 @@ const QUESTION_AUDIO_TIMEOUT_MS = 6000
  * STT dùng WebSocket Deepgram trực tiếp với subprotocol ['bearer', token] — SDK v3 KHÔNG
  * hỗ trợ access token ngắn hạn (chỉ nhận API key) nên trước đây STT chết ngay khi khởi tạo.
  * Chống echo: bỏ mọi transcript khi AI đang nói (aiSpeakingRef) + xóa buffer khi AI nói xong.
+ * Watchdog speaking: HeyGen đôi khi KHÔNG bắn AVATAR_SPEAK_ENDED → cờ aiSpeaking kẹt true
+ * và nuốt toàn bộ transcript ứng viên; đặt timer theo độ dài audio để tự nhả cờ.
+ *
+ * Gửi trả lời THỦ CÔNG: transcript tích lũy hiển thị live (draft), ứng viên bấm
+ * "Gửi trả lời" mới submit — không auto-submit khi im lặng (UtteranceEnd chỉ flush interim).
  *
  * Mọi nhánh media đều fallback mềm: thiếu avatar → phát PCM qua WebAudio / browser TTS;
  * thiếu Deepgram → nhập tay + nút "Gửi trả lời".
@@ -38,6 +57,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const [error, setError] = useState<string | null>(null)
   const [messages, setMessages] = useState<TranscriptItem[]>([])
   const [interim, setInterim] = useState('')
+  const [draft, setDraft] = useState('') // transcript đã chốt (is_final) chờ ứng viên bấm "Gửi trả lời"
   const [aiSpeaking, setAiSpeaking] = useState(false)
   const [listening, setListening] = useState(false)
   const [avatarReady, setAvatarReady] = useState(false)
@@ -63,24 +83,68 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const questionAudioTimerRef = useRef<number | null>(null)
   const audioPlayedForRef = useRef<string | null>(null)
   const keepAliveTimerRef = useRef<number | null>(null)
+  const speakWatchdogRef = useRef<number | null>(null)
+  const closingRef = useRef(false) // đã nhận lời cảm ơn kết thúc từ AI (ReceiveClosing)
+  const pendingEndRef = useRef(false) // server báo completed nhưng chờ AI nói xong lời cảm ơn
+  const closingAudioTimerRef = useRef<number | null>(null)
 
   const updateInterim = useCallback((v: string) => {
     interimRef.current = v
     setInterim(v)
   }, [])
 
+  /** Đồng bộ draft hiển thị với buffer transcript đã chốt. */
+  const syncDraft = useCallback(() => {
+    setDraft(finalBufRef.current)
+  }, [])
+
   const setSpeaking = useCallback((v: boolean) => {
+    if (aiSpeakingRef.current !== v)
+      console.info('[speak]', v ? 'AI bắt đầu nói' : 'AI nói xong — đang nghe ứng viên')
     aiSpeakingRef.current = v
     setAiSpeaking(v)
   }, [])
 
   /** AI nói xong: xả buffer (loại echo lọt vào lúc AI nói) + tính giờ trả lời từ thời điểm này. */
   const handleSpeakEnded = useCallback(() => {
+    if (speakWatchdogRef.current) {
+      window.clearTimeout(speakWatchdogRef.current)
+      speakWatchdogRef.current = null
+    }
     setSpeaking(false)
     finalBufRef.current = ''
     updateInterim('')
+    setDraft('')
     if (currentQuestionRef.current) currentQuestionRef.current.askedAt = Date.now()
+    // Lời cảm ơn kết thúc vừa phát xong + server đã báo completed → giờ mới chuyển màn kết thúc.
+    if (pendingEndRef.current) {
+      pendingEndRef.current = false
+      endedRef.current = true
+      setStatus('ended')
+    }
   }, [setSpeaking, updateInterim])
+
+  /**
+   * Chốt chặn cờ aiSpeaking: nếu sự kiện "nói xong" (HeyGen AVATAR_SPEAK_ENDED / onended)
+   * không bắn, cờ kẹt true sẽ nuốt mọi transcript của ứng viên → tự nhả sau thời lượng dự kiến.
+   * speakUntilRef ghi "hạn sử dụng" của lượt nói hiện tại — mọi đường set cờ đều phải qua đây
+   * (KHÔNG bao giờ setSpeaking(true) mà không kèm watchdog, tránh kẹt vĩnh viễn).
+   */
+  const speakUntilRef = useRef(0)
+  const armSpeakWatchdog = useCallback(
+    (expectedMs: number) => {
+      const ms = Math.min(expectedMs, 90_000) // trần cứng — không lượt nói nào quá 90s
+      speakUntilRef.current = Date.now() + ms
+      if (speakWatchdogRef.current) window.clearTimeout(speakWatchdogRef.current)
+      speakWatchdogRef.current = window.setTimeout(() => {
+        if (aiSpeakingRef.current) {
+          console.warn('[speak-watchdog] không nhận được sự kiện nói xong — tự nhả cờ aiSpeaking')
+          handleSpeakEnded()
+        }
+      }, ms)
+    },
+    [handleSpeakEnded]
+  )
 
   const submitAnswer = useCallback(() => {
     const q = currentQuestionRef.current
@@ -89,6 +153,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     if (!q || !sessionId || !answer) return
     finalBufRef.current = ''
     updateInterim('')
+    setDraft('')
     setMessages((m) => [...m, { role: 'candidate', text: answer }])
     const responseMs = Date.now() - q.askedAt
     connRef.current?.invoke('SubmitAnswerText', sessionId, q.id, answer, responseMs).catch(() => {})
@@ -123,10 +188,11 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
       src.connect(ctx.destination)
       src.onended = handleSpeakEnded
       setSpeaking(true)
+      armSpeakWatchdog(buffer.duration * 1000 + 3000)
       src.start()
       audioSrcRef.current = src
     },
-    [handleSpeakEnded, setSpeaking]
+    [armSpeakWatchdog, handleSpeakEnded, setSpeaking]
   )
 
   const speakBrowserTts = useCallback(
@@ -135,13 +201,15 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
         const u = new SpeechSynthesisUtterance(text)
         u.lang = languageRef.current
         setSpeaking(true)
+        // Không biết trước thời lượng → ước lượng theo độ dài text (~90ms/ký tự + đệm).
+        armSpeakWatchdog(text.length * 90 + 4000)
         u.onend = handleSpeakEnded
         window.speechSynthesis.speak(u)
       } catch {
         /* không hỗ trợ TTS — bỏ qua, vẫn hiển thị text */
       }
     },
-    [handleSpeakEnded, setSpeaking]
+    [armSpeakWatchdog, handleSpeakEnded, setSpeaking]
   )
 
   /** Phát audio câu hỏi: avatar lip-sync (repeatAudio) nếu sẵn sàng, không thì WebAudio. */
@@ -153,6 +221,13 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
       if (session && avatarReadyRef.current) {
         try {
           session.repeatAudio(base64)
+          // HeyGen có khi không bắn AVATAR_SPEAK_STARTED/ENDED → tự set cờ + watchdog
+          // theo thời lượng PCM 16-bit mono 24kHz (base64 → bytes ≈ len * 3/4)
+          // + đệm rộng 6s vì avatar bắt đầu phát TRỄ (network/xử lý phía HeyGen).
+          const pcmBytes = Math.floor(base64.length * 0.75)
+          const durationMs = (pcmBytes / 2 / 24000) * 1000
+          setSpeaking(true)
+          armSpeakWatchdog(durationMs + 6000)
           return
         } catch {
           /* rơi xuống WebAudio */
@@ -160,8 +235,10 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
       }
       void playPcmViaWebAudio(base64)
     },
-    [playPcmViaWebAudio]
+    [armSpeakWatchdog, playPcmViaWebAudio, setSpeaking]
   )
+
+  const avatarRetryRef = useRef(0)
 
   const initAvatar = useCallback(
     async (
@@ -183,21 +260,63 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
           }
           avatarReadyRef.current = true
           setAvatarReady(true)
+          avatarRetryRef.current = 0 // stream sống lại → reset quota reconnect
         }
       })
       session.on(SessionEvent.SESSION_DISCONNECTED, () => {
         avatarReadyRef.current = false
-        setAvatarReady(false) // các câu hỏi sau tự rơi xuống WebAudio
+        setAvatarReady(false) // trong lúc chờ reconnect, câu hỏi tự rơi xuống WebAudio
+        // Avatar chết GIỮA câu nói (gói free LiveAvatar cắt phiên sau 2 phút!) →
+        // SPEAK_ENDED không bao giờ bắn → nhả cờ ngay để STT tiếp tục nhận giọng ứng viên.
+        if (aiSpeakingRef.current) {
+          console.warn('[avatar] disconnected giữa lượt nói — nhả cờ aiSpeaking')
+          handleSpeakEnded()
+        }
+        if (endedRef.current) return
+        // Session LITE rớt giữa buổi (idle-timeout/mạng) → token cũ đã vô hiệu:
+        // mint token MỚI qua media-config rồi dựng lại session, tối đa MAX_AVATAR_RECONNECT lần.
+        if (avatarRetryRef.current >= MAX_AVATAR_RECONNECT) {
+          console.warn('[avatar] hết quota reconnect — dùng WebAudio đến hết buổi')
+          return
+        }
+        avatarRetryRef.current += 1
+        console.warn(
+          `[avatar] DISCONNECTED — thử dựng lại (${avatarRetryRef.current}/${MAX_AVATAR_RECONNECT})`
+        )
+        window.setTimeout(async () => {
+          if (endedRef.current) return
+          try {
+            const media = await interviewService.getMediaConfig(sessionIdRef.current!)
+            if (media.heyGen?.token) await initAvatar(media.heyGen)
+          } catch (e) {
+            console.warn('[avatar] reconnect thất bại', e)
+          }
+        }, 1000 * avatarRetryRef.current)
       })
-      session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => setSpeaking(true))
-      session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, handleSpeakEnded)
+      // SPEAK_STARTED có thể bắn TRỄ (sau khi watchdog đã nhả cờ) — chỉ chấp nhận khi vẫn
+      // trong cửa sổ lượt nói dự kiến (+10s grace); quá hạn = sự kiện lạc → bỏ, nếu không cờ
+      // sẽ kẹt true (SPEAK_ENDED không đáng tin) và nuốt toàn bộ transcript của ứng viên.
+      session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
+        if (Date.now() > speakUntilRef.current + 10_000) {
+          console.warn('[avatar] SPEAK_STARTED lạc ngoài cửa sổ lượt nói — bỏ qua')
+          return
+        }
+        setSpeaking(true)
+        // Gia hạn watchdog theo thời gian dự kiến còn lại (avatar phát trễ nên cần thêm).
+        armSpeakWatchdog(Math.max(speakUntilRef.current - Date.now(), 3000) + 3000)
+      })
+      // SPEAK_ENDED lạc (đến khi ứng viên đang trả lời) sẽ xóa oan buffer → chỉ xử lý khi đang nói.
+      session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
+        if (aiSpeakingRef.current) handleSpeakEnded()
+      })
       await session.start()
       // LITE session có thể bị idle-timeout khi AI im lâu (ứng viên suy nghĩ) → giữ sống định kỳ.
+      if (keepAliveTimerRef.current) window.clearInterval(keepAliveTimerRef.current)
       keepAliveTimerRef.current = window.setInterval(() => {
         avatarRef.current?.keepAlive().catch(() => {})
       }, 60_000)
     },
-    [handleSpeakEnded, setSpeaking]
+    [armSpeakWatchdog, handleSpeakEnded, setSpeaking]
   )
 
   /**
@@ -207,6 +326,12 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
    */
   const initDeepgram = useCallback(
     (cfg: { token: string; model: string }, micStream: MediaStream, language: string) => {
+      console.info(
+        '[deepgram] INIT — lang:',
+        language,
+        '| audio tracks:',
+        micStream.getAudioTracks().length
+      )
       const params = new URLSearchParams({
         model: cfg.model || 'nova-2',
         language: language || 'vi',
@@ -228,10 +353,17 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
           /* noop */
         }
         try {
+          // MediaRecorder mimeType audio/* KHÔNG chấp nhận stream có video track
+          // (DeviceCheck trả stream cam+mic) → Chrome ném NotSupportedError ngay tại
+          // start(). Bắt buộc tách stream audio-only từ audio track trước khi ghi.
+          const audioTracks = micStream.getAudioTracks().filter((t) => t.readyState === 'live')
+          if (audioTracks.length === 0) throw new Error('Mic stream không còn audio track sống')
+          const audioOnly = new MediaStream(audioTracks)
+
           const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
             ? 'audio/webm;codecs=opus'
             : 'audio/webm'
-          const rec = new MediaRecorder(micStream, { mimeType: mime })
+          const rec = new MediaRecorder(audioOnly, { mimeType: mime })
           recorderRef.current = rec
           rec.ondataavailable = (ev: BlobEvent) => {
             if (ev.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(ev.data)
@@ -239,16 +371,30 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
           rec.start(250)
           setListening(true)
           setSttEnabled(true)
+          console.info('[deepgram] MediaRecorder RECORDING —', mime)
         } catch (e) {
-          console.warn('[deepgram] không khởi tạo được MediaRecorder', e)
+          // Lỗi khởi tạo recorder là lỗi cục bộ (stream/codec) — reconnect Deepgram cũng
+          // sẽ thất bại y hệt → đóng socket & dừng hẳn, tránh vòng lặp OPEN/CLOSE 1011.
+          console.error('[deepgram] không khởi tạo được MediaRecorder — dừng STT', e)
           setSttEnabled(false)
+          dgRetryRef.current = MAX_STT_RECONNECT
+          try {
+            ws.close()
+          } catch {
+            /* noop */
+          }
         }
       }
 
       ws.onmessage = (ev: MessageEvent) => {
-        let data: any
+        interface DeepgramMessage {
+          type?: string
+          is_final?: boolean
+          channel?: { alternatives?: { transcript?: string }[] }
+        }
+        let data: DeepgramMessage
         try {
-          data = JSON.parse(ev.data as string)
+          data = JSON.parse(ev.data as string) as DeepgramMessage
         } catch {
           return
         }
@@ -259,12 +405,12 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
           if (data.is_final) {
             finalBufRef.current = `${finalBufRef.current} ${text}`.trim()
             updateInterim('')
+            syncDraft()
           } else {
             updateInterim(text)
           }
-        } else if (data.type === 'UtteranceEnd') {
-          if (!aiSpeakingRef.current) submitAnswer()
         }
+        // UtteranceEnd: KHÔNG auto-submit — ứng viên chủ động bấm "Gửi trả lời" (draft giữ nguyên).
       }
 
       ws.onerror = (e) => console.error('[deepgram] ERROR', e)
@@ -295,7 +441,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
         }, 500 * dgRetryRef.current)
       }
     },
-    [submitAnswer, updateInterim]
+    [syncDraft, updateInterim]
   )
 
   const connectHub = useCallback(async () => {
@@ -307,10 +453,11 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
       .build()
     connRef.current = conn
 
-    conn.on('ReceiveQuestion', (p: any) => {
+    conn.on('ReceiveQuestion', (p: QuestionPayload) => {
       currentQuestionRef.current = { id: p.questionId, askedAt: Date.now() }
       finalBufRef.current = ''
       updateInterim('')
+      setDraft('')
       setMessages((m) => [...m, { role: 'ai', text: p.questionText, seq: p.sequenceNumber }])
       // Audio do BE TTS đẩy qua ReceiveQuestionAudio (thường <2s). Quá hạn → tự fetch /tts,
       // vẫn không có → browser TTS (giữ đúng nhịp phỏng vấn dù thiếu ElevenLabs).
@@ -331,16 +478,50 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
       }, QUESTION_AUDIO_TIMEOUT_MS)
     })
 
-    conn.on('ReceiveQuestionAudio', (p: any) => {
+    conn.on('ReceiveQuestionAudio', (p: QuestionAudioPayload) => {
       if (!p?.audio || !p?.questionId) return
       if (currentQuestionRef.current && currentQuestionRef.current.id !== p.questionId) return
       if (questionAudioTimerRef.current) window.clearTimeout(questionAudioTimerRef.current)
       playQuestionAudio(p.questionId, p.audio)
     })
 
-    conn.on('ReceiveSessionStatus', (p: any) => {
+    // AI kết thúc buổi phỏng vấn: lời cảm ơn (text) → audio → server báo completed.
+    conn.on('ReceiveClosing', (p: { text?: string }) => {
+      if (!p?.text) return
+      closingRef.current = true
+      currentQuestionRef.current = null // không còn câu hỏi chờ trả lời
+      finalBufRef.current = ''
+      updateInterim('')
+      setDraft('')
+      setMessages((m) => [...m, { role: 'ai', text: p.text! }])
+      // Audio cảm ơn không tới trong 6s → browser TTS để vẫn có lời chào.
+      closingAudioTimerRef.current = window.setTimeout(() => {
+        if (!endedRef.current && !aiSpeakingRef.current) speakBrowserTts(p.text!)
+      }, QUESTION_AUDIO_TIMEOUT_MS)
+    })
+
+    conn.on('ReceiveClosingAudio', (p: { audio?: string }) => {
+      if (!p?.audio) return
+      if (closingAudioTimerRef.current) window.clearTimeout(closingAudioTimerRef.current)
+      playQuestionAudio('__closing__', p.audio)
+    })
+
+    conn.on('ReceiveSessionStatus', (p: SessionStatusPayload) => {
       const st = typeof p === 'string' ? p : p?.status
-      if (st === 'completed') setStatus('ended')
+      if (st !== 'completed') return
+      // Đang phát lời cảm ơn → chờ nói xong (handleSpeakEnded) mới chuyển màn; kèm chốt chặn 20s.
+      if (closingRef.current && aiSpeakingRef.current) {
+        pendingEndRef.current = true
+        window.setTimeout(() => {
+          if (pendingEndRef.current) {
+            pendingEndRef.current = false
+            endedRef.current = true
+            setStatus('ended')
+          }
+        }, 20_000)
+        return
+      }
+      setStatus('ended')
     })
     // ReceiveAnswerAnalysis / ReceiveCheatAlert: chưa hiển thị ở practice
 
@@ -365,15 +546,27 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
 
         const media = await interviewService.getMediaConfig(sessionId)
         languageRef.current = media.language || 'vi'
+        console.info(
+          '[media-config] deepgram:',
+          !!media.deepgram?.token,
+          '| heyGen:',
+          !!media.heyGen?.token,
+          '| lang:',
+          media.language
+        )
 
         // STT không phụ thuộc avatar/hub → mở ngay; avatar + hub khởi tạo song song
         // (trước đây tuần tự: avatar chậm làm token Deepgram hết hạn trước khi STT kịp nối).
         if (media.deepgram?.token) {
           try {
             initDeepgram(media.deepgram, micStream, languageRef.current)
-          } catch {
+          } catch (e) {
+            console.error('[deepgram] init lỗi — tắt STT', e)
             setSttEnabled(false)
           }
+        } else {
+          console.warn('[deepgram] media-config không có token — STT tắt (nhập tay)')
+          setSttEnabled(false)
         }
 
         const boot: Promise<unknown>[] = [connectHub()]
@@ -402,6 +595,8 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     endedRef.current = true
     if (questionAudioTimerRef.current) window.clearTimeout(questionAudioTimerRef.current)
     if (keepAliveTimerRef.current) window.clearInterval(keepAliveTimerRef.current)
+    if (speakWatchdogRef.current) window.clearTimeout(speakWatchdogRef.current)
+    if (closingAudioTimerRef.current) window.clearTimeout(closingAudioTimerRef.current)
     try {
       recorderRef.current?.stop()
     } catch {
@@ -460,6 +655,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     error,
     messages,
     interim,
+    draft,
     aiSpeaking,
     listening,
     avatarReady,

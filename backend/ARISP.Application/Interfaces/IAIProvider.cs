@@ -16,6 +16,10 @@ namespace ARISP.Application.Interfaces
         public List<QuestionAnswerDto> ChatHistory { get; set; } = new();
         public List<string> MustAskQuestions { get; set; } = new();
         public List<string> PlaybookStyleGuides { get; set; } = new();
+        /// <summary>Ngôn ngữ phỏng vấn (ISO code, ADR-018) — AI hỏi + nhắc ứng viên theo ngôn ngữ này.</summary>
+        public string? Language { get; set; }
+        /// <summary>Buộc kết thúc NGAY (đạt cap số câu): AI chỉ sinh lời cảm ơn, không hỏi thêm.</summary>
+        public bool ForceClosing { get; set; }
     }
 
     public class AnswerContext
@@ -32,6 +36,8 @@ namespace ARISP.Application.Interfaces
         public string SessionType { get; set; } = "real";
         public List<QuestionAnswerDto> ChatHistory { get; set; } = new();
         public string ScoringRubric { get; set; } = "{}";
+        /// <summary>Ngôn ngữ phỏng vấn yêu cầu — đánh giá mức tuân thủ trong Language Assessment.</summary>
+        public string? Language { get; set; }
     }
 
     public class QuestionAnswerDto
@@ -64,6 +70,8 @@ namespace ARISP.Application.Interfaces
         public decimal Vocabulary { get; set; }
         public decimal Comprehension { get; set; }
         public decimal OverallScore { get; set; }
+        /// <summary>Nhận xét ngắn về mức tuân thủ ngôn ngữ phỏng vấn (ứng viên có trả lời đúng ngôn ngữ yêu cầu không).</summary>
+        public string LanguageAdherence { get; set; } = string.Empty;
     }
 
     public interface IAIProvider

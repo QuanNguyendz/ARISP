@@ -93,6 +93,27 @@ function initialsOf(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase()
 }
 
+<<<<<<< HEAD
+const NAV = [
+  { label: 'Việc làm', to: '/jobs', match: (p: string) => p === '/' || p.startsWith('/jobs') },
+  {
+    label: 'Hồ sơ ứng tuyển',
+    to: '/candidate/applications',
+    match: (p: string) => p.startsWith('/candidate/applications'),
+  },
+  // "Phỏng vấn thử" không còn là điểm đến độc lập — practice được khởi động theo từng
+  // hồ sơ ứng tuyển (trang Hồ sơ ứng tuyển / chi tiết) qua /interview/practice/:applicationId.
+]
+
+const USER_MENU = [
+  { label: 'Hồ sơ của tôi', to: '/candidate/profile', icon: User },
+  { label: 'Đơn ứng tuyển', to: '/candidate/applications', icon: FileText },
+  { label: 'Việc đã lưu', to: '/candidate/saved-jobs', icon: Bookmark },
+  // Kết quả phỏng vấn nằm trong chi tiết từng hồ sơ ứng tuyển ("Đơn ứng tuyển" ở trên).
+  { label: 'Lịch phỏng vấn', to: '/candidate/interviews', icon: Clapperboard },
+  { label: 'Cài đặt', to: '/candidate/settings', icon: Settings },
+]
+=======
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -105,6 +126,7 @@ function timeAgo(iso: string): string {
   if (days === 1) return 'Hôm qua'
   return `${days} ngày trước`
 }
+>>>>>>> 143b54ef0628ea0c12a0c2d22bec133abb3a44e3
 
 type Drop = 'user' | 'notif' | 'lang' | 'mobile' | null
 

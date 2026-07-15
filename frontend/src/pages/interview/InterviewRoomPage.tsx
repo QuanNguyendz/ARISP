@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  Mic,
-  MicOff,
-  Captions,
-  Phone,
-  Settings,
-  Wifi,
-  Bot,
-  MessageSquare,
-} from 'lucide-react'
+import { Mic, MicOff, Captions, Phone, Settings, Wifi, Bot, MessageSquare } from 'lucide-react'
 
 // Mock data for demo
 const mockSession = {
@@ -104,7 +95,7 @@ export default function InterviewRoomPage() {
             Cảm ơn bạn đã tham gia phỏng vấn. Kết quả sẽ được gửi qua email trong vòng 24 giờ.
           </p>
           <button
-            onClick={() => navigate('/candidate/results')}
+            onClick={() => navigate('/candidate/applications')}
             className="px-8 py-4 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-semibold hover:opacity-90 transition-opacity"
           >
             Xem kết quả

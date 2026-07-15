@@ -11,6 +11,9 @@
     "JWT": {
         "Secret": "<generate-a-256-bit-random-string>"
     },
+    "Interview": {
+        "PracticeAttemptsPerRound": 0
+    },
     "Authentication": {
         "Google": {
             "ClientId": "<google-oauth-client-id>",
@@ -41,6 +44,10 @@
         "  - ConnectionStrings.DefaultConnection  (Supabase DB password)",
         "  - JWT.Secret                           (256-bit random string)",
         "  - Authentication.Google.ClientId/Secret (Google Cloud Console)",
-        "  - EmailSettings.AppPassword            (Gmail App Password)"
+        "  - EmailSettings.AppPassword            (Gmail App Password)",
+        "",
+        "=== CẤU HÌNH DEV TIỆN TEST ===",
+        "  - Interview.PracticeAttemptsPerRound = 0 : KHÔNG giới hạn lượt phỏng vấn thử",
+        "    (production mặc định 1 lượt/vòng theo ADR-038 — đừng đặt 0 ở prod, tốn phí media)"
     ]
 }
