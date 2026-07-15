@@ -295,19 +295,18 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
 
 
             var systemInstruction = @"You are an expert technical recruiter reviewing a candidate's CV/Resume (no specific job description).
-CRITICAL: First verify the document is actually a CV/Resume. If it is not, set 'is_valid_cv' to false and 'overall_score' to 0.
+CRITICAL: First verify the document is actually a CV/Resume. If it is not, set 'is_valid_cv' to false.
 
-If it IS a valid CV, evaluate its overall quality as a professional IT resume: clarity, completeness, impact of achievements (quantified results), technical depth, and presentation.
+If it IS a valid CV, analyze its contents to suggest suitable job positions, and provide constructive feedback on their strengths and specific areas to improve. Do not score the CV, do not rate the CV as good/bad/average, and do not make value judgments on the overall quality. Focus entirely on helpful guidance for the candidate.
 
 You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, without markdown formatting:
 {
   ""is_valid_cv"": boolean,
-  ""overall_score"": int (0-100, overall CV quality),
-  ""verdict"": string (one of: ""Đạt chuẩn"", ""Khá - cần chỉnh sửa nhẹ"", ""Cần cải thiện"", ""Chưa đạt""),
-  ""summary"": string (2-3 câu nhận xét tổng quan về CV),
-  ""strengths"": string[] (3-5 điểm mạnh nổi bật của CV),
-  ""improvements"": string[] (3-6 gợi ý cụ thể để cải thiện CV),
-  ""missing_sections"": string[] (các mục quan trọng còn thiếu, ví dụ: 'Kết quả định lượng', 'Liên kết GitHub'. Để rỗng nếu đầy đủ)
+  ""summary"": string (2-3 câu tóm tắt định hướng, nền tảng kỹ thuật và lĩnh vực hoạt động của ứng viên từ thông tin trong CV, không nhận xét tốt/tệ),
+  ""suggested_positions"": string[] (3-5 vị trí công việc cụ thể phù hợp nhất với CV, ví dụ: 'Backend Developer (C#/.NET)', 'Frontend React Developer'),
+  ""strengths"": string[] (3-5 điểm tốt, thế mạnh chuyên môn nổi bật của ứng viên trong CV),
+  ""improvements"": string[] (3-6 gợi ý cải thiện cụ thể cho các điểm chưa tốt, chỉ rõ hành động/kỹ năng cần bổ sung để người dùng có định hướng rõ ràng),
+  ""missing_sections"": string[] (các mục quan trọng còn thiếu trong CV như 'GitHub link', 'Mô tả dự án'. Để rỗng nếu đầy đủ)
 }";
 
             var parts = new List<object>
@@ -516,6 +515,114 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             {
                 _logger.LogError(ex, "Failed to parse Gemini JD extraction. Raw: {RawResponse}", responseJson);
                 return Result<JdExtractionResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<CvContactVerificationResultDto>> VerifyCvContactInfoAsync(
+            byte[]? cvFileBytes,
+            string? cvMimeType,
+            string? fallbackCvText,
+            string formName,
+            string formPhone,
+            string formEmail,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+                return Result<CvContactVerificationResultDto>.Failure("GEMINI_API_KEY is not configured.");
+
+            var systemInstruction = $@"You are an AI assistant verifying CV contact details against a job application form.
+You are given a candidate's CV and the contact details they entered in the form:
+- Full Name: {formName}
+- Phone: {formPhone}
+- Email: {formEmail}
+
+Your task is to extract the name, phone number, and email address from the CV, and check if they match the form values.
+Rules for matching:
+- Name: Check if the name in the CV is substantially the same as the name in the form (ignore accent variations, casing, or middle names slightly formatted differently, e.g., 'Nguyen Van A' and 'Nguyễn Văn A' match).
+- Phone: Check if the phone number in the CV matches the form (ignore formatting like spaces, hyphens, country code like +84 vs 0, e.g., '+84912345678' and '0912345678' match). If the CV has no phone number, flag it.
+- Email: Check if the email address in the CV matches the form (case-insensitive). If the CV has no email address, flag it.
+
+If any of these fields mismatch or are missing in the CV, set 'is_match' to false and provide clear, polite, and detailed warning details in Vietnamese in 'mismatch_details' explaining exactly which fields are mismatched. For each mismatched field, specify BOTH the value entered in the form and the value extracted from the CV.
+For example:
+- 'Họ tên đã nhập ({formName}) khác với họ tên trong CV (Trần Văn B).'
+- 'Số điện thoại đã nhập ({formPhone}) khác với số điện thoại trong CV (0987654321).'
+- 'Không tìm thấy thông tin email hoặc số điện thoại trong file CV.'
+If everything matches, set 'is_match' to true and 'mismatch_details' to null.
+
+You MUST return ONLY a valid JSON object matching this schema, without markdown formatting:
+{{
+  ""is_match"": boolean,
+  ""mismatch_details"": string|null
+}}";
+
+            var parts = new List<object>
+            {
+                new { text = "--- CANDIDATE CV ---" }
+            };
+
+            if (cvFileBytes != null && cvFileBytes.Length > 0 && cvMimeType == "application/pdf")
+            {
+                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(cvFileBytes) } });
+                if (!string.IsNullOrEmpty(fallbackCvText))
+                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackCvText });
+            }
+            else if (!string.IsNullOrEmpty(fallbackCvText))
+            {
+                parts.Add(new { text = fallbackCvText });
+            }
+            else
+            {
+                return Result<CvContactVerificationResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
+            }
+
+            var requestBody = new
+            {
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
+                contents = new[] { new { parts = parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 }
+            };
+
+            string responseJson = string.Empty;
+            try
+            {
+                (responseJson, _) = await GetAnalysisJsonAsync(
+                    requestBody, systemInstruction,
+                    $"--- CANDIDATE CV ---\n{fallbackCvText}", ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV contact verification).");
+                return Result<CvContactVerificationResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(responseJson);
+                var root = document.RootElement;
+                var rawJsonString = root.GetProperty("candidates")[0]
+                    .GetProperty("content").GetProperty("parts")[0]
+                    .GetProperty("text").GetString();
+
+                if (string.IsNullOrEmpty(rawJsonString))
+                    return Result<CvContactVerificationResultDto>.Failure("Gemini returned empty text.");
+
+                if (rawJsonString.StartsWith("```json"))
+                {
+                    rawJsonString = rawJsonString.Substring(7);
+                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
+                }
+                rawJsonString = rawJsonString.Trim();
+
+                var result = JsonSerializer.Deserialize<CvContactVerificationResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result == null)
+                    return Result<CvContactVerificationResultDto>.Failure("Failed to deserialize Gemini CV contact verification output.");
+
+                return Result<CvContactVerificationResultDto>.Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse Gemini CV contact verification. Raw: {RawResponse}", responseJson);
+                return Result<CvContactVerificationResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
             }
         }
     }

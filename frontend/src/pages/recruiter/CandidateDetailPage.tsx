@@ -37,6 +37,7 @@ import {
   timeAgo,
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
+import { resolveAssetUrl } from '@/config/constants'
 
 export default function RecruiterCandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -298,7 +299,7 @@ export default function RecruiterCandidateDetailPage() {
               {app.cvFileUrl && (
                 <button
                   type="button"
-                  onClick={() => openDocument(app.cvFileUrl!, `${app.candidateName || 'Ứng viên'} - CV`)}
+                  onClick={() => openDocument(resolveAssetUrl(app.cvFileUrl), `${app.candidateName || 'Ứng viên'} - CV`)}
                   className="flex w-full items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/5"
                 >
                   <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Xem CV{' '}

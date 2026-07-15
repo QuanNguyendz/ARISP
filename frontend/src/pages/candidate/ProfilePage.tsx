@@ -26,7 +26,6 @@ import {
   Info,
   Save,
   UploadCloud,
-  Star,
   Lightbulb,
   CheckCircle2,
   AlertTriangle,
@@ -1064,39 +1063,36 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function CvReviewCard({ review }: { review: CvReview }) {
-  const { t } = useTranslation('candidate')
-  const score = review.overallScore
-  const scoreColor =
-    score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-red-600'
-  const ring =
-    score >= 80
-      ? 'ring-emerald-200 bg-emerald-50'
-      : score >= 60
-        ? 'ring-amber-200 bg-amber-50'
-        : 'ring-red-200 bg-red-50'
-
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-        <Sparkles className="h-4 w-4" /> {t('profile.aiReviewBy')} ({review.reviewedBy ?? 'Gemini'})
+        <Sparkles className="h-4 w-4" /> Phân tích định hướng CV bởi AI ({review.reviewedBy ?? 'Gemini'})
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-4">
-        <div className={`grid h-20 w-20 shrink-0 place-items-center rounded-2xl ring-1 ${ring}`}>
-          <div className="text-center">
-            <div className={`font-display text-2xl font-extrabold ${scoreColor}`}>{score}</div>
-            <div className="text-[10px] font-medium text-ink-400">/100</div>
+      
+      <p className="mt-3 text-sm text-ink-600 leading-relaxed bg-white/50 rounded-xl p-3 border border-ai-100/50">
+        {review.summary}
+      </p>
+
+      {review.suggestedPositions && review.suggestedPositions.length > 0 && (
+        <div className="mt-4 border-t border-ai-200/50 pt-4">
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-700">
+            <Briefcase className="h-4 w-4 text-brand-600" /> Vị trí công việc phù hợp gợi ý
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {review.suggestedPositions.map((pos, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-100 shadow-sm"
+              >
+                {pos}
+              </span>
+            ))}
           </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold text-ink-700 ring-1 ring-ink-200">
-            <Star className="h-4 w-4 text-amber-500" /> {review.verdict}
-          </span>
-          <p className="mt-2 text-sm text-ink-600">{review.summary}</p>
-        </div>
-      </div>
+      )}
 
       {review.strengths.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4 border-t border-ai-200/50 pt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
             <CheckCircle2 className="h-4 w-4" /> {t('profile.strengths')}
           </div>
@@ -1111,7 +1107,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       )}
 
       {review.improvements.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4 border-t border-ai-200/50 pt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-700">
             <Lightbulb className="h-4 w-4" /> {t('profile.suggestions')}
           </div>
@@ -1126,7 +1122,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       )}
 
       {review.missingSections.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4 border-t border-ai-200/50 pt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-700">
             <AlertTriangle className="h-4 w-4" /> {t('profile.missing')}
           </div>

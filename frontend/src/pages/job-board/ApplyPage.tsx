@@ -19,10 +19,7 @@ import { useAuthStore } from '@store/auth'
 import { jobService } from '@/services/job/jobService'
 import { profileService } from '@/services/profile/profileService'
 import type { CandidateProfile } from '@/services/profile/profileService'
-import { provinceService } from '@/services/location/provinceService'
-import type { Province } from '@/services/location/provinceService'
 import { applicationService } from '@/services/application/applicationService'
-import SearchableSelect from '@/components/ui/SearchableSelect'
 import { resolveAssetUrl } from '@config/constants'
 import type { JobPosting } from '@/types/job'
 
@@ -41,21 +38,25 @@ export default function ApplyPage() {
 
   const [job, setJob] = useState<JobPosting | null>(null)
   const [profile, setProfile] = useState<CandidateProfile | null>(null)
-  const [provinces, setProvinces] = useState<Province[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
   // Form state
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  // Nơi làm việc mong muốn = tỉnh/thành (combo box). Lưu cả code + tên hiển thị.
-  const [locationCode, setLocationCode] = useState<number | null>(null)
-  const [desiredLocation, setDesiredLocation] = useState('')
   const [coverLetter, setCoverLetter] = useState('')
   const [noticePeriod, setNoticePeriod] = useState('')
   // CV: 'profile' = dùng CV hồ sơ; 'upload' = nộp CV khác cho tin này.
   const [cvSource, setCvSource] = useState<'profile' | 'upload'>('profile')
   const [cvFile, setCvFile] = useState<File | null>(null)
+
+  // AI Verification state
+  const [verifyingInfo, setVerifyingInfo] = useState(false)
+  const [verificationResult, setVerificationResult] = useState<{
+    isMatch: boolean
+    mismatchDetails: string | null
+  } | null>(null)
+  const [verificationError, setVerificationError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [submitting, setSubmitting] = useState(false)
@@ -64,6 +65,8 @@ export default function ApplyPage() {
   // Đang gõ thì xoá trạng thái touched của trường đó → không nhắc lỗi liên tục mỗi ký tự.
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set())
   const [showCancel, setShowCancel] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
+  const [showPendingVerificationModal, setShowPendingVerificationModal] = useState(false)
 
   const markTouched = (key: string) =>
     setTouchedFields((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
@@ -87,29 +90,14 @@ export default function ApplyPage() {
     Promise.all([
       jobService.getJobPostingById(id),
       profileService.getProfile().catch(() => null),
-      provinceService.getProvinces().catch(() => [] as Province[]),
     ])
-      .then(([j, p, provs]) => {
+      .then(([j, p]) => {
         if (!active) return
         setJob(j)
         setProfile(p)
-        setProvinces(provs)
         if (p) {
           setFullName(p.fullName || '')
           setPhone(p.phone || '')
-          // Nơi làm việc mong muốn = tỉnh/thành trong hồ sơ. Ưu tiên code+name; nếu hồ sơ cũ
-          // chỉ còn chuỗi "Phường …, Tỉnh …" thì lấy phần tỉnh/thành (sau dấu phẩy cuối).
-          const cityName =
-            p.provinceName?.trim() || (p.location ? p.location.split(',').pop()!.trim() : '')
-          const matched =
-            (p.provinceCode != null && provs.find((x) => x.code === p.provinceCode)) ||
-            provs.find((x) => x.name === cityName)
-          if (matched) {
-            setLocationCode(matched.code)
-            setDesiredLocation(matched.name)
-          } else if (cityName) {
-            setDesiredLocation(cityName)
-          }
         }
         // Không có CV hồ sơ → mặc định bắt buộc tải lên.
         if (!p?.profileCvUrl) setCvSource('upload')
@@ -122,6 +110,36 @@ export default function ApplyPage() {
   }, [id])
 
   const hasProfileCv = !!profile?.profileCvUrl
+
+  // AI CV-Form Contact Verification
+  useEffect(() => {
+    const hasCv = (cvSource === 'upload' && !!cvFile) || (cvSource === 'profile' && hasProfileCv)
+    if (!fullName.trim() || !phone.trim() || !hasCv) {
+      setVerificationResult(null)
+      return
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setVerifyingInfo(true)
+      setVerificationResult(null)
+      setVerificationError('')
+      try {
+        const res = await applicationService.verifyCvContactInfo({
+          candidateName: fullName.trim(),
+          candidatePhone: phone.trim(),
+          cvFile: cvSource === 'upload' ? cvFile : null,
+        })
+        setVerificationResult(res)
+      } catch (err: any) {
+        console.error('Lỗi khi đối chiếu CV:', err)
+        setVerificationError('Không thể đối chiếu thông tin với CV bằng AI.')
+      } finally {
+        setVerifyingInfo(false)
+      }
+    }, 1000)
+
+    return () => clearTimeout(delayDebounceFn)
+  }, [fullName, phone, cvSource, cvFile, hasProfileCv])
 
   const onPickFile = (f: File | null) => {
     setSubmitError('')
@@ -148,29 +166,20 @@ export default function ApplyPage() {
     if (!phone.trim()) e.phone = 'Vui lòng nhập số điện thoại.'
     else if (phone.length < 8 || phone.length > 15)
       e.phone = 'Số điện thoại không hợp lệ (chỉ chứa 8–15 chữ số).'
-    if (!desiredLocation.trim()) e.desiredLocation = 'Vui lòng chọn nơi làm việc mong muốn.'
-    if (!coverLetter.trim()) e.coverLetter = 'Vui lòng trả lời câu hỏi này.'
     if (!noticePeriod.trim()) e.noticePeriod = 'Vui lòng trả lời câu hỏi này.'
     if (cvSource === 'upload' && !cvFile) e.cv = 'Vui lòng đính kèm file CV (PDF/DOCX).'
     if (cvSource === 'profile' && !hasProfileCv)
       e.cv = 'Hồ sơ chưa có CV — hãy tải CV lên cho tin này.'
     return e
-  }, [fullName, phone, desiredLocation, coverLetter, noticePeriod, cvSource, cvFile, hasProfileCv])
+  }, [fullName, phone, noticePeriod, cvSource, cvFile, hasProfileCv])
 
-  const handleSubmit = async () => {
-    // Đánh dấu tất cả trường là "đã chạm" để hiện lỗi (nếu có) khi bấm gửi.
-    setTouchedFields(
-      new Set(['fullName', 'phone', 'desiredLocation', 'coverLetter', 'noticePeriod', 'cv'])
-    )
-    setSubmitError('')
-    if (Object.keys(errors).length > 0) return
-    if (!id) return
+  const executeSubmit = async () => {
     setSubmitting(true)
+    setSubmitError('')
     try {
-      await applicationService.applyToJob(id, {
+      await applicationService.applyToJob(id!, {
         candidateName: fullName.trim(),
         candidatePhone: phone.trim(),
-        desiredLocation: desiredLocation.trim(),
         coverLetter: coverLetter.trim(),
         noticePeriod: noticePeriod.trim(),
         cvFile: cvSource === 'upload' ? cvFile : null,
@@ -192,20 +201,38 @@ export default function ApplyPage() {
     }
   }
 
-  const goBack = () => navigate(`/jobs/${id}`)
+  const handleSubmit = async () => {
+    // Đánh dấu tất cả trường là "đã chạm" để hiện lỗi (nếu có) khi bấm gửi.
+    setTouchedFields(
+      new Set(['fullName', 'phone', 'noticePeriod', 'cv'])
+    )
+    setSubmitError('')
+    if (Object.keys(errors).length > 0) return
+    if (!id) return
 
-  // Giá trị nơi làm việc mong muốn lúc prefill (tỉnh/thành) — để so sánh "đã chỉnh sửa".
-  const initialCity =
-    profile?.provinceName?.trim() ||
-    (profile?.location ? profile.location.split(',').pop()!.trim() : '')
+    // 1. Nếu AI đang trong quá trình phân tích
+    if (verifyingInfo) {
+      setShowPendingVerificationModal(true)
+      return
+    }
+
+    // 2. Nếu AI đã phân tích và phát hiện lệch thông tin liên hệ
+    if (verificationResult && !verificationResult.isMatch) {
+      setShowVerificationModal(true)
+      return
+    }
+
+    // 3. Nếu thông tin khớp hoặc không có cảnh báo
+    await executeSubmit()
+  }
+
+  const goBack = () => navigate(`/jobs/${id}`)
 
   // Có dữ liệu đã nhập → hỏi xác nhận trước khi rời đi.
   const dirty =
     !!coverLetter.trim() ||
     !!noticePeriod.trim() ||
     !!cvFile ||
-    desiredLocation !== initialCity ||
-    locationCode !== (profile?.provinceCode ?? null) ||
     fullName !== (profile?.fullName || '') ||
     phone !== (profile?.phone || '')
 
@@ -456,27 +483,75 @@ export default function ApplyPage() {
               </div>
             </div>
 
-            <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                Nơi làm việc mong muốn
-                <Req />
-              </label>
-              <SearchableSelect
-                icon={<MapPin className="h-4 w-4 shrink-0 text-ink-400" />}
-                options={provinces.map((p) => ({ value: p.code, label: p.name }))}
-                value={locationCode}
-                onChange={(code) => {
-                  const p = provinces.find((x) => x.code === code)
-                  setLocationCode(p ? p.code : null)
-                  setDesiredLocation(p ? p.name : '')
-                  markTouched('desiredLocation')
-                }}
-                placeholder="— Chọn tỉnh/thành —"
-              />
-              {showErr('desiredLocation') && (
-                <p className="mt-1 text-xs text-red-600">{errors.desiredLocation}</p>
-              )}
-            </div>
+            {/* AI Contact Verification Warning/Status */}
+            {(verifyingInfo || verificationResult || verificationError) && (
+              <div className="mt-4 rounded-xl border p-4 transition-all duration-300 bg-blue-50/10 border-blue-200">
+                <div className="flex items-start gap-3">
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
+                    verifyingInfo 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : verificationError
+                      ? 'bg-red-50 text-red-600'
+                      : verificationResult?.isMatch
+                      ? 'bg-green-50 text-green-600'
+                      : 'bg-amber-50 text-amber-600'
+                  }`}>
+                    {verifyingInfo ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                  </span>
+                  <div className="flex-1">
+                    <h4 className="font-display text-sm font-bold text-ink-900 flex items-center gap-1.5">
+                      Xác thực thông tin
+                      {!verifyingInfo && verificationResult?.isMatch && (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                          Trùng khớp
+                        </span>
+                      )}
+                      {!verifyingInfo && verificationResult && !verificationResult.isMatch && (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                          Phát hiện sai lệch
+                        </span>
+                      )}
+                    </h4>
+                    
+                    {verifyingInfo && (
+                      <p className="mt-1 text-xs text-ink-500 animate-pulse">
+                        Đang đối chiếu thông tin liên hệ của bạn với nội dung trong CV bằng AI...
+                      </p>
+                    )}
+
+                    {verificationError && (
+                      <p className="mt-1 text-xs text-red-600">{verificationError}</p>
+                    )}
+
+                    {!verifyingInfo && verificationResult && (
+                      <div className="mt-1.5">
+                        {verificationResult.isMatch ? (
+                          <p className="text-xs text-green-600 font-medium">
+                            Họ tên và số điện thoại hoàn toàn trùng khớp với thông tin trong CV của bạn.
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-xs text-amber-600 font-medium">
+                              Phát hiện sự khác biệt giữa thông tin biểu mẫu và nội dung CV của bạn:
+                            </p>
+                            <p className="text-xs text-ink-600 bg-amber-50/50 p-2 rounded-lg border border-amber-100 italic font-mono">
+                              {verificationResult.mismatchDetails}
+                            </p>
+                            <p className="text-[11px] text-ink-400 mt-1">
+                              * Lưu ý: Bạn vẫn có thể nộp hồ sơ, nhưng hãy chắc chắn thông tin liên hệ là chính xác để Nhà tuyển dụng có thể liên lạc với bạn.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Thư giới thiệu / câu trả lời */}
@@ -484,23 +559,15 @@ export default function ApplyPage() {
             <h2 className="font-display text-base font-bold">Thư giới thiệu</h2>
             <div className="mt-4">
               <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                1. Giới thiệu ngắn về kinh nghiệm, kỹ năng chính và vì sao bạn là ứng viên phù hợp?
-                <Req />
+                1. Giới thiệu ngắn về kinh nghiệm, kỹ năng chính và vì sao bạn là ứng viên phù hợp? <span className="text-xs font-normal text-ink-400">(Không bắt buộc)</span>
               </label>
               <textarea
                 value={coverLetter}
-                onChange={(e) => {
-                  setCoverLetter(e.target.value)
-                  clearTouched('coverLetter')
-                }}
-                onBlur={() => markTouched('coverLetter')}
+                onChange={(e) => setCoverLetter(e.target.value)}
                 rows={5}
                 placeholder="Chia sẻ về kinh nghiệm, kỹ năng nổi bật và lý do bạn phù hợp với vị trí này…"
-                className={inputCls(!!showErr('coverLetter'))}
+                className={inputCls(false)}
               />
-              {showErr('coverLetter') && (
-                <p className="mt-1 text-xs text-red-600">{errors.coverLetter}</p>
-              )}
             </div>
             <div className="mt-4">
               <label className="mb-1.5 block text-sm font-medium text-ink-700">
@@ -588,6 +655,92 @@ export default function ApplyPage() {
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
               >
                 Huỷ &amp; quay lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup xác nhận khi AI đang phân tích */}
+      {showPendingVerificationModal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </span>
+              <div>
+                <h3 className="font-display text-base font-bold text-ink-900 flex items-center gap-1.5">
+                  AI đang xác thực thông tin...
+                </h3>
+                <p className="mt-2 text-sm text-ink-600 leading-relaxed">
+                  Hệ thống đang đối chiếu thông tin liên hệ bạn vừa nhập với nội dung trong CV bằng AI. 
+                  Điều này giúp đảm bảo nhà tuyển dụng có thể liên hệ chính xác với bạn.
+                </p>
+                <p className="mt-1.5 text-xs text-ink-400 italic">
+                  Quá trình đối chiếu thường mất từ 2-4 giây. Bạn có muốn đợi thêm hay nộp hồ sơ ngay?
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setShowPendingVerificationModal(false)}
+                className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
+              >
+                Tiếp tục đợi
+              </button>
+              <button
+                onClick={async () => {
+                  setShowPendingVerificationModal(false)
+                  await executeSubmit()
+                }}
+                className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                Nộp ngay (Bỏ qua)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup cảnh báo sai lệch thông tin */}
+      {showVerificationModal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-600">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="font-display text-base font-bold text-ink-900">
+                  Cảnh báo: Sai lệch thông tin CV
+                </h3>
+                <p className="mt-2 text-sm text-ink-600 leading-relaxed">
+                  Phát hiện thông tin bạn nhập trên form khác với thông tin cá nhân trong CV:
+                </p>
+                <div className="mt-2 text-xs text-ink-700 bg-amber-50/50 p-3 rounded-lg border border-amber-100 italic font-mono whitespace-pre-line leading-relaxed">
+                  {verificationResult?.mismatchDetails}
+                </div>
+                <p className="mt-3 text-xs text-ink-500">
+                  Nếu thông tin không chính xác, nhà tuyển dụng có thể không liên lạc được với bạn. Bạn có muốn điều chỉnh lại không?
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setShowVerificationModal(false)}
+                className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
+              >
+                Chỉnh sửa lại
+              </button>
+              <button
+                onClick={async () => {
+                  setShowVerificationModal(false)
+                  await executeSubmit()
+                }}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Vẫn nộp hồ sơ
               </button>
             </div>
           </div>

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using ARISP.Application.Common;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using ARISP.Domain.Entities;
 
 namespace ARISP.Application.Services
@@ -18,6 +19,7 @@ namespace ARISP.Application.Services
         private readonly IRagIngestionService _ragIngestion;
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
+        private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
@@ -31,18 +33,24 @@ namespace ARISP.Application.Services
             { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
-        public ApplicationService(IUnitOfWork unitOfWork, IRagIngestionService ragIngestion, IEmailService emailService, INotificationService notificationService)
+        public ApplicationService(
+            IUnitOfWork unitOfWork,
+            IRagIngestionService ragIngestion,
+            IEmailService emailService,
+            INotificationService notificationService,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
             _emailService = emailService;
             _notificationService = notificationService;
+            _scopeFactory = scopeFactory;
         }
 
         /// <summary>
         /// Hàm tiện ích dùng chung để Map Entity sang Response (Tránh lặp code)
         /// </summary>
-        private static ApplicationResponse MapToResponse(ARISP.Domain.Entities.Application application, JobPosting? jobPosting)
+        private static ApplicationResponse MapToResponse(ARISP.Domain.Entities.Application application, JobPosting? jobPosting, int? currentRound = null, decimal? interviewScore = null, DateTimeOffset? interviewDate = null)
         {
             return new ApplicationResponse
             {
@@ -58,7 +66,14 @@ namespace ARISP.Application.Services
                 Status = application.Status,
                 PracticeSessionUsed = application.PracticeSessionUsed,
                 CreatedAt = application.CreatedAt,
-                CvJdAnalysisId = application.CvJdAnalysisId
+                CvJdAnalysisId = application.CvJdAnalysisId,
+                CurrentRound = currentRound,
+                CoverLetter = application.CoverLetter,
+                NoticePeriod = application.NoticePeriod,
+                InterviewScore = interviewScore,
+                InterviewDate = interviewDate,
+                MatchScore = application.CvJdAnalysis?.MatchScore,
+                CvJdSummary = application.CvJdAnalysis?.Summary
             };
         }
 
@@ -83,7 +98,6 @@ namespace ARISP.Application.Services
                 CandidatePhone = request.CandidatePhone,
                 CvFileUrl = request.CvFileUrl,
                 CvText = request.CvText,
-                DesiredLocation = request.DesiredLocation,
                 CoverLetter = request.CoverLetter,
                 NoticePeriod = request.NoticePeriod,
                 Source = source,
@@ -104,6 +118,72 @@ namespace ARISP.Application.Services
 
             await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Auto-trigger background CV-JD analysis if it does not already exist
+            if (application.CvJdAnalysisId == null && !string.IsNullOrEmpty(application.CvFileUrl))
+            {
+                var fileUrl = application.CvFileUrl;
+                var extension = System.IO.Path.GetExtension(fileUrl).ToLower();
+                var isTestOrDummy = fileUrl.Contains("test", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("dummy", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("mock", StringComparison.OrdinalIgnoreCase) || 
+                                    fileUrl.Contains("example", StringComparison.OrdinalIgnoreCase);
+                var isValidExtension = extension == ".pdf" || extension == ".docx" || extension == ".doc";
+
+                if (!isTestOrDummy && isValidExtension)
+                {
+                    var appId = application.Id;
+                    var jobId = application.JobPostingId;
+                    var hash = request.CvFileHash;
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                        using var scope = _scopeFactory.CreateScope();
+                        var storage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+                        var cvJdSvc = scope.ServiceProvider.GetRequiredService<CvJdAnalysisService>();
+                        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                        
+                        var bytes = await storage.ReadAllBytesAsync(fileUrl);
+                        if (bytes != null && bytes.Length > 0)
+                        {
+                            using var ms = new System.IO.MemoryStream(bytes);
+                            var fileName = System.IO.Path.GetFileName(fileUrl);
+                            var analysisResult = await cvJdSvc.AnalyzeAndCacheAsync(jobId, ms, fileName, CancellationToken.None);
+                            if (!analysisResult.IsFailure)
+                            {
+                                var appRepo = uow.Repository<ARISP.Domain.Entities.Application>();
+                                var app = await appRepo.GetByIdAsync(appId);
+                                if (app != null)
+                                {
+                                    app.CvJdAnalysisId = analysisResult.Value.Id;
+                                    await uow.SaveChangesAsync();
+                                    
+                                    // Notify candidate and recruiters that background analysis completed
+                                    var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                                    if (app.CandidateAccountId.HasValue)
+                                    {
+                                        await notifSvc.PublishUserEventAsync(app.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "AiAnalysisComplete" }, CancellationToken.None);
+                                    }
+                                    
+                                    if (jobPosting != null)
+                                    {
+                                        var responseDto = MapToResponse(app, jobPosting);
+                                        await notifSvc.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
+                                        await notifSvc.PublishGroupEventAsync("hr_admin", "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Background task must not crash
+                    }
+                });
+            }
+        }
 
             // Chunk + embed + lưu pgvector CV — do RAG service (Python) sở hữu (ADR-039).
             if (!string.IsNullOrEmpty(request.CvText))
@@ -186,6 +266,8 @@ namespace ARISP.Application.Services
                         PracticeSessionUsed = a.PracticeSessionUsed,
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
+                        CoverLetter = a.CoverLetter,
+                        NoticePeriod = a.NoticePeriod
                     }), ct);
 
             return Result.Success(await MapApplicationsAsync(applications, null, ct));
@@ -205,6 +287,8 @@ namespace ARISP.Application.Services
             public bool PracticeSessionUsed { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
             public Guid? CvJdAnalysisId { get; set; }
+            public string? CoverLetter { get; set; }
+            public string? NoticePeriod { get; set; }
         }
 
         /// <summary>
@@ -228,11 +312,11 @@ namespace ARISP.Application.Services
             }
 
             var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
-            var scoreByAnalysisId = analysisIds.Count == 0
-                ? new Dictionary<Guid, int>()
+            var analysisDataById = analysisIds.Count == 0
+                ? new Dictionary<Guid, (int MatchScore, string Summary)>()
                 : (await _unitOfWork.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
-                    .ToDictionary(c => c.Id, c => c.MatchScore);
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Summary }), ct))
+                    .ToDictionary(c => c.Id, c => (c.MatchScore, c.Summary));
 
             // Ứng viên đã đặt lịch phỏng vấn thật (booking "scheduled") → đủ điều kiện cấp Interview Code.
             var appIds = apps.Select(a => a.Id).ToList();
@@ -244,25 +328,106 @@ namespace ARISP.Application.Services
                             .Select(b => b.ApplicationId), ct))
                     .ToHashSet();
 
-            return apps.Select(app => new ApplicationResponse
+            var highestRoundInvites = appIds.Count == 0
+                ? new Dictionary<Guid, int>()
+                : (await _unitOfWork.Repository<InterviewInvite>()
+                    .QueryAsync(q => q.Where(i => appIds.Contains(i.ApplicationId)), ct))
+                    .GroupBy(i => i.ApplicationId)
+                    .ToDictionary(g => g.Key, g => g.Max(i => i.RoundNumber));
+
+            var highestRoundSessions = appIds.Count == 0
+                ? new Dictionary<Guid, int>()
+                : (await _unitOfWork.Repository<InterviewSession>()
+                    .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId)), ct))
+                    .GroupBy(s => s.ApplicationId)
+                    .ToDictionary(g => g.Key, g => g.Max(s => s.RoundNumber));
+
+            var appEvaluations = appIds.Count == 0
+                ? new List<Evaluation>()
+                : await _unitOfWork.Repository<Evaluation>()
+                    .FindAsync(e => appIds.Contains(e.ApplicationId) && e.SessionType == "real", ct);
+
+            var evalDict = appEvaluations
+                .GroupBy(e => new { e.ApplicationId, e.RoundNumber })
+                .ToDictionary(g => g.Key, g => g.First().OverallScore);
+
+            // Lịch thi thực tế: lấy từ InterviewBooking → AvailabilitySlot.StartTime.
+            // (InterviewInvite.ScheduledAt chỉ là dấu thời gian invite, KHÔNG phải giờ thi thực tế)
+            var appBookings = appIds.Count == 0
+                ? new List<InterviewBooking>()
+                : await _unitOfWork.Repository<InterviewBooking>()
+                    .FindAsync(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled", ct);
+
+            // Map (ApplicationId, RoundNumber) -> SlotId
+            var bookingSlotLookup = appBookings
+                .GroupBy(b => new { b.ApplicationId, b.RoundNumber })
+                .ToDictionary(g => g.Key, g => g.First().AvailabilitySlotId);
+
+            // Batch load distinct slots
+            var slotIds2 = bookingSlotLookup.Values.Distinct().ToList();
+            var slotStartDict = slotIds2.Count == 0
+                ? new Dictionary<Guid, DateTimeOffset>()
+                : (await _unitOfWork.Repository<AvailabilitySlot>()
+                    .FindAsync(s => slotIds2.Contains(s.Id), ct))
+                    .ToDictionary(s => s.Id, s => s.StartTime);
+
+            return apps.Select(app =>
             {
-                Id = app.Id,
-                JobPostingId = app.JobPostingId,
-                JobTitle = jobTitleOverride ?? (jobDict.TryGetValue(app.JobPostingId, out var title) ? title : "Unknown Job"),
-                CandidateEmail = app.CandidateEmail,
-                CandidateName = app.CandidateName,
-                CandidatePhone = app.CandidatePhone,
-                CvFileUrl = app.CvFileUrl,
-                CvText = null, // danh sách không trả CvText (xem chi tiết ở GetApplicationById)
-                Source = app.Source,
-                Status = app.Status,
-                PracticeSessionUsed = app.PracticeSessionUsed,
-                CreatedAt = app.CreatedAt,
-                CvJdAnalysisId = app.CvJdAnalysisId,
-                MatchScore = app.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(app.CvJdAnalysisId.Value, out var ms)
-                    ? ms
-                    : (int?)null,
-                HasScheduledInterview = bookedAppIds.Contains(app.Id),
+                int? currentRound = null;
+                if (app.Status != "cv_submitted" && app.Status != "invited" && app.Status != "cv_rejected")
+                {
+                    if (app.Status == "screening")
+                    {
+                        currentRound = 1;
+                    }
+                    else
+                    {
+                        var maxInviteRound = highestRoundInvites.TryGetValue(app.Id, out var ir) ? ir : 0;
+                        var maxSessionRound = highestRoundSessions.TryGetValue(app.Id, out var sr) ? sr : 0;
+                        currentRound = Math.Max(maxInviteRound, maxSessionRound);
+                        if (currentRound == 0) currentRound = 1;
+                    }
+                }
+
+                DateTimeOffset? interviewDate = null;
+                if (currentRound.HasValue)
+                {
+                    var bookingKey = new { ApplicationId = app.Id, RoundNumber = currentRound.Value };
+                    if (bookingSlotLookup.TryGetValue(bookingKey, out var slotId2)
+                        && slotStartDict.TryGetValue(slotId2, out var startTime))
+                    {
+                        interviewDate = startTime;
+                    }
+                }
+
+                return new ApplicationResponse
+                {
+                    Id = app.Id,
+                    JobPostingId = app.JobPostingId,
+                    JobTitle = jobTitleOverride ?? (jobDict.TryGetValue(app.JobPostingId, out var title) ? title : "Unknown Job"),
+                    CandidateEmail = app.CandidateEmail,
+                    CandidateName = app.CandidateName,
+                    CandidatePhone = app.CandidatePhone,
+                    CvFileUrl = app.CvFileUrl,
+                    CvText = null, // danh sách không trả CvText (xem chi tiết ở GetApplicationById)
+                    Source = app.Source,
+                    Status = app.Status,
+                    PracticeSessionUsed = app.PracticeSessionUsed,
+                    CreatedAt = app.CreatedAt,
+                    CvJdAnalysisId = app.CvJdAnalysisId,
+                    MatchScore = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val)
+                        ? val.MatchScore
+                        : (int?)null,
+                    CvJdSummary = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val2)
+                        ? val2.Summary
+                        : null,
+                    HasScheduledInterview = bookedAppIds.Contains(app.Id),
+                    CurrentRound = currentRound,
+                    CoverLetter = app.CoverLetter,
+                    NoticePeriod = app.NoticePeriod,
+                    InterviewScore = currentRound.HasValue && evalDict.TryGetValue(new { ApplicationId = app.Id, RoundNumber = currentRound.Value }, out var iscr) ? iscr : null,
+                    InterviewDate = interviewDate
+                };
             }).ToList();
         }
 
@@ -293,6 +458,8 @@ namespace ARISP.Application.Services
                         PracticeSessionUsed = a.PracticeSessionUsed,
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
+                        CoverLetter = a.CoverLetter,
+                        NoticePeriod = a.NoticePeriod
                     }), ct);
 
             return Result.Success(await MapApplicationsAsync(applications, jobPosting.Title, ct));
@@ -328,6 +495,8 @@ namespace ARISP.Application.Services
                         PracticeSessionUsed = a.PracticeSessionUsed,
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
+                        CoverLetter = a.CoverLetter,
+                        NoticePeriod = a.NoticePeriod
                     }), ct);
 
             return Result.Success(await MapApplicationsAsync(applications, null, ct));
@@ -342,9 +511,56 @@ namespace ARISP.Application.Services
             if (application == null)
                 return Result.Failure<ApplicationResponse>("Application not found.");
 
+            if (application.CvJdAnalysisId.HasValue && application.CvJdAnalysis == null)
+            {
+                application.CvJdAnalysis = await _unitOfWork.Repository<CvJdAnalysis>().GetByIdAsync(application.CvJdAnalysisId.Value, ct);
+            }
+
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
 
-            var response = MapToResponse(application, jobPosting);
+            int? currentRound = null;
+            if (application.Status != "cv_submitted" && application.Status != "invited" && application.Status != "cv_rejected")
+            {
+                if (application.Status == "screening")
+                {
+                    currentRound = 1;
+                }
+                else
+                {
+                    var maxInviteRound = (await _unitOfWork.Repository<InterviewInvite>()
+                        .FindAsync(i => i.ApplicationId == id, ct))
+                        .Select(i => i.RoundNumber).DefaultIfEmpty(0).Max();
+
+                    var maxSessionRound = (await _unitOfWork.Repository<InterviewSession>()
+                        .FindAsync(s => s.ApplicationId == id, ct))
+                        .Select(s => s.RoundNumber).DefaultIfEmpty(0).Max();
+
+                    currentRound = Math.Max(maxInviteRound, maxSessionRound);
+                    if (currentRound == 0) currentRound = 1;
+                }
+            }
+
+            decimal? score = null;
+            DateTimeOffset? interviewDate = null;
+            if (currentRound.HasValue)
+            {
+                var eval = (await _unitOfWork.Repository<Evaluation>()
+                    .FindAsync(e => e.ApplicationId == id && e.RoundNumber == currentRound.Value && e.SessionType == "real", ct))
+                    .FirstOrDefault();
+                score = eval?.OverallScore;
+
+                // Lịch thi thực tế: lấy StartTime từ AvailabilitySlot qua InterviewBooking
+                var booking = (await _unitOfWork.Repository<InterviewBooking>()
+                    .FindAsync(b => b.ApplicationId == id && b.RoundNumber == currentRound.Value && b.Status == "scheduled", ct))
+                    .FirstOrDefault();
+                if (booking != null)
+                {
+                    var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
+                    interviewDate = slot?.StartTime;
+                }
+            }
+
+            var response = MapToResponse(application, jobPosting, currentRound, score, interviewDate);
             // Cờ đủ điều kiện cấp Interview Code: đã đặt lịch phỏng vấn thật (booking "scheduled").
             var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
                 b => b.ApplicationId == id && b.Status != null && b.Status.ToLower() == "scheduled", ct);
@@ -487,6 +703,139 @@ namespace ARISP.Application.Services
             {
                 return Result<bool>.Failure($"Lỗi khi gọi dịch vụ gửi email: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Chấp nhận hồ sơ ứng tuyển: chuyển trạng thái sang screening và gửi email chúc mừng và đặt lịch vòng 1 luôn.
+        /// </summary>
+        public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default)
+        {
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            if (application == null)
+                return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
+
+            if (!string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
+            }
+
+            // Gọi SendInterviewInviteAsync để vừa nâng trạng thái, vừa tạo token chọn lịch, vừa gửi email mời phỏng vấn
+            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct);
+            if (inviteResult.IsFailure)
+            {
+                return Result<bool>.Failure(inviteResult.Error);
+            }
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var jobTitle = job?.Title ?? "Vị trí tuyển dụng";
+
+            // Tạo Notification trong database cho ứng viên
+            var response = MapToResponse(application, job, 1);
+            if (application.CandidateAccountId.HasValue)
+            {
+                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var dedupKey = $"cv_accepted:{application.Id}";
+                var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                if (!existingNotifs.Any())
+                {
+                    var newNotif = new ARISP.Domain.Entities.Notification
+                    {
+                        CandidateAccountId = application.CandidateAccountId.Value,
+                        DedupKey = dedupKey,
+                        Type = "result",
+                        Title = "Hồ sơ ứng tuyển được chấp nhận",
+                        Body = $"Chúc mừng hồ sơ ứng tuyển vị trí {jobTitle} đã được chấp nhận. Vui lòng kiểm tra email để đặt lịch phỏng vấn.",
+                        Link = $"/candidate/applications",
+                        IsRead = false
+                    };
+                    await notifRepo.AddAsync(newNotif, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+
+                // Trigger bell update
+                await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "CvAccepted" }, ct);
+            }
+
+            return Result<bool>.Success(true);
+        }
+
+        /// <summary>
+        /// Từ từ chối hồ sơ ứng tuyển ở vòng duyệt CV: chuyển trạng thái sang not_pass và gửi email cảm ơn.
+        /// </summary>
+        public async Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default)
+        {
+            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            if (application == null)
+                return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
+
+            if (!string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<bool>.Failure("Chỉ có thể từ chối hồ sơ ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
+            }
+
+            application.Status = "cv_rejected";
+            application.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var jobTitle = job?.Title ?? "Vị trí tuyển dụng";
+
+            var subject = $"[ARISP] - Thư cảm ơn ứng tuyển vị trí {jobTitle}";
+            var htmlMessage = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
+            <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
+            <p>Cảm ơn bạn đã quan tâm đến cơ hội nghề nghiệp tại ARISP và dành thời gian nộp hồ sơ ứng tuyển cho vị trí <strong>{jobTitle}</strong>.</p>
+            <p>Chúng tôi rất ấn tượng với hồ sơ và kinh nghiệm của bạn. Tuy nhiên, sau khi xem xét kỹ lưỡng các yêu cầu hiện tại của công việc, chúng tôi rất tiếc chưa thể tiến xa hơn với bạn trong đợt tuyển dụng này.</p>
+            <p>Thông tin của bạn sẽ được lưu giữ trong hệ thống cơ sở dữ liệu tài năng của chúng tôi. Nếu có các cơ hội phù hợp hơn trong tương lai, chúng tôi sẽ chủ động liên hệ lại.</p>
+            <p>Chúc bạn luôn nhiều sức khỏe và may mắn trên con đường sự nghiệp của mình.</p>
+            <br/>
+            <p>Trân trọng,</p>
+            <p><strong>Đội ngũ nhân sự ARISP</strong></p>
+        </div>";
+
+            try
+            {
+                await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
+            }
+            catch (Exception)
+            {
+                // Vẫn cho phép hoàn tất cập nhật status dù lỗi gửi mail.
+            }
+
+            // Gửi SignalR thông báo và tạo Notification trong database cho ứng viên
+            var response = MapToResponse(application, job);
+            if (application.CandidateAccountId.HasValue)
+            {
+                await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
+
+                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var dedupKey = $"cv_rejected:{application.Id}";
+                var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                if (!existingNotifs.Any())
+                {
+                    var newNotif = new ARISP.Domain.Entities.Notification
+                    {
+                        CandidateAccountId = application.CandidateAccountId.Value,
+                        DedupKey = dedupKey,
+                        Type = "result",
+                        Title = "Kết quả ứng tuyển",
+                        Body = $"Thư cảm ơn ứng tuyển vị trí {jobTitle} đã được gửi tới email của bạn.",
+                        Link = $"/candidate/applications",
+                        IsRead = false
+                    };
+                    await notifRepo.AddAsync(newNotif, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+
+                // Trigger bell update
+                await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "CvRejected" }, ct);
+            }
+
+            return Result<bool>.Success(true);
         }
 
         /// <summary>
