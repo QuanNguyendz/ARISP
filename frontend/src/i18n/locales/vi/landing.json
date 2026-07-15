@@ -1,0 +1,244 @@
+{
+  "hero": {
+    "badge": "AI tuyển dụng nội bộ doanh nghiệp",
+    "title": "Tuyển đúng người, với AI đồng hành",
+    "subtitle": "ARISP tự động hoá toàn bộ quy trình tuyển dụng IT — từ đăng tin, sàng lọc CV, phỏng vấn AI đa vòng đến đánh giá — giúp HR tập trung vào quyết định cuối cùng.",
+    "cta": {
+      "primary": "Đăng tuyển miễn phí",
+      "secondary": "Xem cách hoạt động"
+    },
+    "stats": {
+      "rounds": "Vòng phỏng vấn AI tự động",
+      "time": "Thời gian phản hồi trung bình",
+      "languages": "Ngôn ngữ phỏng vấn được hỗ trợ",
+      "availability": "Hệ thống chạy 24/7"
+    }
+  },
+  "features": {
+    "title": "Mọi thứ HR cần, trong một nền tảng",
+    "subtitle": "Không còn chắp vá hàng chục công cụ — ARISP gói gọn quy trình tuyển dụng của bạn.",
+    "items": {
+      "jobBoard": {
+        "title": "Job Board IT nội bộ",
+        "desc": "Ứng viên tự tìm và ứng tuyển trực tiếp trên nền tảng của bạn — không qua bên thứ ba."
+      },
+      "aiInterview": {
+        "title": "Phỏng vấn AI đa vòng",
+        "desc": "Sàng lọc, kỹ thuật, vấn đáp — AI đảm nhận mọi vòng với chất lượng đánh giá nhất quán."
+      },
+      "autoEvaluate": {
+        "title": "Đánh giá tự động",
+        "desc": "Báo cáo Pass/Not Pass kèm phân tích chi tiết theo từng tiêu chí — HR chỉ cần xác nhận."
+      },
+      "playbook": {
+        "title": "Playbook doanh nghiệp",
+        "desc": "Tích hợp tài liệu phỏng vấn nội bộ vào RAG — câu hỏi luôn bám sát tiêu chuẩn công ty."
+      },
+      "multiLang": {
+        "title": "Đa ngôn ngữ",
+        "desc": "Tự động nhận diện ngôn ngữ từ JD — phỏng vấn tiếng Việt, tiếng Anh, và nhiều hơn nữa."
+      },
+      "codeOnsite": {
+        "title": "Mã phỏng vấn tại văn phòng",
+        "desc": "Ứng viên đến on-site nhập mã 6 ký tự để bắt đầu — nhanh, an toàn, không cần cài đặt."
+      }
+    }
+  },
+  "demo": {
+    "title": "Trải nghiệm phỏng vấn AI trong vài phút",
+    "subtitle": "Xem AI phỏng vấn và đánh giá ứng viên như thế nào — không cần đăng ký.",
+    "cta": "Bắt đầu ngay"
+  },
+  "cta": {
+    "title": "Sẵn sàng cách mạng hoá tuyển dụng của bạn?",
+    "subtitle": "Khám phá ARISP và tìm hiểu cách AI giúp đội ngũ HR của bạn tập trung vào điều quan trọng nhất — con người.",
+    "primary": "Đặt lịch demo",
+    "secondary": "Liên hệ tư vấn"
+  },
+  "trust": {
+    "title": "Được tin dùng bởi các đội ngũ HR hiện đại",
+    "subtitle": "Hơn 5000+ ứng viên đã được phỏng vấn bởi ARISP"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — Nền tảng tuyển dụng & phỏng vấn AI",
+    "privacy": "Chính sách bảo mật",
+    "terms": "Điều khoản sử dụng",
+    "contact": "Liên hệ"
+  },
+  "jobs": {
+    "title": "Việc làm",
+    "myApplications": "Hồ sơ ứng tuyển",
+    "searchPlaceholder": "Tìm việc làm, kỹ năng...",
+    "locationPlaceholder": "Địa điểm",
+    "searchButton": "Tìm kiếm",
+    "suggestions": "Gợi ý cho bạn:",
+    "aiInterviewing": "Phỏng vấn AI tự động · Đánh giá khách quan",
+    "findJobTitle": "Tìm công việc IT phù hợp với bạn nhất",
+    "findJobSubtitle": "Ứng tuyển trực tiếp, AI phân tích độ phù hợp CV–JD và phỏng vấn bạn qua nhiều vòng — minh bạch, không thiên vị.",
+    "jobCount": "{{count}} việc làm phù hợp",
+    "loading": "Đang tải...",
+    "sortNewest": "Mới nhất",
+    "sortSalaryHigh": "Lương: Cao đến Thấp",
+    "sortSalaryLow": "Lương: Thấp đến Cao",
+    "sortSalaryHighDisabled": "Lương: Cao đến Thấp (Đang khóa)",
+    "sortSalaryLowDisabled": "Lương: Thấp đến Cao (Đang khóa)",
+    "noJobs": "Không tìm thấy tin tuyển dụng nào phù hợp với bộ lọc tìm kiếm.",
+    "clearFilters": "Xóa bộ lọc",
+    "loadingJobs": "Đang tải tin tuyển dụng mới nhất...",
+    "suggestedJobs": "Việc phù hợp với bạn",
+    "suggestedJobsSubtitle": "· gợi ý theo CV của bạn",
+    "cvTip": {
+      "title": "Mẹo — Tải CV để xem độ phù hợp",
+      "authenticated": "Tải CV lên hồ sơ để AI chấm điểm phù hợp CV–JD và gợi ý việc khớp nhất với bạn.",
+      "unauthenticated": "Đăng nhập và tải CV lên để AI chấm điểm phù hợp CV–JD và gợi ý việc khớp nhất với bạn.",
+      "uploadCv": "Tải CV lên",
+      "login": "Đăng nhập"
+    },
+    "apply": "Ứng tuyển",
+    "saved": "Đã lưu",
+    "unsave": "Bỏ lưu",
+    "applied": "Đã ứng tuyển",
+    "skillMatch": "Khớp {{count}} kỹ năng",
+    "postedOn": "Đăng {{date}}",
+    "deadline": "· Hạn nộp: {{text}}",
+    "salaryNegotiable": "Thỏa thuận",
+    "salaryFrom": "Từ {{value}}",
+    "salaryTo": "Đến {{value}}",
+    "salaryRange": "{{min}} - {{max}}",
+    "workModeFulltime": "Full-time",
+    "workModeParttime": "Part-time",
+    "workModeContract": "Hợp đồng",
+    "workModeInternship": "Thực tập",
+    "experienceJunior": "Junior",
+    "experienceMid": "Middle",
+    "experienceSenior": "Senior",
+    "experienceLead": "Lead",
+    "experienceManager": "Manager",
+    "recentlyPosted": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "daysAgo": "{{count}} ngày trước",
+    "nearby": "Gần đây",
+    "expired": "{{date}} (Đã hết hạn)",
+    "expireToday": "{{date}} (Hết hạn hôm nay)",
+    "expireSoon": "{{date}} (Còn {{days}} ngày)",
+    "filters": {
+      "title": "Bộ lọc",
+      "clearAll": "Xoá tất cả",
+      "noData": "Chưa có dữ liệu để lọc.",
+      "salaryNegotiable": "Lương thỏa thuận",
+      "salaryRange": "Mức lương",
+      "salaryFrom": "Từ",
+      "salaryTo": "Đến",
+      "salaryMin": "Tối thiểu (Min)",
+      "salaryMax": "Tối đa (Max)",
+      "salaryPlus": "220+ triệu",
+      "salaryMillion": "triệu",
+      "category": "Lĩnh vực",
+      "employmentType": "Hình thức",
+      "experienceLevel": "Cấp bậc",
+      "workLocation": "Nơi làm việc",
+      "location": "Địa điểm",
+      "skills": "Kỹ năng / Công nghệ",
+      "interviewLanguage": "Ngôn ngữ phỏng vấn",
+      "interviewLanguageHint": "AI phỏng vấn theo ngôn ngữ của JD",
+      "viewMore": "Xem thêm {{count}}",
+      "collapse": "Thu gọn"
+    },
+    "noLocation": "Remote",
+    "noDepartment": "Engineering",
+    "sortBy": "Sắp xếp theo",
+    "sortRelevance": "Độ phù hợp (theo CV)",
+    "error": "Đã có lỗi xảy ra",
+    "locationNotFound": "Không tìm thấy tỉnh/thành",
+    "salaryNegotiableShort": "Thỏa thuận",
+    "salaryFromShort": "Từ",
+    "salaryToShort": "Đến",
+    "salaryMillionShort": "triệu"
+  },
+  "header": {
+    "savedJobs": "Việc đã lưu",
+    "menu": "Menu",
+    "login": "Đăng nhập",
+    "register": "Đăng ký",
+    "logout": "Đăng xuất",
+    "myProfile": "Hồ sơ của tôi",
+    "myApplications": "Đơn ứng tuyển",
+    "results": "Kết quả & lịch phỏng vấn",
+    "settings": "Cài đặt",
+    "markAllRead": "Đánh dấu đã đọc",
+    "deleteAll": "Xóa tất cả",
+    "noNotifications": "Chưa có thông báo nào.",
+    "viewAll": "Xem tất cả thông báo",
+    "changeTheme": "Đổi giao diện sáng/tối",
+    "notifications": "Thông báo",
+    "vietnamese": "Tiếng Việt",
+    "english": "English",
+    "candidate": "Ứng viên",
+    "deleteNotification": "Xóa thông báo",
+    "justNow": "Vừa xong",
+    "minutesAgo": "{{count}} phút trước",
+    "hoursAgo": "{{count}} giờ trước",
+    "yesterday": "Hôm qua",
+    "daysAgo": "{{count}} ngày trước"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — Nền tảng tuyển dụng & phỏng vấn AI",
+    "transparentEvaluation": "Đánh giá minh bạch"
+  },
+  "pagination": {
+    "label": "Phân trang",
+    "previous": "Trang trước",
+    "next": "Trang sau"
+  },
+  "jobDetail": {
+    "breadcrumb": "Việc làm",
+    "loading": "Đang tải...",
+    "error": {
+      "title": "Đã xảy ra lỗi",
+      "message": "Không tìm thấy tin tuyển dụng này hoặc tin tuyển dụng đã ngừng nhận hồ sơ.",
+      "noData": "Không tìm thấy dữ liệu."
+    },
+    "browseOther": "Xem việc làm khác",
+    "header": {
+      "department": "Phòng ban",
+      "posted": "Đăng {{date}}",
+      "deadline": "Hạn nộp: {{text}}"
+    },
+    "tags": {
+      "experienceNotRequired": "Không yêu cầu kinh nghiệm",
+      "languageDefault": "Tiếng Việt"
+    },
+    "sections": {
+      "skills": "Kỹ năng",
+      "aboutDepartment": "Về phòng ban"
+    },
+    "company": {
+      "teamSize": "Đội ngũ ~{{count}} kỹ sư · Hybrid"
+    },
+    "apply": {
+      "applyNow": "Ứng tuyển ngay",
+      "applied": "Đã ứng tuyển · Xem hồ sơ",
+      "saveJob": "Lưu việc làm",
+      "saved": "Đã lưu"
+    },
+    "match": {
+      "title": "Độ phù hợp CV–JD",
+      "loginRequired": "Đăng nhập bằng tài khoản ứng viên và tải CV lên hồ sơ để xem độ phù hợp với tin này.",
+      "login": "Đăng nhập",
+      "analyzing": "Đang phân tích CV của bạn… việc này có thể mất ~20–30 giây.",
+      "noCv": "Hồ sơ của bạn chưa có CV. Tải CV lên để AI phân tích độ phù hợp với tin này.",
+      "uploadCv": "Tải CV lên",
+      "viewCv": "Xem",
+      "scoreLabel": "/ 100",
+      "aiAnalysis": "Phân tích bởi AI ({{name}})",
+      "skillsMatched": "Kỹ năng khớp",
+      "skillsMissing": "Còn thiếu",
+      "strengths": "Điểm sáng",
+      "considerations": "Điểm cần lưu ý",
+      "geminiNote": "Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo",
+      "updateCv": "Cập nhật CV khác",
+      "cannotAnalyze": "Chưa thể phân tích CV lúc này. Vui lòng thử lại sau.",
+      "loadError": "Không tải được phân tích CV. Vui lòng thử lại sau."
+    }
+  }
+}

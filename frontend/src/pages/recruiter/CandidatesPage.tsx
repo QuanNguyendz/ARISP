@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, Users, Mail, FileText, ChevronRight } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { Search, Users, FileText, Eye } from 'lucide-react'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
 import { applicationService } from '@services/application/applicationService'
 import type { HrApplicationItem } from '@/types/application'
-import { appStatusBadge, appStatusLabel, initials, scoreColor, timeAgo } from './_jobUi'
+import { appStatusBadge, appStatusLabel, initials, scoreColor } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
+import { resolveAssetUrl } from '@/config/constants'
 
 const FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -18,6 +19,13 @@ const FILTERS: { value: string; label: string }[] = [
   { value: 'not_pass', label: 'Không đạt' },
 ]
 
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 export default function RecruiterCandidatesPage() {
   const navigate = useNavigate()
   const { openDocument } = useDocumentViewer()
@@ -26,6 +34,7 @@ export default function RecruiterCandidatesPage() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     ;(async () => {
@@ -33,8 +42,9 @@ export default function RecruiterCandidatesPage() {
       setError('')
       try {
         setApps(await applicationService.getApplications(true))
-      } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được danh sách ứng viên.')
+      } catch (e) {
+        const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+        setError(msg || 'Không tải được danh sách ứng viên.')
       } finally {
         setLoading(false)
       }
@@ -43,15 +53,36 @@ export default function RecruiterCandidatesPage() {
 
   const counts = useMemo(() => {
     const by = (s: string) => apps.filter((a) => a.status === s).length
-    return { total: apps.length, screening: by('screening'), interview: by('interview'), pass: by('pass') }
+    return {
+      total: apps.length,
+      screening: by('screening'),
+      interview: by('interview'),
+      pass: by('pass'),
+    }
   }, [apps])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
     return apps
       .filter((a) => (filter === 'all' ? true : a.status === filter))
-      .filter((a) => (t ? (a.candidateName + a.candidateEmail + (a.jobTitle || '')).toLowerCase().includes(t) : true))
+      .filter((a) =>
+        t
+          ? (a.candidateName + a.candidateEmail + (a.jobTitle || '')).toLowerCase().includes(t)
+          : true
+      )
   }, [apps, q, filter])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [q, filter])
 
   const statCards = [
     { label: 'Tổng ứng viên', value: counts.total, color: 'text-brand-600' },
@@ -103,51 +134,124 @@ export default function RecruiterCandidatesPage() {
           </div>
 
           {filtered.length === 0 ? (
-            <EmptyState icon={<Users className="h-8 w-8 text-ink-400" />} title="Không có ứng viên" description="Không có ứng viên khớp bộ lọc hiện tại." />
+            <EmptyState
+              icon={<Users className="h-8 w-8 text-ink-400" />}
+              title="Không có ứng viên"
+              description="Không có ứng viên khớp bộ lọc hiện tại."
+            />
           ) : (
-            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
-              <div className="divide-y divide-ink-100 dark:divide-white/10">
-                {filtered.map((a, i) => (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i, 12) * 0.02 }}
-                    onClick={() => navigate(`/recruiter/candidates/${a.id}`)}
-                    className="flex cursor-pointer items-center gap-4 px-5 py-4 hover:bg-ink-50 dark:hover:bg-white/5"
-                  >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
-                      {initials(a.candidateName || a.candidateEmail)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{a.candidateName || 'Ứng viên'}</p>
-                      <p className="flex items-center gap-1 truncate text-xs text-ink-500 dark:text-ink-400">
-                        <Mail className="h-3 w-3" /> {a.candidateEmail} · {a.jobTitle || 'Vị trí'}
-                      </p>
-                    </div>
-                    <span className={`hidden text-sm font-bold sm:block ${scoreColor(a.matchScore)}`}>
-                      {a.matchScore != null ? `${a.matchScore}%` : '—'}
-                    </span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${appStatusBadge(a.status)}`}>{appStatusLabel(a.status)}</span>
-                    <span className="hidden text-xs text-ink-400 md:block">{timeAgo(a.createdAt)}</span>
-                    {a.cvFileUrl && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openDocument(a.cvFileUrl!, `${a.candidateName || 'Ứng viên'} - CV`)
-                        }}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-600 dark:hover:bg-white/10"
-                        title="Xem CV"
+            <div className="p-2 sm:p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-ink-200 dark:border-white/10">
+                      {['Ứng viên', 'Vị trí', 'Trạng thái', 'Điểm CV', 'Ngày ứng tuyển'].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                      <th className="text-right py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((a, i) => (
+                      <motion.tr
+                        key={a.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                        onClick={() => navigate(`/recruiter/candidates/${a.id}`)}
+                        className="border-b border-ink-100 dark:border-white/5 hover:bg-ink-50 dark:hover:bg-white/[0.02] cursor-pointer transition-colors"
                       >
-                        <FileText className="h-4 w-4" />
-                      </button>
-                    )}
-                    <ChevronRight className="h-4 w-4 text-ink-300" />
-                  </motion.div>
-                ))}
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                              {initials(a.candidateName || a.candidateEmail)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-ink-900 dark:text-white truncate">
+                                {a.candidateName || 'Ứng viên'}
+                              </p>
+                              <p className="text-sm text-ink-600 dark:text-ink-400 truncate">
+                                {a.candidateEmail}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-ink-700 dark:text-ink-200">
+                          {a.jobTitle || '—'}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${appStatusBadge(a.status)}`}
+                          >
+                            {appStatusLabel(a.status)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {typeof a.matchScore === 'number' ? (
+                            <span className={`font-semibold ${scoreColor(a.matchScore)}`}>
+                              {a.matchScore}
+                            </span>
+                          ) : (
+                            <span className="text-ink-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-ink-600 dark:text-ink-400">
+                          {formatDate(a.createdAt)}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            {a.cvFileUrl && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openDocument(
+                                    resolveAssetUrl(a.cvFileUrl),
+                                    `${a.candidateName || 'Ứng viên'} - CV`
+                                  )
+                                }}
+                                title="Xem CV"
+                                className="p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
+                              >
+                                <FileText className="w-4 h-4 text-ink-500" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/recruiter/candidates/${a.id}`)
+                              }}
+                              title="Xem chi tiết"
+                              className="p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                              <Eye className="w-4 h-4 text-ink-500" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={filtered.length}
+              label="ứng viên"
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Search, Eye, Video, Clock, MonitorPlay } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
 import { HrStatsSkeleton, SessionListSkeleton } from './_skeletons'
 import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
 
@@ -83,6 +83,7 @@ export default function InterviewSessionsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<StatusGroup>('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     let active = true
@@ -141,6 +142,18 @@ export default function InterviewSessionsPage() {
     })
   }, [sessions, search, tab])
 
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi từ khóa/tab
+  useEffect(() => {
+    setPage(1)
+  }, [search, tab])
+
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader
@@ -194,7 +207,7 @@ export default function InterviewSessionsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {filtered.map((session, index) => {
+          {paged.map((session, index) => {
             const sm = statusMeta(session.status)
             const vm = verdictMeta(session.verdict)
             const duration = formatDuration(session.durationSeconds)
@@ -274,6 +287,16 @@ export default function InterviewSessionsPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={filtered.length}
+          label="phiên"
+          onPageChange={setPage}
+        />
       )}
     </div>
   )

@@ -23,6 +23,7 @@ export interface CvReview {
   overallScore: number
   verdict: string
   summary: string
+  suggestedPositions: string[]
   strengths: string[]
   improvements: string[]
   missingSections: string[]

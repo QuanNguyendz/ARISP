@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Sparkles,
   MapPin,
@@ -32,6 +33,7 @@ import {
 } from 'lucide-react'
 import { applicationService } from '@services/application/applicationService'
 import { profileService } from '@services/profile/profileService'
+import { CANDIDATE_DATA_REFRESH_EVENT } from '@services/notification/notificationService'
 import type { CandidateProfile } from '@services/profile/profileService'
 import { resolveAssetUrl } from '@config/constants'
 import { useAuthStore } from '@store/auth/authStore'
@@ -40,60 +42,24 @@ import { useDocumentViewer } from '@components/document/DocumentViewer'
 import type { MyApplicationItem, MyApplicationRound } from '../../types/application'
 
 type FilterKey = 'all' | 'action' | 'processing' | 'done'
+type TFunction = (key: string, options?: Record<string, unknown>) => string
 
-const STATUS_META: Record<
-  string,
-  { label: string; cls: string; group: Exclude<FilterKey, 'all'>; icon: typeof Clock }
-> = {
-  invited: {
-    label: 'Được mời',
-    cls: 'bg-brand-50 text-brand-700 ring-brand-200',
-    group: 'processing',
-    icon: Eye,
-  },
-  cv_submitted: {
-    label: 'HR đang xem hồ sơ',
-    cls: 'bg-brand-50 text-brand-700 ring-brand-200',
-    group: 'processing',
-    icon: Eye,
-  },
-  screening: {
-    label: 'Đang sàng lọc',
-    cls: 'bg-brand-50 text-brand-700 ring-brand-200',
-    group: 'processing',
-    icon: Clock,
-  },
-  interview: {
-    label: 'Đang phỏng vấn',
-    cls: 'bg-amber-50 text-amber-700 ring-amber-200',
-    group: 'action',
-    icon: AlertCircle,
-  },
-  pass: {
-    label: 'Đạt',
-    cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    group: 'done',
-    icon: Check,
-  },
-  not_pass: {
-    label: 'Không phù hợp',
-    cls: 'bg-red-50 text-red-700 ring-red-200',
-    group: 'done',
-    icon: XCircle,
-  },
-  withdrawn: {
-    label: 'Đã rút',
-    cls: 'bg-ink-100 text-ink-500 ring-ink-200',
-    group: 'done',
-    icon: XCircle,
-  },
-}
-
-function metaOf(status: string) {
+function metaOf(t: TFunction, status: string) {
+  const labels: Record<
+    string,
+    { label: string; group: Exclude<FilterKey, 'all'>; icon: typeof Clock }
+  > = {
+    invited: { label: t('applications.status.invited'), group: 'processing', icon: Eye },
+    cv_submitted: { label: t('applications.status.cvSubmitted'), group: 'processing', icon: Eye },
+    screening: { label: t('applications.status.screening'), group: 'processing', icon: Clock },
+    interview: { label: t('applications.status.interview'), group: 'action', icon: AlertCircle },
+    pass: { label: t('applications.status.pass'), group: 'done', icon: Check },
+    not_pass: { label: t('applications.status.notPass'), group: 'done', icon: XCircle },
+    withdrawn: { label: t('applications.status.withdrawn'), group: 'done', icon: XCircle },
+  }
   return (
-    STATUS_META[status] ?? {
+    labels[status] ?? {
       label: status,
-      cls: 'bg-ink-100 text-ink-600 ring-ink-200',
       group: 'processing' as const,
       icon: Clock,
     }
@@ -105,10 +71,10 @@ function metaOf(status: string) {
  * có việc cần ứng viên làm (mã phỏng vấn còn hiệu lực, hoặc đã qua CV và còn lượt phỏng vấn thử)
  * → "Cần hành động"; còn lại theo trạng thái gốc (HR xem hồ sơ → Đang xử lý; pass/not_pass → Đã hoàn tất).
  */
-function groupOf(app: MyApplicationItem): Exclude<FilterKey, 'all'> {
+function groupOf(t: TFunction, app: MyApplicationItem): Exclude<FilterKey, 'all'> {
   if (app.interviewCode) return 'action'
   if (app.practiceAvailable) return 'action'
-  return metaOf(app.status).group
+  return metaOf(t, app.status).group
 }
 
 function formatDate(iso?: string | null): string {
@@ -118,23 +84,23 @@ function formatDate(iso?: string | null): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function formatRelative(iso?: string | null): string {
+function formatRelative(t: TFunction, iso?: string | null): string {
   if (!iso) return ''
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.round(diffMs / 60000)
-  if (mins < 1) return 'vừa xong'
-  if (mins < 60) return `${mins} phút trước`
+  if (mins < 1) return t('applications.appliedTimeAgo')
+  if (mins < 60) return t('applications.minutesAgo', { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs} giờ trước`
+  if (hrs < 24) return t('applications.hoursAgo', { count: hrs })
   const days = Math.round(hrs / 24)
-  if (days === 1) return 'hôm qua'
-  return `${days} ngày trước`
+  if (days === 1) return t('applications.yesterday')
+  return t('applications.daysAgo', { count: days })
 }
 
 /** Đếm ngược tới thời điểm hết hạn → "1g 48p" / "Đã hết hạn". */
-function formatCountdown(iso: string): string {
+function formatCountdown(t: TFunction, iso: string): string {
   const diff = new Date(iso).getTime() - Date.now()
-  if (diff <= 0) return 'Đã hết hạn'
+  if (diff <= 0) return t('applications.countdownExpired')
   const totalMin = Math.floor(diff / 60000)
   const h = Math.floor(totalMin / 60)
   const m = totalMin % 60
@@ -143,20 +109,26 @@ function formatCountdown(iso: string): string {
 }
 
 /** Thông tin hiển thị lịch phỏng vấn: ngày đầy đủ (thứ, dd/mm/yyyy), giờ và nhãn tương đối. */
-function scheduleInfo(iso: string, now: number) {
+function scheduleInfo(t: TFunction, iso: string, now: number) {
   const d = new Date(iso)
   const diff = d.getTime() - now
   const mins = Math.round(diff / 60000)
   let rel: string
-  if (diff <= 0) rel = 'Đang diễn ra'
-  else if (mins < 60) rel = `Còn ${mins} phút`
+  if (diff <= 0) rel = t('applications.scheduleRel.inProgress')
+  else if (mins < 60) rel = t('applications.scheduleRel.minutesLeft', { count: mins })
   else if (mins < 24 * 60) {
     const h = Math.floor(mins / 60)
     const m = mins % 60
-    rel = `Còn ${h}g${m ? ` ${m}p` : ''}`
+    rel =
+      m > 0
+        ? t('applications.scheduleRel.minutesLeft', { count: h * 60 + m })
+        : t('applications.scheduleRel.minutesLeft', { count: h * 60 })
   } else {
     const days = Math.round(mins / (24 * 60))
-    rel = days === 1 ? 'Ngày mai' : `Còn ${days} ngày`
+    rel =
+      days === 1
+        ? t('applications.scheduleRel.tomorrow')
+        : t('applications.scheduleRel.daysLeft', { count: days })
   }
   return {
     day: d.getDate(),
@@ -188,17 +160,17 @@ function deptIcon(department?: string | null) {
   return Code2
 }
 
-function roundTypeLabel(t?: string): string {
+function roundTypeLabel(t: TFunction, type?: string): string {
   const map: Record<string, string> = {
-    screening: 'Screening',
-    technical: 'Technical',
-    online_test: 'Online Test',
-    final: 'Final',
+    screening: t('applications.roundType.screening'),
+    technical: t('applications.roundType.technical'),
+    online_test: t('applications.roundType.online_test'),
+    final: t('applications.roundType.final'),
   }
-  return map[(t || '').toLowerCase()] || t || ''
+  return map[(type || '').toLowerCase()] || type || ''
 }
 
-function RoundStepper({ rounds }: { rounds: MyApplicationRound[] }) {
+function RoundStepper({ t, rounds }: { t: (key: string) => string; rounds: MyApplicationRound[] }) {
   if (!rounds.length) return null
   return (
     <div className="mt-4 flex flex-wrap items-center gap-1.5 text-xs">
@@ -217,10 +189,13 @@ function RoundStepper({ rounds }: { rounds: MyApplicationRound[] }) {
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${cls}`}
             >
               {done && <Check className="h-3.5 w-3.5" />}V{r.roundNumber}{' '}
-              {roundTypeLabel(r.roundType)}
+              {roundTypeLabel(t, r.roundType)}
               {r.verdict && (
                 <span className={r.verdict === 'pass' ? 'text-emerald-700' : 'text-red-600'}>
-                  · {r.verdict === 'pass' ? 'Pass' : 'Not Pass'}
+                  ·{' '}
+                  {r.verdict === 'pass'
+                    ? t('applications.status.pass')
+                    : t('applications.status.notPass')}
                 </span>
               )}
             </span>
@@ -240,29 +215,46 @@ function MatchBadge({ score }: { score?: number | null }) {
   )
 }
 
-function CardFooter({ app, action }: { app: MyApplicationItem; action?: React.ReactNode }) {
+function CardFooter({
+  t,
+  app,
+  action,
+}: {
+  t: TFunction
+  app: MyApplicationItem
+  action?: React.ReactNode
+}) {
   return (
     <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
       <span className="text-xs text-ink-400">
-        Ứng tuyển {formatDate(app.createdAt)}
+        {t('applications.appliedTime')} {formatDate(app.createdAt)}
         {app.updatedAt &&
           app.updatedAt !== app.createdAt &&
-          ` · Cập nhật ${formatRelative(app.updatedAt)}`}
+          ` · ${t('applications.updatedTime', { time: formatRelative(t, app.updatedAt) })}`}
       </span>
       {action ?? (
         <Link
           to={`/candidate/applications/${app.id}`}
           className="inline-flex items-center gap-1 rounded-xl border border-ink-200 px-4 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
         >
-          Xem chi tiết <ChevronRight className="h-4 w-4" />
+          {t('applications.viewDetail')} <ChevronRight className="h-4 w-4" />
         </Link>
       )}
     </div>
   )
 }
 
-function ApplicationCard({ app }: { app: MyApplicationItem }) {
-  const meta = metaOf(app.status)
+function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
+  const meta = metaOf(t, app.status)
+  const statusCls: Record<string, string> = {
+    invited: 'bg-brand-50 text-brand-700 ring-brand-200',
+    cv_submitted: 'bg-brand-50 text-brand-700 ring-brand-200',
+    screening: 'bg-brand-50 text-brand-700 ring-brand-200',
+    interview: 'bg-amber-50 text-amber-700 ring-amber-200',
+    pass: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    not_pass: 'bg-red-50 text-red-700 ring-red-200',
+    withdrawn: 'bg-ink-100 text-ink-500 ring-ink-200',
+  }
   const StatusIcon = meta.icon
   const Icon = deptIcon(app.department)
   const [copied, setCopied] = useState(false)
@@ -291,8 +283,8 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
     >
       {hasCode && (
         <div className="flex items-center gap-2 bg-amber-50 px-5 py-2 text-xs font-semibold text-amber-700">
-          <AlertCircle className="h-4 w-4" /> Cần hành động · Bạn được mời phỏng vấn vòng{' '}
-          {app.interviewCode!.roundNumber} (On-site)
+          <AlertCircle className="h-4 w-4" />{' '}
+          {t('applications.actionNeeded', { round: app.interviewCode!.roundNumber })}
         </div>
       )}
       <div className="p-5">
@@ -310,17 +302,17 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
                 <h3
                   className={`font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
                 >
-                  {app.jobTitle || 'Vị trí tuyển dụng'}
+                  {app.jobTitle || t('applications.jobPosting')}
                 </h3>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
                   <MapPin className="h-3.5 w-3.5" />
                   {[app.location, app.department].filter(Boolean).join(' · ') ||
-                    'Không rõ địa điểm'}
+                    t('applications.locationUnknown')}
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${meta.cls}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
                 >
                   <StatusIcon className="h-3.5 w-3.5" /> {meta.label}
                 </span>
@@ -328,7 +320,7 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
               </div>
             </div>
 
-            <RoundStepper rounds={app.rounds} />
+            <RoundStepper t={t} rounds={app.rounds} />
 
             {/* Mã phỏng vấn On-site */}
             {hasCode && (
@@ -336,7 +328,7 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium text-ink-500">
-                      Mã phỏng vấn On-site (nhập tại Kiosk văn phòng)
+                      {t('applications.interviewCode')}
                     </div>
                     <div className="mt-1 font-display text-2xl font-extrabold tracking-[0.3em] text-ink-900">
                       {app.interviewCode!.code}
@@ -344,10 +336,12 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
                   </div>
                   <div className="text-right">
                     <div className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
-                      <Clock className="h-3.5 w-3.5" /> Hết hạn sau{' '}
-                      {formatCountdown(app.interviewCode!.expiresAt)}
+                      <Clock className="h-3.5 w-3.5" /> {t('applications.expireCountdown')}{' '}
+                      {formatCountdown(t, app.interviewCode!.expiresAt)}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-ink-400">Dùng 1 lần · 6 ký tự</div>
+                    <div className="mt-0.5 text-[11px] text-ink-400">
+                      {t('applications.oneTimeSixChars')}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -355,13 +349,14 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
                     to={`/jobs/${app.jobPostingId}`}
                     className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
                   >
-                    <MapPin className="h-4 w-4" /> Xem tin tuyển dụng
+                    <MapPin className="h-4 w-4" /> {t('applications.viewJobPosting')}
                   </Link>
                   <button
                     onClick={copyCode}
                     className="flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                   >
-                    <Copy className="h-4 w-4" /> {copied ? 'Đã sao chép' : 'Sao chép mã'}
+                    <Copy className="h-4 w-4" />{' '}
+                    {copied ? t('applications.copied') : t('applications.copyCode')}
                   </button>
                 </div>
               </div>
@@ -371,11 +366,9 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
             {!hasCode && app.pendingHrReview && (
               <div className="mt-3 rounded-xl bg-ink-50 p-3 text-sm">
                 <div className="flex items-center gap-2 text-ink-600">
-                  <Clock className="h-4 w-4 text-amber-600" /> Kết quả đang chờ HR Leader xác nhận
+                  <Clock className="h-4 w-4 text-amber-600" /> {t('applications.hrConfirming')}
                 </div>
-                <p className="mt-1 text-xs text-ink-400">
-                  Bạn sẽ nhận thông báo ngay khi có kết quả vòng phỏng vấn này.
-                </p>
+                <p className="mt-1 text-xs text-ink-400">{t('applications.hrConfirmingHint')}</p>
               </div>
             )}
 
@@ -383,19 +376,18 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
             {showPractice && (
               <div className="mt-3 rounded-xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-                  <Sparkles className="h-4 w-4" /> Phỏng vấn thử (Remote) · Vòng{' '}
-                  {app.activeRound ?? 1}
+                  <Sparkles className="h-4 w-4" />{' '}
+                  {t('applications.practiceRemote', { round: app.activeRound ?? 1 })}
                 </div>
-                <p className="mt-1 text-xs text-ink-500">
-                  Bạn đã <b className="text-ink-700">qua vòng CV</b>! Làm{' '}
-                  <b className="text-ink-700">1 buổi phỏng vấn thử</b> cho vòng này để làm quen với
-                  AI trước buổi thật — không ảnh hưởng kết quả tuyển dụng.
-                </p>
+                <p
+                  className="mt-1 text-xs text-ink-500"
+                  dangerouslySetInnerHTML={{ __html: t('applications.practiceAvailable') }}
+                />
                 <Link
                   to={`/interview/practice/${app.id}?round=${app.activeRound ?? 1}`}
                   className="mt-2 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-4 py-2 text-sm font-bold text-white hover:opacity-90"
                 >
-                  <Play className="h-4 w-4" /> Bắt đầu phỏng vấn thử
+                  <Play className="h-4 w-4" /> {t('applications.startPractice')}
                 </Link>
               </div>
             )}
@@ -408,6 +400,7 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
             )}
 
             <CardFooter
+              t={t}
               app={app}
               action={
                 isClosed ? (
@@ -415,7 +408,7 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
                     to={`/candidate/applications/${app.id}`}
                     className="inline-flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                   >
-                    <MessageSquareText className="h-4 w-4" /> Xem feedback
+                    <MessageSquareText className="h-4 w-4" /> {t('applications.viewFeedback')}
                   </Link>
                 ) : undefined
               }
@@ -426,13 +419,6 @@ function ApplicationCard({ app }: { app: MyApplicationItem }) {
     </article>
   )
 }
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'action', label: 'Cần hành động' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'done', label: 'Đã hoàn tất' },
-]
 
 /** Khung skeleton (shimmer) mô phỏng bố cục trang khi đang tải. */
 function ApplicationsSkeleton() {
@@ -521,6 +507,7 @@ function ApplicationsSkeleton() {
 }
 
 export default function ApplicationsPage() {
+  const { t } = useTranslation('candidate')
   const { user } = useAuthStore()
   const { openDocument } = useDocumentViewer()
   const [apps, setApps] = useState<MyApplicationItem[]>([])
@@ -528,38 +515,58 @@ export default function ApplicationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [now, setNow] = useState(() => Date.now()) // tick để cập nhật lịch/đếm ngược realtime
+  const [now, setNow] = useState(() => Date.now())
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    Promise.all([
-      applicationService.getMyApplications(),
-      profileService.getProfile().catch(() => null),
-    ])
-      .then(([data, prof]) => {
-        if (!active) return
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: t('applications.all') },
+    { key: 'action', label: t('applications.action') },
+    { key: 'processing', label: t('applications.processing') },
+    { key: 'done', label: t('applications.done') },
+  ]
+
+  // silent = refetch nền (không bật skeleton) khi có push SignalR — giữ nguyên UI, chỉ đổi dữ liệu.
+  const loadData = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true)
+      try {
+        const [data, prof] = await Promise.all([
+          applicationService.getMyApplications(),
+          profileService.getProfile().catch(() => null),
+        ])
         setApps(data)
         setProfile(prof)
-      })
-      .catch((err: any) => active && setError(err?.message || 'Không tải được danh sách hồ sơ.'))
-      .finally(() => active && setLoading(false))
-    return () => {
-      active = false
-    }
-  }, [])
+      } catch (err) {
+        if (!silent) setError(err instanceof Error ? err.message : t('applications.error'))
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [t]
+  )
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Cấp mã phỏng vấn / đổi trạng thái → useAppNotifications phát event này → refetch nền để
+  // bảng hiển thị mã mới tức thời, không cần F5.
+  useEffect(() => {
+    const handler = () => loadData(true)
+    window.addEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+    return () => window.removeEventListener(CANDIDATE_DATA_REFRESH_EVENT, handler)
+  }, [loadData])
 
   const counts = useMemo(() => {
     const c = { all: apps.length, action: 0, processing: 0, done: 0 }
     apps.forEach((a) => {
-      c[groupOf(a)]++
+      c[groupOf(t, a)]++
     })
     return c
-  }, [apps])
+  }, [apps, t])
 
   const filtered = useMemo(
-    () => (filter === 'all' ? apps : apps.filter((a) => groupOf(a) === filter)),
-    [apps, filter]
+    () => (filter === 'all' ? apps : apps.filter((a) => groupOf(t, a) === filter)),
+    [apps, filter, t]
   )
 
   const passedRounds = useMemo(
@@ -588,23 +595,23 @@ export default function ApplicationsPage() {
     const checks = [
       {
         ok: !!profile.fullName && !!profile.headline && !!profile.phone,
-        label: 'Thông tin cá nhân',
+        label: t('applications.profileChecks.personalInfo'),
       },
-      { ok: !!profile.profileCvUrl, label: 'Tải lên CV' },
+      { ok: !!profile.profileCvUrl, label: t('applications.profileChecks.uploadCv') },
       {
         ok: profile.skills.length > 0 && profile.experience.length > 0,
-        label: 'Kỹ năng & kinh nghiệm',
+        label: t('applications.profileChecks.skillsExperience'),
       },
       {
         ok: !!(profile.linkedinUrl || profile.githubUrl || profile.portfolioUrl),
-        label: 'Liên kết LinkedIn / GitHub',
+        label: t('applications.profileChecks.links'),
       },
     ]
     const pct = Math.round((checks.filter((c) => c.ok).length / checks.length) * 100)
     return { pct, checks }
-  }, [profile])
+  }, [profile, t])
 
-  const displayName = profile?.fullName || user?.name || 'Ứng viên'
+  const displayName = profile?.fullName || user?.name || t('profile.candidate')
   const initials = initialsOf(displayName, user?.email)
 
   return (
@@ -613,10 +620,10 @@ export default function ApplicationsPage() {
       <div className="mx-auto max-w-6xl px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
-            Trang chủ
+            {t('profile.home')}
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span className="font-medium text-ink-600">Hồ sơ ứng tuyển của tôi</span>
+          <span className="font-medium text-ink-600">{t('applications.myApplications')}</span>
         </div>
       </div>
 
@@ -648,7 +655,7 @@ export default function ApplicationsPage() {
                     to="/candidate/profile"
                     className="flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                   >
-                    <Pencil className="h-4 w-4" /> Sửa hồ sơ
+                    <Pencil className="h-4 w-4" /> {t('applications.editProfile')}
                   </Link>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-500">
@@ -673,25 +680,27 @@ export default function ApplicationsPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
                 <div className="font-display text-2xl font-extrabold">{counts.all}</div>
-                <div className="mt-0.5 text-xs text-ink-500">Tổng đơn ứng tuyển</div>
+                <div className="mt-0.5 text-xs text-ink-500">
+                  {t('applications.totalApplications')}
+                </div>
               </div>
               <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
                 <div className="font-display text-2xl font-extrabold text-brand-600">
                   {counts.processing}
                 </div>
-                <div className="mt-0.5 text-xs text-ink-500">Đang xử lý</div>
+                <div className="mt-0.5 text-xs text-ink-500">{t('applications.processing')}</div>
               </div>
               <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
                 <div className="font-display text-2xl font-extrabold text-amber-600">
                   {counts.action}
                 </div>
-                <div className="mt-0.5 text-xs text-ink-500">Cần hành động</div>
+                <div className="mt-0.5 text-xs text-ink-500">{t('applications.action')}</div>
               </div>
               <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
                 <div className="font-display text-2xl font-extrabold text-emerald-600">
                   {passedRounds}
                 </div>
-                <div className="mt-0.5 text-xs text-ink-500">Đã Pass vòng</div>
+                <div className="mt-0.5 text-xs text-ink-500">{t('applications.passedRounds')}</div>
               </div>
             </div>
 
@@ -714,7 +723,7 @@ export default function ApplicationsPage() {
                 </button>
               ))}
               <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-ink-400 sm:flex">
-                <ArrowDownUp className="h-4 w-4" /> Mới cập nhật
+                <ArrowDownUp className="h-4 w-4" /> {t('applications.newest')}
               </span>
             </div>
 
@@ -728,21 +737,21 @@ export default function ApplicationsPage() {
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                   <FileText className="h-6 w-6" />
                 </div>
-                <p className="mt-3 font-semibold text-ink-700">Chưa có hồ sơ ứng tuyển</p>
-                <p className="mt-1 text-sm text-ink-500">
-                  Khám phá việc làm IT phù hợp và ứng tuyển ngay.
+                <p className="mt-3 font-semibold text-ink-700">
+                  {t('applications.noApplications')}
                 </p>
+                <p className="mt-1 text-sm text-ink-500">{t('applications.exploreJobs')}</p>
                 <Link
                   to="/jobs"
                   className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
                 >
-                  <Briefcase className="h-4 w-4" /> Tìm việc ngay
+                  <Briefcase className="h-4 w-4" /> {t('applications.findJobsNow')}
                 </Link>
               </div>
             ) : (
               <div className="space-y-4">
                 {filtered.map((app) => (
-                  <ApplicationCard key={app.id} app={app} />
+                  <ApplicationCard key={app.id} t={t} app={app} />
                 ))}
               </div>
             )}
@@ -754,11 +763,11 @@ export default function ApplicationsPage() {
             <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                  <FileText className="h-4 w-4 text-brand-600" /> CV của bạn
+                  <FileText className="h-4 w-4 text-brand-600" /> {t('applications.cvOfYours')}
                 </span>
                 {profile?.profileCvUrl && (
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    Đang dùng
+                    {t('applications.inUse')}
                   </span>
                 )}
               </div>
@@ -770,11 +779,11 @@ export default function ApplicationsPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-ink-800">
-                        {profile.cvFileName || 'CV hồ sơ'}
+                        {profile.cvFileName || t('applications.cv.profileCv')}
                       </div>
                       <div className="text-xs text-ink-400">
-                        {(profile.cvFileName?.split('.').pop() || 'CV').toUpperCase()} · Tài liệu hồ
-                        sơ
+                        {(profile.cvFileName?.split('.').pop() || 'CV').toUpperCase()} ·{' '}
+                        {t('applications.cv.profileDocument')}
                       </div>
                     </div>
                     <button
@@ -782,12 +791,12 @@ export default function ApplicationsPage() {
                       onClick={() =>
                         openDocument(
                           resolveAssetUrl(profile.profileCvUrl),
-                          profile.cvFileName || 'CV hồ sơ'
+                          profile.cvFileName || t('applications.cv.profileCv')
                         )
                       }
                       className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-600"
-                      title="Xem CV"
-                      aria-label="Xem CV"
+                      title={t('applications.cv.viewCv')}
+                      aria-label={t('applications.cv.viewCv')}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -795,8 +804,8 @@ export default function ApplicationsPage() {
                       href={resolveAssetUrl(profile.cvDownloadUrl || profile.profileCvUrl)}
                       download={profile.cvFileName || true}
                       className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-600"
-                      title="Tải về"
-                      aria-label="Tải CV về"
+                      title={t('applications.cv.downloadCv')}
+                      aria-label={t('applications.cv.downloadCvAria')}
                     >
                       <Download className="h-4 w-4" />
                     </a>
@@ -805,19 +814,17 @@ export default function ApplicationsPage() {
                     to="/candidate/profile?focus=cv"
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                   >
-                    <UploadCloud className="h-4 w-4" /> Cập nhật CV
+                    <UploadCloud className="h-4 w-4" /> {t('applications.updateCv')}
                   </Link>
                 </>
               ) : (
                 <>
-                  <p className="mt-2 text-sm text-ink-500">
-                    Bạn chưa tải CV lên hồ sơ. Tải CV để AI chấm điểm phù hợp và HR xem nhanh.
-                  </p>
+                  <p className="mt-2 text-sm text-ink-500">{t('applications.noCvYet')}</p>
                   <Link
                     to="/candidate/profile?focus=cv"
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
                   >
-                    <UploadCloud className="h-4 w-4" /> Tải CV lên
+                    <UploadCloud className="h-4 w-4" /> {t('applications.uploadCv')}
                   </Link>
                 </>
               )}
@@ -827,16 +834,17 @@ export default function ApplicationsPage() {
             {nextSchedule && (
               <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
                 <div className="flex items-center gap-2 text-sm font-semibold">
-                  <CalendarClock className="h-4 w-4 text-brand-600" /> Lịch phỏng vấn sắp tới
+                  <CalendarClock className="h-4 w-4 text-brand-600" />{' '}
+                  {t('applications.upcomingSchedule')}
                 </div>
                 {(() => {
-                  const info = scheduleInfo(nextSchedule.slot.startTime, now)
+                  const info = scheduleInfo(t, nextSchedule.slot.startTime, now)
                   return (
                     <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3">
                       <div className="flex items-start gap-3">
                         <div className="grid h-11 w-11 shrink-0 flex-col place-items-center rounded-lg bg-white text-brand-700 ring-1 ring-brand-200">
                           <span className="text-[10px] font-semibold leading-none">
-                            Th{info.month}
+                            {info.month}/{info.day}
                           </span>
                           <span className="font-display text-base font-extrabold leading-none">
                             {info.day}
@@ -845,7 +853,9 @@ export default function ApplicationsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <div className="text-sm font-semibold text-ink-800">
-                              Vòng {nextSchedule.slot.roundNumber} · Phỏng vấn
+                              {t('applications.roundInterview', {
+                                number: nextSchedule.slot.roundNumber,
+                              })}
                             </div>
                             <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
                               {info.rel}
@@ -868,9 +878,7 @@ export default function ApplicationsPage() {
                     </div>
                   )
                 })()}
-                <p className="mt-2 text-xs text-ink-400">
-                  Mang theo CCCD và mã phỏng vấn để nhập tại Kiosk.
-                </p>
+                <p className="mt-2 text-xs text-ink-400">{t('applications.bringCccd')}</p>
               </div>
             )}
 
@@ -879,7 +887,8 @@ export default function ApplicationsPage() {
               <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span className="flex items-center gap-2">
-                    <BadgeCheck className="h-4 w-4 text-brand-600" /> Độ hoàn thiện hồ sơ
+                    <BadgeCheck className="h-4 w-4 text-brand-600" />{' '}
+                    {t('applications.profileCompleteness')}
                   </span>
                   <span className="text-brand-600">{completeness.pct}%</span>
                 </div>
@@ -909,7 +918,7 @@ export default function ApplicationsPage() {
                     to="/candidate/profile"
                     className="mt-3 block w-full rounded-xl bg-brand-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-brand-700"
                   >
-                    Hoàn thiện ngay
+                    {t('applications.completeNow')}
                   </Link>
                 )}
               </div>
@@ -918,17 +927,14 @@ export default function ApplicationsPage() {
             {/* AI tip */}
             <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50 to-white p-5 shadow-card">
               <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-                <Sparkles className="h-4 w-4" /> Mẹo từ AI
+                <Sparkles className="h-4 w-4" /> {t('applications.aiTip')}
               </div>
-              <p className="mt-2 text-sm text-ink-500">
-                Cập nhật CV mới nhất và hoàn thiện hồ sơ để cải thiện điểm Match với các vị trí đang
-                mở.
-              </p>
+              <p className="mt-2 text-sm text-ink-500">{t('applications.aiTipContent')}</p>
               <Link
                 to="/jobs"
                 className="mt-3 block w-full rounded-xl border border-ai-300 bg-white px-3 py-2 text-center text-sm font-semibold text-ai-700 hover:bg-ai-50"
               >
-                Khám phá việc phù hợp
+                {t('applications.findSuitableJobs')}
               </Link>
             </div>
           </aside>

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Briefcase, Users, MapPin, Clock, ChevronRight } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import jobService from '@services/job/jobService'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { JobsGridSkeleton, StatsGridSkeleton } from './_skeletons'
@@ -42,6 +42,7 @@ export default function RecruiterMyJobsPage() {
   const jobs = jobsData || []
   const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   const counts = useMemo(() => {
     const by = (s: string) => jobs.filter((j) => j.status === s).length
@@ -52,6 +53,18 @@ export default function RecruiterMyJobsPage() {
     () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
     [jobs, filter],
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
+  // Về trang 1 khi đổi bộ lọc
+  useEffect(() => {
+    setPage(1)
+  }, [filter])
 
   const statCards = [
     { label: 'Tổng tin', value: counts.all, color: 'text-brand-600' },
@@ -104,7 +117,7 @@ export default function RecruiterMyJobsPage() {
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((j, i) => (
+              {paged.map((j, i) => (
                 <motion.div key={j.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <Link
                     to={`/recruiter/my-jobs/${j.id}`}
@@ -158,6 +171,16 @@ export default function RecruiterMyJobsPage() {
                 </motion.div>
               ))}
             </div>
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={filtered.length}
+              label="tin"
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

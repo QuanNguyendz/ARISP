@@ -1,46 +1,58 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, Briefcase, LogOut, User } from 'lucide-react';
-import { useAuthStore } from '@store/auth/authStore';
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Brain, Briefcase, LogOut, User, Globe, ChevronDown, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@store/auth/authStore'
 
 const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Interview', href: '#interview' },
   { label: 'Pricing', href: '#pricing' },
-];
+]
 
 export default function Navigation() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const location = useLocation();
-  const isEmployerPage = location.pathname === '/employer';
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { t, i18n } = useTranslation('landing')
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isLangOpen, setIsLangOpen] = useState(false)
+  const langRef = useRef<HTMLDivElement>(null)
+  const location = useLocation()
+  const isEmployerPage = location.pathname === '/employer'
+  const { user, logout, isAuthenticated } = useAuthStore()
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setIsLangOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleNavClick = (href: string) => {
-    setIsMobileMenuOpen(false);
-    const element = document.querySelector(href);
+    setIsMobileMenuOpen(false)
+    const element = document.querySelector(href)
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+      element.scrollIntoView({ behavior: 'smooth' })
     }
-  };
+  }
 
   return (
     <motion.nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        isScrolled
-          ? 'bg-black/80 backdrop-blur-2xl border-b border-white/5'
-          : 'bg-transparent'
+        isScrolled ? 'bg-black/80 backdrop-blur-2xl border-b border-white/5' : 'bg-transparent'
       }`}
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -49,18 +61,13 @@ export default function Navigation() {
       <div className="max-w-6xl mx-auto px-6 sm:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
-          <Link
-            to="/"
-            className="flex items-center gap-2.5 group"
-          >
+          <Link to="/" className="flex items-center gap-2.5 group">
             <div className="relative">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
                 <Brain className="w-4 h-4 text-white" />
               </div>
             </div>
-            <span className="text-base font-medium tracking-tight text-white">
-              ARISP
-            </span>
+            <span className="text-base font-medium tracking-tight text-white">ARISP</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -80,13 +87,56 @@ export default function Navigation() {
           <div className="hidden lg:flex items-center gap-3">
             {/* Mode Switcher */}
             <Link
-              to={isEmployerPage ? "/" : "/employer"}
+              to={isEmployerPage ? '/' : '/employer'}
               className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 border border-white/10"
             >
               <Briefcase className="w-4 h-4" />
-              {isEmployerPage ? 'Tìm việc' : 'Nhà tuyển dụng'}
+              {isEmployerPage ? t('nav.findJob') : t('nav.employer')}
             </Link>
-            
+
+            {/* Language Switcher */}
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <Globe className="w-4 h-4" />
+                {i18n.language === 'en' ? 'EN' : 'VI'} <ChevronDown className="w-3 h-3" />
+              </button>
+              {isLangOpen && (
+                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-black/90 backdrop-blur-xl p-1 shadow-xl">
+                  <button
+                    onClick={() => {
+                      i18n.changeLanguage('vi')
+                      setIsLangOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      i18n.language === 'vi' || !i18n.language
+                        ? 'text-white bg-white/10'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">🇻🇳 Tiếng Việt</span>
+                    {(i18n.language === 'vi' || !i18n.language) && <Check className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      i18n.changeLanguage('en')
+                      setIsLangOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      i18n.language === 'en'
+                        ? 'text-white bg-white/10'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">🇬🇧 English</span>
+                    {i18n.language === 'en' && <Check className="w-4 h-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {isAuthenticated && user ? (
               <div className="relative">
                 <button
@@ -98,7 +148,7 @@ export default function Navigation() {
                   </div>
                   <span className="text-sm font-medium text-white">{user.name || 'User'}</span>
                 </button>
-                
+
                 {isDropdownOpen && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -113,8 +163,11 @@ export default function Navigation() {
                       Dashboard
                     </Link>
                     <hr className="my-2 border-white/10" />
-                    <button 
-                      onClick={() => { logout(); setIsDropdownOpen(false); }}
+                    <button
+                      onClick={() => {
+                        logout()
+                        setIsDropdownOpen(false)
+                      }}
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-colors w-full"
                     >
                       <LogOut className="w-4 h-4" />
@@ -148,16 +201,21 @@ export default function Navigation() {
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {isMobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               )}
             </svg>
           </button>
@@ -177,14 +235,16 @@ export default function Navigation() {
             <div className="px-6 py-6 space-y-1">
               {/* Mobile Mode Switcher */}
               <Link
-                to={isEmployerPage ? "/" : "/employer"}
+                to={isEmployerPage ? '/' : '/employer'}
                 className="flex items-center gap-2 p-2 mb-4 rounded-xl bg-white/5"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <Briefcase className="w-5 h-5 text-text-secondary" />
-                <span className="text-text-secondary">{isEmployerPage ? 'Chuyển sang trang Tìm việc' : 'Chuyển sang NTD'}</span>
+                <span className="text-text-secondary">
+                  {isEmployerPage ? 'Chuyển sang trang Tìm việc' : 'Chuyển sang NTD'}
+                </span>
               </Link>
-              
+
               {navLinks.map((link) => (
                 <button
                   key={link.label}
@@ -205,8 +265,11 @@ export default function Navigation() {
                     >
                       Dashboard
                     </Link>
-                    <button 
-                      onClick={() => { logout(); setIsMobileMenuOpen(false); }}
+                    <button
+                      onClick={() => {
+                        logout()
+                        setIsMobileMenuOpen(false)
+                      }}
                       className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-colors w-full"
                     >
                       <LogOut className="w-5 h-5" />
@@ -237,5 +300,5 @@ export default function Navigation() {
         )}
       </AnimatePresence>
     </motion.nav>
-  );
+  )
 }

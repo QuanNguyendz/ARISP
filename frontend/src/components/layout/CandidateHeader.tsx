@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Search,
   Bookmark,
@@ -17,25 +18,13 @@ import {
   Clapperboard,
   Settings,
   LogOut,
+  Trash2,
 } from 'lucide-react'
 import { useAuthStore } from '@store/auth'
 import { authService } from '@services/auth/authService'
-import { notificationService } from '@/services/notification/notificationService'
+import { notificationService, resolveNotifLink } from '@/services/notification/notificationService'
 import type { NotificationItem } from '@/services/notification/notificationService'
 import { useQuery } from '@tanstack/react-query'
-
-/** "2 giờ trước" / "Hôm qua" … từ ISO date. */
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Vừa xong'
-  if (mins < 60) return `${mins} phút trước`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} giờ trước`
-  const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Hôm qua'
-  return `${days} ngày trước`
-}
 
 /** Icon + màu theo loại thông báo. */
 function notifStyle(type: string): { Icon: typeof Bell; cls: string } {
@@ -104,6 +93,7 @@ function initialsOf(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase()
 }
 
+<<<<<<< HEAD
 const NAV = [
   { label: 'Việc làm', to: '/jobs', match: (p: string) => p === '/' || p.startsWith('/jobs') },
   {
@@ -123,16 +113,54 @@ const USER_MENU = [
   { label: 'Lịch phỏng vấn', to: '/candidate/interviews', icon: Clapperboard },
   { label: 'Cài đặt', to: '/candidate/settings', icon: Settings },
 ]
+=======
+/** "2 giờ trước" / "Hôm qua" … từ ISO date. */
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Vừa xong'
+  if (mins < 60) return `${mins} phút trước`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} giờ trước`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Hôm qua'
+  return `${days} ngày trước`
+}
+>>>>>>> 143b54ef0628ea0c12a0c2d22bec133abb3a44e3
 
 type Drop = 'user' | 'notif' | 'lang' | 'mobile' | null
 
 export default function CandidateHeader() {
+  const { t, i18n } = useTranslation('landing')
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const pathname = useLocation().pathname
   const { user, isAuthenticated, logout } = useAuthStore()
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
   const rootRef = useRef<HTMLElement>(null)
+
+  const langMap: Record<string, string> = { vi: 'VI', en: 'EN' }
+
+  const NAV = [
+    {
+      label: t('jobs.title'),
+      to: '/jobs',
+      match: (p: string) => p === '/' || p.startsWith('/jobs'),
+    },
+    {
+      label: t('jobs.myApplications'),
+      to: '/candidate/applications',
+      match: (p: string) => p.startsWith('/candidate/applications'),
+    },
+  ]
+
+  const USER_MENU = [
+    { label: t('header.myProfile'), to: '/candidate/profile', icon: User },
+    { label: t('header.myApplications'), to: '/candidate/applications', icon: FileText },
+    { label: t('header.savedJobs'), to: '/candidate/saved-jobs', icon: Bookmark },
+    { label: t('header.results'), to: '/candidate/results', icon: Clapperboard },
+    { label: t('header.settings'), to: '/candidate/settings', icon: Settings },
+  ]
 
   const { data: notifData, refetch } = useQuery({
     queryKey: ['notifications'],
@@ -163,6 +191,24 @@ export default function CandidateHeader() {
     }
   }
 
+  const removeNotif = async (id: string) => {
+    try {
+      await notificationService.remove(id)
+      refetch()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const clearAllNotifs = async () => {
+    try {
+      await notificationService.clearAll()
+      refetch()
+    } catch {
+      /* ignore */
+    }
+  }
+
   const openNotif = (n: NotificationItem) => {
     if (!n.isRead) {
       notificationService
@@ -171,7 +217,7 @@ export default function CandidateHeader() {
         .catch(() => {})
     }
     setOpen(null)
-    navigate(n.link || '/candidate/notifications')
+    navigate(resolveNotifLink(n.link) || '/candidate/notifications')
   }
 
   const toggle = (d: Drop) => (e: React.MouseEvent) => {
@@ -242,7 +288,7 @@ export default function CandidateHeader() {
           <Search className="h-4 w-4 text-ink-400" />
           <input
             className="w-full bg-transparent outline-none placeholder:text-ink-400"
-            placeholder="Tìm việc làm, kỹ năng..."
+            placeholder={t('jobs.searchPlaceholder')}
             onFocus={() => navigate('/jobs')}
           />
           <kbd className="hidden rounded border border-ink-200 bg-white px-1.5 text-[10px] font-semibold text-ink-400 lg:inline">
@@ -256,7 +302,7 @@ export default function CandidateHeader() {
           <button
             type="button"
             onClick={() => navigate('/candidate/saved-jobs')}
-            aria-label="Việc đã lưu"
+            aria-label={t('header.savedJobs')}
             className="relative hidden h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 sm:grid"
           >
             <Bookmark className="h-5 w-5" />
@@ -269,18 +315,40 @@ export default function CandidateHeader() {
               className="flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
             >
               <Globe className="h-[18px] w-[18px]" />
-              VI <ChevronDown className="h-3.5 w-3.5" />
+              {langMap[i18n.language] || 'VI'} <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {open === 'lang' && (
               <div
                 className="absolute right-0 mt-2 w-40 rounded-xl border border-ink-200 bg-white p-1 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <button className="flex w-full items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700">
-                  Tiếng Việt <Check className="h-4 w-4" />
+                <button
+                  onClick={() => {
+                    i18n.changeLanguage('vi')
+                    setOpen(null)
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'vi' || !i18n.language
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
+                >
+                  {t('header.vietnamese')}
+                  {i18n.language === 'vi' || !i18n.language ? <Check className="h-4 w-4" /> : null}
                 </button>
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-ink-600 hover:bg-ink-100">
-                  English
+                <button
+                  onClick={() => {
+                    i18n.changeLanguage('en')
+                    setOpen(null)
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'en'
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
+                >
+                  {t('header.english')}
+                  {i18n.language === 'en' ? <Check className="h-4 w-4" /> : null}
                 </button>
               </div>
             )}
@@ -289,7 +357,7 @@ export default function CandidateHeader() {
           {/* Theme */}
           <button
             onClick={toggleTheme}
-            aria-label="Đổi giao diện sáng/tối"
+            aria-label={t('header.changeTheme')}
             className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
           >
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -300,7 +368,7 @@ export default function CandidateHeader() {
             <div className="relative">
               <button
                 onClick={toggle('notif')}
-                aria-label="Thông báo"
+                aria-label={t('header.notifications')}
                 className="relative grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
               >
                 <Bell className="h-5 w-5" />
@@ -316,29 +384,46 @@ export default function CandidateHeader() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-                    <span className="font-display text-sm font-bold text-ink-900">Thông báo</span>
-                    {unread > 0 && (
-                      <button
-                        onClick={markAllRead}
-                        className="text-xs font-medium text-brand-600 hover:underline"
-                      >
-                        Đánh dấu đã đọc
-                      </button>
-                    )}
+                    <span className="font-display text-sm font-bold text-ink-900">
+                      {t('header.notifications')}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {unread > 0 && (
+                        <button
+                          onClick={markAllRead}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          {t('header.markAllRead')}
+                        </button>
+                      )}
+                      {notifs.length > 0 && (
+                        <button
+                          onClick={clearAllNotifs}
+                          className="text-xs font-medium text-red-500 hover:underline"
+                        >
+                          {t('header.deleteAll')}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="max-h-80 divide-y divide-ink-100 overflow-y-auto">
                     {notifs.length === 0 ? (
                       <div className="px-4 py-8 text-center text-sm text-ink-400">
-                        Chưa có thông báo nào.
+                        {t('header.noNotifications')}
                       </div>
                     ) : (
                       notifs.slice(0, 6).map((n) => {
                         const { Icon, cls } = notifStyle(n.type)
                         return (
-                          <button
+                          <div
                             key={n.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => openNotif(n)}
-                            className={`flex w-full gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') openNotif(n)
+                            }}
+                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
                               !n.isRead ? 'bg-brand-50/40' : ''
                             }`}
                           >
@@ -357,7 +442,19 @@ export default function CandidateHeader() {
                             {!n.isRead && (
                               <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
                             )}
-                          </button>
+                            <button
+                              type="button"
+                              aria-label={t('header.deleteNotification')}
+                              title={t('header.deleteNotification')}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeNotif(n.id)
+                              }}
+                              className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 focus:opacity-100 group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         )
                       })
                     )}
@@ -366,7 +463,7 @@ export default function CandidateHeader() {
                     to="/candidate/notifications"
                     className="block rounded-b-2xl border-t border-ink-100 px-4 py-3 text-center text-sm font-medium text-brand-600 hover:bg-ink-50"
                   >
-                    Xem tất cả thông báo
+                    {t('header.viewAll')}
                   </Link>
                 </div>
               )}
@@ -397,7 +494,7 @@ export default function CandidateHeader() {
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-ink-900">
-                          {user.name || 'Ứng viên'}
+                          {user.name || t('header.candidate')}
                         </div>
                         <div className="truncate text-xs text-ink-400">{user.email}</div>
                       </div>
@@ -421,7 +518,7 @@ export default function CandidateHeader() {
                         onClick={handleLogout}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                       >
-                        <LogOut className="h-4 w-4" /> Đăng xuất
+                        <LogOut className="h-4 w-4" /> {t('header.logout')}
                       </button>
                     </div>
                   </div>
@@ -433,13 +530,13 @@ export default function CandidateHeader() {
                   to="/auth/candidate-login"
                   className="px-4 py-2 text-sm font-medium text-ink-600 hover:text-ink-900"
                 >
-                  Đăng nhập
+                  {t('header.login')}
                 </Link>
                 <Link
                   to="/auth/candidate-register"
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
                 >
-                  Đăng ký
+                  {t('header.register')}
                 </Link>
               </div>
             )}
@@ -454,7 +551,7 @@ export default function CandidateHeader() {
             <Search className="h-4 w-4 text-ink-400" />
             <input
               className="w-full bg-transparent outline-none placeholder:text-ink-400"
-              placeholder="Tìm việc làm, kỹ năng..."
+              placeholder={t('jobs.searchPlaceholder')}
               onFocus={() => navigate('/jobs')}
             />
           </div>
@@ -478,7 +575,7 @@ export default function CandidateHeader() {
             to="/candidate/saved-jobs"
             className="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100"
           >
-            Việc đã lưu
+            {t('header.savedJobs')}
           </Link>
         </div>
       )}

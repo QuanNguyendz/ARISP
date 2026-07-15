@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -314,6 +315,13 @@ namespace ARISP.API.Controllers
                 return query.Select(j => j.Id);
             }, ct)).Count;
 
+            // Sắp xếp theo "độ phù hợp CV": cần danh tính ứng viên đang đăng nhập. Không có kỹ năng
+            // (khách vãng lai / staff / hồ sơ trống) → rơi về "mới nhất". Chấm điểm + phân trang ở
+            // bộ nhớ (tập tin active của 1 doanh nghiệp là nhỏ) để tránh sort collection ở SQL.
+            var useRelevance = string.Equals(sortBy, "relevance", StringComparison.OrdinalIgnoreCase);
+            var candidateSkillsLower = useRelevance ? await GetCurrentCandidateSkillsLowerAsync(ct) : new List<string>();
+            if (useRelevance && candidateSkillsLower.Count == 0) useRelevance = false;
+
             // 2. Lấy dữ liệu phân trang và sắp xếp
             var items = await _unitOfWork.Repository<JobPosting>().QueryAsync(q =>
             {
@@ -386,6 +394,12 @@ namespace ARISP.API.Controllers
                     }
                 }
 
+                // Độ phù hợp CV: không sort/phân trang ở SQL — chấm điểm & phân trang ở bộ nhớ bên dưới.
+                if (useRelevance)
+                {
+                    return query.Select(j => JobPostingListItemResponse.FromEntity(j));
+                }
+
                 // Sắp xếp
                 if (string.Equals(sortBy, "salary_desc", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(sortBy, "salary", StringComparison.OrdinalIgnoreCase))
@@ -413,7 +427,49 @@ namespace ARISP.API.Controllers
                 return query.Select(j => JobPostingListItemResponse.FromEntity(j));
             }, ct);
 
+            // Độ phù hợp CV: xếp theo số kỹ năng trùng giảm dần → tin mới nhất, rồi phân trang ở bộ nhớ.
+            if (useRelevance)
+            {
+                var skillSet = new HashSet<string>(candidateSkillsLower);
+                items = items
+                    .OrderByDescending(j => j.Skills.Count(s => skillSet.Contains(s.ToLowerInvariant())))
+                    .ThenByDescending(j => j.PublishedAt ?? j.CreatedAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+            }
+
             return Ok(new { items, totalCount });
+        }
+
+        /// <summary>
+        /// Kỹ năng (lowercase, distinct) của ứng viên đang đăng nhập, lấy từ hồ sơ
+        /// (<c>CandidateAccount.SkillsJson</c>). Rỗng nếu không phải ứng viên / chưa đăng nhập /
+        /// hồ sơ chưa có kỹ năng — dùng cho sắp xếp "độ phù hợp CV" ở <see cref="GetJobs"/>.
+        /// </summary>
+        private async Task<List<string>> GetCurrentCandidateSkillsLowerAsync(CancellationToken ct)
+        {
+            var sub = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(sub) || !Guid.TryParse(sub, out var candidateId))
+                return new List<string>();
+
+            var acc = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateId, ct);
+            if (acc == null || string.IsNullOrWhiteSpace(acc.SkillsJson))
+                return new List<string>();
+
+            try
+            {
+                var skills = JsonSerializer.Deserialize<List<string>>(acc.SkillsJson) ?? new List<string>();
+                return skills
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Distinct()
+                    .ToList();
+            }
+            catch
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>

@@ -16,6 +16,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  CalendarClock,
 } from 'lucide-react'
 import { ErrorAlert } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
@@ -36,6 +37,7 @@ import {
   timeAgo,
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
+import { resolveAssetUrl } from '@/config/constants'
 
 export default function RecruiterCandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -297,7 +299,7 @@ export default function RecruiterCandidateDetailPage() {
               {app.cvFileUrl && (
                 <button
                   type="button"
-                  onClick={() => openDocument(app.cvFileUrl!, `${app.candidateName || 'Ứng viên'} - CV`)}
+                  onClick={() => openDocument(resolveAssetUrl(app.cvFileUrl), `${app.candidateName || 'Ứng viên'} - CV`)}
                   className="flex w-full items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/5"
                 >
                   <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Xem CV{' '}
@@ -318,8 +320,13 @@ export default function RecruiterCandidateDetailPage() {
               </button>
               <button
                 onClick={genCode}
-                disabled={coding}
-                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50"
+                disabled={coding || !app.hasScheduledInterview}
+                title={
+                  app.hasScheduledInterview
+                    ? undefined
+                    : 'Ứng viên chưa đặt lịch phỏng vấn thật. Chỉ cấp mã sau khi ứng viên đã đặt lịch buổi phỏng vấn thật của vòng.'
+                }
+                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {coding ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -328,6 +335,11 @@ export default function RecruiterCandidateDetailPage() {
                 )}{' '}
                 Cấp Interview Code
               </button>
+              {!app.hasScheduledInterview && (
+                <p className="-mt-1 flex items-center gap-1.5 text-xs text-ink-400">
+                  <CalendarClock className="h-3.5 w-3.5" /> Chờ ứng viên đặt lịch phỏng vấn thật mới cấp được mã.
+                </p>
+              )}
 
               {code && (
                 <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-3">

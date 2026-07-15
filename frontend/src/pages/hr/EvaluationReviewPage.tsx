@@ -19,7 +19,8 @@ import {
 import { evaluationService } from '@/services/evaluation/evaluationService'
 import type { EvaluationReport } from '@/types/evaluation'
 import { EvaluationListSkeleton } from './_skeletons'
-import { useQuery } from '@tanstack/react-query'
+import { Pagination } from '@components/shared'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
 function formatVerdictLabel(verdict?: string) {
   if (verdict === 'pass') return 'Pass'
@@ -70,14 +71,24 @@ export default function EvaluationReviewPage() {
   const [overrideReason, setOverrideReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
-  const { data: evaluationsResponse, isLoading: loading, error, refetch } = useQuery({
-    queryKey: ['evaluations', 1, 10], // Assuming page 1, pageSize 10 for now
-    queryFn: () => evaluationService.getEvaluations({ page: 1, pageSize: 10 }),
+  const PAGE_SIZE = 10
+  const {
+    data: evaluationsResponse,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['evaluations', page, PAGE_SIZE],
+    queryFn: () => evaluationService.getEvaluations({ page, pageSize: PAGE_SIZE }),
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
 
   const evaluations = evaluationsResponse?.items || []
+  const totalPages = Math.max(1, evaluationsResponse?.totalPages ?? 1)
+  const totalCount = evaluationsResponse?.total ?? evaluations.length
   const displayError = error ? 'Không thể tải danh sách đánh giá từ máy chủ.' : null
 
   async function handleOpenDetail(evaluationId: string) {
@@ -268,6 +279,16 @@ export default function EvaluationReviewPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {!loading && !displayError && evaluations.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={totalCount}
+            label="đánh giá"
+            onPageChange={setPage}
+          />
         )}
       </main>
     )

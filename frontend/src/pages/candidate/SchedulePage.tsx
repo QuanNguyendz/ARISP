@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   CalendarCheck,
   Clock,
@@ -33,6 +34,7 @@ function timeLabel(s: AvailabilitySlot): string {
 }
 
 export default function CandidateSchedulePage() {
+  const { t } = useTranslation('candidate')
   const { applicationId } = useParams<{ applicationId: string }>()
   const [params] = useSearchParams()
   const token = params.get('token') || undefined
@@ -43,14 +45,19 @@ export default function CandidateSchedulePage() {
   const [done, setDone] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const { data: slots = [], isLoading: loading, error, refetch } = useQuery({
+  const {
+    data: slots = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['open-slots', applicationId, round, token],
     queryFn: () => scheduleService.getOpenSlots(applicationId!, round, token),
     enabled: !!applicationId,
     retry: false,
   })
 
-  const displayError = errorMsg || (error ? errMsg(error, 'Không tải được khung giờ. Liên kết có thể đã hết hạn.') : '')
+  const displayError = errorMsg || (error ? errMsg(error, t('schedule.loadError')) : '')
 
   const grouped = useMemo(() => {
     const map = new Map<string, AvailabilitySlot[]>()
@@ -70,8 +77,7 @@ export default function CandidateSchedulePage() {
       await scheduleService.book(applicationId, { slotId: selected, round, token })
       setDone(true)
     } catch (e) {
-      setErrorMsg(errMsg(e, 'Không thể đặt lịch. Vui lòng thử lại.'))
-      // tải lại để cập nhật slot đã đầy
+      setErrorMsg(errMsg(e, t('schedule.failed')))
       void refetch()
     } finally {
       setBooking(false)
@@ -86,31 +92,26 @@ export default function CandidateSchedulePage() {
             <CalendarCheck className="h-6 w-6" />
           </span>
           <div>
-            <h1 className="text-xl font-bold text-ink-900">Chọn lịch phỏng vấn</h1>
-            <p className="text-sm text-ink-500">
-              Vòng {round} · chọn một khung giờ phù hợp với bạn
-            </p>
+            <h1 className="text-xl font-bold text-ink-900">{t('schedule.title')}</h1>
+            <p className="text-sm text-ink-500">{t('schedule.subtitle', { round })}</p>
           </div>
         </div>
 
         {done ? (
           <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
             <CheckCircle2 className="mx-auto mb-4 h-14 w-14 text-emerald-500" />
-            <h2 className="text-lg font-semibold text-ink-900">Đã đặt lịch thành công!</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">
-              Hẹn gặp bạn tại buổi phỏng vấn. Buổi phỏng vấn thật diễn ra tại văn phòng — bạn sẽ
-              nhập mã phỏng vấn (Interview Code) do nhân sự cấp tại chỗ. Trước ngày hẹn, bạn có thể
-              luyện tập với chế độ <b>phỏng vấn thử</b> trong cổng ứng viên.
-            </p>
+            <h2 className="text-lg font-semibold text-ink-900">{t('schedule.success')}</h2>
+            <p
+              className="mx-auto mt-2 max-w-md text-sm text-ink-600"
+              dangerouslySetInnerHTML={{ __html: t('schedule.successHint') }}
+            />
             <a
               href="/candidate/applications"
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
             >
-              <Play className="h-4 w-4" /> Vào cổng ứng viên để phỏng vấn thử
+              <Play className="h-4 w-4" /> {t('schedule.goToPractice')}
             </a>
-            <p className="mt-2 text-xs text-ink-400">
-              (Đăng nhập bằng tài khoản ứng viên của bạn nếu được yêu cầu)
-            </p>
+            <p className="mt-2 text-xs text-ink-400">{t('schedule.loginHint')}</p>
           </div>
         ) : (
           <>
@@ -127,10 +128,7 @@ export default function CandidateSchedulePage() {
             ) : slots.length === 0 ? (
               <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
                 <CalendarX className="mx-auto mb-3 h-12 w-12 text-ink-300" />
-                <p className="text-sm text-ink-600">
-                  Hiện chưa có khung giờ trống cho vòng này. Vui lòng quay lại sau hoặc liên hệ nhân
-                  sự.
-                </p>
+                <p className="text-sm text-ink-600">{t('schedule.noSlotsHint')}</p>
               </div>
             ) : (
               <div className="space-y-5">
@@ -172,7 +170,7 @@ export default function CandidateSchedulePage() {
                   ) : (
                     <CalendarCheck className="h-4 w-4" />
                   )}
-                  Xác nhận đặt lịch
+                  {t('schedule.confirm')}
                 </button>
               </div>
             )}
