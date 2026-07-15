@@ -1,0 +1,108 @@
+{
+  "common": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "minLength": "Minimum {{min}} characters",
+    "maxLength": "Maximum {{max}} characters",
+    "passwordTooWeak": "Password is too weak",
+    "passwordMismatch": "Passwords do not match",
+    "invalidPhone": "Invalid phone number",
+    "invalidUrl": "Invalid URL",
+    "fileTooLarge": "File too large (maximum {{size}})",
+    "invalidFileType": "Invalid file type (only {{types}} accepted)"
+  },
+  "auth": {
+    "invalidCredentials": "Invalid email or password",
+    "emailAlreadyExists": "Email already in use",
+    "weakPassword": "Password is too weak, please use at least 8 characters",
+    "accountNotFound": "Account not found",
+    "accountLocked": "Account is locked",
+    "oauthFailed": "Sign in with Google failed",
+    "sessionExpired": "Session expired, please sign in again",
+    "emailNotVerified": "Email not verified",
+    "accountPending": "Account pending approval",
+    "domainNotAllowed": "Email does not belong to allowed domain",
+    "emailRequired": "Email is required",
+    "passwordRequired": "Password is required",
+    "fullNameRequired": "Full name is required",
+    "termsRequired": "You must agree to the terms"
+  },
+  "job": {
+    "titleRequired": "Job title is required",
+    "descriptionRequired": "Job description is required",
+    "departmentRequired": "Department is required",
+    "categoryRequired": "Category is required",
+    "levelRequired": "Level is required",
+    "workModeRequired": "Work mode is required",
+    "vacanciesRequired": "Vacancies must be greater than 0",
+    "invalidJdFile": "Invalid JD file (only PDF, DOCX accepted)",
+    "jdAnalysisFailed": "JD analysis failed, please enter manually",
+    "jobNotFound": "Job posting not found",
+    "jobClosed": "Job posting is closed",
+    "jobExpired": "Job posting has expired",
+    "duplicateApplication": "You have already applied for this position",
+    "cvRequired": "Please upload your CV"
+  },
+  "application": {
+    "notFound": "Application not found",
+    "alreadyApplied": "You have already applied for this position",
+    "cvUploadFailed": "CV upload failed",
+    "cvInvalidType": "CV must be PDF or DOCX file",
+    "cvTooLarge": "CV too large (maximum 10MB)"
+  },
+  "interview": {
+    "codeNotFound": "Interview code not found",
+    "codeExpired": "Interview code has expired",
+    "codeUsed": "Interview code already used",
+    "sessionNotFound": "Interview session not found",
+    "sessionEnded": "Interview session has ended",
+    "deviceNotReady": "Device not ready",
+    "connectionFailed": "Connection failed"
+  },
+  "schedule": {
+    "slotNotAvailable": "This time slot is full",
+    "slotConflict": "You already have an interview scheduled at this time",
+    "pastDate": "Cannot schedule in the past",
+    "invalidCapacity": "Capacity must be greater than 0"
+  },
+  "evaluation": {
+    "notFound": "Evaluation not found",
+    "overrideReasonRequired": "Please provide a reason for changing the result",
+    "overrideTooShort": "Reason must be at least 10 characters"
+  },
+  "hr": {
+    "rejectionReasonRequired": "Please provide a rejection reason",
+    "rejectionReasonTooShort": "Reason must be at least 10 characters",
+    "cannotRejectApproved": "Cannot reject an approved posting",
+    "cannotUnpublishPublished": "Cannot unpublish a posted job"
+  },
+  "recruiter": {
+    "jobNotOwned": "You do not have permission to edit this job",
+    "cannotSubmitUnowned": "You can only submit jobs you created",
+    "roundConfigRequired": "Interview round configuration is required"
+  },
+  "candidate": {
+    "profileNotFound": "Profile not found",
+    "cvNotFound": "No CV in profile yet",
+    "phoneRequired": "Phone number is required",
+    "phoneInvalid": "Invalid phone number",
+    "locationRequired": "Desired work location is required"
+  },
+  "admin": {
+    "userNotFound": "User not found",
+    "cannotLockSelf": "You cannot lock your own account",
+    "cannotDeleteSelf": "You cannot delete your own account",
+    "emailDomainRequired": "Please enter email domain",
+    "invalidEmailDomain": "Invalid email domain"
+  },
+  "server": {
+    "internal": "Server error, please try again later",
+    "timeout": "Request timed out, please try again",
+    "network": "Network error, please check your connection",
+    "unauthorized": "You do not have permission to perform this action",
+    "forbidden": "Access denied",
+    "notFound": "Resource not found",
+    "badRequest": "Invalid request",
+    "conflict": "Data conflict"
+  }
+}

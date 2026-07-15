@@ -24,6 +24,9 @@ _Chưa có task nào đang thực hiện._
 - [ ] Áp design system + logo ARISP vào `frontend` thật (token màu brand/ai/ink, font Plus Jakarta Sans/Inter).
 - [ ] Dark/light theme toggle toàn FE (lưu localStorage / `preferred_theme`), no-flash init.
 - [ ] **i18n UI candidate VI/EN** (react-i18next) — [ADR-033]; cột `candidate_accounts.preferred_locale`.
+  - [x] 2026-07-03 **Cập nhật Candidate pages sử dụng i18n** — Translate ProfilePage, ApplicationsPage, SchedulePage, FeedbackPage, SettingsPage, SavedJobsPage sử dụng react-i18next với candidate.json (vi/en).
+  - [x] 2026-07-13 **Cập nhật FindJobPage và ApplicationsPage i18n** — Hoàn thiện i18n cho FindJobPage (sort options, salary labels, deadline, posted date) và ApplicationsPage (FILTERS, scheduleInfo, roundTypeLabel, CV tooltips, error messages). Thêm keys mới vào landing.json và candidate.json.
+  - [x] 2026-07-13 **Cập nhật JobDetailPage i18n** — Hoàn thiện i18n cho trang chi tiết việc làm (header, tags, CV-JD match section, company info). Thêm keys mới vào landing.json (jobDetail section).
 - [ ] **Saved Jobs (bookmark)** — [ADR-034]; bảng `saved_jobs`, API lưu/bỏ lưu + trang "Việc đã lưu".
 - [x] 2026-06-18 **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
 - [ ] Header candidate: tìm kiếm toàn cục (⌘K), menu người dùng, notification center (đọc/đánh dấu đã đọc), badge số liệu.

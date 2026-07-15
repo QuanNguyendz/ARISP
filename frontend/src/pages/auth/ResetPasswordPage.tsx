@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import {
   Lock,
@@ -27,18 +28,6 @@ function scorePassword(pw: string): number {
   if (pw.split('').some((c) => SPECIAL_CHARS.includes(c))) score++
   return score
 }
-
-function validatePassword(pw: string): string {
-  if (pw.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự.'
-  if (!/[A-Z]/.test(pw)) return 'Mật khẩu phải chứa ít nhất một chữ hoa.'
-  if (!/[0-9]/.test(pw)) return 'Mật khẩu phải chứa ít nhất một chữ số.'
-  if (!pw.split('').some((c) => SPECIAL_CHARS.includes(c)))
-    return 'Mật khẩu phải chứa ít nhất một ký tự đặc biệt trong !@#$%^&*.'
-  return ''
-}
-
-const STRENGTH_LABELS = ['Yếu', 'Trung bình', 'Khá', 'Mạnh']
-const STRENGTH_COLORS = ['bg-red-500', 'bg-amber-500', 'bg-amber-500', 'bg-emerald-500']
 
 function Logo() {
   return (
@@ -81,6 +70,7 @@ function Logo() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation('auth')
   const [searchParams] = useSearchParams()
 
   // Token, email & audience được đính kèm trong liên kết email do backend gửi
@@ -104,35 +94,51 @@ export default function ResetPasswordPage() {
   const strength = useMemo(() => scorePassword(password), [password])
   const matches = confirmPassword.length > 0 && password === confirmPassword
 
+  const strengthLabels = [
+    t('resetPassword.strengthWeak'),
+    t('resetPassword.strengthMedium'),
+    t('resetPassword.strengthGood'),
+    t('resetPassword.strengthStrong'),
+  ]
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
     if (invalidLink) {
-      setError('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.')
+      setError(t('resetPassword.invalidLink'))
       return
     }
 
-    const pwError = validatePassword(password)
-    if (pwError) {
-      setError(pwError)
+    if (password.length < 8) {
+      setError(t('resetPassword.passwordMinLength'))
+      return
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError(t('resetPassword.passwordRequireUppercase'))
+      return
+    }
+    if (!/[0-9]/.test(password)) {
+      setError(t('resetPassword.passwordRequireNumber'))
+      return
+    }
+    if (!password.split('').some((c) => SPECIAL_CHARS.includes(c))) {
+      setError(t('resetPassword.passwordRequireSpecial'))
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không trùng khớp.')
+      setError(t('resetPassword.passwordMismatch'))
       return
     }
 
     setLoading(true)
     try {
       const payload = { email, token, newPassword: password }
-      await (isStaff
-        ? authService.staffResetPassword(payload)
-        : authService.resetPassword(payload))
+      await (isStaff ? authService.staffResetPassword(payload) : authService.resetPassword(payload))
       setDone(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra, vui lòng thử lại sau.')
+      setError(err instanceof Error ? err.message : t('resetPassword.serverError'))
     } finally {
       setLoading(false)
     }
@@ -160,18 +166,16 @@ export default function ResetPasswordPage() {
               <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                 <LockKeyhole className="w-6 h-6" />
               </span>
-              <h1 className="font-display text-xl font-extrabold">Đặt lại mật khẩu</h1>
+              <h1 className="font-display text-xl font-extrabold">{t('resetPassword.title')}</h1>
               <p className="mt-1.5 text-sm text-ink-500">
-                Tạo mật khẩu mới cho <b className="text-ink-700">{email || 'tài khoản của bạn'}</b>
+                {t('resetPassword.subtitle', { email: email || t('resetPassword.yourAccount') })}
               </p>
             </div>
 
             {invalidLink && (
               <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                <p className="text-sm text-red-600">
-                  Liên kết không hợp lệ hoặc thiếu thông tin. Vui lòng yêu cầu liên kết mới.
-                </p>
+                <p className="text-sm text-red-600">{t('resetPassword.invalidLinkInfo')}</p>
               </div>
             )}
 
@@ -179,7 +183,7 @@ export default function ResetPasswordPage() {
               {/* Mật khẩu mới */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-600">
-                  Mật khẩu mới
+                  {t('resetPassword.newPasswordLabel')}
                 </label>
                 <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                   <Lock className="w-4 h-4 text-ink-400" />
@@ -187,7 +191,7 @@ export default function ResetPasswordPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder={t('resetPassword.passwordPlaceholder')}
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                     required
                   />
@@ -207,7 +211,7 @@ export default function ResetPasswordPage() {
                       <span
                         key={i}
                         className={`h-1.5 flex-1 rounded-full ${
-                          i < strength ? STRENGTH_COLORS[Math.min(strength - 1, 3)] : 'bg-ink-200'
+                          i < strength ? 'bg-emerald-500' : 'bg-ink-200'
                         }`}
                       />
                     ))}
@@ -223,7 +227,7 @@ export default function ResetPasswordPage() {
                             : 'text-red-600'
                     }`}
                   >
-                    {strength === 0 ? '—' : STRENGTH_LABELS[Math.min(strength - 1, 3)]}
+                    {strength === 0 ? '—' : strengthLabels[Math.min(strength - 1, 3)]}
                   </span>
                 </div>
               </div>
@@ -231,7 +235,7 @@ export default function ResetPasswordPage() {
               {/* Xác nhận mật khẩu */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-600">
-                  Xác nhận mật khẩu
+                  {t('resetPassword.confirmPasswordLabel')}
                 </label>
                 <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                   <Lock className="w-4 h-4 text-ink-400" />
@@ -239,7 +243,7 @@ export default function ResetPasswordPage() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại mật khẩu mới"
+                    placeholder={t('resetPassword.confirmPasswordPlaceholder')}
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                     required
                   />
@@ -263,11 +267,11 @@ export default function ResetPasswordPage() {
                   >
                     {matches ? (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Mật khẩu khớp
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {t('resetPassword.passwordMatch')}
                       </>
                     ) : (
                       <>
-                        <XCircle className="w-3.5 h-3.5" /> Mật khẩu chưa khớp
+                        <XCircle className="w-3.5 h-3.5" /> {t('resetPassword.passwordNotMatch')}
                       </>
                     )}
                   </p>
@@ -276,11 +280,12 @@ export default function ResetPasswordPage() {
 
               <ul className="space-y-1 text-xs text-ink-500">
                 <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Ít nhất 8 ký tự
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />{' '}
+                  {t('resetPassword.requirement1')}
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Có chữ hoa, chữ số &amp; ký tự
-                  đặc biệt (!@#$%^&amp;*)
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />{' '}
+                  {t('resetPassword.requirement2')}
                 </li>
               </ul>
 
@@ -296,7 +301,7 @@ export default function ResetPasswordPage() {
                 disabled={loading || invalidLink}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Đặt lại mật khẩu'}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : t('resetPassword.submit')}
               </button>
             </form>
           </div>
@@ -306,15 +311,13 @@ export default function ResetPasswordPage() {
             <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
               <ShieldCheck className="w-7 h-7" />
             </span>
-            <h1 className="font-display text-xl font-extrabold">Đổi mật khẩu thành công</h1>
-            <p className="mt-2 text-sm text-ink-500">
-              Mật khẩu của bạn đã được cập nhật. Bạn có thể đăng nhập bằng mật khẩu mới.
-            </p>
+            <h1 className="font-display text-xl font-extrabold">{t('resetPassword.success')}</h1>
+            <p className="mt-2 text-sm text-ink-500">{t('resetPassword.successMessage')}</p>
             <Link
               to={loginPath}
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700"
             >
-              <LogIn className="w-4 h-4" /> Đến trang đăng nhập
+              <LogIn className="w-4 h-4" /> {t('resetPassword.goToLogin')}
             </Link>
           </div>
         )}
@@ -322,12 +325,12 @@ export default function ResetPasswordPage() {
         {/* Expired note */}
         {!done && (
           <p className="mt-6 text-center text-xs text-ink-400">
-            Liên kết hết hạn?{' '}
+            {t('resetPassword.linkExpired')}
             <Link
               to={isStaff ? '/auth/forgot-password?audience=staff' : '/auth/forgot-password'}
               className="font-semibold text-brand-600 hover:underline"
             >
-              Yêu cầu liên kết mới
+              {t('resetPassword.requestNewLink')}
             </Link>
           </p>
         )}

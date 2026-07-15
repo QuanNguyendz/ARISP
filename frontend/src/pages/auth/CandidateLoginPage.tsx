@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Mail,
   Lock,
@@ -58,6 +59,9 @@ function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
 }
 
 export default function CandidateLoginPage() {
+  const { t } = useTranslation('auth')
+  const { t: tCommon } = useTranslation('common')
+  const { t: tErrors } = useTranslation('errors')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const verificationSent =
@@ -85,9 +89,7 @@ export default function CandidateLoginPage() {
       const user = setAuthFromResponse(response)
 
       if (user.role !== 'Candidate') {
-        setError(
-          'Tài khoản này không phải ứng viên. Vui lòng đăng nhập ở màn dành cho nhà tuyển dụng.'
-        )
+        setError(t('candidateLogin.notCandidate'))
         return
       }
 
@@ -96,7 +98,7 @@ export default function CandidateLoginPage() {
       if (err.code === 'email_not_verified') {
         setNeedsVerification(true)
       }
-      setError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.')
+      setError(err.message || tErrors('server.internal'))
     } finally {
       setIsLoading(false)
     }
@@ -110,7 +112,7 @@ export default function CandidateLoginPage() {
       const res = await authService.resendVerification(email)
       setResendMessage(res.message)
     } catch (err: any) {
-      setResendMessage(err.message || 'Không thể gửi lại email. Vui lòng thử lại.')
+      setResendMessage(err.message || t('candidateLogin.resendFailed'))
     } finally {
       setResending(false)
     }
@@ -150,17 +152,15 @@ export default function CandidateLoginPage() {
 
         <div className="relative">
           <h2 className="font-display text-4xl font-extrabold leading-[1.25]">
-            Sự nghiệp IT của bạn,
+            {t('candidateLogin.heroTitle1')}
             <br />
-            bắt đầu từ đây.
+            {t('candidateLogin.heroTitle2')}
           </h2>
-          <p className="mt-4 max-w-md text-white/80">
-            Ứng tuyển trực tiếp, được AI phỏng vấn và đánh giá khách quan qua nhiều vòng.
-          </p>
+          <p className="mt-4 max-w-md text-white/80">{t('candidateLogin.heroSubtitle')}</p>
           <ul className="mt-8 space-y-3 text-white/90">
             <li className="flex items-center gap-3">
               <Sparkles className="w-5 h-5" />
-              Phân tích độ phù hợp CV–JD tức thì
+              {t('candidateLogin.feature1')}
             </li>
             <li className="flex items-center gap-3">
               <svg
@@ -176,7 +176,7 @@ export default function CandidateLoginPage() {
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                 />
               </svg>
-              Đánh giá minh bạch, không thiên vị
+              {t('candidateLogin.feature2')}
             </li>
             <li className="flex items-center gap-3">
               <svg
@@ -192,12 +192,14 @@ export default function CandidateLoginPage() {
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              Phỏng vấn linh hoạt, có bản luyện tập
+              {t('candidateLogin.feature3')}
             </li>
           </ul>
         </div>
 
-        <div className="relative text-sm text-white/60">© 2026 ARISP</div>
+        <div className="relative text-sm text-white/60">
+          {tCommon('footer.copyright', { year: new Date().getFullYear() })}
+        </div>
       </div>
 
       {/* Right form */}
@@ -210,30 +212,29 @@ export default function CandidateLoginPage() {
           </Link>
 
           <h1 className="font-display text-2xl font-extrabold leading-snug">
-            Chào mừng trở lại 👋
+            {t('candidateLogin.title')}
           </h1>
-          <p className="mt-1 text-ink-500">Đăng nhập để tiếp tục ứng tuyển.</p>
+          <p className="mt-1 text-ink-500">{t('candidateLogin.subtitle')}</p>
 
           {verificationSent && (
             <div className="mt-6 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-              <p className="text-sm text-emerald-700">
-                Đăng ký thành công! Chúng tôi đã gửi email xác minh — vui lòng kiểm tra hộp thư và
-                bấm vào liên kết để kích hoạt tài khoản trước khi đăng nhập.
-              </p>
+              <p className="text-sm text-emerald-700">{t('candidateLogin.registrationSuccess')}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                {t('candidateLogin.emailLabel')}
+              </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <Mail className="w-4 h-4 text-ink-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ban@email.com"
+                  placeholder={t('candidateLogin.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                   required
                 />
@@ -242,13 +243,15 @@ export default function CandidateLoginPage() {
 
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-sm font-medium text-ink-600">Mật khẩu</label>
+                <label className="block text-sm font-medium text-ink-600">
+                  {t('candidateLogin.passwordLabel')}
+                </label>
                 <button
                   type="button"
                   onClick={() => navigate('/auth/forgot-password')}
                   className="text-sm font-medium text-brand-600 hover:underline"
                 >
-                  Quên mật khẩu?
+                  {t('candidateLogin.forgotPassword')}
                 </button>
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
@@ -257,7 +260,7 @@ export default function CandidateLoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('candidateLogin.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
                   required
                 />
@@ -289,7 +292,7 @@ export default function CandidateLoginPage() {
                         ) : (
                           <Mail className="h-4 w-4" />
                         )}
-                        Gửi lại email xác minh
+                        {t('candidateLogin.resendVerification')}
                       </button>
                       {resendMessage && (
                         <p className="mt-1 text-sm text-emerald-600">{resendMessage}</p>
@@ -307,7 +310,7 @@ export default function CandidateLoginPage() {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="rounded border-ink-300 text-brand-600"
               />
-              Ghi nhớ đăng nhập
+              {t('candidateLogin.rememberMe')}
             </label>
 
             <button
@@ -319,7 +322,7 @@ export default function CandidateLoginPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Đăng nhập
+                  {t('candidateLogin.submit')}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -328,7 +331,7 @@ export default function CandidateLoginPage() {
 
           <div className="my-6 flex items-center gap-3 text-xs text-ink-400">
             <span className="h-px flex-1 bg-ink-200"></span>
-            HOẶC
+            {t('candidateLogin.or')}
             <span className="h-px flex-1 bg-ink-200"></span>
           </div>
 
@@ -355,28 +358,26 @@ export default function CandidateLoginPage() {
                 d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
               />
             </svg>
-            Đăng nhập với Google
+            {t('candidateLogin.signInWithGoogle')}
           </button>
 
           <p className="mt-8 text-center text-sm text-ink-500">
-            Chưa có tài khoản?
+            {t('candidateLogin.noAccount')}
             <Link
               to="/auth/candidate-register"
               className="font-semibold text-brand-600 hover:underline"
             >
-              {' '}
-              Đăng ký ngay
+              {t('candidateLogin.signUp')}
             </Link>
           </p>
 
           <p className="mt-3 text-center text-xs text-ink-400">
-            Bạn là HR / Recruiter?
+            {t('candidateLogin.isRecruiter')}
             <Link
               to="/auth/login"
               className="font-medium text-ink-600 hover:text-brand-600 hover:underline"
             >
-              {' '}
-              Đăng nhập nội bộ
+              {t('candidateLogin.staffLoginLink')}
             </Link>
           </p>
         </div>

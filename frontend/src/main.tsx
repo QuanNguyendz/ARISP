@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 
+// i18n configuration
+import './i18n'
+
 // Self-hosted fonts (bao gồm subset vietnamese) — đảm bảo render nhất quán trên mọi OS
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'

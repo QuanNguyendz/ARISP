@@ -1,27 +1,38 @@
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
-  CheckCircle, Clock, BarChart3, MessageSquare, Video, Download,
-  Home, TrendingUp, TrendingDown, Minus, ArrowRight, Brain
-} from 'lucide-react';
-import CandidateLayout from '@components/layout/CandidateLayout';
+  CheckCircle,
+  Clock,
+  BarChart3,
+  MessageSquare,
+  Video,
+  Download,
+  Home,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ArrowRight,
+  Brain,
+} from 'lucide-react'
+import CandidateLayout from '@components/layout/CandidateLayout'
 
 interface InterviewResult {
-  id: string;
-  jobTitle: string;
-  company: string;
-  interviewDate: string;
-  overallScore: number;
-  status: 'passed' | 'pending' | 'failed';
+  id: string
+  jobTitle: string
+  company: string
+  interviewDate: string
+  overallScore: number
+  status: 'passed' | 'pending' | 'failed'
   metrics: Array<{
-    label: string;
-    score: number;
-    trend: 'up' | 'stable' | 'down';
-    description: string;
-  }>;
-  strengths: string[];
-  improvements: string[];
-  aiFeedback: string;
+    label: string
+    score: number
+    trend: 'up' | 'stable' | 'down'
+    description: string
+  }>
+  strengths: string[]
+  improvements: string[]
+  aiFeedback: string
 }
 
 const interviewResults: InterviewResult[] = [
@@ -33,9 +44,19 @@ const interviewResults: InterviewResult[] = [
     overallScore: 87,
     status: 'passed',
     metrics: [
-      { label: 'Kỹ thuật', score: 92, trend: 'up', description: 'Kiến thức React, TypeScript vững chắc' },
+      {
+        label: 'Kỹ thuật',
+        score: 92,
+        trend: 'up',
+        description: 'Kiến thức React, TypeScript vững chắc',
+      },
       { label: 'Giao tiếp', score: 85, trend: 'up', description: 'Trình bày rõ ràng, mạch lạc' },
-      { label: 'Giải quyết vấn đề', score: 84, trend: 'stable', description: 'Phân tích bài toán tốt' },
+      {
+        label: 'Giải quyết vấn đề',
+        score: 84,
+        trend: 'stable',
+        description: 'Phân tích bài toán tốt',
+      },
     ],
     strengths: [
       'Nắm vững các thư viện React hiện đại',
@@ -46,7 +67,8 @@ const interviewResults: InterviewResult[] = [
       'Cần cải thiện kỹ năng trình bày ý tưởng trước đám đông',
       'Một số câu hỏi về system design còn chưa sâu',
     ],
-    aiFeedback: 'Ứng viên thể hiện tốt kiến thức chuyên môn và phong thái chuyên nghiệp. Đề xuất tiếp tục vòng tiếp theo.',
+    aiFeedback:
+      'Ứng viên thể hiện tốt kiến thức chuyên môn và phong thái chuyên nghiệp. Đề xuất tiếp tục vòng tiếp theo.',
   },
   {
     id: '2',
@@ -60,17 +82,24 @@ const interviewResults: InterviewResult[] = [
     improvements: [],
     aiFeedback: 'Kết quả đang được xử lý. Vui lòng chờ trong 24-48 giờ.',
   },
-];
+]
 
 function ScoreRing({ score }: { score: number }) {
-  const circumference = 2 * Math.PI * 45;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
+  const circumference = 2 * Math.PI * 45
+  const strokeDashoffset = circumference - (score / 100) * circumference
+  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444'
 
   return (
     <div className="relative w-32 h-32 flex-shrink-0">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+        <circle
+          cx="50"
+          cy="50"
+          r="45"
+          fill="none"
+          stroke="rgba(255,255,255,0.05)"
+          strokeWidth="6"
+        />
         <circle
           cx="50"
           cy="50"
@@ -88,17 +117,17 @@ function ScoreRing({ score }: { score: number }) {
         <span className="text-3xl font-bold text-white">{score}</span>
       </div>
     </div>
-  );
+  )
 }
 
 function TrendIcon({ trend }: { trend: 'up' | 'stable' | 'down' }) {
-  if (trend === 'up') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
-  if (trend === 'down') return <TrendingDown className="w-4 h-4 text-red-400" />;
-  return <Minus className="w-4 h-4 text-white/40" />;
+  if (trend === 'up') return <TrendingUp className="w-4 h-4 text-emerald-400" />
+  if (trend === 'down') return <TrendingDown className="w-4 h-4 text-red-400" />
+  return <Minus className="w-4 h-4 text-white/40" />
 }
 
-function ResultCard({ result }: { result: InterviewResult }) {
-  const navigate = useNavigate();
+function ResultCard({ result, t }: { result: InterviewResult; t: (key: string) => string }) {
+  const navigate = useNavigate()
 
   if (result.status === 'pending') {
     return (
@@ -114,18 +143,20 @@ function ResultCard({ result }: { result: InterviewResult }) {
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-white">{result.jobTitle}</h3>
-            <p className="text-sm text-white/50">{result.company} • {result.interviewDate}</p>
+            <p className="text-sm text-white/50">
+              {result.company} • {result.interviewDate}
+            </p>
           </div>
           <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
-            Đang chờ
+            {t('feedback.pending')}
           </span>
         </div>
-        <p className="text-sm text-white/50">Kết quả đang được xử lý bởi hệ thống AI. Thông báo sẽ được gửi qua email.</p>
+        <p className="text-sm text-white/50">{t('feedback.resultProcessing')}</p>
       </motion.div>
-    );
+    )
   }
 
-  const isPassed = result.status === 'passed';
+  const isPassed = result.status === 'passed'
 
   return (
     <motion.div
@@ -141,10 +172,12 @@ function ResultCard({ result }: { result: InterviewResult }) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-lg font-semibold text-white">{result.jobTitle}</h3>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                isPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                {isPassed ? 'Đạt' : 'Chưa đạt'}
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  isPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {isPassed ? t('feedback.pass') : t('feedback.notPass')}
               </span>
             </div>
             <p className="text-sm text-white/50">{result.company}</p>
@@ -165,8 +198,11 @@ function ResultCard({ result }: { result: InterviewResult }) {
                 <div className="h-1.5 bg-white/10 rounded-full mt-2 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
-                      metric.score >= 80 ? 'bg-emerald-500' :
-                      metric.score >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                      metric.score >= 80
+                        ? 'bg-emerald-500'
+                        : metric.score >= 60
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
                     }`}
                     style={{ width: `${metric.score}%` }}
                   />
@@ -182,7 +218,9 @@ function ResultCard({ result }: { result: InterviewResult }) {
         <div className="p-4 rounded-xl bg-accent-primary/10 border border-accent-primary/20">
           <div className="flex items-center gap-2 mb-2">
             <Brain className="w-4 h-4 text-accent-primary" />
-            <span className="text-sm font-medium text-accent-primary">Phản hồi từ AI</span>
+            <span className="text-sm font-medium text-accent-primary">
+              {t('feedback.aiFeedback')}
+            </span>
           </div>
           <p className="text-sm text-white/70">{result.aiFeedback}</p>
         </div>
@@ -195,7 +233,9 @@ function ResultCard({ result }: { result: InterviewResult }) {
             <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-400">Điểm mạnh</span>
+                <span className="text-sm font-medium text-emerald-400">
+                  {t('feedback.strengths')}
+                </span>
               </div>
               <ul className="space-y-1">
                 {result.strengths.map((s, i) => (
@@ -209,7 +249,9 @@ function ResultCard({ result }: { result: InterviewResult }) {
             <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingDown className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-medium text-amber-400">Cần cải thiện</span>
+                <span className="text-sm font-medium text-amber-400">
+                  {t('feedback.suggestions')}
+                </span>
               </div>
               <ul className="space-y-1">
                 {result.improvements.map((s, i) => (
@@ -231,24 +273,27 @@ function ResultCard({ result }: { result: InterviewResult }) {
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors text-sm"
         >
           <Home className="w-4 h-4" />
-          Về trang chủ
+          {t('feedback.goHome')}
         </button>
         <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-medium hover:opacity-90 transition-opacity text-sm">
           <Download className="w-4 h-4" />
-          Tải báo cáo
+          {t('feedback.downloadReport')}
         </button>
       </div>
     </motion.div>
-  );
+  )
 }
 
 export default function FeedbackPage() {
-  const navigate = useNavigate();
-  const passedCount = interviewResults.filter(r => r.status === 'passed').length;
+  const { t } = useTranslation('candidate')
+  const navigate = useNavigate()
+  const passedCount = interviewResults.filter((r) => r.status === 'passed').length
   const avgScore = Math.round(
-    interviewResults.filter(r => r.status !== 'pending').reduce((sum, r) => sum + r.overallScore, 0) /
-    interviewResults.filter(r => r.status !== 'pending').length
-  );
+    interviewResults
+      .filter((r) => r.status !== 'pending')
+      .reduce((sum, r) => sum + r.overallScore, 0) /
+      interviewResults.filter((r) => r.status !== 'pending').length
+  )
 
   return (
     <CandidateLayout>
@@ -260,16 +305,34 @@ export default function FeedbackPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <h1 className="text-3xl font-bold text-white mb-2">Kết quả phỏng vấn</h1>
-            <p className="text-text-secondary">Xem kết quả và phản hồi từ các buổi phỏng vấn AI</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{t('feedback.title')}</h1>
+            <p className="text-text-secondary">{t('feedback.subtitle')}</p>
           </motion.div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
-              { label: 'Phỏng vấn', value: interviewResults.length.toString(), icon: Video, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-              { label: 'Đạt', value: passedCount.toString(), icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-              { label: 'Điểm TB', value: avgScore.toString(), icon: BarChart3, color: 'text-violet-400', bg: 'bg-violet-500/20' },
+              {
+                label: 'feedback.interviews',
+                value: interviewResults.length.toString(),
+                icon: Video,
+                color: 'text-blue-400',
+                bg: 'bg-blue-500/20',
+              },
+              {
+                label: 'feedback.pass',
+                value: passedCount.toString(),
+                icon: CheckCircle,
+                color: 'text-emerald-400',
+                bg: 'bg-emerald-500/20',
+              },
+              {
+                label: 'feedback.averageScore',
+                value: avgScore.toString(),
+                icon: BarChart3,
+                color: 'text-violet-400',
+                bg: 'bg-violet-500/20',
+              },
             ].map((stat, index) => (
               <motion.div
                 key={stat.label}
@@ -280,7 +343,7 @@ export default function FeedbackPage() {
               >
                 <stat.icon className={`w-5 h-5 ${stat.color} mb-2`} />
                 <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                <p className="text-sm text-white/50">{stat.label}</p>
+                <p className="text-sm text-white/50">{t(stat.label)}</p>
               </motion.div>
             ))}
           </div>
@@ -288,7 +351,7 @@ export default function FeedbackPage() {
           {/* Results */}
           <div className="space-y-4">
             {interviewResults.map((result) => (
-              <ResultCard key={result.id} result={result} />
+              <ResultCard key={result.id} result={result} t={t} />
             ))}
           </div>
 
@@ -304,14 +367,14 @@ export default function FeedbackPage() {
                 <MessageSquare className="w-6 h-6 text-accent-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-white mb-1">Bạn muốn luyện tập thêm?</h3>
-                <p className="text-sm text-white/50">Trải nghiệm phỏng vấn thử với AI để cải thiện kỹ năng</p>
+                <h3 className="font-semibold text-white mb-1">{t('feedback.practiceMore')}</h3>
+                <p className="text-sm text-white/50">{t('feedback.practiceMoreHint')}</p>
               </div>
               <button
                 onClick={() => navigate('/interview/room/practice')}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white text-sm font-medium hover:opacity-90 transition-opacity flex items-center gap-2 whitespace-nowrap"
               >
-                Luyện tập ngay
+                {t('feedback.practiceNow')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -319,5 +382,5 @@ export default function FeedbackPage() {
         </div>
       </div>
     </CandidateLayout>
-  );
+  )
 }

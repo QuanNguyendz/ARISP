@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { authService } from '@services/auth/authService'
 import { useAuthStore } from '@store/auth/authStore'
-
-const pendingMessages: Record<string, string> = {
-  pending_approval: 'Tài khoản của bạn đang chờ được phê duyệt.',
-  created_pending: 'Tài khoản của bạn đã được ghi nhận và đang chờ quản trị viên phê duyệt.',
-}
 
 type CallbackState =
   | { kind: 'loading'; message: string }
@@ -32,11 +28,12 @@ function getRoleDashboard(role: string): string {
 }
 
 export default function OAuthCallbackPage() {
+  const { t } = useTranslation('auth')
   const navigate = useNavigate()
   const setAuthFromResponse = useAuthStore((state) => state.setAuthFromResponse)
   const [callbackState, setCallbackState] = useState<CallbackState>({
     kind: 'loading',
-    message: 'Đang xác thực đăng nhập với Google...',
+    message: t('oauthCallback.loading'),
   })
 
   const parsedCallback = useMemo(() => authService.parseOAuthCallback(window.location.href), [])
@@ -63,7 +60,10 @@ export default function OAuthCallbackPage() {
     if (status === 'pending') {
       setCallbackState({
         kind: 'pending',
-        message: pendingMessages[message ?? ''] ?? 'Tài khoản của bạn đang chờ được duyệt.',
+        message:
+          message === 'pending_approval'
+            ? t('oauthCallback.pendingApproval')
+            : t('oauthCallback.createdPending'),
       })
       return
     }
@@ -71,16 +71,16 @@ export default function OAuthCallbackPage() {
     if (status === 'error') {
       setCallbackState({
         kind: 'error',
-        message: message || 'Đăng nhập OAuth thất bại. Vui lòng thử lại.',
+        message: message || t('oauthCallback.errorDefault'),
       })
       return
     }
 
     setCallbackState({
       kind: 'error',
-      message: 'Không tìm thấy thông tin đăng nhập hợp lệ từ OAuth callback.',
+      message: t('oauthCallback.noValidInfo'),
     })
-  }, [navigate, parsedCallback, setAuthFromResponse])
+  }, [navigate, parsedCallback, setAuthFromResponse, t])
 
   const isPending = callbackState.kind === 'pending'
   const isError = callbackState.kind === 'error'
@@ -109,10 +109,10 @@ export default function OAuthCallbackPage() {
 
           <h1 className="mb-3 text-2xl font-semibold text-white">
             {callbackState.kind === 'loading'
-              ? 'Đang xử lý đăng nhập'
+              ? t('oauthCallback.processing')
               : isPending
-                ? 'Tài khoản chờ duyệt'
-                : 'Không thể đăng nhập'}
+                ? t('oauthCallback.accountPending')
+                : t('oauthCallback.cannotLogin')}
           </h1>
 
           <p className="mb-8 text-sm leading-6 text-text-secondary">{callbackState.message}</p>
@@ -123,7 +123,7 @@ export default function OAuthCallbackPage() {
               onClick={() => navigate('/auth/login', { replace: true })}
               className="w-full rounded-xl bg-gradient-to-r from-accent-primary to-violet px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
-              Quay lại trang đăng nhập
+              {t('oauthCallback.backToLogin')}
             </button>
           )}
         </div>

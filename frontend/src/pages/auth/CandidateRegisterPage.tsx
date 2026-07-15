@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Mail,
   Lock,
@@ -59,6 +60,8 @@ function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
 }
 
 export default function CandidateRegisterPage() {
+  const { t } = useTranslation('auth')
+  const { t: tCommon } = useTranslation('common')
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -71,10 +74,10 @@ export default function CandidateRegisterPage() {
   const [error, setError] = useState('')
 
   const passwordRequirements = [
-    { label: 'Tối thiểu 8 ký tự', met: password.length >= 8 },
-    { label: 'Có chữ hoa', met: /[A-Z]/.test(password) },
-    { label: 'Có số', met: /[0-9]/.test(password) },
-    { label: 'Có ký tự đặc biệt (!@#$%^&*)', met: /[!@#$%^&*]/.test(password) },
+    { label: t('candidateRegister.passwordReqMin'), met: password.length >= 8 },
+    { label: t('candidateRegister.passwordReqUppercase'), met: /[A-Z]/.test(password) },
+    { label: t('candidateRegister.passwordReqNumber'), met: /[0-9]/.test(password) },
+    { label: t('candidateRegister.passwordReqSpecial'), met: /[!@#$%^&*]/.test(password) },
   ]
 
   const metCount = passwordRequirements.filter((r) => r.met).length
@@ -86,15 +89,15 @@ export default function CandidateRegisterPage() {
     setError('')
 
     if (!allRequirementsMet) {
-      setError('Mật khẩu chưa đủ mạnh.')
+      setError(t('candidateRegister.passwordTooWeak'))
       return
     }
     if (!passwordsMatch) {
-      setError('Mật khẩu xác nhận không khớp.')
+      setError(t('candidateRegister.passwordMismatch'))
       return
     }
     if (!agreeTerms) {
-      setError('Bạn cần đồng ý với điều khoản sử dụng.')
+      setError(t('candidateRegister.termsRequired'))
       return
     }
 
@@ -103,7 +106,7 @@ export default function CandidateRegisterPage() {
       await authService.candidateRegister({ email, password, fullName })
       navigate(`/auth/candidate-login?verify=sent&email=${encodeURIComponent(email)}`)
     } catch (err: any) {
-      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.')
+      setError(err.message || t('candidateRegister.registerFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -143,30 +146,30 @@ export default function CandidateRegisterPage() {
 
         <div className="relative">
           <h2 className="font-display text-4xl font-extrabold leading-[1.25]">
-            Tạo hồ sơ,
+            {t('candidateRegister.heroTitle1')}
             <br />
-            để AI tìm việc cho bạn.
+            {t('candidateRegister.heroTitle2')}
           </h2>
-          <p className="mt-4 max-w-md text-white/80">
-            Đăng ký miễn phí bằng email cá nhân và bắt đầu ứng tuyển ngay hôm nay.
-          </p>
+          <p className="mt-4 max-w-md text-white/80">{t('candidateRegister.heroSubtitle')}</p>
           <ul className="mt-8 space-y-3 text-white/90">
             <li className="flex items-center gap-3">
               <UploadCloud className="w-5 h-5" />
-              Tải CV một lần, dùng cho mọi vị trí
+              {t('candidateRegister.feature1')}
             </li>
             <li className="flex items-center gap-3">
               <Target className="w-5 h-5" />
-              Xem điểm Match trước khi ứng tuyển
+              {t('candidateRegister.feature2')}
             </li>
             <li className="flex items-center gap-3">
               <MessageSquare className="w-5 h-5" />
-              Luyện phỏng vấn thử với AI
+              {t('candidateRegister.feature3')}
             </li>
           </ul>
         </div>
 
-        <div className="relative text-sm text-white/60">© 2026 ARISP</div>
+        <div className="relative text-sm text-white/60">
+          {tCommon('footer.copyright', { year: new Date().getFullYear() })}
+        </div>
       </div>
 
       {/* Right form */}
@@ -179,20 +182,22 @@ export default function CandidateRegisterPage() {
           </Link>
 
           <h1 className="font-display text-2xl font-extrabold leading-snug">
-            Tạo tài khoản ứng viên
+            {t('candidateRegister.title')}
           </h1>
-          <p className="mt-1 text-ink-500">Miễn phí — chỉ mất chưa đến 1 phút.</p>
+          <p className="mt-1 text-ink-500">{t('candidateRegister.subtitle')}</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600">Họ và tên</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                {t('candidateRegister.fullNameLabel')}
+              </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <User className="w-4 h-4 text-ink-400" />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
+                  placeholder={t('candidateRegister.fullNamePlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                   required
                 />
@@ -200,14 +205,16 @@ export default function CandidateRegisterPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                {t('candidateRegister.emailLabel')}
+              </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <Mail className="w-4 h-4 text-ink-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ban@email.com"
+                  placeholder={t('candidateRegister.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                   required
                 />
@@ -215,14 +222,16 @@ export default function CandidateRegisterPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600">Mật khẩu</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                {t('candidateRegister.passwordLabel')}
+              </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <Lock className="w-4 h-4 text-ink-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Tạo mật khẩu"
+                  placeholder={t('candidateRegister.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
                   required
                 />
@@ -250,14 +259,12 @@ export default function CandidateRegisterPage() {
                   className={`h-1 flex-1 rounded-full ${metCount >= 4 ? 'bg-emerald-500' : 'bg-ink-200'}`}
                 ></span>
               </div>
-              <p className="mt-1 text-xs text-ink-400">
-                Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt (!@#$%^&*).
-              </p>
+              <p className="mt-1 text-xs text-ink-400">{t('candidateRegister.passwordHint')}</p>
             </div>
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600">
-                Xác nhận mật khẩu
+                {t('candidateRegister.confirmPasswordLabel')}
               </label>
               <div className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
                 <Lock className="w-4 h-4 text-ink-400" />
@@ -265,7 +272,7 @@ export default function CandidateRegisterPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nhập lại mật khẩu"
+                  placeholder={t('candidateRegister.confirmPasswordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
                   required
                 />
@@ -282,7 +289,9 @@ export default function CandidateRegisterPage() {
                 </button>
               </div>
               {confirmPassword.length > 0 && !passwordsMatch && (
-                <p className="mt-1 text-xs text-red-500">Mật khẩu không khớp</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {t('candidateRegister.passwordMismatch')}
+                </p>
               )}
             </div>
 
@@ -294,27 +303,10 @@ export default function CandidateRegisterPage() {
                 className="mt-0.5 rounded border-ink-300 text-brand-600"
               />
               <span>
-                Tôi đồng ý với{' '}
-                <Link
-                  to="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-brand-600 hover:underline"
-                >
-                  Điều khoản
-                </Link>{' '}
-                và{' '}
-                <Link
-                  to="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-brand-600 hover:underline"
-                >
-                  Chính sách bảo mật
-                </Link>
-                .
+                {t('candidateRegister.agreeTerms', {
+                  terms: t('candidateRegister.terms'),
+                  privacy: t('candidateRegister.privacy'),
+                })}
               </span>
             </label>
 
@@ -334,7 +326,7 @@ export default function CandidateRegisterPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Tạo tài khoản
+                  {t('candidateRegister.submit')}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -342,24 +334,22 @@ export default function CandidateRegisterPage() {
           </form>
 
           <p className="mt-8 text-center text-sm text-ink-500">
-            Đã có tài khoản?
+            {t('candidateRegister.haveAccount')}
             <Link
               to="/auth/candidate-login"
               className="font-semibold text-brand-600 hover:underline"
             >
-              {' '}
-              Đăng nhập
+              {t('candidateRegister.signIn')}
             </Link>
           </p>
 
           <p className="mt-3 text-center text-xs text-ink-400">
-            Bạn là HR / Recruiter?
+            {t('candidateRegister.isRecruiter')}
             <Link
               to="/auth/login"
               className="font-medium text-ink-600 hover:text-brand-600 hover:underline"
             >
-              {' '}
-              Đăng nhập nội bộ
+              {t('candidateRegister.staffLoginLink')}
             </Link>
           </p>
         </div>

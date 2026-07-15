@@ -1,0 +1,244 @@
+{
+  "hero": {
+    "badge": "AI-Powered Internal Recruitment Platform",
+    "title": "Hire the right people, with AI by your side",
+    "subtitle": "ARISP automates your entire IT recruitment process — from job posting, CV screening, multi-round AI interviews to evaluation — so HR can focus on the final decision.",
+    "cta": {
+      "primary": "Post jobs for free",
+      "secondary": "See how it works"
+    },
+    "stats": {
+      "rounds": "AI Interview Rounds",
+      "time": "Average Response Time",
+      "languages": "Supported Languages",
+      "availability": "24/7 System Availability"
+    }
+  },
+  "features": {
+    "title": "Everything HR needs, in one platform",
+    "subtitle": "No more juggling dozens of tools — ARISP consolidates your entire recruitment workflow.",
+    "items": {
+      "jobBoard": {
+        "title": "Internal IT Job Board",
+        "desc": "Candidates search and apply directly on your platform — no third-party intermediaries."
+      },
+      "aiInterview": {
+        "title": "Multi-round AI Interviews",
+        "desc": "Screening, technical, case-based — AI handles every round with consistent evaluation quality."
+      },
+      "autoEvaluate": {
+        "title": "Automated Evaluation",
+        "desc": "Pass/Not Pass reports with detailed per-criteria analysis — HR just needs to confirm."
+      },
+      "playbook": {
+        "title": "Company Playbook",
+        "desc": "Integrate internal interview documents into RAG — questions always align with company standards."
+      },
+      "multiLang": {
+        "title": "Multi-language",
+        "desc": "Automatically detects language from JD — interview in Vietnamese, English, and more."
+      },
+      "codeOnsite": {
+        "title": "On-site Interview Codes",
+        "desc": "Candidates arrive on-site, enter a 6-character code to start — fast, secure, no installation."
+      }
+    }
+  },
+  "demo": {
+    "title": "Experience AI Interview in Minutes",
+    "subtitle": "See how AI interviews and evaluates candidates — no registration required.",
+    "cta": "Start now"
+  },
+  "cta": {
+    "title": "Ready to revolutionize your recruitment?",
+    "subtitle": "Explore ARISP and discover how AI helps your HR team focus on what matters most — people.",
+    "primary": "Schedule a demo",
+    "secondary": "Contact us"
+  },
+  "trust": {
+    "title": "Trusted by Modern HR Teams",
+    "subtitle": "5000+ candidates have been interviewed by ARISP"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — AI-Powered Recruitment & Interview Platform",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "contact": "Contact Us"
+  },
+  "jobs": {
+    "title": "Jobs",
+    "myApplications": "My Applications",
+    "searchPlaceholder": "Search jobs, skills...",
+    "locationPlaceholder": "Location",
+    "searchButton": "Search",
+    "suggestions": "Suggestions for you:",
+    "aiInterviewing": "Automated AI Interviewing · Objective Evaluation",
+    "findJobTitle": "Find the Best Fit IT Jobs for You",
+    "findJobSubtitle": "Apply directly, AI analyzes CV-JD match and interviews you across multiple rounds — transparent, unbiased.",
+    "jobCount": "{{count}} jobs found",
+    "loading": "Loading...",
+    "sortNewest": "Newest",
+    "sortSalaryHigh": "Salary: High to Low",
+    "sortSalaryLow": "Salary: Low to High",
+    "sortSalaryHighDisabled": "Salary: High to Low (Disabled)",
+    "sortSalaryLowDisabled": "Salary: Low to High (Disabled)",
+    "noJobs": "No job postings match your search filters.",
+    "clearFilters": "Clear filters",
+    "loadingJobs": "Loading latest job postings...",
+    "suggestedJobs": "Jobs for You",
+    "suggestedJobsSubtitle": "· personalized based on your CV",
+    "cvTip": {
+      "title": "Tip — Upload CV to See Match Score",
+      "authenticated": "Upload CV to your profile for AI to score CV-JD match and recommend the best jobs for you.",
+      "unauthenticated": "Log in and upload your CV for AI to score CV-JD match and recommend the best jobs for you.",
+      "uploadCv": "Upload CV",
+      "login": "Log in"
+    },
+    "apply": "Apply",
+    "saved": "Saved",
+    "unsave": "Unsave",
+    "applied": "Applied",
+    "skillMatch": "{{count}} skills matched",
+    "postedOn": "Posted {{date}}",
+    "deadline": "· Deadline: {{text}}",
+    "salaryNegotiable": "Negotiable",
+    "salaryFrom": "From {{value}}",
+    "salaryTo": "Up to {{value}}",
+    "salaryRange": "{{min}} - {{max}}",
+    "workModeFulltime": "Full-time",
+    "workModeParttime": "Part-time",
+    "workModeContract": "Contract",
+    "workModeInternship": "Internship",
+    "experienceJunior": "Junior",
+    "experienceMid": "Middle",
+    "experienceSenior": "Senior",
+    "experienceLead": "Lead",
+    "experienceManager": "Manager",
+    "recentlyPosted": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "nearby": "Recently",
+    "expired": "{{date}} (Expired)",
+    "expireToday": "{{date}} (Expires today)",
+    "expireSoon": "{{date}} ({{days}} days left)",
+    "filters": {
+      "title": "Filters",
+      "clearAll": "Clear all",
+      "noData": "No filter data available.",
+      "salaryNegotiable": "Negotiable salary",
+      "salaryRange": "Salary Range",
+      "salaryFrom": "From",
+      "salaryTo": "To",
+      "salaryMin": "Minimum",
+      "salaryMax": "Maximum",
+      "salaryPlus": "220+ million",
+      "salaryMillion": "million",
+      "category": "Category",
+      "employmentType": "Employment Type",
+      "experienceLevel": "Experience Level",
+      "workLocation": "Work Location",
+      "location": "Location",
+      "skills": "Skills / Technologies",
+      "interviewLanguage": "Interview Language",
+      "interviewLanguageHint": "AI interviews in the language from JD",
+      "viewMore": "Show {{count}} more",
+      "collapse": "Collapse"
+    },
+    "noLocation": "Remote",
+    "noDepartment": "Engineering",
+    "sortBy": "Sort by",
+    "sortRelevance": "Relevance (by CV)",
+    "error": "An error occurred",
+    "locationNotFound": "No provinces/cities found",
+    "salaryNegotiableShort": "Negotiable",
+    "salaryFromShort": "From",
+    "salaryToShort": "To",
+    "salaryMillionShort": "million"
+  },
+  "header": {
+    "savedJobs": "Saved Jobs",
+    "menu": "Menu",
+    "login": "Log in",
+    "register": "Sign up",
+    "logout": "Log out",
+    "myProfile": "My Profile",
+    "myApplications": "My Applications",
+    "results": "Results & Interview Schedule",
+    "settings": "Settings",
+    "markAllRead": "Mark all as read",
+    "deleteAll": "Delete all",
+    "noNotifications": "No notifications yet.",
+    "viewAll": "View all notifications",
+    "changeTheme": "Toggle light/dark theme",
+    "notifications": "Notifications",
+    "vietnamese": "Tiếng Việt",
+    "english": "English",
+    "candidate": "Candidate",
+    "deleteNotification": "Delete notification",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} minutes ago",
+    "hoursAgo": "{{count}} hours ago",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago"
+  },
+  "footer": {
+    "copyright": "© {{year}} ARISP — AI-Powered Recruitment & Interview Platform",
+    "transparentEvaluation": "Transparent Evaluation"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previous": "Previous page",
+    "next": "Next page"
+  },
+  "jobDetail": {
+    "breadcrumb": "Jobs",
+    "loading": "Loading...",
+    "error": {
+      "title": "An error occurred",
+      "message": "Job not found or no longer accepting applications.",
+      "noData": "No data found."
+    },
+    "browseOther": "Browse other jobs",
+    "header": {
+      "department": "Department",
+      "posted": "Posted {{date}}",
+      "deadline": "Deadline: {{text}}"
+    },
+    "tags": {
+      "experienceNotRequired": "No experience required",
+      "languageDefault": "Vietnamese"
+    },
+    "sections": {
+      "skills": "Skills",
+      "aboutDepartment": "About the Department"
+    },
+    "company": {
+      "teamSize": "{{count}} engineers · Hybrid"
+    },
+    "apply": {
+      "applyNow": "Apply now",
+      "applied": "Applied · View application",
+      "saveJob": "Save job",
+      "saved": "Saved"
+    },
+    "match": {
+      "title": "CV-JD Match Score",
+      "loginRequired": "Log in with your candidate account and upload a CV to your profile to see how well you match this job.",
+      "login": "Log in",
+      "analyzing": "Analyzing your CV... this may take ~20–30 seconds.",
+      "noCv": "Your profile doesn't have a CV yet. Upload one so AI can analyze how well you match this job.",
+      "uploadCv": "Upload CV",
+      "viewCv": "View",
+      "scoreLabel": "/ 100",
+      "aiAnalysis": "AI Analysis by {{name}}",
+      "skillsMatched": "Matched Skills",
+      "skillsMissing": "Missing Skills",
+      "strengths": "Strengths",
+      "considerations": "Considerations",
+      "geminiNote": "Analyzed by Gemini 2.5 Flash · for reference only",
+      "updateCv": "Update CV",
+      "cannotAnalyze": "Unable to analyze CV at this time. Please try again later.",
+      "loadError": "Unable to load CV analysis. Please try again later."
+    }
+  }
+}

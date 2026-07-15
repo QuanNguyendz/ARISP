@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight } from 'lucide-react'
 import { authService } from '@services/auth/authService'
 
@@ -9,6 +10,7 @@ type VerifyState =
   | { kind: 'error'; message: string }
 
 export default function VerifyEmailPage() {
+  const { t } = useTranslation('auth')
   const [searchParams] = useSearchParams()
   const email = searchParams.get('email') ?? ''
   const token = searchParams.get('token') ?? ''
@@ -24,7 +26,7 @@ export default function VerifyEmailPage() {
     hasRun.current = true
 
     if (!email || !token) {
-      setState({ kind: 'error', message: 'Liên kết xác minh không hợp lệ hoặc thiếu thông tin.' })
+      setState({ kind: 'error', message: t('verifyEmail.invalidLink') })
       return
     }
 
@@ -32,9 +34,9 @@ export default function VerifyEmailPage() {
       .verifyEmail(email, token)
       .then((res) => setState({ kind: 'success', message: res.message }))
       .catch((err: any) =>
-        setState({ kind: 'error', message: err.message || 'Xác minh thất bại. Vui lòng thử lại.' })
+        setState({ kind: 'error', message: err.message || t('verifyEmail.verifyFailed') })
       )
-  }, [email, token])
+  }, [email, token, t])
 
   const handleResend = async () => {
     if (!email) return
@@ -44,7 +46,7 @@ export default function VerifyEmailPage() {
       const res = await authService.resendVerification(email)
       setResendMessage(res.message)
     } catch (err: any) {
-      setResendMessage(err.message || 'Không thể gửi lại email. Vui lòng thử lại.')
+      setResendMessage(err.message || t('verifyEmail.resendFailed'))
     } finally {
       setResending(false)
     }
@@ -77,22 +79,20 @@ export default function VerifyEmailPage() {
 
           <h1 className="font-display text-2xl font-extrabold text-ink-900">
             {isLoading
-              ? 'Đang xác minh email...'
+              ? t('verifyEmail.loading')
               : isSuccess
-                ? 'Xác minh thành công'
-                : 'Không thể xác minh'}
+                ? t('verifyEmail.success')
+                : t('verifyEmail.error')}
           </h1>
 
-          {!isLoading && (
-            <p className="mt-2 text-sm leading-6 text-ink-500">{state.message}</p>
-          )}
+          {!isLoading && <p className="mt-2 text-sm leading-6 text-ink-500">{state.message}</p>}
 
           {isSuccess && (
             <Link
               to="/auth/candidate-login"
               className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-700"
             >
-              Đăng nhập ngay
+              {t('verifyEmail.loginNow')}
               <ArrowRight className="h-4 w-4" />
             </Link>
           )}
@@ -111,19 +111,17 @@ export default function VerifyEmailPage() {
                   ) : (
                     <>
                       <Mail className="h-4 w-4" />
-                      Gửi lại email xác minh
+                      {t('verifyEmail.resendVerification')}
                     </>
                   )}
                 </button>
               )}
-              {resendMessage && (
-                <p className="mt-3 text-sm text-emerald-600">{resendMessage}</p>
-              )}
+              {resendMessage && <p className="mt-3 text-sm text-emerald-600">{resendMessage}</p>}
               <Link
                 to="/auth/candidate-login"
                 className="mt-4 text-sm font-medium text-ink-500 hover:text-brand-600 hover:underline"
               >
-                Quay lại đăng nhập
+                {t('verifyEmail.backToLogin')}
               </Link>
             </>
           )}
