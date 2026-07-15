@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARISP.Application.Common;
 using ARISP.Application.DTOs;
 using ARISP.Application.Interfaces;
+using ARISP.Application.Options;
 using ARISP.Domain.Entities;
 using ARISP.Domain.Constants;
 
@@ -21,6 +22,7 @@ namespace ARISP.Application.Services
         private readonly IDeepgramTokenService _deepgramTokenService;
         private readonly IRagIngestionService _ragIngestion;
         private readonly ITTSService _ttsService;
+        private readonly InterviewOptions _interviewOptions;
 
         public InterviewService(
             IUnitOfWork unitOfWork,
@@ -30,7 +32,8 @@ namespace ARISP.Application.Services
             INotificationService notificationService,
             IDeepgramTokenService deepgramTokenService,
             IRagIngestionService ragIngestion,
-            ITTSService ttsService)
+            ITTSService ttsService,
+            InterviewOptions? interviewOptions = null)
         {
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
@@ -40,6 +43,7 @@ namespace ARISP.Application.Services
             _deepgramTokenService = deepgramTokenService;
             _ragIngestion = ragIngestion;
             _ttsService = ttsService;
+            _interviewOptions = interviewOptions ?? new InterviewOptions();
         }
 
         /// <summary>
@@ -220,15 +224,20 @@ namespace ARISP.Application.Services
             if (application == null)
                 return Result.Failure<StartSessionResponse>("Application not found.");
 
-            // Giới hạn phỏng vấn thử: 1 lượt / VÒNG (không phải 1 lượt / hồ sơ).
+            // Giới hạn phỏng vấn thử theo VÒNG (ADR-038, mặc định 1 lượt/vòng).
+            // Interview:PracticeAttemptsPerRound <= 0 = không giới hạn (chỉ dùng dev/test).
             if (request.SessionType == "practice")
             {
-                var existingPractice = await _unitOfWork.Repository<InterviewSession>().FindAsync(
-                    s => s.ApplicationId == application.Id
-                         && s.SessionType == "practice"
-                         && s.RoundNumber == request.RoundNumber, ct);
-                if (existingPractice.Any())
-                    return Result.Failure<StartSessionResponse>("Bạn đã dùng lượt phỏng vấn thử cho vòng này.");
+                var maxAttempts = _interviewOptions.PracticeAttemptsPerRound;
+                if (maxAttempts > 0)
+                {
+                    var existingPractice = await _unitOfWork.Repository<InterviewSession>().FindAsync(
+                        s => s.ApplicationId == application.Id
+                             && s.SessionType == "practice"
+                             && s.RoundNumber == request.RoundNumber, ct);
+                    if (existingPractice.Count() >= maxAttempts)
+                        return Result.Failure<StartSessionResponse>("Bạn đã dùng lượt phỏng vấn thử cho vòng này.");
+                }
 
                 // Giữ cờ tổng để tương thích ngược (không còn dùng làm điều kiện chặn).
                 application.PracticeSessionUsed = true;
@@ -333,12 +342,9 @@ namespace ARISP.Application.Services
             var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
             var sequenceNumber = questions.Count() + 1;
 
-            // Maximum question threshold check for safety
-            if (sequenceNumber > 12)
-            {
-                await EndSessionAsync(sessionId, "completed", ct);
-                return Result.Success("Interview completed.");
-            }
+            // Cap an toàn: quá số câu tối đa → KHÔNG cắt phụt; buộc AI sinh lời cảm ơn kết thúc
+            // (ForceClosing) rồi mới đóng phiên — ứng viên luôn nhận được lời chào tạm biệt.
+            var forceClosing = sequenceNumber > 12;
 
             // 1. Gather Weighted RAG Context.
             // CHỈ project ChunkText — KHÔNG load full entity (cột `embedding` kiểu pgvector không
@@ -399,7 +405,9 @@ namespace ARISP.Application.Services
                 CandidateCv = application.CvText ?? "",
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
-                PlaybookStyleGuides = ragContext.Where(r => r.StartsWith("[Org")).ToList()
+                PlaybookStyleGuides = ragContext.Where(r => r.StartsWith("[Org")).ToList(),
+                Language = session.InterviewLanguage,
+                ForceClosing = forceClosing
             };
 
             if (mustAskQuestionText != null)
@@ -412,6 +420,40 @@ namespace ARISP.Application.Services
             await foreach (var token in _aiProvider.StreamQuestionAsync(aiContext, ct))
             {
                 generatedQuestion += token;
+            }
+
+            // AI chủ động kết thúc (đủ độ bao phủ, marker [END_INTERVIEW]) hoặc bị buộc (cap câu hỏi):
+            // gửi lời cảm ơn (text + TTS) cho ứng viên TRƯỚC, rồi mới đóng phiên + sinh evaluation.
+            const string endMarker = "[END_INTERVIEW]";
+            if (forceClosing || generatedQuestion.Contains(endMarker, StringComparison.OrdinalIgnoreCase))
+            {
+                var farewell = generatedQuestion
+                    .Replace(endMarker, "", StringComparison.OrdinalIgnoreCase)
+                    .Trim();
+                if (string.IsNullOrWhiteSpace(farewell))
+                {
+                    farewell = (session.InterviewLanguage ?? "vi").StartsWith("vi", StringComparison.OrdinalIgnoreCase)
+                        ? "Cảm ơn bạn đã dành thời gian tham gia buổi phỏng vấn hôm nay. Kết quả sẽ được gửi tới bạn trong thời gian sớm nhất. Chúc bạn một ngày tốt lành!"
+                        : "Thank you for taking the time to join this interview. Your results will be shared with you soon. Have a great day!";
+                }
+
+                await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosing", new { text = farewell }, ct);
+
+                try
+                {
+                    var closingAudio = await _ttsService.TextToSpeechBase64PcmAsync(farewell, string.Empty, ct);
+                    if (!string.IsNullOrEmpty(closingAudio))
+                    {
+                        await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosingAudio", new { audio = closingAudio }, ct);
+                    }
+                }
+                catch
+                {
+                    // TTS best-effort — FE tự fallback browser TTS.
+                }
+
+                await EndSessionAsync(sessionId, "completed", ct);
+                return Result.Success(farewell);
             }
 
             // 4. Save generated question
@@ -589,7 +631,8 @@ namespace ARISP.Application.Services
                 CandidateCv = application.CvText ?? "",
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
-                ScoringRubric = jobPosting.ScoringRubric ?? "{}"
+                ScoringRubric = jobPosting.ScoringRubric ?? "{}",
+                Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage
             };
 
             // Call AI provider to generate Verdict, Score, Reasoning, etc.
@@ -621,8 +664,17 @@ namespace ARISP.Application.Services
                 QuestionAnalyses = evalReport.QuestionAnalysesJson,
                 CheatScore = cheatScore,
                 CheatSignals = "[]",
-                LanguageAssessment = langAssess != null 
-                    ? $"{{\"fluency\":{langAssess.Fluency},\"grammar\":{langAssess.Grammar},\"vocabulary\":{langAssess.Vocabulary},\"comprehension\":{langAssess.Comprehension},\"overall_score\":{langAssess.OverallScore}}}"
+                LanguageAssessment = langAssess != null
+                    ? System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        language = evalCtx.Language,
+                        fluency = langAssess.Fluency,
+                        grammar = langAssess.Grammar,
+                        vocabulary = langAssess.Vocabulary,
+                        comprehension = langAssess.Comprehension,
+                        overall_score = langAssess.OverallScore,
+                        language_adherence = langAssess.LanguageAdherence
+                    })
                     : null
             };
 

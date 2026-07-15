@@ -121,7 +121,11 @@ namespace ARISP.Infrastructure.AI
                 var sequenceIndex = (ctx.ChatHistory.Count) % mockQuestions.Length;
                 var baseQuestion = mockQuestions[sequenceIndex];
 
-                if (ctx.MustAskQuestions.Count > 0)
+                if (ctx.ForceClosing)
+                {
+                    baseQuestion = "[END_INTERVIEW] Cảm ơn bạn đã dành thời gian tham gia buổi phỏng vấn hôm nay. Kết quả sẽ được gửi tới bạn sớm. Chúc bạn một ngày tốt lành!";
+                }
+                else if (ctx.MustAskQuestions.Count > 0)
                 {
                     baseQuestion = $"[Must Ask] {ctx.MustAskQuestions[0]}";
                 }
@@ -140,7 +144,23 @@ namespace ARISP.Infrastructure.AI
             var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            var systemPrompt = "You are a professional HR and Technical AI Interviewer. Generate a suitable interview question based on the Job Description, Candidate CV, and current Chat History. Adjust difficulty adaptively. Be polite and concise.";
+            var interviewLang = string.IsNullOrEmpty(ctx.Language) ? "vi" : ctx.Language;
+            string systemPrompt;
+            if (ctx.ForceClosing)
+            {
+                // Buộc đóng phiên: chỉ sinh lời cảm ơn kèm marker để InterviewService nhận diện.
+                systemPrompt = "You are a professional AI Interviewer wrapping up an interview. The interview must END NOW. " +
+                    $"Output exactly the marker [END_INTERVIEW] followed by a short, warm farewell in language '{interviewLang}': " +
+                    "thank the candidate, mention results will be shared soon. 2-3 sentences. Do NOT ask any question.";
+            }
+            else
+            {
+                systemPrompt = "You are a professional HR and Technical AI Interviewer. Generate a suitable interview question based on the Job Description, Candidate CV, and current Chat History. Adjust difficulty adaptively. Be polite and concise." +
+                    $"\nLANGUAGE RULE: conduct the interview in language '{interviewLang}'. If the candidate's most recent answer is clearly in a different language, start with one short polite reminder (in '{interviewLang}') to answer in that language, then ask the next question." +
+                    (ctx.ChatHistory.Count >= 5 && ctx.MustAskQuestions.Count == 0
+                        ? $"\nENDING RULE: if the conversation already covers the key competencies of the JD or the candidate has clearly stopped engaging, output exactly [END_INTERVIEW] followed by a short farewell in '{interviewLang}' instead of another question."
+                        : "");
+            }
             if (ctx.PlaybookStyleGuides.Count > 0)
             {
                 systemPrompt += "\nAdhere to company interview playbook style:\n" + string.Join("\n", ctx.PlaybookStyleGuides);
@@ -269,8 +289,9 @@ namespace ARISP.Infrastructure.AI
                 };
             }
 
-            var prompt = $"Assess candidate language proficiency based on the conversation history:\n{JsonSerializer.Serialize(ctx.ChatHistory)}\n\n" +
-                         $"Return JSON format only: {{\"Fluency\": 8.0, \"Grammar\": 7.5, \"Vocabulary\": 8.0, \"Comprehension\": 8.5, \"OverallScore\": 8.0}}";
+            var requiredLang = string.IsNullOrEmpty(ctx.Language) ? "vi" : ctx.Language;
+            var prompt = $"Assess candidate proficiency in language '{requiredLang}' based on the conversation history:\n{JsonSerializer.Serialize(ctx.ChatHistory)}\n\n" +
+                         $"Return JSON format only: {{\"Fluency\": 8.0, \"Grammar\": 7.5, \"Vocabulary\": 8.0, \"Comprehension\": 8.5, \"OverallScore\": 8.0, \"LanguageAdherence\": \"one short sentence: did the candidate consistently answer in '{requiredLang}'?\"}}";
 
             var jsonResponse = await CallOpenAIChatAsync(prompt, ct, jsonMode: true);
             using var doc = JsonDocument.Parse(jsonResponse);
@@ -281,7 +302,8 @@ namespace ARISP.Infrastructure.AI
                 Grammar = doc.RootElement.GetProperty("Grammar").GetDecimal(),
                 Vocabulary = doc.RootElement.GetProperty("Vocabulary").GetDecimal(),
                 Comprehension = doc.RootElement.GetProperty("Comprehension").GetDecimal(),
-                OverallScore = doc.RootElement.GetProperty("OverallScore").GetDecimal()
+                OverallScore = doc.RootElement.GetProperty("OverallScore").GetDecimal(),
+                LanguageAdherence = doc.RootElement.TryGetProperty("LanguageAdherence", out var la) ? la.GetString() ?? "" : ""
             };
         }
 

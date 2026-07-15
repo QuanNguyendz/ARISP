@@ -119,7 +119,8 @@ const USER_MENU = [
   { label: 'Hồ sơ của tôi', to: '/candidate/profile', icon: User },
   { label: 'Đơn ứng tuyển', to: '/candidate/applications', icon: FileText },
   { label: 'Việc đã lưu', to: '/candidate/saved-jobs', icon: Bookmark },
-  { label: 'Kết quả & lịch phỏng vấn', to: '/candidate/results', icon: Clapperboard },
+  // Kết quả phỏng vấn nằm trong chi tiết từng hồ sơ ứng tuyển ("Đơn ứng tuyển" ở trên).
+  { label: 'Lịch phỏng vấn', to: '/candidate/interviews', icon: Clapperboard },
   { label: 'Cài đặt', to: '/candidate/settings', icon: Settings },
 ]
 
@@ -164,7 +165,10 @@ export default function CandidateHeader() {
 
   const openNotif = (n: NotificationItem) => {
     if (!n.isRead) {
-      notificationService.markRead(n.id).then(() => refetch()).catch(() => {})
+      notificationService
+        .markRead(n.id)
+        .then(() => refetch())
+        .catch(() => {})
     }
     setOpen(null)
     navigate(n.link || '/candidate/notifications')

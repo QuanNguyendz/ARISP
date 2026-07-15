@@ -77,6 +77,8 @@ class QuestionContext(CamelModel):
     must_ask_questions: list[str] = []
     playbook_style_guides: list[str] = []
     language: str | None = None
+    # Buộc kết thúc NGAY (cap số câu phía .NET): model chỉ sinh [END_INTERVIEW] + lời cảm ơn.
+    force_closing: bool = False
 
 
 class AnswerContext(CamelModel):
@@ -114,6 +116,8 @@ class LanguageAssessment(CamelModel):
     vocabulary: float = 0.0
     comprehension: float = 0.0
     overall_score: float = 0.0
+    # Nhận xét ngắn: ứng viên có trả lời đúng ngôn ngữ phỏng vấn yêu cầu không.
+    language_adherence: str = ""
 
 
 class DetectLanguageRequest(CamelModel):

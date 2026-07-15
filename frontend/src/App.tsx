@@ -75,7 +75,6 @@ const CandidateNotificationsPage = lazy(() => import('@pages/candidate/Notificat
 const CandidateSettingsPage = lazy(() => import('@pages/candidate/SettingsPage'))
 const InterviewSchedulePage = lazy(() => import('@pages/candidate/InterviewSchedulePage'))
 const CandidateSchedulePage = lazy(() => import('@pages/candidate/SchedulePage'))
-const FeedbackPage = lazy(() => import('@pages/candidate/FeedbackPage'))
 
 // Interview
 const InterviewRoomPage = lazy(() => import('@pages/interview/InterviewRoomPage'))
@@ -101,7 +100,7 @@ function RouteFallback() {
 function App() {
   const setAuth = useAuthStore((state) => state.setAuth)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  
+
   useAppNotifications()
 
   useEffect(() => {
@@ -222,7 +221,7 @@ function App() {
             element={<Navigate to="/candidate/applications" replace />}
           />
 
-          {/* ========== CANDIDATE ROUTES (Kết quả & Lịch phỏng vấn — chờ redesign) ========== */}
+          {/* ========== CANDIDATE ROUTES (Lịch phỏng vấn — chờ redesign) ========== */}
           <Route
             element={
               <ProtectedRoute allowedRoles={['Candidate']}>
@@ -231,9 +230,18 @@ function App() {
             }
           >
             <Route path="/candidate/interviews" element={<InterviewSchedulePage />} />
-            <Route path="/candidate/results" element={<FeedbackPage />} />
-            <Route path="/candidate/results/:id" element={<FeedbackPage />} />
           </Route>
+
+          {/* Màn "Kết quả" cũ (FeedbackPage, mock) đã xoá — kết quả phỏng vấn nằm trong
+              chi tiết hồ sơ ứng tuyển (/candidate/applications/:id). Redirect link cũ. */}
+          <Route
+            path="/candidate/results"
+            element={<Navigate to="/candidate/applications" replace />}
+          />
+          <Route
+            path="/candidate/results/:id"
+            element={<Navigate to="/candidate/applications" replace />}
+          />
 
           {/* ==================== SUPER ADMIN ROUTES ==================== */}
           <Route

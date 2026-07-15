@@ -19,16 +19,16 @@ export const routes = {
   reports: '/admin/reports',
   settings: '/admin/settings',
 
-  // Candidate
+  // Candidate — kết quả phỏng vấn nằm trong chi tiết hồ sơ ứng tuyển
   candidateApply: '/candidate/applications',
+  candidateApplicationDetail: (id: string) => `/candidate/applications/${id}`,
   candidateInterview: '/candidate/interviews',
   candidatePortal: '/candidate/portal',
-  candidateResult: (id: string) => `/candidate/results/${id}`,
 
   // Interview
   interviewRoom: '/interview/room/:sessionId',
   interviewKiosk: '/kiosk',
-} as const;
+} as const
 
 // Đổi tên type để không trùng với thư viện react-router-dom
-export type AppRoutesType = typeof routes;
+export type AppRoutesType = typeof routes

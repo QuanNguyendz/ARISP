@@ -30,7 +30,13 @@ function Logo() {
         </linearGradient>
       </defs>
       <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-prac)" />
-      <path d="M30 70 L48 26 L66 70" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M30 70 L48 26 L66 70"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
       <path
         d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
@@ -49,8 +55,15 @@ export default function PracticeSessionPage() {
   const [isMuted, setIsMuted] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
   const selfVideoRef = useRef<HTMLVideoElement>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
 
   const practice = usePracticeSession(applicationId ?? '', 1)
+
+  // Tin nhắn/diễn giải mới → tự cuộn transcript xuống cuối (chỉ cuộn panel, không cuộn page).
+  useEffect(() => {
+    const el = transcriptRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [practice.messages, practice.draft, practice.interim])
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -122,16 +135,20 @@ export default function PracticeSessionPage() {
             <h2 className="font-display text-xl font-bold text-white">Trước khi bắt đầu</h2>
             <ul className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <li className="flex items-start gap-2">
-                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> AI hỏi dựa trên JD của vị trí và CV của bạn.
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> AI hỏi dựa trên JD
+                của vị trí và CV của bạn.
               </li>
               <li className="flex items-start gap-2">
-                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Cùng dạng vòng &amp; ngôn ngữ với buổi thật sắp tới.
+                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Cùng dạng vòng
+                &amp; ngôn ngữ với buổi thật sắp tới.
               </li>
               <li className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> Không ghi hình — chỉ lưu transcript &amp; nhận xét tham khảo.
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> Không ghi hình
+                — chỉ lưu transcript &amp; nhận xét tham khảo.
               </li>
               <li className="flex items-start gap-2">
-                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Trả lời bằng giọng nói như phỏng vấn thật.
+                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Trả lời bằng giọng nói
+                như phỏng vấn thật.
               </li>
             </ul>
           </div>
@@ -163,11 +180,12 @@ export default function PracticeSessionPage() {
           </div>
           <h1 className="mb-3 font-display text-3xl font-bold text-white">Hoàn thành buổi thử!</h1>
           <p className="mb-8 text-slate-400">
-            Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Bản nhận xét tham khảo sẽ hiển thị trong mục Kết quả.
+            Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Bản nhận xét tham khảo sẽ
+            hiển thị trong mục Kết quả.
           </p>
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => navigate('/candidate/results')}
+              onClick={() => navigate(`/candidate/applications/${applicationId}`)}
               className="rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-3 font-semibold text-white hover:opacity-90"
             >
               Xem kết quả
@@ -187,7 +205,8 @@ export default function PracticeSessionPage() {
   // ===== LIVE ROOM =====
   const starting = practice.status === 'starting'
   return (
-    <div className="flex min-h-screen flex-col bg-ink-950 text-slate-100">
+    // h-screen + overflow-hidden: page KHÔNG giãn theo transcript — chỉ panel Transcript cuộn nội bộ.
+    <div className="flex h-screen flex-col overflow-hidden bg-ink-950 text-slate-100">
       {/* Top bar */}
       <header className="flex h-14 items-center justify-between border-b border-white/5 px-6">
         <div className="flex items-center gap-3">
@@ -202,10 +221,10 @@ export default function PracticeSessionPage() {
         </span>
       </header>
 
-      {/* Main */}
-      <main className="grid flex-1 lg:grid-cols-[1fr_380px]">
+      {/* Main — min-h-0 để grid con không đẩy chiều cao vượt viewport */}
+      <main className="grid min-h-0 flex-1 grid-rows-[minmax(45vh,1fr)_minmax(0,1fr)] lg:grid-cols-[1fr_380px] lg:grid-rows-none">
         {/* Avatar — video phủ kín toàn khung (object-cover), không còn ô nhỏ giữa màn */}
-        <section className="relative min-h-[60vh] overflow-hidden bg-black lg:min-h-0">
+        <section className="relative min-h-0 overflow-hidden bg-black">
           <video
             ref={practice.videoRef}
             autoPlay
@@ -270,7 +289,12 @@ export default function PracticeSessionPage() {
 
           {/* Self view */}
           <div className="absolute bottom-4 right-4 z-10 aspect-video w-40 overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-white/15 sm:w-52">
-            <video ref={selfVideoRef} muted playsInline className="h-full w-full -scale-x-100 object-cover" />
+            <video
+              ref={selfVideoRef}
+              muted
+              playsInline
+              className="h-full w-full -scale-x-100 object-cover"
+            />
             {isMuted && (
               <span className="absolute bottom-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-500/80">
                 <MicOff className="h-3.5 w-3.5 text-white" />
@@ -279,13 +303,13 @@ export default function PracticeSessionPage() {
           </div>
         </section>
 
-        {/* Transcript */}
-        <aside className="flex flex-col border-l border-white/5 bg-ink-900/60">
+        {/* Transcript — min-h-0 để vùng messages cuộn nội bộ thay vì giãn page */}
+        <aside className="flex min-h-0 flex-col border-l border-white/5 bg-ink-900/60">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
             <span className="font-display font-bold text-white">Transcript</span>
             <span className="text-xs text-slate-400">JD + CV</span>
           </div>
-          <div className="flex-1 space-y-3 overflow-y-auto p-5">
+          <div ref={transcriptRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
             {practice.messages.length === 0 && !practice.interim && (
               <p className="pt-6 text-center text-sm text-slate-500">
                 Cuộc trò chuyện sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.
@@ -306,9 +330,18 @@ export default function PracticeSessionPage() {
                 {m.text}
               </div>
             ))}
-            {practice.interim && (
-              <div className="ml-6 rounded-xl bg-white/5 px-3.5 py-2.5 text-sm italic text-slate-400">
-                {practice.interim}…
+            {(practice.draft || practice.interim) && (
+              <div className="ml-6 rounded-xl border border-dashed border-brand-400/40 bg-white/5 px-3.5 py-2.5 text-sm text-slate-300">
+                <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-brand-300">
+                  Bạn (đang trả lời — bấm “Gửi trả lời” khi xong)
+                </span>
+                {practice.draft}
+                {practice.interim && (
+                  <span className="italic text-slate-400">
+                    {practice.draft ? ' ' : ''}
+                    {practice.interim}…
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -323,12 +356,20 @@ export default function PracticeSessionPage() {
             className="grid h-12 w-12 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
             aria-label={isMuted ? 'Bật micro' : 'Tắt micro'}
           >
-            {isMuted ? <MicOff className="h-5 w-5 text-red-400" /> : <Mic className="h-5 w-5 text-white" />}
+            {isMuted ? (
+              <MicOff className="h-5 w-5 text-red-400" />
+            ) : (
+              <Mic className="h-5 w-5 text-white" />
+            )}
           </button>
           <button
             onClick={practice.submitAnswer}
-            disabled={starting}
-            className="flex h-12 items-center gap-2 rounded-full bg-white/10 px-5 font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
+            disabled={starting || !(practice.draft || practice.interim)}
+            className={`flex h-12 items-center gap-2 rounded-full px-5 font-semibold text-white transition disabled:opacity-40 ${
+              practice.draft || practice.interim
+                ? 'bg-gradient-to-r from-brand-600 to-ai-600 hover:opacity-90'
+                : 'bg-white/10 hover:bg-white/20'
+            }`}
             title="Gửi câu trả lời hiện tại cho AI"
           >
             <Send className="h-4 w-4" /> Gửi trả lời
@@ -342,7 +383,7 @@ export default function PracticeSessionPage() {
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">
           {practice.sttEnabled
-            ? 'Mẹo: dừng nói ~1 giây để AI tự nhận câu trả lời, hoặc bấm “Gửi trả lời”.'
+            ? 'Giọng nói của bạn được chuyển thành chữ ở khung Transcript — trả lời xong, bấm “Gửi trả lời” để AI tiếp tục.'
             : 'Buổi thử chỉ để luyện tập — không ảnh hưởng đến kết quả tuyển dụng.'}
         </p>
       </footer>

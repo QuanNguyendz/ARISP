@@ -184,6 +184,12 @@ var mediaOptions = new ARISP.Infrastructure.Media.MediaOptions();
 builder.Configuration.GetSection("Media").Bind(mediaOptions);
 builder.Services.AddSingleton(mediaOptions);
 
+// Cấu hình nghiệp vụ phỏng vấn (số lượt practice/vòng...) — Development đặt
+// PracticeAttemptsPerRound = 0 (không giới hạn) để test lặp lại không vướng gating.
+var interviewOptions = new ARISP.Application.Options.InterviewOptions();
+builder.Configuration.GetSection("Interview").Bind(interviewOptions);
+builder.Services.AddSingleton(interviewOptions);
+
 // STT (Deepgram): BE mint ephemeral token cho FE live STT.
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>(); // server-side STT chưa dùng (FE stream trực tiếp)
 if (!string.IsNullOrWhiteSpace(mediaOptions.Deepgram.ApiKey))

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { Brain } from 'lucide-react';
+import { Link } from 'react-router-dom'
+import { Brain } from 'lucide-react'
 
 export default function Footer() {
   return (
@@ -15,7 +15,8 @@ export default function Footer() {
               <span className="text-xl font-semibold text-white">ARISP</span>
             </Link>
             <p className="text-text-secondary text-sm mb-4">
-              Nền tảng tuyển dụng thông minh với AI giúp kết nối nhà tuyển dụng và ứng viên hiệu quả hơn.
+              Nền tảng tuyển dụng thông minh với AI giúp kết nối nhà tuyển dụng và ứng viên hiệu quả
+              hơn.
             </p>
           </div>
 
@@ -24,18 +25,27 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Dành cho ứng viên</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/jobs" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link
+                  to="/jobs"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Tìm việc làm
                 </Link>
               </li>
               <li>
-                <Link to="/auth/candidate-register" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link
+                  to="/auth/candidate-register"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Tạo hồ sơ
                 </Link>
               </li>
               <li>
-                <Link to="/candidate/results" className="text-text-secondary hover:text-white transition-colors text-sm">
-                  Kết quả phỏng vấn
+                <Link
+                  to="/candidate/applications"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
+                  Hồ sơ ứng tuyển
                 </Link>
               </li>
             </ul>
@@ -46,17 +56,26 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Dành cho NTD</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/auth/register" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link
+                  to="/auth/register"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Đăng ký tuyển dụng
                 </Link>
               </li>
               <li>
-                <Link to="/admin/dashboard" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link
+                  to="/admin/dashboard"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Quản lý tuyển dụng
                 </Link>
               </li>
               <li>
-                <Link to="/admin/reports" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <Link
+                  to="/admin/reports"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Báo cáo & Phân tích
                 </Link>
               </li>
@@ -68,22 +87,34 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Công ty</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Về chúng tôi
                 </a>
               </li>
               <li>
-                <a href="#" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Liên hệ
                 </a>
               </li>
               <li>
-                <a href="#" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Chính sách bảo mật
                 </a>
               </li>
               <li>
-                <a href="#" className="text-text-secondary hover:text-white transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
                   Điều khoản sử dụng
                 </a>
               </li>
@@ -93,11 +124,9 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="mt-12 pt-8 border-t border-white/10 text-center">
-          <p className="text-text-tertiary text-sm">
-            © 2026 ARISP. Tất cả quyền được bảo lưu.
-          </p>
+          <p className="text-text-tertiary text-sm">© 2026 ARISP. Tất cả quyền được bảo lưu.</p>
         </div>
       </div>
     </footer>
-  );
+  )
 }
