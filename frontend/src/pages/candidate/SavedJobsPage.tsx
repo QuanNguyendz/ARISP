@@ -16,7 +16,7 @@ import {
 import { savedJobService } from '@/services/job/savedJobService'
 import type { SavedJobItem } from '@/services/job/savedJobService'
 
-function formatSalary(job: SavedJobItem, t: (key: string) => string): string {
+function formatSalary(job: SavedJobItem, t: (key: string, options?: any) => string): string {
   if (
     job.salaryIsNegotiable ||
     (job.salaryMin == null && job.salaryMax == null) ||
@@ -56,7 +56,7 @@ function formatSalary(job: SavedJobItem, t: (key: string) => string): string {
   return t('savedJobs.salaryNegotiable')
 }
 
-function formatWorkMode(t: (key: string) => string, mode?: string): string {
+function formatWorkMode(t: (key: string, options?: any) => string, mode?: string): string {
   if (!mode) return t('savedJobs.fulltime')
   const mappings: Record<string, string> = {
     fulltime: t('savedJobs.fulltime'),
@@ -67,7 +67,7 @@ function formatWorkMode(t: (key: string) => string, mode?: string): string {
   return mappings[mode.toLowerCase()] || mode
 }
 
-function formatSavedDate(t: (key: string) => string, dateStr: string): string {
+function formatSavedDate(t: (key: string, options?: any) => string, dateStr: string): string {
   try {
     const diffDays = Math.ceil(
       Math.abs(new Date().getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)
@@ -100,7 +100,7 @@ function SavedJobCard({
   job,
   onUnsave,
 }: {
-  t: (key: string) => string
+  t: (key: string, options?: any) => string
   job: SavedJobItem
   onUnsave: (jobId: string) => void
 }) {

@@ -93,7 +93,6 @@ function initialsOf(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase()
 }
 
-<<<<<<< HEAD
 const NAV = [
   { label: 'Việc làm', to: '/jobs', match: (p: string) => p === '/' || p.startsWith('/jobs') },
   {
@@ -113,7 +112,6 @@ const USER_MENU = [
   { label: 'Lịch phỏng vấn', to: '/candidate/interviews', icon: Clapperboard },
   { label: 'Cài đặt', to: '/candidate/settings', icon: Settings },
 ]
-=======
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -126,7 +124,6 @@ function timeAgo(iso: string): string {
   if (days === 1) return 'Hôm qua'
   return `${days} ngày trước`
 }
->>>>>>> 143b54ef0628ea0c12a0c2d22bec133abb3a44e3
 
 type Drop = 'user' | 'notif' | 'lang' | 'mobile' | null
 
@@ -214,7 +211,7 @@ export default function CandidateHeader() {
       notificationService
         .markRead(n.id)
         .then(() => refetch())
-        .catch(() => {})
+        .catch(() => { })
     }
     setOpen(null)
     navigate(resolveNotifLink(n.link) || '/candidate/notifications')
@@ -327,11 +324,10 @@ export default function CandidateHeader() {
                     i18n.changeLanguage('vi')
                     setOpen(null)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
-                    i18n.language === 'vi' || !i18n.language
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-ink-600 hover:bg-ink-100'
-                  }`}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${i18n.language === 'vi' || !i18n.language
+                    ? 'bg-brand-50 text-brand-700'
+                    : 'text-ink-600 hover:bg-ink-100'
+                    }`}
                 >
                   {t('header.vietnamese')}
                   {i18n.language === 'vi' || !i18n.language ? <Check className="h-4 w-4" /> : null}
@@ -341,11 +337,10 @@ export default function CandidateHeader() {
                     i18n.changeLanguage('en')
                     setOpen(null)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
-                    i18n.language === 'en'
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-ink-600 hover:bg-ink-100'
-                  }`}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${i18n.language === 'en'
+                    ? 'bg-brand-50 text-brand-700'
+                    : 'text-ink-600 hover:bg-ink-100'
+                    }`}
                 >
                   {t('header.english')}
                   {i18n.language === 'en' ? <Check className="h-4 w-4" /> : null}
@@ -423,9 +418,8 @@ export default function CandidateHeader() {
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') openNotif(n)
                             }}
-                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
-                              !n.isRead ? 'bg-brand-50/40' : ''
-                            }`}
+                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${!n.isRead ? 'bg-brand-50/40' : ''
+                              }`}
                           >
                             <span
                               className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${cls}`}
@@ -561,11 +555,10 @@ export default function CandidateHeader() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`block rounded-lg px-3 py-2 text-sm ${
-                  active
-                    ? 'bg-brand-50 font-medium text-brand-700'
-                    : 'text-ink-700 hover:bg-ink-100'
-                }`}
+                className={`block rounded-lg px-3 py-2 text-sm ${active
+                  ? 'bg-brand-50 font-medium text-brand-700'
+                  : 'text-ink-700 hover:bg-ink-100'
+                  }`}
               >
                 {item.label}
               </Link>
