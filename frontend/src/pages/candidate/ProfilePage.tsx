@@ -114,7 +114,7 @@ const inputWrap =
 const cardCls = 'rounded-2xl border border-ink-200 bg-white p-6 shadow-card scroll-mt-24'
 
 export default function ProfilePage() {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   const { updateUser } = useAuthStore()
   const { openDocument } = useDocumentViewer()
 
@@ -1066,9 +1066,10 @@ function CvReviewCard({ review }: { review: CvReview }) {
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-        <Sparkles className="h-4 w-4" /> Phân tích định hướng CV bởi AI ({review.reviewedBy ?? 'Gemini'})
+        <Sparkles className="h-4 w-4" /> Phân tích định hướng CV bởi AI (
+        {review.reviewedBy ?? 'Gemini'})
       </div>
-      
+
       <p className="mt-3 text-sm text-ink-600 leading-relaxed bg-white/50 rounded-xl p-3 border border-ai-100/50">
         {review.summary}
       </p>

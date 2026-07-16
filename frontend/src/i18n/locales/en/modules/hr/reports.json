@@ -1,0 +1,50 @@
+{
+  "title": "Recruitment Reports",
+  "subtitle": "Statistics and analysis of the recruitment process",
+  "overview": "Overview",
+  "byJob": "By Position",
+  "byRecruiter": "By Recruiter",
+  "byTime": "By Time",
+  "dateRange": "Date Range",
+  "thisWeek": "This Week",
+  "thisMonth": "This Month",
+  "thisQuarter": "This Quarter",
+  "thisYear": "This Year",
+  "custom": "Custom",
+  "from": "From",
+  "to": "To",
+  "export": "Export Report",
+  "exportPdf": "Export PDF",
+  "exportExcel": "Export Excel",
+  "metrics": {
+    "totalApplications": "Total Applications",
+    "newApplications": "New Applications",
+    "totalInterviews": "Total Interviews",
+    "totalPass": "Total Passed",
+    "totalNotPass": "Total Not Passed",
+    "passRate": "Pass Rate",
+    "avgScore": "Average Score",
+    "avgTimeToHire": "Avg Time to Hire",
+    "activeJobs": "Active Jobs",
+    "totalRecruiters": "Total Recruiters"
+  },
+  "charts": {
+    "applicationsTrend": "Applications Trend",
+    "passRateByRound": "Pass Rate by Round",
+    "topJobs": "Positions with Most Applications",
+    "recruiterPerformance": "Recruiter Performance",
+    "matchScoreDistribution": "Match Score Distribution"
+  },
+  "table": {
+    "job": "Position",
+    "recruiter": "Recruiter",
+    "applications": "Applications",
+    "interviews": "Interviews",
+    "pass": "Pass",
+    "fail": "Not Pass",
+    "passRate": "Pass Rate",
+    "avgScore": "Avg Score"
+  },
+  "noData": "No data available for this time period.",
+  "loadingError": "Unable to load reports."
+}

@@ -1,0 +1,59 @@
+{
+  "title": "HR Team",
+  "subtitle": "Manage accounts and permissions for the HR team",
+  "allMembers": "All Members",
+  "hrLeaders": "HR Leaders",
+  "recruiters": "Recruiters",
+  "noMembers": "No members yet",
+  "addMember": "Add Member",
+  "inviteMember": "Invite Member",
+  "memberDetails": "Member Details",
+  "name": "Full Name",
+  "email": "Email",
+  "role": "Role",
+  "roles": {
+    "hr_leader": "HR Leader",
+    "recruiter": "Recruiter"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "pending": "Pending"
+  },
+  "department": "Department",
+  "phone": "Phone Number",
+  "joinedAt": "Joined Date",
+  "lastActive": "Last Active",
+  "table": {
+    "name": "Full Name",
+    "email": "Email",
+    "role": "Role",
+    "department": "Department",
+    "status": "Status",
+    "joinedAt": "Joined",
+    "actions": "Actions"
+  },
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "resetPassword": "Reset Password",
+    "changeRole": "Change Role"
+  },
+  "invite": {
+    "title": "Invite Member",
+    "email": "Member Email",
+    "emailPlaceholder": "Enter email of person to invite...",
+    "selectRole": "Select Role",
+    "selectDepartment": "Select Department",
+    "sendInvite": "Send Invite",
+    "inviteSent": "Invitation sent",
+    "inviteSentHint": "The member will receive an email with login instructions."
+  },
+  "confirmRemove": "Confirm member removal?",
+  "confirmRemoveHint": "The account will be deactivated but data will be preserved.",
+  "removed": "Member removed",
+  "loadingError": "Unable to load members list."
+}

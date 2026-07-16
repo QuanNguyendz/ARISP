@@ -34,7 +34,7 @@ function timeLabel(s: AvailabilitySlot): string {
 }
 
 export default function CandidateSchedulePage() {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   const { applicationId } = useParams<{ applicationId: string }>()
   const [params] = useSearchParams()
   const token = params.get('token') || undefined

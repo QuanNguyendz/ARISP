@@ -1,4 +1,17 @@
 {
+  "dashboard": {
+    "title": "Trang chủ",
+    "welcome": "Chào mừng trở lại",
+    "myProfile": "Hồ sơ của tôi",
+    "myApplications": "Việc đã ứng tuyển",
+    "savedJobs": "Việc đã lưu",
+    "interviewSchedule": "Lịch phỏng vấn",
+    "notifications": "Thông báo",
+    "settings": "Cài đặt",
+    "profileCompleteness": "Độ hoàn thiện hồ sơ",
+    "aiTip": "Mẹo từ AI",
+    "findSuitableJobs": "Khám phá việc phù hợp"
+  },
   "profile": {
     "title": "Hồ sơ của tôi",
     "subtitle": "Quản lý thông tin cá nhân và CV",
@@ -90,8 +103,7 @@
     "completeHint": "Thêm kỹ năng, kinh nghiệm và liên kết để đạt 100%.",
     "candidate": "Ứng viên",
     "notUpdatedYet": "Chưa cập nhật chức danh",
-    "home": "Trang chủ",
-    "myProfile": "Hồ sơ của tôi"
+    "home": "Trang chủ"
   },
   "applications": {
     "title": "Việc đã ứng tuyển",

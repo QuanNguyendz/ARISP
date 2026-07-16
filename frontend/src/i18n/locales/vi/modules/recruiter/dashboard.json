@@ -1,0 +1,32 @@
+{
+  "greeting": "Xin chào, {{name}}",
+  "description": "Tổng quan tin tuyển dụng & ứng viên của bạn",
+  "myJobs": "Tin tuyển dụng của tôi",
+  "myJob": "Tin của tôi",
+  "active": "Đang đăng",
+  "pendingHr": "Chờ HR duyệt",
+  "totalApplicants": "Tổng ứng viên",
+  "rejected": "Tin bị từ chối",
+  "rejectedAlert": "{{count}} tin bị từ chối — chỉnh sửa và gửi lại để HR duyệt",
+  "reason": "lý do",
+  "drafts": "Bản nháp",
+  "draftsWaiting": "Bản nháp chờ gửi duyệt",
+  "quickActions": "Thao tác nhanh",
+  "createJob": "Tạo tin mới",
+  "manageJobs": "Quản lý tin",
+  "viewCandidates": "Xem ứng viên",
+  "viewAll": "Xem tất cả",
+  "noJobs": "Chưa có tin tuyển dụng",
+  "createFirst": "Tạo tin đầu tiên — upload JD để hệ thống tự điền các trường giúp bạn.",
+  "applicants": "ứng viên",
+  "noDepartment": "Chưa phân phòng ban",
+  "loadingError": "Không tải được dữ liệu tin tuyển dụng.",
+  "stats": {
+    "total": "Tổng tin",
+    "active": "Đang đăng",
+    "pending": "Chờ duyệt",
+    "rejected": "Từ chối",
+    "draft": "Nháp",
+    "applicants": "Ứng viên"
+  }
+}

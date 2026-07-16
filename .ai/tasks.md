@@ -27,6 +27,8 @@ _Chưa có task nào đang thực hiện._
   - [x] 2026-07-03 **Cập nhật Candidate pages sử dụng i18n** — Translate ProfilePage, ApplicationsPage, SchedulePage, FeedbackPage, SettingsPage, SavedJobsPage sử dụng react-i18next với candidate.json (vi/en).
   - [x] 2026-07-13 **Cập nhật FindJobPage và ApplicationsPage i18n** — Hoàn thiện i18n cho FindJobPage (sort options, salary labels, deadline, posted date) và ApplicationsPage (FILTERS, scheduleInfo, roundTypeLabel, CV tooltips, error messages). Thêm keys mới vào landing.json và candidate.json.
   - [x] 2026-07-13 **Cập nhật JobDetailPage i18n** — Hoàn thiện i18n cho trang chi tiết việc làm (header, tags, CV-JD match section, company info). Thêm keys mới vào landing.json (jobDetail section).
+  - [x] 2026-07-16 **Cập nhật i18n cho HR/Recruiter Dashboard và Jobs pages** — Tạo cấu trúc modules/hr và modules/recruiter trong i18n, cập nhật DashboardPage.tsx (HR & Recruiter), JobsPage.tsx, PendingJobsPage.tsx, CandidatesPage.tsx, MyJobsPage.tsx sử dụng react-i18next.
+  - [x] 2026-07-16 **Cập nhật i18n cho HR Jobs và Recruiter pages** — Hoàn thiện translation files (dashboard.json, jobs.json, candidates.json) với đầy đủ keys cho HR Dashboard, Jobs list, Candidates list, và Recruiter My Jobs.
 - [ ] **Saved Jobs (bookmark)** — [ADR-034]; bảng `saved_jobs`, API lưu/bỏ lưu + trang "Việc đã lưu".
 - [x] 2026-06-18 **Candidate Google OAuth2 (no domain)** — [ADR-035]; mở rộng auth flow, tự tạo `candidate_accounts`.
 - [ ] Header candidate: tìm kiếm toàn cục (⌘K), menu người dùng, notification center (đọc/đánh dấu đã đọc), badge số liệu.

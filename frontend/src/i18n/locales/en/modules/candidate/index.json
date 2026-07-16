@@ -1,4 +1,17 @@
 {
+  "dashboard": {
+    "title": "Home",
+    "welcome": "Welcome back",
+    "myProfile": "My Profile",
+    "myApplications": "My Applications",
+    "savedJobs": "Saved Jobs",
+    "interviewSchedule": "Interview Schedule",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "profileCompleteness": "Profile Completeness",
+    "aiTip": "AI Tip",
+    "findSuitableJobs": "Find Suitable Jobs"
+  },
   "profile": {
     "title": "My Profile",
     "subtitle": "Manage your personal information and CV",
@@ -86,12 +99,11 @@
     "saved": "Profile saved",
     "saveFailed": "Failed to save profile",
     "nameRequired": "Please enter your full name.",
-    "completeness": "Profile Completeness",
+    "completeness": "Completeness",
     "completeHint": "Add skills, experience, and links to reach 100%.",
     "candidate": "Candidate",
     "notUpdatedYet": "No title updated yet",
-    "home": "Home",
-    "myProfile": "My Profile"
+    "home": "Home"
   },
   "applications": {
     "title": "My Applications",

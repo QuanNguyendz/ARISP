@@ -507,7 +507,7 @@ function ApplicationsSkeleton() {
 }
 
 export default function ApplicationsPage() {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   const { user } = useAuthStore()
   const { openDocument } = useDocumentViewer()
   const [apps, setApps] = useState<MyApplicationItem[]>([])

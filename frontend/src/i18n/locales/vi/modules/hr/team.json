@@ -1,0 +1,59 @@
+{
+  "title": "Nhóm HR",
+  "subtitle": "Quản lý tài khoản và phân quyền nhóm HR",
+  "allMembers": "Tất cả thành viên",
+  "hrLeaders": "HR Leader",
+  "recruiters": "Recruiter",
+  "noMembers": "Chưa có thành viên nào",
+  "addMember": "Thêm thành viên",
+  "inviteMember": "Mời thành viên",
+  "memberDetails": "Chi tiết thành viên",
+  "name": "Họ và tên",
+  "email": "Email",
+  "role": "Vai trò",
+  "roles": {
+    "hr_leader": "HR Leader",
+    "recruiter": "Recruiter"
+  },
+  "status": {
+    "active": "Hoạt động",
+    "inactive": "Không hoạt động",
+    "pending": "Chờ xác nhận"
+  },
+  "department": "Phòng ban",
+  "phone": "Số điện thoại",
+  "joinedAt": "Ngày tham gia",
+  "lastActive": "Hoạt động lần cuối",
+  "table": {
+    "name": "Họ và tên",
+    "email": "Email",
+    "role": "Vai trò",
+    "department": "Phòng ban",
+    "status": "Trạng thái",
+    "joinedAt": "Tham gia",
+    "actions": "Thao tác"
+  },
+  "actions": {
+    "view": "Xem",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "deactivate": "Vô hiệu hóa",
+    "reactivate": "Kích hoạt lại",
+    "resetPassword": "Đặt lại mật khẩu",
+    "changeRole": "Thay đổi vai trò"
+  },
+  "invite": {
+    "title": "Mời thành viên",
+    "email": "Email thành viên",
+    "emailPlaceholder": "Nhập email người cần mời...",
+    "selectRole": "Chọn vai trò",
+    "selectDepartment": "Chọn phòng ban",
+    "sendInvite": "Gửi lời mời",
+    "inviteSent": "Đã gửi lời mời",
+    "inviteSentHint": "Thành viên sẽ nhận email hướng dẫn đăng nhập."
+  },
+  "confirmRemove": "Xác nhận xóa thành viên?",
+  "confirmRemoveHint": "Tài khoản sẽ bị vô hiệu hóa nhưng dữ liệu được giữ lại.",
+  "removed": "Đã xóa thành viên",
+  "loadingError": "Không tải được danh sách thành viên."
+}

@@ -172,7 +172,7 @@ function SavedJobCard({
 }
 
 export default function SavedJobsPage() {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   const [jobs, setJobs] = useState<SavedJobItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
