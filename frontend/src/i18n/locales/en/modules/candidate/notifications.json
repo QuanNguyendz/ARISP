@@ -1,0 +1,44 @@
+{
+  "breadcrumb": {
+    "home": "Home",
+    "notifications": "Notifications"
+  },
+  "title": "Notifications",
+  "subtitle": {
+    "unread": "You have {{count}} unread notifications",
+    "allRead": "You have read all notifications"
+  },
+  "filters": {
+    "all": "All",
+    "unread": "Unread",
+    "interview": "Interviews",
+    "result": "Results",
+    "system": "System"
+  },
+  "timeAgo": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hr ago",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago"
+  },
+  "groupLabels": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "older": "Earlier"
+  },
+  "actionLabels": {
+    "viewReport": "View report",
+    "viewInterviewCode": "View interview code",
+    "viewSchedule": "View schedule",
+    "viewDetails": "View details"
+  },
+  "actions": {
+    "markAllRead": "Mark all read",
+    "settings": "Notification settings"
+  },
+  "emptyState": {
+    "title": "No notifications",
+    "description": "Updates about your applications, interview invitations and results will appear here."
+  }
+}

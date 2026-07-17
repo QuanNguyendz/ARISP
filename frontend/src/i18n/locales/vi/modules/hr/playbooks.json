@@ -1,64 +1,46 @@
 {
-  "title": "Playbook phỏng vấn",
-  "subtitle": "Quản lý tài liệu phỏng vấn nội bộ",
-  "allPlaybooks": "Tất cả playbook",
-  "noPlaybooks": "Chưa có playbook nào",
-  "noPlaybooksHint": "Upload playbook để AI sử dụng trong phỏng vấn.",
-  "createNew": "Tạo playbook mới",
+  "title": "Interview Playbook",
+  "description": "Tài liệu phỏng vấn nội bộ — AI nạp vào RAG để hỏi đúng phong cách & nội dung công ty",
   "uploadPlaybook": "Upload Playbook",
-  "editPlaybook": "Chỉnh sửa playbook",
-  "playbookDetails": "Chi tiết Playbook",
-  "name": "Tên playbook",
-  "namePlaceholder": "VD: Playbook Frontend Engineer",
-  "description": "Mô tả",
-  "descriptionPlaceholder": "Mô tả nội dung và mục đích của playbook...",
-  "scope": "Phạm vi sử dụng",
-  "scopeGlobal": "Toàn công ty",
-  "scopeDepartment": "Theo phòng ban",
-  "scopeJob": "Theo vị trí",
-  "selectDepartment": "Chọn phòng ban",
-  "selectJob": "Chọn vị trí",
-  "rounds": "Vòng áp dụng",
-  "roundScreening": "Sàng lọc",
-  "roundTechnical": "Kỹ thuật",
-  "roundFinal": "Vòng cuối",
-  "allRounds": "Tất cả các vòng",
-  "upload": {
-    "title": "Upload tài liệu",
-    "dragDrop": "Kéo thả file vào đây",
-    "or": "hoặc",
-    "browse": "Chọn file",
-    "supported": "Hỗ trợ PDF, DOCX, DOC",
-    "maxSize": "Kích thước tối đa: 10MB",
-    "uploading": "Đang upload...",
-    "uploaded": "Đã upload",
-    "remove": "Xóa file"
+  "loadingError": "Không tải được danh sách playbook.",
+  "deleteError": "Không thể xoá playbook.",
+  "filters": {
+    "all": "Tất cả"
+  },
+  "scopes": {
+    "org": "Công ty",
+    "jobPosting": "Theo tin",
+    "round": "Theo vòng"
   },
   "status": {
-    "active": "Đang sử dụng",
-    "inactive": "Không sử dụng",
-    "draft": "Nháp"
+    "ready": "Đã nạp RAG"
   },
-  "table": {
-    "name": "Tên",
-    "scope": "Phạm vi",
-    "rounds": "Vòng",
-    "uploadedBy": "Người upload",
-    "uploadedAt": "Ngày upload",
-    "status": "Trạng thái",
-    "actions": "Thao tác"
+  "paginationLabel": "tài liệu",
+  "noPlaybooks": "Chưa có playbook",
+  "noPlaybooksHint": "Upload tài liệu phỏng vấn (PDF/DOCX/TXT/MD) để AI phỏng vấn đúng phong cách công ty.",
+  "docTypes": {
+    "styleGuide": "Hướng dẫn phong cách",
+    "questionBank": "Ngân hàng câu hỏi",
+    "competencyFramework": "Khung năng lực",
+    "cultureGuide": "Văn hóa & giá trị",
+    "compliance": "Quy định không được hỏi",
+    "redFlag": "Red Flag Guide",
+    "technicalScenario": "Kịch bản kỹ thuật",
+    "expectedAnswer": "Đáp án mong đợi",
+    "mustAsk": "Câu hỏi bắt buộc",
+    "roundPlaybook": "Playbook theo vòng"
   },
-  "actions": {
-    "view": "Xem",
-    "edit": "Chỉnh sửa",
-    "delete": "Xóa",
-    "activate": "Kích hoạt",
-    "deactivate": "Vô hiệu hóa",
-    "download": "Tải về"
-  },
-  "confirmDelete": "Xác nhận xóa playbook?",
-  "confirmDeleteHint": "Hành động này không thể hoàn tác.",
-  "deleted": "Đã xóa playbook",
-  "saved": "Đã lưu playbook",
-  "loadingError": "Không tải được danh sách playbook."
+  "uploadTitle": "Upload Playbook",
+  "uploadHint": "PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",
+  "selectFile": "Chọn file tài liệu...",
+  "selectFileError": "Vui lòng chọn file.",
+  "selectJob": "Chọn tin",
+  "selectJobError": "Vui lòng chọn tin tuyển dụng.",
+  "uploadError": "Upload thất bại.",
+  "documentType": "Loại tài liệu",
+  "scope": "Phạm vi",
+  "jobPosting": "Tin tuyển dụng",
+  "round": "Vòng",
+  "cancel": "Hủy",
+  "upload": "Upload"
 }

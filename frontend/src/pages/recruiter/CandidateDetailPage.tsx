@@ -18,6 +18,7 @@ import {
   Clock,
   CalendarClock,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
 import { applicationService } from '@services/application/applicationService'
@@ -40,6 +41,7 @@ import { JobDetailSkeleton } from './_skeletons'
 import { resolveAssetUrl } from '@/config/constants'
 
 export default function RecruiterCandidateDetailPage() {
+  const { t } = useTranslation('modules/recruiter/candidateDetail')
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
   const [app, setApp] = useState<HrApplicationItem | null>(null)
@@ -68,12 +70,12 @@ export default function RecruiterCandidateDetailPage() {
         setEvals(ev)
         setSessions(ss)
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được hồ sơ ứng viên.')
+        setError(e?.response?.data?.message || t('loadingError'))
       } finally {
         setLoading(false)
       }
     })()
-  }, [id])
+  }, [id, t])
 
   const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])
 
@@ -84,9 +86,9 @@ export default function RecruiterCandidateDetailPage() {
     setNotice('')
     try {
       await applicationService.sendInvite(id)
-      setNotice('Đã gửi magic link mời ứng viên.')
+      setNotice(t('sent'))
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể gửi lời mời.')
+      setError(e?.response?.data?.message || t('sendError'))
     } finally {
       setInviting(false)
     }
@@ -101,7 +103,7 @@ export default function RecruiterCandidateDetailPage() {
       const r = await interviewService.generateCode(id)
       setCode({ code: r.code, expiresAt: r.expiresAt })
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể cấp mã phỏng vấn.')
+      setError(e?.response?.data?.message || t('codeError'))
     } finally {
       setCoding(false)
     }
@@ -118,16 +120,21 @@ export default function RecruiterCandidateDetailPage() {
     }
   }
 
+  const roundLabel = (num: number, type?: string) =>
+    `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
+
+  const sessionTypeLabel = (type?: string) => (type === 'practice' ? t('practice') : t('real'))
+
   if (loading) return <JobDetailSkeleton />
   if (!app) {
     return (
       <div className="p-6 lg:p-8">
-        <ErrorAlert message={error || 'Không tìm thấy hồ sơ ứng viên.'} />
+        <ErrorAlert message={error || t('notFound')} />
         <Link
           to="/recruiter/candidates"
           className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         >
-          ← Quay lại
+          ← {t('back')}
         </Link>
       </div>
     )
@@ -139,7 +146,7 @@ export default function RecruiterCandidateDetailPage() {
         to="/recruiter/candidates"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
       >
-        <ArrowLeft className="h-4 w-4" /> Quay lại danh sách
+        <ArrowLeft className="h-4 w-4" /> {t('backToList')}
       </Link>
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
@@ -157,7 +164,7 @@ export default function RecruiterCandidateDetailPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-ink-900 dark:text-white">
-              {app.candidateName || 'Ứng viên'}
+              {app.candidateName || t('candidate')}
             </h1>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
               <span className="flex items-center gap-1">
@@ -172,7 +179,7 @@ export default function RecruiterCandidateDetailPage() {
               ) : null}
               <span className="flex items-center gap-1">
                 <Briefcase className="h-3.5 w-3.5" />
-                {app.jobTitle || 'Vị trí'}
+                {app.jobTitle || t('position')}
               </span>
             </p>
             <div className="mt-2 flex items-center gap-2">
@@ -181,7 +188,9 @@ export default function RecruiterCandidateDetailPage() {
               >
                 {appStatusLabel(app.status)}
               </span>
-              <span className="text-xs text-ink-400">Ứng tuyển {timeAgo(app.createdAt)}</span>
+              <span className="text-xs text-ink-400">
+                {t('applied')} {timeAgo(app.createdAt)}
+              </span>
             </div>
           </div>
         </div>
@@ -190,7 +199,7 @@ export default function RecruiterCandidateDetailPage() {
             <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
               {app.matchScore}%
             </div>
-            <div className="text-xs text-ink-400">Match CV–JD</div>
+            <div className="text-xs text-ink-400">{t('matchCVJD')}</div>
           </div>
         )}
       </div>
@@ -201,12 +210,12 @@ export default function RecruiterCandidateDetailPage() {
           {/* Evaluations */}
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-              <ClipboardList className="h-5 w-5 text-brand-600 dark:text-brand-400" /> Báo cáo đánh
-              giá ({evals.length})
+              <ClipboardList className="h-5 w-5 text-brand-600 dark:text-brand-400" />{' '}
+              {t('reportTitle')} {t('reportCount', { count: evals.length })}
             </h2>
             {evals.length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-500 dark:text-ink-400">
-                Chưa có báo cáo đánh giá nào.
+                {t('noReport')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -217,9 +226,12 @@ export default function RecruiterCandidateDetailPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        Vòng {ev.roundNumber} · {ev.sessionType === 'practice' ? 'Thử' : 'Thật'}
+                        {roundLabel(ev.roundNumber)} · {sessionTypeLabel(ev.sessionType)}
                       </p>
-                      <p className="text-xs text-ink-400">{timeAgo(ev.createdAt)}</p>
+                      <p className="text-xs text-ink-400">
+                        {timeAgo(ev.createdAt)}
+                        {ev.hrReview ? ` · ${t('hrReviewed')}` : ''}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       {ev.overallScore != null && (
@@ -242,12 +254,12 @@ export default function RecruiterCandidateDetailPage() {
           {/* Interview sessions */}
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-              <Video className="h-5 w-5 text-ai-600 dark:text-ai-400" /> Phiên phỏng vấn (
-              {mySessions.length})
+              <Video className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('sessionTitle')}{' '}
+              {t('sessionCount', { count: mySessions.length })}
             </h2>
             {mySessions.length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-500 dark:text-ink-400">
-                Chưa có phiên phỏng vấn nào.
+                {t('noSession')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -258,15 +270,14 @@ export default function RecruiterCandidateDetailPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        Vòng {s.roundNumber} ·{' '}
-                        {s.roundType === 'technical' ? 'Chuyên môn' : 'Sơ loại'} ·{' '}
-                        {s.sessionType === 'practice' ? 'Thử' : 'Thật'}
+                        {roundLabel(s.roundNumber, s.roundType)} · {sessionTypeLabel(s.sessionType)}
                       </p>
                       <p className="flex items-center gap-1 text-xs text-ink-400">
                         <Clock className="h-3 w-3" />
                         {s.durationSeconds
-                          ? `${Math.round(s.durationSeconds / 60)} phút`
-                          : '—'} · {timeAgo(s.createdAt)}
+                          ? t('durationMinutes', { minutes: Math.round(s.durationSeconds / 60) })
+                          : t('noDuration')}{' '}
+                        · {timeAgo(s.createdAt)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -294,15 +305,22 @@ export default function RecruiterCandidateDetailPage() {
         <div className="space-y-6">
           {/* Actions */}
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
-            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">Thao tác</h2>
+            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">
+              {t('actions')}
+            </h2>
             <div className="space-y-2">
               {app.cvFileUrl && (
                 <button
                   type="button"
-                  onClick={() => openDocument(resolveAssetUrl(app.cvFileUrl), `${app.candidateName || 'Ứng viên'} - CV`)}
+                  onClick={() =>
+                    openDocument(
+                      resolveAssetUrl(app.cvFileUrl),
+                      `${app.candidateName || t('candidate')} - CV`
+                    )
+                  }
                   className="flex w-full items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/5"
                 >
-                  <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Xem CV{' '}
+                  <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> {t('viewCV')}
                   <ExternalLink className="ml-auto h-3.5 w-3.5 text-ink-400" />
                 </button>
               )}
@@ -316,16 +334,12 @@ export default function RecruiterCandidateDetailPage() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}{' '}
-                Gửi magic link
+                {t('sendMagicLink')}
               </button>
               <button
                 onClick={genCode}
                 disabled={coding || !app.hasScheduledInterview}
-                title={
-                  app.hasScheduledInterview
-                    ? undefined
-                    : 'Ứng viên chưa đặt lịch phỏng vấn thật. Chỉ cấp mã sau khi ứng viên đã đặt lịch buổi phỏng vấn thật của vòng.'
-                }
+                title={app.hasScheduledInterview ? undefined : t('noSchedule')}
                 className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {coding ? (
@@ -333,18 +347,18 @@ export default function RecruiterCandidateDetailPage() {
                 ) : (
                   <KeyRound className="h-4 w-4" />
                 )}{' '}
-                Cấp Interview Code
+                {t('generateCode')}
               </button>
               {!app.hasScheduledInterview && (
                 <p className="-mt-1 flex items-center gap-1.5 text-xs text-ink-400">
-                  <CalendarClock className="h-3.5 w-3.5" /> Chờ ứng viên đặt lịch phỏng vấn thật mới cấp được mã.
+                  <CalendarClock className="h-3.5 w-3.5" /> {t('waitForSchedule')}
                 </p>
               )}
 
               {code && (
                 <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-3">
                   <p className="mb-1 text-xs text-emerald-700 dark:text-emerald-400">
-                    Mã On-site (1 lần):
+                    {t('codeTitle')}
                   </p>
                   <button
                     onClick={copyCode}
@@ -360,24 +374,24 @@ export default function RecruiterCandidateDetailPage() {
 
           {/* Info */}
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
-            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">Thông tin</h2>
+            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">{t('info')}</h2>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <dt className="text-ink-500 dark:text-ink-400">Nguồn</dt>
+                <dt className="text-ink-500 dark:text-ink-400">{t('source')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
-                  {app.source === 'job_board' ? 'Job Board' : 'Được mời'}
+                  {app.source === 'job_board' ? t('jobBoard') : t('invited')}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-ink-500 dark:text-ink-400">Phỏng vấn thử</dt>
+                <dt className="text-ink-500 dark:text-ink-400">{t('practiceUsed')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
-                  {app.practiceSessionUsed ? 'Đã dùng' : 'Chưa dùng'}
+                  {app.practiceSessionUsed ? t('used') : t('notUsed')}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-ink-500 dark:text-ink-400">Ngày ứng tuyển</dt>
+                <dt className="text-ink-500 dark:text-ink-400">{t('appliedDate')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
-                  {new Date(app.createdAt).toLocaleDateString('vi-VN')}
+                  {new Date(app.createdAt).toLocaleDateString()}
                 </dd>
               </div>
             </dl>

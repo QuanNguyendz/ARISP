@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   UserPlus,
   Mail,
@@ -22,37 +23,40 @@ import {
   type NewAccountRequestItem,
 } from '@services/hr/accountRequestService'
 
-const roleLabel = (r: string) =>
-  r === 'hr_admin' ? 'HR Admin' : r === 'recruiter' ? 'Recruiter' : r
-const statusMeta = (s: string): { label: string; cls: string; Icon: typeof Clock } =>
-  s === 'approved'
-    ? {
-        label: 'Đã duyệt',
-        cls: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-        Icon: CheckCircle2,
-      }
-    : s === 'rejected'
-      ? {
-          label: 'Bị từ chối',
-          cls: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-          Icon: XCircle,
-        }
-      : {
-          label: 'Chờ duyệt',
-          cls: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-          Icon: Clock,
-        }
-
-const initials = (n: string) =>
-  n
-    .trim()
-    .split(/\s+/)
-    .map((x) => x[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-
 export default function HrTeamPage() {
+  const { t } = useTranslation('modules/hr/team')
+
+  const roleLabel = (r: string) =>
+    r === 'hr_admin' ? t('roles.hrAdmin') : r === 'recruiter' ? t('roles.recruiter') : r
+
+  const statusMeta = (s: string): { label: string; cls: string; Icon: typeof Clock } =>
+    s === 'approved'
+      ? {
+          label: t('status.approved'),
+          cls: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+          Icon: CheckCircle2,
+        }
+      : s === 'rejected'
+        ? {
+            label: t('status.rejected'),
+            cls: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+            Icon: XCircle,
+          }
+        : {
+            label: t('status.pending'),
+            cls: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+            Icon: Clock,
+          }
+
+  const initials = (n: string) =>
+    n
+      .trim()
+      .split(/\s+/)
+      .map((x) => x[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
+
   const [showModal, setShowModal] = useState(false)
   const [notice, setNotice] = useState('')
   const [page, setPage] = useState(1)
@@ -83,10 +87,10 @@ export default function HrTeamPage() {
   }, [requests])
 
   const statCards = [
-    { label: 'Tổng yêu cầu', value: stats.total, color: 'text-brand-600' },
-    { label: 'Chờ duyệt', value: stats.pending, color: 'text-amber-600' },
-    { label: 'Đã duyệt', value: stats.approved, color: 'text-emerald-600' },
-    { label: 'Bị từ chối', value: stats.rejected, color: 'text-red-600' },
+    { label: t('stats.total'), value: stats.total, color: 'text-brand-600' },
+    { label: t('stats.pending'), value: stats.pending, color: 'text-amber-600' },
+    { label: t('stats.approved'), value: stats.approved, color: 'text-emerald-600' },
+    { label: t('stats.rejected'), value: stats.rejected, color: 'text-red-600' },
   ]
 
   const PAGE_SIZE = 10
@@ -96,7 +100,6 @@ export default function HrTeamPage() {
     [requests, page]
   )
 
-  // Trở về trang hợp lệ khi danh sách thay đổi
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
@@ -104,14 +107,10 @@ export default function HrTeamPage() {
   return (
     <div className="min-h-screen bg-ink-50 p-6 dark:bg-ink-950 lg:p-8">
       <PageHeader
-        title="Nhóm HR"
-        description="Gửi yêu cầu tạo tài khoản staff (HR Admin / Recruiter) để Super Admin duyệt"
+        title={t('title')}
+        description={t('description')}
         actions={[
-          {
-            label: 'Gửi yêu cầu tạo tài khoản',
-            onClick: () => setShowModal(true),
-            variant: 'primary',
-          },
+          { label: t('sendRequest'), onClick: () => setShowModal(true), variant: 'primary' },
         ]}
       />
 
@@ -129,9 +128,9 @@ export default function HrTeamPage() {
       ) : requests.length === 0 ? (
         <EmptyState
           icon={<UserPlus className="h-8 w-8 text-ink-400" />}
-          title="Chưa có yêu cầu nào"
-          description="Gửi yêu cầu tạo tài khoản cho thành viên mới — Super Admin sẽ duyệt và kích hoạt."
-          action={{ label: 'Gửi yêu cầu', onClick: () => setShowModal(true) }}
+          title={t('noRequests')}
+          description={t('noRequestsHint')}
+          action={{ label: t('sendRequestBtn'), onClick: () => setShowModal(true) }}
         />
       ) : (
         <div className="space-y-3">
@@ -173,7 +172,7 @@ export default function HrTeamPage() {
                 </div>
                 {r.status === 'rejected' && r.reviewReason && (
                   <p className="mt-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                    Lý do từ chối: {r.reviewReason}
+                    {t('rejectionReason')}: {r.reviewReason}
                   </p>
                 )}
               </motion.div>
@@ -187,17 +186,18 @@ export default function HrTeamPage() {
           page={page}
           totalPages={totalPages}
           total={requests.length}
-          label="yêu cầu"
+          label={t('paginationLabel')}
           onPageChange={setPage}
         />
       )}
 
       {showModal && (
         <RequestModal
+          t={t}
           onClose={() => setShowModal(false)}
           onDone={(count) => {
             setShowModal(false)
-            setNotice(`Đã gửi ${count} yêu cầu tạo tài khoản chờ Super Admin duyệt.`)
+            setNotice(t('requestSent', { count }))
             refetch()
           }}
         />
@@ -206,23 +206,23 @@ export default function HrTeamPage() {
   )
 }
 
-type Row = NewAccountRequestItem
-
 function RequestModal({
+  t,
   onClose,
   onDone,
 }: {
+  t: (key: string) => string
   onClose: () => void
   onDone: (count: number) => void
 }) {
   const csvRef = useRef<HTMLInputElement>(null)
-  const [rows, setRows] = useState<Row[]>([
+  const [rows, setRows] = useState<NewAccountRequestItem[]>([
     { email: '', fullName: '', role: 'recruiter', department: '' },
   ])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const update = (i: number, field: keyof Row, value: string) => {
+  const update = (i: number, field: keyof NewAccountRequestItem, value: string) => {
     const u = [...rows]
     u[i] = { ...u[i], [field]: value }
     setRows(u)
@@ -252,13 +252,13 @@ function RequestModal({
       .map((l) => l.trim())
       .filter(Boolean)
     if (lines.length < 2) {
-      setError('File CSV trống hoặc thiếu dữ liệu.')
+      setError(t('emptyCsvError'))
       return
     }
     const header = lines[0].toLowerCase()
     const hasHeader = header.includes('email')
     const dataLines = hasHeader ? lines.slice(1) : lines
-    const parsed: Row[] = dataLines
+    const parsed: NewAccountRequestItem[] = dataLines
       .map((l) => {
         const [email = '', fullName = '', role = 'recruiter', department = ''] = l
           .split(',')
@@ -272,7 +272,7 @@ function RequestModal({
       })
       .filter((r) => r.email)
     if (parsed.length === 0) {
-      setError('Không đọc được dòng hợp lệ nào từ CSV.')
+      setError(t('noValidRowsError'))
       return
     }
     setRows(parsed)
@@ -288,16 +288,16 @@ function RequestModal({
       }))
       .filter((r) => r.email || r.fullName)
     if (cleaned.length === 0) {
-      setError('Vui lòng nhập ít nhất một yêu cầu.')
+      setError(t('atLeastOneError'))
       return
     }
     for (const r of cleaned) {
       if (!r.email.includes('@')) {
-        setError(`Email không hợp lệ: ${r.email || '(trống)'}`)
+        setError(t('invalidEmail', { email: r.email || t('empty') }))
         return
       }
       if (!r.fullName) {
-        setError(`Thiếu họ tên cho ${r.email}`)
+        setError(t('missingName', { email: r.email }))
         return
       }
     }
@@ -307,7 +307,7 @@ function RequestModal({
       const res = await accountRequestService.create(cleaned)
       onDone(res.count)
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể gửi yêu cầu.')
+      setError(e?.response?.data?.message || t('submitError'))
     } finally {
       setSubmitting(false)
     }
@@ -327,11 +327,9 @@ function RequestModal({
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-              Gửi yêu cầu tạo tài khoản
+              {t('modalTitle')}
             </h3>
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Thêm từng dòng hoặc import CSV. Mỗi dòng = 1 tài khoản đề xuất.
-            </p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{t('modalDescription')}</p>
           </div>
           <button
             onClick={onClose}
@@ -352,7 +350,7 @@ function RequestModal({
             onClick={downloadTemplate}
             className="inline-flex items-center gap-2 rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
           >
-            <Download className="h-3.5 w-3.5" /> Tải template CSV
+            <Download className="h-3.5 w-3.5" /> {t('downloadTemplate')}
           </button>
           <input
             ref={csvRef}
@@ -368,16 +366,16 @@ function RequestModal({
             onClick={() => csvRef.current?.click()}
             className="inline-flex items-center gap-2 rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
           >
-            <Upload className="h-3.5 w-3.5" /> Import CSV
+            <Upload className="h-3.5 w-3.5" /> {t('importCsv')}
           </button>
         </div>
 
         <div className="space-y-2">
           <div className="hidden grid-cols-[1fr_1fr_120px_1fr_36px] gap-2 px-1 text-xs font-medium text-ink-400 sm:grid">
-            <span>Email</span>
-            <span>Họ tên</span>
-            <span>Vai trò</span>
-            <span>Phòng ban</span>
+            <span>{t('tableHeader.email')}</span>
+            <span>{t('tableHeader.fullName')}</span>
+            <span>{t('tableHeader.role')}</span>
+            <span>{t('tableHeader.department')}</span>
             <span />
           </div>
           {rows.map((r, i) => (
@@ -385,13 +383,13 @@ function RequestModal({
               <input
                 value={r.email}
                 onChange={(e) => update(i, 'email', e.target.value)}
-                placeholder="email@congty.com"
+                placeholder={t('placeholder.email')}
                 className={inputCls}
               />
               <input
                 value={r.fullName}
                 onChange={(e) => update(i, 'fullName', e.target.value)}
-                placeholder="Họ tên"
+                placeholder={t('placeholder.fullName')}
                 className={inputCls}
               />
               <select
@@ -399,13 +397,13 @@ function RequestModal({
                 onChange={(e) => update(i, 'role', e.target.value)}
                 className={inputCls}
               >
-                <option value="recruiter">Recruiter</option>
-                <option value="hr_admin">HR Admin</option>
+                <option value="recruiter">{t('roles.recruiter')}</option>
+                <option value="hr_admin">{t('roles.hrAdmin')}</option>
               </select>
               <input
                 value={r.department || ''}
                 onChange={(e) => update(i, 'department', e.target.value)}
-                placeholder="Phòng ban"
+                placeholder={t('placeholder.department')}
                 className={inputCls}
               />
               <button
@@ -422,7 +420,7 @@ function RequestModal({
           onClick={addRow}
           className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
         >
-          <Plus className="h-4 w-4" /> Thêm dòng
+          <Plus className="h-4 w-4" /> {t('addRow')}
         </button>
 
         <div className="mt-5 flex justify-end gap-2">
@@ -430,7 +428,7 @@ function RequestModal({
             onClick={onClose}
             className="rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
           >
-            Hủy
+            {t('cancel')}
           </button>
           <button
             onClick={submit}
@@ -441,8 +439,8 @@ function RequestModal({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <UserPlus className="h-4 w-4" />
-            )}{' '}
-            Gửi {rows.length > 1 ? `${rows.length} yêu cầu` : 'yêu cầu'}
+            )}
+            {rows.length > 1 ? t('submitMultiple', { count: rows.length }) : t('submitSingle')}
           </button>
         </div>
       </motion.div>

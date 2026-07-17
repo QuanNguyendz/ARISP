@@ -1,48 +1,28 @@
 {
   "title": "Cài đặt",
-  "subtitle": "Quản lý cài đặt tài khoản",
-  "profile": "Hồ sơ",
-  "account": "Tài khoản",
-  "security": "Bảo mật",
-  "notifications": "Thông báo",
-  "preferences": "Tùy chọn",
-  "personalInfo": "Thông tin cá nhân",
-  "fullName": "Họ và tên",
-  "email": "Email",
-  "phone": "Số điện thoại",
-  "avatar": "Ảnh đại diện",
-  "changeAvatar": "Đổi ảnh",
-  "removeAvatar": "Xóa ảnh",
-  "changePassword": "Đổi mật khẩu",
-  "currentPassword": "Mật khẩu hiện tại",
-  "newPassword": "Mật khẩu mới",
-  "confirmPassword": "Xác nhận mật khẩu mới",
-  "passwordChanged": "Đã đổi mật khẩu",
-  "twoFactor": "Xác thực hai yếu tố",
-  "enableTwoFactor": "Bật xác thực 2FA",
-  "disableTwoFactor": "Tắt xác thực 2FA",
-  "emailNotifications": "Thông báo qua email",
-  "interviewReminders": "Nhắc lịch phỏng vấn",
-  "applicationUpdates": "Cập nhật đơn ứng tuyển",
-  "systemNotifications": "Thông báo hệ thống",
-  "language": "Ngôn ngữ",
-  "theme": "Giao diện",
-  "light": "Sáng",
-  "dark": "Tối",
-  "system": "Theo hệ thống",
-  "timezone": "Múi giờ",
-  "save": "Lưu",
-  "saved": "Đã lưu",
-  "saving": "Đang lưu...",
-  "cancel": "Hủy",
-  "reset": "Đặt lại",
-  "unsavedChanges": "Bạn có thay đổi chưa lưu",
-  "discardChanges": "Hủy thay đổi",
-  "keepEditing": "Tiếp tục chỉnh sửa",
-  "profileSaved": "Đã lưu hồ sơ",
-  "profileSaveFailed": "Lưu hồ sơ thất bại",
-  "passwordSaveFailed": "Đổi mật khẩu thất bại",
-  "invalidPassword": "Mật khẩu hiện tại không đúng",
-  "passwordMismatch": "Mật khẩu mới không khớp",
-  "loadingError": "Không tải được cài đặt."
+  "description": "Quản lý hồ sơ và cài đặt cá nhân",
+  "tabs": {
+    "profile": "Hồ sơ",
+    "notifications": "Thông báo",
+    "security": "Bảo mật"
+  },
+  "profile": {
+    "title": "Hồ sơ",
+    "fullName": "Họ tên",
+    "email": "Email",
+    "saveChanges": "Lưu thay đổi"
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "email": {
+      "title": "Email thông báo",
+      "description": "Nhận email khi có ứng viên mới ứng tuyển"
+    }
+  },
+  "security": {
+    "title": "Bảo mật",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "changePassword": "Đổi mật khẩu"
+  }
 }

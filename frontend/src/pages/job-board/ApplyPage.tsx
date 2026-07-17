@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   FileText,
@@ -32,6 +33,7 @@ const MAX_CV_MB = 10
 const ACCEPTED = ['.pdf', '.docx']
 
 export default function ApplyPage() {
+  const { t } = useTranslation('modules/job-board/apply')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
@@ -87,10 +89,7 @@ export default function ApplyPage() {
     if (!id) return
     let active = true
     setLoading(true)
-    Promise.all([
-      jobService.getJobPostingById(id),
-      profileService.getProfile().catch(() => null),
-    ])
+    Promise.all([jobService.getJobPostingById(id), profileService.getProfile().catch(() => null)])
       .then(([j, p]) => {
         if (!active) return
         setJob(j)
@@ -102,12 +101,12 @@ export default function ApplyPage() {
         // Không có CV hồ sơ → mặc định bắt buộc tải lên.
         if (!p?.profileCvUrl) setCvSource('upload')
       })
-      .catch(() => active && setLoadError('Không tải được thông tin tin tuyển dụng.'))
+      .catch(() => active && setLoadError(t('loading.error')))
       .finally(() => active && setLoading(false))
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, t])
 
   const hasProfileCv = !!profile?.profileCvUrl
 
@@ -132,14 +131,14 @@ export default function ApplyPage() {
         setVerificationResult(res)
       } catch (err: any) {
         console.error('Lỗi khi đối chiếu CV:', err)
-        setVerificationError('Không thể đối chiếu thông tin với CV bằng AI.')
+        setVerificationError(t('aiVerification.error'))
       } finally {
         setVerifyingInfo(false)
       }
     }, 1000)
 
     return () => clearTimeout(delayDebounceFn)
-  }, [fullName, phone, cvSource, cvFile, hasProfileCv])
+  }, [fullName, phone, cvSource, cvFile, hasProfileCv, t])
 
   const onPickFile = (f: File | null) => {
     setSubmitError('')
@@ -149,11 +148,11 @@ export default function ApplyPage() {
     }
     const ext = '.' + (f.name.split('.').pop() || '').toLowerCase()
     if (!ACCEPTED.includes(ext)) {
-      setSubmitError('Chỉ chấp nhận CV định dạng PDF hoặc DOCX.')
+      setSubmitError(t('cv.errors.invalidFormat'))
       return
     }
     if (f.size > MAX_CV_MB * 1024 * 1024) {
-      setSubmitError(`Kích thước CV tối đa ${MAX_CV_MB}MB.`)
+      setSubmitError(t('cv.errors.tooLarge', { max: MAX_CV_MB }))
       return
     }
     setCvFile(f)
@@ -162,16 +161,14 @@ export default function ApplyPage() {
   // Lỗi từng trường (chỉ hiện sau khi bấm gửi hoặc blur).
   const errors = useMemo(() => {
     const e: Record<string, string> = {}
-    if (!fullName.trim()) e.fullName = 'Vui lòng nhập họ và tên.'
-    if (!phone.trim()) e.phone = 'Vui lòng nhập số điện thoại.'
-    else if (phone.length < 8 || phone.length > 15)
-      e.phone = 'Số điện thoại không hợp lệ (chỉ chứa 8–15 chữ số).'
-    if (!noticePeriod.trim()) e.noticePeriod = 'Vui lòng trả lời câu hỏi này.'
-    if (cvSource === 'upload' && !cvFile) e.cv = 'Vui lòng đính kèm file CV (PDF/DOCX).'
-    if (cvSource === 'profile' && !hasProfileCv)
-      e.cv = 'Hồ sơ chưa có CV — hãy tải CV lên cho tin này.'
+    if (!fullName.trim()) e.fullName = t('contact.errors.fullNameRequired')
+    if (!phone.trim()) e.phone = t('contact.errors.phoneRequired')
+    else if (phone.length < 8 || phone.length > 15) e.phone = t('contact.errors.phoneInvalid')
+    if (!noticePeriod.trim()) e.noticePeriod = t('coverLetter.errors.noticePeriodRequired')
+    if (cvSource === 'upload' && !cvFile) e.cv = t('cv.errors.required')
+    if (cvSource === 'profile' && !hasProfileCv) e.cv = t('cv.errors.noProfileCv')
     return e
-  }, [fullName, phone, noticePeriod, cvSource, cvFile, hasProfileCv])
+  }, [fullName, phone, noticePeriod, cvSource, cvFile, hasProfileCv, t])
 
   const executeSubmit = async () => {
     setSubmitting(true)
@@ -195,7 +192,7 @@ export default function ApplyPage() {
         navigate('/auth/candidate-login')
         return
       }
-      setSubmitError(e?.response?.data?.message || 'Gửi hồ sơ thất bại. Vui lòng thử lại.')
+      setSubmitError(e?.response?.data?.message || t('submit.submitError'))
     } finally {
       setSubmitting(false)
     }
@@ -203,9 +200,7 @@ export default function ApplyPage() {
 
   const handleSubmit = async () => {
     // Đánh dấu tất cả trường là "đã chạm" để hiện lỗi (nếu có) khi bấm gửi.
-    setTouchedFields(
-      new Set(['fullName', 'phone', 'noticePeriod', 'cv'])
-    )
+    setTouchedFields(new Set(['fullName', 'phone', 'noticePeriod', 'cv']))
     setSubmitError('')
     if (Object.keys(errors).length > 0) return
     if (!id) return
@@ -260,12 +255,12 @@ export default function ApplyPage() {
     return (
       <div className="grid min-h-screen place-items-center bg-ink-50 px-6 text-center">
         <div>
-          <p className="text-ink-600">{loadError || 'Không tìm thấy tin tuyển dụng.'}</p>
+          <p className="text-ink-600">{loadError || t('loading.notFound')}</p>
           <Link
             to="/jobs"
             className="mt-4 inline-block rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
           >
-            Về danh sách việc làm
+            {t('loading.backToJobs')}
           </Link>
         </div>
       </div>
@@ -283,9 +278,11 @@ export default function ApplyPage() {
             onClick={requestCancel}
             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-600 hover:bg-ink-100"
           >
-            <ArrowLeft className="h-4 w-4" /> Quay lại
+            <ArrowLeft className="h-4 w-4" /> {t('header.back')}
           </button>
-          <span className="ml-auto font-display text-sm font-bold text-ink-700">Ứng tuyển</span>
+          <span className="ml-auto font-display text-sm font-bold text-ink-700">
+            {t('header.title')}
+          </span>
         </div>
       </header>
 
@@ -293,15 +290,15 @@ export default function ApplyPage() {
         {/* Job summary */}
         <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
           <div className="text-xs font-semibold uppercase tracking-wide text-ink-400">
-            Bạn đang ứng tuyển vị trí
+            {t('jobSummary.label')}
           </div>
           <h1 className="mt-1 font-display text-xl font-extrabold">{job.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
             <span className="inline-flex items-center gap-1.5">
-              <Briefcase className="h-4 w-4" /> {job.department || 'Phòng ban'}
+              <Briefcase className="h-4 w-4" /> {job.department || t('jobSummary.department')}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" /> {job.location || 'Remote'}
+              <MapPin className="h-4 w-4" /> {job.location || t('jobSummary.location')}
             </span>
           </div>
         </div>
@@ -310,12 +307,10 @@ export default function ApplyPage() {
           {/* CV */}
           <section className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <h2 className="font-display text-base font-bold">
-              CV ứng tuyển
+              {t('cv.title')}
               <Req />
             </h2>
-            <p className="mt-0.5 text-sm text-ink-500">
-              Mặc định dùng CV trong hồ sơ. Bạn có thể nộp CV khác cho riêng tin này.
-            </p>
+            <p className="mt-0.5 text-sm text-ink-500">{t('cv.helpText')}</p>
 
             <div className="mt-4 space-y-2">
               {/* Dùng CV hồ sơ */}
@@ -339,12 +334,12 @@ export default function ApplyPage() {
                   {hasProfileCv ? (
                     <>
                       <span className="block truncate text-sm font-medium text-ink-800">
-                        {profile?.cvFileName || 'CV hồ sơ'}
+                        {profile?.cvFileName || t('cv.profile.fallbackName')}
                       </span>
-                      <span className="text-xs text-ink-400">Dùng CV trong hồ sơ</span>
+                      <span className="text-xs text-ink-400">{t('cv.profile.label')}</span>
                     </>
                   ) : (
-                    <span className="text-sm text-ink-500">Hồ sơ chưa có CV</span>
+                    <span className="text-sm text-ink-500">{t('cv.profile.noCv')}</span>
                   )}
                 </span>
                 {hasProfileCv && profile?.profileCvUrl && (
@@ -355,7 +350,7 @@ export default function ApplyPage() {
                     onClick={(e) => e.stopPropagation()}
                     className="shrink-0 text-xs font-medium text-brand-600 hover:underline"
                   >
-                    Xem
+                    {t('cv.profile.view')}
                   </a>
                 )}
               </label>
@@ -378,9 +373,11 @@ export default function ApplyPage() {
                 <UploadCloud className="h-5 w-5 shrink-0 text-ai-600" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium text-ink-800">
-                    Tải CV khác cho tin này
+                    {t('cv.upload.label')}
                   </span>
-                  <span className="text-xs text-ink-400">PDF hoặc DOCX, tối đa {MAX_CV_MB}MB</span>
+                  <span className="text-xs text-ink-400">
+                    {t('cv.upload.hint', { max: MAX_CV_MB })}
+                  </span>
                 </span>
               </label>
 
@@ -402,7 +399,7 @@ export default function ApplyPage() {
                       <button
                         onClick={() => onPickFile(null)}
                         className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-red-600"
-                        aria-label="Bỏ file"
+                        aria-label={t('cv.upload.removeFile')}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -412,7 +409,7 @@ export default function ApplyPage() {
                       onClick={() => fileRef.current?.click()}
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink-50 px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
                     >
-                      <UploadCloud className="h-4 w-4" /> Chọn file CV
+                      <UploadCloud className="h-4 w-4" /> {t('cv.upload.chooseFile')}
                     </button>
                   )}
                 </div>
@@ -423,11 +420,11 @@ export default function ApplyPage() {
 
           {/* Thông tin liên hệ */}
           <section className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
-            <h2 className="font-display text-base font-bold">Thông tin liên hệ</h2>
+            <h2 className="font-display text-base font-bold">{t('contact.title')}</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                  Họ và tên
+                  {t('contact.fullName')}
                   <Req />
                 </label>
                 <div className="relative">
@@ -439,7 +436,7 @@ export default function ApplyPage() {
                       clearTouched('fullName')
                     }}
                     onBlur={() => markTouched('fullName')}
-                    placeholder="Nguyễn Văn A"
+                    placeholder={t('contact.fullNamePlaceholder')}
                     className={inputCls(!!showErr('fullName')) + ' pl-9'}
                   />
                 </div>
@@ -449,7 +446,7 @@ export default function ApplyPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                  Số điện thoại
+                  {t('contact.phone')}
                   <Req />
                 </label>
                 <div className="relative">
@@ -463,7 +460,7 @@ export default function ApplyPage() {
                       markTouched('phone')
                     }}
                     onBlur={() => markTouched('phone')}
-                    placeholder="09xx xxx xxx"
+                    placeholder={t('contact.phonePlaceholder')}
                     className={inputCls(!!showErr('phone')) + ' pl-9'}
                   />
                 </div>
@@ -472,7 +469,9 @@ export default function ApplyPage() {
             </div>
 
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-medium text-ink-700">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-700">
+                {t('contact.email')}
+              </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-ink-400" />
                 <input
@@ -487,15 +486,17 @@ export default function ApplyPage() {
             {(verifyingInfo || verificationResult || verificationError) && (
               <div className="mt-4 rounded-xl border p-4 transition-all duration-300 bg-blue-50/10 border-blue-200">
                 <div className="flex items-start gap-3">
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-                    verifyingInfo 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : verificationError
-                      ? 'bg-red-50 text-red-600'
-                      : verificationResult?.isMatch
-                      ? 'bg-green-50 text-green-600'
-                      : 'bg-amber-50 text-amber-600'
-                  }`}>
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
+                      verifyingInfo
+                        ? 'bg-blue-50 text-blue-600'
+                        : verificationError
+                          ? 'bg-red-50 text-red-600'
+                          : verificationResult?.isMatch
+                            ? 'bg-green-50 text-green-600'
+                            : 'bg-amber-50 text-amber-600'
+                    }`}
+                  >
                     {verifyingInfo ? (
                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                     ) : (
@@ -504,22 +505,22 @@ export default function ApplyPage() {
                   </span>
                   <div className="flex-1">
                     <h4 className="font-display text-sm font-bold text-ink-900 flex items-center gap-1.5">
-                      Xác thực thông tin
+                      {t('aiVerification.title')}
                       {!verifyingInfo && verificationResult?.isMatch && (
                         <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                          Trùng khớp
+                          {t('aiVerification.matchBadge')}
                         </span>
                       )}
                       {!verifyingInfo && verificationResult && !verificationResult.isMatch && (
                         <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                          Phát hiện sai lệch
+                          {t('aiVerification.mismatchBadge')}
                         </span>
                       )}
                     </h4>
-                    
+
                     {verifyingInfo && (
                       <p className="mt-1 text-xs text-ink-500 animate-pulse">
-                        Đang đối chiếu thông tin liên hệ của bạn với nội dung trong CV bằng AI...
+                        {t('aiVerification.verifying')}
                       </p>
                     )}
 
@@ -531,18 +532,18 @@ export default function ApplyPage() {
                       <div className="mt-1.5">
                         {verificationResult.isMatch ? (
                           <p className="text-xs text-green-600 font-medium">
-                            Họ tên và số điện thoại hoàn toàn trùng khớp với thông tin trong CV của bạn.
+                            {t('aiVerification.matchSuccess')}
                           </p>
                         ) : (
                           <div className="space-y-1">
                             <p className="text-xs text-amber-600 font-medium">
-                              Phát hiện sự khác biệt giữa thông tin biểu mẫu và nội dung CV của bạn:
+                              {t('aiVerification.mismatchTitle')}
                             </p>
                             <p className="text-xs text-ink-600 bg-amber-50/50 p-2 rounded-lg border border-amber-100 italic font-mono">
                               {verificationResult.mismatchDetails}
                             </p>
                             <p className="text-[11px] text-ink-400 mt-1">
-                              * Lưu ý: Bạn vẫn có thể nộp hồ sơ, nhưng hãy chắc chắn thông tin liên hệ là chính xác để Nhà tuyển dụng có thể liên lạc với bạn.
+                              {t('aiVerification.mismatchNote')}
                             </p>
                           </div>
                         )}
@@ -556,22 +557,25 @@ export default function ApplyPage() {
 
           {/* Thư giới thiệu / câu trả lời */}
           <section className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
-            <h2 className="font-display text-base font-bold">Thư giới thiệu</h2>
+            <h2 className="font-display text-base font-bold">{t('coverLetter.title')}</h2>
             <div className="mt-4">
               <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                1. Giới thiệu ngắn về kinh nghiệm, kỹ năng chính và vì sao bạn là ứng viên phù hợp? <span className="text-xs font-normal text-ink-400">(Không bắt buộc)</span>
+                {t('coverLetter.question1')}{' '}
+                <span className="text-xs font-normal text-ink-400">
+                  {t('coverLetter.optional')}
+                </span>
               </label>
               <textarea
                 value={coverLetter}
                 onChange={(e) => setCoverLetter(e.target.value)}
                 rows={5}
-                placeholder="Chia sẻ về kinh nghiệm, kỹ năng nổi bật và lý do bạn phù hợp với vị trí này…"
+                placeholder={t('coverLetter.question1Placeholder')}
                 className={inputCls(false)}
               />
             </div>
             <div className="mt-4">
               <label className="mb-1.5 block text-sm font-medium text-ink-700">
-                2. Thời gian báo trước khi nghỉ việc (notice period) của bạn là bao lâu?
+                {t('coverLetter.question2')}
                 <Req />
               </label>
               <input
@@ -581,7 +585,7 @@ export default function ApplyPage() {
                   clearTouched('noticePeriod')
                 }}
                 onBlur={() => markTouched('noticePeriod')}
-                placeholder="VD: 30 ngày / 45 ngày / có thể bắt đầu ngay"
+                placeholder={t('coverLetter.question2Placeholder')}
                 className={inputCls(!!showErr('noticePeriod'))}
               />
               {showErr('noticePeriod') && (
@@ -602,7 +606,7 @@ export default function ApplyPage() {
               onClick={requestCancel}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-5 py-3 text-sm font-semibold text-ink-700 hover:bg-ink-50"
             >
-              <ArrowLeft className="h-4 w-4" /> Quay lại tin tuyển dụng
+              <ArrowLeft className="h-4 w-4" /> {t('submit.backToJob')}
             </button>
             <button
               onClick={handleSubmit}
@@ -611,18 +615,18 @@ export default function ApplyPage() {
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Đang gửi hồ sơ…
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t('submit.submitting')}
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-4 w-4" /> Gửi hồ sơ ứng tuyển
+                  <CheckCircle2 className="h-4 w-4" /> {t('submit.submitApplication')}
                 </>
               )}
             </button>
           </div>
 
           <p className="flex items-center justify-center gap-1.5 pb-6 text-center text-xs text-ink-400">
-            <Sparkles className="h-3.5 w-3.5" /> Hồ sơ sẽ được gửi tới bộ phận nhân sự để xem xét.
+            <Sparkles className="h-3.5 w-3.5" /> {t('submit.footerHint')}
           </p>
         </div>
       </main>
@@ -636,11 +640,10 @@ export default function ApplyPage() {
                 <AlertCircle className="h-5 w-5" />
               </span>
               <div>
-                <h3 className="font-display text-base font-bold text-ink-900">Huỷ ứng tuyển?</h3>
-                <p className="mt-1 text-sm text-ink-500">
-                  Bạn có chắc chắn muốn quay lại? Thông tin đã nhập trong biểu mẫu sẽ không được
-                  lưu.
-                </p>
+                <h3 className="font-display text-base font-bold text-ink-900">
+                  {t('cancelModal.title')}
+                </h3>
+                <p className="mt-1 text-sm text-ink-500">{t('cancelModal.description')}</p>
               </div>
             </div>
             <div className="mt-5 flex gap-3">
@@ -648,13 +651,13 @@ export default function ApplyPage() {
                 onClick={() => setShowCancel(false)}
                 className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
               >
-                Tiếp tục điền
+                {t('cancelModal.continue')}
               </button>
               <button
                 onClick={goBack}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
               >
-                Huỷ &amp; quay lại
+                {t('cancelModal.confirm')}
               </button>
             </div>
           </div>
@@ -671,14 +674,13 @@ export default function ApplyPage() {
               </span>
               <div>
                 <h3 className="font-display text-base font-bold text-ink-900 flex items-center gap-1.5">
-                  AI đang xác thực thông tin...
+                  {t('aiVerification.pendingModal.title')}
                 </h3>
                 <p className="mt-2 text-sm text-ink-600 leading-relaxed">
-                  Hệ thống đang đối chiếu thông tin liên hệ bạn vừa nhập với nội dung trong CV bằng AI. 
-                  Điều này giúp đảm bảo nhà tuyển dụng có thể liên hệ chính xác với bạn.
+                  {t('aiVerification.pendingModal.description')}
                 </p>
                 <p className="mt-1.5 text-xs text-ink-400 italic">
-                  Quá trình đối chiếu thường mất từ 2-4 giây. Bạn có muốn đợi thêm hay nộp hồ sơ ngay?
+                  {t('aiVerification.pendingModal.hint')}
                 </p>
               </div>
             </div>
@@ -687,7 +689,7 @@ export default function ApplyPage() {
                 onClick={() => setShowPendingVerificationModal(false)}
                 className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
               >
-                Tiếp tục đợi
+                {t('aiVerification.pendingModal.continueWaiting')}
               </button>
               <button
                 onClick={async () => {
@@ -696,7 +698,7 @@ export default function ApplyPage() {
                 }}
                 className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
               >
-                Nộp ngay (Bỏ qua)
+                {t('aiVerification.pendingModal.skipAndSubmit')}
               </button>
             </div>
           </div>
@@ -713,16 +715,16 @@ export default function ApplyPage() {
               </span>
               <div>
                 <h3 className="font-display text-base font-bold text-ink-900">
-                  Cảnh báo: Sai lệch thông tin CV
+                  {t('aiVerification.mismatchModal.title')}
                 </h3>
                 <p className="mt-2 text-sm text-ink-600 leading-relaxed">
-                  Phát hiện thông tin bạn nhập trên form khác với thông tin cá nhân trong CV:
+                  {t('aiVerification.mismatchModal.description')}
                 </p>
                 <div className="mt-2 text-xs text-ink-700 bg-amber-50/50 p-3 rounded-lg border border-amber-100 italic font-mono whitespace-pre-line leading-relaxed">
                   {verificationResult?.mismatchDetails}
                 </div>
                 <p className="mt-3 text-xs text-ink-500">
-                  Nếu thông tin không chính xác, nhà tuyển dụng có thể không liên lạc được với bạn. Bạn có muốn điều chỉnh lại không?
+                  {t('aiVerification.mismatchModal.hint')}
                 </p>
               </div>
             </div>
@@ -731,7 +733,7 @@ export default function ApplyPage() {
                 onClick={() => setShowVerificationModal(false)}
                 className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
               >
-                Chỉnh sửa lại
+                {t('aiVerification.mismatchModal.edit')}
               </button>
               <button
                 onClick={async () => {
@@ -740,7 +742,7 @@ export default function ApplyPage() {
                 }}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
               >
-                Vẫn nộp hồ sơ
+                {t('aiVerification.mismatchModal.submitAnyway')}
               </button>
             </div>
           </div>

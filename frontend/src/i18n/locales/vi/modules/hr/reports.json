@@ -1,50 +1,25 @@
 {
-  "title": "Báo cáo tuyển dụng",
-  "subtitle": "Thống kê và phân tích quy trình tuyển dụng",
-  "overview": "Tổng quan",
-  "byJob": "Theo vị trí",
-  "byRecruiter": "Theo recruiter",
-  "byTime": "Theo thời gian",
-  "dateRange": "Khoảng thời gian",
-  "thisWeek": "Tuần này",
-  "thisMonth": "Tháng này",
-  "thisQuarter": "Quý này",
-  "thisYear": "Năm nay",
-  "custom": "Tùy chọn",
-  "from": "Từ ngày",
-  "to": "Đến ngày",
-  "export": "Xuất báo cáo",
-  "exportPdf": "Xuất PDF",
-  "exportExcel": "Xuất Excel",
-  "metrics": {
-    "totalApplications": "Tổng đơn ứng tuyển",
-    "newApplications": "Đơn mới",
-    "totalInterviews": "Tổng buổi phỏng vấn",
-    "totalPass": "Tổng Pass",
-    "totalNotPass": "Tổng Not Pass",
-    "passRate": "Tỷ lệ Pass",
-    "avgScore": "Điểm TB",
-    "avgTimeToHire": "TB thời gian tuyển",
-    "activeJobs": "Tin đang đăng",
-    "totalRecruiters": "Số recruiter"
+  "title": "Báo cáo",
+  "description": "Xem và tải các báo cáo tuyển dụng",
+  "stats": {
+    "totalCandidates": "Tổng ứng viên",
+    "hired": "Đã tuyển",
+    "avgTimeToHire": "Tgian TB tuyển",
+    "passRate": "Tỷ lệ Pass"
   },
-  "charts": {
-    "applicationsTrend": "Xu hướng đơn ứng tuyển",
-    "passRateByRound": "Tỷ lệ Pass theo vòng",
-    "topJobs": "Vị trí có nhiều đơn nhất",
-    "recruiterPerformance": "Hiệu suất recruiter",
-    "matchScoreDistribution": "Phân bố điểm Match"
+  "days": "ngày",
+  "recentReports": "Báo cáo gần đây",
+  "report1": {
+    "title": "Báo cáo tuyển dụng tháng 5",
+    "description": "Tổng hợp hoạt động tuyển dụng tháng 5/2026"
   },
-  "table": {
-    "job": "Vị trí",
-    "recruiter": "Recruiter",
-    "applications": "Đơn",
-    "interviews": "Phỏng vấn",
-    "pass": "Pass",
-    "fail": "Not Pass",
-    "passRate": "Tỷ lệ Pass",
-    "avgScore": "Điểm TB"
+  "report2": {
+    "title": "Phân tích hiệu suất NTD",
+    "description": "So sánh hiệu suất giữa các nhà tuyển dụng"
   },
-  "noData": "Chưa có dữ liệu trong khoảng thời gian này.",
-  "loadingError": "Không tải được báo cáo."
+  "report3": {
+    "title": "Báo cáo ứng viên",
+    "description": "Thống kê ứng viên theo vị trí"
+  },
+  "download": "Tải xuống"
 }

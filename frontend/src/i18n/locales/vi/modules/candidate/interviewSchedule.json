@@ -1,0 +1,51 @@
+{
+  "back": "Quay lại",
+  "title": "Phòng vấn",
+  "subtitle": "Nhập mã phỏng vấn để bắt đầu",
+  "enterCode": {
+    "title": "Nhập mã phỏng vấn",
+    "description": "Mã phỏng vấn được gửi qua email sau khi bạn ứng tuyển thành công",
+    "placeholder": "VD: INT001",
+    "verify": "Xác thực mã",
+    "noCode": "Bạn chưa có mã phỏng vấn?",
+    "findJob": "Tìm việc ngay"
+  },
+  "validation": {
+    "emptyCode": "Vui lòng nhập mã phỏng vấn",
+    "invalidCode": "Mã phỏng vấn không hợp lệ hoặc đã hết hạn"
+  },
+  "jobInfo": {
+    "title": "Thông tin công việc"
+  },
+  "candidateInfo": {
+    "title": "Thông tin ứng viên",
+    "fullName": "Họ và tên",
+    "email": "Email",
+    "phone": "Số điện thoại",
+    "location": "Địa điểm"
+  },
+  "cvInfo": {
+    "title": "CV đã nộp",
+    "uploadedAt": "Tải lên:"
+  },
+  "confirmInfo": {
+    "title": "Xác nhận thông tin",
+    "description": "Vui lòng kiểm tra kỹ thông tin bên trên trước khi bắt đầu phỏng vấn. Thông tin phải chính xác.",
+    "button": "Tôi xác nhận thông tin chính xác"
+  },
+  "success": {
+    "title": "Xác nhận thành công!",
+    "description": "Bạn đã sẵn sàng để bắt đầu phỏng vấn",
+    "infoConfirmed": "Thông tin đã được xác nhận"
+  },
+  "interviewType": {
+    "startInterview": "Bắt đầu phỏng vấn",
+    "startInterviewDesc": "Phỏng vấn chính thức với nhà tuyển dụng",
+    "practiceInterview": "Thử phỏng vấn",
+    "practiceInterviewDesc": "Luyện tập trước với AI"
+  },
+  "note": {
+    "title": "Lưu ý:",
+    "description": "Phỏng vấn sẽ được ghi hình và ghi âm. Hãy đảm bảo bạn ở trong môi trường yên tĩnh."
+  }
+}

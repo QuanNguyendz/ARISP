@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Pencil,
@@ -41,22 +42,25 @@ import {
 import { JobDetailSkeleton } from './_skeletons'
 import { resolveAssetUrl } from '@/config/constants'
 
-function getDeadlineText(deadlineStr?: string | null): string {
+function getDeadlineText(deadlineStr?: string | null, t: (key: string) => string): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
-  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
-  return `${formattedDate} (Còn ${diffDays} ngày)`
+  if (diffDays < 0) return `${formattedDate} (${t('deadline.expired')})`
+  if (diffDays === 0) return `${formattedDate} (${t('deadline.today')})`
+  return `${formattedDate} (${t('deadline.days', { count: diffDays })})`
 }
 
-// Chuyển date sang YYYY-MM-DD theo múi giờ LOCAL (tránh lỗi UTC +/-7)
 function toLocalDateStr(d: string | Date | number | undefined | null): string {
   if (!d) return ''
   const dt = new Date(d)
@@ -66,13 +70,6 @@ function toLocalDateStr(d: string | Date | number | undefined | null): string {
   const dd = String(dt.getDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
 }
-
-const FUNNEL: { key: string; label: string }[] = [
-  { key: 'cv_submitted', label: 'Mới ứng tuyển' },
-  { key: 'screening', label: 'Đang sơ loại' },
-  { key: 'interview', label: 'Phỏng vấn' },
-  { key: 'pass', label: 'Đạt' },
-]
 
 const matchColor = (s?: number | null) =>
   s == null
@@ -84,16 +81,26 @@ const matchColor = (s?: number | null) =>
         : 'text-red-600 dark:text-red-400'
 
 export default function RecruiterJobDetailPage() {
+  const { t } = useTranslation('modules/recruiter/jobDetail')
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
-  const { data: job, isLoading: loadingJob, error: jobError } = useQuery({
+
+  const {
+    data: job,
+    isLoading: loadingJob,
+    error: jobError,
+  } = useQuery({
     queryKey: ['job', id],
     queryFn: () => jobService.getJobPostingById(id!),
     enabled: !!id,
-    retry: false
+    retry: false,
   })
 
-  const { data: appsData, isLoading: loadingApps, refetch: refetchApps } = useQuery({
+  const {
+    data: appsData,
+    isLoading: loadingApps,
+    refetch: refetchApps,
+  } = useQuery({
     queryKey: ['job', id, 'applications'],
     queryFn: () => jobService.getJobApplications(id!).catch(() => [] as HrApplicationItem[]),
     enabled: !!id,
@@ -101,8 +108,7 @@ export default function RecruiterJobDetailPage() {
 
   const apps = appsData || []
   const loading = loadingJob || loadingApps
-  
-  // Keep error state for mutations like status change
+
   const [mutationError, setMutationError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -110,14 +116,21 @@ export default function RecruiterJobDetailPage() {
   const [processingAppId, setProcessingAppId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
-  const error = mutationError || (jobError as any)?.response?.data?.message || (jobError ? 'Không tải được chi tiết tin tuyển dụng.' : '')
-
+  const error =
+    mutationError ||
+    (jobError as any)?.response?.data?.message ||
+    (jobError ? t('loadingError') : '')
   const load = refetchApps
 
   const funnel = useMemo(() => {
     const by = (s: string) => apps.filter((a) => a.status === s).length
-    return FUNNEL.map((f) => ({ ...f, count: by(f.key) }))
-  }, [apps])
+    return [
+      { key: 'cv_submitted', label: t('funnel.cvSubmitted'), count: by('cv_submitted') },
+      { key: 'screening', label: t('funnel.screening'), count: by('screening') },
+      { key: 'interview', label: t('funnel.interview'), count: by('interview') },
+      { key: 'pass', label: t('funnel.pass'), count: by('pass') },
+    ]
+  }, [apps, t])
 
   const hired = useMemo(() => apps.filter((a) => a.status === 'pass').length, [apps])
   const isFull = job?.vacancies != null && job.vacancies > 0 && hired >= job.vacancies
@@ -134,32 +147,23 @@ export default function RecruiterJobDetailPage() {
     cvFileUrl?: string | null
   } | null>(null)
 
-  // Trạng thái lọc & sắp xếp cho Duyệt Hồ Sơ
   const [cvDateFilter, setCvDateFilter] = useState<string>('')
   const [cvStatusFilter, setCvStatusFilter] = useState<string>('all')
-  const [cvSortOrder, setCvSortOrder] = useState<string>('desc') // desc, asc, default
-
-  // Trạng thái lọc & sắp xếp cho Vòng phỏng vấn
+  const [cvSortOrder, setCvSortOrder] = useState<string>('desc')
   const [interviewDateFilter, setInterviewDateFilter] = useState<string>('')
   const [interviewStatusFilter, setInterviewStatusFilter] = useState<string>('all')
-  const [interviewSortOrder, setInterviewSortOrder] = useState<string>('desc') // desc, asc, default
-
-  // Trạng thái chọn hàng loạt
+  const [interviewSortOrder, setInterviewSortOrder] = useState<string>('desc')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchProcessing, setBatchProcessing] = useState<boolean>(false)
 
-  const activeRoundNumber = useMemo(() => {
-    return activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0
-  }, [activeTab])
+  const activeRoundNumber = useMemo(
+    () => (activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0),
+    [activeTab]
+  )
 
   const tabs = useMemo(() => {
     if (!job) return []
-
-    // Vòng duyệt hồ sơ (chưa qua vòng nào)
-    const cvReviewCount = apps.filter(
-      (a) => !a.currentRound || a.currentRound === 0
-    ).length
-
+    const cvReviewCount = apps.filter((a) => !a.currentRound || a.currentRound === 0).length
     const roundTabs = (job.roundConfigs || [])
       .slice()
       .sort((a, b) => a.roundNumber - b.roundNumber)
@@ -167,72 +171,57 @@ export default function RecruiterJobDetailPage() {
         const count = apps.filter((a) => a.currentRound === rc.roundNumber).length
         return {
           id: `round_${rc.roundNumber}`,
-          label: `Vòng ${rc.roundNumber}`,
+          label: `${t('tabs.round')} ${rc.roundNumber}`,
           count,
         }
       })
-
-    return [
-      { id: 'cv_review', label: 'Duyệt Hồ Sơ', count: cvReviewCount },
-      ...roundTabs,
-    ]
-  }, [job, apps])
+    return [{ id: 'cv_review', label: t('tabs.cvReview'), count: cvReviewCount }, ...roundTabs]
+  }, [job, apps, t])
 
   const activeCandidates = useMemo(() => {
-    if (activeTab === 'cv_review') {
+    if (activeTab === 'cv_review')
       return apps.filter((a) => !a.currentRound || a.currentRound === 0)
-    }
-
     if (activeTab.startsWith('round_')) {
       const roundNumber = parseInt(activeTab.replace('round_', ''), 10)
       return apps.filter((a) => a.currentRound === roundNumber)
     }
-
     return apps
   }, [apps, activeTab])
 
   const processedApps = useMemo(() => {
     let result = [...activeCandidates]
-
     if (activeTab === 'cv_review') {
-      // 1. Lọc theo ngày nộp (so sánh theo múi giờ local)
-      if (cvDateFilter) {
-        result = result.filter((a) => toLocalDateStr(a.createdAt) === cvDateFilter)
-      }
-      // 2. Lọc theo trạng thái
-      if (cvStatusFilter && cvStatusFilter !== 'all') {
+      if (cvDateFilter) result = result.filter((a) => toLocalDateStr(a.createdAt) === cvDateFilter)
+      if (cvStatusFilter && cvStatusFilter !== 'all')
         result = result.filter((a) => a.status === cvStatusFilter)
-      }
-      // 3. Sắp xếp theo độ phù hợp
-      if (cvSortOrder === 'desc') {
-        result.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-      } else if (cvSortOrder === 'asc') {
+      if (cvSortOrder === 'desc') result.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
+      else if (cvSortOrder === 'asc')
         result.sort((a, b) => (a.matchScore ?? 0) - (b.matchScore ?? 0))
-      }
     } else {
-      // 1. Lọc theo ngày thi (so sánh theo múi giờ local)
-      if (interviewDateFilter) {
+      if (interviewDateFilter)
         result = result.filter((a) => toLocalDateStr(a.interviewDate) === interviewDateFilter)
-      }
-      // 2. Lọc theo trạng thái
-      if (interviewStatusFilter && interviewStatusFilter !== 'all') {
+      if (interviewStatusFilter && interviewStatusFilter !== 'all')
         result = result.filter((a) => a.status === interviewStatusFilter)
-      }
-      // 3. Sắp xếp theo điểm đánh giá
-      if (interviewSortOrder === 'desc') {
+      if (interviewSortOrder === 'desc')
         result.sort((a, b) => (b.interviewScore ?? 0) - (a.interviewScore ?? 0))
-      } else if (interviewSortOrder === 'asc') {
+      else if (interviewSortOrder === 'asc')
         result.sort((a, b) => (a.interviewScore ?? 0) - (b.interviewScore ?? 0))
-      }
     }
-
     return result
-  }, [activeCandidates, activeTab, cvDateFilter, cvStatusFilter, cvSortOrder, interviewDateFilter, interviewStatusFilter, interviewSortOrder])
+  }, [
+    activeCandidates,
+    activeTab,
+    cvDateFilter,
+    cvStatusFilter,
+    cvSortOrder,
+    interviewDateFilter,
+    interviewStatusFilter,
+    interviewSortOrder,
+  ])
 
-  const isSelectable = useCallback((a: HrApplicationItem) => {
-    if (activeTab === 'cv_review') {
-      return a.status === 'cv_submitted' || a.status === 'invited'
-    } else {
+  const isSelectable = useCallback(
+    (a: HrApplicationItem) => {
+      if (activeTab === 'cv_review') return a.status === 'cv_submitted' || a.status === 'invited'
       return !(
         a.status === 'rejected' ||
         a.status === 'failed' ||
@@ -241,8 +230,9 @@ export default function RecruiterJobDetailPage() {
         a.status === 'pass' ||
         (a.currentRound != null && activeRoundNumber > 0 && a.currentRound > activeRoundNumber)
       )
-    }
-  }, [activeTab, activeRoundNumber])
+    },
+    [activeTab, activeRoundNumber]
+  )
 
   const PAGE_SIZE = 10
   const totalPages = Math.max(1, Math.ceil(processedApps.length / PAGE_SIZE))
@@ -250,50 +240,56 @@ export default function RecruiterJobDetailPage() {
     () => processedApps.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [processedApps, page]
   )
-
-  const pageSelectableCandidates = useMemo(() => {
-    return pagedApps.filter(isSelectable)
-  }, [pagedApps, isSelectable])
-
-  const isAllSelected = useMemo(() => {
-    if (pageSelectableCandidates.length === 0) return false
-    return pageSelectableCandidates.every((c) => selectedIds.includes(c.id))
-  }, [pageSelectableCandidates, selectedIds])
+  const pageSelectableCandidates = useMemo(
+    () => pagedApps.filter(isSelectable),
+    [pagedApps, isSelectable]
+  )
+  const isAllSelected = useMemo(
+    () =>
+      pageSelectableCandidates.length > 0 &&
+      pageSelectableCandidates.every((c) => selectedIds.includes(c.id)),
+    [pageSelectableCandidates, selectedIds]
+  )
 
   const handleSelectAll = useCallback(() => {
-    if (isAllSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !pageSelectableCandidates.some((c) => c.id === id)))
-    } else {
-      setSelectedIds((prev) => {
-        const newIds = pageSelectableCandidates.map((c) => c.id).filter((id) => !prev.includes(id))
-        return [...prev, ...newIds]
-      })
-    }
+    if (isAllSelected)
+      setSelectedIds((prev) =>
+        prev.filter((id) => !pageSelectableCandidates.some((c) => c.id === id))
+      )
+    else
+      setSelectedIds((prev) => [
+        ...prev,
+        ...pageSelectableCandidates.map((c) => c.id).filter((id) => !prev.includes(id)),
+      ])
   }, [isAllSelected, pageSelectableCandidates])
 
-  // Reset page when tab changes
   useEffect(() => {
     setPage(1)
   }, [activeTab])
-
-  // Kẹp trang khi danh sách ứng viên thay đổi
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
-
   useEffect(() => {
     setSelectedIds([])
-  }, [activeTab, cvDateFilter, cvStatusFilter, cvSortOrder, interviewDateFilter, interviewStatusFilter, interviewSortOrder])
+  }, [
+    activeTab,
+    cvDateFilter,
+    cvStatusFilter,
+    cvSortOrder,
+    interviewDateFilter,
+    interviewStatusFilter,
+    interviewSortOrder,
+  ])
 
   const handleBatchAccept = async () => {
     if (selectedIds.length === 0) return
-    if (!window.confirm(`Bạn có chắc chắn muốn duyệt ${selectedIds.length} hồ sơ đã chọn và chuyển sang Vòng 1?`)) return
+    if (!window.confirm(t('confirm.approve', { count: selectedIds.length }))) return
     setBatchProcessing(true)
     setMutationError('')
     setNotice('')
     try {
-      let successCount = 0
-      let failCount = 0
+      let successCount = 0,
+        failCount = 0
       const results = await Promise.allSettled(
         selectedIds.map((id) => applicationService.acceptApplication(id))
       )
@@ -301,11 +297,14 @@ export default function RecruiterJobDetailPage() {
         if (res.status === 'fulfilled') successCount++
         else failCount++
       })
-      setNotice(`Đã duyệt thành công ${successCount} hồ sơ.${failCount > 0 ? ` Thất bại ${failCount} hồ sơ.` : ''}`)
+      setNotice(
+        t('messages.approvedSuccess', { count: successCount }) +
+          (failCount > 0 ? ` ${t('messages.approvedFailed', { count: failCount })}` : '')
+      )
       setSelectedIds([])
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || 'Lỗi khi duyệt hàng loạt.')
+      setMutationError(err?.response?.data?.message || t('messages.approveError'))
     } finally {
       setBatchProcessing(false)
     }
@@ -313,13 +312,13 @@ export default function RecruiterJobDetailPage() {
 
   const handleBatchReject = async () => {
     if (selectedIds.length === 0) return
-    if (!window.confirm(`Bạn có chắc chắn muốn từ chối ${selectedIds.length} hồ sơ đã chọn và gửi thư cảm ơn?`)) return
+    if (!window.confirm(t('confirm.reject', { count: selectedIds.length }))) return
     setBatchProcessing(true)
     setMutationError('')
     setNotice('')
     try {
-      let successCount = 0
-      let failCount = 0
+      let successCount = 0,
+        failCount = 0
       const results = await Promise.allSettled(
         selectedIds.map((id) => applicationService.rejectApplication(id))
       )
@@ -327,11 +326,14 @@ export default function RecruiterJobDetailPage() {
         if (res.status === 'fulfilled') successCount++
         else failCount++
       })
-      setNotice(`Đã từ chối thành công ${successCount} hồ sơ.${failCount > 0 ? ` Thất bại ${failCount} hồ sơ.` : ''}`)
+      setNotice(
+        t('messages.rejectedSuccess', { count: successCount }) +
+          (failCount > 0 ? ` ${t('messages.rejectedFailed', { count: failCount })}` : '')
+      )
       setSelectedIds([])
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || 'Lỗi khi từ chối hàng loạt.')
+      setMutationError(err?.response?.data?.message || t('messages.rejectError'))
     } finally {
       setBatchProcessing(false)
     }
@@ -339,13 +341,13 @@ export default function RecruiterJobDetailPage() {
 
   const handleBatchInvite = async () => {
     if (selectedIds.length === 0) return
-    if (!window.confirm(`Bạn có chắc chắn muốn gửi lời mời phỏng vấn cho ${selectedIds.length} ứng viên đã chọn?`)) return
+    if (!window.confirm(t('confirm.invite', { count: selectedIds.length }))) return
     setBatchProcessing(true)
     setMutationError('')
     setNotice('')
     try {
-      let successCount = 0
-      let failCount = 0
+      let successCount = 0,
+        failCount = 0
       const results = await Promise.allSettled(
         selectedIds.map((id) => applicationService.sendInvite(id))
       )
@@ -353,11 +355,14 @@ export default function RecruiterJobDetailPage() {
         if (res.status === 'fulfilled') successCount++
         else failCount++
       })
-      setNotice(`Đã gửi lời mời thành công cho ${successCount} ứng viên.${failCount > 0 ? ` Thất bại ${failCount} ứng viên.` : ''}`)
+      setNotice(
+        t('messages.inviteSentSuccess', { count: successCount }) +
+          (failCount > 0 ? ` ${t('messages.inviteSentFailed', { count: failCount })}` : '')
+      )
       setSelectedIds([])
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || 'Lỗi khi gửi lời mời hàng loạt.')
+      setMutationError(err?.response?.data?.message || t('messages.inviteError'))
     } finally {
       setBatchProcessing(false)
     }
@@ -372,14 +377,14 @@ export default function RecruiterJobDetailPage() {
       await jobService.updateJobStatus(id, status)
       setNotice(
         status === 'pending'
-          ? 'Đã gửi tin cho HR Leader duyệt.'
+          ? t('messages.jobSubmittedForApproval')
           : status === 'closed'
-            ? 'Đã đóng tin tuyển dụng.'
-            : 'Đã cập nhật trạng thái.'
+            ? t('messages.jobClosed')
+            : t('messages.statusUpdated')
       )
       await load()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || 'Không thể cập nhật trạng thái tin.')
+      setMutationError(e?.response?.data?.message || t('messages.statusError'))
     } finally {
       setBusy(false)
     }
@@ -391,9 +396,9 @@ export default function RecruiterJobDetailPage() {
     setNotice('')
     try {
       await applicationService.sendInvite(appId)
-      setNotice('Đã gửi lời mời (magic link) cho ứng viên.')
+      setNotice(t('messages.singleInviteSent'))
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || 'Không thể gửi lời mời.')
+      setMutationError(e?.response?.data?.message || t('messages.inviteError'))
     } finally {
       setInvitingId(null)
     }
@@ -405,26 +410,27 @@ export default function RecruiterJobDetailPage() {
     setNotice('')
     try {
       await applicationService.acceptApplication(appId)
-      setNotice('Đã duyệt hồ sơ ứng viên và chuyển sang Vòng 1 thành công.')
+      setNotice(t('messages.singleApproved'))
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || 'Lỗi khi duyệt hồ sơ.')
+      setMutationError(err?.response?.data?.message || t('messages.approveError'))
     } finally {
       setProcessingAppId(null)
     }
   }
 
   const handleReject = async (appId: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn từ chối hồ sơ ứng viên này và gửi thư cảm ơn?')) return
+    if (!window.confirm('Bạn có chắc chắn muốn từ chối hồ sơ ứng viên này và gửi thư cảm ơn?'))
+      return
     setProcessingAppId(appId)
     setMutationError('')
     setNotice('')
     try {
       await applicationService.rejectApplication(appId)
-      setNotice('Đã từ chối hồ sơ và gửi email cảm ơn ứng viên thành công.')
+      setNotice(t('messages.singleRejected'))
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || 'Lỗi khi từ chối hồ sơ.')
+      setMutationError(err?.response?.data?.message || t('messages.rejectError'))
     } finally {
       setProcessingAppId(null)
     }
@@ -434,12 +440,12 @@ export default function RecruiterJobDetailPage() {
   if (!job) {
     return (
       <div className="p-6 lg:p-8">
-        <ErrorAlert message={error || 'Không tìm thấy tin tuyển dụng.'} />
+        <ErrorAlert message={error || t('notFound')} />
         <Link
           to="/recruiter/my-jobs"
           className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         >
-          ← Quay lại danh sách
+          ← {t('backToList')}
         </Link>
       </div>
     )
@@ -455,7 +461,7 @@ export default function RecruiterJobDetailPage() {
         to="/recruiter/my-jobs"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
       >
-        <ArrowLeft className="h-4 w-4" /> Quay lại danh sách
+        <ArrowLeft className="h-4 w-4" /> {t('backToList')}
       </Link>
 
       {error && <ErrorAlert message={error} onDismiss={() => setMutationError('')} />}
@@ -465,7 +471,7 @@ export default function RecruiterJobDetailPage() {
             <CheckCircle2 className="h-4 w-4" /> {notice}
           </span>
           <button onClick={() => setNotice('')} className="hover:opacity-70">
-            Đóng
+            {t('coverLetterModal.close')}
           </button>
         </div>
       )}
@@ -491,32 +497,34 @@ export default function RecruiterJobDetailPage() {
                 </span>
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
-                <span>{job.department || 'Chưa phân phòng ban'}</span>
-                {job.location ? (
+                <span>{job.department || t('noDepartment')}</span>
+                {job.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />
                     {job.location}
                   </span>
-                ) : null}
+                )}
                 <span>{formatSalary(job)}</span>
                 {job.vacancies != null && job.vacancies > 0 && (
                   <span
                     className={`flex items-center gap-1 font-medium ${isFull ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-600 dark:text-ink-300'}`}
                   >
-                    <Target className="h-3.5 w-3.5" /> Tuyển {hired}/{job.vacancies}
+                    <Target className="h-3.5 w-3.5" />{' '}
+                    {t('hiringProgress', { hired, total: job.vacancies })}
                   </span>
                 )}
                 {job.applicationDeadline && (
                   <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                     <CalendarClock className="h-3.5 w-3.5" />
-                    Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                    {t('deadline')}: {getDeadlineText(job.applicationDeadline, t)}
                   </span>
                 )}
-                <span className="text-ink-400">· tạo {timeAgo(job.createdAt)}</span>
+                <span className="text-ink-400">
+                  · {t('created')} {timeAgo(job.createdAt)}
+                </span>
               </p>
             </div>
           </div>
-
           <div className="flex flex-wrap items-center gap-2">
             {job.jdFileUrl && (
               <button
@@ -524,21 +532,21 @@ export default function RecruiterJobDetailPage() {
                 onClick={() => openDocument(job.jdFileUrl!, job.jdFileName || `${job.title} - JD`)}
                 className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
               >
-                <FileText className="h-4 w-4" /> JD gốc
+                <FileText className="h-4 w-4" /> {t('jdFile')}
               </button>
             )}
             <Link
               to={`/recruiter/my-jobs/${job.id}/schedule`}
               className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
             >
-              <CalendarClock className="h-4 w-4" /> Lịch phỏng vấn
+              <CalendarClock className="h-4 w-4" /> {t('interviewSchedule')}
             </Link>
             {canEdit && (
               <Link
                 to={`/recruiter/my-jobs/${job.id}/edit`}
                 className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
               >
-                <Pencil className="h-4 w-4" /> Sửa tin
+                <Pencil className="h-4 w-4" /> {t('editJob')}
               </Link>
             )}
             {canSubmit && (
@@ -548,7 +556,7 @@ export default function RecruiterJobDetailPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{' '}
-                Gửi HR duyệt
+                {t('submitForApproval')}
               </button>
             )}
             {canClose && (
@@ -562,7 +570,7 @@ export default function RecruiterJobDetailPage() {
                 ) : (
                   <XCircle className="h-4 w-4" />
                 )}{' '}
-                Đóng tin
+                {t('closeJob')}
               </button>
             )}
           </div>
@@ -572,7 +580,7 @@ export default function RecruiterJobDetailPage() {
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <b>HR từ chối:</b> {job.rejectionReason}. Sửa tin và gửi duyệt lại.
+              <b>{t('hrRejected')}:</b> {job.rejectionReason}. {t('hrRejectedHint', { reason: '' })}
             </span>
           </div>
         )}
@@ -580,25 +588,25 @@ export default function RecruiterJobDetailPage() {
         {isFull && canClose && (
           <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
             <span className="flex items-center gap-2">
-              <Target className="h-4 w-4" /> Đã tuyển đủ chỉ tiêu ({hired}/{job.vacancies}) — cân
-              nhắc đóng tin.
+              <Target className="h-4 w-4" />{' '}
+              {t('hiringGoalReached', { hired, total: job.vacancies })}
             </span>
             <button
               onClick={() => changeStatus('closed')}
               disabled={busy}
               className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              Đóng tin
+              {t('closeJob')}
             </button>
           </div>
         )}
       </motion.div>
 
-      {/* Phễu ứng viên */}
+      {/* Candidate Funnel */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
           <span className="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
-            <Users className="h-4 w-4" /> Tổng UV
+            <Users className="h-4 w-4" /> {t('stats.totalCandidates')}
           </span>
           <div className="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400">
             {apps.length}
@@ -615,12 +623,12 @@ export default function RecruiterJobDetailPage() {
         ))}
       </div>
 
-      {/* Cấu hình vòng phỏng vấn */}
+      {/* Interview Rounds Config */}
       {job.roundConfigs?.length > 0 && (
         <div className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
-            <Layers className="h-4 w-4 text-ai-600 dark:text-ai-400" /> Vòng phỏng vấn (
-            {job.roundConfigs.length})
+            <Layers className="h-4 w-4 text-ai-600 dark:text-ai-400" /> {t('interviewRounds')}{' '}
+            {t('interviewRoundsCount', { count: job.roundConfigs.length })}
           </h2>
           <div className="flex flex-wrap gap-2">
             {job.roundConfigs.map((r) => (
@@ -628,7 +636,8 @@ export default function RecruiterJobDetailPage() {
                 key={r.roundNumber}
                 className="rounded-lg border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-1.5 text-xs text-ink-700 dark:text-ink-200"
               >
-                Vòng {r.roundNumber}: {r.roundType === 'technical' ? 'Chuyên môn' : 'Sơ loại'} ·{' '}
+                {t('tabs.round')} {r.roundNumber}:{' '}
+                {r.roundType === 'technical' ? t('roundTechnical') : t('roundScreening')} ·{' '}
                 {r.maxDurationMinutes}′
               </span>
             ))}
@@ -636,11 +645,12 @@ export default function RecruiterJobDetailPage() {
         </div>
       )}
 
-      {/* Danh sách ứng viên của job */}
+      {/* Candidates List */}
       <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
         <div className="flex items-center justify-between border-b border-ink-100 dark:border-white/10 px-5 py-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-            <Users className="h-5 w-5 text-brand-600 dark:text-brand-400" /> Ứng viên ({apps.length})
+            <Users className="h-5 w-5 text-brand-600 dark:text-brand-400" /> {t('candidateFunnel')}{' '}
+            ({apps.length})
           </h2>
         </div>
 
@@ -651,11 +661,7 @@ export default function RecruiterJobDetailPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? 'bg-brand-600 text-white shadow-sm'
-                      : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${activeTab === tab.id ? 'bg-brand-600 text-white shadow-sm' : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'}`}
                 >
                   {tab.label} ({tab.count})
                 </button>
@@ -667,102 +673,91 @@ export default function RecruiterJobDetailPage() {
         {apps.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <Users className="h-8 w-8 text-ink-300" />
-            <p className="text-sm text-ink-500 dark:text-ink-400">
-              Chưa có ứng viên nào cho tin này.
-            </p>
+            <p className="text-sm text-ink-500 dark:text-ink-400">{t('noCandidatesForJob')}</p>
           </div>
         ) : (
           <>
-            {/* Bộ lọc và sắp xếp */}
+            {/* Filters */}
             <div className="mx-5 mb-6 flex flex-wrap items-end justify-between gap-4 p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
               <div className="flex flex-wrap items-center gap-4">
-                {/* Lọc theo ngày */}
                 <div className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                    {activeTab === 'cv_review' ? 'Lọc theo ngày nộp' : 'Lọc theo ngày thi'}
+                    {activeTab === 'cv_review'
+                      ? t('filters.filterByDateCv')
+                      : t('filters.filterByDateInterview')}
                   </span>
                   <input
                     type="date"
                     value={activeTab === 'cv_review' ? cvDateFilter : interviewDateFilter}
-                    onChange={(e) => {
-                      if (activeTab === 'cv_review') {
-                        setCvDateFilter(e.target.value)
-                      } else {
-                        setInterviewDateFilter(e.target.value)
-                      }
-                    }}
+                    onChange={(e) =>
+                      activeTab === 'cv_review'
+                        ? setCvDateFilter(e.target.value)
+                        : setInterviewDateFilter(e.target.value)
+                    }
                     className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
                   />
                 </div>
-
-                {/* Lọc theo trạng thái */}
                 <div className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                    Lọc theo trạng thái
+                    {t('filters.filterByStatus')}
                   </span>
                   <select
                     value={activeTab === 'cv_review' ? cvStatusFilter : interviewStatusFilter}
-                    onChange={(e) => {
-                      if (activeTab === 'cv_review') {
-                        setCvStatusFilter(e.target.value)
-                      } else {
-                        setInterviewStatusFilter(e.target.value)
-                      }
-                    }}
+                    onChange={(e) =>
+                      activeTab === 'cv_review'
+                        ? setCvStatusFilter(e.target.value)
+                        : setInterviewStatusFilter(e.target.value)
+                    }
                     className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
                   >
-                    <option value="all">Tất cả trạng thái</option>
+                    <option value="all">{t('filters.allStatuses')}</option>
                     {activeTab === 'cv_review' ? (
                       <>
-                        {/* cv_submitted: nộp qua job board | invited: được mời, chưa nộp CV */}
-                        <option value="cv_submitted">Mới ứng tuyển</option>
-                        <option value="invited">Được mời (chưa nộp CV)</option>
-                        <option value="cv_rejected">CV bị từ chối</option>
+                        <option value="cv_submitted">{t('filters.cvSubmitted')}</option>
+                        <option value="invited">{t('filters.invited')}</option>
+                        <option value="cv_rejected">{t('filters.cvRejected')}</option>
                       </>
                     ) : (
                       <>
-                        {/* Luồng: acceptApplication → screening → (book slot) → interview → pass/not_pass */}
-                        <option value="invited">Chờ gửi lời mời</option>
-                        <option value="screening">Đã mời, chờ đặt lịch</option>
-                        <option value="interview">Đã đặt lịch / Đang phỏng vấn</option>
-                        <option value="pass">Đạt</option>
-                        <option value="not_pass">Không đạt</option>
-                        <option value="withdrawn">Đã rút</option>
+                        <option value="invited">{t('filters.waitingForInvite')}</option>
+                        <option value="screening">{t('filters.invitedWaitingSchedule')}</option>
+                        <option value="interview">{t('filters.scheduledInterview')}</option>
+                        <option value="pass">{t('funnel.pass')}</option>
+                        <option value="not_pass">{t('funnel.screening')}</option>
+                        <option value="withdrawn">{t('filters.withdrawn')}</option>
                       </>
                     )}
                   </select>
                 </div>
               </div>
-
-              {/* Sắp xếp */}
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                  {activeTab === 'cv_review' ? 'Sắp xếp theo độ phù hợp' : 'Sắp xếp theo điểm đánh giá'}
+                  {activeTab === 'cv_review'
+                    ? t('filters.sortByRelevance')
+                    : t('filters.sortByScore')}
                 </span>
                 <select
                   value={activeTab === 'cv_review' ? cvSortOrder : interviewSortOrder}
-                  onChange={(e) => {
-                    if (activeTab === 'cv_review') {
-                      setCvSortOrder(e.target.value)
-                    } else {
-                      setInterviewSortOrder(e.target.value)
-                    }
-                  }}
+                  onChange={(e) =>
+                    activeTab === 'cv_review'
+                      ? setCvSortOrder(e.target.value)
+                      : setInterviewSortOrder(e.target.value)
+                  }
                   className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
                 >
-                  <option value="desc">Giảm dần (Cao nhất trước)</option>
-                  <option value="asc">Tăng dần (Thấp nhất trước)</option>
-                  <option value="default">Mặc định (Thời gian nộp)</option>
+                  <option value="desc">{t('filters.sortDesc')}</option>
+                  <option value="asc">{t('filters.sortAsc')}</option>
+                  <option value="default">{t('filters.sortDefault')}</option>
                 </select>
               </div>
             </div>
 
-            {/* Thanh hành động hàng loạt (Batch Actions Bar) */}
+            {/* Batch Actions */}
             {selectedIds.length > 0 && (
               <div className="mx-5 flex items-center justify-between p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-brand-900 dark:text-brand-400">
-                    Đã chọn {selectedIds.length} ứng viên
+                    {t('batch.selected', { count: selectedIds.length })}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -778,7 +773,7 @@ export default function RecruiterJobDetailPage() {
                         ) : (
                           <Check className="w-3.5 h-3.5" />
                         )}
-                        Duyệt hàng loạt
+                        {t('batch.approveAll')}
                       </button>
                       <button
                         disabled={batchProcessing}
@@ -786,7 +781,7 @@ export default function RecruiterJobDetailPage() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
                       >
                         <X className="w-3.5 h-3.5" />
-                        Từ chối hàng loạt
+                        {t('batch.rejectAll')}
                       </button>
                     </>
                   ) : (
@@ -800,7 +795,7 @@ export default function RecruiterJobDetailPage() {
                       ) : (
                         <Send className="w-3.5 h-3.5" />
                       )}
-                      Mời phỏng vấn hàng loạt
+                      {t('batch.inviteAll')}
                     </button>
                   )}
                 </div>
@@ -810,12 +805,11 @@ export default function RecruiterJobDetailPage() {
             {processedApps.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <Users className="h-8 w-8 text-ink-300" />
-                <p className="text-sm text-ink-500 dark:text-ink-400">
-                  Không tìm thấy ứng viên nào phù hợp với bộ lọc.
-                </p>
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('noResults')}</p>
               </div>
             ) : (
               <>
+                {/* Table Headers */}
                 {activeTab === 'cv_review' ? (
                   <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
                     <div className="flex items-center justify-center">
@@ -827,12 +821,12 @@ export default function RecruiterJobDetailPage() {
                         className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
                       />
                     </div>
-                    <div>Ứng viên</div>
-                    <div className="text-center">Ngày nộp</div>
-                    <div className="text-center">Báo trước</div>
-                    <div className="text-center">Độ Phù Hợp</div>
-                    <div className="text-center">Trạng Thái</div>
-                    <div className="text-center">Hành động</div>
+                    <div>{t('tableHeaders.candidate')}</div>
+                    <div className="text-center">{t('tableHeaders.submittedDate')}</div>
+                    <div className="text-center">{t('tableHeaders.noticePeriod')}</div>
+                    <div className="text-center">{t('tableHeaders.matchScore')}</div>
+                    <div className="text-center">{t('tableHeaders.status')}</div>
+                    <div className="text-center">{t('tableHeaders.actions')}</div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
@@ -845,11 +839,11 @@ export default function RecruiterJobDetailPage() {
                         className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
                       />
                     </div>
-                    <div>Ứng viên</div>
-                    <div className="text-center">Lịch thi/phỏng vấn</div>
-                    <div className="text-center">Điểm Đánh Giá</div>
-                    <div className="text-center">Trạng Thái</div>
-                    <div className="text-center">Hành động</div>
+                    <div>{t('tableHeaders.candidate')}</div>
+                    <div className="text-center">{t('tableHeaders.interviewSchedule')}</div>
+                    <div className="text-center">{t('tableHeaders.evaluationScore')}</div>
+                    <div className="text-center">{t('tableHeaders.status')}</div>
+                    <div className="text-center">{t('tableHeaders.actions')}</div>
                   </div>
                 )}
 
@@ -857,29 +851,20 @@ export default function RecruiterJobDetailPage() {
                   {pagedApps.map((a) => (
                     <div
                       key={a.id}
-                      className={`grid items-center gap-4 px-5 py-3 hover:bg-ink-50/50 dark:hover:bg-white-[0.02] transition-colors ${
-                        activeTab === 'cv_review'
-                          ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]'
-                          : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'
-                      }`}
+                      className={`grid items-center gap-4 px-5 py-3 hover:bg-ink-50/50 dark:hover:bg-white-[0.02] transition-colors ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
                     >
-                      {/* Checkbox chọn hàng loạt */}
                       <div className="flex items-center justify-center">
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(a.id)}
                           disabled={!isSelectable(a) || batchProcessing}
                           onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedIds((prev) => [...prev, a.id])
-                            } else {
-                              setSelectedIds((prev) => prev.filter((id) => id !== a.id))
-                            }
+                            if (e.target.checked) setSelectedIds((prev) => [...prev, a.id])
+                            else setSelectedIds((prev) => prev.filter((id) => id !== a.id))
                           }}
                           className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </div>
-
                       <Link
                         to={`/recruiter/candidates/${a.id}`}
                         className="flex min-w-0 items-center gap-3 group cursor-pointer"
@@ -889,28 +874,21 @@ export default function RecruiterJobDetailPage() {
                         </span>
                         <div className="min-w-0">
                           <h4 className="truncate text-sm font-semibold text-ink-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                            {a.candidateName || 'Ứng viên'}
+                            {a.candidateName || t('candidate')}
                           </h4>
                           <p className="flex items-center gap-1 truncate text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                             <Mail className="h-3 w-3" /> {a.candidateEmail}
                           </p>
                         </div>
                       </Link>
-
-                      {/* Cột 2 & 3 thay đổi tùy theo tab */}
                       {activeTab === 'cv_review' ? (
                         <>
-                          {/* Ngày nộp */}
                           <div className="text-center text-xs text-ink-600 dark:text-ink-300">
                             {new Date(a.createdAt).toLocaleDateString('vi-VN')}
                           </div>
-
-                          {/* Báo trước */}
-                          <div className="text-center text-xs text-ink-600 dark:text-ink-300 truncate" title={a.noticePeriod || undefined}>
+                          <div className="text-center text-xs text-ink-600 dark:text-ink-300 truncate">
                             {a.noticePeriod || '—'}
                           </div>
-
-                          {/* Độ phù hợp */}
                           <div className="text-center">
                             {a.matchScore != null ? (
                               <span className={`text-sm font-bold ${matchColor(a.matchScore)}`}>
@@ -923,7 +901,6 @@ export default function RecruiterJobDetailPage() {
                         </>
                       ) : (
                         <>
-                          {/* Lịch thi/phỏng vấn */}
                           <div className="text-center text-xs text-ink-600 dark:text-ink-300">
                             {a.interviewDate ? (
                               new Date(a.interviewDate).toLocaleString('vi-VN', {
@@ -931,11 +908,11 @@ export default function RecruiterJobDetailPage() {
                                 timeStyle: 'short',
                               })
                             ) : (
-                              <span className="text-ink-400 italic">Chưa đặt lịch</span>
+                              <span className="text-ink-400 italic">
+                                {t('filters.scheduledInterview')}
+                              </span>
                             )}
                           </div>
-
-                          {/* Điểm đánh giá */}
                           <div className="text-center">
                             {a.interviewScore != null ? (
                               <span className="text-sm font-bold text-brand-600 dark:text-brand-400">
@@ -947,7 +924,6 @@ export default function RecruiterJobDetailPage() {
                           </div>
                         </>
                       )}
-                      
                       <div className="text-center flex flex-col items-center justify-center gap-1">
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${appStatusBadge(a.status)} whitespace-nowrap`}
@@ -955,15 +931,18 @@ export default function RecruiterJobDetailPage() {
                           {appStatusLabel(a.status)}
                         </span>
                       </div>
-
                       <div className="flex items-center justify-center gap-1 shrink-0">
                         <div className="w-36 flex gap-2 shrink-0 justify-center">
-                          {(!a.currentRound || a.currentRound === 0) ? (
+                          {!a.currentRound || a.currentRound === 0 ? (
                             <>
                               <button
-                                disabled={processingAppId != null || (a.status !== 'cv_submitted' && a.status !== 'invited') || batchProcessing}
+                                disabled={
+                                  processingAppId != null ||
+                                  (a.status !== 'cv_submitted' && a.status !== 'invited') ||
+                                  batchProcessing
+                                }
                                 onClick={() => handleAccept(a.id)}
-                                title="Duyệt hồ sơ & Mời phỏng vấn"
+                                title={t('actions.approve')}
                                 className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
                               >
                                 {processingAppId === a.id ? (
@@ -971,16 +950,20 @@ export default function RecruiterJobDetailPage() {
                                 ) : (
                                   <Check className="w-3 h-3" />
                                 )}
-                                Duyệt
+                                {t('actions.approve')}
                               </button>
                               <button
-                                disabled={processingAppId != null || (a.status !== 'cv_submitted' && a.status !== 'invited') || batchProcessing}
+                                disabled={
+                                  processingAppId != null ||
+                                  (a.status !== 'cv_submitted' && a.status !== 'invited') ||
+                                  batchProcessing
+                                }
                                 onClick={() => handleReject(a.id)}
-                                title="Từ chối hồ sơ"
+                                title={t('actions.reject')}
                                 className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                               >
                                 <X className="w-3 h-3" />
-                                Từ chối
+                                {t('actions.reject')}
                               </button>
                             </>
                           ) : (
@@ -993,7 +976,9 @@ export default function RecruiterJobDetailPage() {
                                 a.status === 'not_pass' ||
                                 a.status === 'cv_rejected' ||
                                 a.status === 'pass' ||
-                                (a.currentRound != null && activeRoundNumber > 0 && a.currentRound > activeRoundNumber) ||
+                                (a.currentRound != null &&
+                                  activeRoundNumber > 0 &&
+                                  a.currentRound > activeRoundNumber) ||
                                 batchProcessing
                               }
                               className="flex w-full items-center justify-center gap-1 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors whitespace-nowrap"
@@ -1003,45 +988,46 @@ export default function RecruiterJobDetailPage() {
                               ) : (
                                 <Send className="w-3 h-3" />
                               )}
-                              Mời
+                              {t('actions.invite')}
                             </button>
                           )}
                         </div>
-                        
                         {a.cvFileUrl ? (
                           <button
                             type="button"
                             onClick={() =>
-                              openDocument(resolveAssetUrl(a.cvFileUrl!), `${a.candidateName || 'Ứng viên'} - CV`)
+                              openDocument(
+                                resolveAssetUrl(a.cvFileUrl!),
+                                `${a.candidateName || t('candidate')} - CV`
+                              )
                             }
+                            title={t('actions.viewCv')}
                             className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                            title="Xem CV"
                           >
                             <FileText className="h-4 w-4" />
                           </button>
                         ) : (
                           <div className="w-8 h-8 shrink-0" />
                         )}
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedCoverLetter({
-                                candidateName: a.candidateName,
-                                text: a.coverLetter || '',
-                                email: a.candidateEmail,
-                                phone: a.candidatePhone,
-                                noticePeriod: a.noticePeriod,
-                                cvJdSummary: a.cvJdSummary,
-                                matchScore: a.matchScore,
-                                cvFileUrl: a.cvFileUrl,
-                              })
-                            }
-                            className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                            title="Xem thông tin ứng tuyển & Thư giới thiệu"
-                          >
-                            <ScrollText className="h-4 w-4" />
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedCoverLetter({
+                              candidateName: a.candidateName,
+                              text: a.coverLetter || '',
+                              email: a.candidateEmail,
+                              phone: a.candidatePhone,
+                              noticePeriod: a.noticePeriod,
+                              cvJdSummary: a.cvJdSummary,
+                              matchScore: a.matchScore,
+                              cvFileUrl: a.cvFileUrl,
+                            })
+                          }
+                          title={t('actions.viewApplication')}
+                          className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                        >
+                          <ScrollText className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1057,7 +1043,7 @@ export default function RecruiterJobDetailPage() {
           page={page}
           totalPages={totalPages}
           total={processedApps.length}
-          label="ứng viên"
+          label={t('paginationLabel')}
           onPageChange={setPage}
         />
       )}
@@ -1071,7 +1057,7 @@ export default function RecruiterJobDetailPage() {
           >
             <div className="flex items-center justify-between border-b border-ink-100 dark:border-white/10 pb-3 mb-4 shrink-0">
               <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                Thông tin hồ sơ - {selectedCoverLetter.candidateName}
+                {t('coverLetterModal.title', { name: selectedCoverLetter.candidateName })}
               </h3>
               <button
                 onClick={() => setSelectedCoverLetter(null)}
@@ -1080,17 +1066,17 @@ export default function RecruiterJobDetailPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {selectedCoverLetter.cvJdSummary ? (
                 <div className="rounded-xl border border-ai-100 bg-ai-50/50 p-4 dark:border-ai-500/20 dark:bg-ai-500/10">
                   <div className="flex items-center justify-between mb-2">
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-ai-700 dark:text-ai-400 uppercase tracking-wider">
-                      <Sparkles className="h-3.5 w-3.5 text-ai-500 animate-pulse" /> Tóm tắt CV & Đánh giá AI
+                      <Sparkles className="h-3.5 w-3.5 text-ai-500 animate-pulse" />{' '}
+                      {t('coverLetterModal.aiSummary')}
                     </span>
                     {selectedCoverLetter.matchScore != null && (
                       <span className="rounded-full bg-ai-100 px-2 py-0.5 text-xs font-bold text-ai-800 dark:bg-ai-500/30 dark:text-ai-300">
-                        Độ phù hợp: {selectedCoverLetter.matchScore}%
+                        {t('coverLetterModal.matchScore')}: {selectedCoverLetter.matchScore}%
                       </span>
                     )}
                   </div>
@@ -1101,56 +1087,64 @@ export default function RecruiterJobDetailPage() {
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Không có dữ liệu đánh giá AI
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />{' '}
+                    {t('coverLetterModal.noAiData')}
                   </span>
                   <p className="mt-1 text-xs text-amber-900 dark:text-amber-100 leading-relaxed">
-                    Hồ sơ này chưa có kết quả đánh giá AI (do là hồ sơ thử nghiệm hoặc không có tệp CV hợp lệ).
+                    {t('coverLetterModal.noAiDataHint')}
                   </p>
                 </div>
               )}
-
-              {/* 2. Thông tin liên hệ */}
               <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 dark:border-white/10 dark:bg-white/5">
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
-                  Thông tin liên hệ
+                  {t('coverLetterModal.contactInfo')}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-ink-400 block mb-0.5">Họ và tên</span>
-                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.candidateName}</span>
+                    <span className="text-ink-400 block mb-0.5">
+                      {t('coverLetterModal.fullName')}
+                    </span>
+                    <span className="font-medium text-ink-950 dark:text-white">
+                      {selectedCoverLetter.candidateName}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-ink-400 block mb-0.5">Số điện thoại</span>
-                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.phone || '—'}</span>
+                    <span className="text-ink-400 block mb-0.5">{t('coverLetterModal.phone')}</span>
+                    <span className="font-medium text-ink-950 dark:text-white">
+                      {selectedCoverLetter.phone || '—'}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-ink-400 block mb-0.5">Email</span>
-                    <span className="font-medium text-ink-950 dark:text-white truncate block" title={selectedCoverLetter.email}>{selectedCoverLetter.email}</span>
+                    <span className="text-ink-400 block mb-0.5">{t('coverLetterModal.email')}</span>
+                    <span className="font-medium text-ink-950 dark:text-white truncate block">
+                      {selectedCoverLetter.email}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-ink-400 block mb-0.5">Báo trước khi nghỉ việc</span>
-                    <span className="font-medium text-ink-950 dark:text-white">{selectedCoverLetter.noticePeriod || '—'}</span>
+                    <span className="text-ink-400 block mb-0.5">
+                      {t('coverLetterModal.noticePeriod')}
+                    </span>
+                    <span className="font-medium text-ink-950 dark:text-white">
+                      {selectedCoverLetter.noticePeriod || '—'}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              {/* 3. Thư giới thiệu */}
               <div className="rounded-xl border border-ink-100 bg-ink-50/20 p-4 dark:border-white/5 dark:bg-white-[0.02]">
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
-                  Thư giới thiệu
+                  {t('coverLetterModal.coverLetter')}
                 </h4>
                 <p className="text-xs text-ink-700 dark:text-ink-300 leading-relaxed whitespace-pre-line">
-                  {selectedCoverLetter.text || 'Ứng viên không gửi thư giới thiệu.'}
+                  {selectedCoverLetter.text || t('coverLetterModal.noCoverLetter')}
                 </p>
               </div>
             </div>
-
             <div className="flex justify-end mt-4 pt-3 border-t border-ink-100 dark:border-white/10 shrink-0">
               <button
                 onClick={() => setSelectedCoverLetter(null)}
                 className="px-4 py-2 text-sm font-semibold text-ink-700 dark:text-ink-200 bg-ink-100 dark:bg-white/10 hover:bg-ink-200 dark:hover:bg-white/20 rounded-xl transition-colors"
               >
-                Đóng
+                {t('coverLetterModal.close')}
               </button>
             </div>
           </motion.div>

@@ -1,0 +1,25 @@
+{
+  "title": "Nhật ký hoạt động",
+  "description": "Theo dõi mọi thay đổi quan trọng trong hệ thống",
+  "filters": {
+    "all": "Tất cả hành động",
+    "staffAccountCreated": "Tạo tài khoản staff",
+    "userApproved": "Duyệt tài khoản",
+    "userRoleUpdated": "Đổi vai trò",
+    "userActivated": "Kích hoạt tài khoản",
+    "userDeactivated": "Khóa tài khoản",
+    "userDeleted": "Xóa tài khoản",
+    "systemSettingsUpdated": "Cập nhật cài đặt"
+  },
+  "empty": {
+    "title": "Chưa có hoạt động",
+    "description": "Không có bản ghi nào khớp với bộ lọc."
+  },
+  "by": "bởi {{name}}",
+  "pagination": {
+    "summary": "Trang {{page}}/{{totalPages}} · {{total}} bản ghi"
+  },
+  "errors": {
+    "loadFailed": "Không tải được nhật ký hoạt động."
+  }
+}

@@ -1,64 +1,46 @@
 {
-  "title": "Interview Playbooks",
-  "subtitle": "Manage internal interview documents",
-  "allPlaybooks": "All Playbooks",
-  "noPlaybooks": "No playbooks yet",
-  "noPlaybooksHint": "Upload playbooks for AI to use in interviews.",
-  "createNew": "Create New Playbook",
+  "title": "Interview Playbook",
+  "description": "Internal interview documents — AI loads into RAG to ask in company style & content",
   "uploadPlaybook": "Upload Playbook",
-  "editPlaybook": "Edit Playbook",
-  "playbookDetails": "Playbook Details",
-  "name": "Playbook Name",
-  "namePlaceholder": "e.g. Frontend Engineer Playbook",
-  "description": "Description",
-  "descriptionPlaceholder": "Describe the content and purpose of this playbook...",
-  "scope": "Usage Scope",
-  "scopeGlobal": "Company-wide",
-  "scopeDepartment": "By Department",
-  "scopeJob": "By Position",
-  "selectDepartment": "Select Department",
-  "selectJob": "Select Position",
-  "rounds": "Applicable Rounds",
-  "roundScreening": "Screening",
-  "roundTechnical": "Technical",
-  "roundFinal": "Final",
-  "allRounds": "All Rounds",
-  "upload": {
-    "title": "Upload Document",
-    "dragDrop": "Drag and drop file here",
-    "or": "or",
-    "browse": "Browse Files",
-    "supported": "Supports PDF, DOCX, DOC",
-    "maxSize": "Max size: 10MB",
-    "uploading": "Uploading...",
-    "uploaded": "Uploaded",
-    "remove": "Remove file"
+  "loadingError": "Failed to load playbooks.",
+  "deleteError": "Cannot delete playbook.",
+  "filters": {
+    "all": "All"
+  },
+  "scopes": {
+    "org": "Company",
+    "jobPosting": "By Job",
+    "round": "By Round"
   },
   "status": {
-    "active": "Active",
-    "inactive": "Inactive",
-    "draft": "Draft"
+    "ready": "RAG Loaded"
   },
-  "table": {
-    "name": "Name",
-    "scope": "Scope",
-    "rounds": "Rounds",
-    "uploadedBy": "Uploaded By",
-    "uploadedAt": "Uploaded At",
-    "status": "Status",
-    "actions": "Actions"
+  "paginationLabel": "documents",
+  "noPlaybooks": "No playbooks yet",
+  "noPlaybooksHint": "Upload interview documents (PDF/DOCX/TXT/MD) for AI to interview in company style.",
+  "docTypes": {
+    "styleGuide": "Style Guide",
+    "questionBank": "Question Bank",
+    "competencyFramework": "Competency Framework",
+    "cultureGuide": "Culture & Values",
+    "compliance": "Compliance Rules",
+    "redFlag": "Red Flag Guide",
+    "technicalScenario": "Technical Scenario",
+    "expectedAnswer": "Expected Answer",
+    "mustAsk": "Must-Ask Questions",
+    "roundPlaybook": "Round Playbook"
   },
-  "actions": {
-    "view": "View",
-    "edit": "Edit",
-    "delete": "Delete",
-    "activate": "Activate",
-    "deactivate": "Deactivate",
-    "download": "Download"
-  },
-  "confirmDelete": "Confirm playbook deletion?",
-  "confirmDeleteHint": "This action cannot be undone.",
-  "deleted": "Playbook deleted",
-  "saved": "Playbook saved",
-  "loadingError": "Unable to load playbooks list."
+  "uploadTitle": "Upload Playbook",
+  "uploadHint": "PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",
+  "selectFile": "Select document file...",
+  "selectFileError": "Please select a file.",
+  "selectJob": "Select a job posting",
+  "selectJobError": "Please select a job posting.",
+  "uploadError": "Upload failed.",
+  "documentType": "Document Type",
+  "scope": "Scope",
+  "jobPosting": "Job Posting",
+  "round": "Round",
+  "cancel": "Cancel",
+  "upload": "Upload"
 }

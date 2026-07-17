@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   BookOpen,
   Plus,
@@ -16,43 +17,47 @@ import {
 } from 'lucide-react'
 import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { CardGridSkeleton } from './_skeletons'
-import { playbookService, type PlaybookItem } from '@services/playbook/playbookService'
+import { playbookService } from '@services/playbook/playbookService'
+import type { PlaybookItem } from '@services/playbook/playbookService'
 import jobService from '@services/job/jobService'
 import type { JobPosting } from '@/types/job'
 
-const DOC_TYPES: [string, string][] = [
-  ['style_guide', 'Hướng dẫn phong cách'],
-  ['question_bank', 'Ngân hàng câu hỏi'],
-  ['competency_framework', 'Khung năng lực'],
-  ['culture_guide', 'Văn hóa & giá trị'],
-  ['compliance', 'Quy định không được hỏi'],
-  ['red_flag', 'Red flag guide'],
-  ['technical_scenario', 'Kịch bản kỹ thuật'],
-  ['expected_answer', 'Đáp án mong đợi'],
-  ['must_ask', 'Câu hỏi bắt buộc'],
-  ['round_playbook', 'Playbook theo vòng'],
-]
-const docTypeLabel = (t: string) => DOC_TYPES.find(([v]) => v === t)?.[1] || t
-
-const SCOPES: [string, string][] = [
-  ['org', 'Công ty'],
-  ['job_posting', 'Theo tin'],
-  ['round', 'Theo vòng'],
-]
-const scopeLabel = (s: string) => SCOPES.find(([v]) => v === s)?.[1] || s
-const scopeBadge = (s: string) =>
-  (
-    ({
-      org: 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400',
-      job_posting: 'bg-ai-100 dark:bg-ai-500/20 text-ai-700 dark:text-ai-400',
-      round: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-    }) as Record<string, string>
-  )[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
-
-const scopeIcon = (s: string) =>
-  s === 'org' ? Building2 : s === 'job_posting' ? Briefcase : Layers
-
 export default function HrPlaybooksPage() {
+  const { t } = useTranslation('modules/hr/playbooks')
+
+  const DOC_TYPES: [string, string][] = [
+    ['style_guide', t('docTypes.styleGuide')],
+    ['question_bank', t('docTypes.questionBank')],
+    ['competency_framework', t('docTypes.competencyFramework')],
+    ['culture_guide', t('docTypes.cultureGuide')],
+    ['compliance', t('docTypes.compliance')],
+    ['red_flag', t('docTypes.redFlag')],
+    ['technical_scenario', t('docTypes.technicalScenario')],
+    ['expected_answer', t('docTypes.expectedAnswer')],
+    ['must_ask', t('docTypes.mustAsk')],
+    ['round_playbook', t('docTypes.roundPlaybook')],
+  ]
+
+  const SCOPES: [string, string][] = [
+    ['org', t('scopes.org')],
+    ['job_posting', t('scopes.jobPosting')],
+    ['round', t('scopes.round')],
+  ]
+
+  const docTypeLabel = (dt: string) => DOC_TYPES.find(([v]) => v === dt)?.[1] || dt
+  const scopeLabel = (s: string) => SCOPES.find(([v]) => v === s)?.[1] || s
+  const scopeBadge = (s: string) =>
+    (
+      ({
+        org: 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400',
+        job_posting: 'bg-ai-100 dark:bg-ai-500/20 text-ai-700 dark:text-ai-400',
+        round: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+      }) as Record<string, string>
+    )[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
+
+  const scopeIcon = (s: string) =>
+    s === 'org' ? Building2 : s === 'job_posting' ? Briefcase : Layers
+
   const [docs, setDocs] = useState<PlaybookItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -67,7 +72,7 @@ export default function HrPlaybooksPage() {
     try {
       setDocs(await playbookService.getPlaybooks())
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách playbook.')
+      setError(e?.response?.data?.message || t('loadingError'))
     } finally {
       setLoading(false)
     }
@@ -75,7 +80,7 @@ export default function HrPlaybooksPage() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [t])
 
   const filtered = useMemo(
     () => (filter === 'all' ? docs : docs.filter((d) => d.scope === filter)),
@@ -89,7 +94,6 @@ export default function HrPlaybooksPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi bộ lọc
   useEffect(() => {
     setPage(1)
   }, [filter])
@@ -100,7 +104,7 @@ export default function HrPlaybooksPage() {
       await playbookService.deletePlaybook(id)
       setDocs((prev) => prev.filter((d) => d.id !== id))
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể xoá playbook.')
+      setError(e?.response?.data?.message || t('deleteError'))
     } finally {
       setDeletingId(null)
     }
@@ -109,25 +113,21 @@ export default function HrPlaybooksPage() {
   return (
     <div className="min-h-screen bg-ink-50 p-6 dark:bg-ink-950 lg:p-8">
       <PageHeader
-        title="Interview Playbook"
-        description="Tài liệu phỏng vấn nội bộ — AI nạp vào RAG để hỏi đúng phong cách & nội dung công ty"
+        title={t('title')}
+        description={t('description')}
         actions={[
-          { label: 'Upload playbook', onClick: () => setShowUpload(true), variant: 'primary' },
+          { label: t('uploadPlaybook'), onClick: () => setShowUpload(true), variant: 'primary' },
         ]}
       />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
       <div className="mb-6 flex flex-wrap gap-2">
-        {[['all', 'Tất cả'], ...SCOPES].map(([v, l]) => (
+        {[['all', t('filters.all')], ...SCOPES].map(([v, l]) => (
           <button
             key={v}
             onClick={() => setFilter(v)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-              filter === v
-                ? 'bg-brand-600 text-white'
-                : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'
-            }`}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${filter === v ? 'bg-brand-600 text-white' : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'}`}
           >
             {l}
           </button>
@@ -139,9 +139,9 @@ export default function HrPlaybooksPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<BookOpen className="h-8 w-8 text-ink-400" />}
-          title="Chưa có playbook"
-          description="Upload tài liệu phỏng vấn (PDF/DOCX/TXT/MD) để AI phỏng vấn đúng phong cách công ty."
-          action={{ label: 'Upload playbook', onClick: () => setShowUpload(true) }}
+          title={t('noPlaybooks')}
+          description={t('noPlaybooksHint')}
+          action={{ label: t('uploadPlaybook'), onClick: () => setShowUpload(true) }}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -189,7 +189,7 @@ export default function HrPlaybooksPage() {
                   <span
                     className={`rounded-full px-2 py-0.5 ${d.status === 'ready' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'}`}
                   >
-                    {d.status === 'ready' ? 'Đã nạp RAG' : d.status}
+                    {d.status === 'ready' ? t('status.ready') : d.status}
                   </span>
                   <span className="uppercase text-ink-400">{d.fileFormat}</span>
                 </div>
@@ -204,13 +204,14 @@ export default function HrPlaybooksPage() {
           page={page}
           totalPages={totalPages}
           total={filtered.length}
-          label="tài liệu"
+          label={t('paginationLabel')}
           onPageChange={setPage}
         />
       )}
 
       {showUpload && (
         <UploadModal
+          t={t}
           onClose={() => setShowUpload(false)}
           onUploaded={(doc) => {
             setDocs((prev) => [doc, ...prev])
@@ -222,10 +223,14 @@ export default function HrPlaybooksPage() {
   )
 }
 
+type Row = NewAccountRequestItem
+
 function UploadModal({
+  t,
   onClose,
   onUploaded,
 }: {
+  t: (key: string) => string
   onClose: () => void
   onUploaded: (doc: PlaybookItem) => void
 }) {
@@ -244,19 +249,17 @@ function UploadModal({
       jobService
         .getAdminJobPostings()
         .then(setJobs)
-        .catch(() => {
-          /* ignore */
-        })
+        .catch(() => {})
     }
   }, [scope, jobs.length])
 
   const submit = async () => {
     if (!file) {
-      setError('Vui lòng chọn file.')
+      setError(t('selectFileError'))
       return
     }
     if (scope !== 'org' && !scopeRefId) {
-      setError('Vui lòng chọn tin tuyển dụng.')
+      setError(t('selectJobError'))
       return
     }
     setSubmitting(true)
@@ -271,7 +274,7 @@ function UploadModal({
       })
       onUploaded(doc)
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Upload thất bại.')
+      setError(e?.response?.data?.message || t('uploadError'))
     } finally {
       setSubmitting(false)
     }
@@ -279,6 +282,25 @@ function UploadModal({
 
   const inputCls =
     'w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400'
+
+  const DOC_TYPES: [string, string][] = [
+    ['style_guide', t('docTypes.styleGuide')],
+    ['question_bank', t('docTypes.questionBank')],
+    ['competency_framework', t('docTypes.competencyFramework')],
+    ['culture_guide', t('docTypes.cultureGuide')],
+    ['compliance', t('docTypes.compliance')],
+    ['red_flag', t('docTypes.redFlag')],
+    ['technical_scenario', t('docTypes.technicalScenario')],
+    ['expected_answer', t('docTypes.expectedAnswer')],
+    ['must_ask', t('docTypes.mustAsk')],
+    ['round_playbook', t('docTypes.roundPlaybook')],
+  ]
+
+  const SCOPES: [string, string][] = [
+    ['org', t('scopes.org')],
+    ['job_posting', t('scopes.jobPosting')],
+    ['round', t('scopes.round')],
+  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -290,10 +312,10 @@ function UploadModal({
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Upload playbook</h3>
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.
-            </p>
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+              {t('uploadTitle')}
+            </h3>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{t('uploadHint')}</p>
           </div>
           <button
             onClick={onClose}
@@ -327,13 +349,13 @@ function UploadModal({
             ) : (
               <UploadCloud className="h-5 w-5 text-ink-400" />
             )}
-            <span className="truncate">{file ? file.name : 'Chọn file tài liệu...'}</span>
+            <span className="truncate">{file ? file.name : t('selectFile')}</span>
           </button>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                Loại tài liệu
+                {t('documentType')}
               </label>
               <select
                 value={documentType}
@@ -349,7 +371,7 @@ function UploadModal({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                Phạm vi
+                {t('scope')}
               </label>
               <select value={scope} onChange={(e) => setScope(e.target.value)} className={inputCls}>
                 {SCOPES.map(([v, l]) => (
@@ -365,14 +387,14 @@ function UploadModal({
             <div className="grid grid-cols-2 gap-3">
               <div className={scope === 'round' ? '' : 'col-span-2'}>
                 <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                  Tin tuyển dụng
+                  {t('jobPosting')}
                 </label>
                 <select
                   value={scopeRefId}
                   onChange={(e) => setScopeRefId(e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">— Chọn tin —</option>
+                  <option value="">— {t('selectJob')} —</option>
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>
                       {j.title}
@@ -383,7 +405,7 @@ function UploadModal({
               {scope === 'round' && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                    Vòng
+                    {t('round')}
                   </label>
                   <input
                     type="number"
@@ -403,7 +425,7 @@ function UploadModal({
             onClick={onClose}
             className="rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
           >
-            Hủy
+            {t('cancel')}
           </button>
           <button
             onClick={submit}
@@ -414,8 +436,8 @@ function UploadModal({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Plus className="h-4 w-4" />
-            )}{' '}
-            Upload
+            )}
+            {t('upload')}
           </button>
         </div>
       </motion.div>

@@ -1,0 +1,90 @@
+{
+  "breadcrumb": {
+    "home": "Trang chủ",
+    "applications": "Hồ sơ ứng tuyển"
+  },
+  "loadError": "Không tải được hồ sơ.",
+  "position": "Vị trí tuyển dụng",
+  "upcomingInterview": {
+    "title": "Lịch sắp tới",
+    "interview": "Phỏng vấn"
+  },
+  "viewCode": "Xem mã & hướng dẫn",
+  "roundList": {
+    "title": "Các vòng phỏng vấn",
+    "empty": "Chưa có vòng phỏng vấn nào cho hồ sơ này."
+  },
+  "round": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "online_test": "Online Test",
+    "final": "Final"
+  },
+  "badge": {
+    "practice": "Thử",
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "pendingHr": "Chờ HR",
+    "inProgress": "Đang diễn ra",
+    "noResult": "Chưa có kết quả",
+    "practiceInterview": "Phỏng vấn thử",
+    "realInterview": "Phỏng vấn thật"
+  },
+  "criteria": {
+    "byCriteria": "Theo tiêu chí",
+    "byQuestions": "Theo câu hỏi"
+  },
+  "criterionLabels": {
+    "technical": "Kiến thức kỹ thuật",
+    "technical_knowledge": "Kiến thức kỹ thuật",
+    "communication": "Giao tiếp",
+    "problem_solving": "Giải quyết vấn đề",
+    "culture_fit": "Văn hoá phù hợp",
+    "experience": "Kinh nghiệm thực tế",
+    "practical_experience": "Kinh nghiệm thực tế",
+    "language": "Ngôn ngữ",
+    "attitude": "Thái độ",
+    "teamwork": "Làm việc nhóm"
+  },
+  "questionAnalysis": {
+    "title": "Phân tích từng câu hỏi",
+    "empty": "Chưa có phân tích chi tiết cho từng câu hỏi.",
+    "good": "Tốt",
+    "fair": "Khá",
+    "needsImprovement": "Cần cải thiện",
+    "answer": "Trả lời:",
+    "feedback": "Gợi ý:"
+  },
+  "languageAssessment": {
+    "title": "Đánh giá ngôn ngữ ({lang})",
+    "overallLevel": "Trình độ tổng thể",
+    "fluency": "Độ trôi chảy /10",
+    "grammar": "Ngữ pháp /10"
+  },
+  "report": {
+    "title": "Nhận định tổng quan",
+    "scoresByCriteria": "Điểm theo tiêu chí",
+    "downloadRecording": "Tải bản ghi",
+    "footer": "Báo cáo do AI tạo · HR đã xác nhận · Một số phần có thể được HR điều chỉnh hiển thị"
+  },
+  "nextStep": {
+    "title": "Bước tiếp theo",
+    "goToApplication": "Đến đơn ứng tuyển"
+  },
+  "hrFeedback": {
+    "title": "Nhận xét từ HR",
+    "hrLeader": "HR Leader"
+  },
+  "pendingHrReview": {
+    "title": "Kết quả đang chờ HR Leader xác nhận",
+    "description": "AI đã hoàn tất chấm điểm vòng {round}. Bạn sẽ nhận thông báo ngay khi HR xác nhận và chia sẻ kết quả."
+  },
+  "noReport": {
+    "title": "Chưa có báo cáo cho vòng này",
+    "description": "Kết quả & bản ghi sẽ hiển thị tại đây sau khi vòng phỏng vấn hoàn tất và được HR chia sẻ."
+  },
+  "noSession": {
+    "title": "Chưa có vòng nào để hiển thị",
+    "description": "Khi bạn hoàn thành phỏng vấn, kết quả sẽ xuất hiện tại đây."
+  }
+}

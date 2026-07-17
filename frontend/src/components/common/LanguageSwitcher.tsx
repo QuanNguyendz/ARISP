@@ -1,15 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe, Check } from 'lucide-react'
-import { supportedLanguages, SupportedLanguage } from '@/i18n'
+import { supportedLanguages, SupportedLanguage, storeLanguage } from '@/i18n'
+import { useThemeStore } from '@store/theme'
 
 export function LanguageSwitcher() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation('modules/shared/layout')
+  const { isDark } = useThemeStore()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const currentLang =
     supportedLanguages.find((l) => l.code === i18n.language) || supportedLanguages[0]
+
+  // Short code display like VI/EN
+  const shortCode = i18n.language.toUpperCase().slice(0, 2)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -23,6 +28,7 @@ export function LanguageSwitcher() {
   }, [])
 
   const changeLanguage = (langCode: SupportedLanguage) => {
+    storeLanguage(langCode)
     i18n.changeLanguage(langCode)
     setIsOpen(false)
   }
@@ -31,30 +37,32 @@ export function LanguageSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors rounded-lg hover:bg-white/5"
-        aria-label="Change language"
+        aria-label={t('changeLanguage')}
+        className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
       >
         <Globe className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentLang.name}</span>
+        <span className="text-sm font-medium">{shortCode}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-bg-secondary rounded-xl shadow-lg border border-ink-200 dark:border-white/10 z-50">
+        <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-ink-900 rounded-xl shadow-lg border border-ink-200 dark:border-white/10 z-50">
           {supportedLanguages.map((lang) => (
             <button
               key={lang.code}
               onClick={() => changeLanguage(lang.code)}
-              className={`w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-ink-50 dark:hover:bg-white/5 transition-colors ${
+              className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
                 i18n.language === lang.code
                   ? 'text-brand-600 dark:text-brand-400 font-medium'
-                  : 'text-ink-700 dark:text-ink-200'
+                  : 'text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/5'
               }`}
             >
               <span className="flex items-center gap-2">
                 <span>{lang.flag}</span>
                 <span>{lang.name}</span>
               </span>
-              {i18n.language === lang.code && <Check className="w-4 h-4" />}
+              {i18n.language === lang.code && (
+                <Check className="w-4 h-4 text-brand-500 dark:text-brand-400" />
+              )}
             </button>
           ))}
         </div>

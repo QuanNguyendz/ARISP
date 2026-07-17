@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Video, Search, Clock, FileVideo } from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
@@ -14,14 +15,9 @@ import {
 } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
 
-const FILTERS: { value: string; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'active', label: 'Đang diễn ra' },
-  { value: 'completed', label: 'Hoàn thành' },
-  { value: 'pending', label: 'Chờ' },
-]
-
 export default function RecruiterInterviewSessionsPage() {
+  const { t } = useTranslation('modules/recruiter/interviews')
+
   const [sessions, setSessions] = useState<HrInterviewSessionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -41,12 +37,12 @@ export default function RecruiterInterviewSessionsPage() {
         const myIds = new Set(myApps.map((a) => a.id))
         setSessions(all.filter((s) => myIds.has(s.applicationId)))
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được danh sách phiên phỏng vấn.')
+        setError(e?.response?.data?.message || t('loadingError'))
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [t])
 
   const counts = useMemo(() => {
     const by = (s: string) => sessions.filter((x) => x.status === s).length
@@ -59,10 +55,14 @@ export default function RecruiterInterviewSessionsPage() {
   }, [sessions])
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase()
+    const searchTerm = q.trim().toLowerCase()
     return sessions
       .filter((s) => (filter === 'all' ? true : s.status === filter))
-      .filter((s) => (t ? (s.candidateName + (s.jobTitle || '')).toLowerCase().includes(t) : true))
+      .filter((s) =>
+        searchTerm
+          ? (s.candidateName + (s.jobTitle || '')).toLowerCase().includes(searchTerm)
+          : true
+      )
   }, [sessions, q, filter])
 
   const PAGE_SIZE = 10
@@ -72,24 +72,27 @@ export default function RecruiterInterviewSessionsPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi từ khóa/bộ lọc
   useEffect(() => {
     setPage(1)
   }, [q, filter])
 
   const statCards = [
-    { label: 'Tổng phiên', value: counts.total, color: 'text-brand-600' },
-    { label: 'Đang diễn ra', value: counts.active, color: 'text-amber-600' },
-    { label: 'Hoàn thành', value: counts.completed, color: 'text-emerald-600' },
-    { label: 'Có bản ghi', value: counts.recorded, color: 'text-ai-600' },
+    { label: t('stats.totalSessions'), value: counts.total, color: 'text-brand-600' },
+    { label: t('stats.active'), value: counts.active, color: 'text-amber-600' },
+    { label: t('stats.completed'), value: counts.completed, color: 'text-emerald-600' },
+    { label: t('stats.recorded'), value: counts.recorded, color: 'text-ai-600' },
+  ]
+
+  const FILTERS = [
+    { value: 'all', label: t('filters.all') },
+    { value: 'active', label: t('filters.active') },
+    { value: 'completed', label: t('filters.completed') },
+    { value: 'pending', label: t('filters.pending') },
   ]
 
   return (
     <div className="p-6 lg:p-8">
-      <PageHeader
-        title="Phiên phỏng vấn"
-        description="Theo dõi phiên phỏng vấn AI của ứng viên thuộc tin của bạn"
-      />
+      <PageHeader title={t('title')} description={t('description')} />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
@@ -108,7 +111,7 @@ export default function RecruiterInterviewSessionsPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Tìm ứng viên, vị trí..."
+                placeholder={t('searchPlaceholder')}
                 className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
               />
             </div>
@@ -132,8 +135,8 @@ export default function RecruiterInterviewSessionsPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon={<Video className="h-8 w-8 text-ink-400" />}
-              title="Chưa có phiên phỏng vấn"
-              description="Phiên phỏng vấn AI của ứng viên sẽ xuất hiện ở đây."
+              title={t('noSessions')}
+              description={t('noSessionsHint')}
             />
           ) : (
             <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
@@ -157,8 +160,8 @@ export default function RecruiterInterviewSessionsPage() {
                         {s.candidateName}
                       </Link>
                       <p className="truncate text-xs text-ink-500 dark:text-ink-400">
-                        {s.jobTitle || 'Vị trí'} · Vòng {s.roundNumber} ·{' '}
-                        {s.sessionType === 'practice' ? 'Thử' : 'Thật'}
+                        {s.jobTitle || t('position')} · {t('round')} {s.roundNumber} ·{' '}
+                        {s.sessionType === 'practice' ? t('practice') : t('real')}
                       </p>
                     </div>
                     {s.hasRecording && (
@@ -191,7 +194,7 @@ export default function RecruiterInterviewSessionsPage() {
               page={page}
               totalPages={totalPages}
               total={filtered.length}
-              label="phiên"
+              label={t('paginationLabel')}
               onPageChange={setPage}
             />
           )}

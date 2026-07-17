@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Mic, MicOff, Captions, Phone, Settings, Wifi, Bot, MessageSquare } from 'lucide-react'
 
@@ -44,6 +45,7 @@ function SpeakingIndicator() {
 
 export default function InterviewRoomPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation('modules/interview/room')
   const [isMuted, setIsMuted] = useState(false)
   const [isCaptionsOn, setIsCaptionsOn] = useState(true)
   const [isRecording] = useState(true)
@@ -90,15 +92,15 @@ export default function InterviewRoomPage() {
           <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
             <MessageSquare className="w-12 h-12 text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-white mb-4">Hoàn thành phỏng vấn!</h1>
-          <p className="text-slate-400 mb-8">
-            Cảm ơn bạn đã tham gia phỏng vấn. Kết quả sẽ được gửi qua email trong vòng 24 giờ.
-          </p>
+          <h1 className="text-3xl font-display font-bold text-white mb-4">
+            {t('room.completed.title')}
+          </h1>
+          <p className="text-slate-400 mb-8">{t('room.completed.message')}</p>
           <button
             onClick={() => navigate('/candidate/applications')}
             className="px-8 py-4 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-semibold hover:opacity-90 transition-opacity"
           >
-            Xem kết quả
+            {t('room.completed.viewResult')}
           </button>
         </motion.div>
       </div>
@@ -156,10 +158,10 @@ export default function InterviewRoomPage() {
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1 text-sm font-medium text-red-400">
             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            REC {recordingTime}
+            {t('room.status.recording')} {recordingTime}
           </span>
           <span className="flex items-center gap-2 text-sm text-emerald-400">
-            <Wifi className="w-4 h-4" /> Ổn định
+            <Wifi className="w-4 h-4" /> {t('room.status.stable')}
           </span>
         </div>
       </header>
@@ -192,13 +194,13 @@ export default function InterviewRoomPage() {
             animate={{ opacity: isAiSpeaking ? 1 : 0.5 }}
           >
             <SpeakingIndicator />
-            <span className="text-sm font-medium text-ai-400">AI đang nói…</span>
+            <span className="text-sm font-medium text-ai-400">{t('room.ai.speaking')}</span>
           </motion.div>
 
           {/* Current question */}
           <div className="relative mt-8 max-w-xl text-center">
             <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">
-              Câu hỏi {currentQuestion + 1} / {mockQuestions.length}
+              {t('room.ai.question', { current: currentQuestion + 1, total: mockQuestions.length })}
             </div>
             <p className="font-display text-2xl font-bold leading-relaxed text-white">
               {mockQuestions[currentQuestion - 1] || mockQuestions[0]}
@@ -209,8 +211,8 @@ export default function InterviewRoomPage() {
         {/* Transcript panel */}
         <aside className="border-l border-white/5 bg-ink-900/60 flex flex-col">
           <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
-            <span className="font-display font-bold text-white">Transcript</span>
-            <span className="text-xs text-slate-400">Streaming</span>
+            <span className="font-display font-bold text-white">{t('room.transcript.title')}</span>
+            <span className="text-xs text-slate-400">{t('room.transcript.streaming')}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
             {conversation.map((msg, index) => (
@@ -274,15 +276,13 @@ export default function InterviewRoomPage() {
             onClick={handleEndInterview}
             className="flex items-center gap-2 rounded-full bg-red-600 hover:bg-red-700 px-6 h-12 font-semibold transition text-white"
           >
-            <Phone className="w-5 h-5" /> Kết thúc phỏng vấn
+            <Phone className="w-5 h-5" /> {t('room.controls.endInterview')}
           </button>
           <button className="grid h-12 w-12 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition">
             <Settings className="w-5 h-5 text-white" />
           </button>
         </div>
-        <p className="mt-3 text-center text-xs text-slate-500">
-          Mất kết nối sẽ tự động khôi phục phiên khi bạn nhập lại Interview Code
-        </p>
+        <p className="mt-3 text-center text-xs text-slate-500">{t('room.footer.reconnectNote')}</p>
       </footer>
     </div>
   )

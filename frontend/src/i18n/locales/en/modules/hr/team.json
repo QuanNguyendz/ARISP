@@ -1,59 +1,52 @@
 {
   "title": "HR Team",
-  "subtitle": "Manage accounts and permissions for the HR team",
-  "allMembers": "All Members",
-  "hrLeaders": "HR Leaders",
-  "recruiters": "Recruiters",
-  "noMembers": "No members yet",
-  "addMember": "Add Member",
-  "inviteMember": "Invite Member",
-  "memberDetails": "Member Details",
-  "name": "Full Name",
-  "email": "Email",
-  "role": "Role",
+  "description": "Send requests to create staff accounts (HR Admin / Recruiter) for Super Admin approval",
+  "sendRequest": "Send Account Request",
   "roles": {
-    "hr_leader": "HR Leader",
+    "hrAdmin": "HR Admin",
     "recruiter": "Recruiter"
   },
   "status": {
-    "active": "Active",
-    "inactive": "Inactive",
+    "approved": "Approved",
+    "rejected": "Rejected",
     "pending": "Pending"
   },
-  "department": "Department",
-  "phone": "Phone Number",
-  "joinedAt": "Joined Date",
-  "lastActive": "Last Active",
-  "table": {
-    "name": "Full Name",
+  "stats": {
+    "total": "Total Requests",
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "rejectionReason": "Rejection reason",
+  "paginationLabel": "requests",
+  "noRequests": "No requests yet",
+  "noRequestsHint": "Send requests to create accounts for new members — Super Admin will review and activate.",
+  "sendRequestBtn": "Send Request",
+  "requestSent": "Sent {{count}} account request(s) waiting for Super Admin approval.",
+  "modalTitle": "Send Account Creation Request",
+  "modalDescription": "Add rows individually or import CSV. Each row = 1 proposed account.",
+  "downloadTemplate": "Download CSV Template",
+  "importCsv": "Import CSV",
+  "tableHeader": {
     "email": "Email",
+    "fullName": "Full Name",
     "role": "Role",
-    "department": "Department",
-    "status": "Status",
-    "joinedAt": "Joined",
-    "actions": "Actions"
+    "department": "Department"
   },
-  "actions": {
-    "view": "View",
-    "edit": "Edit",
-    "delete": "Delete",
-    "deactivate": "Deactivate",
-    "reactivate": "Reactivate",
-    "resetPassword": "Reset Password",
-    "changeRole": "Change Role"
+  "placeholder": {
+    "email": "email@company.com",
+    "fullName": "Full Name",
+    "department": "Department"
   },
-  "invite": {
-    "title": "Invite Member",
-    "email": "Member Email",
-    "emailPlaceholder": "Enter email of person to invite...",
-    "selectRole": "Select Role",
-    "selectDepartment": "Select Department",
-    "sendInvite": "Send Invite",
-    "inviteSent": "Invitation sent",
-    "inviteSentHint": "The member will receive an email with login instructions."
-  },
-  "confirmRemove": "Confirm member removal?",
-  "confirmRemoveHint": "The account will be deactivated but data will be preserved.",
-  "removed": "Member removed",
-  "loadingError": "Unable to load members list."
+  "addRow": "Add Row",
+  "cancel": "Cancel",
+  "submitSingle": "Submit Request",
+  "submitMultiple": "Submit {{count}} Requests",
+  "emptyCsvError": "CSV file is empty or missing data.",
+  "noValidRowsError": "Could not read any valid rows from CSV.",
+  "atLeastOneError": "Please enter at least one request.",
+  "invalidEmail": "Invalid email: {{email}}",
+  "missingName": "Missing full name for {{email}}",
+  "submitError": "Cannot submit request.",
+  "empty": "(empty)"
 }

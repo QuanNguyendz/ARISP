@@ -1,0 +1,55 @@
+{
+  "hr": {
+    "workspace": "HR Leader Workspace",
+    "dashboard": "Tổng quan",
+    "jobs": "Tin tuyển dụng",
+    "candidates": "Ứng viên",
+    "interviews": "Phiên phỏng vấn",
+    "evaluations": "Đánh giá",
+    "playbooks": "Playbook",
+    "team": "Nhóm HR",
+    "settings": "Cài đặt",
+    "help": "Trợ giúp & tài liệu",
+    "searchPlaceholder": "Tìm ứng viên, tin tuyển dụng...",
+    "createJob": "Tạo tin",
+    "roleLabel": "HR Leader"
+  },
+  "recruiter": {
+    "workspace": "Recruiter Workspace",
+    "dashboard": "Tổng quan",
+    "jobs": "Tin tuyển dụng",
+    "candidates": "Ứng viên",
+    "interviewCode": "Cấp mã phỏng vấn",
+    "evaluations": "Đánh giá",
+    "interviews": "Phỏng vấn",
+    "settings": "Cài đặt",
+    "searchPlaceholder": "Tìm tin tuyển dụng, ứng viên...",
+    "createJob": "Tạo tin",
+    "roleLabel": "Recruiter"
+  },
+  "superAdmin": {
+    "workspace": "Super Admin Workspace",
+    "dashboard": "Tổng quan",
+    "users": "Quản lý Users",
+    "allUsers": "Tất cả người dùng",
+    "pendingUsers": "Duyệt User mới",
+    "auditLogs": "Audit Logs",
+    "systemSettings": "Cài đặt hệ thống",
+    "searchPlaceholder": "Tìm user, audit log...",
+    "addStaff": "Thêm staff",
+    "roleLabel": "Super Admin"
+  },
+  "shared": {
+    "help": "Trợ giúp & tài liệu",
+    "logout": "Đăng xuất",
+    "myAccount": "Tài khoản của tôi",
+    "workspaceSettings": "Cài đặt workspace",
+    "systemSettings": "Cài đặt hệ thống",
+    "notifications": "Thông báo",
+    "markAllRead": "Đánh dấu đã đọc",
+    "clearAll": "Xóa tất cả",
+    "noNotifications": "Không có thông báo mới",
+    "viewAllNotifications": "Xem tất cả thông báo",
+    "openMenu": "Mở menu"
+  }
+}

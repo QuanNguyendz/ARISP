@@ -1,20 +1,12 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import LegalPageShell, { LegalSection } from '@components/legal/LegalPageShell'
 
 // NOTE: Nội dung mang tính mẫu cho nền tảng ARISP, nên được bộ phận pháp chế rà soát trước khi go-live.
 export default function PrivacyPolicyPage() {
+  const { t } = useTranslation('modules/legal/privacyPolicy')
   return (
-    <LegalPageShell
-      title="Chính sách bảo mật"
-      lastUpdated="18/06/2026"
-      intro={
-        <p>
-          ARISP coi trọng quyền riêng tư của bạn. Chính sách này mô tả những dữ liệu chúng tôi thu
-          thập, cách sử dụng và bảo vệ chúng khi bạn tham gia quy trình tuyển dụng và phỏng vấn bằng
-          AI trên nền tảng.
-        </p>
-      }
-    >
+    <LegalPageShell title={t('title')} lastUpdated={t('lastUpdated')} intro={<p>{t('intro')}</p>}>
       <LegalSection title="1. Dữ liệu chúng tôi thu thập">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>

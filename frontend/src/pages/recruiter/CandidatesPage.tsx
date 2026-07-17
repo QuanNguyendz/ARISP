@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Search, Users, FileText, Eye } from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { useDocumentViewer } from '@components/document/DocumentViewer'
@@ -10,23 +11,9 @@ import { appStatusBadge, appStatusLabel, initials, scoreColor } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
 import { resolveAssetUrl } from '@/config/constants'
 
-const FILTERS: { value: string; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'cv_submitted', label: 'Mới ứng tuyển' },
-  { value: 'screening', label: 'Đang sơ loại' },
-  { value: 'interview', label: 'Phỏng vấn' },
-  { value: 'pass', label: 'Đạt' },
-  { value: 'not_pass', label: 'Không đạt' },
-]
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
 export default function RecruiterCandidatesPage() {
+  const { t } = useTranslation('modules/recruiter/candidates')
+
   const navigate = useNavigate()
   const { openDocument } = useDocumentViewer()
   const [apps, setApps] = useState<HrApplicationItem[]>([])
@@ -44,12 +31,12 @@ export default function RecruiterCandidatesPage() {
         setApps(await applicationService.getApplications(true))
       } catch (e) {
         const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-        setError(msg || 'Không tải được danh sách ứng viên.')
+        setError(msg || t('loadingError'))
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [t])
 
   const counts = useMemo(() => {
     const by = (s: string) => apps.filter((a) => a.status === s).length
@@ -62,12 +49,14 @@ export default function RecruiterCandidatesPage() {
   }, [apps])
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase()
+    const searchTerm = q.trim().toLowerCase()
     return apps
       .filter((a) => (filter === 'all' ? true : a.status === filter))
       .filter((a) =>
-        t
-          ? (a.candidateName + a.candidateEmail + (a.jobTitle || '')).toLowerCase().includes(t)
+        searchTerm
+          ? (a.candidateName + a.candidateEmail + (a.jobTitle || ''))
+              .toLowerCase()
+              .includes(searchTerm)
           : true
       )
   }, [apps, q, filter])
@@ -79,21 +68,28 @@ export default function RecruiterCandidatesPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi từ khóa/bộ lọc
   useEffect(() => {
     setPage(1)
   }, [q, filter])
 
   const statCards = [
-    { label: 'Tổng ứng viên', value: counts.total, color: 'text-brand-600' },
-    { label: 'Đang sơ loại', value: counts.screening, color: 'text-amber-600' },
-    { label: 'Phỏng vấn', value: counts.interview, color: 'text-ai-600' },
-    { label: 'Đạt', value: counts.pass, color: 'text-emerald-600' },
+    { label: t('stats.totalCandidates'), value: counts.total, color: 'text-brand-600' },
+    { label: t('stats.screening'), value: counts.screening, color: 'text-amber-600' },
+    { label: t('stats.interview'), value: counts.interview, color: 'text-ai-600' },
+    { label: t('stats.pass'), value: counts.pass, color: 'text-emerald-600' },
+  ]
+
+  const FILTERS = [
+    { value: 'all', label: t('filters.all') },
+    { value: 'cv_submitted', label: t('filters.cvSubmitted') },
+    { value: 'screening', label: t('filters.screening') },
+    { value: 'interview', label: t('filters.interview') },
+    { value: 'pass', label: t('filters.pass') },
   ]
 
   return (
     <div className="p-6 lg:p-8">
-      <PageHeader title="Ứng viên" description="Ứng viên ứng tuyển vào các tin của bạn" />
+      <PageHeader title={t('title')} description={t('description')} />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
@@ -112,7 +108,7 @@ export default function RecruiterCandidatesPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Tìm ứng viên, vị trí..."
+                placeholder={t('searchPlaceholder')}
                 className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
               />
             </div>
@@ -136,8 +132,8 @@ export default function RecruiterCandidatesPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon={<Users className="h-8 w-8 text-ink-400" />}
-              title="Không có ứng viên"
-              description="Không có ứng viên khớp bộ lọc hiện tại."
+              title={t('noCandidates')}
+              description={t('noCandidatesHint')}
             />
           ) : (
             <div className="p-2 sm:p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
@@ -145,7 +141,13 @@ export default function RecruiterCandidatesPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-ink-200 dark:border-white/10">
-                      {['Ứng viên', 'Vị trí', 'Trạng thái', 'Điểm CV', 'Ngày ứng tuyển'].map((h) => (
+                      {[
+                        t('tableHeader.candidate'),
+                        t('tableHeader.position'),
+                        t('tableHeader.status'),
+                        t('tableHeader.matchScore'),
+                        t('tableHeader.appliedDate'),
+                      ].map((h) => (
                         <th
                           key={h}
                           className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400"
@@ -154,7 +156,7 @@ export default function RecruiterCandidatesPage() {
                         </th>
                       ))}
                       <th className="text-right py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">
-                        Thao tác
+                        {t('tableHeader.actions')}
                       </th>
                     </tr>
                   </thead>
@@ -175,7 +177,7 @@ export default function RecruiterCandidatesPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="font-medium text-ink-900 dark:text-white truncate">
-                                {a.candidateName || 'Ứng viên'}
+                                {a.candidateName || t('candidate')}
                               </p>
                               <p className="text-sm text-ink-600 dark:text-ink-400 truncate">
                                 {a.candidateEmail}
@@ -203,7 +205,11 @@ export default function RecruiterCandidatesPage() {
                           )}
                         </td>
                         <td className="py-4 px-4 text-ink-600 dark:text-ink-400">
-                          {formatDate(a.createdAt)}
+                          {new Date(a.createdAt).toLocaleDateString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-end gap-2">
@@ -214,10 +220,10 @@ export default function RecruiterCandidatesPage() {
                                   e.stopPropagation()
                                   openDocument(
                                     resolveAssetUrl(a.cvFileUrl),
-                                    `${a.candidateName || 'Ứng viên'} - CV`
+                                    `${a.candidateName || t('candidate')} - CV`
                                   )
                                 }}
-                                title="Xem CV"
+                                title={t('viewCv')}
                                 className="p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
                               >
                                 <FileText className="w-4 h-4 text-ink-500" />
@@ -229,7 +235,7 @@ export default function RecruiterCandidatesPage() {
                                 e.stopPropagation()
                                 navigate(`/recruiter/candidates/${a.id}`)
                               }}
-                              title="Xem chi tiết"
+                              title={t('viewDetails')}
                               className="p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
                             >
                               <Eye className="w-4 h-4 text-ink-500" />
@@ -249,7 +255,7 @@ export default function RecruiterCandidatesPage() {
               page={page}
               totalPages={totalPages}
               total={filtered.length}
-              label="ứng viên"
+              label={t('paginationLabel')}
               onPageChange={setPage}
             />
           )}

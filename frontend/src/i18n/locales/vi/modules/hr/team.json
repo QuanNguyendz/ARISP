@@ -1,59 +1,52 @@
 {
   "title": "Nhóm HR",
-  "subtitle": "Quản lý tài khoản và phân quyền nhóm HR",
-  "allMembers": "Tất cả thành viên",
-  "hrLeaders": "HR Leader",
-  "recruiters": "Recruiter",
-  "noMembers": "Chưa có thành viên nào",
-  "addMember": "Thêm thành viên",
-  "inviteMember": "Mời thành viên",
-  "memberDetails": "Chi tiết thành viên",
-  "name": "Họ và tên",
-  "email": "Email",
-  "role": "Vai trò",
+  "description": "Gửi yêu cầu tạo tài khoản staff (HR Admin / Recruiter) để Super Admin duyệt",
+  "sendRequest": "Gửi yêu cầu tạo tài khoản",
   "roles": {
-    "hr_leader": "HR Leader",
+    "hrAdmin": "HR Admin",
     "recruiter": "Recruiter"
   },
   "status": {
-    "active": "Hoạt động",
-    "inactive": "Không hoạt động",
-    "pending": "Chờ xác nhận"
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối",
+    "pending": "Chờ duyệt"
   },
-  "department": "Phòng ban",
-  "phone": "Số điện thoại",
-  "joinedAt": "Ngày tham gia",
-  "lastActive": "Hoạt động lần cuối",
-  "table": {
-    "name": "Họ và tên",
+  "stats": {
+    "total": "Tổng yêu cầu",
+    "pending": "Chờ duyệt",
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối"
+  },
+  "rejectionReason": "Lý do từ chối",
+  "paginationLabel": "yêu cầu",
+  "noRequests": "Chưa có yêu cầu nào",
+  "noRequestsHint": "Gửi yêu cầu tạo tài khoản cho thành viên mới — Super Admin sẽ duyệt và kích hoạt.",
+  "sendRequestBtn": "Gửi yêu cầu",
+  "requestSent": "Đã gửi {{count}} yêu cầu tạo tài khoản chờ Super Admin duyệt.",
+  "modalTitle": "Gửi yêu cầu tạo tài khoản",
+  "modalDescription": "Thêm từng dòng hoặc import CSV. Mỗi dòng = 1 tài khoản đề xuất.",
+  "downloadTemplate": "Tải template CSV",
+  "importCsv": "Import CSV",
+  "tableHeader": {
     "email": "Email",
+    "fullName": "Họ tên",
     "role": "Vai trò",
-    "department": "Phòng ban",
-    "status": "Trạng thái",
-    "joinedAt": "Tham gia",
-    "actions": "Thao tác"
+    "department": "Phòng ban"
   },
-  "actions": {
-    "view": "Xem",
-    "edit": "Chỉnh sửa",
-    "delete": "Xóa",
-    "deactivate": "Vô hiệu hóa",
-    "reactivate": "Kích hoạt lại",
-    "resetPassword": "Đặt lại mật khẩu",
-    "changeRole": "Thay đổi vai trò"
+  "placeholder": {
+    "email": "email@congty.com",
+    "fullName": "Họ tên",
+    "department": "Phòng ban"
   },
-  "invite": {
-    "title": "Mời thành viên",
-    "email": "Email thành viên",
-    "emailPlaceholder": "Nhập email người cần mời...",
-    "selectRole": "Chọn vai trò",
-    "selectDepartment": "Chọn phòng ban",
-    "sendInvite": "Gửi lời mời",
-    "inviteSent": "Đã gửi lời mời",
-    "inviteSentHint": "Thành viên sẽ nhận email hướng dẫn đăng nhập."
-  },
-  "confirmRemove": "Xác nhận xóa thành viên?",
-  "confirmRemoveHint": "Tài khoản sẽ bị vô hiệu hóa nhưng dữ liệu được giữ lại.",
-  "removed": "Đã xóa thành viên",
-  "loadingError": "Không tải được danh sách thành viên."
+  "addRow": "Thêm dòng",
+  "cancel": "Hủy",
+  "submitSingle": "Gửi yêu cầu",
+  "submitMultiple": "Gửi {{count}} yêu cầu",
+  "emptyCsvError": "File CSV trống hoặc thiếu dữ liệu.",
+  "noValidRowsError": "Không đọc được dòng hợp lệ nào từ CSV.",
+  "atLeastOneError": "Vui lòng nhập ít nhất một yêu cầu.",
+  "invalidEmail": "Email không hợp lệ: {{email}}",
+  "missingName": "Thiếu họ tên cho {{email}}",
+  "submitError": "Không thể gửi yêu cầu.",
+  "empty": "(trống)"
 }

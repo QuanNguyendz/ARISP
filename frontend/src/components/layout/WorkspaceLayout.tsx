@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type ComponentType } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@store/auth/authStore'
 import { useThemeStore } from '@store/theme'
+import { LanguageSwitcher } from '@components/common/LanguageSwitcher'
 import {
   staffNotificationService,
   STAFF_NOTIF_REFRESH_EVENT,
@@ -143,6 +145,7 @@ export default function WorkspaceLayout({
   const [unread, setUnread] = useState(0)
   const { user, logout } = useAuthStore()
   const { isDark, toggleTheme } = useThemeStore()
+  const { t } = useTranslation('modules/shared/nav')
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
 
@@ -364,7 +367,7 @@ export default function WorkspaceLayout({
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
               >
                 <CircleHelp className="w-[18px] h-[18px]" />
-                Trợ giúp & tài liệu
+                <span className="flex-1">{t('shared.help')}</span>
               </Link>
             </>
           )}
@@ -387,11 +390,11 @@ export default function WorkspaceLayout({
       {/* Main */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-6 h-16">
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 backdrop-blur px-6 h-16">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
-            aria-label="Mở menu"
+            aria-label={t('shared.openMenu')}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -433,7 +436,7 @@ export default function WorkspaceLayout({
                   >
                     <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 dark:border-white/10">
                       <span className="font-display font-bold text-sm text-ink-900 dark:text-white">
-                        Thông báo
+                        {t('shared.notifications')}
                       </span>
                       <div className="flex items-center gap-3">
                         {unread > 0 && (
@@ -441,7 +444,7 @@ export default function WorkspaceLayout({
                             onClick={markAllRead}
                             className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                           >
-                            Đánh dấu đã đọc
+                            {t('shared.markAllRead')}
                           </button>
                         )}
                         {notifs.length > 0 && (
@@ -449,14 +452,14 @@ export default function WorkspaceLayout({
                             onClick={clearAll}
                             className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
                           >
-                            Xóa tất cả
+                            {t('shared.clearAll')}
                           </button>
                         )}
                       </div>
                     </div>
                     {notifs.length === 0 ? (
                       <div className="px-4 py-8 text-center text-sm text-ink-400">
-                        Không có thông báo mới
+                        {t('shared.noNotifications')}
                       </div>
                     ) : (
                       <div className="max-h-80 overflow-y-auto divide-y divide-ink-100 dark:divide-white/10">
@@ -511,13 +514,16 @@ export default function WorkspaceLayout({
                         onClick={() => setNotifOpen(false)}
                         className="block border-t border-ink-100 dark:border-white/10 px-4 py-2.5 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5"
                       >
-                        Xem tất cả thông báo
+                        {t('shared.viewAllNotifications')}
                       </Link>
                     )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Theme toggle */}
             <button
@@ -590,7 +596,7 @@ export default function WorkspaceLayout({
                           to={settingsPath}
                           className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-white/10"
                         >
-                          <Settings className="w-4 h-4 text-ink-400" /> Cài đặt hệ thống
+                          <Settings className="w-4 h-4 text-ink-400" /> {t('shared.systemSettings')}
                         </Link>
                       </div>
                     )}
@@ -599,7 +605,7 @@ export default function WorkspaceLayout({
                         onClick={handleLogout}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20"
                       >
-                        <LogOut className="w-4 h-4" /> Đăng xuất
+                        <LogOut className="w-4 h-4" /> {t('shared.logout')}
                       </button>
                     </div>
                   </motion.div>
