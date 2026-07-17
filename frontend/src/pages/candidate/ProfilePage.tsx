@@ -1063,6 +1063,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function CvReviewCard({ review }: { review: CvReview }) {
+  const { t } = useTranslation('candidate')
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
