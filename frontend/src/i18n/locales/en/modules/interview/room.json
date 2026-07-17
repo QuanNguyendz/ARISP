@@ -1,0 +1,80 @@
+{
+  "room": {
+    "title": "Interview Room",
+    "kiosk": {
+      "title": "Already have an interview code?",
+      "description": "Enter your code to start the interview immediately",
+      "placeholder": "Enter code",
+      "submit": "Start",
+      "noCode": "Contact HR if you don't have a code"
+    },
+    "status": {
+      "recording": "REC",
+      "stable": "Stable"
+    },
+    "ai": {
+      "speaking": "AI is speaking…",
+      "question": "Question {{current}} / {{total}}"
+    },
+    "transcript": {
+      "title": "Transcript",
+      "streaming": "Streaming",
+      "jdCv": "JD + CV",
+      "waiting": "The conversation will appear here when the interview starts.",
+      "aiLabel": "AI Interviewer",
+      "candidateLabel": "You",
+      "drafting": "You (answering — click \"Submit answer\" when done)"
+    },
+    "completed": {
+      "title": "Interview Complete!",
+      "message": "Thank you for participating in the interview. The results will be sent via email within 24 hours.",
+      "viewResult": "View Results"
+    },
+    "controls": {
+      "mute": "Mute microphone",
+      "unmute": "Unmute microphone",
+      "captions": "Captions",
+      "endInterview": "End Interview",
+      "settings": "Settings",
+      "submitAnswer": "Submit Answer",
+      "end": "End"
+    },
+    "footer": {
+      "reconnectNote": "Connection loss will automatically restore the session when you re-enter the Interview Code",
+      "sttEnabled": "Your voice is transcribed in the Transcript panel — when done answering, click \"Submit Answer\" for AI to continue.",
+      "sttDisabled": "This practice session is for training only — it does not affect recruitment results."
+    },
+    "statusMessages": {
+      "connecting": "Connecting to AI interview…",
+      "error": "Error",
+      "aiSpeaking": "AI is speaking…",
+      "listening": "Listening to your answer…",
+      "ready": "Ready — answer when AI is done asking."
+    },
+    "practice": {
+      "introTitle": "ARISP Practice Interview",
+      "beforeStart": "Before You Start",
+      "badge": "Practice • Does not affect recruitment results",
+      "points": {
+        "jdBased": "AI asks based on the job position JD and your CV.",
+        "sameAsReal": "Same round type & language as your upcoming real interview.",
+        "noRecording": "No video recording — only transcript & reference notes are saved.",
+        "voiceAnswer": "Answer by voice just like a real interview."
+      },
+      "deviceCheck": {
+        "title": "Check camera & microphone",
+        "startLabel": "Start practice interview"
+      },
+      "header": {
+        "title": "Practice Interview",
+        "subtitle": "Practice · Based on JD + CV"
+      },
+      "noVideo": "No video recording",
+      "endedTitle": "Practice session complete!",
+      "endedMessage": "This is a practice session, so it does not affect your recruitment results. The reference notes will be shown in the Results section.",
+      "viewResult": "View Results",
+      "backToApplication": "Back to Application"
+    },
+    "invalidApplication": "Invalid application."
+  }
+}

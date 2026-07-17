@@ -133,5 +133,9 @@
     "minLength": "Minimum {{min}} characters",
     "maxLength": "Maximum {{max}} characters",
     "passwordTooWeak": "Password too weak"
+  },
+  "notFoundPage": {
+    "title": "Page not found",
+    "backToHome": "Back to home"
   }
 }

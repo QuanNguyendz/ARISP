@@ -1,0 +1,22 @@
+{
+  "title": "Applied Jobs",
+  "subtitle": "Track and manage your applications",
+  "stats": {
+    "total": "Total",
+    "pending": "Pending",
+    "interview": "Interview",
+    "accepted": "Accepted"
+  },
+  "status": {
+    "pending": "Pending Review",
+    "reviewing": "Under Review",
+    "interview": "Interview",
+    "accepted": "Accepted",
+    "rejected": "Rejected"
+  },
+  "labels": {
+    "appliedDate": "Applied:",
+    "interviewDate": "Interview:",
+    "score": "Score:"
+  }
+}

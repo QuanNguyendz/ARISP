@@ -1,0 +1,25 @@
+{
+  "title": "Reports",
+  "description": "View and download recruitment reports",
+  "stats": {
+    "totalCandidates": "Total Candidates",
+    "hired": "Hired",
+    "avgTimeToHire": "Avg Time to Hire",
+    "passRate": "Pass Rate"
+  },
+  "days": "days",
+  "recentReports": "Recent Reports",
+  "report1": {
+    "title": "May Recruitment Report",
+    "description": "Recruitment activities summary for May 2026"
+  },
+  "report2": {
+    "title": "Recruiter Performance Analysis",
+    "description": "Compare performance between recruiters"
+  },
+  "report3": {
+    "title": "Candidate Report",
+    "description": "Candidate statistics by position"
+  },
+  "download": "Download"
+}

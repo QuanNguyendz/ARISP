@@ -1,0 +1,37 @@
+{
+  "title": "Cấu hình lịch phỏng vấn",
+  "description": "{jobTitle} — mỗi khung giờ mặc định dành cho 1 ứng viên. Ứng viên sẽ tự chọn khung giờ trống sau khi nhận lời mời.",
+  "back": "Quay lại chi tiết tin",
+  "loadError": "Không tải được tin tuyển dụng.",
+  "slotsLoadError": "Không tải được danh sách khung giờ.",
+  "roundLabel": "Vòng {number} · {type}",
+  "screening": "Sơ loại",
+  "technical": "Chuyên môn",
+  "addSlot": "Thêm khung giờ",
+  "slotForm": {
+    "date": "Ngày",
+    "startTime": "Bắt đầu",
+    "endTime": "Kết thúc",
+    "capacity": "Sức chứa (số ứng viên / khung)",
+    "add": "Thêm khung giờ"
+  },
+  "validation": {
+    "fillAllFields": "Vui lòng nhập ngày, giờ bắt đầu và giờ kết thúc.",
+    "endAfterStart": "Giờ kết thúc phải sau giờ bắt đầu."
+  },
+  "slotList": {
+    "title": "Khung giờ vòng {round} ({count})",
+    "empty": "Chưa có khung giờ nào cho vòng này.",
+    "booked": "Đã đặt {booked}/{capacity}",
+    "full": "Đã đầy",
+    "decreaseCapacity": "Giảm sức chứa",
+    "increaseCapacity": "Tăng sức chứa",
+    "delete": "Xoá khung giờ",
+    "cannotDelete": "Đã có người đặt, không thể xoá"
+  },
+  "actions": {
+    "capacityError": "Không thể đổi sức chứa.",
+    "createError": "Không thể tạo khung giờ.",
+    "deleteError": "Không thể xoá khung giờ."
+  }
+}

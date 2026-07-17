@@ -1,0 +1,52 @@
+{
+  "title": "HR Team",
+  "description": "Send requests to create staff accounts (HR Admin / Recruiter) for Super Admin approval",
+  "sendRequest": "Send Account Request",
+  "roles": {
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter"
+  },
+  "status": {
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "pending": "Pending"
+  },
+  "stats": {
+    "total": "Total Requests",
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "rejectionReason": "Rejection reason",
+  "paginationLabel": "requests",
+  "noRequests": "No requests yet",
+  "noRequestsHint": "Send requests to create accounts for new members — Super Admin will review and activate.",
+  "sendRequestBtn": "Send Request",
+  "requestSent": "Sent {{count}} account request(s) waiting for Super Admin approval.",
+  "modalTitle": "Send Account Creation Request",
+  "modalDescription": "Add rows individually or import CSV. Each row = 1 proposed account.",
+  "downloadTemplate": "Download CSV Template",
+  "importCsv": "Import CSV",
+  "tableHeader": {
+    "email": "Email",
+    "fullName": "Full Name",
+    "role": "Role",
+    "department": "Department"
+  },
+  "placeholder": {
+    "email": "email@company.com",
+    "fullName": "Full Name",
+    "department": "Department"
+  },
+  "addRow": "Add Row",
+  "cancel": "Cancel",
+  "submitSingle": "Submit Request",
+  "submitMultiple": "Submit {{count}} Requests",
+  "emptyCsvError": "CSV file is empty or missing data.",
+  "noValidRowsError": "Could not read any valid rows from CSV.",
+  "atLeastOneError": "Please enter at least one request.",
+  "invalidEmail": "Invalid email: {{email}}",
+  "missingName": "Missing full name for {{email}}",
+  "submitError": "Cannot submit request.",
+  "empty": "(empty)"
+}

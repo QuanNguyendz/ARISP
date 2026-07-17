@@ -285,7 +285,7 @@ function ResultCard({ result, t }: { result: InterviewResult; t: (key: string) =
 }
 
 export default function FeedbackPage() {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   const navigate = useNavigate()
   const passedCount = interviewResults.filter((r) => r.status === 'passed').length
   const avgScore = Math.round(

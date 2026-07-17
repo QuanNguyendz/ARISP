@@ -1,58 +1,56 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navigation from '@components/layout/Navigation';
-import Footer from '@components/layout/Footer';
-import ThreeBackground from '@components/three/ThreeBackground';
-import Hero from '@components/sections/Hero';
-import ScrollStorytelling from '@components/sections/ScrollStorytelling';
-import Stats from '@components/sections/Stats';
-import CTA from '@components/sections/CTA';
-import { ArrowRight } from 'lucide-react';
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import Navigation from '@components/layout/Navigation'
+import Footer from '@components/layout/Footer'
+import ThreeBackground from '@components/three/ThreeBackground'
+import Hero from '@components/sections/Hero'
+import ScrollStorytelling from '@components/sections/ScrollStorytelling'
+import Stats from '@components/sections/Stats'
+import CTA from '@components/sections/CTA'
+import { ArrowRight } from 'lucide-react'
 
 function InterviewKioskSection() {
-  const navigate = useNavigate();
-  const [code, setCode] = useState('');
+  const { t } = useTranslation('modules/landing/home')
+  const navigate = useNavigate()
+  const [code, setCode] = useState('')
 
   return (
     <section id="interview" className="relative py-32">
       <div className="max-w-6xl mx-auto px-6">
         <div className="max-w-md mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl font-light tracking-tight mb-4">
-            Already have an interview code?
+            {t('interviewKiosk.title')}
           </h2>
-          <p className="text-white/40 mb-8 font-light">
-            Enter your code to start the interview immediately
-          </p>
+          <p className="text-white/40 mb-8 font-light">{t('interviewKiosk.description')}</p>
 
           <div className="flex gap-3">
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Enter code"
+              placeholder={t('interviewKiosk.placeholder')}
               className="flex-1 px-5 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white text-center placeholder:text-white/30 focus:outline-none focus:border-white/20 transition-colors"
               maxLength={10}
             />
             <button
               onClick={() => {
                 if (code.length > 0) {
-                  navigate('/interview');
+                  navigate('/interview')
                 }
               }}
               className="px-6 py-3.5 rounded-xl bg-white text-bg-primary font-medium text-sm hover:bg-white/90 transition-colors flex items-center gap-2"
             >
-              Start
+              {t('interviewKiosk.button')}
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          <p className="text-xs text-white/20 mt-4">
-            Contact HR if you don't have a code
-          </p>
+          <p className="text-xs text-white/20 mt-4">{t('interviewKiosk.noCodeHint')}</p>
         </div>
       </div>
     </section>
-  );
+  )
 }
 
 export default function Home() {
@@ -74,5 +72,5 @@ export default function Home() {
         <Footer />
       </div>
     </div>
-  );
+  )
 }

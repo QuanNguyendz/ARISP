@@ -1,0 +1,46 @@
+{
+  "greeting": "Hello, {{name}}",
+  "greetingFallback": "Super Admin",
+  "description": "ARISP system administration overview",
+  "settingsButton": "System Settings",
+  "statCards": {
+    "totalUsers": "Total Users",
+    "pendingRequests": "Pending Requests",
+    "lockedUsers": "Locked",
+    "recruiters": "Recruiters"
+  },
+  "pendingUsers": {
+    "title": "Account Creation Requests",
+    "subtitle": "Submitted by HR Leader · awaiting your approval",
+    "viewAll": "View all",
+    "empty": "No pending requests",
+    "by": "by {{name}}",
+    "approve": "Approve",
+    "approving": "Approving..."
+  },
+  "auditLogs": {
+    "title": "Activity Log",
+    "subtitle": "Recent changes in the system",
+    "viewAll": "View all",
+    "empty": "No activity yet",
+    "by": "by {{name}}"
+  },
+  "quickActions": {
+    "title": "Quick Actions",
+    "createStaff": "Create Staff Account",
+    "approveUsers": "Approve New Users",
+    "manageUsers": "Manage Users",
+    "viewAuditLogs": "View Audit Logs"
+  },
+  "accountDistribution": {
+    "title": "Account Distribution",
+    "superAdmin": "Super Admin",
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter",
+    "candidate": "Candidates"
+  },
+  "errors": {
+    "loadFailed": "Failed to load dashboard data.",
+    "approveFailed": "Failed to approve request."
+  }
+}

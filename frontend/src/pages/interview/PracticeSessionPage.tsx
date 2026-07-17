@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import {
   Mic,
@@ -50,6 +51,7 @@ function Logo() {
 export default function PracticeSessionPage() {
   const { applicationId } = useParams<{ applicationId: string }>()
   const navigate = useNavigate()
+  const { t } = useTranslation('modules/interview/practice')
 
   const [phase, setPhase] = useState<Phase>('intro')
   const [isMuted, setIsMuted] = useState(false)
@@ -111,7 +113,7 @@ export default function PracticeSessionPage() {
   if (!applicationId) {
     return (
       <div className="grid min-h-screen place-items-center bg-ink-950 text-slate-300">
-        Hồ sơ ứng tuyển không hợp lệ.
+        {t('practice.invalidApplication')}
       </div>
     )
   }
@@ -124,39 +126,44 @@ export default function PracticeSessionPage() {
           <div className="mb-8 flex items-center gap-2.5">
             <Logo />
             <span className="font-display text-lg font-extrabold text-white">
-              ARISP <span className="font-medium text-slate-400">Phỏng vấn thử</span>
+              ARISP{' '}
+              <span className="font-medium text-slate-400">
+                {t('practice.introTitle').replace('ARISP ', '')}
+              </span>
             </span>
           </div>
 
           <div className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-br from-brand-600/15 to-ai-600/10 p-5">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-ai-300">
-              <Sparkles className="h-3.5 w-3.5" /> Luyện tập • Không ảnh hưởng kết quả tuyển dụng
+              <Sparkles className="h-3.5 w-3.5" /> {t('practice.badge')}
             </div>
-            <h2 className="font-display text-xl font-bold text-white">Trước khi bắt đầu</h2>
+            <h2 className="font-display text-xl font-bold text-white">
+              {t('practice.beforeStart')}
+            </h2>
             <ul className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <li className="flex items-start gap-2">
-                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> AI hỏi dựa trên JD
-                của vị trí và CV của bạn.
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" />{' '}
+                {t('practice.points.jdBased')}
               </li>
               <li className="flex items-start gap-2">
-                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Cùng dạng vòng
-                &amp; ngôn ngữ với buổi thật sắp tới.
+                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" />{' '}
+                {t('practice.points.sameAsReal')}
               </li>
               <li className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> Không ghi hình
-                — chỉ lưu transcript &amp; nhận xét tham khảo.
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />{' '}
+                {t('practice.points.noRecording')}
               </li>
               <li className="flex items-start gap-2">
-                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Trả lời bằng giọng nói
-                như phỏng vấn thật.
+                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" />{' '}
+                {t('practice.points.voiceAnswer')}
               </li>
             </ul>
           </div>
 
           <div className="flex flex-1 items-center">
             <DeviceCheck
-              title="Kiểm tra camera & micro"
-              startLabel="Vào phỏng vấn thử"
+              title={t('practice.deviceCheck.title')}
+              startLabel={t('practice.deviceCheck.startLabel')}
               onReady={handleReady}
               onCancel={() => navigate(-1)}
             />
@@ -178,23 +185,22 @@ export default function PracticeSessionPage() {
           <div className="mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full bg-emerald-500/20">
             <ShieldCheck className="h-12 w-12 text-emerald-400" />
           </div>
-          <h1 className="mb-3 font-display text-3xl font-bold text-white">Hoàn thành buổi thử!</h1>
-          <p className="mb-8 text-slate-400">
-            Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Bản nhận xét tham khảo sẽ
-            hiển thị trong mục Kết quả.
-          </p>
+          <h1 className="mb-3 font-display text-3xl font-bold text-white">
+            {t('practice.ended.title')}
+          </h1>
+          <p className="mb-8 text-slate-400">{t('practice.ended.message')}</p>
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => navigate(`/candidate/applications/${applicationId}`)}
               className="rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-3 font-semibold text-white hover:opacity-90"
             >
-              Xem kết quả
+              {t('practice.ended.viewResult')}
             </button>
             <button
               onClick={() => navigate('/candidate/applications')}
               className="rounded-xl bg-white/10 px-6 py-3 font-semibold text-white hover:bg-white/20"
             >
-              Về hồ sơ ứng tuyển
+              {t('practice.ended.backToApplication')}
             </button>
           </div>
         </motion.div>
@@ -212,12 +218,12 @@ export default function PracticeSessionPage() {
         <div className="flex items-center gap-3">
           <Logo />
           <div className="text-sm">
-            <span className="font-semibold text-white">Phỏng vấn thử</span>
-            <span className="text-slate-400"> · Luyện tập · Dựa trên JD + CV</span>
+            <span className="font-semibold text-white">{t('practice.header.title')}</span>
+            <span className="text-slate-400"> · {t('practice.header.subtitle')}</span>
           </div>
         </div>
         <span className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-300">
-          <ShieldCheck className="h-4 w-4" /> Không ghi hình
+          <ShieldCheck className="h-4 w-4" /> {t('practice.noVideo')}
         </span>
       </header>
 
@@ -255,7 +261,8 @@ export default function PracticeSessionPage() {
             <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-4 py-2 text-sm text-slate-200 backdrop-blur">
               {starting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Đang kết nối phỏng vấn AI…
+                  <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                  {t('practice.statusMessages.connecting')}
                 </>
               ) : practice.status === 'error' ? (
                 <>
@@ -264,15 +271,17 @@ export default function PracticeSessionPage() {
                 </>
               ) : practice.aiSpeaking ? (
                 <>
-                  <Sparkles className="h-4 w-4 text-ai-300" /> AI đang nói…
+                  <Sparkles className="h-4 w-4 text-ai-300" />{' '}
+                  {t('practice.statusMessages.aiSpeaking')}
                 </>
               ) : practice.listening ? (
                 <>
-                  <Mic className="h-4 w-4 text-emerald-300" /> Đang nghe câu trả lời của bạn…
+                  <Mic className="h-4 w-4 text-emerald-300" />{' '}
+                  {t('practice.statusMessages.listening')}
                 </>
               ) : (
                 <>
-                  <Info className="h-4 w-4" /> Sẵn sàng — hãy trả lời khi AI hỏi xong.
+                  <Info className="h-4 w-4" /> {t('practice.statusMessages.ready')}
                 </>
               )}
             </div>
@@ -306,13 +315,15 @@ export default function PracticeSessionPage() {
         {/* Transcript — min-h-0 để vùng messages cuộn nội bộ thay vì giãn page */}
         <aside className="flex min-h-0 flex-col border-l border-white/5 bg-ink-900/60">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
-            <span className="font-display font-bold text-white">Transcript</span>
-            <span className="text-xs text-slate-400">JD + CV</span>
+            <span className="font-display font-bold text-white">
+              {t('practice.transcript.title')}
+            </span>
+            <span className="text-xs text-slate-400">{t('practice.transcript.jdCv')}</span>
           </div>
           <div ref={transcriptRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
             {practice.messages.length === 0 && !practice.interim && (
               <p className="pt-6 text-center text-sm text-slate-500">
-                Cuộc trò chuyện sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.
+                {t('practice.transcript.waiting')}
               </p>
             )}
             {practice.messages.map((m, i) => (
@@ -325,7 +336,9 @@ export default function PracticeSessionPage() {
                 }`}
               >
                 <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  {m.role === 'ai' ? 'AI phỏng vấn' : 'Bạn'}
+                  {m.role === 'ai'
+                    ? t('practice.transcript.aiLabel')
+                    : t('practice.transcript.candidateLabel')}
                 </span>
                 {m.text}
               </div>
@@ -333,7 +346,7 @@ export default function PracticeSessionPage() {
             {(practice.draft || practice.interim) && (
               <div className="ml-6 rounded-xl border border-dashed border-brand-400/40 bg-white/5 px-3.5 py-2.5 text-sm text-slate-300">
                 <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-brand-300">
-                  Bạn (đang trả lời — bấm “Gửi trả lời” khi xong)
+                  {t('practice.transcript.drafting')}
                 </span>
                 {practice.draft}
                 {practice.interim && (
@@ -354,7 +367,7 @@ export default function PracticeSessionPage() {
           <button
             onClick={toggleMute}
             className="grid h-12 w-12 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
-            aria-label={isMuted ? 'Bật micro' : 'Tắt micro'}
+            aria-label={isMuted ? t('practice.controls.unmute') : t('practice.controls.mute')}
           >
             {isMuted ? (
               <MicOff className="h-5 w-5 text-red-400" />
@@ -370,21 +383,18 @@ export default function PracticeSessionPage() {
                 ? 'bg-gradient-to-r from-brand-600 to-ai-600 hover:opacity-90'
                 : 'bg-white/10 hover:bg-white/20'
             }`}
-            title="Gửi câu trả lời hiện tại cho AI"
           >
-            <Send className="h-4 w-4" /> Gửi trả lời
+            <Send className="h-4 w-4" /> {t('practice.controls.submitAnswer')}
           </button>
           <button
             onClick={endSession}
             className="flex h-12 items-center gap-2 rounded-full bg-red-600 px-6 font-semibold text-white transition hover:bg-red-700"
           >
-            <Phone className="h-5 w-5" /> Kết thúc
+            <Phone className="h-5 w-5" /> {t('practice.controls.end')}
           </button>
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">
-          {practice.sttEnabled
-            ? 'Giọng nói của bạn được chuyển thành chữ ở khung Transcript — trả lời xong, bấm “Gửi trả lời” để AI tiếp tục.'
-            : 'Buổi thử chỉ để luyện tập — không ảnh hưởng đến kết quả tuyển dụng.'}
+          {practice.sttEnabled ? t('practice.footer.sttEnabled') : t('practice.footer.sttDisabled')}
         </p>
       </footer>
     </div>

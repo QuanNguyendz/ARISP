@@ -1,20 +1,12 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import LegalPageShell, { LegalSection } from '@components/legal/LegalPageShell'
 
 // NOTE: Nội dung mang tính mẫu cho nền tảng ARISP, nên được bộ phận pháp chế rà soát trước khi go-live.
 export default function TermsPage() {
+  const { t } = useTranslation('modules/legal/terms')
   return (
-    <LegalPageShell
-      title="Điều khoản sử dụng"
-      lastUpdated="18/06/2026"
-      intro={
-        <p>
-          Chào mừng bạn đến với ARISP — nền tảng tuyển dụng tích hợp phỏng vấn tự động bằng AI. Khi
-          tạo tài khoản hoặc sử dụng dịch vụ, bạn xác nhận đã đọc, hiểu và đồng ý với các điều khoản
-          dưới đây. Vui lòng đọc kỹ trước khi tiếp tục.
-        </p>
-      }
-    >
+    <LegalPageShell title={t('title')} lastUpdated={t('lastUpdated')} intro={<p>{t('intro')}</p>}>
       <LegalSection title="1. Chấp nhận điều khoản">
         <p>
           Bằng việc đăng ký tài khoản ứng viên, nộp hồ sơ hoặc tham gia phỏng vấn trên ARISP, bạn

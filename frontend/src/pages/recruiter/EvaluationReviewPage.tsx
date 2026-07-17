@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { ClipboardList, Search, X, Loader2, Lock } from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import { evaluationService } from '@services/evaluation/evaluationService'
@@ -8,10 +9,11 @@ import type { EvaluationReport } from '@/types/evaluation'
 import { verdictBadge, verdictLabel, scoreColor, initials, timeAgo } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
 
-// Recruiter chỉ XEM báo cáo (không có quyền Confirm/Override — đó là quyền HR Leader).
 const INTERVIEWED = new Set(['screening', 'interview', 'pass', 'not_pass'])
 
 export default function RecruiterEvaluationReviewPage() {
+  const { t } = useTranslation('modules/recruiter/evaluations')
+
   const [evals, setEvals] = useState<EvaluationReport[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,12 +42,12 @@ export default function RecruiterEvaluationReviewPage() {
           .sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())
         setEvals(flat)
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được danh sách đánh giá.')
+        setError(e?.response?.data?.message || t('loadingError'))
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [t])
 
   const counts = useMemo(() => {
     const pass = evals.filter((e) => (e.finalVerdict ?? e.aiVerdict) === 'pass').length
@@ -55,11 +57,13 @@ export default function RecruiterEvaluationReviewPage() {
   }, [evals])
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase()
+    const searchTerm = q.trim().toLowerCase()
     return evals
       .filter((e) => (filter === 'all' ? true : (e.finalVerdict ?? e.aiVerdict) === filter))
       .filter((e) =>
-        t ? ((e.candidateName || '') + (e.jobTitle || '')).toLowerCase().includes(t) : true
+        searchTerm
+          ? ((e.candidateName || '') + (e.jobTitle || '')).toLowerCase().includes(searchTerm)
+          : true
       )
   }, [evals, q, filter])
 
@@ -70,7 +74,6 @@ export default function RecruiterEvaluationReviewPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi từ khóa/bộ lọc
   useEffect(() => {
     setPage(1)
   }, [q, filter])
@@ -81,25 +84,28 @@ export default function RecruiterEvaluationReviewPage() {
     try {
       setDetail(await evaluationService.getEvaluationById(id))
     } catch {
-      setError('Không tải được chi tiết đánh giá.')
+      setError(t('loadDetailError'))
     } finally {
       setDetailLoading(false)
     }
   }
 
   const statCards = [
-    { label: 'Tổng đánh giá', value: counts.total, color: 'text-brand-600' },
-    { label: 'Verdict Đạt', value: counts.pass, color: 'text-emerald-600' },
-    { label: 'Điểm ≥ 80', value: counts.high, color: 'text-ai-600' },
-    { label: 'HR đã duyệt', value: counts.reviewed, color: 'text-amber-600' },
+    { label: t('stats.totalEvaluations'), value: counts.total, color: 'text-brand-600' },
+    { label: t('stats.passVerdict'), value: counts.pass, color: 'text-emerald-600' },
+    { label: t('stats.score80'), value: counts.high, color: 'text-ai-600' },
+    { label: t('stats.hrReviewed'), value: counts.reviewed, color: 'text-amber-600' },
+  ]
+
+  const FILTERS = [
+    { value: 'all', label: t('filters.all') },
+    { value: 'pass', label: t('filters.pass') },
+    { value: 'not_pass', label: t('filters.notPass') },
   ]
 
   return (
     <div className="p-6 lg:p-8">
-      <PageHeader
-        title="Đánh giá"
-        description="Xem báo cáo đánh giá AI của ứng viên (chỉ xem — duyệt kết quả do HR Leader thực hiện)"
-      />
+      <PageHeader title={t('title')} description={t('description')} />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
@@ -118,16 +124,12 @@ export default function RecruiterEvaluationReviewPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Tìm ứng viên, vị trí..."
+                placeholder={t('searchPlaceholder')}
                 className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {[
-                { value: 'all', label: 'Tất cả' },
-                { value: 'pass', label: 'Đạt' },
-                { value: 'not_pass', label: 'Không đạt' },
-              ].map((f) => (
+              {FILTERS.map((f) => (
                 <button
                   key={f.value}
                   onClick={() => setFilter(f.value)}
@@ -146,8 +148,8 @@ export default function RecruiterEvaluationReviewPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon={<ClipboardList className="h-8 w-8 text-ink-400" />}
-              title="Chưa có đánh giá"
-              description="Báo cáo đánh giá sau phỏng vấn của ứng viên sẽ xuất hiện ở đây."
+              title={t('noEvaluations')}
+              description={t('noEvaluationsHint')}
             />
           ) : (
             <div className="space-y-3">
@@ -165,10 +167,11 @@ export default function RecruiterEvaluationReviewPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
-                      {ev.candidateName || 'Ứng viên'}
+                      {ev.candidateName || t('candidate')}
                     </p>
                     <p className="truncate text-xs text-ink-500 dark:text-ink-400">
-                      {ev.jobTitle || 'Vị trí'} · Vòng {ev.roundNumber} · {timeAgo(ev.createdAt)}
+                      {ev.jobTitle || t('position')} · {t('round')} {ev.roundNumber} ·{' '}
+                      {timeAgo(ev.createdAt)}
                     </p>
                   </div>
                   {ev.overallScore != null && (
@@ -183,7 +186,7 @@ export default function RecruiterEvaluationReviewPage() {
                   </span>
                   {ev.hrReview && (
                     <span className="hidden rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400 sm:inline">
-                      HR duyệt
+                      {t('hrReviewed')}
                     </span>
                   )}
                 </motion.button>
@@ -196,7 +199,7 @@ export default function RecruiterEvaluationReviewPage() {
               page={page}
               totalPages={totalPages}
               total={filtered.length}
-              label="đánh giá"
+              label={t('paginationLabel')}
               onPageChange={setPage}
             />
           )}
@@ -221,36 +224,36 @@ export default function RecruiterEvaluationReviewPage() {
             {detailLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" />
-                <p className="text-sm text-ink-500 dark:text-ink-400">Đang tải chi tiết...</p>
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('loadingDetail')}</p>
               </div>
             ) : detail ? (
               <div>
                 <div className="mb-5 pr-10">
                   <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                    Chi tiết đánh giá
+                    {t('evaluationDetail')}
                   </h2>
                   <p className="text-sm text-ink-500 dark:text-ink-400">
-                    {detail.candidateName} · {detail.jobTitle} · Vòng {detail.roundNumber}
+                    {detail.candidateName} · {detail.jobTitle} · {t('round')} {detail.roundNumber}
                   </p>
                 </div>
 
                 <div className="mb-5 grid grid-cols-3 gap-3">
                   <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">AI Verdict</p>
+                    <p className="mb-1 text-xs text-ink-400">{t('aiVerdict')}</p>
                     <p className="text-sm font-semibold text-ink-900 dark:text-white">
                       {verdictLabel(detail.aiVerdict)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">Điểm tổng</p>
+                    <p className="mb-1 text-xs text-ink-400">{t('totalScore')}</p>
                     <p className={`text-sm font-semibold ${scoreColor(detail.overallScore)}`}>
                       {detail.overallScore ?? '—'}
                     </p>
                   </div>
                   <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">HR review</p>
+                    <p className="mb-1 text-xs text-ink-400">{t('hrReview')}</p>
                     <p className="text-sm font-semibold text-ink-900 dark:text-white">
-                      {detail.hrReview ? 'Đã duyệt' : 'Chờ duyệt'}
+                      {detail.hrReview ? t('reviewed') : t('pending')}
                     </p>
                   </div>
                 </div>
@@ -258,7 +261,7 @@ export default function RecruiterEvaluationReviewPage() {
                 {detail.criterionScores && Object.keys(detail.criterionScores).length > 0 && (
                   <section className="mb-5">
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      Điểm theo tiêu chí
+                      {t('criterionScores')}
                     </h3>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(detail.criterionScores).map(([k, v]) => (
@@ -277,7 +280,7 @@ export default function RecruiterEvaluationReviewPage() {
                 {detail.reasoning && (
                   <section className="mb-5">
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      Nhận định
+                      {t('reasoning')}
                     </h3>
                     <p className="whitespace-pre-wrap rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm leading-7 text-ink-700 dark:text-ink-200">
                       {detail.reasoning}
@@ -288,7 +291,7 @@ export default function RecruiterEvaluationReviewPage() {
                 {detail.questionAnalyses && detail.questionAnalyses.length > 0 && (
                   <section className="mb-5">
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      Phân tích từng câu hỏi
+                      {t('questionAnalysis')}
                     </h3>
                     <div className="space-y-2">
                       {detail.questionAnalyses.map((qa, idx) => (
@@ -302,7 +305,9 @@ export default function RecruiterEvaluationReviewPage() {
                           <p className="mb-1 text-sm text-ink-600 dark:text-ink-300">
                             {qa.analysis}
                           </p>
-                          <p className="text-xs text-ink-400">Điểm: {qa.score}</p>
+                          <p className="text-xs text-ink-400">
+                            {t('score')}: {qa.score}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -310,8 +315,7 @@ export default function RecruiterEvaluationReviewPage() {
                 )}
 
                 <div className="flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 p-3 text-xs text-ink-500 dark:text-ink-400">
-                  <Lock className="h-3.5 w-3.5" /> Việc xác nhận / đổi kết quả (Override) do HR
-                  Leader thực hiện.
+                  <Lock className="h-3.5 w-3.5" /> {t('readOnlyNote')}
                 </div>
               </div>
             ) : null}

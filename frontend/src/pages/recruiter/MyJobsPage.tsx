@@ -2,56 +2,68 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Briefcase, Users, MapPin, Clock, ChevronRight } from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
 import jobService from '@services/job/jobService'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { JobsGridSkeleton, StatsGridSkeleton } from './_skeletons'
 
-function getDeadlineText(deadlineStr?: string | null): string {
+function getDeadlineText(
+  deadlineStr: string | null | undefined,
+  t: (key: string) => string
+): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
-  const formattedDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
-  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
-  return `${formattedDate} (Còn ${diffDays} ngày)`
+  if (diffDays < 0) return `${formattedDate} (${t('deadline.expired')})`
+  if (diffDays === 0) return `${formattedDate} (${t('deadline.today')})`
+  return `${formattedDate} (${t('deadline.daysLeft', { count: diffDays })})`
 }
 
-const FILTERS: { value: string; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'active', label: 'Đang đăng' },
-  { value: 'pending', label: 'Chờ HR duyệt' },
-  { value: 'rejected', label: 'Bị từ chối' },
-  { value: 'draft', label: 'Nháp' },
-  { value: 'closed', label: 'Đã đóng' },
-]
-
 export default function RecruiterMyJobsPage() {
-  const { data: jobsData, isLoading: loading, error: fetchError } = useQuery({
+  const { t } = useTranslation('modules/recruiter/jobs')
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
     queryKey: ['my-jobs'],
     queryFn: () => jobService.getMyJobPostings(),
     refetchOnWindowFocus: false,
   })
 
   const jobs = jobsData || []
-  const error = (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
+  const error =
+    (fetchError as any)?.response?.data?.message || (fetchError ? t('loadingError') : '')
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
 
   const counts = useMemo(() => {
     const by = (s: string) => jobs.filter((j) => j.status === s).length
-    return { all: jobs.length, active: by('active'), pending: by('pending'), rejected: by('rejected'), draft: by('draft'), closed: by('closed') }
+    return {
+      all: jobs.length,
+      active: by('active'),
+      pending: by('pending'),
+      rejected: by('rejected'),
+      draft: by('draft'),
+      closed: by('closed'),
+    }
   }, [jobs])
 
   const filtered = useMemo(
     () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
-    [jobs, filter],
+    [jobs, filter]
   )
 
   const PAGE_SIZE = 10
@@ -61,24 +73,32 @@ export default function RecruiterMyJobsPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi bộ lọc
   useEffect(() => {
     setPage(1)
   }, [filter])
 
   const statCards = [
-    { label: 'Tổng tin', value: counts.all, color: 'text-brand-600' },
-    { label: 'Đang đăng', value: counts.active, color: 'text-emerald-600' },
-    { label: 'Chờ HR duyệt', value: counts.pending, color: 'text-amber-600' },
-    { label: 'Bị từ chối', value: counts.rejected, color: 'text-red-600' },
+    { label: t('stats.total'), value: counts.all, color: 'text-brand-600' },
+    { label: t('status.active'), value: counts.active, color: 'text-emerald-600' },
+    { label: t('status.pending'), value: counts.pending, color: 'text-amber-600' },
+    { label: t('status.rejected'), value: counts.rejected, color: 'text-red-600' },
+  ]
+
+  const filters = [
+    { value: 'all', label: t('filters.all') },
+    { value: 'active', label: t('status.active') },
+    { value: 'pending', label: t('status.pending') },
+    { value: 'rejected', label: t('status.rejected') },
+    { value: 'draft', label: t('status.draft') },
+    { value: 'closed', label: t('status.closed') },
   ]
 
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
-        title="Tin tuyển dụng của tôi"
-        description="Quản lý tin đã tạo — bấm vào tin để xem ứng viên & gửi duyệt"
-        actions={[{ label: 'Tạo tin', href: '/recruiter/jobs/create', variant: 'primary' }]}
+        title={t('title')}
+        description={t('description')}
+        actions={[{ label: t('createJob'), href: '/recruiter/jobs/create', variant: 'primary' }]}
       />
 
       {error && <ErrorAlert message={error} />}
@@ -93,7 +113,7 @@ export default function RecruiterMyJobsPage() {
           <StatsGrid stats={statCards} />
 
           <div className="mb-6 flex flex-wrap gap-2">
-            {FILTERS.map((f) => (
+            {filters.map((f) => (
               <button
                 key={f.value}
                 onClick={() => setFilter(f.value)}
@@ -111,14 +131,23 @@ export default function RecruiterMyJobsPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon={<Briefcase className="h-8 w-8 text-ink-400" />}
-              title="Không có tin nào"
-              description={filter === 'all' ? 'Hãy tạo tin tuyển dụng đầu tiên của bạn.' : 'Không có tin ở trạng thái này.'}
-              action={filter === 'all' ? { label: 'Tạo tin', href: '/recruiter/jobs/create' } : undefined}
+              title={filter === 'all' ? t('noJobs') : t('noMatchingJobs')}
+              description={filter === 'all' ? t('noJobsHint') : t('noMatchingJobsHint')}
+              action={
+                filter === 'all'
+                  ? { label: t('createJob'), href: '/recruiter/jobs/create' }
+                  : undefined
+              }
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {paged.map((j, i) => (
-                <motion.div key={j.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                <motion.div
+                  key={j.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                >
                   <Link
                     to={`/recruiter/my-jobs/${j.id}`}
                     className={`group block h-full rounded-2xl border bg-white dark:bg-white/5 p-5 shadow-card transition-all hover:shadow-card-hover ${
@@ -131,7 +160,9 @@ export default function RecruiterMyJobsPage() {
                       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
                         <Briefcase className="h-5 w-5" />
                       </span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status)}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status)}`}
+                      >
                         {jobStatusLabel(j.status)}
                       </span>
                     </div>
@@ -139,13 +170,21 @@ export default function RecruiterMyJobsPage() {
                       {j.title}
                     </h3>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500 dark:text-ink-400">
-                      <span>{j.department || 'Chưa phân phòng ban'}</span>
-                      {j.location ? <><span>·</span><span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{j.location}</span></> : null}
+                      <span>{j.department || t('noDepartment')}</span>
+                      {j.location ? (
+                        <>
+                          <span>·</span>
+                          <span className="flex items-center gap-0.5">
+                            <MapPin className="h-3 w-3" />
+                            {j.location}
+                          </span>
+                        </>
+                      ) : null}
                       {j.applicationDeadline ? (
                         <>
                           <span>·</span>
                           <span className="text-amber-600 dark:text-amber-400 font-medium">
-                            Hạn nộp: {getDeadlineText(j.applicationDeadline)}
+                            {t('deadlineLabel')}: {getDeadlineText(j.applicationDeadline, t)}
                           </span>
                         </>
                       ) : null}
@@ -153,7 +192,7 @@ export default function RecruiterMyJobsPage() {
 
                     {j.status === 'rejected' && j.rejectionReason && (
                       <p className="mt-2 rounded-lg bg-red-50 dark:bg-red-500/10 px-2.5 py-1.5 text-xs text-red-600 dark:text-red-400">
-                        Lý do: {j.rejectionReason}
+                        {t('rejectionReason')}: {j.rejectionReason}
                       </p>
                     )}
 
@@ -178,7 +217,7 @@ export default function RecruiterMyJobsPage() {
               page={page}
               totalPages={totalPages}
               total={filtered.length}
-              label="tin"
+              label={t('paginationLabel')}
               onPageChange={setPage}
             />
           )}

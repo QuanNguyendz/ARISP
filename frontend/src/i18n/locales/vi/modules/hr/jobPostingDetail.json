@@ -1,0 +1,198 @@
+{
+  "back": "Quay lại danh sách",
+  "loading": "Đang tải chi tiết tin tuyển dụng...",
+  "errorTitle": "Đã xảy ra lỗi",
+  "errorNotFound": "Không tìm thấy dữ liệu.",
+  "edit": "Chỉnh sửa",
+  "department": "Phòng ban tuyển dụng",
+  "noLocation": "Chưa cấu hình",
+  "workModes": {
+    "fulltime": "Toàn thời gian (Full-time)",
+    "parttime": "Bán thời gian (Part-time)",
+    "contract": "Hợp đồng (Contract)",
+    "internship": "Thực tập (Internship)"
+  },
+  "deadline": {
+    "label": "Hạn nộp:",
+    "noLimit": "Không giới hạn",
+    "expired": "Đã hết hạn",
+    "today": "Hết hạn hôm nay",
+    "daysLeft": "Còn {count} ngày"
+  },
+  "vacancies": "Chỉ tiêu:",
+  "statusLabels": {
+    "draft": "Bản nháp",
+    "pending": "Chờ bạn duyệt",
+    "active": "Đang đăng",
+    "rejected": "Đã từ chối",
+    "closed": "Đã đóng",
+    "archived": "Lưu trữ",
+    "paused": "Tạm dừng"
+  },
+  "jdSection": {
+    "title": "Tài liệu JD",
+    "originalJd": "JD gốc",
+    "approvedJd": "JD đã đóng dấu duyệt",
+    "noJd": "Tin này chưa đính kèm file JD."
+  },
+  "description": "Mô tả công việc",
+  "skills": "Yêu cầu kỹ năng",
+  "aiConfig": {
+    "title": "Cấu hình AI Interviewer Persona",
+    "requiredLanguage": "Ngôn ngữ yêu cầu:",
+    "autoDetect": "Ngôn ngữ tự động phát hiện:",
+    "autoDetectLabels": {
+      "vi": "Tiếng Việt",
+      "other": "Tiếng Anh/Khác"
+    },
+    "availableHours": "Giờ phỏng vấn khả dụng:",
+    "rescheduleDeadline": "Hạn đổi lịch phỏng vấn:",
+    "hoursBefore": "giờ trước buổi hẹn",
+    "defaultLang": "Mặc định theo hệ thống",
+    "onsiteRequired": "Bắt buộc On-site"
+  },
+  "rounds": {
+    "title": "Các vòng phỏng vấn AI ({count})",
+    "round": "Vòng {number}",
+    "types": {
+      "technical": "Technical",
+      "screening": "Screening"
+    },
+    "language": "Ngôn ngữ:",
+    "languages": {
+      "vi": "Tiếng Việt",
+      "other": "Tiếng Anh/Khác"
+    },
+    "duration": "Thời gian:",
+    "minutes": "{count} phút",
+    "codeTtl": "TTL Code:",
+    "hours": "giờ",
+    "noConfig": "Chưa cấu hình các vòng phỏng vấn."
+  },
+  "funnel": {
+    "title": "Tiến trình ứng tuyển của ứng viên",
+    "description": "Theo dõi và phê duyệt hồ sơ ứng viên theo từng giai đoạn phỏng vấn",
+    "total": "Tổng cộng: {count} ứng viên",
+    "cvReview": "Duyệt Hồ Sơ",
+    "cvReviewSubtitle": "CV mới nộp",
+    "cvSubmitted": "Mới ứng tuyển",
+    "invited": "Được mời (chưa nộp CV)",
+    "cvRejected": "CV bị từ chối",
+    "waiting": "Chờ gửi lời mời",
+    "waitingSchedule": "Đã mời, chờ đặt lịch",
+    "interview": "Đã đặt lịch / Đang phỏng vấn",
+    "pass": "Đạt",
+    "notPass": "Không đạt",
+    "withdrawn": "Đã rút"
+  },
+  "table": {
+    "candidate": "Ứng viên",
+    "appliedDate": "Ngày nộp",
+    "noticePeriod": "Báo trước",
+    "matchScore": "Độ Phù Hợp",
+    "status": "Trạng Thái",
+    "actions": "Hành động",
+    "interviewSchedule": "Lịch thi/phỏng vấn",
+    "interviewScore": "Điểm Đánh Giá",
+    "notScheduled": "Chưa đặt lịch",
+    "notProvided": "—"
+  },
+  "filters": {
+    "byDate": "Lọc theo ngày nộp",
+    "byInterviewDate": "Lọc theo ngày thi",
+    "byStatus": "Lọc theo trạng thái",
+    "allStatus": "Tất cả trạng thái",
+    "sortByMatch": "Sắp xếp theo độ phù hợp",
+    "sortByScore": "Sắp xếp theo điểm đánh giá",
+    "sortOptions": {
+      "desc": "Giảm dần (Cao nhất trước)",
+      "asc": "Tăng dần (Thấp nhất trước)",
+      "default": "Mặc định (Thời gian nộp)"
+    }
+  },
+  "actions": {
+    "accept": "Duyệt",
+    "reject": "Từ chối",
+    "invite": "Mời",
+    "viewCv": "Xem CV",
+    "viewCoverLetter": "Xem thông tin ứng tuyển & Thư giới thiệu"
+  },
+  "batchActions": {
+    "selected": "Đã chọn {count} ứng viên",
+    "acceptBatch": "Duyệt hàng loạt",
+    "rejectBatch": "Từ chối hàng loạt",
+    "inviteBatch": "Mời phỏng vấn hàng loạt"
+  },
+  "noCandidates": "Chưa có ứng viên nào ứng tuyển cho tin này.",
+  "noFilterResults": "Không tìm thấy ứng viên nào phù hợp với bộ lọc.",
+  "paginationLabel": "ứng viên",
+  "pendingApproval": {
+    "title": "Tin đang chờ bạn duyệt",
+    "description": "Recruiter {name} đã gửi tin kèm file JD. Duyệt để đăng tin (JD sẽ được đóng dấu xác nhận) hoặc từ chối kèm lý do.",
+    "approve": "Duyệt & đóng dấu",
+    "reject": "Từ chối"
+  },
+  "rejectedBanner": {
+    "label": "Đã từ chối:"
+  },
+  "approvedBanner": {
+    "label": "Đã duyệt bởi",
+    "at": "lúc"
+  },
+  "confirmRejectModal": {
+    "title": "Từ chối tin tuyển dụng",
+    "description": "Nhập lý do từ chối tin \"{title}\". Recruiter sẽ thấy lý do này để chỉnh sửa và gửi duyệt lại.",
+    "placeholder": "Lý do từ chối...",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận từ chối"
+  },
+  "coverLetterModal": {
+    "title": "Thông tin hồ sơ - {name}",
+    "aiSummary": "Tóm tắt CV & Đánh giá AI",
+    "noAiData": "Không có dữ liệu đánh giá AI",
+    "noAiDataHint": "Hồ sơ này chưa có kết quả đánh giá AI (do là hồ sơ thử nghiệm hoặc không có tệp CV hợp lệ).",
+    "contactInfo": "Thông tin liên hệ",
+    "fullName": "Họ và tên",
+    "phone": "Số điện thoại",
+    "email": "Email",
+    "noticePeriod": "Báo trước khi nghỉ việc",
+    "coverLetter": "Thư giới thiệu",
+    "noCoverLetter": "Ứng viên không gửi thư giới thiệu.",
+    "close": "Đóng",
+    "matchScore": "Độ phù hợp: {score}%"
+  },
+  "notices": {
+    "acceptSuccess": "Đã duyệt hồ sơ ứng viên và gửi lời mời phỏng vấn Vòng 1 thành công.",
+    "rejectSuccess": "Đã từ chối hồ sơ và gửi email cảm ơn ứng viên thành công.",
+    "inviteSuccess": "Đã gửi lời mời (magic link) cho ứng viên.",
+    "jobApproveSuccess": "Đã duyệt tin tuyển dụng. File JD đã được đóng dấu xác nhận.",
+    "jobRejectSuccess": "Đã từ chối tin tuyển dụng. Recruiter sẽ thấy lý do để chỉnh sửa.",
+    "batchAcceptSuccess": "Đã duyệt thành công {success} hồ sơ.{failed, plural, other{ Thất bại {failed} hồ sơ.}}",
+    "batchRejectSuccess": "Đã từ chối thành công {success} hồ sơ.{failed, plural, other{ Thất bại {failed} hồ sơ.}}",
+    "batchInviteSuccess": "Đã gửi lời mời thành công cho {success} ứng viên.{failed, plural, other{ Thất bại {failed} ứng viên.}}",
+    "close": "Đóng"
+  },
+  "errors": {
+    "loadJob": "Không thể tải chi tiết tin tuyển dụng. Tin có thể không tồn tại hoặc bạn không có quyền xem.",
+    "acceptApplication": "Lỗi khi duyệt hồ sơ.",
+    "rejectApplication": "Lỗi khi từ chối hồ sơ.",
+    "sendInvite": "Không thể gửi lời mời.",
+    "approveJob": "Không thể duyệt tin. Vui lòng thử lại.",
+    "rejectJob": "Không thể từ chối tin. Vui lòng thử lại.",
+    "batchAccept": "Lỗi khi duyệt hàng loạt.",
+    "batchReject": "Lỗi khi từ chối hàng loạt.",
+    "batchInvite": "Lỗi khi gửi lời mời hàng loạt.",
+    "loadCandidates": "Lỗi khi tải danh sách ứng viên"
+  },
+  "confirmDialogs": {
+    "batchAccept": "Bạn có chắc chắn muốn duyệt {count} hồ sơ đã chọn và chuyển sang Vòng 1?",
+    "batchReject": "Bạn có chắc chắn muốn từ chối {count} hồ sơ đã chọn và gửi thư cảm ơn?",
+    "batchInvite": "Bạn có chắc chắn muốn gửi lời mời phỏng vấn cho {count} ứng viên đã chọn?",
+    "rejectApplication": "Bạn có chắc chắn muốn từ chối hồ sơ ứng viên này và gửi thư cảm ơn?"
+  },
+  "salary": {
+    "negotiable": "Thỏa thuận",
+    "from": "Từ",
+    "to": "Đến"
+  }
+}

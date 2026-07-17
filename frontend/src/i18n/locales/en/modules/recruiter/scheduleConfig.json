@@ -1,0 +1,37 @@
+{
+  "title": "Interview Schedule Configuration",
+  "description": "{jobTitle} — each time slot defaults to 1 candidate. Candidates will select available slots after receiving the invitation.",
+  "back": "Back to job detail",
+  "loadError": "Unable to load job posting.",
+  "slotsLoadError": "Unable to load time slots.",
+  "roundLabel": "Round {number} · {type}",
+  "screening": "Screening",
+  "technical": "Technical",
+  "addSlot": "Add Time Slot",
+  "slotForm": {
+    "date": "Date",
+    "startTime": "Start",
+    "endTime": "End",
+    "capacity": "Capacity (candidates / slot)",
+    "add": "Add Time Slot"
+  },
+  "validation": {
+    "fillAllFields": "Please fill in date, start time and end time.",
+    "endAfterStart": "End time must be after start time."
+  },
+  "slotList": {
+    "title": "Time Slots for Round {round} ({count})",
+    "empty": "No time slots for this round yet.",
+    "booked": "Booked {booked}/{capacity}",
+    "full": "Full",
+    "decreaseCapacity": "Decrease capacity",
+    "increaseCapacity": "Increase capacity",
+    "delete": "Delete time slot",
+    "cannotDelete": "Has bookings, cannot delete"
+  },
+  "actions": {
+    "capacityError": "Unable to change capacity.",
+    "createError": "Unable to create time slot.",
+    "deleteError": "Unable to delete time slot."
+  }
+}

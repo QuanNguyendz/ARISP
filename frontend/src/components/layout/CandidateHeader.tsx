@@ -103,15 +103,6 @@ const NAV = [
   // "Phỏng vấn thử" không còn là điểm đến độc lập — practice được khởi động theo từng
   // hồ sơ ứng tuyển (trang Hồ sơ ứng tuyển / chi tiết) qua /interview/practice/:applicationId.
 ]
-
-const USER_MENU = [
-  { label: 'Hồ sơ của tôi', to: '/candidate/profile', icon: User },
-  { label: 'Đơn ứng tuyển', to: '/candidate/applications', icon: FileText },
-  { label: 'Việc đã lưu', to: '/candidate/saved-jobs', icon: Bookmark },
-  // Kết quả phỏng vấn nằm trong chi tiết từng hồ sơ ứng tuyển ("Đơn ứng tuyển" ở trên).
-  { label: 'Lịch phỏng vấn', to: '/candidate/interviews', icon: Clapperboard },
-  { label: 'Cài đặt', to: '/candidate/settings', icon: Settings },
-]
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -211,7 +202,7 @@ export default function CandidateHeader() {
       notificationService
         .markRead(n.id)
         .then(() => refetch())
-        .catch(() => { })
+        .catch(() => {})
     }
     setOpen(null)
     navigate(resolveNotifLink(n.link) || '/candidate/notifications')
@@ -244,7 +235,7 @@ export default function CandidateHeader() {
   return (
     <header
       ref={rootRef}
-      className="sticky top-0 z-30 border-b border-ink-200 bg-white/80 backdrop-blur"
+      className="sticky top-0 z-30 border-b border-ink-200 bg-white dark:bg-ink-900 backdrop-blur"
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         {/* Mobile menu toggle */}
@@ -324,10 +315,11 @@ export default function CandidateHeader() {
                     i18n.changeLanguage('vi')
                     setOpen(null)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${i18n.language === 'vi' || !i18n.language
-                    ? 'bg-brand-50 text-brand-700'
-                    : 'text-ink-600 hover:bg-ink-100'
-                    }`}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'vi' || !i18n.language
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
                 >
                   {t('header.vietnamese')}
                   {i18n.language === 'vi' || !i18n.language ? <Check className="h-4 w-4" /> : null}
@@ -337,10 +329,11 @@ export default function CandidateHeader() {
                     i18n.changeLanguage('en')
                     setOpen(null)
                   }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${i18n.language === 'en'
-                    ? 'bg-brand-50 text-brand-700'
-                    : 'text-ink-600 hover:bg-ink-100'
-                    }`}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                    i18n.language === 'en'
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink-600 hover:bg-ink-100'
+                  }`}
                 >
                   {t('header.english')}
                   {i18n.language === 'en' ? <Check className="h-4 w-4" /> : null}
@@ -418,8 +411,9 @@ export default function CandidateHeader() {
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') openNotif(n)
                             }}
-                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${!n.isRead ? 'bg-brand-50/40' : ''
-                              }`}
+                            className={`group flex w-full cursor-pointer gap-3 px-4 py-3 text-left hover:bg-ink-50 ${
+                              !n.isRead ? 'bg-brand-50/40' : ''
+                            }`}
                           >
                             <span
                               className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${cls}`}
@@ -555,10 +549,11 @@ export default function CandidateHeader() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`block rounded-lg px-3 py-2 text-sm ${active
-                  ? 'bg-brand-50 font-medium text-brand-700'
-                  : 'text-ink-700 hover:bg-ink-100'
-                  }`}
+                className={`block rounded-lg px-3 py-2 text-sm ${
+                  active
+                    ? 'bg-brand-50 font-medium text-brand-700'
+                    : 'text-ink-700 hover:bg-ink-100'
+                }`}
               >
                 {item.label}
               </Link>

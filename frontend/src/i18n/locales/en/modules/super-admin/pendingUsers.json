@@ -1,0 +1,24 @@
+{
+  "title": "Approve New Accounts",
+  "description": "Account creation requests sent by HR Leader — approve to create active accounts",
+  "by": "Requested by {{name}}",
+  "processing": "Processing...",
+  "approve": "Approve",
+  "reject": "Reject",
+  "empty": {
+    "title": "No pending requests",
+    "description": "When HR Leader sends account creation requests, they will appear here."
+  },
+  "rejectModal": {
+    "title": "Reject Request",
+    "description": "Enter the reason for rejecting account creation for \"{{name}}\".",
+    "confirm": "Reject",
+    "placeholder": "Enter reason...",
+    "cancel": "Cancel"
+  },
+  "errors": {
+    "loadFailed": "Failed to load requests list.",
+    "approveFailed": "Failed to approve request.",
+    "rejectFailed": "Failed to reject request."
+  }
+}

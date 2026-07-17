@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
-import { Users, Activity, UserCheck, Shield, UserPlus, ArrowRight, CheckCircle2 } from 'lucide-react'
+import {
+  Users,
+  Activity,
+  UserCheck,
+  Shield,
+  UserPlus,
+  ArrowRight,
+  CheckCircle2,
+} from 'lucide-react'
 import { PageHeader, StatsGrid, ErrorAlert } from '@components/shared'
 import { useAuthStore } from '@store/auth/authStore'
-import { adminService, type AdminStats, type AccountRequest, type AuditLogEntry } from '@services/admin'
+import {
+  adminService,
+  type AdminStats,
+  type AccountRequest,
+  type AuditLogEntry,
+} from '@services/admin'
 import { auditActionLabel, roleLabel, roleBadgeClass, timeAgo } from '@utils/adminLabels'
 import { DashboardSkeleton } from './_skeletons'
 
@@ -18,6 +32,7 @@ const initials = (name?: string | null) =>
     .toUpperCase()
 
 export default function SuperAdminDashboardPage() {
+  const { t } = useTranslation('modules/super-admin/dashboard')
   const { user } = useAuthStore()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [requests, setRequests] = useState<AccountRequest[]>([])
@@ -39,7 +54,7 @@ export default function SuperAdminDashboardPage() {
       setRequests(p)
       setLogs(l.items)
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Không tải được dữ liệu tổng quan.')
+      setError(e?.response?.data?.message || e?.message || t('errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -55,7 +70,7 @@ export default function SuperAdminDashboardPage() {
       await adminService.approveAccountRequest(id)
       await load()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể duyệt yêu cầu.')
+      setError(e?.response?.data?.message || t('errors.approveFailed'))
     } finally {
       setApprovingId(null)
     }
@@ -64,18 +79,24 @@ export default function SuperAdminDashboardPage() {
   if (loading) return <DashboardSkeleton />
 
   const statCards = [
-    { label: 'Tổng người dùng', value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
-    { label: 'YC chờ duyệt', value: stats?.pendingRequests ?? 0, color: 'text-amber-600' },
-    { label: 'Bị khóa', value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
-    { label: 'Recruiter', value: stats?.recruiters ?? 0, color: 'text-emerald-600' },
+    { label: t('statCards.totalUsers'), value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
+    {
+      label: t('statCards.pendingRequests'),
+      value: stats?.pendingRequests ?? 0,
+      color: 'text-amber-600',
+    },
+    { label: t('statCards.lockedUsers'), value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
+    { label: t('statCards.recruiters'), value: stats?.recruiters ?? 0, color: 'text-emerald-600' },
   ]
 
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
-        title={`Xin chào, ${user?.name || 'Super Admin'}`}
-        description="Tổng quan quản trị hệ thống ARISP"
-        actions={[{ label: 'Cài đặt hệ thống', href: '/super-admin/settings', variant: 'secondary' }]}
+        title={t('greeting', { name: user?.name || t('greetingFallback') })}
+        description={t('description')}
+        actions={[
+          { label: t('settingsButton'), href: '/super-admin/settings', variant: 'secondary' },
+        ]}
       />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
@@ -97,19 +118,26 @@ export default function SuperAdminDashboardPage() {
                   <UserCheck className="w-5 h-5" />
                 </span>
                 <div>
-                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">Yêu cầu tạo tài khoản</h2>
-                  <p className="text-xs text-ink-500 dark:text-ink-400">HR Leader gửi · chờ bạn duyệt</p>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">
+                    {t('pendingUsers.title')}
+                  </h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">
+                    {t('pendingUsers.subtitle')}
+                  </p>
                 </div>
               </div>
-              <Link to="/super-admin/users/pending" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                Xem tất cả
+              <Link
+                to="/super-admin/users/pending"
+                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                {t('pendingUsers.viewAll')}
               </Link>
             </div>
 
             {requests.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-                <p className="text-sm text-ink-500 dark:text-ink-400">Không có yêu cầu nào chờ duyệt</p>
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('pendingUsers.empty')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -123,12 +151,18 @@ export default function SuperAdminDashboardPage() {
                         {initials(r.fullName || r.email)}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{r.fullName || r.email}</p>
-                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">{r.email} · bởi {r.requestedBy}</p>
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
+                          {r.fullName || r.email}
+                        </p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">
+                          {r.email} · {t('pendingUsers.by', { name: r.requestedBy })}
+                        </p>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className={`hidden sm:inline rounded-full px-2.5 py-0.5 text-xs font-medium ${roleBadgeClass(r.role)}`}>
+                      <span
+                        className={`hidden sm:inline rounded-full px-2.5 py-0.5 text-xs font-medium ${roleBadgeClass(r.role)}`}
+                      >
                         {roleLabel(r.role)}
                       </span>
                       <button
@@ -136,7 +170,9 @@ export default function SuperAdminDashboardPage() {
                         disabled={approvingId === r.id}
                         className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
-                        {approvingId === r.id ? 'Đang duyệt...' : 'Duyệt'}
+                        {approvingId === r.id
+                          ? t('pendingUsers.approving')
+                          : t('pendingUsers.approve')}
                       </button>
                     </div>
                   </div>
@@ -158,17 +194,26 @@ export default function SuperAdminDashboardPage() {
                   <Activity className="w-5 h-5" />
                 </span>
                 <div>
-                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">Nhật ký hoạt động</h2>
-                  <p className="text-xs text-ink-500 dark:text-ink-400">Thay đổi gần đây trong hệ thống</p>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">
+                    {t('auditLogs.title')}
+                  </h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">
+                    {t('auditLogs.subtitle')}
+                  </p>
                 </div>
               </div>
-              <Link to="/super-admin/audit-logs" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                Xem tất cả
+              <Link
+                to="/super-admin/audit-logs"
+                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                {t('auditLogs.viewAll')}
               </Link>
             </div>
 
             {logs.length === 0 ? (
-              <p className="py-8 text-center text-sm text-ink-500 dark:text-ink-400">Chưa có hoạt động nào</p>
+              <p className="py-8 text-center text-sm text-ink-500 dark:text-ink-400">
+                {t('auditLogs.empty')}
+              </p>
             ) : (
               <div className="space-y-2">
                 {logs.map((log) => (
@@ -181,8 +226,12 @@ export default function SuperAdminDashboardPage() {
                         <Activity className="w-4 h-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{auditActionLabel(log.action)}</p>
-                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">bởi {log.actorName}</p>
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
+                          {auditActionLabel(log.action)}
+                        </p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">
+                          {t('auditLogs.by', { name: log.actorName })}
+                        </p>
                       </div>
                     </div>
                     <span className="shrink-0 text-xs text-ink-400">{timeAgo(log.createdAt)}</span>
@@ -202,13 +251,35 @@ export default function SuperAdminDashboardPage() {
             transition={{ delay: 0.15 }}
             className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
           >
-            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">Thao tác nhanh</h2>
+            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">
+              {t('quickActions.title')}
+            </h2>
             <div className="space-y-2">
               {[
-                { to: '/super-admin/users?create=1', icon: UserPlus, label: 'Tạo tài khoản staff', tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20' },
-                { to: '/super-admin/users/pending', icon: UserCheck, label: 'Duyệt user mới', tint: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20' },
-                { to: '/super-admin/users', icon: Users, label: 'Quản lý người dùng', tint: 'text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-500/20' },
-                { to: '/super-admin/audit-logs', icon: Activity, label: 'Xem audit logs', tint: 'text-ai-600 dark:text-ai-400 bg-ai-100 dark:bg-ai-500/20' },
+                {
+                  to: '/super-admin/users?create=1',
+                  icon: UserPlus,
+                  label: t('quickActions.createStaff'),
+                  tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20',
+                },
+                {
+                  to: '/super-admin/users/pending',
+                  icon: UserCheck,
+                  label: t('quickActions.approveUsers'),
+                  tint: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20',
+                },
+                {
+                  to: '/super-admin/users',
+                  icon: Users,
+                  label: t('quickActions.manageUsers'),
+                  tint: 'text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-500/20',
+                },
+                {
+                  to: '/super-admin/audit-logs',
+                  icon: Activity,
+                  label: t('quickActions.viewAuditLogs'),
+                  tint: 'text-ai-600 dark:text-ai-400 bg-ai-100 dark:bg-ai-500/20',
+                },
               ].map((a) => (
                 <Link
                   key={a.to}
@@ -234,14 +305,16 @@ export default function SuperAdminDashboardPage() {
           >
             <div className="mb-4 flex items-center gap-2">
               <Shield className="w-4 h-4 text-ink-400" />
-              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Phân bổ tài khoản</h2>
+              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
+                {t('accountDistribution.title')}
+              </h2>
             </div>
             <div className="space-y-3 text-sm">
               {[
-                { label: 'Super Admin', value: stats?.superAdmins ?? 0 },
-                { label: 'HR Admin', value: stats?.hrAdmins ?? 0 },
-                { label: 'Recruiter', value: stats?.recruiters ?? 0 },
-                { label: 'Ứng viên', value: stats?.candidates ?? 0 },
+                { label: t('accountDistribution.superAdmin'), value: stats?.superAdmins ?? 0 },
+                { label: t('accountDistribution.hrAdmin'), value: stats?.hrAdmins ?? 0 },
+                { label: t('accountDistribution.recruiter'), value: stats?.recruiters ?? 0 },
+                { label: t('accountDistribution.candidate'), value: stats?.candidates ?? 0 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-ink-500 dark:text-ink-400">{row.label}</span>

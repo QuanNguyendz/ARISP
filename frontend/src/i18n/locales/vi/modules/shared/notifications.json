@@ -1,0 +1,40 @@
+{
+  "title": "Thông báo",
+  "subtitle": {
+    "unread": "Bạn có {{count}} thông báo chưa đọc",
+    "allRead": "Bạn đã đọc hết thông báo"
+  },
+  "filters": {
+    "all": "Tất cả",
+    "unread": "Chưa đọc",
+    "applicant": "Ứng viên",
+    "evaluation": "Đánh giá",
+    "job": "Tin tuyển dụng",
+    "system": "Hệ thống"
+  },
+  "timeAgo": {
+    "justNow": "Vừa xong",
+    "minutesAgo": "{{count}} phút trước",
+    "hoursAgo": "{{count}} giờ trước",
+    "yesterday": "Hôm qua",
+    "daysAgo": "{{count}} ngày trước"
+  },
+  "actions": {
+    "viewDetails": "Xem chi tiết",
+    "deleteNotification": "Xóa thông báo",
+    "markAllRead": "Đánh dấu đã đọc",
+    "deleteAll": "Xóa tất cả"
+  },
+  "errors": {
+    "loadFailed": "Không tải được danh sách thông báo. Vui lòng thử lại.",
+    "deleteAllFailed": "Không thể xóa tất cả thông báo. Vui lòng thử lại.",
+    "confirmDeleteAll": "Xóa tất cả thông báo? Hành động này không thể hoàn tác."
+  },
+  "emptyState": {
+    "title": "Không có thông báo",
+    "description": "Cập nhật về ứng viên mới, đánh giá chờ duyệt và tin tuyển dụng sẽ hiển thị tại đây."
+  },
+  "pagination": {
+    "label": "thông báo"
+  }
+}

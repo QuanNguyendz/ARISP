@@ -1,0 +1,99 @@
+{
+  "header": {
+    "back": "Back",
+    "title": "Apply"
+  },
+  "jobSummary": {
+    "label": "You are applying for",
+    "department": "Department",
+    "location": "Remote"
+  },
+  "loading": {
+    "error": "Unable to load job posting information.",
+    "notFound": "Job posting not found.",
+    "backToJobs": "Back to job listings"
+  },
+  "cv": {
+    "title": "Application CV",
+    "helpText": "By default, we use the CV from your profile. You can also submit a different CV for this specific job.",
+    "profile": {
+      "label": "Use CV from profile",
+      "noCv": "No CV in profile",
+      "fallbackName": "Profile CV",
+      "view": "View"
+    },
+    "upload": {
+      "label": "Upload a different CV for this job",
+      "hint": "PDF or DOCX, up to {max}MB",
+      "chooseFile": "Choose CV file",
+      "removeFile": "Remove file"
+    },
+    "errors": {
+      "invalidFormat": "Only PDF or DOCX CV format is accepted.",
+      "tooLarge": "CV size must be {max}MB or less.",
+      "required": "Please attach a CV file (PDF/DOCX).",
+      "noProfileCv": "Your profile does not have a CV yet — please upload one for this job."
+    }
+  },
+  "contact": {
+    "title": "Contact information",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "John Doe",
+    "phone": "Phone number",
+    "phonePlaceholder": "09xx xxx xxx",
+    "email": "Email",
+    "errors": {
+      "fullNameRequired": "Please enter your full name.",
+      "phoneRequired": "Please enter your phone number.",
+      "phoneInvalid": "Invalid phone number (only 8–15 digits)."
+    }
+  },
+  "aiVerification": {
+    "title": "Information verification",
+    "matchBadge": "Matched",
+    "mismatchBadge": "Mismatch detected",
+    "verifying": "Comparing your contact information with your CV content using AI...",
+    "error": "Unable to verify contact information against your CV.",
+    "matchSuccess": "Your full name and phone number exactly match the information in your CV.",
+    "mismatchTitle": "Differences detected between the form data and your CV:",
+    "mismatchNote": "* Note: You can still submit your application, but please make sure your contact information is correct so the employer can reach you.",
+    "pendingModal": {
+      "title": "AI is verifying your information...",
+      "description": "The system is comparing the contact information you just entered with the content of your CV using AI. This helps ensure the employer can contact you accurately.",
+      "hint": "Verification usually takes 2–4 seconds. Would you like to wait or submit now?",
+      "continueWaiting": "Keep waiting",
+      "skipAndSubmit": "Submit now (skip)"
+    },
+    "mismatchModal": {
+      "title": "Warning: CV information mismatch",
+      "description": "The form information differs from your CV personal details:",
+      "hint": "If the information is incorrect, the employer may not be able to reach you. Would you like to update it?",
+      "edit": "Edit again",
+      "submitAnyway": "Submit anyway"
+    }
+  },
+  "coverLetter": {
+    "title": "Cover letter",
+    "question1": "1. Briefly introduce your experience, key skills, and why you are a strong fit?",
+    "optional": "(Optional)",
+    "question1Placeholder": "Share your experience, key skills, and why you are a good fit for this role…",
+    "question2": "2. What is your notice period?",
+    "question2Placeholder": "E.g.: 30 days / 45 days / available immediately",
+    "errors": {
+      "noticePeriodRequired": "Please answer this question."
+    }
+  },
+  "submit": {
+    "submitError": "Failed to submit application. Please try again.",
+    "submitting": "Submitting application…",
+    "submitApplication": "Submit application",
+    "backToJob": "Back to job posting",
+    "footerHint": "Your application will be sent to the HR team for review."
+  },
+  "cancelModal": {
+    "title": "Cancel application?",
+    "description": "Are you sure you want to go back? The information you entered will not be saved.",
+    "continue": "Continue filling",
+    "confirm": "Cancel & go back"
+  }
+}

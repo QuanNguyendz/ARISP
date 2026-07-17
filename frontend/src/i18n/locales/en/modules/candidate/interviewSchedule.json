@@ -1,0 +1,51 @@
+{
+  "back": "Back",
+  "title": "Interview Room",
+  "subtitle": "Enter your interview code to begin",
+  "enterCode": {
+    "title": "Enter Interview Code",
+    "description": "The interview code was sent to your email after successful application",
+    "placeholder": "e.g. INT001",
+    "verify": "Verify Code",
+    "noCode": "Don't have an interview code?",
+    "findJob": "Find a job now"
+  },
+  "validation": {
+    "emptyCode": "Please enter the interview code",
+    "invalidCode": "Invalid or expired interview code"
+  },
+  "jobInfo": {
+    "title": "Job Information"
+  },
+  "candidateInfo": {
+    "title": "Candidate Information",
+    "fullName": "Full Name",
+    "email": "Email",
+    "phone": "Phone Number",
+    "location": "Location"
+  },
+  "cvInfo": {
+    "title": "Submitted CV",
+    "uploadedAt": "Uploaded:"
+  },
+  "confirmInfo": {
+    "title": "Confirm Information",
+    "description": "Please carefully review the information above before starting the interview. The information must be accurate.",
+    "button": "I confirm the information is correct"
+  },
+  "success": {
+    "title": "Confirmation Successful!",
+    "description": "You are ready to start the interview",
+    "infoConfirmed": "Information has been confirmed"
+  },
+  "interviewType": {
+    "startInterview": "Start Interview",
+    "startInterviewDesc": "Formal interview with recruiter",
+    "practiceInterview": "Practice Interview",
+    "practiceInterviewDesc": "Practice with AI first"
+  },
+  "note": {
+    "title": "Note:",
+    "description": "The interview will be recorded. Please ensure you are in a quiet environment."
+  }
+}

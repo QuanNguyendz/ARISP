@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Clock, XCircle, CheckCircle, Loader2, X, Mail } from 'lucide-react'
 import { PageHeader, EmptyState, ErrorAlert } from '@components/shared'
@@ -17,7 +18,13 @@ const initials = (name?: string | null) =>
     .toUpperCase()
 
 export default function PendingUsersPage() {
-  const { data: requestsData, isLoading: loading, error: fetchError, refetch } = useQuery({
+  const { t } = useTranslation('modules/super-admin/pendingUsers')
+  const {
+    data: requestsData,
+    isLoading: loading,
+    error: fetchError,
+    refetch,
+  } = useQuery({
     queryKey: ['pending-account-requests'],
     queryFn: () => adminService.getAccountRequests('pending'),
     refetchOnWindowFocus: false,
@@ -27,7 +34,10 @@ export default function PendingUsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<AccountRequest | null>(null)
 
-  const error = mutationError || (fetchError as any)?.response?.data?.message || (fetchError ? 'Không tải được danh sách yêu cầu.' : '')
+  const error =
+    mutationError ||
+    (fetchError as any)?.response?.data?.message ||
+    (fetchError ? t('errors.loadFailed') : '')
   const requests = requestsData || []
 
   const handleApprove = async (r: AccountRequest) => {
@@ -37,7 +47,7 @@ export default function PendingUsersPage() {
       await adminService.approveAccountRequest(r.id)
       refetch()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || 'Không thể duyệt yêu cầu.')
+      setMutationError(e?.response?.data?.message || t('errors.approveFailed'))
     } finally {
       setBusyId(null)
     }
@@ -53,7 +63,7 @@ export default function PendingUsersPage() {
       refetch()
       setRejectTarget(null)
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || 'Không thể từ chối yêu cầu.')
+      setMutationError(e?.response?.data?.message || t('errors.rejectFailed'))
     } finally {
       setBusyId(null)
     }
@@ -61,10 +71,7 @@ export default function PendingUsersPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <PageHeader
-        title="Duyệt tài khoản mới"
-        description="Yêu cầu tạo tài khoản do HR Leader gửi — duyệt để tạo tài khoản hoạt động"
-      />
+      <PageHeader title={t('title')} description={t('description')} />
 
       {error && <ErrorAlert message={error} onDismiss={() => setMutationError('')} />}
 
@@ -73,8 +80,8 @@ export default function PendingUsersPage() {
       ) : requests.length === 0 ? (
         <EmptyState
           icon={<CheckCircle className="h-8 w-8 text-emerald-500" />}
-          title="Không có yêu cầu chờ duyệt"
-          description="Khi HR Leader gửi yêu cầu tạo tài khoản, chúng sẽ xuất hiện ở đây."
+          title={t('empty.title')}
+          description={t('empty.description')}
         />
       ) : (
         <div className="space-y-3">
@@ -92,13 +99,17 @@ export default function PendingUsersPage() {
                     {initials(r.fullName || r.email)}
                   </span>
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-ink-900 dark:text-white">{r.fullName || r.email}</h3>
+                    <h3 className="text-base font-semibold text-ink-900 dark:text-white">
+                      {r.fullName || r.email}
+                    </h3>
                     <p className="mb-2 flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400">
                       <Mail className="h-3.5 w-3.5" /> {r.email}
                       {r.department ? <span className="text-ink-400">· {r.department}</span> : null}
                     </p>
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(r.role)}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(r.role)}`}
+                      >
                         {roleLabel(r.role)}
                       </span>
                       <span className="flex items-center gap-1 text-xs text-ink-400">
@@ -111,14 +122,16 @@ export default function PendingUsersPage() {
                           minute: '2-digit',
                         })}
                       </span>
-                      <span className="text-xs text-ink-400">Yêu cầu bởi {r.requestedBy}</span>
+                      <span className="text-xs text-ink-400">
+                        {t('by', { name: r.requestedBy })}
+                      </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {busyId === r.id ? (
                     <span className="flex items-center gap-2 px-4 py-2 text-sm text-ink-400">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý...
+                      <Loader2 className="h-4 w-4 animate-spin" /> {t('processing')}
                     </span>
                   ) : (
                     <>
@@ -126,13 +139,13 @@ export default function PendingUsersPage() {
                         onClick={() => handleApprove(r)}
                         className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                       >
-                        <CheckCircle className="h-4 w-4" /> Duyệt
+                        <CheckCircle className="h-4 w-4" /> {t('approve')}
                       </button>
                       <button
                         onClick={() => setRejectTarget(r)}
                         className="flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20"
                       >
-                        <XCircle className="h-4 w-4" /> Từ chối
+                        <XCircle className="h-4 w-4" /> {t('reject')}
                       </button>
                     </>
                   )}
@@ -145,9 +158,11 @@ export default function PendingUsersPage() {
 
       {rejectTarget && (
         <ReasonModal
-          title="Từ chối yêu cầu"
-          description={`Nhập lý do từ chối tạo tài khoản cho "${rejectTarget.fullName || rejectTarget.email}".`}
-          confirmLabel="Từ chối"
+          title={t('rejectModal.title')}
+          description={t('rejectModal.description', {
+            name: rejectTarget.fullName || rejectTarget.email,
+          })}
+          confirmLabel={t('rejectModal.confirm')}
           submitting={busyId === rejectTarget.id}
           onCancel={() => setRejectTarget(null)}
           onConfirm={handleReject}
@@ -173,6 +188,7 @@ function ReasonModal({
   onCancel: () => void
   onConfirm: (reason: string) => void
 }) {
+  const { t } = useTranslation('modules/super-admin/pendingUsers')
   const [reason, setReason] = useState('')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -187,7 +203,10 @@ function ReasonModal({
             <h3 className="text-lg font-semibold text-ink-900 dark:text-white">{title}</h3>
             <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{description}</p>
           </div>
-          <button onClick={onCancel} className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10">
+          <button
+            onClick={onCancel}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -196,7 +215,7 @@ function ReasonModal({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           autoFocus
-          placeholder="Nhập lý do..."
+          placeholder={t('rejectModal.placeholder')}
           className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
         />
         <div className="mt-4 flex justify-end gap-2">
@@ -204,14 +223,18 @@ function ReasonModal({
             onClick={onCancel}
             className="rounded-xl border border-ink-200 dark:border-white/10 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
           >
-            Hủy
+            {t('rejectModal.cancel')}
           </button>
           <button
             disabled={!reason.trim() || submitting}
             onClick={() => onConfirm(reason.trim())}
             className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
             {confirmLabel}
           </button>
         </div>

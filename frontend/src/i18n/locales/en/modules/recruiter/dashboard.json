@@ -1,0 +1,32 @@
+{
+  "greeting": "Hello, {{name}}",
+  "description": "Overview of your job postings & candidates",
+  "myJobs": "My Job Postings",
+  "myJob": "My Jobs",
+  "active": "Active",
+  "pendingHr": "Pending HR Approval",
+  "totalApplicants": "Total Applicants",
+  "rejected": "Rejected Jobs",
+  "rejectedAlert": "{{count}} rejected jobs — edit and resubmit for HR approval",
+  "reason": "reason",
+  "drafts": "Drafts",
+  "draftsWaiting": "Drafts waiting to submit",
+  "quickActions": "Quick Actions",
+  "createJob": "Create Job",
+  "manageJobs": "Manage Jobs",
+  "viewCandidates": "View Candidates",
+  "viewAll": "View All",
+  "noJobs": "No job postings yet",
+  "createFirst": "Create your first job — upload JD and the system will auto-fill fields for you.",
+  "applicants": "applicants",
+  "noDepartment": "Unassigned",
+  "loadingError": "Unable to load job postings data.",
+  "stats": {
+    "total": "Total Jobs",
+    "active": "Active",
+    "pending": "Pending",
+    "rejected": "Rejected",
+    "draft": "Draft",
+    "applicants": "Applicants"
+  }
+}

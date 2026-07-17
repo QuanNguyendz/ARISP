@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import {
   Users,
@@ -15,7 +16,12 @@ import {
 } from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
 import { useAuthStore } from '@store/auth/authStore'
-import { adminService, type AdminUser, type AdminStats, type CreateStaffPayload } from '@services/admin'
+import {
+  adminService,
+  type AdminUser,
+  type AdminStats,
+  type CreateStaffPayload,
+} from '@services/admin'
 import { roleLabel, roleBadgeClass } from '@utils/adminLabels'
 import { StatsGridSkeleton, TableSkeleton } from './_skeletons'
 
@@ -31,6 +37,7 @@ const initials = (name?: string | null) =>
     .toUpperCase()
 
 export default function UsersPage() {
+  const { t } = useTranslation('modules/super-admin/users')
   const currentUserId = useAuthStore((s) => s.user?.id)
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -70,11 +77,11 @@ export default function UsersPage() {
       setUsers(res.items)
       setTotal(res.totalCount)
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách người dùng.')
+      setError(e?.response?.data?.message || t('errors.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [search, roleFilter, page])
+  }, [search, roleFilter, page, t])
 
   useEffect(() => {
     loadUsers()
@@ -115,7 +122,7 @@ export default function UsersPage() {
       await adminService.activateUser(u.id)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể mở khóa.')
+      setError(e?.response?.data?.message || t('errors.unlockFailed'))
     } finally {
       setBusyId(null)
     }
@@ -131,7 +138,7 @@ export default function UsersPage() {
       setLockTarget(null)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể khóa tài khoản.')
+      setError(e?.response?.data?.message || t('errors.lockFailed'))
     } finally {
       setBusyId(null)
     }
@@ -144,21 +151,21 @@ export default function UsersPage() {
       await adminService.updateRole(u.id, role)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể đổi vai trò.')
+      setError(e?.response?.data?.message || t('errors.roleChangeFailed'))
     } finally {
       setBusyId(null)
     }
   }
 
   const handleDelete = async (u: AdminUser) => {
-    if (!window.confirm(`Xóa tài khoản "${u.fullName || u.email}"? Hành động này không thể hoàn tác.`)) return
+    if (!window.confirm(t('deleteConfirm', { name: u.fullName || u.email }))) return
     setBusyId(u.id)
     setError('')
     try {
       await adminService.deleteUser(u.id)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể xóa tài khoản.')
+      setError(e?.response?.data?.message || t('errors.deleteFailed'))
     } finally {
       setBusyId(null)
     }
@@ -166,12 +173,12 @@ export default function UsersPage() {
 
   const statCards = useMemo(
     () => [
-      { label: 'Tổng người dùng', value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
-      { label: 'HR Admin', value: stats?.hrAdmins ?? 0, color: 'text-ai-600' },
-      { label: 'Recruiter', value: stats?.recruiters ?? 0, color: 'text-amber-600' },
-      { label: 'Bị khóa', value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
+      { label: t('statCards.totalUsers'), value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
+      { label: t('statCards.hrAdmin'), value: stats?.hrAdmins ?? 0, color: 'text-ai-600' },
+      { label: t('statCards.recruiter'), value: stats?.recruiters ?? 0, color: 'text-amber-600' },
+      { label: t('statCards.lockedUsers'), value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
     ],
-    [stats]
+    [stats, t]
   )
 
   const isSuperAdmin = (role: string) => role.toLowerCase().replace(/\s+/g, '_') === 'super_admin'
@@ -179,9 +186,16 @@ export default function UsersPage() {
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
-        title="Quản lý người dùng"
-        description="Quản lý tài khoản nội bộ và phân quyền"
-        actions={[{ label: 'Thêm staff', onClick: () => setShowCreate(true), variant: 'primary', icon: <UserPlus className="w-4 h-4" /> }]}
+        title={t('title')}
+        description={t('description')}
+        actions={[
+          {
+            label: t('addStaff'),
+            onClick: () => setShowCreate(true),
+            variant: 'primary',
+            icon: <UserPlus className="w-4 h-4" />,
+          },
+        ]}
       />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
@@ -195,7 +209,7 @@ export default function UsersPage() {
           <input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Tìm theo tên hoặc email..."
+            placeholder={t('searchPlaceholder')}
             className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 pl-10 pr-4 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
           />
         </form>
@@ -207,10 +221,10 @@ export default function UsersPage() {
           }}
           className="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
         >
-          <option value="all">Tất cả vai trò</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="hr_admin">HR Admin</option>
-          <option value="recruiter">Recruiter</option>
+          <option value="all">{t('filters.allRoles')}</option>
+          <option value="super_admin">{t('filters.superAdmin')}</option>
+          <option value="hr_admin">{t('filters.hrAdmin')}</option>
+          <option value="recruiter">{t('filters.recruiter')}</option>
         </select>
       </div>
 
@@ -219,9 +233,9 @@ export default function UsersPage() {
       ) : users.length === 0 ? (
         <EmptyState
           icon={<Users className="h-8 w-8 text-ink-400" />}
-          title="Không tìm thấy người dùng"
-          description="Không có tài khoản nào khớp với điều kiện lọc."
-          action={{ label: 'Thêm staff', onClick: () => setShowCreate(true) }}
+          title={t('empty.title')}
+          description={t('empty.description')}
+          action={{ label: t('empty.action'), onClick: () => setShowCreate(true) }}
         />
       ) : (
         <motion.div
@@ -233,11 +247,11 @@ export default function UsersPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-ink-100 dark:border-white/10 text-xs uppercase tracking-wider text-ink-400">
-                  <th className="px-6 py-3 font-medium">Người dùng</th>
-                  <th className="px-6 py-3 font-medium">Vai trò</th>
-                  <th className="px-6 py-3 font-medium">Trạng thái</th>
-                  <th className="px-6 py-3 font-medium">Ngày tạo</th>
-                  <th className="px-6 py-3 text-right font-medium">Thao tác</th>
+                  <th className="px-6 py-3 font-medium">{t('table.headers.user')}</th>
+                  <th className="px-6 py-3 font-medium">{t('table.headers.role')}</th>
+                  <th className="px-6 py-3 font-medium">{t('table.headers.status')}</th>
+                  <th className="px-6 py-3 font-medium">{t('table.headers.createdAt')}</th>
+                  <th className="px-6 py-3 text-right font-medium">{t('table.headers.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100 dark:divide-white/10">
@@ -253,42 +267,56 @@ export default function UsersPage() {
                           </span>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
-                              {u.fullName || '—'} {self && <span className="text-xs text-ink-400">(bạn)</span>}
+                              {u.fullName || t('table.emptyName')}{' '}
+                              {self && (
+                                <span className="text-xs text-ink-400">{t('table.you')}</span>
+                              )}
                             </p>
-                            <p className="truncate text-xs text-ink-500 dark:text-ink-400">{u.email}</p>
+                            <p className="truncate text-xs text-ink-500 dark:text-ink-400">
+                              {u.email}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         {superAdmin || self ? (
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(u.role)}`}>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(u.role)}`}
+                          >
                             {roleLabel(u.role)}
                           </span>
                         ) : (
                           <select
                             value={u.role.toLowerCase().replace(/\s+/g, '_')}
                             disabled={busyId === u.id}
-                            onChange={(e) => handleChangeRole(u, e.target.value as 'hr_admin' | 'recruiter')}
+                            onChange={(e) =>
+                              handleChangeRole(u, e.target.value as 'hr_admin' | 'recruiter')
+                            }
                             className="rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs text-ink-700 dark:text-ink-200 outline-none focus:border-brand-400 disabled:opacity-50"
                           >
-                            <option value="hr_admin">HR Admin</option>
-                            <option value="recruiter">Recruiter</option>
+                            <option value="hr_admin">{t('filters.hrAdmin')}</option>
+                            <option value="recruiter">{t('filters.recruiter')}</option>
                           </select>
                         )}
                       </td>
                       <td className="px-6 py-4">
                         {u.isActive ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Hoạt động
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{' '}
+                            {t('table.status.active')}
                           </span>
                         ) : (
                           <div className="flex flex-col gap-1">
                             <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-400">
-                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Bị khóa
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />{' '}
+                              {t('table.status.locked')}
                             </span>
                             {u.lockReason && (
-                              <span className="max-w-[200px] truncate text-xs text-ink-400" title={u.lockReason}>
-                                Lý do: {u.lockReason}
+                              <span
+                                className="max-w-[200px] truncate text-xs text-ink-400"
+                                title={u.lockReason}
+                              >
+                                {t('table.lockReason', { reason: u.lockReason })}
                               </span>
                             )}
                           </div>
@@ -306,7 +334,9 @@ export default function UsersPage() {
                               {!self && (
                                 <button
                                   onClick={() => handleToggleActive(u)}
-                                  title={u.isActive ? 'Khóa tài khoản' : 'Kích hoạt tài khoản'}
+                                  title={
+                                    u.isActive ? t('table.actions.lock') : t('table.actions.unlock')
+                                  }
                                   className="grid h-8 w-8 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 dark:hover:bg-white/10"
                                 >
                                   {u.isActive ? (
@@ -319,7 +349,7 @@ export default function UsersPage() {
                               {!self && !superAdmin && (
                                 <button
                                   onClick={() => handleDelete(u)}
-                                  title="Xóa tài khoản"
+                                  title={t('table.actions.delete')}
                                   className="grid h-8 w-8 place-items-center rounded-lg text-ink-500 hover:bg-red-50 dark:hover:bg-red-500/10"
                                 >
                                   <Trash2 className="h-4 w-4 text-red-500" />
@@ -340,7 +370,7 @@ export default function UsersPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-ink-100 dark:border-white/10 px-6 py-3 text-sm">
               <span className="text-ink-500 dark:text-ink-400">
-                Trang {page}/{totalPages} · {total} tài khoản
+                {t('pagination.summary', { page, totalPages, total })}
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -397,6 +427,7 @@ function LockReasonModal({
   onCancel: () => void
   onConfirm: (reason: string) => void
 }) {
+  const { t } = useTranslation('modules/super-admin/users')
   const [reason, setReason] = useState('')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -408,12 +439,17 @@ function LockReasonModal({
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Khóa tài khoản</h3>
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+              {t('lockModal.title')}
+            </h3>
             <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Nhập lý do khóa "{userName}". Lý do sẽ được lưu lại và hiển thị cho người bị khóa.
+              {t('lockModal.description', { name: userName })}
             </p>
           </div>
-          <button onClick={onCancel} className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10">
+          <button
+            onClick={onCancel}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -422,7 +458,7 @@ function LockReasonModal({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           autoFocus
-          placeholder="Vd: Vi phạm chính sách, nghỉ việc..."
+          placeholder={t('lockModal.placeholder')}
           className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
         />
         <div className="mt-4 flex justify-end gap-2">
@@ -430,15 +466,19 @@ function LockReasonModal({
             onClick={onCancel}
             className="rounded-xl border border-ink-200 dark:border-white/10 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
           >
-            Hủy
+            {t('lockModal.cancel')}
           </button>
           <button
             disabled={!reason.trim() || submitting}
             onClick={() => onConfirm(reason.trim())}
             className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-            Khóa tài khoản
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Lock className="h-4 w-4" />
+            )}
+            {t('lockModal.confirm')}
           </button>
         </div>
       </motion.div>
@@ -448,7 +488,13 @@ function LockReasonModal({
 
 // ===== Create Staff Modal =====
 function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState<CreateStaffPayload>({ email: '', fullName: '', role: 'recruiter', department: '' })
+  const { t } = useTranslation('modules/super-admin/users')
+  const [form, setForm] = useState<CreateStaffPayload>({
+    email: '',
+    fullName: '',
+    role: 'recruiter',
+    department: '',
+  })
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
@@ -465,7 +511,7 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
       })
       onCreated()
     } catch (e: any) {
-      setErr(e?.response?.data?.message || 'Không thể tạo tài khoản.')
+      setErr(e?.response?.data?.message || t('errors.createFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -481,10 +527,15 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
       >
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Tạo tài khoản staff</h3>
-            <p className="text-xs text-ink-500 dark:text-ink-400">Mật khẩu tạm sẽ được gửi qua email cho nhân viên.</p>
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+              {t('createModal.title')}
+            </h3>
+            <p className="text-xs text-ink-500 dark:text-ink-400">{t('createModal.description')}</p>
           </div>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -493,44 +544,54 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">Họ và tên</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              {t('createModal.fullName')}
+            </label>
             <input
               required
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-              placeholder="Nguyễn Văn A"
+              placeholder={t('createModal.fullNamePlaceholder')}
               className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">Email công ty</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              {t('createModal.email')}
+            </label>
             <input
               required
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="ban@congty.com"
+              placeholder={t('createModal.emailPlaceholder')}
               className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">Vai trò</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                {t('createModal.role')}
+              </label>
               <select
                 value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value as 'hr_admin' | 'recruiter' })}
+                onChange={(e) =>
+                  setForm({ ...form, role: e.target.value as 'hr_admin' | 'recruiter' })
+                }
                 className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
               >
-                <option value="recruiter">Recruiter</option>
-                <option value="hr_admin">HR Admin</option>
+                <option value="recruiter">{t('filters.recruiter')}</option>
+                <option value="hr_admin">{t('filters.hrAdmin')}</option>
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">Phòng ban</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                {t('createModal.department')}
+              </label>
               <input
                 value={form.department}
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
-                placeholder="Tùy chọn"
+                placeholder={t('createModal.departmentPlaceholder')}
                 className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
               />
             </div>
@@ -542,15 +603,19 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
               onClick={onClose}
               className="rounded-xl border border-ink-200 dark:border-white/10 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
             >
-              Hủy
+              {t('createModal.cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              Tạo tài khoản
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
+              {t('createModal.submit')}
             </button>
           </div>
         </form>

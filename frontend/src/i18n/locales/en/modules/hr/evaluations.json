@@ -1,0 +1,52 @@
+{
+  "title": "Review & Confirm",
+  "subtitle": "View and confirm AI interview results for candidates",
+  "loadingError": "Unable to load evaluation list from server.",
+  "noEvaluations": "No evaluations to display.",
+  "candidate": "Candidate",
+  "round": "Round",
+  "paginationLabel": "evaluations",
+  "stats": {
+    "total": "Total Evaluations",
+    "completed": "Completed",
+    "pending": "Pending",
+    "highScore": "High Score (≥80)"
+  },
+  "status": {
+    "pendingHrReview": "Awaiting HR Review"
+  },
+  "verdict": {
+    "pass": "Pass",
+    "notPass": "Not Pass"
+  },
+  "evaluations": "Evaluations",
+  "criterionScores": "Scores by Criterion",
+  "noCriterionData": "No criterion score data available.",
+  "languageAssessment": "Language Assessment",
+  "cefr": "CEFR",
+  "fluency": "Fluency",
+  "vocabulary": "Vocabulary",
+  "questionAnalysis": "Per-Question Analysis",
+  "aiComment": "AI Comment",
+  "recordingTranscript": "Recording & Transcript",
+  "viewFullTranscript": "View Full Transcript",
+  "aiVerdict": "AI Verdict",
+  "recommendation": "Recommendation",
+  "inviteNextRound": "Invite to Round {{round}}",
+  "hrDecision": "HR Decision",
+  "hrDecisionHint": "Confirm AI verdict or override (reason required).",
+  "confirming": "Confirming...",
+  "confirmAi": "Confirm AI",
+  "override": "Override",
+  "overrideVerdict": "Override Verdict",
+  "overrideReason": "Override Reason",
+  "overrideReasonPlaceholder": "Required — explain why you changed AI verdict...",
+  "saveAndSendResult": "Save & Send Result",
+  "saveAndInviteNext": "Save & Invite Next Round",
+  "confirmed": "Confirmed",
+  "verdict": "Verdict",
+  "cvJdMatch": "CV–JD Match",
+  "confirmError": "Unable to confirm result at this time.",
+  "overrideReasonRequired": "Please enter the reason for override.",
+  "overrideError": "Unable to override result at this time."
+}

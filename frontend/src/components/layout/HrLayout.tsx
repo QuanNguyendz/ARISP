@@ -2,14 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard,
-  Briefcase,
-  Users,
-  Video,
-  ClipboardCheck,
-  BookOpen,
-  UserCog,
-  Settings,
   CircleHelp,
   Search,
   Bell,
@@ -23,10 +15,17 @@ import {
   CheckCircle2,
   XCircle,
   X,
+  Users,
+  Briefcase,
+  ClipboardCheck,
+  Settings,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@store/auth/authStore'
 import { useThemeStore } from '@store/theme'
+import { LanguageSwitcher } from '@components/common/LanguageSwitcher'
+import { useHrNav } from '@hooks/useWorkspaceNav'
 import {
   staffNotificationService,
   STAFF_NOTIF_REFRESH_EVENT,
@@ -94,20 +93,11 @@ function Logo() {
   )
 }
 
-const sidebarItems: { icon: LucideIcon; label: string; path: string; badge?: number }[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/hr/dashboard' },
-  { icon: Briefcase, label: 'Tin tuyển dụng', path: '/hr/jobs' },
-  { icon: Users, label: 'Ứng viên', path: '/hr/candidates' },
-  { icon: Video, label: 'Phiên phỏng vấn', path: '/hr/interviews' },
-  { icon: ClipboardCheck, label: 'Đánh giá', path: '/hr/evaluations' },
-  { icon: BookOpen, label: 'Playbook', path: '/hr/playbooks' },
-  { icon: UserCog, label: 'Nhóm HR', path: '/hr/team' },
-  { icon: Settings, label: 'Cài đặt', path: '/hr/settings' },
-]
-
 export default function HrLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useTranslation('modules/shared/nav')
+  const sidebarItems = useHrNav()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -215,16 +205,16 @@ export default function HrLayout() {
           <Logo />
           <div>
             <div className="font-display text-base font-extrabold leading-none">ARISP</div>
-            <div className="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader Workspace</div>
+            <div className="text-[11px] text-ink-400 leading-none mt-0.5">{t('hr.workspace')}</div>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
           {sidebarItems.map((item) => (
             <Link
               key={item.path}
-              to={item.path}
+              to={item.path!}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
-                isActive(item.path)
+                isActive(item.path!)
                   ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
                   : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
               }`}
@@ -244,7 +234,7 @@ export default function HrLayout() {
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
           >
             <CircleHelp className="w-[18px] h-[18px]" />
-            Trợ giúp & tài liệu
+            <span className="flex-1">{t('hr.help')}</span>
           </Link>
         </nav>
       </aside>
@@ -252,7 +242,7 @@ export default function HrLayout() {
       {/* Main Content */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-6 h-16">
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 backdrop-blur px-6 h-16">
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -266,7 +256,7 @@ export default function HrLayout() {
             <Search className="w-4 h-4 text-ink-400" />
             <input
               className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
-              placeholder="Tìm ứng viên, tin tuyển dụng..."
+              placeholder={t('hr.searchPlaceholder')}
             />
             <kbd className="hidden sm:inline rounded border border-ink-200 dark:border-white/10 bg-white dark:bg-white/10 px-1.5 text-[10px] font-semibold text-ink-400">
               ⌘K
@@ -299,7 +289,7 @@ export default function HrLayout() {
                   >
                     <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 dark:border-white/10">
                       <span className="font-display font-bold text-sm text-ink-900 dark:text-white">
-                        Thông báo
+                        {t('shared.notifications')}
                       </span>
                       <div className="flex items-center gap-3">
                         {unread > 0 && (
@@ -307,7 +297,7 @@ export default function HrLayout() {
                             onClick={markAllRead}
                             className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                           >
-                            Đánh dấu đã đọc
+                            {t('shared.markAllRead')}
                           </button>
                         )}
                         {notifs.length > 0 && (
@@ -315,7 +305,7 @@ export default function HrLayout() {
                             onClick={clearAll}
                             className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
                           >
-                            Xóa tất cả
+                            {t('shared.clearAll')}
                           </button>
                         )}
                       </div>
@@ -323,7 +313,7 @@ export default function HrLayout() {
                     <div className="max-h-80 overflow-y-auto divide-y divide-ink-100 dark:divide-white/10">
                       {notifs.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-ink-400">
-                          Không có thông báo mới
+                          {t('shared.noNotifications')}
                         </div>
                       ) : (
                         notifs.map((n) => {
@@ -376,12 +366,15 @@ export default function HrLayout() {
                       onClick={() => setNotifOpen(false)}
                       className="block border-t border-ink-100 dark:border-white/10 px-4 py-2.5 text-center text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-ink-50 dark:hover:bg-white/5"
                     >
-                      Xem tất cả thông báo
+                      {t('shared.viewAllNotifications')}
                     </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Theme toggle */}
             <button
@@ -400,7 +393,7 @@ export default function HrLayout() {
               className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Tạo tin</span>
+              <span className="hidden sm:inline">{t('hr.createJob')}</span>
             </Link>
 
             <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10"></span>
@@ -418,7 +411,7 @@ export default function HrLayout() {
                   <span className="block text-sm font-semibold text-ink-900 dark:text-white">
                     {user?.name || 'User'}
                   </span>
-                  <span className="block text-[11px] text-ink-400">HR Leader</span>
+                  <span className="block text-[11px] text-ink-400">{t('hr.roleLabel')}</span>
                 </span>
                 <ChevronDown className="w-4 h-4 text-ink-400" />
               </button>
@@ -447,13 +440,14 @@ export default function HrLayout() {
                         to="/hr/settings"
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-white/10"
                       >
-                        <User className="w-4 h-4 text-ink-400" /> Tài khoản của tôi
+                        <User className="w-4 h-4 text-ink-400" /> {t('shared.myAccount')}
                       </Link>
                       <Link
                         to="/hr/settings"
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-white/10"
                       >
-                        <Settings className="w-4 h-4 text-ink-400" /> Cài đặt workspace
+                        <Settings className="w-4 h-4 text-ink-400" />{' '}
+                        {t('shared.workspaceSettings')}
                       </Link>
                     </div>
                     <div className="p-1.5 border-t border-ink-100 dark:border-white/10">
@@ -461,7 +455,7 @@ export default function HrLayout() {
                         onClick={handleLogout}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20"
                       >
-                        <LogOut className="w-4 h-4" /> Đăng xuất
+                        <LogOut className="w-4 h-4" /> {t('shared.logout')}
                       </button>
                     </div>
                   </motion.div>
@@ -495,7 +489,9 @@ export default function HrLayout() {
                       <div className="font-display text-base font-extrabold leading-none text-ink-900 dark:text-white">
                         ARISP
                       </div>
-                      <div className="text-[11px] text-ink-400 leading-none mt-0.5">HR Leader</div>
+                      <div className="text-[11px] text-ink-400 leading-none mt-0.5">
+                        {t('hr.roleLabel')}
+                      </div>
                     </div>
                   </div>
                   <button
@@ -509,10 +505,10 @@ export default function HrLayout() {
                   {sidebarItems.map((item) => (
                     <Link
                       key={item.path}
-                      to={item.path}
+                      to={item.path!}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
-                        isActive(item.path)
+                        isActive(item.path!)
                           ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
                           : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
                       }`}

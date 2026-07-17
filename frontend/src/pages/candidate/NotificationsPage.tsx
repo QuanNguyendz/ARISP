@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Bell,
   Clock,
@@ -16,13 +17,17 @@ import { Skeleton } from '@components/ui/Skeleton'
 
 type FilterKey = 'all' | 'unread' | 'interview' | 'result' | 'system'
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'unread', label: 'Chưa đọc' },
-  { key: 'interview', label: 'Phỏng vấn' },
-  { key: 'result', label: 'Kết quả' },
-  { key: 'system', label: 'Hệ thống' },
-]
+function getFilters(
+  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+): { key: FilterKey; label: string }[] {
+  return [
+    { key: 'all', label: t('filters.all') },
+    { key: 'unread', label: t('filters.unread') },
+    { key: 'interview', label: t('filters.interview') },
+    { key: 'result', label: t('filters.result') },
+    { key: 'system', label: t('filters.system') },
+  ]
+}
 
 function categoryOf(type: string): Exclude<FilterKey, 'all' | 'unread'> {
   if (type === 'result') return 'result'
@@ -45,29 +50,35 @@ function notifStyle(type: string): { Icon: typeof Bell; cls: string } {
   }
 }
 
-function actionLabel(type: string): string {
+function actionLabel(
+  type: string,
+  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+): string {
   switch (type) {
     case 'result':
-      return 'Xem báo cáo'
+      return t('actionLabels.viewReport')
     case 'invite':
-      return 'Xem mã phỏng vấn'
+      return t('actionLabels.viewInterviewCode')
     case 'schedule':
-      return 'Xem lịch'
+      return t('actionLabels.viewSchedule')
     default:
-      return 'Xem chi tiết'
+      return t('actionLabels.viewDetails')
   }
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(
+  iso: string,
+  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Vừa xong'
-  if (mins < 60) return `${mins} phút trước`
+  if (mins < 1) return t('timeAgo.justNow')
+  if (mins < 60) return t('timeAgo.minutesAgo', { count: mins })
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} giờ trước`
+  if (hrs < 24) return t('timeAgo.hoursAgo', { count: hrs })
   const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Hôm qua'
-  return `${days} ngày trước`
+  if (days === 1) return t('timeAgo.yesterday')
+  return t('timeAgo.daysAgo', { count: days })
 }
 
 /** Nhóm theo ngày: Hôm nay / Hôm qua / Trước đó. */
@@ -81,13 +92,23 @@ function dayGroupOf(iso: string): 'today' | 'yesterday' | 'older' {
   return 'older'
 }
 
-const GROUP_LABEL: Record<string, string> = {
-  today: 'Hôm nay',
-  yesterday: 'Hôm qua',
-  older: 'Trước đó',
-}
+const getGroupLabels = (
+  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+): Record<string, string> => ({
+  today: t('groupLabels.today'),
+  yesterday: t('groupLabels.yesterday'),
+  older: t('groupLabels.older'),
+})
 
-function NotifRow({ n, onOpen }: { n: NotificationItem; onOpen: (n: NotificationItem) => void }) {
+function NotifRow({
+  n,
+  onOpen,
+  t,
+}: {
+  n: NotificationItem
+  onOpen: (n: NotificationItem) => void
+  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+}) {
   const { Icon, cls } = notifStyle(n.type)
   return (
     <button
@@ -105,9 +126,9 @@ function NotifRow({ n, onOpen }: { n: NotificationItem; onOpen: (n: Notification
           {n.body ? ` — ${n.body}` : ''}
         </div>
         <div className="mt-1.5 flex items-center gap-3">
-          <span className="text-xs text-ink-400">{timeAgo(n.createdAt)}</span>
+          <span className="text-xs text-ink-400">{timeAgo(n.createdAt, t)}</span>
           <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand-600">
-            {actionLabel(n.type)} <ChevronRight className="h-3.5 w-3.5" />
+            {actionLabel(n.type, t)} <ChevronRight className="h-3.5 w-3.5" />
           </span>
         </div>
       </div>
@@ -117,6 +138,7 @@ function NotifRow({ n, onOpen }: { n: NotificationItem; onOpen: (n: Notification
 }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation('modules/candidate/notifications')
   const navigate = useNavigate()
   const [items, setItems] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -173,20 +195,18 @@ export default function NotificationsPage() {
       {/* Breadcrumb */}
       <div className="mb-4 flex items-center gap-2 text-sm text-ink-400">
         <Link to="/jobs" className="hover:text-brand-600">
-          Trang chủ
+          {t('breadcrumb.home')}
         </Link>
         <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-ink-600">Thông báo</span>
+        <span className="font-medium text-ink-600">{t('breadcrumb.notifications')}</span>
       </div>
 
       {/* Header */}
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-extrabold text-ink-900">Thông báo</h1>
+          <h1 className="font-display text-2xl font-extrabold text-ink-900">{t('title')}</h1>
           <p className="text-sm text-ink-500">
-            {unreadCount > 0
-              ? `Bạn có ${unreadCount} thông báo chưa đọc`
-              : 'Bạn đã đọc hết thông báo'}
+            {unreadCount > 0 ? t('subtitle.unread', { count: unreadCount }) : t('subtitle.allRead')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -195,11 +215,11 @@ export default function NotificationsPage() {
             disabled={unreadCount === 0}
             className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50"
           >
-            <CheckCheck className="h-4 w-4" /> Đánh dấu đã đọc
+            <CheckCheck className="h-4 w-4" /> {t('actions.markAllRead')}
           </button>
           <Link
             to="/candidate/settings"
-            title="Cài đặt thông báo"
+            title={t('actions.settings')}
             className="grid h-9 w-9 place-items-center rounded-xl border border-ink-200 bg-white text-ink-600 hover:bg-ink-50"
           >
             <Settings className="h-4 w-4" />
@@ -209,7 +229,7 @@ export default function NotificationsPage() {
 
       {/* Filter tabs */}
       <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1 text-sm">
-        {FILTERS.map((f) => (
+        {getFilters(t).map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
@@ -248,10 +268,8 @@ export default function NotificationsPage() {
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
             <Bell className="h-6 w-6" />
           </div>
-          <p className="mt-3 font-semibold text-ink-700">Không có thông báo</p>
-          <p className="mt-1 text-sm text-ink-500">
-            Các cập nhật về hồ sơ, lời mời phỏng vấn và kết quả sẽ hiển thị tại đây.
-          </p>
+          <p className="mt-3 font-semibold text-ink-700">{t('emptyState.title')}</p>
+          <p className="mt-1 text-sm text-ink-500">{t('emptyState.description')}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -259,11 +277,11 @@ export default function NotificationsPage() {
             groups[key].length === 0 ? null : (
               <section key={key}>
                 <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                  {GROUP_LABEL[key]}
+                  {getGroupLabels(t)[key]}
                 </div>
                 <div className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
                   {groups[key].map((n) => (
-                    <NotifRow key={n.id} n={n} onOpen={openNotif} />
+                    <NotifRow key={n.id} n={n} onOpen={openNotif} t={t} />
                   ))}
                 </div>
               </section>

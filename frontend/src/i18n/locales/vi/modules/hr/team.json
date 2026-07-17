@@ -1,0 +1,52 @@
+{
+  "title": "Nhóm HR",
+  "description": "Gửi yêu cầu tạo tài khoản staff (HR Admin / Recruiter) để Super Admin duyệt",
+  "sendRequest": "Gửi yêu cầu tạo tài khoản",
+  "roles": {
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter"
+  },
+  "status": {
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối",
+    "pending": "Chờ duyệt"
+  },
+  "stats": {
+    "total": "Tổng yêu cầu",
+    "pending": "Chờ duyệt",
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối"
+  },
+  "rejectionReason": "Lý do từ chối",
+  "paginationLabel": "yêu cầu",
+  "noRequests": "Chưa có yêu cầu nào",
+  "noRequestsHint": "Gửi yêu cầu tạo tài khoản cho thành viên mới — Super Admin sẽ duyệt và kích hoạt.",
+  "sendRequestBtn": "Gửi yêu cầu",
+  "requestSent": "Đã gửi {{count}} yêu cầu tạo tài khoản chờ Super Admin duyệt.",
+  "modalTitle": "Gửi yêu cầu tạo tài khoản",
+  "modalDescription": "Thêm từng dòng hoặc import CSV. Mỗi dòng = 1 tài khoản đề xuất.",
+  "downloadTemplate": "Tải template CSV",
+  "importCsv": "Import CSV",
+  "tableHeader": {
+    "email": "Email",
+    "fullName": "Họ tên",
+    "role": "Vai trò",
+    "department": "Phòng ban"
+  },
+  "placeholder": {
+    "email": "email@congty.com",
+    "fullName": "Họ tên",
+    "department": "Phòng ban"
+  },
+  "addRow": "Thêm dòng",
+  "cancel": "Hủy",
+  "submitSingle": "Gửi yêu cầu",
+  "submitMultiple": "Gửi {{count}} yêu cầu",
+  "emptyCsvError": "File CSV trống hoặc thiếu dữ liệu.",
+  "noValidRowsError": "Không đọc được dòng hợp lệ nào từ CSV.",
+  "atLeastOneError": "Vui lòng nhập ít nhất một yêu cầu.",
+  "invalidEmail": "Email không hợp lệ: {{email}}",
+  "missingName": "Thiếu họ tên cho {{email}}",
+  "submitError": "Không thể gửi yêu cầu.",
+  "empty": "(trống)"
+}

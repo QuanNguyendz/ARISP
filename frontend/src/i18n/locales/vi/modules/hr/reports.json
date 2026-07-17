@@ -1,0 +1,25 @@
+{
+  "title": "Báo cáo",
+  "description": "Xem và tải các báo cáo tuyển dụng",
+  "stats": {
+    "totalCandidates": "Tổng ứng viên",
+    "hired": "Đã tuyển",
+    "avgTimeToHire": "Tgian TB tuyển",
+    "passRate": "Tỷ lệ Pass"
+  },
+  "days": "ngày",
+  "recentReports": "Báo cáo gần đây",
+  "report1": {
+    "title": "Báo cáo tuyển dụng tháng 5",
+    "description": "Tổng hợp hoạt động tuyển dụng tháng 5/2026"
+  },
+  "report2": {
+    "title": "Phân tích hiệu suất NTD",
+    "description": "So sánh hiệu suất giữa các nhà tuyển dụng"
+  },
+  "report3": {
+    "title": "Báo cáo ứng viên",
+    "description": "Thống kê ứng viên theo vị trí"
+  },
+  "download": "Tải xuống"
+}

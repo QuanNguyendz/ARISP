@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
@@ -10,33 +11,6 @@ import { jobService } from '@services/job/jobService'
 type StatusKey = 'draft' | 'active' | 'paused' | 'closed'
 type FilterKey = 'all' | StatusKey
 
-const STATUS_META: Record<StatusKey, { label: string; badge: string }> = {
-  active: {
-    label: 'Đang tuyển',
-    badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-  },
-  draft: {
-    label: 'Nháp',
-    badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-  },
-  paused: {
-    label: 'Tạm dừng',
-    badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
-  },
-  closed: {
-    label: 'Đã đóng',
-    badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400',
-  },
-}
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'active', label: 'Đang tuyển' },
-  { key: 'draft', label: 'Nháp' },
-  { key: 'paused', label: 'Tạm dừng' },
-  { key: 'closed', label: 'Đã đóng' },
-]
-
 function formatDate(iso?: string): string {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -44,7 +18,7 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function getDeadlineText(deadlineStr?: string | null): string {
+function getDeadlineText(deadlineStr?: string | null, t: (key: string) => string): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''
@@ -58,12 +32,13 @@ function getDeadlineText(deadlineStr?: string | null): string {
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (Đã hết hạn)`
-  if (diffDays === 0) return `${formattedDate} (Hết hạn hôm nay)`
-  return `${formattedDate} (Còn ${diffDays} ngày)`
+  if (diffDays < 0) return `${formattedDate} (${t('deadline.expired')})`
+  if (diffDays === 0) return `${formattedDate} (${t('deadline.today')})`
+  return `${formattedDate} (${t('deadline.daysLeft', { count: diffDays })})`
 }
 
 export default function HrJobsPage() {
+  const { t } = useTranslation('modules/hr/jobs')
   const {
     data: jobsData,
     isLoading: loading,
@@ -76,24 +51,58 @@ export default function HrJobsPage() {
 
   const jobs = jobsData || []
   const error =
-    (fetchError as any)?.response?.data?.message ||
-    (fetchError ? 'Không tải được danh sách tin tuyển dụng.' : '')
+    (fetchError as any)?.response?.data?.message || (fetchError ? t('loadingError') : '')
   const [filter, setFilter] = useState<FilterKey>('all')
   const [page, setPage] = useState(1)
+
+  const statusMeta: Record<StatusKey, { label: string; badge: string }> = {
+    active: {
+      label: t('status.active'),
+      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    },
+    draft: {
+      label: t('status.draft'),
+      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+    },
+    paused: {
+      label: t('status.paused'),
+      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    },
+    closed: {
+      label: t('status.closed'),
+      badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400',
+    },
+  }
+
+  const filters: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: t('filters.all') },
+    { key: 'active', label: t('status.active') },
+    { key: 'draft', label: t('status.draft') },
+    { key: 'paused', label: t('status.paused') },
+    { key: 'closed', label: t('status.closed') },
+  ]
 
   const stats = useMemo(() => {
     const count = (s: StatusKey) => jobs.filter((j) => j.status === s).length
     return [
-      { label: 'Tổng tin', value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
+      { label: t('stats.total'), value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
       {
-        label: 'Đang tuyển',
+        label: t('status.active'),
         value: count('active'),
         color: 'text-emerald-600 dark:text-emerald-400',
       },
-      { label: 'Nháp', value: count('draft'), color: 'text-amber-600 dark:text-amber-400' },
-      { label: 'Đã đóng', value: count('closed'), color: 'text-ink-600 dark:text-ink-400' },
+      {
+        label: t('status.draft'),
+        value: count('draft'),
+        color: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        label: t('status.closed'),
+        value: count('closed'),
+        color: 'text-ink-600 dark:text-ink-400',
+      },
     ]
-  }, [jobs])
+  }, [jobs, t])
 
   const filtered = useMemo(
     () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
@@ -107,25 +116,20 @@ export default function HrJobsPage() {
     [filtered, page]
   )
 
-  // Về trang 1 khi đổi bộ lọc
   useEffect(() => {
     setPage(1)
   }, [filter])
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
-      <PageHeader
-        title="Tin tuyển dụng"
-        description="Quản lý tất cả tin tuyển dụng trong hệ thống"
-      />
+      <PageHeader title={t('title')} description={t('subtitle')} />
 
       {loading && <HrStatsSkeleton />}
       {!loading && !error && <StatsGrid stats={stats} />}
 
-      {/* Status filter tabs */}
       {!loading && !error && jobs.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {FILTERS.map((f) => {
+          {filters.map((f) => {
             const cnt =
               f.key === 'all' ? jobs.length : jobs.filter((j) => j.status === f.key).length
             const activeTab = filter === f.key
@@ -155,19 +159,15 @@ export default function HrJobsPage() {
       {!loading && !error && filtered.length === 0 && (
         <EmptyState
           icon={<Briefcase className="w-8 h-8 text-ink-400" />}
-          title={jobs.length === 0 ? 'Chưa có tin tuyển dụng' : 'Không có tin phù hợp'}
-          description={
-            jobs.length === 0
-              ? 'Hệ thống chưa có tin tuyển dụng nào. Tin do Recruiter tạo và HR duyệt sẽ hiển thị tại đây.'
-              : 'Không có tin tuyển dụng nào ở trạng thái đã chọn. Thử bộ lọc khác.'
-          }
+          title={jobs.length === 0 ? t('noJobs') : t('noMatchingJobs')}
+          description={jobs.length === 0 ? t('noJobsHint') : t('noMatchingJobsHint')}
         />
       )}
 
       {!loading && !error && filtered.length > 0 && (
         <div className="space-y-4">
           {paged.map((job, index) => {
-            const meta = STATUS_META[job.status as StatusKey] ?? STATUS_META.draft
+            const meta = statusMeta[job.status as StatusKey] ?? statusMeta.draft
             return (
               <motion.div
                 key={job.id}
@@ -193,7 +193,7 @@ export default function HrJobsPage() {
                         </span>
                         {job.isUrgent && (
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-1">
-                            <Zap className="w-3 h-3" /> Gấp
+                            <Zap className="w-3 h-3" /> {t('urgent')}
                           </span>
                         )}
                       </div>
@@ -218,12 +218,12 @@ export default function HrJobsPage() {
                         )}
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          {job.applicantCount ?? 0} ứng viên
+                          {job.applicantCount ?? 0} {t('applicants')}
                         </span>
                         {job.applicationDeadline && (
                           <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                             <Calendar className="w-4 h-4" />
-                            Hạn nộp: {getDeadlineText(job.applicationDeadline)}
+                            {t('deadlineLabel')}: {getDeadlineText(job.applicationDeadline, t)}
                           </span>
                         )}
                         <span className="flex items-center gap-1">
@@ -238,7 +238,7 @@ export default function HrJobsPage() {
                       to={`/hr/jobs/${job.id}`}
                       className="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 transition-colors text-sm font-medium"
                     >
-                      Chi tiết
+                      {t('viewDetails')}
                     </Link>
                   </div>
                 </div>
@@ -253,7 +253,7 @@ export default function HrJobsPage() {
           page={page}
           totalPages={totalPages}
           total={filtered.length}
-          label="tin"
+          label={t('paginationLabel')}
           onPageChange={setPage}
         />
       )}

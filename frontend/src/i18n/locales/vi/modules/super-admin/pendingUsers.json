@@ -1,0 +1,24 @@
+{
+  "title": "Duyệt tài khoản mới",
+  "description": "Yêu cầu tạo tài khoản do HR Leader gửi — duyệt để tạo tài khoản hoạt động",
+  "by": "Yêu cầu bởi {{name}}",
+  "processing": "Đang xử lý...",
+  "approve": "Duyệt",
+  "reject": "Từ chối",
+  "empty": {
+    "title": "Không có yêu cầu chờ duyệt",
+    "description": "Khi HR Leader gửi yêu cầu tạo tài khoản, chúng sẽ xuất hiện ở đây."
+  },
+  "rejectModal": {
+    "title": "Từ chối yêu cầu",
+    "description": "Nhập lý do từ chối tạo tài khoản cho \"{{name}}\".",
+    "confirm": "Từ chối",
+    "placeholder": "Nhập lý do...",
+    "cancel": "Hủy"
+  },
+  "errors": {
+    "loadFailed": "Không tải được danh sách yêu cầu.",
+    "approveFailed": "Không thể duyệt yêu cầu.",
+    "rejectFailed": "Không thể từ chối yêu cầu."
+  }
+}

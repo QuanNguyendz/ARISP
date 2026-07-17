@@ -1,20 +1,23 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { User, Bell, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { PageHeader } from '@components/shared'
 
 export default function HrSettingsPage() {
+  const { t } = useTranslation('modules/hr/settings')
+
   const [activeTab, setActiveTab] = useState('profile')
 
   const tabs = [
-    { id: 'profile', label: 'Hồ sơ', icon: User },
-    { id: 'notifications', label: 'Thông báo', icon: Bell },
-    { id: 'security', label: 'Bảo mật', icon: Lock },
+    { id: 'profile', label: t('tabs.profile'), icon: User },
+    { id: 'notifications', label: t('tabs.notifications'), icon: Bell },
+    { id: 'security', label: t('tabs.security'), icon: Lock },
   ]
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
-      <PageHeader title="Cài đặt" description="Quản lý hồ sơ và cài đặt cá nhân" />
+      <PageHeader title={t('title')} description={t('description')} />
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Tabs Sidebar */}
@@ -47,11 +50,13 @@ export default function HrSettingsPage() {
           >
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Hồ sơ</h3>
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+                  {t('profile.title')}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      Họ tên
+                      {t('profile.fullName')}
                     </label>
                     <input
                       type="text"
@@ -61,7 +66,7 @@ export default function HrSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      Email
+                      {t('profile.email')}
                     </label>
                     <input
                       type="email"
@@ -71,22 +76,24 @@ export default function HrSettingsPage() {
                   </div>
                 </div>
                 <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity">
-                  Lưu thay đổi
+                  {t('profile.saveChanges')}
                 </button>
               </div>
             )}
 
             {activeTab === 'notifications' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Thông báo</h3>
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+                  {t('notifications.title')}
+                </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
                     <div>
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        Email thông báo
+                        {t('notifications.email.title')}
                       </p>
                       <p className="text-xs text-ink-500 dark:text-ink-400">
-                        Nhận email khi có ứng viên mới
+                        {t('notifications.email.description')}
                       </p>
                     </div>
                     <button className="relative w-12 h-6 rounded-full bg-brand-600">
@@ -96,10 +103,10 @@ export default function HrSettingsPage() {
                   <div className="flex items-center justify-between p-4 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
                     <div>
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        Thông báo trình duyệt
+                        {t('notifications.browser.title')}
                       </p>
                       <p className="text-xs text-ink-500 dark:text-ink-400">
-                        Nhận thông báo khi có cập nhật mới
+                        {t('notifications.browser.description')}
                       </p>
                     </div>
                     <button className="relative w-12 h-6 rounded-full bg-brand-600">
@@ -112,11 +119,13 @@ export default function HrSettingsPage() {
 
             {activeTab === 'security' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Bảo mật</h3>
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+                  {t('security.title')}
+                </h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      Mật khẩu hiện tại
+                      {t('security.currentPassword')}
                     </label>
                     <input
                       type="password"
@@ -126,7 +135,7 @@ export default function HrSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      Mật khẩu mới
+                      {t('security.newPassword')}
                     </label>
                     <input
                       type="password"
@@ -136,7 +145,7 @@ export default function HrSettingsPage() {
                   </div>
                 </div>
                 <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity">
-                  Đổi mật khẩu
+                  {t('security.changePassword')}
                 </button>
               </div>
             )}

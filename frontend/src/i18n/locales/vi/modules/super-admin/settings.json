@@ -1,0 +1,48 @@
+{
+  "title": "Cài đặt hệ thống",
+  "description": "Cấu hình toàn cục cho nền tảng ARISP (single-tenant)",
+  "saveChanges": "Lưu thay đổi",
+  "saving": "Đang lưu...",
+  "saveSuccess": "Đã lưu cài đặt hệ thống.",
+  "tabs": {
+    "auth": "Đăng nhập & miền email",
+    "integrations": "Tích hợp & Webhook"
+  },
+  "auth": {
+    "title": "Miền email được phép",
+    "description": "Danh sách miền email công ty được phép đăng nhập (Google OAuth + pre-provisioning).",
+    "infoLine1": "Chỉ áp dụng cho",
+    "infoHighlight": "đăng nhập Google của nhân viên",
+    "infoLine1End": "(HR · Recruiter · Super Admin). Đăng nhập bằng email + mật khẩu và tài khoản ứng viên không bị ràng buộc bởi danh sách này.",
+    "infoLine2": "Để trống = cho phép mọi miền. Sau khi qua cửa miền, tài khoản vẫn phải được cấp trước trong hệ thống.",
+    "placeholder": "vd: congty.com",
+    "addButton": "Thêm",
+    "empty": "Chưa có miền nào. Khi trống, mọi miền email sẽ bị chặn đăng nhập qua Google.",
+    "removeDomainAria": "Xóa {{domain}}",
+    "invalidDomain": "\"{{domain}}\" không phải miền hợp lệ."
+  },
+  "integrations": {
+    "title": "Webhook & tích hợp",
+    "description": "Cấu hình điểm gửi sự kiện tới ATS và kênh thông báo nội bộ.",
+    "atsWebhookUrl": "ATS Webhook URL",
+    "atsWebhookSecret": "ATS Webhook Secret",
+    "slackWebhookUrl": "Slack Incoming Webhook",
+    "teamsWebhookUrl": "Microsoft Teams Webhook",
+    "descriptions": {
+      "atsWebhookUrl": "URL webhook gửi sự kiện tuyển dụng sang hệ thống ATS.",
+      "atsWebhookSecret": "Khóa bí mật ký payload webhook ATS.",
+      "slackWebhookUrl": "Incoming webhook để gửi thông báo tới Slack.",
+      "teamsWebhookUrl": "Incoming webhook để gửi thông báo tới Microsoft Teams."
+    },
+    "placeholders": {
+      "atsWebhookUrl": "https://ats.example.com/hooks/arisp",
+      "atsWebhookSecret": "••••••••",
+      "slackWebhookUrl": "https://hooks.slack.com/services/...",
+      "teamsWebhookUrl": "https://outlook.office.com/webhook/..."
+    }
+  },
+  "errors": {
+    "loadFailed": "Không tải được cài đặt hệ thống.",
+    "saveFailed": "Không thể lưu cài đặt."
+  }
+}

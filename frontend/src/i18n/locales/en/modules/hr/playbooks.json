@@ -1,0 +1,46 @@
+{
+  "title": "Interview Playbook",
+  "description": "Internal interview documents — AI loads into RAG to ask in company style & content",
+  "uploadPlaybook": "Upload Playbook",
+  "loadingError": "Failed to load playbooks.",
+  "deleteError": "Cannot delete playbook.",
+  "filters": {
+    "all": "All"
+  },
+  "scopes": {
+    "org": "Company",
+    "jobPosting": "By Job",
+    "round": "By Round"
+  },
+  "status": {
+    "ready": "RAG Loaded"
+  },
+  "paginationLabel": "documents",
+  "noPlaybooks": "No playbooks yet",
+  "noPlaybooksHint": "Upload interview documents (PDF/DOCX/TXT/MD) for AI to interview in company style.",
+  "docTypes": {
+    "styleGuide": "Style Guide",
+    "questionBank": "Question Bank",
+    "competencyFramework": "Competency Framework",
+    "cultureGuide": "Culture & Values",
+    "compliance": "Compliance Rules",
+    "redFlag": "Red Flag Guide",
+    "technicalScenario": "Technical Scenario",
+    "expectedAnswer": "Expected Answer",
+    "mustAsk": "Must-Ask Questions",
+    "roundPlaybook": "Round Playbook"
+  },
+  "uploadTitle": "Upload Playbook",
+  "uploadHint": "PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",
+  "selectFile": "Select document file...",
+  "selectFileError": "Please select a file.",
+  "selectJob": "Select a job posting",
+  "selectJobError": "Please select a job posting.",
+  "uploadError": "Upload failed.",
+  "documentType": "Document Type",
+  "scope": "Scope",
+  "jobPosting": "Job Posting",
+  "round": "Round",
+  "cancel": "Cancel",
+  "upload": "Upload"
+}

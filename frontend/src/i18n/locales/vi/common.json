@@ -133,5 +133,9 @@
     "minLength": "Tối thiểu {{min}} ký tự",
     "maxLength": "Tối đa {{max}} ký tự",
     "passwordTooWeak": "Mật khẩu quá yếu"
+  },
+  "notFoundPage": {
+    "title": "Trang không tìm thấy",
+    "backToHome": "Quay về trang chủ"
   }
 }

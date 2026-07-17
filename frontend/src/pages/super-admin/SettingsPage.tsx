@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Shield, Webhook, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
 import { PageHeader, ErrorAlert } from '@components/shared'
@@ -7,16 +8,16 @@ import { SettingsSkeleton } from './_skeletons'
 
 type TabId = 'auth' | 'integrations'
 
-const SETTING_DESCRIPTIONS: Record<string, string> = {
-  allowed_email_domains:
-    'Danh sách miền email công ty được phép đăng nhập (Google OAuth + pre-provisioning).',
-  ats_webhook_url: 'URL webhook gửi sự kiện tuyển dụng sang hệ thống ATS.',
-  ats_webhook_secret: 'Khóa bí mật ký payload webhook ATS.',
-  slack_webhook_url: 'Incoming webhook để gửi thông báo tới Slack.',
-  teams_webhook_url: 'Incoming webhook để gửi thông báo tới Microsoft Teams.',
-}
+const SETTING_KEYS = {
+  allowedEmailDomains: 'allowed_email_domains',
+  atsWebhookUrl: 'ats_webhook_url',
+  atsWebhookSecret: 'ats_webhook_secret',
+  slackWebhookUrl: 'slack_webhook_url',
+  teamsWebhookUrl: 'teams_webhook_url',
+} as const
 
 export default function SuperAdminSettingsPage() {
+  const { t } = useTranslation('modules/super-admin/settings')
   const [tab, setTab] = useState<TabId>('auth')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -37,24 +38,24 @@ export default function SuperAdminSettingsPage() {
         settings.forEach((s) => (map[s.key] = s.value))
         setValues(map)
         setDomains(
-          (map['allowed_email_domains'] || '')
+          (map[SETTING_KEYS.allowedEmailDomains] || '')
             .split(',')
             .map((d) => d.trim())
             .filter(Boolean)
         )
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được cài đặt hệ thống.')
+        setError(e?.response?.data?.message || t('errors.loadFailed'))
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [t])
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase().replace(/^@/, '')
     if (!d) return
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d)) {
-      setError(`"${d}" không phải miền hợp lệ.`)
+      setError(t('auth.invalidDomain', { domain: d }))
       return
     }
     if (!domains.includes(d)) setDomains([...domains, d])
@@ -65,16 +66,23 @@ export default function SuperAdminSettingsPage() {
   const buildPayload = (): SystemSettingItem[] => {
     const items: SystemSettingItem[] = [
       {
-        key: 'allowed_email_domains',
+        key: SETTING_KEYS.allowedEmailDomains,
         value: domains.join(','),
-        description: SETTING_DESCRIPTIONS['allowed_email_domains'],
+        description: t('auth.description'),
       },
     ]
-    ;['ats_webhook_url', 'ats_webhook_secret', 'slack_webhook_url', 'teams_webhook_url'].forEach(
-      (k) => {
-        items.push({ key: k, value: values[k] || '', description: SETTING_DESCRIPTIONS[k] })
-      }
-    )
+    ;[
+      SETTING_KEYS.atsWebhookUrl,
+      SETTING_KEYS.atsWebhookSecret,
+      SETTING_KEYS.slackWebhookUrl,
+      SETTING_KEYS.teamsWebhookUrl,
+    ].forEach((k) => {
+      items.push({
+        key: k,
+        value: values[k] || '',
+        description: t(`integrations.descriptions.${k}`),
+      })
+    })
     return items
   }
 
@@ -87,19 +95,16 @@ export default function SuperAdminSettingsPage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Không thể lưu cài đặt.')
+      setError(e?.response?.data?.message || t('errors.saveFailed'))
     } finally {
       setSaving(false)
     }
   }
 
-  const tabs = useMemo(
-    () => [
-      { id: 'auth' as const, label: 'Đăng nhập & miền email', icon: Shield },
-      { id: 'integrations' as const, label: 'Tích hợp & Webhook', icon: Webhook },
-    ],
-    []
-  )
+  const tabs = [
+    { id: 'auth' as const, label: t('tabs.auth'), icon: Shield },
+    { id: 'integrations' as const, label: t('tabs.integrations'), icon: Webhook },
+  ]
 
   const inputClass =
     'w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400'
@@ -107,11 +112,11 @@ export default function SuperAdminSettingsPage() {
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
-        title="Cài đặt hệ thống"
-        description="Cấu hình toàn cục cho nền tảng ARISP (single-tenant)"
+        title={t('title')}
+        description={t('description')}
         actions={[
           {
-            label: saving ? 'Đang lưu...' : 'Lưu thay đổi',
+            label: saving ? t('saving') : t('saveChanges'),
             onClick: handleSave,
             variant: 'primary',
             icon: saving ? (
@@ -126,7 +131,7 @@ export default function SuperAdminSettingsPage() {
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
       {saved && (
         <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
-          <CheckCircle2 className="h-4 w-4" /> Đã lưu cài đặt hệ thống.
+          <CheckCircle2 className="h-4 w-4" /> {t('saveSuccess')}
         </div>
       )}
 
@@ -137,18 +142,18 @@ export default function SuperAdminSettingsPage() {
           {/* Tabs */}
           <div className="lg:w-64 lg:shrink-0">
             <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-2 shadow-card">
-              {tabs.map((t) => (
+              {tabs.map((tb) => (
                 <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
+                  key={tb.id}
+                  onClick={() => setTab(tb.id)}
                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                    tab === t.id
+                    tab === tb.id
                       ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
                       : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
                   }`}
                 >
-                  <t.icon className="h-5 w-5" />
-                  <span className="text-left">{t.label}</span>
+                  <tb.icon className="h-5 w-5" />
+                  <span className="text-left">{tb.label}</span>
                 </button>
               ))}
             </div>
@@ -165,10 +170,10 @@ export default function SuperAdminSettingsPage() {
               <div className="space-y-5">
                 <div>
                   <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                    Miền email được phép
+                    {t('auth.title')}
                   </h3>
                   <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    {SETTING_DESCRIPTIONS['allowed_email_domains']}
+                    {t('auth.description')}
                   </p>
                 </div>
 
@@ -176,17 +181,11 @@ export default function SuperAdminSettingsPage() {
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
                   <div className="space-y-1">
                     <p>
-                      Chỉ áp dụng cho{' '}
-                      <b className="text-ink-800 dark:text-ink-100">
-                        đăng nhập Google của nhân viên
-                      </b>{' '}
-                      (HR · Recruiter · Super Admin). Đăng nhập bằng email + mật khẩu và tài khoản
-                      ứng viên không bị ràng buộc bởi danh sách này.
+                      {t('auth.infoLine1')}{' '}
+                      <b className="text-ink-800 dark:text-ink-100">{t('auth.infoHighlight')}</b>{' '}
+                      {t('auth.infoLine1End')}
                     </p>
-                    <p>
-                      Để trống = cho phép mọi miền. Sau khi qua cửa miền, tài khoản vẫn phải được
-                      cấp trước trong hệ thống.
-                    </p>
+                    <p>{t('auth.infoLine2')}</p>
                   </div>
                 </div>
 
@@ -200,20 +199,20 @@ export default function SuperAdminSettingsPage() {
                         addDomain()
                       }
                     }}
-                    placeholder="vd: congty.com"
+                    placeholder={t('auth.placeholder')}
                     className={inputClass}
                   />
                   <button
                     onClick={addDomain}
                     className="flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
                   >
-                    <Plus className="h-4 w-4" /> Thêm
+                    <Plus className="h-4 w-4" /> {t('auth.addButton')}
                   </button>
                 </div>
 
                 {domains.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-ink-200 dark:border-white/10 px-4 py-6 text-center text-sm text-ink-400">
-                    Chưa có miền nào. Khi trống, mọi miền email sẽ bị chặn đăng nhập qua Google.
+                    {t('auth.empty')}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -226,7 +225,7 @@ export default function SuperAdminSettingsPage() {
                         <button
                           onClick={() => setDomains(domains.filter((x) => x !== d))}
                           className="text-ink-400 hover:text-red-500"
-                          aria-label={`Xóa ${d}`}
+                          aria-label={t('auth.removeDomainAria', { domain: d })}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -241,34 +240,34 @@ export default function SuperAdminSettingsPage() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                    Webhook & tích hợp
+                    {t('integrations.title')}
                   </h3>
                   <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    Cấu hình điểm gửi sự kiện tới ATS và kênh thông báo nội bộ.
+                    {t('integrations.description')}
                   </p>
                 </div>
 
                 {[
                   {
-                    key: 'ats_webhook_url',
-                    label: 'ATS Webhook URL',
-                    placeholder: 'https://ats.example.com/hooks/arisp',
+                    key: SETTING_KEYS.atsWebhookUrl,
+                    label: t('integrations.atsWebhookUrl'),
+                    placeholder: t('integrations.placeholders.atsWebhookUrl'),
                   },
                   {
-                    key: 'ats_webhook_secret',
-                    label: 'ATS Webhook Secret',
-                    placeholder: '••••••••',
+                    key: SETTING_KEYS.atsWebhookSecret,
+                    label: t('integrations.atsWebhookSecret'),
+                    placeholder: t('integrations.placeholders.atsWebhookSecret'),
                     type: 'password',
                   },
                   {
-                    key: 'slack_webhook_url',
-                    label: 'Slack Incoming Webhook',
-                    placeholder: 'https://hooks.slack.com/services/...',
+                    key: SETTING_KEYS.slackWebhookUrl,
+                    label: t('integrations.slackWebhookUrl'),
+                    placeholder: t('integrations.placeholders.slackWebhookUrl'),
                   },
                   {
-                    key: 'teams_webhook_url',
-                    label: 'Microsoft Teams Webhook',
-                    placeholder: 'https://outlook.office.com/webhook/...',
+                    key: SETTING_KEYS.teamsWebhookUrl,
+                    label: t('integrations.teamsWebhookUrl'),
+                    placeholder: t('integrations.placeholders.teamsWebhookUrl'),
                   },
                 ].map((f) => (
                   <div key={f.key}>
@@ -282,7 +281,9 @@ export default function SuperAdminSettingsPage() {
                       placeholder={f.placeholder}
                       className={inputClass}
                     />
-                    <p className="mt-1 text-xs text-ink-400">{SETTING_DESCRIPTIONS[f.key]}</p>
+                    <p className="mt-1 text-xs text-ink-400">
+                      {t(`integrations.descriptions.${f.key}`)}
+                    </p>
                   </div>
                 ))}
               </div>
