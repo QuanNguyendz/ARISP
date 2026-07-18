@@ -303,6 +303,11 @@
 
 ## Completed
 
+- [x] 2026-07-18: **Refactor Phase 2 — DI decomposition theo JT template: `Program.cs` 521 → 62 dòng.**
+  - Tạo `ARI.Application/DependencyInjection.cs` (`AddApplication`: InterviewOptions + 6 app services), `ARI.Infrastructure/DependencyInjection.cs` (`AddInfrastructure`: DbContext + Npgsql pooling, UoW, AI provider switch rag/openai, storage switch Local/S3, media real-vs-mock, email queue + hosted service), `ARI.API/DependencyInjection.cs` (`AddWebServices`: swagger, SignalR, JWT + External cookie + Google, 4 authorization policies, CORS, ForwardedHeaders, `INotificationService`).
+  - `AriDbContextInitialiser` (Infrastructure/Data): migrate-retry 3 lần + raw SQL bootstrap move verbatim (sẽ xoá ở Phase 3); Program gọi qua `app.InitialiseDatabaseAsync()`. Thêm `ValidateScopes/ValidateOnBuild` (Development) bắt DI miss lúc boot.
+  - Thuần relocation — không đổi logic đăng ký. Verify: build 0 lỗi, boot cả 2 nhánh `AI:Provider` (openai/rag), swagger diff = rỗng, negotiate 401, staff login 401 (bad creds), GET /api/jobs 200, log initialiser đủ 5 bước.
+
 - [x] 2026-07-18: **Refactor Phase 1 — Rename `backend/` → `ari-service/` (src/ layout) + `ARISP.*` → `ARI.*` (namespace PascalCase).**
   - Commit A thuần `git mv` (153 file, 100% rename — giữ git history `--follow`); Commit B text sweep 5 token (`ARISP.Domain|Application|Infrastructure|API`→`ARI.*`, `ARISPDbContext`→`AriDbContext`) — KHÔNG blanket replace, giữ nguyên brand values (JWT Issuer `ARISP`, cookie `ARISP.External`, swagger title, email templates).
   - Layout mới theo template Jason Taylor: `ari-service/ARI.sln` + `src/ARI.{Domain,Application,Infrastructure,API}` (tests/ sẽ thêm ở phase sau). Sln paths + Dockerfile (`docker/backend/Dockerfile`: COPY `src/ARI.*`, ENTRYPOINT `ARI.API.dll`) + docker-compose (context/volume `../ari-service`) + hooks `.claude` (arch-guard, tasks-reminder regex `ari-service/`) + skill `arisp-feature` + docs (README, CLAUDE.md, coding-rules, practice-interview-setup, schema.md) cập nhật đồng bộ.
