@@ -3,10 +3,10 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
-using ARISP.Application.DTOs;
-using ARISP.Application.Services;
+using ARI.Application.DTOs;
+using ARI.Application.Services;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/interview")] // Đồng bộ chuẩn prefix số ít theo đúng yêu cầu đồng bộ hệ thống backend

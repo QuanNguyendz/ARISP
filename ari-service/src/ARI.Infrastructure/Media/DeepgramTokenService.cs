@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Media
+namespace ARI.Infrastructure.Media
 {
     /// <summary>
     /// Mint ephemeral token Deepgram (endpoint /v1/auth/grant) để FE kết nối live STT trực tiếp,

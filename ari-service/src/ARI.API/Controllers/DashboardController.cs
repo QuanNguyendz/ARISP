@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/dashboard")]
@@ -89,7 +89,7 @@ namespace ARISP.API.Controllers
                     Id = j.Id, Title = j.Title, Department = j.Department, Status = j.Status,
                     CreatedByUserId = j.CreatedByUserId, Vacancies = j.Vacancies, CreatedAt = j.CreatedAt,
                 }), ct));
-            var appsTask = RunScopedAsync(uow => uow.Repository<ARISP.Domain.Entities.Application>()
+            var appsTask = RunScopedAsync(uow => uow.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Select(a => new AppLite
                 {
                     Id = a.Id, JobPostingId = a.JobPostingId, Status = a.Status,

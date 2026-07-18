@@ -6,11 +6,11 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Constants;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
+using ARI.Domain.Entities;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/admin")]

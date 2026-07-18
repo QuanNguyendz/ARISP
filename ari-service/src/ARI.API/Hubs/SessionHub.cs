@@ -2,10 +2,10 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using ARISP.Application.Hubs;
-using ARISP.Application.Services;
+using ARI.Application.Hubs;
+using ARI.Application.Services;
 
-namespace ARISP.API.Hubs
+namespace ARI.API.Hubs
 {
     [Authorize]
     public class SessionHub : Hub<ISessionClient>

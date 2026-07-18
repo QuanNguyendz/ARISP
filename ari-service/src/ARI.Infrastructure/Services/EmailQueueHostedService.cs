@@ -1,12 +1,12 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     /// <summary>
     /// Worker nền tiêu thụ IEmailQueue và gửi email thật qua IEmailService.

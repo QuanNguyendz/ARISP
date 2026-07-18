@@ -4,10 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace ARISP.Infrastructure.Storage
+namespace ARI.Infrastructure.Storage
 {
     /// <summary>
     /// Lưu file lên object storage S3-compatible (Cloudflare R2 / AWS S3 / MinIO).

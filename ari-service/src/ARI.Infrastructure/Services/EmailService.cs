@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     public class EmailService : IEmailService
     {

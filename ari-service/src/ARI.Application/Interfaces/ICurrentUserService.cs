@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     public interface ICurrentUserService
     {

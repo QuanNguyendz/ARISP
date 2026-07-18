@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     /// <summary>
     /// Yêu cầu tạo tài khoản staff do HR Leader gửi lên Super Admin phê duyệt.

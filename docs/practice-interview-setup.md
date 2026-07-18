@@ -35,7 +35,7 @@ Mic (FE) ──> Deepgram live STT (WebSocket trực tiếp, auth subprotocol ['
 ### Cách điền bằng user-secrets (khuyến nghị cho dev)
 
 ```bash
-cd backend/ARISP.API
+cd ari-service/src/ARI.API
 dotnet user-secrets set "AI:OpenAI:ApiKey"            "sk-..."
 dotnet user-secrets set "Media:Deepgram:ApiKey"       "..."
 dotnet user-secrets set "Media:ElevenLabs:ApiKey"     "..."
@@ -96,7 +96,7 @@ Practice mở **1 lượt / vòng** sau khi ứng viên **đã pass CV + đặt 
 
 ```bash
 # Backend
-cd backend/ARISP.API && dotnet run
+cd ari-service/src/ARI.API && dotnet run
 # Frontend
 cd frontend && npm install && npm run dev
 ```

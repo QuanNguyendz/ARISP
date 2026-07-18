@@ -1,18 +1,18 @@
-using ARISP.Infrastructure.Data;
+using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ARISP.Infrastructure.Migrations
+namespace ARI.Infrastructure.Migrations
 {
     /// <summary>
     /// GIN full-text index trên document_chunks.chunk_text — phục vụ nhánh SPARSE của Hybrid RAG
     /// (RAG service Python dùng to_tsvector('simple', chunk_text) @@ to_tsquery + ts_rank).
     /// Chỉ là index (không đổi model) nên không cần cập nhật ModelSnapshot. Idempotent.
     /// </summary>
-    [DbContext(typeof(ARISPDbContext))]
+    [DbContext(typeof(AriDbContext))]
     [Migration("20260626000000_AddDocumentChunksFtsIndex")]
     public partial class AddDocumentChunksFtsIndex : Migration
     {

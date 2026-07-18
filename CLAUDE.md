@@ -131,17 +131,20 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 ### Backend (C# / ASP.NET Core .NET 8)
 
 **Naming:**
-- Namespace: `ARISP.<Layer>.<Module>` (ví dụ: `ARISP.Application.Interview`)
+- Namespace: `ARI.<Layer>.<Module>` (ví dụ: `ARI.Application.Interview`) — PascalCase
 - Class: PascalCase | Interface: prefix `I` | Method: PascalCase + suffix `Async` cho async
 - Private field: `_camelCase` | Constant: `UPPER_SNAKE_CASE`
 
 **Project Structure (Clean Architecture):**
 ```
-backend/
-├── ARISP.API/            # Controllers, Middleware, Program.cs
-├── ARISP.Application/    # Use Cases, DTOs, Interfaces, Validators
-├── ARISP.Domain/         # Entities, Value Objects, Domain Events
-└── ARISP.Infrastructure/ # EF Core, Repositories, External Services
+ari-service/
+├── ARI.sln
+├── src/
+│   ├── ARI.API/            # Controllers, Middleware, Program.cs
+│   ├── ARI.Application/    # Use Cases (CQRS), DTOs, Interfaces, Validators
+│   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
+│   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
+└── tests/                # Unit / functional tests
 ```
 
 **Patterns bắt buộc:** Repository Pattern, CQRS (MediatR nếu phức tạp), Result Pattern (không throw exception cho business errors), Dependency Injection, Async/Await cho mọi I/O.

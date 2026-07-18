@@ -5,13 +5,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
-using ARISP.Domain.Entities;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     public class ApplicationService
     {
@@ -50,7 +50,7 @@ namespace ARISP.Application.Services
         /// <summary>
         /// Hàm tiện ích dùng chung để Map Entity sang Response (Tránh lặp code)
         /// </summary>
-        private static ApplicationResponse MapToResponse(ARISP.Domain.Entities.Application application, JobPosting? jobPosting, int? currentRound = null, decimal? interviewScore = null, DateTimeOffset? interviewDate = null)
+        private static ApplicationResponse MapToResponse(ARI.Domain.Entities.Application application, JobPosting? jobPosting, int? currentRound = null, decimal? interviewScore = null, DateTimeOffset? interviewDate = null)
         {
             return new ApplicationResponse
             {
@@ -89,7 +89,7 @@ namespace ARISP.Application.Services
             if (jobPosting.ApplicationDeadline.HasValue && jobPosting.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
                 return Result.Failure<ApplicationResponse>("Tin tuyển dụng này đã hết hạn nộp hồ sơ.");
 
-            var application = new ARISP.Domain.Entities.Application
+            var application = new ARI.Domain.Entities.Application
             {
                 JobPostingId = request.JobPostingId,
                 CandidateAccountId = request.CandidateAccountId,
@@ -116,7 +116,7 @@ namespace ARISP.Application.Services
                 }
             }
 
-            await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().AddAsync(application, ct);
+            await _unitOfWork.Repository<ARI.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
             // Auto-trigger background CV-JD analysis if it does not already exist
@@ -153,7 +153,7 @@ namespace ARISP.Application.Services
                             var analysisResult = await cvJdSvc.AnalyzeAndCacheAsync(jobId, ms, fileName, CancellationToken.None);
                             if (!analysisResult.IsFailure)
                             {
-                                var appRepo = uow.Repository<ARISP.Domain.Entities.Application>();
+                                var appRepo = uow.Repository<ARI.Domain.Entities.Application>();
                                 var app = await appRepo.GetByIdAsync(appId);
                                 if (app != null)
                                 {
@@ -220,12 +220,12 @@ namespace ARISP.Application.Services
                 await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
                 
                 // Add a Notification record so it shows up in the bell
-                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
                 var dedupKey = $"applied:{application.Id}";
                 var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == request.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
                 if (existingNotifs.FirstOrDefault() == null)
                 {
-                    var newNotif = new ARISP.Domain.Entities.Notification
+                    var newNotif = new ARI.Domain.Entities.Notification
                     {
                         CandidateAccountId = request.CandidateAccountId.Value,
                         DedupKey = dedupKey,
@@ -250,7 +250,7 @@ namespace ARISP.Application.Services
         {
             // Projection ở tầng SQL — KHÔNG kéo cột text lớn (CvText/CoverLetter/DemographicData)
             // vốn khiến danh sách rất nặng và timeout khi đọc stream từ Postgres.
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
                     .OrderByDescending(a => a.CreatedAt)
                     .Select(a => new AppListProjection
@@ -441,7 +441,7 @@ namespace ARISP.Application.Services
             if (jobPosting == null)
                 return Result.Failure<List<ApplicationResponse>>("Job posting not found.");
 
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
                     .Where(a => a.JobPostingId == jobPostingId)
                     .OrderByDescending(a => a.CreatedAt)
@@ -478,7 +478,7 @@ namespace ARISP.Application.Services
             if (jobIds.Count == 0)
                 return Result.Success(new List<ApplicationResponse>());
 
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
                     .Where(a => jobIds.Contains(a.JobPostingId))
                     .OrderByDescending(a => a.CreatedAt)
@@ -507,7 +507,7 @@ namespace ARISP.Application.Services
         /// </summary>
         public async Task<Result<ApplicationResponse>> GetApplicationByIdAsync(Guid id, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(id, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(id, ct);
             if (application == null)
                 return Result.Failure<ApplicationResponse>("Application not found.");
 
@@ -576,7 +576,7 @@ namespace ARISP.Application.Services
             if (string.IsNullOrWhiteSpace(newStatus))
                 return Result.Failure<ApplicationResponse>("Target status cannot be empty.");
 
-            var repository = _unitOfWork.Repository<ARISP.Domain.Entities.Application>();
+            var repository = _unitOfWork.Repository<ARI.Domain.Entities.Application>();
             var application = await repository.GetByIdAsync(id, ct);
             if (application == null)
                 return Result.Failure<ApplicationResponse>("Application not found.");
@@ -643,7 +643,7 @@ namespace ARISP.Application.Services
         /// <param name="roundNumber">Vòng cần mời (mặc định 1).</param>
         public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
@@ -710,7 +710,7 @@ namespace ARISP.Application.Services
         /// </summary>
         public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
@@ -734,12 +734,12 @@ namespace ARISP.Application.Services
             var response = MapToResponse(application, job, 1);
             if (application.CandidateAccountId.HasValue)
             {
-                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
                 var dedupKey = $"cv_accepted:{application.Id}";
                 var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
                 if (!existingNotifs.Any())
                 {
-                    var newNotif = new ARISP.Domain.Entities.Notification
+                    var newNotif = new ARI.Domain.Entities.Notification
                     {
                         CandidateAccountId = application.CandidateAccountId.Value,
                         DedupKey = dedupKey,
@@ -765,7 +765,7 @@ namespace ARISP.Application.Services
         /// </summary>
         public async Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
@@ -778,7 +778,7 @@ namespace ARISP.Application.Services
             application.Status = "cv_rejected";
             application.UpdatedAt = DateTimeOffset.UtcNow;
 
-            _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+            _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
             await _unitOfWork.SaveChangesAsync(ct);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
@@ -812,12 +812,12 @@ namespace ARISP.Application.Services
             {
                 await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
 
-                var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
                 var dedupKey = $"cv_rejected:{application.Id}";
                 var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
                 if (!existingNotifs.Any())
                 {
-                    var newNotif = new ARISP.Domain.Entities.Notification
+                    var newNotif = new ARI.Domain.Entities.Notification
                     {
                         CandidateAccountId = application.CandidateAccountId.Value,
                         DedupKey = dedupKey,
@@ -844,7 +844,7 @@ namespace ARISP.Application.Services
         /// </summary>
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result.Failure<bool>("Application not found.");
 

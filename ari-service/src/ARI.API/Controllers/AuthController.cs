@@ -9,14 +9,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
-using ARISP.Domain.Constants;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
+using ARI.Domain.Constants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

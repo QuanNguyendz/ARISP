@@ -4,14 +4,14 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Fonts;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Pdf.IO;
 using PdfSharpCore.Utils;
 
-namespace ARISP.Infrastructure.Documents
+namespace ARI.Infrastructure.Documents
 {
     /// <summary>
     /// Đóng dấu duyệt trực quan lên file JD bằng PdfSharpCore (chạy tốt trên Linux nhờ

@@ -1,4 +1,4 @@
-namespace ARISP.Infrastructure.Media
+namespace ARI.Infrastructure.Media
 {
     /// <summary>Cấu hình media stack phỏng vấn realtime (ADR-043/044). Bind từ section "Media".</summary>
     public class MediaOptions

@@ -1,12 +1,12 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Services;
+using ARI.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     public class AnalyzeCvRequest
     {

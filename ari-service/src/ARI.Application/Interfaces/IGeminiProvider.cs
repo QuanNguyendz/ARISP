@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     public interface IGeminiProvider
     {

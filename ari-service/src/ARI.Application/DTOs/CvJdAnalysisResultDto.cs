@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     public class CvJdAnalysisResultDto
     {

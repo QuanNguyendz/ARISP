@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\ARISP.Domain\ARISP.Domain.csproj" />
+    <ProjectReference Include="..\ARI.Domain\ARI.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

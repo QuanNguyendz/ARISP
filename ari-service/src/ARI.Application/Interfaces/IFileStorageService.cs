@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     /// <summary>
     /// Trừu tượng hoá lưu trữ file (CV, tài liệu...). Cho phép thay đổi backend lưu trữ

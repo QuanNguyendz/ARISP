@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Hubs
+namespace ARI.Application.Hubs
 {
     public interface ISessionClient
     {

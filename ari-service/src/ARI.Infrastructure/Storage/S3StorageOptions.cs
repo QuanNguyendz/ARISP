@@ -1,4 +1,4 @@
-namespace ARISP.Infrastructure.Storage
+namespace ARI.Infrastructure.Storage
 {
     /// <summary>
     /// Cấu hình object storage S3-compatible (Cloudflare R2 / AWS S3 / MinIO).

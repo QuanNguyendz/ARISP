@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     public class MockSTTProvider : ISTTProvider
     {

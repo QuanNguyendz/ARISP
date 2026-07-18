@@ -13,26 +13,26 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS development
 WORKDIR /app/src
 # Restore dependencies first (cache layer)
 COPY *.sln ./
-COPY ARISP.API/*.csproj ./ARISP.API/
-COPY ARISP.Application/*.csproj ./ARISP.Application/
-COPY ARISP.Domain/*.csproj ./ARISP.Domain/
-COPY ARISP.Infrastructure/*.csproj ./ARISP.Infrastructure/
+COPY src/ARI.API/*.csproj ./src/ARI.API/
+COPY src/ARI.Application/*.csproj ./src/ARI.Application/
+COPY src/ARI.Domain/*.csproj ./src/ARI.Domain/
+COPY src/ARI.Infrastructure/*.csproj ./src/ARI.Infrastructure/
 RUN dotnet restore
 # Copy everything else
 COPY . .
-ENTRYPOINT ["dotnet", "watch", "run", "--project", "ARISP.API", "--urls", "http://+:5000"]
+ENTRYPOINT ["dotnet", "watch", "run", "--project", "src/ARI.API", "--urls", "http://+:5000"]
 
 # --- Stage: build ---
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY *.sln ./
-COPY ARISP.API/*.csproj ./ARISP.API/
-COPY ARISP.Application/*.csproj ./ARISP.Application/
-COPY ARISP.Domain/*.csproj ./ARISP.Domain/
-COPY ARISP.Infrastructure/*.csproj ./ARISP.Infrastructure/
+COPY src/ARI.API/*.csproj ./src/ARI.API/
+COPY src/ARI.Application/*.csproj ./src/ARI.Application/
+COPY src/ARI.Domain/*.csproj ./src/ARI.Domain/
+COPY src/ARI.Infrastructure/*.csproj ./src/ARI.Infrastructure/
 RUN dotnet restore
 COPY . .
-RUN dotnet publish ARISP.API -c Release -o /app/publish --no-restore
+RUN dotnet publish src/ARI.API -c Release -o /app/publish --no-restore
 
 # --- Stage: production ---
 FROM base AS production
@@ -41,4 +41,4 @@ COPY --from=build /app/publish .
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
-ENTRYPOINT ["dotnet", "ARISP.API.dll"]
+ENTRYPOINT ["dotnet", "ARI.API.dll"]

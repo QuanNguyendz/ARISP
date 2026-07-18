@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     /// <summary>Token ngắn hạn để FE kết nối trực tiếp Deepgram live STT (BE giữ API key thật).</summary>
     public record DeepgramToken(string AccessToken, int ExpiresInSeconds, string Model);

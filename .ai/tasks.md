@@ -8,13 +8,13 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-06-18
+**Last updated:** 2026-07-18
 
 ---
 
 ## Đang làm (In Progress)
 
-_Chưa có task nào đang thực hiện._
+- [ ] **Refactor backend → Clean Architecture (JT template) + CQRS/MediatR** — branch `refactor/be/clean-architecture`. Đã xong: Phase 1 (rename `backend/`→`ari-service/` src-layout, `ARISP.*`→`ARI.*`). Còn: DI decomposition, migration reconciliation, CQRS waves (14 controllers → ~110 commands/queries), tests skeleton.
 
 ---
 
@@ -302,6 +302,11 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-07-18: **Refactor Phase 1 — Rename `backend/` → `ari-service/` (src/ layout) + `ARISP.*` → `ARI.*` (namespace PascalCase).**
+  - Commit A thuần `git mv` (153 file, 100% rename — giữ git history `--follow`); Commit B text sweep 5 token (`ARISP.Domain|Application|Infrastructure|API`→`ARI.*`, `ARISPDbContext`→`AriDbContext`) — KHÔNG blanket replace, giữ nguyên brand values (JWT Issuer `ARISP`, cookie `ARISP.External`, swagger title, email templates).
+  - Layout mới theo template Jason Taylor: `ari-service/ARI.sln` + `src/ARI.{Domain,Application,Infrastructure,API}` (tests/ sẽ thêm ở phase sau). Sln paths + Dockerfile (`docker/backend/Dockerfile`: COPY `src/ARI.*`, ENTRYPOINT `ARI.API.dll`) + docker-compose (context/volume `../ari-service`) + hooks `.claude` (arch-guard, tasks-reminder regex `ari-service/`) + skill `arisp-feature` + docs (README, CLAUDE.md, coding-rules, practice-interview-setup, schema.md) cập nhật đồng bộ.
+  - Migrations an toàn: chỉ đổi namespace + `[DbContext(typeof(AriDbContext))]`, KHÔNG đụng `[Migration("id")]`/`ef_migrations_history`. Verify: build 0 lỗi (7 warnings pre-existing), 16 migrations list đủ, model fingerprint trước/sau rename identical, swagger.json diff = rỗng (98 paths), SignalR negotiate 401 không đổi. Gate `docker compose build` hoãn (Docker daemon không chạy lúc refactor).
 
 - [x] 2026-07-02: **Practice Interview production-ready: sửa STT chết + giảm trễ AI + avatar full màn + LiveAvatar production (ADR-044 hoàn thiện).**
   - **Root cause STT:** `@deepgram/sdk` v3 chỉ nhận API key (`createClient({ accessToken })` ném "A deepgram API key is required" ngay khi khởi tạo) → STT chưa bao giờ chạy. **Bỏ SDK**, FE mở **WebSocket Deepgram trực tiếp** (`wss://api.deepgram.com/v1/listen`, auth subprotocol `['bearer', <token ngắn hạn>]`), tự parse `Results`/`UtteranceEnd`; auto-reconnect tối đa 3 lần (mint token mới qua media-config). TTL token 60s→300s (`MediaOptions` + appsettings) — trước đây avatar khởi tạo tuần tự làm token hết hạn trước khi STT nối.

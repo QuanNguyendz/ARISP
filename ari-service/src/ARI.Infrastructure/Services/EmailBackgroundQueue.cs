@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     /// <summary>
     /// Triển khai hàng đợi email dựa trên System.Threading.Channels (unbounded, single-reader).

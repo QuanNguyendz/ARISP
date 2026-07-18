@@ -2,12 +2,12 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using UglyToad.PdfPig;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     public class DocumentParserService : IDocumentParserService
     {

@@ -3,9 +3,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using ARISP.Application.Hubs;
+using ARI.Application.Hubs;
 
-namespace ARISP.API.Hubs
+namespace ARI.API.Hubs
 {
     [Authorize]
     public class AppNotificationHub : Hub<IAppNotificationClient>

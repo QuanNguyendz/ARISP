@@ -2,15 +2,15 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using System.Security.Claims;
-using ARISP.API.Hubs;
-using ARISP.API.Middleware;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Constants;
-using ARISP.Infrastructure.AI;
-using ARISP.Infrastructure.Data;
-using ARISP.Infrastructure.Repositories;
-using ARISP.Infrastructure.Services;
+using ARI.API.Hubs;
+using ARI.API.Middleware;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
+using ARI.Domain.Constants;
+using ARI.Infrastructure.AI;
+using ARI.Infrastructure.Data;
+using ARI.Infrastructure.Repositories;
+using ARI.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -95,7 +95,7 @@ var csb = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
 };
 connectionString = csb.ConnectionString;
 
-builder.Services.AddDbContext<ARISPDbContext>(options =>
+builder.Services.AddDbContext<AriDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
     {
         npgsql.MigrationsHistoryTable("ef_migrations_history");
@@ -120,15 +120,15 @@ if (string.Equals(aiProvider, "rag", StringComparison.OrdinalIgnoreCase))
         ?? "http://rag-service:8000";
 
     // Typed HttpClient tới RAG service nội bộ (không qua Nginx).
-    builder.Services.AddHttpClient<ARISP.Infrastructure.AI.RagServiceProvider>(c =>
+    builder.Services.AddHttpClient<ARI.Infrastructure.AI.RagServiceProvider>(c =>
     {
         c.BaseAddress = new Uri(ragServiceUrl);
         c.Timeout = TimeSpan.FromSeconds(120); // sinh câu hỏi/đánh giá có thể lâu
     });
 
-    builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
-    builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
-    builder.Services.AddScoped<IRagIngestionService>(sp => sp.GetRequiredService<ARISP.Infrastructure.AI.RagServiceProvider>());
+    builder.Services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<ARI.Infrastructure.AI.RagServiceProvider>());
+    builder.Services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<ARI.Infrastructure.AI.RagServiceProvider>());
+    builder.Services.AddScoped<IRagIngestionService>(sp => sp.GetRequiredService<ARI.Infrastructure.AI.RagServiceProvider>());
 }
 else
 {
@@ -140,14 +140,14 @@ else
     builder.Services.AddScoped<IRagIngestionService, LocalRagIngestionService>();
 }
 
-builder.Services.AddScoped<IGeminiProvider, ARISP.Infrastructure.AI.GeminiProvider>();
+builder.Services.AddScoped<IGeminiProvider, ARI.Infrastructure.AI.GeminiProvider>();
 
 // File storage — Local (dev) hoặc S3-compatible object storage như Cloudflare R2 (prod).
 // Chọn qua "Storage:Provider" = "Local" | "S3". Mặc định Local.
 var storageProvider = builder.Configuration["Storage:Provider"] ?? "Local";
 if (string.Equals(storageProvider, "S3", StringComparison.OrdinalIgnoreCase))
 {
-    var s3Options = new ARISP.Infrastructure.Storage.S3StorageOptions();
+    var s3Options = new ARI.Infrastructure.Storage.S3StorageOptions();
     builder.Configuration.GetSection("Storage:S3").Bind(s3Options);
 
     if (string.IsNullOrWhiteSpace(s3Options.Endpoint) ||
@@ -172,47 +172,47 @@ if (string.Equals(storageProvider, "S3", StringComparison.OrdinalIgnoreCase))
         var creds = new Amazon.Runtime.BasicAWSCredentials(s3Options.AccessKeyId, s3Options.SecretAccessKey);
         return new Amazon.S3.AmazonS3Client(creds, config);
     });
-    builder.Services.AddScoped<IFileStorageService, ARISP.Infrastructure.Storage.S3FileStorageService>();
+    builder.Services.AddScoped<IFileStorageService, ARI.Infrastructure.Storage.S3FileStorageService>();
 }
 else
 {
-    builder.Services.AddScoped<IFileStorageService, ARISP.Infrastructure.Storage.LocalFileStorageService>();
+    builder.Services.AddScoped<IFileStorageService, ARI.Infrastructure.Storage.LocalFileStorageService>();
 }
 
 // === Media stack phỏng vấn realtime (ADR-043/044): real provider nếu có API key, else Mock ===
-var mediaOptions = new ARISP.Infrastructure.Media.MediaOptions();
+var mediaOptions = new ARI.Infrastructure.Media.MediaOptions();
 builder.Configuration.GetSection("Media").Bind(mediaOptions);
 builder.Services.AddSingleton(mediaOptions);
 
 // Cấu hình nghiệp vụ phỏng vấn (số lượt practice/vòng...) — Development đặt
 // PracticeAttemptsPerRound = 0 (không giới hạn) để test lặp lại không vướng gating.
-var interviewOptions = new ARISP.Application.Options.InterviewOptions();
+var interviewOptions = new ARI.Application.Options.InterviewOptions();
 builder.Configuration.GetSection("Interview").Bind(interviewOptions);
 builder.Services.AddSingleton(interviewOptions);
 
 // STT (Deepgram): BE mint ephemeral token cho FE live STT.
 builder.Services.AddScoped<ISTTProvider, MockSTTProvider>(); // server-side STT chưa dùng (FE stream trực tiếp)
 if (!string.IsNullOrWhiteSpace(mediaOptions.Deepgram.ApiKey))
-    builder.Services.AddHttpClient<IDeepgramTokenService, ARISP.Infrastructure.Media.DeepgramTokenService>();
+    builder.Services.AddHttpClient<IDeepgramTokenService, ARI.Infrastructure.Media.DeepgramTokenService>();
 else
     builder.Services.AddScoped<IDeepgramTokenService, MockDeepgramTokenService>();
 
 // TTS (ElevenLabs Flash v2.5).
 if (!string.IsNullOrWhiteSpace(mediaOptions.ElevenLabs.ApiKey))
-    builder.Services.AddHttpClient<ITTSService, ARISP.Infrastructure.Media.ElevenLabsTTSService>();
+    builder.Services.AddHttpClient<ITTSService, ARI.Infrastructure.Media.ElevenLabsTTSService>();
 else
     builder.Services.AddScoped<ITTSService, MockTTSService>();
 
 // Avatar (HeyGen Streaming): BE mint session token; FE chạy @heygen/streaming-avatar.
 if (!string.IsNullOrWhiteSpace(mediaOptions.HeyGen.ApiKey))
-    builder.Services.AddHttpClient<IAvatarService, ARISP.Infrastructure.Media.HeyGenAvatarService>();
+    builder.Services.AddHttpClient<IAvatarService, ARI.Infrastructure.Media.HeyGenAvatarService>();
 else
     builder.Services.AddScoped<IAvatarService, MockAvatarService>();
 
 // Notification: SignalR thật (đẩy ReceiveQuestion/... tới SessionHub) + email qua IEmailService.
-builder.Services.AddScoped<INotificationService, ARISP.API.Services.SignalRNotificationService>();
+builder.Services.AddScoped<INotificationService, ARI.API.Services.SignalRNotificationService>();
 builder.Services.AddScoped<IDocumentParserService, DocumentParserService>();
-builder.Services.AddScoped<IJdStampService, ARISP.Infrastructure.Documents.JdStampService>();
+builder.Services.AddScoped<IJdStampService, ARI.Infrastructure.Documents.JdStampService>();
 
 builder.Services.AddTransient<IEmailService, EmailService>();
 
@@ -430,7 +430,7 @@ for (var attempt = 1; attempt <= 3; attempt++)
     try
     {
         using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ARISPDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AriDbContext>();
         Console.WriteLine($"Applying EF Core migrations (attempt {attempt}/3)...");
         await dbContext.Database.MigrateAsync();
         Console.WriteLine("Migrations applied.");
@@ -450,7 +450,7 @@ for (var attempt = 1; attempt <= 3; attempt++)
 try
 {
     using var idxScope = app.Services.CreateScope();
-    var db = idxScope.ServiceProvider.GetRequiredService<ARISPDbContext>();
+    var db = idxScope.ServiceProvider.GetRequiredService<AriDbContext>();
     var indexStatements = new[]
     {
         "CREATE INDEX IF NOT EXISTS ix_applications_candidate_account_id ON applications (candidate_account_id)",

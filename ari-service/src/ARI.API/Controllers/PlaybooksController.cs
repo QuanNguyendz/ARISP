@@ -4,14 +4,14 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
+using ARI.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     /// <summary>
     /// Quản lý Interview Playbook (tài liệu phỏng vấn nội bộ) — upload, liệt kê, xoá.

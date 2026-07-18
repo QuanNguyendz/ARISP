@@ -2,7 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     public interface ISTTProvider
     {

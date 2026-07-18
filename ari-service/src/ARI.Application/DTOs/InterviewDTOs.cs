@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     public class StartSessionRequest
     {

@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     /// <summary>
     /// Đóng dấu duyệt (visual stamp) lên file JD PDF sau khi HR Leader phê duyệt.

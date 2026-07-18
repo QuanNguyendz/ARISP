@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Options;
-using ARISP.Domain.Entities;
-using ARISP.Domain.Constants;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Application.Options;
+using ARI.Domain.Entities;
+using ARI.Domain.Constants;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     public class InterviewService
     {
@@ -59,7 +59,7 @@ namespace ARISP.Application.Services
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
                 return Result.Failure<string>("Không tìm thấy phiên phỏng vấn.");
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<string>("Không tìm thấy hồ sơ ứng tuyển.");
             var owns = (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
@@ -84,7 +84,7 @@ namespace ARISP.Application.Services
         /// RAG (hybrid retrieve hoặc in-process) có ngữ cảnh khi sinh câu hỏi. Chỉ ingest khi THIẾU
         /// (idempotent, tránh re-embed mỗi lần vào phòng). An toàn nếu RAG service tạm lỗi (nuốt lỗi).
         /// </summary>
-        private async Task EnsureSourcesIngestedAsync(ARISP.Domain.Entities.Application application, JobPosting? jobPosting, CancellationToken ct)
+        private async Task EnsureSourcesIngestedAsync(ARI.Domain.Entities.Application application, JobPosting? jobPosting, CancellationToken ct)
         {
             try
             {
@@ -119,7 +119,7 @@ namespace ARISP.Application.Services
             if (session == null)
                 return Result.Failure<PracticeMediaConfigResponse>("Không tìm thấy phiên phỏng vấn.");
 
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<PracticeMediaConfigResponse>("Không tìm thấy hồ sơ ứng tuyển.");
 
@@ -171,7 +171,7 @@ namespace ARISP.Application.Services
             if (sessions.Count == 0) return new List<HrInterviewSessionItem>();
 
             var appIds = sessions.Select(s => s.ApplicationId).Distinct().ToList();
-            var apps = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var apps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .FindAsync(a => appIds.Contains(a.Id), ct)).ToList();
             var appById = apps.ToDictionary(a => a.Id);
 
@@ -220,7 +220,7 @@ namespace ARISP.Application.Services
 
         public async Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<StartSessionResponse>("Application not found.");
 
@@ -241,7 +241,7 @@ namespace ARISP.Application.Services
 
                 // Giữ cờ tổng để tương thích ngược (không còn dùng làm điều kiện chặn).
                 application.PracticeSessionUsed = true;
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
             }
 
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
@@ -337,7 +337,7 @@ namespace ARISP.Application.Services
             if (session.Status != "active")
                 return Result.Failure<string>("Session is not active.");
 
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application!.JobPostingId, ct);
             var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
             var sequenceNumber = questions.Count() + 1;
@@ -608,7 +608,7 @@ namespace ARISP.Application.Services
         private async Task GenerateEvaluationReportAsync(Guid sessionId, CancellationToken ct = default)
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session!.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session!.ApplicationId, ct);
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application!.JobPostingId, ct);
             var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
 
@@ -682,7 +682,7 @@ namespace ARISP.Application.Services
             
             // Set candidate status to screening / interview finished
             application.Status = evalReport.Verdict == "pass" ? "screening" : "not_pass";
-            _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+            _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
 
             await _unitOfWork.SaveChangesAsync(ct);
             
@@ -737,11 +737,11 @@ namespace ARISP.Application.Services
             await _unitOfWork.Repository<HrReview>().AddAsync(review, ct);
 
             // Update Application status based on final verdict
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
             {
                 application.Status = request.FinalVerdict == "pass" ? "pass" : "not_pass";
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
 
                 var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var jobTitle = jobPosting?.Title ?? "vị trí ứng tuyển";
@@ -816,14 +816,14 @@ namespace ARISP.Application.Services
                     }, ct);
 
                     // Add Notification record
-                    var notifRepo = _unitOfWork.Repository<ARISP.Domain.Entities.Notification>();
+                    var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
                     var dedupKey = $"hr_review:{evaluation.Id}";
                     var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
                     if (existingNotifs.FirstOrDefault() == null)
                     {
                         var verdict = isOverride ? request.FinalVerdict : evaluation.AiVerdict;
                         var isPass = verdict == "pass";
-                        var newNotif = new ARISP.Domain.Entities.Notification
+                        var newNotif = new ARI.Domain.Entities.Notification
                         {
                             CandidateAccountId = application.CandidateAccountId.Value,
                             DedupKey = dedupKey,
@@ -857,7 +857,7 @@ namespace ARISP.Application.Services
             return Result.Success(true);
         }
 
-        private async Task<bool> TriggerAutoProgressionAsync(ARISP.Domain.Entities.Application application, int currentRoundNumber, string? frontendBaseUrl = null, CancellationToken ct = default)
+        private async Task<bool> TriggerAutoProgressionAsync(ARI.Domain.Entities.Application application, int currentRoundNumber, string? frontendBaseUrl = null, CancellationToken ct = default)
         {
             var nextRoundNumber = currentRoundNumber + 1;
 
@@ -870,7 +870,7 @@ namespace ARISP.Application.Services
                 var nextRound = nextRoundConfigs.First();
                 // Status = interview (đang trong giai đoạn phỏng vấn vòng kế); chi tiết vòng suy ra từ record.
                 application.Status = "interview";
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
 
                 // Tạo lời mời CHỌN LỊCH cho vòng kế (mỗi vòng cần duyệt → chỉ tạo sau khi confirm Pass).
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);

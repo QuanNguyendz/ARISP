@@ -4,16 +4,16 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     public class SubmitApplicationFormRequest
     {

@@ -2,19 +2,19 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
-using ARISP.Infrastructure.Data;
+using ARI.Application.Interfaces;
+using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace ARISP.Infrastructure.Repositories
+namespace ARI.Infrastructure.Repositories
 {
     public class UnitOfWork : IUnitOfWork
     {
-        private readonly ARISPDbContext _context;
+        private readonly AriDbContext _context;
         private readonly ConcurrentDictionary<string, object> _repositories;
         private bool _disposed;
 
-        public UnitOfWork(ARISPDbContext context)
+        public UnitOfWork(AriDbContext context)
         {
             _context = context;
             _repositories = new ConcurrentDictionary<string, object>();

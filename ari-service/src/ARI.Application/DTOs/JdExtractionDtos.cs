@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     /// <summary>
     /// Kết quả Gemini trích xuất thông tin Job Posting từ file JD (PDF/DOCX) — output JSON thô.

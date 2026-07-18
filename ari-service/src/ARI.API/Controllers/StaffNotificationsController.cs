@@ -4,14 +4,14 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Constants;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
+using ARI.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     /// <summary>
     /// Thông báo cho nhân sự nội bộ (HR Admin / Recruiter / Super Admin).
@@ -172,7 +172,7 @@ namespace ARISP.API.Controllers
             }
 
             // 1. Ứng viên mới ứng tuyển (30 ngày gần nhất) vào tin trong phạm vi.
-            var apps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var apps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
                     .Where(a => jobIds.Contains(a.JobPostingId) && a.CreatedAt >= since)
                     .Select(a => new { a.Id, a.JobPostingId, a.CandidateName, a.CreatedAt }), ct);
@@ -181,7 +181,7 @@ namespace ARISP.API.Controllers
                     $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates", a.CreatedAt);
 
             // 2. Đánh giá AI chờ HR xác nhận (chưa có HrReview) cho tin trong phạm vi.
-            var appIds = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var appIds = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Where(a => jobIds.Contains(a.JobPostingId)).Select(a => a.Id), ct);
             if (appIds.Count > 0)
             {

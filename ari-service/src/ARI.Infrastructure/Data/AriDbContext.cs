@@ -5,15 +5,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
-using ARISP.Domain.Entities;
-using ARISP.Domain.Constants;
-using ARISP.Application.Interfaces;
+using ARI.Domain.Entities;
+using ARI.Domain.Constants;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Data
+namespace ARI.Infrastructure.Data
 {
-    public class ARISPDbContext : DbContext
+    public class AriDbContext : DbContext
     {
-        public ARISPDbContext(DbContextOptions<ARISPDbContext> options)
+        public AriDbContext(DbContextOptions<AriDbContext> options)
             : base(options)
         {
         }
@@ -25,7 +25,7 @@ namespace ARISP.Infrastructure.Data
         public DbSet<CandidateRefreshToken> CandidateRefreshTokens => Set<CandidateRefreshToken>();
         public DbSet<JobPosting> JobPostings => Set<JobPosting>();
         public DbSet<InterviewRoundConfig> InterviewRoundConfigs => Set<InterviewRoundConfig>();
-        public DbSet<ARISP.Domain.Entities.Application> Applications => Set<ARISP.Domain.Entities.Application>();
+        public DbSet<ARI.Domain.Entities.Application> Applications => Set<ARI.Domain.Entities.Application>();
         public DbSet<AvailabilitySlot> AvailabilitySlots => Set<AvailabilitySlot>();
         public DbSet<InterviewBooking> InterviewBookings => Set<InterviewBooking>();
         public DbSet<InterviewInvite> InterviewInvites => Set<InterviewInvite>();
@@ -109,7 +109,7 @@ namespace ARISP.Infrastructure.Data
                 .Property(j => j.ScoringRubric)
                 .HasColumnType("jsonb");
 
-            modelBuilder.Entity<ARISP.Domain.Entities.Application>()
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
                 .Property(a => a.DemographicData)
                 .HasColumnType("jsonb");
 

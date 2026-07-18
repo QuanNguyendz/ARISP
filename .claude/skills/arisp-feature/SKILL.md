@@ -23,35 +23,35 @@ Domain  ←  Application  ←  Infrastructure
 Frontend (React) ──HTTP/SignalR──▶ API
 ```
 
-- `ARISP.Domain` — Entities, không phụ thuộc tầng nào khác.
-- `ARISP.Application` — Services, DTOs, Interfaces (`I*`), `Common/Result.cs`. Chỉ phụ thuộc Domain.
-- `ARISP.Infrastructure` — EF Core (`Data/`), `Repositories/`, `Migrations/`, external providers (`AI/`, `Storage/`, `Services/`). Implement interfaces của Application.
-- `ARISP.API` — Controllers, Hubs, Middleware, `Program.cs` (DI wiring).
+- `ARI.Domain` — Entities, không phụ thuộc tầng nào khác.
+- `ARI.Application` — Services, DTOs, Interfaces (`I*`), `Common/Result.cs`. Chỉ phụ thuộc Domain.
+- `ARI.Infrastructure` — EF Core (`Data/`), `Repositories/`, `Migrations/`, external providers (`AI/`, `Storage/`, `Services/`). Implement interfaces của Application.
+- `ARI.API` — Controllers, Hubs, Middleware, `Program.cs` (DI wiring).
 - `frontend/src` — `pages/` (theo role) → `services/` → `apiClient` → API. Không bao giờ fetch trực tiếp trong component.
 
 ## Checklist một vertical slice (backend → frontend)
 
-1. **Domain entity** (`ARISP.Domain/Entities/<Name>.cs`)
+1. **Domain entity** (`ARI.Domain/Entities/<Name>.cs`)
    - `Guid Id { get; set; } = Guid.NewGuid();`
    - Bắt buộc `CreatedAt`, `UpdatedAt` (kiểu `DateTimeOffset`, default `UtcNow`).
    - Soft delete: implement `ISoftDelete` → `DateTimeOffset? DeletedAt`. KHÔNG hard delete.
    - Comment inline cho field dạng enum-string (vd `// draft | active | closed`).
    - KHÔNG có `organization_id` (ADR-012, single-tenant).
 
-2. **EF mapping + migration** (`ARISP.Infrastructure`)
+2. **EF mapping + migration** (`ARI.Infrastructure`)
    - Map trong `Data/` (DbContext config). Table `snake_case` số nhiều, column `snake_case`.
    - Mọi schema change qua migration — không sửa DB tay:
-     `dotnet ef migrations add <Name> -p ARISP.Infrastructure -s ARISP.API`
+     `dotnet ef migrations add <Name> -p ari-service/src/ARI.Infrastructure -s ari-service/src/ARI.API`
    - User đã pre-approve việc thêm cột/migration khi task cần (xem memory).
 
-3. **Interface + Service** (`ARISP.Application`)
+3. **Interface + Service** (`ARI.Application`)
    - Interface đặt ở `Interfaces/I<Name>.cs`, prefix `I`.
    - Service trả về `Result` / `Result<T>` cho business error — **không throw exception** cho lỗi nghiệp vụ (`Common/Result.cs`). Method async có suffix `Async` + nhận `CancellationToken ct`.
    - Truy cập DB qua `IUnitOfWork.Repository<T>()`; gọi `SaveChangesAsync(ct)`.
    - Projection cột lớn: dùng `repo.QueryAsync(q => q.Where(...).Select(...))` để tránh kéo cột text khổng lồ (vd `ParsedText`, `CvText`). Đếm dùng `CountAsync`.
    - AI/LLM: chỉ qua `IAIProvider` / `IEmbeddingProvider` — KHÔNG gọi OpenAI SDK trực tiếp (rule #8). CV-JD analysis dùng `IGeminiProvider` (Gemini 2.5 Flash, ADR-030). File qua `IFileStorageService` (ADR-036).
 
-4. **Controller** (`ARISP.API/Controllers/<Name>Controller.cs`)
+4. **Controller** (`ARI.API/Controllers/<Name>Controller.cs`)
    - `[ApiController]`, `[Route("api/<resource>")]`, `[Authorize(Policy = "...")]` (vd `HrManagement`).
    - Inject qua constructor: `IUnitOfWork`, service, `ICurrentUserService`...
    - Action nhận `CancellationToken ct`. Map `Result.IsFailure` → `BadRequest(result.Error)`; success → `Ok(...)`.

@@ -5,10 +5,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.Infrastructure.AI
+namespace ARI.Infrastructure.AI
 {
     /// <summary>
     /// Client gọi RAG microservice (Python/FastAPI) — ADR-039 (mở rộng: Python sở hữu cả

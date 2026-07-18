@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     /// <summary>
     /// Đẩy tài liệu (JD/CV/Playbook) sang RAG service (Python) để chunk + embed + lưu pgvector.

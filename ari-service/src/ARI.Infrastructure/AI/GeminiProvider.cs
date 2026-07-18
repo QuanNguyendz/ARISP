@@ -7,13 +7,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace ARISP.Infrastructure.AI
+namespace ARI.Infrastructure.AI
 {
     public class GeminiProvider : IGeminiProvider
     {

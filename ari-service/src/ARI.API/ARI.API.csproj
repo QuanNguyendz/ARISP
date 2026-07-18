@@ -31,8 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ARISP.Infrastructure\ARISP.Infrastructure.csproj" />
-    <ProjectReference Include="..\ARISP.Application\ARISP.Application.csproj" />
+    <ProjectReference Include="..\ARI.Infrastructure\ARI.Infrastructure.csproj" />
+    <ProjectReference Include="..\ARI.Application\ARI.Application.csproj" />
   </ItemGroup>
 
 </Project>

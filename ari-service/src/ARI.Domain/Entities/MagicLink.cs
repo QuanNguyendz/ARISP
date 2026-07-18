@@ -1,7 +1,7 @@
 using System;
-using ARISP.Domain.Constants;
+using ARI.Domain.Constants;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     public class MagicLink
     {

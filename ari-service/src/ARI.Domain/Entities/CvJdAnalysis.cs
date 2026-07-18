@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     public class CvJdAnalysis
     {

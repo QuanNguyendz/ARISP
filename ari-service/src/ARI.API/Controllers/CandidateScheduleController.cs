@@ -4,15 +4,15 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
+using ARI.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     public class BookSlotRequest
     {
@@ -39,10 +39,10 @@ namespace ARISP.API.Controllers
         }
 
         /// <summary>Xác thực quyền truy cập hồ sơ: token lời mời hợp lệ hoặc candidate đăng nhập sở hữu hồ sơ.</summary>
-        private async Task<(bool ok, ARISP.Domain.Entities.Application? app, string? error)> AuthorizeAsync(
+        private async Task<(bool ok, ARI.Domain.Entities.Application? app, string? error)> AuthorizeAsync(
             Guid applicationId, int round, string? token, CancellationToken ct)
         {
-            var app = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (app == null) return (false, null, "Không tìm thấy hồ sơ ứng tuyển.");
 
             // 1) Token lời mời
@@ -117,7 +117,7 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Bạn đã đặt lịch cho vòng này rồi." });
 
             // Không trùng khung giờ với booking khác của chính ứng viên (kể cả JD khác).
-            var myAppIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+            var myAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
                     a => (app.CandidateAccountId != null && a.CandidateAccountId == app.CandidateAccountId)
                          || a.CandidateEmail == app.CandidateEmail, ct))
                 .Select(a => a.Id).ToHashSet();
@@ -159,7 +159,7 @@ namespace ARISP.API.Controllers
             if (string.Equals(app.Status, "screening", StringComparison.OrdinalIgnoreCase))
             {
                 app.Status = "interview";
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(app);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
             }
 
             var invites = await _unitOfWork.Repository<InterviewInvite>().FindAsync(
@@ -225,7 +225,7 @@ namespace ARISP.API.Controllers
             var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
             Guid.TryParse(subClaim, out var accId);
 
-            var myAppIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+            var myAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
                     a => (accId != Guid.Empty && a.CandidateAccountId == accId)
                          || (emailClaim != null && a.CandidateEmail == emailClaim), ct))
                 .Select(a => a.Id).ToHashSet();

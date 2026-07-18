@@ -10,13 +10,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
-using ARISP.Domain.Constants;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
+using ARI.Domain.Entities;
+using ARI.Domain.Constants;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -677,7 +677,7 @@ namespace ARISP.API.Controllers
 
             // Đếm ứng viên theo tin bằng SQL GROUP BY (không nạp Application/CvText).
             var jobIds = jobList.Select(j => j.Id).ToList();
-            var countByJob = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var countByJob = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                     .QueryAsync(q => q.Where(a => jobIds.Contains(a.JobPostingId))
                         .GroupBy(a => a.JobPostingId)
                         .Select(g => new { JobId = g.Key, Count = g.Count() }), ct))
@@ -952,7 +952,7 @@ namespace ARISP.API.Controllers
             }
 
             // 2. Validate theo Spec: Loại trừ hồ sơ đã fail ("not_pass"), đã rút ("withdrawn") và đã pass hoàn toàn ("pass")
-            var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+            var activeApps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
                 a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
                 ct);
 
@@ -1176,7 +1176,7 @@ namespace ARISP.API.Controllers
             if (targetStatus == "archived")
             {
                 // Kiểm tra xem có hồ sơ ứng tuyển nào đang xử lý dở dang không
-                var activeApps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().FindAsync(
+                var activeApps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
                     a => a.JobPostingId == id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
                     ct);
 

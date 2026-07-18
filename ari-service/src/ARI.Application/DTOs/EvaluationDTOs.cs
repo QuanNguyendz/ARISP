@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ARISP.Domain.Entities;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     public class ConfirmReviewRequest
     {
@@ -137,7 +137,7 @@ namespace ARISP.Application.DTOs
 
         public static EvaluationDetailResponse FromEntity(
             Evaluation eval, 
-            ARISP.Domain.Entities.Application app, 
+            ARI.Domain.Entities.Application app, 
             JobPosting job, 
             HrReview? hrReview)
         {
@@ -240,7 +240,7 @@ namespace ARISP.Application.DTOs
 
         public static EvaluationListItemResponse FromEntity(
             Evaluation eval,
-            ARISP.Domain.Entities.Application app,
+            ARI.Domain.Entities.Application app,
             JobPosting job,
             HrReview? hrReview)
         {

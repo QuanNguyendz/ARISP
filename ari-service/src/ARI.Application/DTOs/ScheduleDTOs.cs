@@ -1,7 +1,7 @@
 using System;
-using ARISP.Domain.Entities;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     /// <summary>Khung giờ phỏng vấn (slot) trả về cho client.</summary>
     public class AvailabilitySlotResponse

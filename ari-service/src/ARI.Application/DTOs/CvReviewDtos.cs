@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     /// <summary>Kết quả Gemini đánh giá CV độc lập (không gắn JD) — output JSON thô.</summary>
     public class CvReviewResultDto

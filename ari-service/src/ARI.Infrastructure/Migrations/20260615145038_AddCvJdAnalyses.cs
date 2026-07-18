@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ARISP.Infrastructure.Migrations
+namespace ARI.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddCvJdAnalyses : Migration

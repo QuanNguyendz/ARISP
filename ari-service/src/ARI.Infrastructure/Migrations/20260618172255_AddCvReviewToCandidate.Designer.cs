@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using ARISP.Infrastructure.Data;
+using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -11,9 +11,9 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace ARISP.Infrastructure.Migrations
+namespace ARI.Infrastructure.Migrations
 {
-    [DbContext(typeof(ARISPDbContext))]
+    [DbContext(typeof(AriDbContext))]
     [Migration("20260618172255_AddCvReviewToCandidate")]
     partial class AddCvReviewToCandidate
     {
@@ -29,7 +29,7 @@ namespace ARISP.Infrastructure.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("ARISP.Domain.Entities.Answer", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.Answer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -65,7 +65,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("answers", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.Application", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.Application", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -155,7 +155,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("applications", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.AuditLog", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -196,7 +196,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.AvailabilitySlot", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.AvailabilitySlot", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -245,7 +245,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("availability_slots", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.CandidateAccount", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.CandidateAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -351,7 +351,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("candidate_accounts", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.CandidateRefreshToken", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.CandidateRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -384,7 +384,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("candidate_refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.CheatDetectionSignal", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.CheatDetectionSignal", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -414,7 +414,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("cheat_detection_signals", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.CvJdAnalysis", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.CvJdAnalysis", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -510,7 +510,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("cv_jd_analyses", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.DocumentChunk", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.DocumentChunk", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -552,7 +552,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("document_chunks", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.Evaluation", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.Evaluation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -626,7 +626,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("evaluations", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.HrReview", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.HrReview", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -687,7 +687,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("hr_reviews", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.InterviewBooking", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.InterviewBooking", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -740,7 +740,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("interview_bookings", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.InterviewCode", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.InterviewCode", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -781,7 +781,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("interview_codes", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.InterviewRoundConfig", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.InterviewRoundConfig", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -821,7 +821,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("interview_round_configs", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.InterviewSession", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.InterviewSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -889,7 +889,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("interview_sessions", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.JobPosting", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.JobPosting", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1049,7 +1049,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("job_postings", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.MagicLink", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.MagicLink", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1090,7 +1090,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("magic_links", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.MustAskTracking", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.MustAskTracking", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1123,7 +1123,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("must_ask_tracking", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.OnlineTestQuestion", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.OnlineTestQuestion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1157,7 +1157,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("online_test_questions", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.OnlineTestSubmission", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.OnlineTestSubmission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1194,7 +1194,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("online_test_submissions", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.PlaybookDocument", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.PlaybookDocument", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1268,7 +1268,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("playbook_documents", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.Question", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.Question", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1314,7 +1314,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("questions", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.RefreshToken", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1347,7 +1347,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.SystemSetting", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.SystemSetting", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1377,7 +1377,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("system_settings", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.User", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1431,7 +1431,7 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.WebhookDelivery", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.WebhookDelivery", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1477,9 +1477,9 @@ namespace ARISP.Infrastructure.Migrations
                     b.ToTable("webhook_deliveries", (string)null);
                 });
 
-            modelBuilder.Entity("ARISP.Domain.Entities.Application", b =>
+            modelBuilder.Entity("ARI.Domain.Entities.Application", b =>
                 {
-                    b.HasOne("ARISP.Domain.Entities.CvJdAnalysis", "CvJdAnalysis")
+                    b.HasOne("ARI.Domain.Entities.CvJdAnalysis", "CvJdAnalysis")
                         .WithMany()
                         .HasForeignKey("CvJdAnalysisId");
 

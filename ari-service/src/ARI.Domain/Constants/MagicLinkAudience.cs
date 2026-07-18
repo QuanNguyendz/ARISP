@@ -1,4 +1,4 @@
-namespace ARISP.Domain.Constants
+namespace ARI.Domain.Constants
 {
     /// <summary>
     /// Loại tài khoản sở hữu MagicLink/token khôi phục mật khẩu.

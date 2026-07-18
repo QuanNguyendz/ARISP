@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Application.Common
+namespace ARI.Application.Common
 {
     public class Result
     {

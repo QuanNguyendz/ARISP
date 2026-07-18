@@ -5,17 +5,17 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
-using ARISP.Infrastructure.Data;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
+using ARI.Infrastructure.Data;
 
-namespace ARISP.Infrastructure.Repositories
+namespace ARI.Infrastructure.Repositories
 {
     public class Repository<T> : IRepository<T> where T : class
     {
-        protected readonly ARISPDbContext _context;
+        protected readonly AriDbContext _context;
 
-        public Repository(ARISPDbContext context)
+        public Repository(AriDbContext context)
         {
             _context = context;
         }

@@ -2,15 +2,15 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Constants;
-using ARISP.Domain.Entities;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
+using ARI.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     /// <summary>
     /// Quản lý khung giờ phỏng vấn (Availability Slots) cho Recruiter/HR.

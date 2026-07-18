@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.API.Hubs
+namespace ARI.API.Hubs
 {
     [Authorize]
     public class WebRTCSignalingHub : Hub

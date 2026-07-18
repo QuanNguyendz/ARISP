@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     public class JobPosting : ISoftDelete
     {

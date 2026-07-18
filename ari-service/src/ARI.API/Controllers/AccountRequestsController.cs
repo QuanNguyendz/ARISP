@@ -6,10 +6,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     /// <summary>
     /// HR Leader gửi yêu cầu tạo tài khoản staff (lẻ hoặc hàng loạt) lên Super Admin phê duyệt.

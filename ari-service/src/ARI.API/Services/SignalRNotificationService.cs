@@ -1,13 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.API.Hubs;
-using ARISP.Application.Hubs;
-using ARISP.Application.Interfaces;
+using ARI.API.Hubs;
+using ARI.Application.Hubs;
+using ARI.Application.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
-namespace ARISP.API.Services
+namespace ARI.API.Services
 {
     /// <summary>
     /// NotificationService thật: đẩy sự kiện phiên phỏng vấn qua SignalR (SessionHub group = sessionId)

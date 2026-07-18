@@ -3,9 +3,9 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Media
+namespace ARI.Infrastructure.Media
 {
     /// <summary>
     /// HeyGen LiveAvatar (ADR-044) — thay Streaming Avatar API cũ (đã sunset 410). Mô hình client-SDK:

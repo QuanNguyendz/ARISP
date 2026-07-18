@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     /// <summary>
     /// Lời mời phỏng vấn theo từng vòng (magic link phạm vi hẹp): cho phép ứng viên mở trang

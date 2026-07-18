@@ -3,10 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using ARISP.Application.DTOs;
-using ARISP.Application.Services;
+using ARI.Application.DTOs;
+using ARI.Application.Services;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

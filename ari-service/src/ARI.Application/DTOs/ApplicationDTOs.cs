@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     public class SubmitApplicationRequest
     {

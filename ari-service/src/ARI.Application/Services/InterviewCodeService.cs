@@ -3,12 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     /// <summary>
     /// Service quản lý sinh mã (Interview Code) và xác thực mã để bắt đầu Session phỏng vấn thật.
@@ -28,7 +28,7 @@ namespace ARISP.Application.Services
 
         public async Task<Result<InterviewCode>> GenerateCodeAsync(Guid applicationId, int? roundNumber, Guid createdByUserId, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
             {
                 return Result.Failure<InterviewCode>("Hồ sơ ứng tuyển không tồn tại.");
@@ -106,7 +106,7 @@ namespace ARISP.Application.Services
             if (string.Equals(application.Status, "screening", StringComparison.OrdinalIgnoreCase))
             {
                 application.Status = "interview";
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(application);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
             }
 
             var auditLog = new AuditLog
@@ -232,7 +232,7 @@ namespace ARISP.Application.Services
         public async Task<List<InterviewCodeSummaryDto>> GetCodesByJobAsync(Guid jobPostingId, CancellationToken ct = default)
         {
             // Lấy tất cả hồ sơ thuộc Tin tuyển dụng này
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .FindAsync(a => a.JobPostingId == jobPostingId, ct);
 
             var applicationIds = applications.Select(a => a.Id).ToList();

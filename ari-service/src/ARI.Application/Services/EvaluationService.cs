@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     public class EvaluationService
     {
@@ -67,7 +67,7 @@ namespace ARISP.Application.Services
             // Filter by JobPostingId if specified
             if (jobPostingId.HasValue)
             {
-                var appIds = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+                var appIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                         .QueryAsync(q => q.Where(a => a.JobPostingId == jobPostingId.Value).Select(a => a.Id), ct))
                     .ToHashSet();
                 evaluations = evaluations.Where(e => appIds.Contains(e.ApplicationId)).ToList();
@@ -114,7 +114,7 @@ namespace ARISP.Application.Services
             }
 
             var appIdsInEvals = paginatedEvals.Select(e => e.ApplicationId).Distinct().ToList();
-            var appDict = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var appDict = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                     .QueryAsync(q => q.Where(a => appIdsInEvals.Contains(a.Id)).Select(a => new EvalAppLite
                     {
                         Id = a.Id, JobPostingId = a.JobPostingId, CandidateName = a.CandidateName, CandidateEmail = a.CandidateEmail,
@@ -179,7 +179,7 @@ namespace ARISP.Application.Services
             if (evaluation == null)
                 return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
 
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<EvaluationDetailResponse>("Application associated with this evaluation was not found.");
 
@@ -196,7 +196,7 @@ namespace ARISP.Application.Services
 
         public async Task<Result<List<EvaluationListItemResponse>>> GetEvaluationsByApplicationIdAsync(Guid applicationId, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Application not found.");
 

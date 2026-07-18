@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     /// <summary>
     /// Việc làm được ứng viên lưu (bookmark) trên Job Board. Quan hệ N-N giữa

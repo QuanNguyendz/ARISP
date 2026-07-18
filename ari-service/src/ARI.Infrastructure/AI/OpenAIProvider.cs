@@ -8,20 +8,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
-using ARISP.Infrastructure.Data;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
+using ARI.Infrastructure.Data;
 
-namespace ARISP.Infrastructure.AI
+namespace ARI.Infrastructure.AI
 {
     public class OpenAIProvider : IAIProvider, IEmbeddingProvider
     {
-        private readonly ARISPDbContext _context;
+        private readonly AriDbContext _context;
         private readonly HttpClient _httpClient;
         private readonly string? _apiKey;
         private readonly bool _useLocalMock;
 
-        public OpenAIProvider(ARISPDbContext context, IConfiguration configuration, HttpClient httpClient)
+        public OpenAIProvider(AriDbContext context, IConfiguration configuration, HttpClient httpClient)
         {
             _context = context;
             _httpClient = httpClient;

@@ -1,7 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     /// <summary>
     /// Service to parse document text from CVs or Job Descriptions (PDF, DOCX, TXT).

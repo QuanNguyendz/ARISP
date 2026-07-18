@@ -1,13 +1,13 @@
-using ARISP.Infrastructure.Data;
+using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ARISP.Infrastructure.Migrations
+namespace ARI.Infrastructure.Migrations
 {
-    [DbContext(typeof(ARISPDbContext))]
+    [DbContext(typeof(AriDbContext))]
     [Migration("20260620060000_AddCandidateSettings")]
     public partial class AddCandidateSettings : Migration
     {

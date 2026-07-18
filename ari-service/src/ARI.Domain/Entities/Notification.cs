@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     /// <summary>
     /// Thông báo cho ứng viên HOẶC nhân sự nội bộ (HR Admin / Recruiter / Super Admin).

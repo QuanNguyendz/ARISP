@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using ARISP.Domain.Entities;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     /// <summary>
     /// DTO đại diện cho yêu cầu tạo một Job Posting (tin tuyển dụng) mới, kèm theo cấu hình các vòng phỏng vấn.

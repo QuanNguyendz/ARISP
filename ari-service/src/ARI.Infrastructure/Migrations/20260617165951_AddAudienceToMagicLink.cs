@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace ARISP.Infrastructure.Migrations
+namespace ARI.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddAudienceToMagicLink : Migration

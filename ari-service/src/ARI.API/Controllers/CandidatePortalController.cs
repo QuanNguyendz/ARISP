@@ -11,12 +11,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Application.Services;
-using ARISP.Domain.Entities;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Application.Services;
+using ARI.Domain.Entities;
 
-namespace ARISP.API.Controllers
+namespace ARI.API.Controllers
 {
     /// <summary>Form nộp hồ sơ ứng tuyển qua Job Board (multipart). CvFile tùy chọn — không có thì dùng CV hồ sơ.</summary>
     public class PortalApplyFormRequest
@@ -48,7 +48,7 @@ namespace ARISP.API.Controllers
         private readonly ApplicationService _applicationService;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly INotificationService _notificationService;
-        private readonly ARISP.Application.Options.InterviewOptions _interviewOptions;
+        private readonly ARI.Application.Options.InterviewOptions _interviewOptions;
 
         // Trạng thái phân tích CV-JD đang chạy nền (key = "{jobId}:{cvHash}"). Dùng cho lỗi AI
         // (không ghi row vào DB) để poll biết được kết quả thất bại. Kết quả thành công nằm ở DB cache.
@@ -68,7 +68,7 @@ namespace ARISP.API.Controllers
             ApplicationService applicationService,
             IServiceScopeFactory scopeFactory,
             INotificationService notificationService,
-            ARISP.Application.Options.InterviewOptions? interviewOptions = null)
+            ARI.Application.Options.InterviewOptions? interviewOptions = null)
         {
             _unitOfWork = unitOfWork;
             _geminiProvider = geminiProvider;
@@ -78,7 +78,7 @@ namespace ARISP.API.Controllers
             _applicationService = applicationService;
             _scopeFactory = scopeFactory;
             _notificationService = notificationService;
-            _interviewOptions = interviewOptions ?? new ARISP.Application.Options.InterviewOptions();
+            _interviewOptions = interviewOptions ?? new ARI.Application.Options.InterviewOptions();
         }
 
         /// <summary>
@@ -191,14 +191,14 @@ namespace ARISP.API.Controllers
                             _matchJobs.TryRemove(key, out _);
                             
                             var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                            var notifRepo = uow.Repository<ARISP.Domain.Entities.Notification>();
+                            var notifRepo = uow.Repository<ARI.Domain.Entities.Notification>();
                             var dedupKey = $"ai_analysis:{jobPostingId}";
                             
                             var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == candidateId && n.DedupKey == dedupKey, CancellationToken.None);
                             var existingNotif = existingNotifs.FirstOrDefault();
                             if (existingNotif == null)
                             {
-                                var newNotif = new ARISP.Domain.Entities.Notification
+                                var newNotif = new ARI.Domain.Entities.Notification
                                 {
                                     CandidateAccountId = candidateId,
                                     DedupKey = dedupKey,
@@ -517,7 +517,7 @@ namespace ARISP.API.Controllers
                 return BadRequest(new { message = "Vui lòng nhập thời gian báo trước khi nghỉ việc." });
 
             // Chặn ứng tuyển trùng (đã có hồ sơ chưa rút cho tin này).
-            var existing = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var existing = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .FindAsync(a => a.JobPostingId == jobPostingId && a.CandidateAccountId == candidateId, ct))
                 .Where(a => a.Status != "withdrawn")
                 .OrderByDescending(a => a.CreatedAt)
@@ -751,7 +751,7 @@ namespace ARISP.API.Controllers
             if (acc == null)
                 return Unauthorized(new { message = "Không tìm thấy tài khoản ứng viên." });
 
-            var apps = (await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var apps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .FindAsync(a => a.CandidateAccountId == candidateId, ct)).ToList();
             var jobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
             var jobs = (await _unitOfWork.Repository<JobPosting>().FindAsync(j => jobIds.Contains(j.Id), ct))
@@ -821,7 +821,7 @@ namespace ARISP.API.Controllers
         /// </summary>
         private async Task SyncNotificationsAsync(Guid candidateId, CancellationToken ct)
         {
-            var apps = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var apps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Where(a => a.CandidateAccountId == candidateId)
                     .Select(a => new { a.Id, a.JobPostingId, a.CreatedAt }), ct);
             if (apps.Count == 0) return;
@@ -950,7 +950,7 @@ namespace ARISP.API.Controllers
             }
 
             // Hồ sơ của ứng viên — projection nhẹ (KHÔNG kéo CvText/CoverLetter/DemographicData lớn).
-            var appsList = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var appsList = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
                     .Where(a => a.CandidateAccountId == candidateAccountId)
                     .Select(a => new
@@ -1135,7 +1135,7 @@ namespace ARISP.API.Controllers
 
             var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
 
-            var app = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(id);
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(id);
             if (app == null)
             {
                 return NotFound(new { message = "Không tìm thấy hồ sơ ứng tuyển." });
@@ -1147,7 +1147,7 @@ namespace ARISP.API.Controllers
                 string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase))
             {
                 app.CandidateAccountId = candidateAccountId;
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(app);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
                 await _unitOfWork.SaveChangesAsync();
                 isOwner = true;
             }
@@ -1300,7 +1300,7 @@ namespace ARISP.API.Controllers
                 return NotFound(new { message = "Không tìm thấy buổi phỏng vấn." });
             }
 
-            var app = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId);
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId);
             if (app == null)
             {
                 return NotFound(new { message = "Không tìm thấy hồ sơ ứng tuyển liên quan." });
@@ -1314,7 +1314,7 @@ namespace ARISP.API.Controllers
                 string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase))
             {
                 app.CandidateAccountId = candidateAccountId;
-                _unitOfWork.Repository<ARISP.Domain.Entities.Application>().Update(app);
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
                 await _unitOfWork.SaveChangesAsync();
                 isOwner = true;
             }

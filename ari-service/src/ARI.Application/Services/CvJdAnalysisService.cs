@@ -3,11 +3,11 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
-namespace ARISP.Application.Services
+using ARI.Application.Common;
+using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
+namespace ARI.Application.Services
 {
     public class CvJdAnalysisService
     {
@@ -154,7 +154,7 @@ Scoring Rubric: {jobPosting.ScoringRubric ?? "Sử dụng trọng số chuẩn: 
 
         public async Task<Result<CvJdAnalysis>> GetAnalysisByApplicationIdAsync(Guid applicationId, CancellationToken ct = default)
         {
-            var application = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null || application.CvJdAnalysisId == null)
                 return Result.Failure<CvJdAnalysis>("Không tìm thấy bản đánh giá cho đơn ứng tuyển này.");
 
@@ -163,7 +163,7 @@ Scoring Rubric: {jobPosting.ScoringRubric ?? "Sử dụng trọng số chuẩn: 
 
         public async Task<bool> CheckCandidateOwnershipAsync(Guid cvAnalysisId, Guid candidateAccountId, CancellationToken ct = default)
         {
-            var applications = await _unitOfWork.Repository<ARISP.Domain.Entities.Application>()
+            var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .FindAsync(a => a.CvJdAnalysisId == cvAnalysisId && a.CandidateAccountId == candidateAccountId, ct);
             return System.Linq.Enumerable.Any(applications);
         }

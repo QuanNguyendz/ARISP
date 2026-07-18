@@ -1,6 +1,6 @@
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     public class DocumentChunk
     {

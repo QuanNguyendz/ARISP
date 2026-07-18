@@ -1,9 +1,9 @@
 using System;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Services
+namespace ARI.Infrastructure.Services
 {
     public class CurrentUserService : ICurrentUserService
     {

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     /// <summary>
     /// Fallback ingestion CHẠY TRONG TIẾN TRÌNH .NET — dùng khi AI:Provider != "rag"

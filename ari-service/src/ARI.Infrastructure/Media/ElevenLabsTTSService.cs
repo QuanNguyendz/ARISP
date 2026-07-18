@@ -5,9 +5,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Media
+namespace ARI.Infrastructure.Media
 {
     /// <summary>
     /// TTS qua ElevenLabs Flash v2.5 (ADR-005/043). Trả MP3 stream cho luồng không-avatar

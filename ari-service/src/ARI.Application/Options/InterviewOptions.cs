@@ -1,4 +1,4 @@
-namespace ARISP.Application.Options
+namespace ARI.Application.Options
 {
     /// <summary>Cấu hình nghiệp vụ phỏng vấn. Bind từ section "Interview" (Program.cs).</summary>
     public class InterviewOptions

@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
-using ARISP.Domain.Entities;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     public class PlaybookService
     {

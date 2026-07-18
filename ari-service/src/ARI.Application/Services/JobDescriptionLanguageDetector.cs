@@ -3,7 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace ARISP.Application.Services
+namespace ARI.Application.Services
 {
     /// <summary>
     /// Minimal language stub: counts Latin/English tokens in JD; majority English → "en", else "vi".

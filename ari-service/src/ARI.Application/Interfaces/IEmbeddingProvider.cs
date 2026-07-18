@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Domain.Entities;
+using ARI.Domain.Entities;
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     public interface IEmbeddingProvider
     {

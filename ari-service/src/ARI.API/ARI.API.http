@@ -1,6 +1,6 @@
-@ARISP.API_HostAddress = http://localhost:5102
+@ARI.API_HostAddress = http://localhost:5102
 
-GET {{ARISP.API_HostAddress}}/weatherforecast/
+GET {{ARI.API_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ARISP.Application.DTOs
+namespace ARI.Application.DTOs
 {
     /// <summary>
     /// Một bước trong phễu tuyển dụng (label + số lượng).

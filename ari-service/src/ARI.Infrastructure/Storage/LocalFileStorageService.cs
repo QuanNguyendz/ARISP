@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Interfaces;
+using ARI.Application.Interfaces;
 
-namespace ARISP.Infrastructure.Storage
+namespace ARI.Infrastructure.Storage
 {
     /// <summary>
     /// Lưu file vào thư mục "uploads" trên đĩa local — dùng cho môi trường dev.
