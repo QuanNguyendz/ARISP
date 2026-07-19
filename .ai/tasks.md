@@ -303,6 +303,11 @@
 
 ## Completed
 
+- [x] 2026-07-19: **Refactor Phase 3 — Hợp nhất raw SQL bootstrap vào EF migration `ReconcileStartupBootstrap`.**
+  - `OnModelCreating` thêm 16 `HasIndex(...).HasDatabaseName(...)` khớp đúng tên index bootstrap (13 perf + 2 invite + partial unique `ux_interview_bookings_app_round_scheduled` filter `status='scheduled'`); model giờ chứa `InterviewInvite` + 4 cột approval mà snapshot trước đây thiếu.
+  - Migration `Up()/Down()` viết bằng `migrationBuilder.Sql(...)` idempotent (`IF NOT EXISTS`/`IF EXISTS`) thay vì scaffold ops — an toàn trên DB đã bootstrap đầy đủ/dở dang/trống. Bonus: hợp nhất index trùng `"IX_applications_cv_jd_analysis_id"` (EF default từ AddCvJdAnalyses) với bản lowercase của bootstrap — giữ 1 bản.
+  - Xoá toàn bộ khối raw SQL khỏi `AriDbContextInitialiser` — schema từ nay 100% do migrations sở hữu. Verify: scaffold thử ra migration RỖNG (model = snapshot), boot dev DB áp đúng 1 migration không warning, boot lần 2 "already up to date", swagger diff = rỗng, GET /api/jobs 200.
+
 - [x] 2026-07-18: **Refactor Phase 2 — DI decomposition theo JT template: `Program.cs` 521 → 62 dòng.**
   - Tạo `ARI.Application/DependencyInjection.cs` (`AddApplication`: InterviewOptions + 6 app services), `ARI.Infrastructure/DependencyInjection.cs` (`AddInfrastructure`: DbContext + Npgsql pooling, UoW, AI provider switch rag/openai, storage switch Local/S3, media real-vs-mock, email queue + hosted service), `ARI.API/DependencyInjection.cs` (`AddWebServices`: swagger, SignalR, JWT + External cookie + Google, 4 authorization policies, CORS, ForwardedHeaders, `INotificationService`).
   - `AriDbContextInitialiser` (Infrastructure/Data): migrate-retry 3 lần + raw SQL bootstrap move verbatim (sẽ xoá ở Phase 3); Program gọi qua `app.InitialiseDatabaseAsync()`. Thêm `ValidateScopes/ValidateOnBuild` (Development) bắt DI miss lúc boot.

@@ -219,6 +219,46 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<MagicLink>()
                 .Property(m => m.Audience)
                 .HasDefaultValue(MagicLinkAudience.Candidate);
+
+            // Index cho các cột lọc nóng — tên khớp đúng index đã tạo bởi startup bootstrap cũ
+            // (nay là migration ReconcileStartupBootstrap) để snapshot hội tụ với schema DB thật.
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasIndex(a => a.CandidateAccountId).HasDatabaseName("ix_applications_candidate_account_id");
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasIndex(a => a.CandidateEmail).HasDatabaseName("ix_applications_candidate_email");
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasIndex(a => a.JobPostingId).HasDatabaseName("ix_applications_job_posting_id");
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasIndex(a => a.CvJdAnalysisId).HasDatabaseName("ix_applications_cv_jd_analysis_id");
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.CandidateAccountId).HasDatabaseName("ix_notifications_candidate_account_id");
+            modelBuilder.Entity<SavedJob>()
+                .HasIndex(s => s.CandidateAccountId).HasDatabaseName("ix_saved_jobs_candidate_account_id");
+            modelBuilder.Entity<InterviewSession>()
+                .HasIndex(s => s.ApplicationId).HasDatabaseName("ix_interview_sessions_application_id");
+            modelBuilder.Entity<Evaluation>()
+                .HasIndex(e => e.SessionId).HasDatabaseName("ix_evaluations_session_id");
+            modelBuilder.Entity<Evaluation>()
+                .HasIndex(e => e.ApplicationId).HasDatabaseName("ix_evaluations_application_id");
+            modelBuilder.Entity<HrReview>()
+                .HasIndex(h => h.EvaluationId).HasDatabaseName("ix_hr_reviews_evaluation_id");
+            modelBuilder.Entity<InterviewCode>()
+                .HasIndex(c => c.ApplicationId).HasDatabaseName("ix_interview_codes_application_id");
+            modelBuilder.Entity<InterviewBooking>()
+                .HasIndex(b => b.ApplicationId).HasDatabaseName("ix_interview_bookings_application_id");
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => j.CreatedByUserId).HasDatabaseName("ix_job_postings_created_by_user_id");
+            modelBuilder.Entity<InterviewInvite>()
+                .HasIndex(i => i.ApplicationId).HasDatabaseName("ix_interview_invites_application_id");
+            modelBuilder.Entity<InterviewInvite>()
+                .HasIndex(i => i.TokenHash).HasDatabaseName("ix_interview_invites_token_hash");
+
+            // Chống đặt trùng: tối đa 1 booking 'scheduled' / (hồ sơ, vòng).
+            modelBuilder.Entity<InterviewBooking>()
+                .HasIndex(b => new { b.ApplicationId, b.RoundNumber })
+                .IsUnique()
+                .HasFilter("status = 'scheduled'")
+                .HasDatabaseName("ux_interview_bookings_app_round_scheduled");
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
