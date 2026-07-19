@@ -303,6 +303,11 @@
 
 ## Completed
 
+- [x] 2026-07-19: **Refactor Phase 6 (Wave B) — Admin + AccountRequests sang CQRS (17 endpoints).**
+  - `ARI.Application/Admin/`: 6 queries (PendingUsers, Users paged, AdminStats, AuditLogs, SystemSettings, AccountRequests) + 8 commands (ApproveUser, CreateStaffUser, UpdateUserRole, Deactivate/Activate/DeleteUser, UpdateSystemSettings, Approve/RejectAccountRequest). `AdminSupport` (GenerateTemporaryPassword, WriteAuditAsync không SaveChanges, SendStaffWelcomeEmailAsync best-effort) — chuyển verbatim từ private helpers.
+  - `ARI.Application/AccountRequests/` (phía HR Leader): GetMyAccountRequests + CreateAccountRequests (batch, validate từng item, chặn trùng, conflict 409). `CommonErrorCodes` (not_found/conflict) cho mapping 404/409. Request classes (CreateStaffUserRequest, UpdateSettingItem...) move sang Application giữ nguyên tên — schema swagger không đổi. Temp-password hash qua `IPasswordHasher`. ActorId từ claims truyền qua command.
+  - Verify: build 0 lỗi, swagger diff = rỗng, smoke 14 cases dữ liệu thật (stats/users/audit/settings shape camelCase đúng, 404/400/409 + message verbatim, thứ tự guard giữ nguyên).
+
 - [x] 2026-07-19: **Refactor Phase 5 (Wave A) — Auth: `AuthController` 1107 → ~450 dòng thin controller, 15 commands + 1 query.**
   - `ARI.Application/Auth/`: CandidateLogin, StaffLogin, CompleteExternalStaffSignIn (domain validate + pre-provisioning check), CompleteExternalCandidateSignIn (JIT provisioning), RefreshStaffToken, RefreshCandidateToken, Logout, RegisterCandidate, VerifyCandidateEmail, ResendCandidateVerification, VerifyMagicLink, CandidateForgotPassword, CandidateResetPassword, StaffForgotPassword, StaffResetPassword + GetCurrentUserQuery. `AuthSupport` (NormalizeEmail, IsStrongPassword, refresh-token issuance, verification email) + `AuthErrorCodes` + `Common/Security/TokenHashing` (SHA256).
   - `Result.ErrorCode` (additive) để controller map failure → đúng status cũ (401 invalid_credentials, 403+code email_not_verified, 404 not_found, redirect pending/rejected cho OAuth). BCrypt/JWT inline → `IPasswordHasher`/`ITokenService`. Google OAuth Challenge/Authenticate/SignOut/Redirect + `BuildRedirectUrl` ở lại controller (protocol, không phải business logic). RegisterCandidate KHÔNG dùng validator cho password — giữ đúng thứ tự check gốc (email trùng trước, độ mạnh sau).
