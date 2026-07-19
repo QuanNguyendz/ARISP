@@ -303,6 +303,13 @@
 
 ## Completed
 
+- [x] 2026-07-19: **Refactor Phase 4 — CQRS plumbing (MediatR + FluentValidation) + pilot StaffNotifications & Evaluations.**
+  - Packages: MediatR **pin cứng [12.5.0]** (bản Apache-2.0 cuối — v13+ commercial), FluentValidation.DependencyInjectionExtensions 11.11.0, Microsoft.EntityFrameworkCore 8.0.4 vào ARI.Application (cho LINQ extension trong handler, giống JT); BCrypt.Net-Next + System.IdentityModel.Tokens.Jwt vào Infrastructure. KHÔNG AutoMapper (v15 commercial + projection thủ công là load-bearing).
+  - 4 pipeline Behaviours (`Common/Behaviours/`): UnhandledException → Logging (pre-processor) → **Validation trả `Result.Failure` thay vì throw** (deviation JT có chủ đích — giữ Result Pattern + body 400 y hệt) → Performance (warn >500ms).
+  - `ITokenService`/`IPasswordHasher` (Application/Interfaces) + `Infrastructure/Identity/{JwtTokenService,BcryptPasswordHasher}` — logic mint JWT copy verbatim từ AuthController (HS256, 7 ngày, map role legacy), sẵn cho Wave A.
+  - Pilot: **Evaluations** (4 endpoints → 3 queries, XÓA `EvaluationService`; DTO move vào `Evaluations/`) + **StaffNotifications** (5 endpoints → 1 query + 4 commands, logic sync DedupKey move verbatim). Controllers chỉ còn guard HTTP + `ISender.Send` + mapping Result→ActionResult copy đúng shape cũ.
+  - Verify: build 0 lỗi, swagger diff = rỗng, smoke 9 endpoints bằng JWT super_admin tự mint — body/status y hệt (items/unreadCount camelCase, 404 message, validation strings verbatim, danh sách evaluations dữ liệu thật OK).
+
 - [x] 2026-07-19: **Refactor Phase 3 — Hợp nhất raw SQL bootstrap vào EF migration `ReconcileStartupBootstrap`.**
   - `OnModelCreating` thêm 16 `HasIndex(...).HasDatabaseName(...)` khớp đúng tên index bootstrap (13 perf + 2 invite + partial unique `ux_interview_bookings_app_round_scheduled` filter `status='scheduled'`); model giờ chứa `InterviewInvite` + 4 cột approval mà snapshot trước đây thiếu.
   - Migration `Up()/Down()` viết bằng `migrationBuilder.Sql(...)` idempotent (`IF NOT EXISTS`/`IF EXISTS`) thay vì scaffold ops — an toàn trên DB đã bootstrap đầy đủ/dở dang/trống. Bonus: hợp nhất index trùng `"IX_applications_cv_jd_analysis_id"` (EF default từ AddCvJdAnalyses) với bản lowercase của bootstrap — giữ 1 bản.

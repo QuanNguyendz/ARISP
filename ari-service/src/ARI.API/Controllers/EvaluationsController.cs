@@ -3,8 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using ARI.Application.DTOs;
-using ARI.Application.Services;
+using ARI.Application.Evaluations.Queries.GetEvaluationDetail;
+using ARI.Application.Evaluations.Queries.GetEvaluations;
+using ARI.Application.Evaluations.Queries.GetEvaluationsByApplication;
+using MediatR;
 
 namespace ARI.API.Controllers
 {
@@ -13,11 +15,11 @@ namespace ARI.API.Controllers
     [Authorize(Policy = "InternalStaff")]
     public class EvaluationsController : ControllerBase
     {
-        private readonly EvaluationService _evaluationService;
+        private readonly ISender _sender;
 
-        public EvaluationsController(EvaluationService evaluationService)
+        public EvaluationsController(ISender sender)
         {
-            _evaluationService = evaluationService;
+            _sender = sender;
         }
 
         [HttpGet]
@@ -53,7 +55,7 @@ namespace ARI.API.Controllers
                 }
             }
 
-            var result = await _evaluationService.GetEvaluationsAsync(jobPostingId, status, page, pageSize, ct);
+            var result = await _sender.Send(new GetEvaluationsQuery(jobPostingId, status, page, pageSize), ct);
             if (result.IsFailure)
             {
                 return BadRequest($"Đã xảy ra lỗi hệ thống khi tải danh sách đánh giá: {result.Error}");
@@ -70,7 +72,7 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã ID báo cáo đánh giá hoặc mã phiên phỏng vấn không được phép là Guid rỗng.");
             }
 
-            var result = await _evaluationService.GetEvaluationDetailAsync(id, ct);
+            var result = await _sender.Send(new GetEvaluationDetailQuery(id), ct);
             if (result.IsFailure)
             {
                 return NotFound($"Không tìm thấy báo cáo đánh giá hoặc phiên phỏng vấn có mã ID tương ứng: {id}");
@@ -87,7 +89,7 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã phiên phỏng vấn (sessionId) không được phép là Guid rỗng.");
             }
 
-            var result = await _evaluationService.GetEvaluationDetailAsync(sessionId, ct);
+            var result = await _sender.Send(new GetEvaluationDetailQuery(sessionId), ct);
             if (result.IsFailure)
             {
                 return NotFound($"Không tìm thấy báo cáo đánh giá nào thuộc về phiên phỏng vấn (sessionId): {sessionId}");
@@ -104,7 +106,7 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã hồ sơ ứng tuyển (applicationId) không được phép là Guid rỗng.");
             }
 
-            var result = await _evaluationService.GetEvaluationsByApplicationIdAsync(applicationId, ct);
+            var result = await _sender.Send(new GetEvaluationsByApplicationQuery(applicationId), ct);
             if (result.IsFailure)
             {
                 return BadRequest($"Không thể tải danh sách đánh giá cho hồ sơ ứng tuyển (applicationId): {result.Error}");

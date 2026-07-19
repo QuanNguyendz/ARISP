@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
+using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Options;
 using ARI.Domain.Entities;

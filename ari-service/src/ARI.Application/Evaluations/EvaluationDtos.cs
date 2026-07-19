@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ARI.Domain.Entities;
 
-namespace ARI.Application.DTOs
+namespace ARI.Application.Evaluations
 {
     public class ConfirmReviewRequest
     {

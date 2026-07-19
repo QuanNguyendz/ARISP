@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ARI.Application.DTOs;
+using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Services;
 using ARI.Domain.Entities;

@@ -7,14 +7,22 @@ using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
+using MediatR;
 
-namespace ARI.Application.Services
+namespace ARI.Application.Evaluations.Queries.GetEvaluations
 {
-    public class EvaluationService
+    public record GetEvaluationsQuery(
+        Guid? JobPostingId,
+        string? Status,
+        int Page,
+        int PageSize) : IRequest<Result<PaginatedResponse<EvaluationListItemResponse>>>;
+
+    public class GetEvaluationsQueryHandler
+        : IRequestHandler<GetEvaluationsQuery, Result<PaginatedResponse<EvaluationListItemResponse>>>
     {
         private readonly IUnitOfWork _unitOfWork;
 
-        public EvaluationService(IUnitOfWork unitOfWork)
+        public GetEvaluationsQueryHandler(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
         }
@@ -46,13 +54,11 @@ namespace ARI.Application.Services
             public string CandidateEmail { get; set; } = string.Empty;
         }
 
-        public async Task<Result<PaginatedResponse<EvaluationListItemResponse>>> GetEvaluationsAsync(
-            Guid? jobPostingId,
-            string? status,
-            int page,
-            int pageSize,
-            CancellationToken ct = default)
+        public async Task<Result<PaginatedResponse<EvaluationListItemResponse>>> Handle(
+            GetEvaluationsQuery request, CancellationToken ct)
         {
+            var (jobPostingId, status, page, pageSize) = (request.JobPostingId, request.Status, request.Page, request.PageSize);
+
             List<EvalLite> evaluations = await _unitOfWork.Repository<Evaluation>()
                 .QueryAsync(q => q.Select(e => new EvalLite
                 {
@@ -162,61 +168,6 @@ namespace ARI.Application.Services
                 PageSize = pageSize,
                 TotalPages = (int)Math.Ceiling((double)totalItems / pageSize)
             });
-        }
-
-        public async Task<Result<EvaluationDetailResponse>> GetEvaluationDetailAsync(Guid id, CancellationToken ct = default)
-        {
-            // First check by evaluation ID
-            var evaluation = await _unitOfWork.Repository<Evaluation>().GetByIdAsync(id, ct);
-            
-            // If not found, try search by SessionId
-            if (evaluation == null)
-            {
-                var evals = await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.SessionId == id, ct);
-                evaluation = evals.FirstOrDefault();
-            }
-
-            if (evaluation == null)
-                return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
-
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
-            if (application == null)
-                return Result.Failure<EvaluationDetailResponse>("Application associated with this evaluation was not found.");
-
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
-            if (job == null)
-                return Result.Failure<EvaluationDetailResponse>("Job posting associated with this evaluation was not found.");
-
-            var hrReviews = await _unitOfWork.Repository<HrReview>().FindAsync(r => r.EvaluationId == evaluation.Id, ct);
-            var hrReview = hrReviews.FirstOrDefault();
-
-            var response = EvaluationDetailResponse.FromEntity(evaluation, application, job, hrReview);
-            return Result.Success(response);
-        }
-
-        public async Task<Result<List<EvaluationListItemResponse>>> GetEvaluationsByApplicationIdAsync(Guid applicationId, CancellationToken ct = default)
-        {
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
-            if (application == null)
-                return Result.Failure<List<EvaluationListItemResponse>>("Application not found.");
-
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
-            if (job == null)
-                return Result.Failure<List<EvaluationListItemResponse>>("Job posting associated with this application was not found.");
-
-            var evaluations = (await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.ApplicationId == applicationId, ct)).ToList();
-            var evalIds = evaluations.Select(e => e.Id).ToList();
-            // Chỉ lấy HrReview của các đánh giá thuộc hồ sơ này (không quét toàn bảng).
-            var hrDict = (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId), ct))
-                .ToDictionary(r => r.EvaluationId);
-
-            var responseList = evaluations.Select(e =>
-            {
-                hrDict.TryGetValue(e.Id, out var hr);
-                return EvaluationListItemResponse.FromEntity(e, application, job, hr);
-            }).ToList();
-
-            return Result.Success(responseList);
         }
     }
 }

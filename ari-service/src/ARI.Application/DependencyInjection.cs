@@ -1,5 +1,8 @@
+using System.Reflection;
+using ARI.Application.Common.Behaviours;
 using ARI.Application.Options;
 using ARI.Application.Services;
+using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,13 +18,24 @@ namespace ARI.Application
             configuration.GetSection("Interview").Bind(interviewOptions);
             services.AddSingleton(interviewOptions);
 
-            // Application Services
+            // CQRS: MediatR pipeline (thứ tự đăng ký = thứ tự chạy) + FluentValidation validators.
+            services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+            services.AddMediatR(cfg =>
+            {
+                cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
+                cfg.AddOpenBehavior(typeof(UnhandledExceptionBehaviour<,>));
+                cfg.AddOpenRequestPreProcessor(typeof(LoggingBehaviour<>));
+                cfg.AddOpenBehavior(typeof(ValidationBehaviour<,>));
+                cfg.AddOpenBehavior(typeof(PerformanceBehaviour<,>));
+            });
+
+            // Application Services dùng chung (nhiều consumer hoặc hub gọi trực tiếp).
+            // Service 1-consumer đang được absorb dần vào handlers theo từng wave CQRS.
             services.AddScoped<PlaybookService>();
             services.AddScoped<ApplicationService>();
             services.AddScoped<CvJdAnalysisService>();
             services.AddScoped<InterviewService>();
             services.AddScoped<InterviewCodeService>();
-            services.AddScoped<EvaluationService>();
 
             return services;
         }

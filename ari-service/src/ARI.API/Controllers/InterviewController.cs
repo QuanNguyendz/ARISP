@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using ARI.Application.DTOs;
+using ARI.Application.Evaluations;
 using ARI.Application.Services;
 
 namespace ARI.API.Controllers

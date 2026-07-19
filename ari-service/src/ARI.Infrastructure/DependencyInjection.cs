@@ -51,6 +51,10 @@ namespace ARI.Infrastructure
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+            // Identity helpers — mint JWT + hash mật khẩu (tách khỏi controllers, ADR refactor CQRS).
+            services.AddScoped<ITokenService, Identity.JwtTokenService>();
+            services.AddSingleton<IPasswordHasher, Identity.BcryptPasswordHasher>();
+
             // AI provider switch (ADR-039): "rag" -> microservice Python (RagServiceProvider);
             // "openai" | "local" -> OpenAIProvider in-process (fallback, không khoá cứng vào Python).
             var aiProvider = configuration["AI:Provider"]
