@@ -14,7 +14,7 @@
 
 ## Đang làm (In Progress)
 
-- [ ] **Refactor backend → Clean Architecture (JT template) + CQRS/MediatR** — branch `refactor/be/clean-architecture`. Đã xong: Phase 1 (rename `backend/`→`ari-service/` src-layout, `ARISP.*`→`ARI.*`). Còn: DI decomposition, migration reconciliation, CQRS waves (14 controllers → ~110 commands/queries), tests skeleton.
+_Chưa có task nào đang thực hiện._
 
 ---
 
@@ -302,6 +302,12 @@
 ---
 
 ## Completed
+
+- [x] 2026-07-19: **Refactor Phase 10 (close-out) — tests skeleton + ADR-045 + cập nhật docs. HOÀN TẤT refactor Clean Architecture.**
+  - `ari-service/tests/`: `ARI.Domain.UnitTests` (3 tests — chốt cứng AppRoles values + entity defaults) + `ARI.Application.UnitTests` (11 tests — ValidationBehaviour trả Result.Failure không throw, TokenHashing 2 format Base64/Hex với known vectors, StaffLoginCommandValidator message verbatim). `dotnet test`: **14/14 pass**. Đã add vào `ARI.sln` (solution folder `tests`).
+  - Docs: ADR-045 đầy đủ trong `.ai/architecture.md` (quyết định + deviations + follow-ups); CLAUDE.md thêm dòng ADR-045; skill `arisp-feature` viết lại bước 3–4 theo pattern CQRS (Command/Handler/Validator + thin controller + ErrorCode mapping).
+  - Gate cuối: build 0 lỗi 0 warning (tests), swagger.json diff = RỖNG so baseline Phase 0 (98 paths), inventory `[Authorize]` IDENTICAL (41 attributes: 23 InternalStaff / 8 CandidateOnly / 6 bare / 3 HrManagement / 1 SuperAdminOnly), SignalR negotiate 401 không đổi.
+  - Còn lại cho user: (1) chạy practice interview E2E xác nhận SessionHub (đổi `InterviewService` → `IInterviewService`); (2) `docker compose build backend` khi bật Docker Desktop (path Dockerfile đã sửa src/ layout); (3) follow-up tùy chọn — dissolve `ApplicationService`, tách `IEntityTypeConfiguration`, move DTOs/ vào feature folders.
 
 - [x] 2026-07-19: **Refactor Phase 9 (Wave E) — CandidatePortal + Interviews sang CQRS (35 endpoints; CandidatePortalController 1666 → ~430 dòng).**
   - `IInterviewService` + `IInterviewCodeService` mới; **SessionHub đổi sang `IInterviewService`** (chỉ đổi type constructor — hub vẫn gọi TRỰC TIẾP service, KHÔNG qua MediatR pipeline để giữ latency ADR-006). `ARI.Application/Interviews/`: 11 thin delegate handlers (codes + sessions + HR review confirm).
