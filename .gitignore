@@ -66,8 +66,8 @@ _ReSharper*/
 *.env.local
 docker/.env
 !docker/.env.example
-frontend/.env
-!frontend/.env.example
+ari-web/src/*/.env
+!ari-web/src/*/.env.example
 supabase/.env.keys
 
 # Google OAuth credentials for MCP (Docs/Drive) – NEVER commit

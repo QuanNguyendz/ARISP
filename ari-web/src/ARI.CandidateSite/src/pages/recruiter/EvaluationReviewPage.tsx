@@ -24,7 +24,7 @@ export default function RecruiterEvaluationReviewPage() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       setLoading(true)
       setError('')
       try {

@@ -26,7 +26,7 @@ export default function RecruiterInterviewSessionsPage() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       setLoading(true)
       setError('')
       try {

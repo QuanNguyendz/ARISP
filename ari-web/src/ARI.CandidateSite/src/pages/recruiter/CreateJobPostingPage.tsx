@@ -60,7 +60,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
   useEffect(() => {
     if (mode === 'edit' && jobId) {
-      ;(async () => {
+      (async () => {
         try {
           setLoading(true)
           const job: JobPosting = await jobService.getJobPostingById(jobId)

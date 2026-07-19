@@ -29,7 +29,7 @@ export default function SuperAdminSettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       setLoading(true)
       setError('')
       try {
