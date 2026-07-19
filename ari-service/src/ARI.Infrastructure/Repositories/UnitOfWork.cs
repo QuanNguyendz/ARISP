@@ -1,0 +1,59 @@
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
+using ARI.Application.Interfaces;
+using ARI.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace ARI.Infrastructure.Repositories
+{
+    public class UnitOfWork : IUnitOfWork
+    {
+        private readonly AriDbContext _context;
+        private readonly ConcurrentDictionary<string, object> _repositories;
+        private bool _disposed;
+
+        public UnitOfWork(AriDbContext context)
+        {
+            _context = context;
+            _repositories = new ConcurrentDictionary<string, object>();
+        }
+
+        public IRepository<T> Repository<T>() where T : class
+        {
+            var type = typeof(T).Name;
+
+            return (IRepository<T>)_repositories.GetOrAdd(type, _ => 
+                new Repository<T>(_context));
+        }
+
+        public async Task<int> SaveChangesAsync(CancellationToken ct = default)
+        {
+            return await _context.SaveChangesAsync(ct);
+        }
+
+        public async Task<int> ExecuteSqlRawAsync(string sql, object[] parameters, CancellationToken ct = default)
+        {
+            return await _context.Database.ExecuteSqlRawAsync(sql, parameters, ct);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _context.Dispose();
+                }
+                _disposed = true;
+            }
+        }
+    }
+}

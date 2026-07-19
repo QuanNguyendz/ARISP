@@ -7,7 +7,7 @@ services:
   # --- ASP.NET Core Backend ---
   backend:
     build:
-      context: ../backend
+      context: ../ari-service
       dockerfile: ../docker/backend/Dockerfile
       target: development
     container_name: arisp-backend
@@ -21,7 +21,7 @@ services:
       # ADR-039: chọn RAG microservice Python. Đặt AI_PROVIDER=rag để dùng service Python.
       - RAG_SERVICE_URL=http://rag-service:8000
     volumes:
-      - ../backend:/app/src
+      - ../ari-service:/app/src
     depends_on:
       redis:
         condition: service_healthy

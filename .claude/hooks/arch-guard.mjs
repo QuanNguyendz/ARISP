@@ -42,7 +42,7 @@ if (isTs && /:\s*any\b|<any>|as any\b/.test(content)) {
   warnings.push("FE rule: tránh dùng `any` trong TypeScript.");
 }
 // Backend nghi vấn gọi thẳng OpenAI SDK thay vì IAIProvider.
-if (/backend\//.test(filePath) && /\bnew OpenAIClient\b|OpenAI\.GPT/i.test(content)) {
+if (/ari-service\//.test(filePath) && /\bnew OpenAIClient\b|OpenAI\.GPT/i.test(content)) {
   warnings.push("Rule #8: business logic không gọi trực tiếp OpenAI SDK — qua IAIProvider/IEmbeddingProvider.");
 }
 

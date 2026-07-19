@@ -2,12 +2,12 @@
 
 Copy-paste rồi đổi tên. Tất cả khớp với code hiện có trong repo (đã verify). Thay `Widget` bằng tên thật.
 
-## 1. Domain entity — `ARISP.Domain/Entities/Widget.cs`
+## 1. Domain entity — `ARI.Domain/Entities/Widget.cs`
 
 ```csharp
 using System;
 
-namespace ARISP.Domain.Entities
+namespace ARI.Domain.Entities
 {
     public class Widget : ISoftDelete
     {
@@ -23,25 +23,25 @@ namespace ARISP.Domain.Entities
 }
 ```
 
-## 2. EF mapping + migration (`ARISP.Infrastructure/Data/`)
+## 2. EF mapping + migration (`ARI.Infrastructure/Data/`)
 
-Đăng ký `DbSet<Widget>` và map table/cột `snake_case` trong cấu hình của `ARISPDbContext` (xem các entity khác trong `Data/`). Rồi:
+Đăng ký `DbSet<Widget>` và map table/cột `snake_case` trong cấu hình của `AriDbContext` (xem các entity khác trong `Data/`). Rồi:
 
 ```bash
-dotnet ef migrations add AddWidget -p ARISP.Infrastructure -s ARISP.API
-# Lưu ý: build migration FAIL nếu ARISP.API.exe đang chạy (file lock) — stop nó trước.
+dotnet ef migrations add AddWidget -p ari-service/src/ARI.Infrastructure -s ari-service/src/ARI.API
+# Lưu ý: build migration FAIL nếu ARI.API.exe đang chạy (file lock) — stop nó trước.
 ```
 
-## 3. Interface — `ARISP.Application/Interfaces/IWidgetService.cs`
+## 3. Interface — `ARI.Application/Interfaces/IWidgetService.cs`
 
 ```csharp
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using ARISP.Application.Common;
-using ARISP.Application.DTOs; // WidgetDto
+using ARI.Application.Common;
+using ARI.Application.DTOs; // WidgetDto
 
-namespace ARISP.Application.Interfaces
+namespace ARI.Application.Interfaces
 {
     public interface IWidgetService
     {
@@ -51,7 +51,7 @@ namespace ARISP.Application.Interfaces
 }
 ```
 
-## 4. Service — `ARISP.Application/Services/WidgetService.cs`
+## 4. Service — `ARI.Application/Services/WidgetService.cs`
 
 ```csharp
 public class WidgetService : IWidgetService
@@ -96,7 +96,7 @@ var items = await _unitOfWork.Repository<Widget>().QueryAsync(q => q
     .Select(w => new WidgetListItemDto { Id = w.Id, Name = w.Name, Status = w.Status }), ct);
 ```
 
-## 5. Controller — `ARISP.API/Controllers/WidgetsController.cs`
+## 5. Controller — `ARI.API/Controllers/WidgetsController.cs`
 
 ```csharp
 [ApiController]

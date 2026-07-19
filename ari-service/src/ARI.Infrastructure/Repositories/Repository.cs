@@ -1,0 +1,65 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using ARI.Application.Interfaces;
+using ARI.Domain.Entities;
+using ARI.Infrastructure.Data;
+
+namespace ARI.Infrastructure.Repositories
+{
+    public class Repository<T> : IRepository<T> where T : class
+    {
+        protected readonly AriDbContext _context;
+
+        public Repository(AriDbContext context)
+        {
+            _context = context;
+        }
+
+        public virtual async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        {
+            return await _context.Set<T>().FindAsync(new object[] { id }, ct);
+        }
+
+        public virtual async Task<IEnumerable<T>> GetAllAsync(CancellationToken ct = default)
+        {
+            return await _context.Set<T>().ToListAsync(ct);
+        }
+
+        public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        {
+            return await _context.Set<T>().Where(predicate).ToListAsync(ct);
+        }
+
+        public virtual async Task<List<TResult>> QueryAsync<TResult>(
+            Func<IQueryable<T>, IQueryable<TResult>> shaper,
+            CancellationToken ct = default)
+        {
+            return await shaper(_context.Set<T>().AsNoTracking()).ToListAsync(ct);
+        }
+
+        public virtual async Task<int> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        {
+            return await _context.Set<T>().CountAsync(predicate, ct);
+        }
+
+        public virtual async Task AddAsync(T entity, CancellationToken ct = default)
+        {
+            await _context.Set<T>().AddAsync(entity, ct);
+        }
+
+        public virtual void Update(T entity)
+        {
+            _context.Entry(entity).State = EntityState.Modified;
+        }
+
+        public virtual void Delete(T entity)
+        {
+            _context.Set<T>().Remove(entity);
+        }
+    }
+}

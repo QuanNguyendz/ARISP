@@ -131,17 +131,20 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 ### Backend (C# / ASP.NET Core .NET 8)
 
 **Naming:**
-- Namespace: `ARISP.<Layer>.<Module>` (ví dụ: `ARISP.Application.Interview`)
+- Namespace: `ARI.<Layer>.<Module>` (ví dụ: `ARI.Application.Interview`) — PascalCase
 - Class: PascalCase | Interface: prefix `I` | Method: PascalCase + suffix `Async` cho async
 - Private field: `_camelCase` | Constant: `UPPER_SNAKE_CASE`
 
 **Project Structure (Clean Architecture):**
 ```
-backend/
-├── ARISP.API/            # Controllers, Middleware, Program.cs
-├── ARISP.Application/    # Use Cases, DTOs, Interfaces, Validators
-├── ARISP.Domain/         # Entities, Value Objects, Domain Events
-└── ARISP.Infrastructure/ # EF Core, Repositories, External Services
+ari-service/
+├── ARI.sln
+├── src/
+│   ├── ARI.API/            # Controllers, Middleware, Program.cs
+│   ├── ARI.Application/    # Use Cases (CQRS), DTOs, Interfaces, Validators
+│   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
+│   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
+└── tests/                # Unit / functional tests
 ```
 
 **Patterns bắt buộc:** Repository Pattern, CQRS (MediatR nếu phức tạp), Result Pattern (không throw exception cho business errors), Dependency Injection, Async/Await cho mọi I/O.
@@ -294,6 +297,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-036 | File storage abstraction `IFileStorageService`: Local (dev) / Cloudflare R2 (prod, presigned URL); DB lưu storageKey |
 | ADR-041 | Vòng đời tài khoản staff: yêu cầu tạo (HR→SA duyệt) tách khỏi khóa/mở khóa (`AccountRequest` + `User.LockReason`) |
 | ADR-042 | Recruiter workspace cụm Job: `mine` filter, ứng viên theo job, Gemini trích xuất JD auto-fill (mở rộng ADR-030) |
+| ADR-045 | Refactor Clean Architecture chuẩn JT template: `ari-service/` (src/+tests/), namespace `ARI.*`, CQRS + MediatR **pin [12.5.0]** (v13 commercial), FluentValidation, thin controllers, DI per-project, schema 100% migrations. SessionHub gọi thẳng `IInterviewService` (không qua MediatR — latency ADR-006) |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 
