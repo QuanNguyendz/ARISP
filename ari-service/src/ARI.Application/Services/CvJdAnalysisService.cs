@@ -9,7 +9,7 @@ using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 namespace ARI.Application.Services
 {
-    public class CvJdAnalysisService
+    public class CvJdAnalysisService : ICvJdAnalysisService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiProvider _geminiProvider;

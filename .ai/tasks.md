@@ -303,6 +303,11 @@
 
 ## Completed
 
+- [x] 2026-07-19: **Refactor Phase 7 (Wave C) — Jobs + Playbooks + CvAnalysis sang CQRS (18 endpoints; JobsController 1408 → ~260 dòng).**
+  - `ARI.Application/Jobs/`: 5 queries (GetJobs với filter/sort/relevance, GetJobFacets, GetJobById, GetAdminJobs, GetJobApplications) + 6 commands (CreateJob + RAG ingest, UpdateJob + re-create rounds, DeleteJob, UpdateJobStatus — toàn bộ approval workflow + đóng dấu JD PDF/DOCX best-effort, CreateJobSlots, AnalyzeJd — Gemini auto-fill ADR-042). `JobsSupport`: ValidateJobRequest dùng chung Create/Update (giữ khác biệt deadline-exemption khi update), facet label maps + BuildFacet, ParseCsv. Khối filter Job Board gộp thành local func `ApplyFilters` dùng chung count + page (trước lặp 2 lần).
+  - `ARI.Application/Playbooks/`: GetPlaybooks + UploadPlaybook (absorb + XÓA `PlaybookService` — 1 consumer; parse → save → ingest RAG, lỗi thì xoá file) + DeletePlaybook. `ARI.Application/CvAnalysis/`: 4 thin handlers delegate sang `ICvJdAnalysisService` (interface mới cho `CvJdAnalysisService` — 3 consumer, giữ shared).
+  - Controllers giữ guards IFormFile/claims + `MapFailure` cục bộ (map ErrorCode → 400/401/403/404/500 đúng shape cũ). Verify: build 0 lỗi, swagger diff = rỗng, smoke 18 cases dữ liệu thật (list/facets/detail/admin/mine 200, validation + 404 message verbatim).
+
 - [x] 2026-07-19: **Refactor Phase 6 (Wave B) — Admin + AccountRequests sang CQRS (17 endpoints).**
   - `ARI.Application/Admin/`: 6 queries (PendingUsers, Users paged, AdminStats, AuditLogs, SystemSettings, AccountRequests) + 8 commands (ApproveUser, CreateStaffUser, UpdateUserRole, Deactivate/Activate/DeleteUser, UpdateSystemSettings, Approve/RejectAccountRequest). `AdminSupport` (GenerateTemporaryPassword, WriteAuditAsync không SaveChanges, SendStaffWelcomeEmailAsync best-effort) — chuyển verbatim từ private helpers.
   - `ARI.Application/AccountRequests/` (phía HR Leader): GetMyAccountRequests + CreateAccountRequests (batch, validate từng item, chặn trùng, conflict 409). `CommonErrorCodes` (not_found/conflict) cho mapping 404/409. Request classes (CreateStaffUserRequest, UpdateSettingItem...) move sang Application giữ nguyên tên — schema swagger không đổi. Temp-password hash qua `IPasswordHasher`. ActorId từ claims truyền qua command.

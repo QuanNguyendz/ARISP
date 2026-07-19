@@ -1,7 +1,12 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using ARI.Application.Services;
+using ARI.Application.Common;
+using ARI.Application.CvAnalysis.Commands.AnalyzeCv;
+using ARI.Application.CvAnalysis.Commands.ClearCvAnalysisCache;
+using ARI.Application.CvAnalysis.Queries.GetCvAnalysis;
+using ARI.Application.CvAnalysis.Queries.GetCvAnalysisByApplication;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,11 +23,11 @@ namespace ARI.API.Controllers
     [Route("api/cv-analysis")]
     public class CvAnalysisController : ControllerBase
     {
-        private readonly CvJdAnalysisService _analysisService;
+        private readonly ISender _sender;
 
-        public CvAnalysisController(CvJdAnalysisService analysisService)
+        public CvAnalysisController(ISender sender)
         {
-            _analysisService = analysisService;
+            _sender = sender;
         }
 
         [HttpPost("analyze")]
@@ -41,7 +46,7 @@ namespace ARI.API.Controllers
             }
 
             using var cvStream = request.CvFile.OpenReadStream();
-            var result = await _analysisService.AnalyzeAndCacheAsync(request.JobPostingId, cvStream, request.CvFile.FileName, ct);
+            var result = await _sender.Send(new AnalyzeCvCommand(request.JobPostingId, cvStream, request.CvFile.FileName), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -60,14 +65,13 @@ namespace ARI.API.Controllers
                 return Unauthorized(new { message = "Không xác định được danh tính người dùng." });
             }
 
-            var hasPermission = await _analysisService.CheckCandidateOwnershipAsync(id, candidateId, ct);
-            if (!hasPermission)
+            var result = await _sender.Send(new GetCvAnalysisQuery(id, candidateId), ct);
+            if (result.IsFailure)
             {
-                return StatusCode(403, new { message = "Bạn không có quyền xem bản đánh giá này, hoặc bạn chưa hoàn tất việc nộp đơn." });
+                return result.ErrorCode == CommonErrorCodes.Forbidden
+                    ? StatusCode(403, new { message = result.Error })
+                    : NotFound(new { message = result.Error });
             }
-
-            var result = await _analysisService.GetAnalysisByIdAsync(id, ct);
-            if (result.IsFailure) return NotFound(new { message = result.Error });
             return Ok(result.Value);
         }
 
@@ -75,15 +79,16 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetByApplicationId(Guid applicationId, CancellationToken ct)
         {
-            var result = await _analysisService.GetAnalysisByApplicationIdAsync(applicationId, ct);
+            var result = await _sender.Send(new GetCvAnalysisByApplicationQuery(applicationId), ct);
             if (result.IsFailure) return NotFound(new { message = result.Error });
             return Ok(result.Value);
         }
+
         [HttpDelete("clear-cache")]
         [AllowAnonymous]
         public async Task<IActionResult> ClearCache(CancellationToken ct)
         {
-            await _analysisService.ClearAllCacheAsync(ct);
+            await _sender.Send(new ClearCvAnalysisCacheCommand(), ct);
             return Ok(new { message = "Đã xóa toàn bộ bộ nhớ đệm (cache) phân tích CV." });
         }
     }
