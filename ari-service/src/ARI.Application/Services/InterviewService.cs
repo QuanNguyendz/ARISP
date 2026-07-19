@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
@@ -888,7 +889,7 @@ namespace ARI.Application.Services
                 {
                     ApplicationId = application.Id,
                     RoundNumber = nextRoundNumber,
-                    TokenHash = ApplicationService.HashInviteToken(rawToken),
+                    TokenHash = TokenHashing.Sha256Hex(rawToken),
                     ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
                 }, ct);
 

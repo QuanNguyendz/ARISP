@@ -32,6 +32,7 @@ namespace ARI.Application
             // Application Services dùng chung (nhiều consumer hoặc hub gọi trực tiếp).
             // Service 1-consumer đang được absorb dần vào handlers theo từng wave CQRS.
             services.AddScoped<ApplicationService>();
+            services.AddScoped<Interfaces.IApplicationService>(sp => sp.GetRequiredService<ApplicationService>());
             services.AddScoped<CvJdAnalysisService>();
             services.AddScoped<Interfaces.ICvJdAnalysisService>(sp => sp.GetRequiredService<CvJdAnalysisService>());
             services.AddScoped<InterviewService>();

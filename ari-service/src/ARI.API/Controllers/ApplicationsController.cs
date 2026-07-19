@@ -3,15 +3,16 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using ARI.Application.Applications.Commands;
+using ARI.Application.Applications.Commands.SubmitApplication;
+using ARI.Application.Applications.Queries;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
-using ARI.Application.Services;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 
 namespace ARI.API.Controllers
 {
@@ -39,39 +40,24 @@ namespace ARI.API.Controllers
     [Route("api/[controller]")]
     public class ApplicationsController : ControllerBase
     {
-        private readonly ApplicationService _applicationService;
-        private readonly IDocumentParserService _documentParserService;
-        private readonly IFileStorageService _fileStorage;
+        private readonly ISender _sender;
         private readonly ICurrentUserService _currentUserService;
-        private readonly IConfiguration _configuration;
 
-        public ApplicationsController(ApplicationService applicationService, IDocumentParserService documentParserService, IFileStorageService fileStorage, ICurrentUserService currentUserService, IConfiguration configuration)
+        public ApplicationsController(ISender sender, ICurrentUserService currentUserService)
         {
-            _applicationService = applicationService;
-            _documentParserService = documentParserService;
-            _fileStorage = fileStorage;
+            _sender = sender;
             _currentUserService = currentUserService;
-            _configuration = configuration;
         }
-
-        /// <summary>Base URL portal ứng viên (theo môi trường), fallback AdminFrontendUrl rồi localhost.</summary>
-        private string CandidateBaseUrl =>
-            _configuration["Frontend:CandidateBaseUrl"]
-            ?? _configuration["Authentication:AdminFrontendUrl"]
-            ?? "http://localhost:3000";
 
         [HttpGet("{id}")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetApplicationById(Guid id, CancellationToken ct)
         {
-            var result = await _applicationService.GetApplicationByIdAsync(id, ct);
+            var result = await _sender.Send(new GetApplicationByIdQuery(id), ct);
             if (result.IsFailure)
             {
                 return NotFound(new { message = result.Error });
             }
-
-            if (!string.IsNullOrEmpty(result.Value!.CvFileUrl))
-                result.Value.CvFileUrl = await _fileStorage.GetUrlAsync(result.Value.CvFileUrl, ct);
 
             return Ok(result.Value);
         }
@@ -85,7 +71,7 @@ namespace ARI.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = await _applicationService.UpdateApplicationStatusAsync(id, request.Status, ct);
+            var result = await _sender.Send(new UpdateApplicationStatusCommand(id, request.Status), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -126,50 +112,6 @@ namespace ARI.API.Controllers
                 cvBytes = ms.ToArray();
             }
 
-            // Compute CV Hash for Match Analysis Cache
-            string cvFileHash;
-            using (var md5 = System.Security.Cryptography.MD5.Create())
-            {
-                var hashBytes = md5.ComputeHash(cvBytes);
-                cvFileHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-            }
-
-            // Extract CV text using the real document parser service (parse trước khi tốn công lưu).
-            string cvText;
-            try
-            {
-                using (var stream = new MemoryStream(cvBytes))
-                {
-                    cvText = await _documentParserService.ParseDocumentAsync(stream, extension);
-                }
-
-                if (!string.IsNullOrEmpty(cvText))
-                {
-                    cvText = cvText.Replace("\0", string.Empty);
-                }
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = $"Không thể phân tích file CV: {ex.Message}" });
-            }
-
-            // Lưu file qua abstraction (Local cho dev / S3-compatible cho prod). DB lưu storageKey.
-            var contentType = extension switch
-            {
-                ".pdf" => "application/pdf",
-                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                _ => "text/plain"
-            };
-            string cvFileUrl;
-            try
-            {
-                cvFileUrl = await _fileStorage.SaveAsync(cvBytes, request.CvFile.FileName, contentType);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Không thể lưu file CV: {ex.Message}" });
-            }
-
             Guid? candidateAccountId = request.CandidateAccountId;
             if (candidateAccountId == null && User.Identity?.IsAuthenticated == true)
             {
@@ -180,24 +122,15 @@ namespace ARI.API.Controllers
                 }
             }
 
-            var serviceRequest = new SubmitApplicationRequest
-            {
-                JobPostingId = request.JobPostingId,
-                CandidateAccountId = candidateAccountId,
-                CandidateEmail = request.CandidateEmail,
-                CandidateName = request.CandidateName,
-                CandidatePhone = request.CandidatePhone,
-                CvFileUrl = cvFileUrl,
-                CvText = cvText,
-                CvFileHash = cvFileHash
-            };
+            var result = await _sender.Send(new SubmitApplicationCommand(
+                request.JobPostingId, candidateAccountId, request.CandidateEmail, request.CandidateName,
+                request.CandidatePhone, cvBytes, request.CvFile.FileName, extension));
 
-            var result = await _applicationService.SubmitApplicationAsync(serviceRequest, "job_board");
             if (result.IsFailure)
             {
-                // Clean up file if db write fails
-                await _fileStorage.DeleteAsync(cvFileUrl);
-                return BadRequest(new { message = result.Error });
+                return result.ErrorCode == CommonErrorCodes.ServerError
+                    ? StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error })
+                    : BadRequest(new { message = result.Error });
             }
 
             return Ok(result.Value);
@@ -211,27 +144,17 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetApplications([FromQuery] bool mine, CancellationToken ct)
         {
-            Result<List<ApplicationResponse>> result;
+            Guid? mineUid = null;
             if (mine)
             {
                 if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
                     return Unauthorized(new { message = "Không xác định được người dùng." });
-                result = await _applicationService.GetApplicationsForCreatorAsync(uid, ct);
-            }
-            else
-            {
-                result = await _applicationService.GetAllApplicationsAsync(ct);
+                mineUid = uid;
             }
 
+            var result = await _sender.Send(new GetApplicationsQuery(mineUid), ct);
             if (result.IsFailure)
                 return BadRequest(new { message = result.Error });
-
-            // Resolve storageKey -> URL client dùng được
-            foreach (var app in result.Value!)
-            {
-                if (!string.IsNullOrEmpty(app.CvFileUrl))
-                    app.CvFileUrl = await _fileStorage.GetUrlAsync(app.CvFileUrl, ct);
-            }
 
             return Ok(result.Value);
         }
@@ -241,7 +164,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> GetPracticeEligibility(Guid id, [FromQuery] int round, CancellationToken ct)
         {
             var roundNumber = round > 0 ? round : 1;
-            var result = await _applicationService.CheckPracticeEligibilityAsync(id, roundNumber, ct);
+            var result = await _sender.Send(new GetPracticeEligibilityQuery(id, roundNumber), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -255,7 +178,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> SendInvite(Guid id, [FromQuery] int round, CancellationToken ct)
         {
             var roundNumber = round > 0 ? round : 1;
-            var result = await _applicationService.SendInterviewInviteAsync(id, CandidateBaseUrl, roundNumber, ct);
+            var result = await _sender.Send(new SendInterviewInviteCommand(id, roundNumber), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -268,7 +191,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm duyệt hồ sơ
         public async Task<IActionResult> Accept(Guid id, CancellationToken ct)
         {
-            var result = await _applicationService.AcceptApplicationAsync(id, CandidateBaseUrl, ct);
+            var result = await _sender.Send(new AcceptApplicationCommand(id), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -281,7 +204,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm từ chối
         public async Task<IActionResult> Reject(Guid id, CancellationToken ct)
         {
-            var result = await _applicationService.RejectApplicationAsync(id, ct);
+            var result = await _sender.Send(new RejectApplicationCommand(id), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });

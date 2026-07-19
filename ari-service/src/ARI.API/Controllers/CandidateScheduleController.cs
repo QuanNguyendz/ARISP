@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using ARI.Application.DTOs;
-using ARI.Application.Interfaces;
-using ARI.Application.Services;
-using ARI.Domain.Entities;
+using ARI.Application.Common;
+using ARI.Application.Scheduling;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -29,47 +27,31 @@ namespace ARI.API.Controllers
     [Route("api")]
     public class CandidateScheduleController : ControllerBase
     {
-        private readonly IUnitOfWork _unitOfWork;
-        private readonly INotificationService _notificationService;
+        private readonly ISender _sender;
 
-        public CandidateScheduleController(IUnitOfWork unitOfWork, INotificationService notificationService)
+        public CandidateScheduleController(ISender sender)
         {
-            _unitOfWork = unitOfWork;
-            _notificationService = notificationService;
+            _sender = sender;
         }
 
-        /// <summary>Xác thực quyền truy cập hồ sơ: token lời mời hợp lệ hoặc candidate đăng nhập sở hữu hồ sơ.</summary>
-        private async Task<(bool ok, ARI.Domain.Entities.Application? app, string? error)> AuthorizeAsync(
-            Guid applicationId, int round, string? token, CancellationToken ct)
+        /// <summary>Danh tính candidate từ claims (nếu đã đăng nhập) — dùng cho xác thực quyền truy cập hồ sơ.</summary>
+        private (Guid? accountId, string? email) GetCandidateIdentity()
         {
-            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
-            if (app == null) return (false, null, "Không tìm thấy hồ sơ ứng tuyển.");
+            if (User?.Identity?.IsAuthenticated != true) return (null, null);
+            var subClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
+                           ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
+            return (Guid.TryParse(subClaim, out var accId) ? accId : null, emailClaim);
+        }
 
-            // 1) Token lời mời
-            if (!string.IsNullOrWhiteSpace(token))
+        private IActionResult MapFailure(Result result)
+        {
+            return result.ErrorCode switch
             {
-                var hash = ApplicationService.HashInviteToken(token);
-                var invites = await _unitOfWork.Repository<InterviewInvite>().FindAsync(
-                    i => i.ApplicationId == applicationId && i.RoundNumber == round && i.TokenHash == hash, ct);
-                var invite = invites.FirstOrDefault();
-                if (invite != null && invite.ExpiresAt > DateTimeOffset.UtcNow)
-                    return (true, app, null);
-                if (invite != null) return (false, app, "Lời mời đã hết hạn. Vui lòng liên hệ nhân sự để được gửi lại.");
-            }
-
-            // 2) Candidate đăng nhập sở hữu hồ sơ
-            if (User?.Identity?.IsAuthenticated == true)
-            {
-                var subClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
-                               ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-                var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
-                var byAccount = Guid.TryParse(subClaim, out var accId) && app.CandidateAccountId == accId;
-                var byEmail = !string.IsNullOrEmpty(emailClaim) &&
-                              string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase);
-                if (byAccount || byEmail) return (true, app, null);
-            }
-
-            return (false, app, "Bạn không có quyền truy cập lịch của hồ sơ này (thiếu token hợp lệ hoặc chưa đăng nhập).");
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
+                _ => BadRequest(new { message = result.Error }),
+            };
         }
 
         /// <summary>Khung giờ còn trống của hồ sơ cho một vòng (để ứng viên chọn).</summary>
@@ -78,17 +60,11 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> GetOpenSlots(Guid applicationId, [FromQuery] int round, [FromQuery] string? token, CancellationToken ct)
         {
             var roundNumber = round > 0 ? round : 1;
-            var (ok, app, error) = await AuthorizeAsync(applicationId, roundNumber, token, ct);
-            if (app == null) return NotFound(new { message = error });
-            if (!ok) return StatusCode(StatusCodes.Status403Forbidden, new { message = error });
+            var (accountId, email) = GetCandidateIdentity();
 
-            var now = DateTimeOffset.UtcNow;
-            var slots = await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(
-                s => s.JobPostingId == app.JobPostingId && s.RoundNumber == roundNumber
-                     && s.StartTime > now && s.BookedCount < s.Capacity, ct);
-
-            var result = slots.OrderBy(s => s.StartTime).Select(AvailabilitySlotResponse.FromEntity);
-            return Ok(result);
+            var result = await _sender.Send(new GetOpenSlotsQuery(applicationId, roundNumber, token, accountId, email), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
         }
 
         /// <summary>Đặt một khung giờ phỏng vấn cho hồ sơ + vòng.</summary>
@@ -97,121 +73,17 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> Book(Guid applicationId, [FromBody] BookSlotRequest request, CancellationToken ct)
         {
             var roundNumber = request.Round > 0 ? request.Round : 1;
-            var (ok, app, error) = await AuthorizeAsync(applicationId, roundNumber, request.Token, ct);
-            if (app == null) return NotFound(new { message = error });
-            if (!ok) return StatusCode(StatusCodes.Status403Forbidden, new { message = error });
+            var (accountId, email) = GetCandidateIdentity();
 
-            var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(request.SlotId, ct);
-            if (slot == null) return NotFound(new { message = "Không tìm thấy khung giờ." });
-            if (slot.JobPostingId != app.JobPostingId || slot.RoundNumber != roundNumber)
-                return BadRequest(new { message = "Khung giờ không thuộc vòng phỏng vấn này." });
-            if (slot.StartTime <= DateTimeOffset.UtcNow)
-                return BadRequest(new { message = "Khung giờ đã ở quá khứ." });
-            if (slot.BookedCount >= slot.Capacity)
-                return BadRequest(new { message = "Khung giờ đã đầy. Vui lòng chọn khung giờ khác." });
+            var result = await _sender.Send(new BookSlotCommand(applicationId, request.SlotId, roundNumber, request.Token, accountId, email), ct);
+            if (result.IsFailure) return MapFailure(result);
 
-            // Đã đặt lịch vòng này rồi?
-            var existing = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
-                b => b.ApplicationId == applicationId && b.RoundNumber == roundNumber && b.Status == "scheduled", ct);
-            if (existing.Any())
-                return BadRequest(new { message = "Bạn đã đặt lịch cho vòng này rồi." });
-
-            // Không trùng khung giờ với booking khác của chính ứng viên (kể cả JD khác).
-            var myAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
-                    a => (app.CandidateAccountId != null && a.CandidateAccountId == app.CandidateAccountId)
-                         || a.CandidateEmail == app.CandidateEmail, ct))
-                .Select(a => a.Id).ToHashSet();
-
-            var myBookings = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
-                    b => myAppIds.Contains(b.ApplicationId) && b.Status == "scheduled", ct)).ToList();
-
-            if (myBookings.Count > 0)
-            {
-                var bookedSlotIds = myBookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
-                var bookedSlots = await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(
-                    s => bookedSlotIds.Contains(s.Id), ct);
-                var conflict = bookedSlots.Any(s => slot.StartTime < s.EndTime && s.StartTime < slot.EndTime);
-                if (conflict)
-                    return BadRequest(new { message = "Bạn đã có một buổi phỏng vấn khác trùng khung giờ này. Vui lòng chọn giờ khác." });
-            }
-
-            // Chốt chỗ NGUYÊN TỬ chống overbooking: chỉ tăng khi còn chỗ (DB row-lock 1 câu lệnh).
-            // Tránh race 2 ứng viên cùng giành slot cuối. Không mutate entity slot đang được EF theo dõi
-            // (để SaveChanges không ghi đè đếm lần nữa).
-            var incremented = await _unitOfWork.ExecuteSqlRawAsync(
-                "UPDATE availability_slots SET booked_count = booked_count + 1, updated_at = {0} WHERE id = {1} AND booked_count < capacity",
-                new object[] { DateTimeOffset.UtcNow, slot.Id }, ct);
-            if (incremented == 0)
-                return BadRequest(new { message = "Khung giờ vừa được đặt hết. Vui lòng chọn khung giờ khác." });
-
-            var booking = new InterviewBooking
-            {
-                ApplicationId = applicationId,
-                AvailabilitySlotId = slot.Id,
-                RoundNumber = roundNumber,
-                Status = "scheduled",
-            };
-            await _unitOfWork.Repository<InterviewBooking>().AddAsync(booking, ct);
-
-            // Đặt lịch buổi phỏng vấn thật = ứng viên đã vào giai đoạn phỏng vấn thật → chuyển
-            // "screening" (đang sàng lọc) sang "interview" (đang phỏng vấn). Nhờ vậy status KHÔNG
-            // còn là "sàng lọc" khi đã có lịch/mã On-site (ADR-015). Vòng 2+ vốn đã ở "interview".
-            if (string.Equals(app.Status, "screening", StringComparison.OrdinalIgnoreCase))
-            {
-                app.Status = "interview";
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
-            }
-
-            var invites = await _unitOfWork.Repository<InterviewInvite>().FindAsync(
-                i => i.ApplicationId == applicationId && i.RoundNumber == roundNumber && i.ScheduledAt == null, ct);
-            foreach (var inv in invites)
-            {
-                inv.ScheduledAt = DateTimeOffset.UtcNow;
-                _unitOfWork.Repository<InterviewInvite>().Update(inv);
-            }
-
-            try
-            {
-                await _unitOfWork.SaveChangesAsync(ct);
-            }
-            catch (Exception)
-            {
-                // Bù trừ chỗ đã chiếm nếu lưu booking thất bại (vd trùng vòng do double-click —
-                // chặn bởi unique index một-booking-scheduled/vòng).
-                await _unitOfWork.ExecuteSqlRawAsync(
-                    "UPDATE availability_slots SET booked_count = GREATEST(booked_count - 1, 0), updated_at = {0} WHERE id = {1}",
-                    new object[] { DateTimeOffset.UtcNow, slot.Id }, ct);
-                return BadRequest(new { message = "Không thể hoàn tất đặt lịch (có thể bạn đã đặt vòng này). Vui lòng tải lại và thử lại." });
-            }
-
-            // DTO phản ánh lần đặt vừa rồi (DTO độc lập, không bị EF theo dõi).
-            var slotDto = AvailabilitySlotResponse.FromEntity(slot);
-            slotDto.BookedCount += 1;
-
-            // Notify Recruiter
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
-            if (job != null)
-            {
-                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveSystemEvent", new { 
-                    Type = "SlotBooked", 
-                    ApplicationId = applicationId, 
-                    JobId = job.Id, 
-                    SlotId = slot.Id 
-                }, ct);
-
-                // Notify all candidates viewing the schedule to refresh their open slots
-                await _notificationService.PublishGroupEventAsync("candidate", "ReceiveSystemEvent", new { 
-                    Type = "SlotBooked", 
-                    ApplicationId = applicationId,
-                    SlotId = request.SlotId 
-                }, ct);
-            }
-
+            var value = result.Value;
             return Ok(new
             {
                 message = "Đặt lịch thành công. Bạn có thể luyện tập với phỏng vấn thử trước ngày hẹn.",
-                bookingId = booking.Id,
-                slot = slotDto,
+                bookingId = value.BookingId,
+                slot = value.Slot,
             });
         }
 
@@ -225,32 +97,9 @@ namespace ARI.API.Controllers
             var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
             Guid.TryParse(subClaim, out var accId);
 
-            var myAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
-                    a => (accId != Guid.Empty && a.CandidateAccountId == accId)
-                         || (emailClaim != null && a.CandidateEmail == emailClaim), ct))
-                .Select(a => a.Id).ToHashSet();
-
-            var upcoming = new List<AvailabilitySlotResponse>();
-            var past = new List<AvailabilitySlotResponse>();
-
-            if (myAppIds.Count > 0)
-            {
-                var bookings = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
-                        b => myAppIds.Contains(b.ApplicationId) && b.Status == "scheduled", ct)).ToList();
-                var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
-                if (slotIds.Count > 0)
-                {
-                    var slots = await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id), ct);
-                    var now = DateTimeOffset.UtcNow;
-                    foreach (var s in slots.OrderBy(s => s.StartTime))
-                    {
-                        var dto = AvailabilitySlotResponse.FromEntity(s);
-                        (s.StartTime >= now ? upcoming : past).Add(dto);
-                    }
-                }
-            }
-
-            return Ok(new { upcomingSlots = upcoming, pastSlots = past });
+            var result = await _sender.Send(new GetCandidateScheduleQuery(accId, emailClaim), ct);
+            var value = result.Value;
+            return Ok(new { upcomingSlots = value.UpcomingSlots, pastSlots = value.PastSlots });
         }
     }
 }

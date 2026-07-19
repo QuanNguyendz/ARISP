@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +14,7 @@ using ARI.Domain.Entities;
 
 namespace ARI.Application.Services
 {
-    public class ApplicationService
+    public class ApplicationService : IApplicationService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IRagIngestionService _ragIngestion;
@@ -628,13 +629,6 @@ namespace ARI.Application.Services
             return Result.Success(response);
         }
 
-        /// <summary>Hash token mời phỏng vấn bằng SHA256 (lưu DB an toàn). Dùng chung với controller đặt lịch.</summary>
-        public static string HashInviteToken(string token)
-        {
-            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-            return Convert.ToHexString(bytes);
-        }
-
         /// <summary>
         /// Gửi lời mời phỏng vấn theo vòng: tạo InterviewInvite (token hoá), email link CHỌN LỊCH
         /// trên thiết bị cá nhân của ứng viên (base URL theo môi trường, không hardcode localhost).
@@ -663,7 +657,7 @@ namespace ARI.Application.Services
             {
                 ApplicationId = applicationId,
                 RoundNumber = roundNumber,
-                TokenHash = HashInviteToken(rawToken),
+                TokenHash = TokenHashing.Sha256Hex(rawToken),
                 ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
             };
             await _unitOfWork.Repository<InterviewInvite>().AddAsync(invite, ct);
