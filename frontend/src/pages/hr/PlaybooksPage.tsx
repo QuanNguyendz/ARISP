@@ -223,8 +223,6 @@ export default function HrPlaybooksPage() {
   )
 }
 
-type Row = NewAccountRequestItem
-
 function UploadModal({
   t,
   onClose,

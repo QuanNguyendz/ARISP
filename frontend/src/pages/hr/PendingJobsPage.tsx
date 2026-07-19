@@ -48,7 +48,10 @@ function formatDateTime(iso: string): string {
   })
 }
 
-function getDeadlineText(deadlineStr?: string | null, t: (key: string) => string): string {
+function getDeadlineText(
+  deadlineStr: string | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''

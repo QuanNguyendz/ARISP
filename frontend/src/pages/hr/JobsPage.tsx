@@ -18,7 +18,10 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function getDeadlineText(deadlineStr?: string | null, t: (key: string) => string): string {
+function getDeadlineText(
+  deadlineStr: string | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)
   if (Number.isNaN(d.getTime())) return ''

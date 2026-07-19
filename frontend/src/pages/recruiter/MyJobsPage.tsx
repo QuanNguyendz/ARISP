@@ -11,7 +11,7 @@ import { JobsGridSkeleton, StatsGridSkeleton } from './_skeletons'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
-  t: (key: string) => string
+  t: (key: string, options?: Record<string, unknown>) => string
 ): string {
   if (!deadlineStr) return ''
   const d = new Date(deadlineStr)

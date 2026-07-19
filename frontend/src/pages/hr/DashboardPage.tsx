@@ -129,7 +129,11 @@ interface TrendTooltipProps {
   payload?: Array<{ payload: { label: string; count: number } }>
 }
 
-function TrendTooltip({ active, payload, t }: TrendTooltipProps & { t: (key: string) => string }) {
+function TrendTooltip({
+  active,
+  payload,
+  t,
+}: TrendTooltipProps & { t: (key: string, options?: Record<string, unknown>) => string }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (

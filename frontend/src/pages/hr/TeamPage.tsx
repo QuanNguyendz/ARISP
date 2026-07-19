@@ -211,7 +211,7 @@ function RequestModal({
   onClose,
   onDone,
 }: {
-  t: (key: string) => string
+  t: (key: string, options?: Record<string, unknown>) => string
   onClose: () => void
   onDone: (count: number) => void
 }) {

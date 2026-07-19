@@ -34,11 +34,6 @@ import type { HrApplicationItem } from '@/types/application'
 import { resolveAssetUrl } from '@/config/constants'
 import { appStatusBadge, appStatusLabel, initials, scoreColor } from '../recruiter/_jobUi'
 
-function errMessage(err: unknown, fallback: string): string {
-  const e = err as { response?: { data?: { message?: string } } }
-  return e?.response?.data?.message || fallback
-}
-
 function toLocalDateStr(d: string | Date | number | undefined | null): string {
   if (!d) return ''
   const dt = new Date(d)

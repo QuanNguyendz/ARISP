@@ -24,7 +24,7 @@ const PAGE_SIZE = 10
 type FilterKey = 'all' | 'unread' | 'applicant' | 'evaluation' | 'job' | 'system'
 
 function getFilters(
-  t: ReturnType<(typeof useTranslation<'modules/shared/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/shared/notifications'>>['t']
 ): { key: FilterKey; label: string }[] {
   return [
     { key: 'all', label: t('filters.all') },
@@ -78,7 +78,7 @@ function notifStyle(type: string): { Icon: ComponentType<{ className?: string }>
 
 function timeAgo(
   iso: string,
-  t: ReturnType<(typeof useTranslation<'modules/shared/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/shared/notifications'>>['t']
 ): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -100,7 +100,7 @@ function NotifRow({
   n: NotificationItem
   onOpen: (n: NotificationItem) => void
   onRemove: (n: NotificationItem) => void
-  t: ReturnType<(typeof useTranslation<'modules/shared/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/shared/notifications'>>['t']
 }) {
   const { Icon, cls } = notifStyle(n.type)
   return (

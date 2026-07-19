@@ -18,7 +18,7 @@ import { Skeleton } from '@components/ui/Skeleton'
 type FilterKey = 'all' | 'unread' | 'interview' | 'result' | 'system'
 
 function getFilters(
-  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/candidate/notifications'>>['t']
 ): { key: FilterKey; label: string }[] {
   return [
     { key: 'all', label: t('filters.all') },
@@ -52,7 +52,7 @@ function notifStyle(type: string): { Icon: typeof Bell; cls: string } {
 
 function actionLabel(
   type: string,
-  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/candidate/notifications'>>['t']
 ): string {
   switch (type) {
     case 'result':
@@ -68,7 +68,7 @@ function actionLabel(
 
 function timeAgo(
   iso: string,
-  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/candidate/notifications'>>['t']
 ): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -93,7 +93,7 @@ function dayGroupOf(iso: string): 'today' | 'yesterday' | 'older' {
 }
 
 const getGroupLabels = (
-  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/candidate/notifications'>>['t']
 ): Record<string, string> => ({
   today: t('groupLabels.today'),
   yesterday: t('groupLabels.yesterday'),
@@ -107,7 +107,7 @@ function NotifRow({
 }: {
   n: NotificationItem
   onOpen: (n: NotificationItem) => void
-  t: ReturnType<(typeof useTranslation<'modules/candidate/notifications'>)['t']>
+  t: ReturnType<typeof useTranslation<'modules/candidate/notifications'>>['t']
 }) {
   const { Icon, cls } = notifStyle(n.type)
   return (

@@ -2,16 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe, Check } from 'lucide-react'
 import { supportedLanguages, SupportedLanguage, storeLanguage } from '@/i18n'
-import { useThemeStore } from '@store/theme'
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation('modules/shared/layout')
-  const { isDark } = useThemeStore()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  const currentLang =
-    supportedLanguages.find((l) => l.code === i18n.language) || supportedLanguages[0]
 
   // Short code display like VI/EN
   const shortCode = i18n.language.toUpperCase().slice(0, 2)

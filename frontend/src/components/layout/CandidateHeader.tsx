@@ -93,16 +93,6 @@ function initialsOf(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase()
 }
 
-const NAV = [
-  { label: 'Việc làm', to: '/jobs', match: (p: string) => p === '/' || p.startsWith('/jobs') },
-  {
-    label: 'Hồ sơ ứng tuyển',
-    to: '/candidate/applications',
-    match: (p: string) => p.startsWith('/candidate/applications'),
-  },
-  // "Phỏng vấn thử" không còn là điểm đến độc lập — practice được khởi động theo từng
-  // hồ sơ ứng tuyển (trang Hồ sơ ứng tuyển / chi tiết) qua /interview/practice/:applicationId.
-]
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()

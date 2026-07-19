@@ -32,6 +32,7 @@ export interface CriterionScore {
 
 export interface LanguageAssessment {
   language: string;
+  cefrLevel?: string | null;
   fluency: number;
   grammar: number;
   vocabulary: number;
