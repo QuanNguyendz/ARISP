@@ -52,7 +52,7 @@ services:
   # --- React Frontend ---
   frontend:
     build:
-      context: ../frontend
+      context: ../ari-web
       dockerfile: ../docker/frontend/Dockerfile
       target: development
     container_name: arisp-frontend
@@ -61,7 +61,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ../frontend:/app
+      - ../ari-web:/app
       - /app/node_modules
     depends_on:
       - backend
