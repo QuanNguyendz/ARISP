@@ -1,11 +1,13 @@
 using System;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Configuration;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
-using ARI.Application.Services;
+using ARI.Application.Interviews;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
@@ -13,21 +15,12 @@ namespace ARI.API.Controllers
     [Route("api/interview")] // Đồng bộ chuẩn prefix số ít theo đúng yêu cầu đồng bộ hệ thống backend
     public class InterviewController : ControllerBase
     {
-        private readonly InterviewService _interviewService;
-        private readonly InterviewCodeService _interviewCodeService;
-        private readonly IConfiguration _configuration;
+        private readonly ISender _sender;
 
-        public InterviewController(InterviewService interviewService, InterviewCodeService interviewCodeService, IConfiguration configuration)
+        public InterviewController(ISender sender)
         {
-            _interviewService = interviewService;
-            _interviewCodeService = interviewCodeService;
-            _configuration = configuration;
+            _sender = sender;
         }
-
-        private string CandidateBaseUrl =>
-            _configuration["Frontend:CandidateBaseUrl"]
-            ?? _configuration["Authentication:AdminFrontendUrl"]
-            ?? "http://localhost:3000";
 
         /// <summary>
         /// POST /api/interview/generate-code
@@ -36,9 +29,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GenerateInterviewCode([FromBody] GenerateCodeRequest request, CancellationToken ct)
         {
-            var hrUserId = GetCurrentUserId();
-
-            var result = await _interviewCodeService.GenerateCodeAsync(request.ApplicationId, request.RoundNumber, hrUserId, ct);
+            var result = await _sender.Send(new GenerateInterviewCodeCommand(request.ApplicationId, request.RoundNumber, GetCurrentUserId()), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -53,15 +44,13 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// POST /api/interview/generate-code-batch (MỚI BỔ SUNG)
+        /// POST /api/interview/generate-code-batch
         /// </summary>
         [HttpPost("generate-code-batch")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GenerateInterviewCodeBatch([FromBody] GenerateBatchRequest request, CancellationToken ct)
         {
-            var hrUserId = GetCurrentUserId();
-
-            var result = await _interviewCodeService.GenerateBatchAsync(request.ApplicationIds, request.RoundNumber, hrUserId, ct);
+            var result = await _sender.Send(new GenerateInterviewCodeBatchCommand(request.ApplicationIds, request.RoundNumber, GetCurrentUserId()), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error });
@@ -89,7 +78,7 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = "Mã phỏng vấn không được để trống.", valid = false });
             }
 
-            var result = await _interviewCodeService.ValidateCodeAsync(request.Code, ct);
+            var result = await _sender.Send(new ValidateInterviewCodeCommand(request.Code), ct);
             if (result.IsFailure)
             {
                 return BadRequest(new { message = result.Error, valid = false });
@@ -108,7 +97,7 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// GET /api/interview/codes?jobPostingId={id} (MỚI BỔ SUNG)
+        /// GET /api/interview/codes?jobPostingId={id}
         /// </summary>
         [HttpGet("codes")]
         [Authorize(Policy = "InternalStaff")]
@@ -119,8 +108,8 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = "JobPostingId không hợp lệ." });
             }
 
-            var list = await _interviewCodeService.GetCodesByJobAsync(jobPostingId, ct);
-            return Ok(list);
+            var result = await _sender.Send(new GetInterviewCodesByJobQuery(jobPostingId), ct);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -131,8 +120,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetSessions(CancellationToken ct)
         {
-            var list = await _interviewService.GetSessionsForHrAsync(ct);
-            return Ok(list);
+            var result = await _sender.Send(new GetHrInterviewSessionsQuery(), ct);
+            return Ok(result.Value);
         }
 
         #region ================= EXISTED INTERVIEW SESSION ENDPOINTS =================
@@ -141,7 +130,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> StartSession([FromBody] StartSessionRequest request)
         {
-            var result = await _interviewService.StartSessionAsync(request);
+            var result = await _sender.Send(new StartInterviewSessionCommand(request));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
@@ -154,13 +143,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> GetMediaConfig(Guid id, CancellationToken ct)
         {
-            var subClaim = User.FindFirst("sub")?.Value
-                           ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var email = User.FindFirst("email")?.Value
-                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-            Guid? accountId = Guid.TryParse(subClaim, out var aid) ? aid : null;
-
-            var result = await _interviewService.GetMediaConfigAsync(id, accountId, email, ct);
+            var (accountId, email) = GetCandidateIdentity();
+            var result = await _sender.Send(new GetMediaConfigQuery(id, accountId, email), ct);
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
@@ -173,13 +157,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> GetSpeechAudio(Guid id, [FromBody] TtsRequest request, CancellationToken ct)
         {
-            var subClaim = User.FindFirst("sub")?.Value
-                           ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var email = User.FindFirst("email")?.Value
-                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-            Guid? accountId = Guid.TryParse(subClaim, out var aid) ? aid : null;
-
-            var result = await _interviewService.GetSpeechAudioAsync(id, request?.Text ?? string.Empty, accountId, email, ct);
+            var (accountId, email) = GetCandidateIdentity();
+            var result = await _sender.Send(new SynthesizeSpeechCommand(id, request?.Text ?? string.Empty, accountId, email), ct);
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { audio = result.Value });
         }
@@ -188,7 +167,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "CandidateOnly")]
         public async Task<IActionResult> SubmitAnswer(Guid id, [FromBody] SubmitAnswerRequest request)
         {
-            var result = await _interviewService.SubmitAnswerAsync(id, request.QuestionId, request.Transcript, request.ResponseTimeMs);
+            var result = await _sender.Send(new SubmitAnswerCommand(id, request.QuestionId, request.Transcript, request.ResponseTimeMs));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
@@ -197,7 +176,7 @@ namespace ARI.API.Controllers
         [Authorize]
         public async Task<IActionResult> EndSession(Guid id, [FromQuery] string status = "completed")
         {
-            var result = await _interviewService.EndSessionAsync(id, status);
+            var result = await _sender.Send(new EndInterviewSessionCommand(id, status));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
         }
@@ -210,12 +189,21 @@ namespace ARI.API.Controllers
             {
                 userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
             }
-            var result = await _interviewService.SubmitHrReviewAsync(userId, request, CandidateBaseUrl);
+            var result = await _sender.Send(new ConfirmHrReviewCommand(userId, request));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
         }
 
         #endregion
+
+        private (Guid? accountId, string? email) GetCandidateIdentity()
+        {
+            var subClaim = User.FindFirst("sub")?.Value
+                           ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst("email")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            return (Guid.TryParse(subClaim, out var aid) ? aid : null, email);
+        }
 
         private Guid GetCurrentUserId()
         {

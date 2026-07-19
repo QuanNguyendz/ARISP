@@ -3,16 +3,17 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using ARI.Application.Hubs;
-using ARI.Application.Services;
+using ARI.Application.Interfaces;
 
 namespace ARI.API.Hubs
 {
     [Authorize]
     public class SessionHub : Hub<ISessionClient>
     {
-        private readonly InterviewService _interviewService;
+        // Gọi TRỰC TIẾP service (không qua MediatR) — critical path latency ADR-006.
+        private readonly IInterviewService _interviewService;
 
-        public SessionHub(InterviewService interviewService)
+        public SessionHub(IInterviewService interviewService)
         {
             _interviewService = interviewService;
         }

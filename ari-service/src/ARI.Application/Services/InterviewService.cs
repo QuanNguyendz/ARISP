@@ -14,7 +14,7 @@ using ARI.Domain.Constants;
 
 namespace ARI.Application.Services
 {
-    public class InterviewService
+    public class InterviewService : IInterviewService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAIProvider _aiProvider;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,7 +13,7 @@ namespace ARI.Application.Services
     /// <summary>
     /// Service quản lý sinh mã (Interview Code) và xác thực mã để bắt đầu Session phỏng vấn thật.
     /// </summary>
-    public class InterviewCodeService
+    public class InterviewCodeService : IInterviewCodeService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly InterviewService _interviewService;

@@ -36,7 +36,9 @@ namespace ARI.Application
             services.AddScoped<CvJdAnalysisService>();
             services.AddScoped<Interfaces.ICvJdAnalysisService>(sp => sp.GetRequiredService<CvJdAnalysisService>());
             services.AddScoped<InterviewService>();
+            services.AddScoped<Interfaces.IInterviewService>(sp => sp.GetRequiredService<InterviewService>());
             services.AddScoped<InterviewCodeService>();
+            services.AddScoped<Interfaces.IInterviewCodeService>(sp => sp.GetRequiredService<InterviewCodeService>());
 
             return services;
         }
