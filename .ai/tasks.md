@@ -303,6 +303,11 @@
 
 ## Completed
 
+- [x] 2026-07-19: **Refactor Phase 5 (Wave A) — Auth: `AuthController` 1107 → ~450 dòng thin controller, 15 commands + 1 query.**
+  - `ARI.Application/Auth/`: CandidateLogin, StaffLogin, CompleteExternalStaffSignIn (domain validate + pre-provisioning check), CompleteExternalCandidateSignIn (JIT provisioning), RefreshStaffToken, RefreshCandidateToken, Logout, RegisterCandidate, VerifyCandidateEmail, ResendCandidateVerification, VerifyMagicLink, CandidateForgotPassword, CandidateResetPassword, StaffForgotPassword, StaffResetPassword + GetCurrentUserQuery. `AuthSupport` (NormalizeEmail, IsStrongPassword, refresh-token issuance, verification email) + `AuthErrorCodes` + `Common/Security/TokenHashing` (SHA256).
+  - `Result.ErrorCode` (additive) để controller map failure → đúng status cũ (401 invalid_credentials, 403+code email_not_verified, 404 not_found, redirect pending/rejected cho OAuth). BCrypt/JWT inline → `IPasswordHasher`/`ITokenService`. Google OAuth Challenge/Authenticate/SignOut/Redirect + `BuildRedirectUrl` ở lại controller (protocol, không phải business logic). RegisterCandidate KHÔNG dùng validator cho password — giữ đúng thứ tự check gốc (email trùng trước, độ mạnh sau).
+  - Verify: build 0 lỗi, swagger diff = rỗng, smoke matrix 16 cases — status + body y hệt (401/400/403/404/503, message tiếng Việt verbatim, /me shape, thứ tự check register đúng).
+
 - [x] 2026-07-19: **Refactor Phase 4 — CQRS plumbing (MediatR + FluentValidation) + pilot StaffNotifications & Evaluations.**
   - Packages: MediatR **pin cứng [12.5.0]** (bản Apache-2.0 cuối — v13+ commercial), FluentValidation.DependencyInjectionExtensions 11.11.0, Microsoft.EntityFrameworkCore 8.0.4 vào ARI.Application (cho LINQ extension trong handler, giống JT); BCrypt.Net-Next + System.IdentityModel.Tokens.Jwt vào Infrastructure. KHÔNG AutoMapper (v15 commercial + projection thủ công là load-bearing).
   - 4 pipeline Behaviours (`Common/Behaviours/`): UnhandledException → Logging (pre-processor) → **Validation trả `Result.Failure` thay vì throw** (deviation JT có chủ đích — giữ Result Pattern + body 400 y hệt) → Performance (warn >500ms).

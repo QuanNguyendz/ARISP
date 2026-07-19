@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace ARI.Application.DTOs
+namespace ARI.Application.Auth
 {
     public class LoginRequest
     {

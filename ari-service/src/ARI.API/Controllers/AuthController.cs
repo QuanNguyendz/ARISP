@@ -1,38 +1,48 @@
 using System;
-using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using ARI.Application.DTOs;
-using ARI.Application.Interfaces;
-using ARI.Domain.Entities;
-using ARI.Domain.Constants;
+using ARI.Application.Auth;
+using ARI.Application.Auth.Commands.CandidateForgotPassword;
+using ARI.Application.Auth.Commands.CandidateLogin;
+using ARI.Application.Auth.Commands.CandidateResetPassword;
+using ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn;
+using ARI.Application.Auth.Commands.CompleteExternalStaffSignIn;
+using ARI.Application.Auth.Commands.Logout;
+using ARI.Application.Auth.Commands.RefreshCandidateToken;
+using ARI.Application.Auth.Commands.RefreshStaffToken;
+using ARI.Application.Auth.Commands.RegisterCandidate;
+using ARI.Application.Auth.Commands.ResendCandidateVerification;
+using ARI.Application.Auth.Commands.StaffForgotPassword;
+using ARI.Application.Auth.Commands.StaffLogin;
+using ARI.Application.Auth.Commands.StaffResetPassword;
+using ARI.Application.Auth.Commands.VerifyCandidateEmail;
+using ARI.Application.Auth.Commands.VerifyMagicLink;
+using ARI.Application.Auth.Queries.GetCurrentUser;
+using MediatR;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ARI.API.Controllers
 {
+    /// <summary>
+    /// Cổng xác thực — controller thin: nghiệp vụ nằm trong ARI.Application/Auth (CQRS),
+    /// controller chỉ giữ HTTP mapping + luồng protocol OAuth (Challenge/Authenticate/SignOut/Redirect).
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly ISender _sender;
         private readonly IConfiguration _configuration;
-        private readonly IEmailQueue _emailQueue;
 
-        private const int REFRESH_TOKEN_EXPIRY_DAYS = 30;
-
-        public AuthController(IUnitOfWork unitOfWork, IConfiguration configuration, IEmailQueue emailQueue)
+        public AuthController(ISender sender, IConfiguration configuration)
         {
-            _unitOfWork = unitOfWork;
+            _sender = sender;
             _configuration = configuration;
-            _emailQueue = emailQueue;
         }
 
         // ============================================================
@@ -47,40 +57,17 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateLogin([FromBody] LoginRequest request)
         {
-            var email = NormalizeEmail(request.Email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == email);
-            var candidate = candidates.FirstOrDefault();
-
-            if (candidate == null)
-                return Unauthorized(new { message = "Invalid email or password." });
-
-            // Tài khoản tạo qua Google Sign-In không có mật khẩu → hướng dẫn đăng nhập bằng Google
-            if (string.IsNullOrEmpty(candidate.PasswordHash))
-                return BadRequest(new { message = "Tài khoản này đăng ký qua Google. Vui lòng đăng nhập bằng Google." });
-
-            bool isValidCandidatePass = BCrypt.Net.BCrypt.Verify(request.Password, candidate.PasswordHash);
-            if (!isValidCandidatePass)
-                return Unauthorized(new { message = "Invalid email or password." });
-
-            // Chặn đăng nhập đến khi ứng viên xác minh email (code để FE hiển thị nút gửi lại)
-            if (!candidate.EmailVerified)
-                return StatusCode(403, new { message = "Tài khoản chưa được xác minh. Vui lòng kiểm tra email để kích hoạt.", code = "email_not_verified" });
-
-            // Cập nhật thời gian đăng nhập cuối
-            candidate.LastLoginAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<CandidateAccount>().Update(candidate);
-            await _unitOfWork.SaveChangesAsync();
-
-            var accessToken = GenerateJwtTokenForCandidate(candidate);
-            var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
-
-            return Ok(new AuthResponse
+            var result = await _sender.Send(new CandidateLoginCommand(request.Email, request.Password));
+            if (result.IsFailure)
             {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
-                FullName = candidate.FullName ?? "Candidate",
-                Role = AppRoles.Candidate
-            });
+                return result.ErrorCode switch
+                {
+                    AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error }),
+                    AuthErrorCodes.EmailNotVerified => StatusCode(403, new { message = result.Error, code = "email_not_verified" }),
+                    _ => Unauthorized(new { message = result.Error }),
+                };
+            }
+            return Ok(result.Value);
         }
 
         // ============================================================
@@ -95,39 +82,17 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> StaffLogin([FromBody] LoginRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
-                return BadRequest(new { message = "Email và mật khẩu là bắt buộc." });
-
-            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == request.Email);
-            var user = users.FirstOrDefault();
-
-            if (user == null)
-                return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
-
-            if (!user.IsActive)
-                return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên." });
-
-            if (string.IsNullOrEmpty(user.PasswordHash))
-                return BadRequest(new { message = "Tài khoản này chỉ hỗ trợ đăng nhập qua SSO." });
-
-            bool isValidPass = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-            if (!isValidPass)
-                return Unauthorized(new { message = "Sai email hoặc mật khẩu." });
-
-            user.LastLoginAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<User>().Update(user);
-            await _unitOfWork.SaveChangesAsync();
-
-            var accessToken = GenerateJwtTokenForUser(user);
-            var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
-
-            return Ok(new AuthResponse
+            var result = await _sender.Send(new StaffLoginCommand(request.Email, request.Password));
+            if (result.IsFailure)
             {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
-                FullName = user.FullName ?? "Staff",
-                Role = user.Role
-            });
+                return result.ErrorCode switch
+                {
+                    AuthErrorCodes.InvalidCredentials or AuthErrorCodes.AccountDisabled => Unauthorized(new { message = result.Error }),
+                    // SsoOnly + lỗi validation (không có ErrorCode) → 400 như cũ
+                    _ => BadRequest(new { message = result.Error }),
+                };
+            }
+            return Ok(result.Value);
         }
 
         // ============================================================
@@ -155,7 +120,7 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// CỔNG ĐĂNG NHẬP 2 (CALLBACK): TIẾP NHẬN DỮ LIỆU ĐĂNG NHẬP OAUTH2 VÀ XỬ LÝ JIT PROVISIONING
+        /// CỔNG ĐĂNG NHẬP 2 (CALLBACK): TIẾP NHẬN DỮ LIỆU ĐĂNG NHẬP OAUTH2 VÀ XỬ LÝ PROVISIONING
         /// </summary>
         [HttpGet("external/callback")]
         [AllowAnonymous]
@@ -169,7 +134,6 @@ namespace ARI.API.Controllers
 
             var externalPrincipal = result.Principal;
             var email = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email || c.Type == "email")?.Value;
-            var name = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name || c.Type == "name")?.Value;
 
             if (string.IsNullOrEmpty(email))
             {
@@ -177,55 +141,22 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = "External provider did not return an email." });
             }
 
-            // Ưu tiên danh sách miền do Super Admin cấu hình qua UI (bảng system_settings),
-            // fallback sang appsettings/env nếu DB chưa được set.
-            var dbDomainSetting = (await _unitOfWork.Repository<SystemSetting>()
-                .FindAsync(s => s.Key == "allowed_email_domains")).FirstOrDefault();
-            var allowed = !string.IsNullOrWhiteSpace(dbDomainSetting?.Value)
-                ? dbDomainSetting!.Value
-                : (_configuration["Authentication:AllowedDomains"] ?? _configuration["Auth:AllowedDomains"] ?? string.Empty);
-            var allowedDomains = allowed
-                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim().TrimStart('@').ToLower())
-                .Where(s => s.Length > 0)
-                .ToList();
-            var emailDomain = email.Split('@').ElementAtOrDefault(1)?.ToLower() ?? string.Empty;
-
-            var isDomainAllowed = !allowedDomains.Any() || allowedDomains.Contains(emailDomain);
-            if (!isDomainAllowed)
-            {
-                await HttpContext.SignOutAsync("External");
-                return Forbid();
-            }
-
-            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == email);
-            var user = users.FirstOrDefault();
-
-            if (user != null)
-            {
-                if (!user.IsActive || user.Role == "Pending")
-                {
-                    await HttpContext.SignOutAsync("External");
-                    var pendingUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "pending_approval") });
-                    return Redirect(pendingUrl);
-                }
-
-                user.LastLoginAt = DateTimeOffset.UtcNow;
-                _unitOfWork.Repository<User>().Update(user);
-                await _unitOfWork.SaveChangesAsync();
-
-                var token = GenerateJwtTokenForUser(user);
-                var refreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
-                await HttpContext.SignOutAsync("External");
-
-                var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(token)}&refresh_token={Uri.EscapeDataString(refreshToken)}&role={Uri.EscapeDataString(user.Role)}");
-                return Redirect(redirectUrl);
-            }
-
-            // Tài khoản chưa được Super Admin cấp phát → CHẶN đăng nhập, KHÔNG tự động tạo tài khoản
+            var signIn = await _sender.Send(new CompleteExternalStaffSignInCommand(email));
             await HttpContext.SignOutAsync("External");
-            var rejectedUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", "account_not_provisioned") });
-            return Redirect(rejectedUrl);
+
+            if (signIn.IsFailure)
+            {
+                return signIn.ErrorCode switch
+                {
+                    AuthErrorCodes.DomainNotAllowed => Forbid(),
+                    AuthErrorCodes.PendingApproval => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "pending_approval") })),
+                    _ => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", "account_not_provisioned") })),
+                };
+            }
+
+            var tokens = signIn.Value;
+            var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(tokens.AccessToken)}&refresh_token={Uri.EscapeDataString(tokens.RefreshToken)}&role={Uri.EscapeDataString(tokens.Role)}");
+            return Redirect(redirectUrl);
         }
 
         // ============================================================
@@ -279,44 +210,17 @@ namespace ARI.API.Controllers
                 return Redirect(noEmailUrl);
             }
 
-            var email = NormalizeEmail(rawEmail);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == email);
-            var candidate = candidates.FirstOrDefault();
-
-            if (candidate == null)
-            {
-                // JIT provisioning — ứng viên đăng nhập Google lần đầu: tạo tài khoản tự do (không cần mật khẩu)
-                candidate = new CandidateAccount
-                {
-                    Email = email,
-                    PasswordHash = string.Empty,
-                    FullName = string.IsNullOrWhiteSpace(name) ? email.Split('@')[0] : name,
-                    EmailVerified = true,
-                    LastLoginAt = DateTimeOffset.UtcNow
-                };
-                await _unitOfWork.Repository<CandidateAccount>().AddAsync(candidate);
-                await _unitOfWork.SaveChangesAsync();
-            }
-            else
-            {
-                if (!candidate.IsActive)
-                {
-                    await HttpContext.SignOutAsync("External");
-                    var disabledUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "error"), ("message", "account_disabled") });
-                    return Redirect(disabledUrl);
-                }
-
-                candidate.LastLoginAt = DateTimeOffset.UtcNow;
-                if (!candidate.EmailVerified) candidate.EmailVerified = true;
-                _unitOfWork.Repository<CandidateAccount>().Update(candidate);
-                await _unitOfWork.SaveChangesAsync();
-            }
-
-            var token = GenerateJwtTokenForCandidate(candidate);
-            var refreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
+            var signIn = await _sender.Send(new CompleteExternalCandidateSignInCommand(rawEmail, name));
             await HttpContext.SignOutAsync("External");
 
-            var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(token)}&refresh_token={Uri.EscapeDataString(refreshToken)}&role={Uri.EscapeDataString(AppRoles.Candidate)}");
+            if (signIn.IsFailure)
+            {
+                var disabledUrl = BuildRedirectUrl(returnUrl, new[] { ("status", "error"), ("message", "account_disabled") });
+                return Redirect(disabledUrl);
+            }
+
+            var tokens = signIn.Value;
+            var redirectUrl = BuildRedirectUrl(returnUrl, fragment: $"access_token={Uri.EscapeDataString(tokens.AccessToken)}&refresh_token={Uri.EscapeDataString(tokens.RefreshToken)}&role={Uri.EscapeDataString(tokens.Role)}");
             return Redirect(redirectUrl);
         }
 
@@ -332,41 +236,15 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> RefreshTokenForUser([FromBody] RefreshTokenRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
-                return BadRequest(new { message = "Refresh token is required." });
-
-            var tokenHash = HashToken(request.RefreshToken);
-
-            var storedTokens = await _unitOfWork.Repository<RefreshToken>().FindAsync(rt => 
-                rt.TokenHash == tokenHash
-                && rt.RevokedAt == null
-                && rt.ExpiresAt > DateTimeOffset.UtcNow);
-            var storedToken = storedTokens.FirstOrDefault();
-
-            if (storedToken == null)
-                return Unauthorized(new { message = "Invalid or expired refresh token." });
-
-            // Revoke token cũ
-            storedToken.RevokedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<RefreshToken>().Update(storedToken);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Tìm user để sinh JWT mới
-            var user = await _unitOfWork.Repository<User>().GetByIdAsync(storedToken.UserId);
-            if (user == null)
-                return Unauthorized(new { message = "User not found." });
-
-            // Sinh token mới
-            var newAccessToken = GenerateJwtTokenForUser(user);
-            var newRefreshToken = await GenerateAndStoreRefreshTokenForUserAsync(user.Id);
-
-            return Ok(new AuthResponse
+            var result = await _sender.Send(new RefreshStaffTokenCommand(request.RefreshToken));
+            if (result.IsFailure)
             {
-                AccessToken = newAccessToken,
-                RefreshToken = newRefreshToken,
-                FullName = user.FullName ?? "",
-                Role = user.Role
-            });
+                // Lỗi validation (thiếu token, không có ErrorCode) → 400; token sai/hết hạn → 401
+                return result.ErrorCode is null
+                    ? BadRequest(new { message = result.Error })
+                    : Unauthorized(new { message = result.Error });
+            }
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -376,41 +254,14 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> RefreshTokenForCandidate([FromBody] RefreshTokenRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
-                return BadRequest(new { message = "Refresh token is required." });
-
-            var tokenHash = HashToken(request.RefreshToken);
-
-            var storedTokens = await _unitOfWork.Repository<CandidateRefreshToken>().FindAsync(rt => 
-                rt.TokenHash == tokenHash
-                && rt.RevokedAt == null
-                && rt.ExpiresAt > DateTimeOffset.UtcNow);
-            var storedToken = storedTokens.FirstOrDefault();
-
-            if (storedToken == null)
-                return Unauthorized(new { message = "Invalid or expired refresh token." });
-
-            // Revoke token cũ
-            storedToken.RevokedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<CandidateRefreshToken>().Update(storedToken);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Tìm candidate để sinh JWT mới
-            var candidate = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(storedToken.CandidateAccountId);
-            if (candidate == null)
-                return Unauthorized(new { message = "Candidate not found." });
-
-            // Sinh token mới
-            var newAccessToken = GenerateJwtTokenForCandidate(candidate);
-            var newRefreshToken = await GenerateAndStoreRefreshTokenForCandidateAsync(candidate.Id);
-
-            return Ok(new AuthResponse
+            var result = await _sender.Send(new RefreshCandidateTokenCommand(request.RefreshToken));
+            if (result.IsFailure)
             {
-                AccessToken = newAccessToken,
-                RefreshToken = newRefreshToken,
-                FullName = candidate.FullName ?? "Candidate",
-                Role = AppRoles.Candidate
-            });
+                return result.ErrorCode is null
+                    ? BadRequest(new { message = result.Error })
+                    : Unauthorized(new { message = result.Error });
+            }
+            return Ok(result.Value);
         }
 
         // ============================================================
@@ -435,33 +286,8 @@ namespace ARI.API.Controllers
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "Invalid token." });
 
-            string fullName = "";
-
-            // Xác định user type dựa theo role
-            if (role == AppRoles.Candidate)
-            {
-                if (Guid.TryParse(userId, out var candidateGuid))
-                {
-                    var candidate = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(candidateGuid);
-                    fullName = candidate?.FullName ?? "";
-                }
-            }
-            else
-            {
-                if (Guid.TryParse(userId, out var userGuid))
-                {
-                    var user = await _unitOfWork.Repository<User>().GetByIdAsync(userGuid);
-                    fullName = user?.FullName ?? "";
-                }
-            }
-
-            return Ok(new UserMeResponse
-            {
-                Id = userId,
-                Email = email ?? "",
-                Name = fullName,
-                Role = role ?? ""
-            });
+            var result = await _sender.Send(new GetCurrentUserQuery(userId, email, role));
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -472,31 +298,7 @@ namespace ARI.API.Controllers
         [Authorize]
         public async Task<IActionResult> Logout([FromBody] LogoutRequest? request = null)
         {
-            if (!string.IsNullOrWhiteSpace(request?.RefreshToken))
-            {
-                var tokenHash = HashToken(request.RefreshToken);
-
-                // Thử tìm trong bảng RefreshTokens (HR User)
-                var hrTokens = await _unitOfWork.Repository<RefreshToken>().FindAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
-                var hrToken = hrTokens.FirstOrDefault();
-                if (hrToken != null)
-                {
-                    hrToken.RevokedAt = DateTimeOffset.UtcNow;
-                    _unitOfWork.Repository<RefreshToken>().Update(hrToken);
-                }
-
-                // Thử tìm trong bảng CandidateRefreshTokens
-                var candidateTokens = await _unitOfWork.Repository<CandidateRefreshToken>().FindAsync(rt => rt.TokenHash == tokenHash && rt.RevokedAt == null);
-                var candidateToken = candidateTokens.FirstOrDefault();
-                if (candidateToken != null)
-                {
-                    candidateToken.RevokedAt = DateTimeOffset.UtcNow;
-                    _unitOfWork.Repository<CandidateRefreshToken>().Update(candidateToken);
-                }
-
-                await _unitOfWork.SaveChangesAsync();
-            }
-
+            await _sender.Send(new LogoutCommand(request?.RefreshToken));
             return Ok(new { message = "Logged out successfully." });
         }
 
@@ -511,32 +313,9 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> RegisterCandidate([FromBody] CandidateRegisterRequest request)
         {
-            var email = NormalizeEmail(request.Email);
-            var existing = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == email);
-            if (existing.Any())
-            {
-                return BadRequest(new { message = "Email already registered." });
-            }
-
-            if (!IsStrongPassword(request.Password, out var validationError))
-            {
-                return BadRequest(new { message = validationError });
-            }
-
-            var account = new CandidateAccount
-            {
-                Email = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                FullName = request.FullName,
-                Phone = request.Phone,
-                EmailVerified = false
-            };
-
-            await _unitOfWork.Repository<CandidateAccount>().AddAsync(account);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Gửi email xác minh — ứng viên phải bấm link mới đăng nhập được
-            await SendCandidateVerificationEmailAsync(account);
+            var result = await _sender.Send(new RegisterCandidateCommand(request.Email, request.Password, request.FullName, request.Phone));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản." });
         }
@@ -552,40 +331,11 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> VerifyCandidateEmail([FromQuery] string email, [FromQuery] string token)
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
-                return BadRequest(new { message = "Thiếu email hoặc token xác minh." });
+            var result = await _sender.Send(new VerifyCandidateEmailCommand(email, token));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
-            var normalizedEmail = NormalizeEmail(email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == normalizedEmail);
-            var candidate = candidates.FirstOrDefault();
-
-            if (candidate == null)
-                return BadRequest(new { message = "Liên kết xác minh không hợp lệ." });
-
-            if (candidate.EmailVerified)
-                return Ok(new { message = "Tài khoản đã được xác minh trước đó. Bạn có thể đăng nhập." });
-
-            var magicLinks = await _unitOfWork.Repository<MagicLink>().FindAsync(m =>
-                m.Email.ToLower() == normalizedEmail
-                && m.TokenHash == token
-                && m.Audience == MagicLinkAudience.CandidateEmailVerify
-                && m.UsedAt == null
-                && m.ExpiresAt > DateTimeOffset.UtcNow);
-            var magicLink = magicLinks.FirstOrDefault();
-
-            if (magicLink == null)
-                return BadRequest(new { message = "Liên kết xác minh không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu gửi lại." });
-
-            candidate.EmailVerified = true;
-            candidate.UpdatedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<CandidateAccount>().Update(candidate);
-
-            magicLink.UsedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<MagicLink>().Update(magicLink);
-
-            await _unitOfWork.SaveChangesAsync();
-
-            return Ok(new { message = "Xác minh email thành công. Bạn có thể đăng nhập ngay bây giờ." });
+            return Ok(new { message = result.Value });
         }
 
         /// <summary>
@@ -596,18 +346,9 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> ResendCandidateVerification([FromBody] ForgotPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
-                return BadRequest(new { message = "Email là bắt buộc." });
-
-            var normalizedEmail = NormalizeEmail(request.Email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == normalizedEmail);
-            var candidate = candidates.FirstOrDefault();
-
-            // Chỉ gửi khi tài khoản tồn tại & chưa xác minh
-            if (candidate != null && !candidate.EmailVerified)
-            {
-                await SendCandidateVerificationEmailAsync(candidate);
-            }
+            var result = await _sender.Send(new ResendCandidateVerificationCommand(request.Email));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "Nếu tài khoản tồn tại và chưa xác minh, email xác minh đã được gửi lại." });
         }
@@ -623,21 +364,18 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> VerifyMagicLink([FromQuery] string email, [FromQuery] string token)
         {
-            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
-                return BadRequest(new { message = "Invalid token or email." });
+            var result = await _sender.Send(new VerifyMagicLinkCommand(email, token));
+            if (result.IsFailure)
+            {
+                return result.ErrorCode == AuthErrorCodes.NotFound
+                    ? NotFound(new { message = result.Error })
+                    : BadRequest(new { message = result.Error });
+            }
 
-            var normalizedEmail = NormalizeEmail(email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == normalizedEmail);
-            var candidate = candidates.FirstOrDefault();
-
-            if (candidate == null)
-                return NotFound(new { message = "Candidate account not found." });
-
-            var candidateToken = GenerateJwtTokenForCandidate(candidate);
             return Ok(new
             {
                 message = "Magic link authenticated successfully.",
-                token = candidateToken
+                token = result.Value
             });
         }
 
@@ -652,53 +390,9 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
-                return BadRequest(new { message = "Email is required." });
-
-            var normalizedEmail = NormalizeEmail(request.Email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == normalizedEmail);
-            var candidate = candidates.FirstOrDefault();
-
-            // Bảo mật: Luôn báo Ok để tránh kẻ xấu lợi dụng dò tìm email có tồn tại hay không
-            if (candidate == null)
-                return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
-
-            var resetToken = Guid.NewGuid().ToString("N");
-
-            // 1. Tạo bản ghi MagicLink mới dựa trên class MagicLink
-            var magicLinkRecord = new MagicLink
-            {
-                Id = Guid.NewGuid(),
-                Email = candidate.Email,
-                TokenHash = resetToken,
-                Audience = MagicLinkAudience.Candidate,
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(2), // Link có giá trị trong 2 giờ
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-
-            // 2. Lưu token vào bảng MagicLinks
-            await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord);
-            await _unitOfWork.SaveChangesAsync();
-
-            var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
-            var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}&audience={MagicLinkAudience.Candidate}";
-
-            var emailBody = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;'>
-                    <h2 style='color: #0056b3; text-align: center;'>ARISP Account Password Reset</h2>
-                    <p>Hi {candidate.FullName ?? "Candidate"},</p>
-                    <p>We received a request to reset your password. Click the button below to set up a new password. This link is valid for 2 hours:</p>
-                    <div style='text-align: center; margin: 30px 0;'>
-                        <a href='{resetLink}' style='background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;'>Reset Password</a>
-                    </div>
-                    <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
-                    <p style='word-break: break-all; color: #666;'>{resetLink}</p>
-                    <hr style='border: none; border-top: 1px solid #eee;'/>
-                    <p style='font-size: 12px; color: #999;'>If you did not request this change, please ignore this email.</p>
-                </div>";
-
-            // Gửi mail qua hàng đợi nền — không chặn response (tránh độ trễ SMTP 3–4s)
-            _emailQueue.Enqueue(new EmailQueueItem(candidate.Email, "Reset Your ARISP Account Password", emailBody));
+            var result = await _sender.Send(new CandidateForgotPasswordCommand(request.Email));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
         }
@@ -710,254 +404,53 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CandidateResetPassword([FromBody] ResetPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
-            {
-                return BadRequest(new { message = "Missing required fields." });
-            }
-
-            // 1. Tìm ứng viên dựa theo email
-            var normalizedEmail = NormalizeEmail(request.Email);
-            var candidates = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == normalizedEmail);
-            var candidate = candidates.FirstOrDefault();
-
-            if (candidate == null)
-            {
-                return BadRequest(new { message = "Invalid email or recovery token." });
-            }
-
-            // Tìm token hợp lệ trong bảng MagicLinks (chỉ token thuộc cổng Candidate)
-            var magicLinks = await _unitOfWork.Repository<MagicLink>().FindAsync(m =>
-                m.Email.ToLower() == normalizedEmail
-                && m.TokenHash == request.Token
-                && m.Audience == MagicLinkAudience.Candidate
-                && m.UsedAt == null
-                && m.ExpiresAt > DateTimeOffset.UtcNow);
-            var magicLink = magicLinks.FirstOrDefault();
-
-            if (magicLink == null)
-            {
-                return BadRequest(new { message = "Invalid, expired, or already used recovery token." });
-            }
-
-            if (!IsStrongPassword(request.NewPassword, out var validationError))
-            {
-                return BadRequest(new { message = validationError });
-            }
-
-            // 2. Cập nhật mật khẩu mới hóa mã BCrypt
-            candidate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-            candidate.UpdatedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<CandidateAccount>().Update(candidate);
-
-            // 3. Đánh dấu token đã được sử dụng để tránh dùng lại (Tăng cường bảo mật)
-            magicLink.UsedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<MagicLink>().Update(magicLink);
-
-            await _unitOfWork.SaveChangesAsync();
+            var result = await _sender.Send(new CandidateResetPasswordCommand(request.Email, request.Token, request.NewPassword));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
         }
 
         /// <summary>
         /// API QUÊN MẬT KHẨU DÀNH RIÊNG CHO STAFF NỘI BỘ (Super Admin / HR Admin / Recruiter).
-        /// Tách biệt khỏi luồng Candidate – tra cứu bảng Users, token gắn Audience="staff".
-        /// Tài khoản chỉ đăng nhập qua SSO (không có mật khẩu) vẫn được phép đặt mật khẩu lần đầu qua link này.
         /// </summary>
         [HttpPost("staff/forgot-password")]
         [AllowAnonymous]
         public async Task<IActionResult> StaffForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
-                return BadRequest(new { message = "Email is required." });
-
-            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == request.Email);
-            var user = users.FirstOrDefault();
-
-            // Bảo mật: Luôn trả Ok để tránh dò tìm email tồn tại. Chỉ gửi thư khi tài khoản hợp lệ & đang hoạt động.
-            if (user != null && user.IsActive)
-            {
-                var resetToken = Guid.NewGuid().ToString("N");
-
-                var magicLinkRecord = new MagicLink
-                {
-                    Id = Guid.NewGuid(),
-                    Email = user.Email,
-                    TokenHash = resetToken,
-                    Audience = MagicLinkAudience.Staff,
-                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(2), // Link có giá trị trong 2 giờ
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-
-                await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord);
-                await _unitOfWork.SaveChangesAsync();
-
-                var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
-                var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(user.Email)}&audience={MagicLinkAudience.Staff}";
-
-                var emailBody = $@"
-                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;'>
-                        <h2 style='color: #0056b3; text-align: center;'>ARISP Staff Account Password Reset</h2>
-                        <p>Hi {user.FullName ?? "there"},</p>
-                        <p>We received a request to reset the password for your ARISP internal account. Click the button below to set up a new password. This link is valid for 2 hours:</p>
-                        <div style='text-align: center; margin: 30px 0;'>
-                            <a href='{resetLink}' style='background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;'>Reset Password</a>
-                        </div>
-                        <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
-                        <p style='word-break: break-all; color: #666;'>{resetLink}</p>
-                        <hr style='border: none; border-top: 1px solid #eee;'/>
-                        <p style='font-size: 12px; color: #999;'>If you did not request this change, please ignore this email or contact your administrator.</p>
-                    </div>";
-
-                // Gửi mail qua hàng đợi nền — không chặn response (tránh độ trễ SMTP 3–4s)
-                _emailQueue.Enqueue(new EmailQueueItem(user.Email, "Reset Your ARISP Staff Account Password", emailBody));
-            }
+            var result = await _sender.Send(new StaffForgotPasswordCommand(request.Email));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
         }
 
         /// <summary>
         /// API ĐẶT LẠI MẬT KHẨU DÀNH RIÊNG CHO STAFF NỘI BỘ.
-        /// Xác thực token Audience="staff" trong bảng MagicLinks rồi cập nhật mật khẩu trong bảng Users.
         /// </summary>
         [HttpPost("staff/reset-password")]
         [AllowAnonymous]
         public async Task<IActionResult> StaffResetPassword([FromBody] ResetPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
-            {
-                return BadRequest(new { message = "Missing required fields." });
-            }
-
-            var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == request.Email);
-            var user = users.FirstOrDefault();
-
-            if (user == null || !user.IsActive)
-            {
-                return BadRequest(new { message = "Invalid email or recovery token." });
-            }
-
-            // Tìm token hợp lệ trong bảng MagicLinks (chỉ token thuộc cổng Staff)
-            var magicLinks = await _unitOfWork.Repository<MagicLink>().FindAsync(m =>
-                m.Email == request.Email
-                && m.TokenHash == request.Token
-                && m.Audience == MagicLinkAudience.Staff
-                && m.UsedAt == null
-                && m.ExpiresAt > DateTimeOffset.UtcNow);
-            var magicLink = magicLinks.FirstOrDefault();
-
-            if (magicLink == null)
-            {
-                return BadRequest(new { message = "Invalid, expired, or already used recovery token." });
-            }
-
-            if (!IsStrongPassword(request.NewPassword, out var validationError))
-            {
-                return BadRequest(new { message = validationError });
-            }
-
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-            user.UpdatedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<User>().Update(user);
-
-            // Đánh dấu token đã dùng để chống tái sử dụng
-            magicLink.UsedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<MagicLink>().Update(magicLink);
-
-            await _unitOfWork.SaveChangesAsync();
+            var result = await _sender.Send(new StaffResetPasswordCommand(request.Email, request.Token, request.NewPassword));
+            if (result.IsFailure)
+                return BadRequest(new { message = result.Error });
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
         }
 
-        /// <summary>
-        /// Chuẩn hóa email: trim + chữ thường. Gmail/đa số provider không phân biệt hoa thường,
-        /// nên chuẩn hóa để tránh tạo trùng tài khoản giữa đăng ký thủ công và đăng nhập Google.
-        /// </summary>
-        private static string NormalizeEmail(string? email) => (email ?? string.Empty).Trim().ToLowerInvariant();
-
-        private bool IsStrongPassword(string password, out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-            {
-                errorMessage = "Mật khẩu phải có ít nhất 8 ký tự.";
-                return false;
-            }
-
-            if (!password.Any(char.IsUpper))
-            {
-                errorMessage = "Mật khẩu phải chứa ít nhất một chữ hoa.";
-                return false;
-            }
-
-            if (!password.Any(char.IsDigit))
-            {
-                errorMessage = "Mật khẩu phải chứa ít nhất một chữ số.";
-                return false;
-            }
-
-            const string specialCharacters = "!@#$%^&*";
-            if (!password.Any(c => specialCharacters.Contains(c)))
-            {
-                errorMessage = "Mật khẩu phải chứa ít nhất một ký tự đặc biệt trong !@#$%^&*.";
-                return false;
-            }
-
-            return true;
-        }
-
         // ============================================================
-        // PRIVATE HELPERS
+        // PRIVATE HELPERS (HTTP/protocol concerns — ở lại controller)
         // ============================================================
 
         /// <summary>
         /// Kiểm tra một external auth scheme (vd "Google") đã được đăng ký chưa.
-        /// Provider chỉ được đăng ký khi có credentials thật (xem Program.cs) — tránh Challenge ném 500 khi tắt mềm ở Dev.
+        /// Provider chỉ được đăng ký khi có credentials thật — tránh Challenge ném 500 khi tắt mềm ở Dev.
         /// </summary>
         private async Task<bool> IsExternalProviderAvailableAsync(string provider)
         {
             var schemeProvider = HttpContext.RequestServices.GetRequiredService<IAuthenticationSchemeProvider>();
             return await schemeProvider.GetSchemeAsync(provider) is not null;
-        }
-
-        /// <summary>
-        /// Sinh token xác minh (Audience=candidate_verify, TTL 24h), lưu vào MagicLinks và gửi email kích hoạt.
-        /// </summary>
-        private async Task SendCandidateVerificationEmailAsync(CandidateAccount candidate)
-        {
-            var verifyToken = Guid.NewGuid().ToString("N");
-
-            var magicLinkRecord = new MagicLink
-            {
-                Id = Guid.NewGuid(),
-                Email = candidate.Email,
-                TokenHash = verifyToken,
-                Audience = MagicLinkAudience.CandidateEmailVerify,
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(24),
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-
-            await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord);
-            await _unitOfWork.SaveChangesAsync();
-
-            var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
-            var verifyLink = $"{frontendUrl}/auth/verify-email?token={verifyToken}&email={Uri.EscapeDataString(candidate.Email)}";
-
-            var emailBody = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;'>
-                    <h2 style='color: #0056b3; text-align: center;'>Xác minh tài khoản ARISP</h2>
-                    <p>Chào {candidate.FullName ?? "bạn"},</p>
-                    <p>Cảm ơn bạn đã đăng ký. Vui lòng bấm nút bên dưới để xác minh email và kích hoạt tài khoản. Liên kết có hiệu lực trong 24 giờ:</p>
-                    <div style='text-align: center; margin: 30px 0;'>
-                        <a href='{verifyLink}' style='background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;'>Xác minh email</a>
-                    </div>
-                    <p>Nếu nút không hoạt động, hãy sao chép liên kết sau vào trình duyệt:</p>
-                    <p style='word-break: break-all; color: #666;'>{verifyLink}</p>
-                    <hr style='border: none; border-top: 1px solid #eee;'/>
-                    <p style='font-size: 12px; color: #999;'>Nếu bạn không tạo tài khoản này, vui lòng bỏ qua email.</p>
-                </div>";
-
-            _emailQueue.Enqueue(new EmailQueueItem(candidate.Email, "Xác minh tài khoản ARISP của bạn", emailBody));
         }
 
         private string BuildRedirectUrl(string returnUrl, (string, string)[]? queryPairs = null, string? fragment = null)
@@ -993,116 +486,6 @@ namespace ARI.API.Controllers
             }
 
             return target;
-        }
-
-        /// <summary>
-        /// Hash token bằng SHA256 để lưu an toàn trong DB
-        /// </summary>
-        private static string HashToken(string token)
-        {
-            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-            return Convert.ToBase64String(bytes);
-        }
-
-        /// <summary>
-        /// Sinh refresh token mới cho HR User, hash SHA256 rồi lưu vào bảng RefreshTokens.
-        /// Trả về token gốc (chưa hash) để gửi cho client.
-        /// </summary>
-        private async Task<string> GenerateAndStoreRefreshTokenForUserAsync(Guid userId)
-        {
-            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-            var tokenHash = HashToken(rawToken);
-
-            var refreshTokenEntity = new RefreshToken
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                TokenHash = tokenHash,
-                ExpiresAt = DateTimeOffset.UtcNow.AddDays(REFRESH_TOKEN_EXPIRY_DAYS),
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-
-            await _unitOfWork.Repository<RefreshToken>().AddAsync(refreshTokenEntity);
-            await _unitOfWork.SaveChangesAsync();
-
-            return rawToken;
-        }
-
-        /// <summary>
-        /// Sinh refresh token mới cho Candidate, hash SHA256 rồi lưu vào bảng CandidateRefreshTokens.
-        /// Trả về token gốc (chưa hash) để gửi cho client.
-        /// </summary>
-        private async Task<string> GenerateAndStoreRefreshTokenForCandidateAsync(Guid candidateAccountId)
-        {
-            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-            var tokenHash = HashToken(rawToken);
-
-            var refreshTokenEntity = new CandidateRefreshToken
-            {
-                Id = Guid.NewGuid(),
-                CandidateAccountId = candidateAccountId,
-                TokenHash = tokenHash,
-                ExpiresAt = DateTimeOffset.UtcNow.AddDays(REFRESH_TOKEN_EXPIRY_DAYS),
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-
-            await _unitOfWork.Repository<CandidateRefreshToken>().AddAsync(refreshTokenEntity);
-            await _unitOfWork.SaveChangesAsync();
-
-            return rawToken;
-        }
-
-        private string GenerateJwtTokenForUser(User user)
-        {
-            var roleClaimValue = user.Role switch
-            {
-                "super_admin" => AppRoles.SuperAdmin,
-                "hr_admin" => AppRoles.HrAdmin,
-                "recruiter" => AppRoles.Recruiter,
-                _ => user.Role
-            };
-
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("name", user.FullName ?? string.Empty),
-                new Claim("role", roleClaimValue)
-            };
-
-            return CreateTokenString(claims);
-        }
-
-        private string GenerateJwtTokenForCandidate(CandidateAccount candidate)
-        {
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, candidate.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, candidate.Email),
-                new Claim("name", candidate.FullName ?? string.Empty),
-                new Claim("role", AppRoles.Candidate)
-            };
-
-            return CreateTokenString(claims);
-        }
-
-        private string CreateTokenString(Claim[] claims)
-        {
-            var keyStr = _configuration["JWT:Secret"] is { Length: > 0 } s ? s
-                : Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
-            if (string.IsNullOrEmpty(keyStr))
-                throw new InvalidOperationException("JWT:Secret is not configured.");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyStr));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:Issuer"] ?? "ARISP",
-                audience: _configuration["JWT:Audience"] ?? "ARISP_Client",
-                claims: claims,
-                expires: DateTime.Now.AddDays(7),
-                signingCredentials: credentials);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
