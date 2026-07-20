@@ -49,15 +49,43 @@ services:
       - arisp-network
     restart: unless-stopped
 
-  # --- React Frontend ---
-  frontend:
+  # --- React Frontend: Candidate site (public) ---
+  frontend-candidate:
     build:
       context: ../ari-web
       dockerfile: ../docker/frontend/Dockerfile
       target: development
-    container_name: arisp-frontend
+      args:
+        PKG: "@ari/candidate-site"
+        SITE: ARI.CandidateSite
+        PORT: "3000"
+    container_name: arisp-frontend-candidate
     ports:
       - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ../ari-web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - arisp-network
+    restart: unless-stopped
+
+  # --- React Frontend: Staff site (nội bộ) ---
+  frontend-staff:
+    build:
+      context: ../ari-web
+      dockerfile: ../docker/frontend/Dockerfile
+      target: development
+      args:
+        PKG: "@ari/staff-site"
+        SITE: ARI.StaffSite
+        PORT: "3001"
+    container_name: arisp-frontend-staff
+    ports:
+      - "3001:3001"
     env_file:
       - .env
     volumes:
@@ -98,7 +126,8 @@ services:
       - ../nginx/snippets:/etc/nginx/snippets:ro
     depends_on:
       - backend
-      - frontend
+      - frontend-candidate
+      - frontend-staff
     networks:
       - arisp-network
     restart: unless-stopped

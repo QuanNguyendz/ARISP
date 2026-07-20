@@ -65,7 +65,8 @@ namespace ARI.Application.Auth.Commands.CandidateForgotPassword
             await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord, ct);
             await _unitOfWork.SaveChangesAsync();
 
-            var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+            // ADR-046: link reset của candidate phải về Candidate site → ưu tiên CandidateBaseUrl.
+            var frontendUrl = _configuration["Frontend:CandidateBaseUrl"] ?? _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
             var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}&audience={MagicLinkAudience.Candidate}";
 
             var emailBody = $@"

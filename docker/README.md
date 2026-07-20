@@ -21,11 +21,18 @@ docker compose up --build
 | Service | Container | Port (host) | Mô tả |
 |---|---|---|---|
 | **backend** | `arisp-backend` | 5000 | ASP.NET Core .NET 8 – REST API + SignalR |
-| **frontend** | `arisp-frontend` | 3000 | React + TypeScript (Vite dev server) |
+| **frontend-candidate** | `arisp-frontend-candidate` | 3000 | Candidate site (public) — `@ari/candidate-site` |
+| **frontend-staff** | `arisp-frontend-staff` | 3001 | Staff site (nội bộ) — `@ari/staff-site` |
 | **redis** | `arisp-redis` | 6379 | Cache (session, rate limiting) |
-| **nginx** | `arisp-nginx` | 80 | Reverse proxy (routing frontend + backend) |
+| **nginx** | `arisp-nginx` | 80 | Reverse proxy host-based (localhost → candidate, staff.localhost → staff) |
 
 > **PostgreSQL** hosted trên Supabase – không containerize. Kết nối qua `DATABASE_*` env vars.
+
+> **Frontend là monorepo npm workspaces** (`ari-web/`): `ARI.CandidateSite`, `ARI.StaffSite`, `ARI.Shared`.
+> Dev không dùng Docker: `cd ari-web && npm install` rồi `npm run dev:candidate` (3000) / `npm run dev:staff` (3001).
+> Qua Nginx: Candidate = `http://localhost`, Staff = `http://staff.localhost` (trình duyệt hiện đại tự phân giải `*.localhost`;
+> nếu không, thêm `127.0.0.1 staff.localhost` vào file hosts).
+> Backend CORS/OAuth: `Authentication:AdminFrontendUrl` = staff origin (3001), `Frontend:CandidateBaseUrl` = candidate origin (3000) — ADR-046.
 
 ## Compose Files
 

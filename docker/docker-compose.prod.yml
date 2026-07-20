@@ -17,8 +17,19 @@ services:
           memory: 1G
           cpus: "1.0"
 
-  # --- Frontend: serve static build via nginx ---
-  frontend:
+  # --- Frontend Candidate: serve static build via nginx ---
+  frontend-candidate:
+    build:
+      target: production
+    volumes: []  # No source mount in production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # --- Frontend Staff: serve static build via nginx ---
+  frontend-staff:
     build:
       target: production
     volumes: []  # No source mount in production
