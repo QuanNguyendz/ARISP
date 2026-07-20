@@ -101,7 +101,7 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 
 | Layer | Technology |
 |---|---|
-| Frontend | React, TypeScript, TailwindCSS |
+| Frontend | React, TypeScript, TailwindCSS — monorepo `ari-web/` (npm workspaces): **ARI.CandidateSite** (public, 3000) + **ARI.StaffSite** (nội bộ, 3001) + **ARI.Shared** (ADR-046) |
 | Backend | C#, ASP.NET Core .NET 8 |
 | API Style | REST API + SignalR |
 | Realtime Media | WebRTC |
@@ -155,19 +155,24 @@ ari-service/
 
 **Naming:** Component: PascalCase | Hook: prefix `use` | Util: camelCase | Type/Interface: PascalCase
 
-**File Structure:**
+**File Structure (`ari-web/` — npm workspaces, 3 package — ADR-046):**
 ```
-frontend/src/
-├── components/  # Reusable UI
-├── pages/       # Route-level components
-├── hooks/       # Custom hooks
-├── services/    # API calls (không fetch trực tiếp trong component)
-├── store/       # State management
-├── types/       # TypeScript interfaces & types
-└── utils/       # Pure utility functions
+ari-web/                         # workspaces root (1 package-lock.json), tsconfig.base.json
+├── src/ARI.Shared/              # @ari/shared — dùng chung, import source-level qua @ari/shared/*
+│   ├── tailwind-preset.cjs      # theme (ink/brand/ai) dùng chung
+│   └── src/{api, fservices, ui, guards, document, media, realtime,
+│            store, types, config, utils, authflows, i18n, styles}
+├── src/ARI.CandidateSite/       # @ari/candidate-site (port 3000, public deploy)
+│   └── src/{app(main+App+layouts), pages(theo domain), components, fservices, i18n}
+└── src/ARI.StaffSite/           # @ari/staff-site (port 3001, nội bộ)
+    └── src/{app(main+App+layouts), pages(hr/recruiter/super-admin), components, fservices, utils, i18n}
 ```
+- **`services/` → `fservices/`** (quy tắc "f" prefix). `fservices` mirror tên feature slice backend (tầng API).
+- **Mỗi folder một nhiệm vụ:** `app/` = routing+layouts, `pages/` = màn theo domain, `fservices/` = gọi API, `components/` = UI tái dùng.
+- Code dùng chung ở `ARI.Shared`; hướng phụ thuộc 1 chiều: site → Shared (Shared không import site).
+- Dev: `npm run dev:candidate` (3000) / `npm run dev:staff` (3001).
 
-**Patterns:** Không fetch API trong component – qua `services/`. Dùng custom hook cho logic tái sử dụng. Không dùng `any`.
+**Patterns:** Không fetch API trong component – qua `fservices/`. Dùng custom hook cho logic tái sử dụng. Không dùng `any`.
 
 ### Database (PostgreSQL + EF Core)
 
@@ -298,6 +303,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-041 | Vòng đời tài khoản staff: yêu cầu tạo (HR→SA duyệt) tách khỏi khóa/mở khóa (`AccountRequest` + `User.LockReason`) |
 | ADR-042 | Recruiter workspace cụm Job: `mine` filter, ứng viên theo job, Gemini trích xuất JD auto-fill (mở rộng ADR-030) |
 | ADR-045 | Refactor Clean Architecture chuẩn JT template: `ari-service/` (src/+tests/), namespace `ARI.*`, CQRS + MediatR **pin [12.5.0]** (v13 commercial), FluentValidation, thin controllers, DI per-project, schema 100% migrations. SessionHub gọi thẳng `IInterviewService` (không qua MediatR — latency ADR-006) |
+| ADR-046 | Refactor FE mirror ADR-045: `frontend/` → `ari-web/` (npm workspaces), tách **ARI.CandidateSite** (public, 3000) + **ARI.StaffSite** (nội bộ, 3001) + **ARI.Shared**. `services/`→`fservices/` (quy tắc "f"). Tách concern app/pages/fservices/components; import Shared qua `@ari/shared/*`. URL/API/DTO/localStorage/hub freeze. Nginx host-based 2 origin (localhost / staff.localhost); CORS thêm `Frontend:CandidateBaseUrl`. `configureApiClient` refresh riêng mỗi site (candidate = `/auth/candidate/refresh`) |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 

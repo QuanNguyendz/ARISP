@@ -1,6 +1,13 @@
-# ARISP Frontend - Developer Guide
+# ARISP Web - Developer Guide
 
 > Nền tảng tuyển dụng thông minh tích hợp AI Interview Automation
+>
+> **Monorepo npm workspaces (ADR-046)** — 3 package dưới `ari-web/src/`:
+> - **`ARI.CandidateSite`** (`@ari/candidate-site`, port **3000**) — site ứng viên (public, deploy): job board, portal, practice/real interview, kiosk.
+> - **`ARI.StaffSite`** (`@ari/staff-site`, port **3001**) — site nội bộ: HR / Recruiter / Super Admin.
+> - **`ARI.Shared`** (`@ari/shared`) — dùng chung, import source-level qua `@ari/shared/*` (không build step).
+>
+> Dev 2 site: `npm install` (ở `ari-web/`) rồi `npm run dev:candidate` và/hoặc `npm run dev:staff` (2 terminal).
 
 ---
 
@@ -50,118 +57,48 @@
 ## Cấu Trúc Thư Mục
 
 ```
-frontend/src/
-│
-├── main.tsx                              # Entry point
-├── App.tsx                               # Router - định nghĩa routes + layouts
-│
-├── components/
-│   │
-│   ├── layout/                          # Layout wrappers
-│   │   ├── SuperAdminLayout.tsx         # Super Admin
-│   │   ├── HrLayout.tsx                 # HR - sidebar + topbar + dark toggle
-│   │   ├── RecruiterLayout.tsx         # Recruiter
-│   │   ├── CandidateLayout.tsx          # Candidate
-│   │   ├── InterviewLayout.tsx          # Interview (always dark, fullscreen)
-│   │   └── AuthLayout.tsx               # Auth pages
-│   │
-│   ├── shared/                          # Shared components
-│   │   └── index.tsx                   # PageHeader, StatsCard, EmptyState, etc.
-│   │
-│   ├── ui/                              # Base UI
-│   │   ├── Button.tsx
-│   │   ├── GlassCard.tsx
-│   │   └── Container.tsx
-│   │
-│   ├── common/                          # Common
-│   │   ├── LoadingButton.tsx
-│   │   ├── LoadingSpinner.tsx
-│   │   └── ErrorAlert.tsx
-│   │
-│   ├── auth/
-│   │   └── ProtectedRoute.tsx          # Route protection
-│   │
-│   └── sections/                        # Landing page sections
-│       ├── Hero.tsx
-│       ├── Demo.tsx
-│       └── ...
-│
-├── pages/
-│   │
-│   ├── super-admin/                     # Super Admin pages
-│   │   ├── DashboardPage.tsx
-│   │   ├── UsersPage.tsx
-│   │   └── ...
-│   │
-│   ├── hr/                              # HR Leader pages
-│   │   ├── DashboardPage.tsx           # KPIs, funnel, recent candidates
-│   │   ├── EvaluationReviewPage.tsx    # Review & confirm AI verdicts
-│   │   └── ...
-│   │
-│   ├── recruiter/                       # Recruiter pages
-│   │   ├── DashboardPage.tsx
-│   │   ├── MyJobsPage.tsx
-│   │   ├── CandidatesPage.tsx
-│   │   └── ...
-│   │
-│   ├── admin/                           # Legacy/admin pages (đang migrate)
-│   │   ├── DashboardPage.tsx
-│   │   ├── JobPostingsPage.tsx
-│   │   └── ...
-│   │
-│   ├── candidate/                       # Candidate pages
-│   │   ├── DashboardPage.tsx
-│   │   ├── MyApplicationsPage.tsx
-│   │   └── ...
-│   │
-│   ├── interview/                       # Interview room
-│   │   ├── InterviewRoomPage.tsx        # Real interview
-│   │   └── PracticeSessionPage.tsx     # Practice
-│   │
-│   ├── auth/                            # Auth pages
-│   │   ├── LoginPage.tsx
-│   │   ├── RegisterPage.tsx
-│   │   ├── CandidateLoginPage.tsx
-│   │   └── ...
-│   │
-│   ├── landing/                         # Public landing
-│   │   ├── HomePage.tsx                # Employer landing
-│   │   └── FindJobPage.tsx             # Job board (/)
-│   │
-│   └── job-board/                       # Public job pages
-│       └── JobDetailPage.tsx
-│
-├── services/                             # API layer
-│   ├── apiClient.ts                    # Axios instance + interceptors
-│   ├── auth/authService.ts
-│   ├── job/jobService.ts
-│   ├── application/applicationService.ts
-│   ├── interview/interviewService.ts
-│   ├── evaluation/evaluationService.ts
-│   └── schedule/scheduleService.ts
-│
-├── store/                               # Zustand stores
-│   ├── auth/authStore.ts              # user, tokens, login/logout
-│   └── theme/themeStore.ts            # isDark, toggleTheme
-│
-├── hooks/                               # Custom hooks
-│   ├── interview/useInterviewRoom.ts
-│   └── cheat-detection/useCheatDetection.ts
-│
-├── types/                               # TypeScript types
-│   ├── auth/auth.types.ts
-│   ├── job/job.types.ts
-│   ├── application/application.types.ts
-│   ├── interview/interview.types.ts
-│   └── evaluation/evaluation.types.ts
-│
-├── utils/                               # Utilities
-│   ├── devAuth.ts                     # Dev mode helpers
-│   └── format/format.ts               # Date formatting
-│
-└── config/
-    └── constants.ts                    # Constants, API_URL
+ari-web/                                  # workspaces root (1 package-lock.json)
+├── package.json                          # scripts dev:candidate / dev:staff / build
+├── tsconfig.base.json                    # strict options dùng chung
+└── src/
+    │
+    ├── ARI.Shared/                       # @ari/shared — dùng chung (import @ari/shared/*)
+    │   ├── tailwind-preset.cjs           # theme ink/brand/ai dùng chung
+    │   └── src/
+    │       ├── api/apiClient.ts          # Axios instance + interceptors + configureApiClient()
+    │       ├── fservices/                # auth, job, application, interview, notification, schedule, profile
+    │       ├── ui/                        # designSystem (PageHeader…) + kit (Button/GlassCard…) + common
+    │       ├── guards/                    # ProtectedRoute, GuestRoute
+    │       ├── document/  media/  realtime/   # DocumentViewer; DeviceCheck+interview hooks; useAppNotifications
+    │       ├── store/                     # auth, theme, interview (Zustand)
+    │       ├── authflows/                 # OAuthCallback, Forgot/Reset password (2 site cùng route)
+    │       ├── types/  config/  utils/  styles/
+    │       └── i18n/                      # core (initI18n) + sharedResources + locales chung
+    │
+    ├── ARI.CandidateSite/                # @ari/candidate-site (port 3000, public)
+    │   ├── index.html  vite.config.ts  tailwind.config.js  tsconfig.json
+    │   └── src/
+    │       ├── main.tsx
+    │       ├── app/                       # App.tsx (router) + layouts/ (Candidate*/Interview/Public)
+    │       ├── pages/                     # auth, candidate(portal), interview, job-board, kiosk, landing, legal
+    │       ├── components/                # sections, three, legal, profile
+    │       ├── fservices/                 # job/savedJobService, location/provinceService, settings/settingsService
+    │       └── i18n/                      # namespace riêng candidate
+    │
+    └── ARI.StaffSite/                    # @ari/staff-site (port 3001, nội bộ)
+        ├── index.html  vite.config.ts  tailwind.config.js  tsconfig.json
+        └── src/
+            ├── main.tsx
+            ├── app/                       # App.tsx + StaffHomeRedirect + layouts/ (Workspace/Hr/Recruiter/SuperAdmin + useWorkspaceNav)
+            ├── pages/                     # auth, hr, recruiter, super-admin
+            ├── components/                # StaffNotificationsView
+            ├── fservices/                 # dashboard, evaluation, admin, playbook, accountRequest
+            ├── utils/adminLabels.ts
+            └── i18n/                      # namespace riêng staff
 ```
+
+> **Quy tắc:** `services/` → **`fservices/`** (prefix "f"). Mỗi folder một nhiệm vụ: `app/` (routing+layouts),
+> `pages/` (màn theo domain), `fservices/` (gọi API), `components/` (UI tái dùng). Hướng phụ thuộc 1 chiều: site → Shared.
 
 ---
 
@@ -249,9 +186,14 @@ Mọi component PHẢI có cả light và dark classes.
 ### 2. Import Patterns
 
 ```tsx
-// ✅ Dùng alias @
-import { useAuthStore } from '@store/auth/authStore'
-import { PageHeader } from '@components/shared'
+// ✅ Code dùng chung → @ari/shared/*
+import { useAuthStore } from '@ari/shared/store/auth'
+import { PageHeader } from '@ari/shared/ui'
+import { apiClient } from '@ari/shared/api/apiClient'
+
+// ✅ Code trong site → @/ (alias tới src của site đó)
+import CandidateLayout from '@/app/layouts/CandidateLayout'
+import { savedJobService } from '@/fservices/job/savedJobService'
 
 // ❌ Relative path dài
 import { useAuthStore } from '../../../store/auth/authStore'
@@ -609,21 +551,28 @@ export const exampleService = {
 ## Environment Variables
 
 ```env
-# .env trong frontend/
-VITE_API_URL=http://localhost:8080/api
-VITE_WS_URL=ws://localhost:8080/ws
-VITE_DEV_AUTH=false    # true = auto login dev user
+# .env đặt TRONG mỗi package: ari-web/src/ARI.CandidateSite/.env và ari-web/src/ARI.StaffSite/.env
+VITE_API_BASE_URL=http://localhost:5000/api
+VITE_WS_BASE_URL=ws://localhost:5000
+VITE_ENABLE_CHEAT_DETECTION=false
+VITE_ENABLE_AVATAR=true
+VITE_ENABLE_RECORDING=false
 ```
 
 ---
 
-## Scripts
+## Scripts (chạy ở `ari-web/`)
 
 ```bash
-npm run dev      # Dev server (port 5173)
-npm run build    # Production build
-npm run preview  # Preview build
+npm install              # cài toàn bộ workspace (1 lần)
+npm run dev:candidate    # Candidate site (port 3000)
+npm run dev:staff        # Staff site (port 3001)
+npm run build            # Build cả 2 site
+npm run build:candidate  # Chỉ candidate   |  npm run build:staff  # Chỉ staff
+npm run lint             # ESLint toàn monorepo
 ```
+
+> Qua Docker/Nginx: Candidate = `http://localhost`, Staff = `http://staff.localhost`.
 
 ---
 
