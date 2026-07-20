@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Video, Search, Clock, FileVideo } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
-import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
-import { applicationService } from '@services/application/applicationService'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import { interviewService, type HrInterviewSessionItem } from '@ari/shared/fservices/interview'
+import { applicationService } from '@ari/shared/fservices/application'
 import {
   sessionStatusBadge,
   sessionStatusLabel,

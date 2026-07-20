@@ -1,4 +1,4 @@
-import { apiClient } from '../apiClient'
+import { apiClient } from '@ari/shared/api/apiClient'
 
 /** Một việc làm đã lưu (bookmark) — đủ thông tin để render thẻ job. */
 export interface SavedJobItem {

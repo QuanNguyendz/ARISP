@@ -12,10 +12,10 @@ import {
   ShieldCheck,
   CalendarClock,
 } from 'lucide-react'
-import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@components/shared'
-import { applicationService } from '@services/application/applicationService'
-import { interviewService } from '@services/interview/interviewService'
-import type { HrApplicationItem } from '@/types/application'
+import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import { applicationService } from '@ari/shared/fservices/application'
+import { interviewService } from '@ari/shared/fservices/interview'
+import type { HrApplicationItem } from '@ari/shared/types/application'
 import { appStatusBadge, appStatusLabel, initials } from './_jobUi'
 import { ApplicantsSkeleton } from './_skeletons'
 

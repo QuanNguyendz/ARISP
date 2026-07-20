@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Briefcase, LogOut, User, Globe, ChevronDown, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAuthStore } from '@store/auth/authStore'
+import { useAuthStore } from '@ari/shared/store/auth'
 
 const navLinks = [
   { label: 'Features', href: '#features' },

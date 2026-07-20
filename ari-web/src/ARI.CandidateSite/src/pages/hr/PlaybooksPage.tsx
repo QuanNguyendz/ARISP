@@ -15,12 +15,12 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@components/shared'
+import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
 import { CardGridSkeleton } from './_skeletons'
 import { playbookService } from '@services/playbook/playbookService'
 import type { PlaybookItem } from '@services/playbook/playbookService'
-import jobService from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
+import jobService from '@ari/shared/fservices/job'
+import type { JobPosting } from '@ari/shared/types/job'
 
 export default function HrPlaybooksPage() {
   const { t } = useTranslation('modules/hr/playbooks')

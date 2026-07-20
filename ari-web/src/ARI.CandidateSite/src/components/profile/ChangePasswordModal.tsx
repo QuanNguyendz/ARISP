@@ -11,7 +11,7 @@ import {
   AlertCircle,
   AlertTriangle,
 } from 'lucide-react'
-import { profileService } from '@services/profile/profileService'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
 
 const inputWrap =
   'flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100'

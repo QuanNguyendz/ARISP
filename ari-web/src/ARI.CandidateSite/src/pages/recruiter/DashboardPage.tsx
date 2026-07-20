@@ -13,9 +13,9 @@ import {
   AlertCircle,
   Send,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@components/shared'
-import { useAuthStore } from '@store/auth/authStore'
-import jobService from '@services/job/jobService'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
+import jobService from '@ari/shared/fservices/job'
 import { jobStatusBadge, jobStatusLabel, formatSalary, timeAgo } from './_jobUi'
 import { DashboardSkeleton } from './_skeletons'
 

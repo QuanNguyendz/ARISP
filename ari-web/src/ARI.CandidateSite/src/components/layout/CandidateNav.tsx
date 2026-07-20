@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, Briefcase, FileText, Calendar, User, LogOut, Menu, X, Building2 } from 'lucide-react';
-import { useAuthStore } from '@store/auth';
+import { useAuthStore } from '@ari/shared/store/auth';
 
 const candidateLinks = [
   { label: 'Tìm việc', href: '/jobs', icon: Briefcase },

@@ -12,8 +12,8 @@ import {
   Sparkles,
   Check,
 } from 'lucide-react'
-import { useAuthStore } from '@store/auth/authStore'
-import { authService } from '@services/auth/authService'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { authService } from '@ari/shared/fservices/auth'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {

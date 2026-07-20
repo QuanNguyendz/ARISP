@@ -16,8 +16,8 @@ import {
   Loader2,
   AlertTriangle,
 } from 'lucide-react'
-import DeviceCheck from '@components/interview/DeviceCheck'
-import { usePracticeSession } from '@hooks/interview/usePracticeSession'
+import DeviceCheck from '@ari/shared/media/DeviceCheck'
+import { usePracticeSession } from '@ari/shared/media/usePracticeSession'
 
 type Phase = 'intro' | 'live' | 'ended'
 

@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, FileText, Eye } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import { applicationService } from '@services/application/applicationService'
-import type { HrApplicationItem } from '@/types/application'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import { applicationService } from '@ari/shared/fservices/application'
+import type { HrApplicationItem } from '@ari/shared/types/application'
 import { appStatusBadge, appStatusLabel, initials, scoreColor } from './_jobUi'
 import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
-import { resolveAssetUrl } from '@/config/constants'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 
 export default function RecruiterCandidatesPage() {
   const { t } = useTranslation('modules/recruiter/candidates')

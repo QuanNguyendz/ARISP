@@ -11,9 +11,9 @@ import {
   Settings,
   ChevronRight,
 } from 'lucide-react'
-import { notificationService, resolveNotifLink } from '@services/notification/notificationService'
-import type { NotificationItem } from '@services/notification/notificationService'
-import { Skeleton } from '@components/ui/Skeleton'
+import { notificationService, resolveNotifLink } from '@ari/shared/fservices/notification/notificationService'
+import type { NotificationItem } from '@ari/shared/fservices/notification/notificationService'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
 
 type FilterKey = 'all' | 'unread' | 'interview' | 'result' | 'system'
 

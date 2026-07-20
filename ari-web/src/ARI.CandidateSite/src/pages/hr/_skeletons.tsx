@@ -1,4 +1,4 @@
-import { Skeleton } from '@components/ui/Skeleton'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
 
 /**
  * Bộ skeleton loading cho khu HR Leader — khung "giả lập" có shimmer chuyển động,

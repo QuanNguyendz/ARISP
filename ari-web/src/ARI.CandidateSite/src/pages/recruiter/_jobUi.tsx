@@ -1,4 +1,4 @@
-import type { JobPosting } from '@/types/job'
+import type { JobPosting } from '@ari/shared/types/job'
 
 // ===== Trạng thái Job (khớp backend: draft|pending|active|rejected|closed|archived) =====
 export type JobStatus = JobPosting['status']

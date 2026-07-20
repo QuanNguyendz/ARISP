@@ -13,10 +13,10 @@ import {
   Users,
   AlertCircle,
 } from 'lucide-react'
-import { ErrorAlert } from '@components/shared'
-import jobService from '@services/job/jobService'
-import { scheduleService } from '@services/schedule'
-import type { JobPosting, AvailabilitySlot } from '@/types/job'
+import { ErrorAlert } from '@ari/shared/ui'
+import jobService from '@ari/shared/fservices/job'
+import { scheduleService } from '@ari/shared/fservices/schedule'
+import type { JobPosting, AvailabilitySlot } from '@ari/shared/types/job'
 
 function errMsg(e: unknown, fallback: string): string {
   const x = e as { response?: { data?: { message?: string } } }

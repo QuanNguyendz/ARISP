@@ -14,10 +14,10 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react'
-import { PageHeader, EmptyState, ErrorAlert, Pagination } from '@components/shared'
-import { Skeleton } from '@components/ui/Skeleton'
-import { staffNotificationService } from '@services/notification/notificationService'
-import type { NotificationItem } from '@services/notification/notificationService'
+import { PageHeader, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
+import { staffNotificationService } from '@ari/shared/fservices/notification/notificationService'
+import type { NotificationItem } from '@ari/shared/fservices/notification/notificationService'
 
 const PAGE_SIZE = 10
 

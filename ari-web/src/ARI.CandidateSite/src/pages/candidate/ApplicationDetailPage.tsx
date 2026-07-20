@@ -20,14 +20,14 @@ import {
   User,
   Globe,
 } from 'lucide-react'
-import { applicationService } from '@services/application/applicationService'
-import { resolveAssetUrl } from '@config/constants'
-import { Skeleton } from '@components/ui/Skeleton'
+import { applicationService } from '@ari/shared/fservices/application'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
 import type {
   MyApplicationDetail,
   MyApplicationSession,
   MyEvalCriterion,
-} from '../../types/application'
+} from '@ari/shared/types/application'
 
 function scoreColor(score: number): string {
   if (score >= 80) return 'bg-emerald-500'

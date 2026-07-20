@@ -7,8 +7,8 @@ import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
 } from 'lucide-react'
-import jobService from '@services/job/jobService'
-import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@/types/job'
+import jobService from '@ari/shared/fservices/job'
+import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
 interface CreateJobPostingPageProps {
   mode: 'create' | 'edit'

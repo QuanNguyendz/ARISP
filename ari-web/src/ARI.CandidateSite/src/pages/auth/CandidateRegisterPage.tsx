@@ -14,7 +14,7 @@ import {
   Target,
   MessageSquare,
 } from 'lucide-react'
-import { authService } from '@services/auth/authService'
+import { authService } from '@ari/shared/fservices/auth'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {

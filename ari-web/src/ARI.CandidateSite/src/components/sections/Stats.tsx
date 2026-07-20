@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Container, ContainerItem } from '../ui/Container';
+import { Container, ContainerItem } from '@ari/shared/ui/Container';
 
 interface StatItemProps {
   value: number;

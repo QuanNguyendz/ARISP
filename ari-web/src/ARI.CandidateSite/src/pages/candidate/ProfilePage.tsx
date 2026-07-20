@@ -31,21 +31,21 @@ import {
   AlertTriangle,
   Download,
 } from 'lucide-react'
-import { profileService } from '@services/profile/profileService'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
 import { provinceService } from '@services/location/provinceService'
 import type { Province } from '@services/location/provinceService'
 import ChangePasswordModal from '@components/profile/ChangePasswordModal'
-import SearchableSelect from '@components/ui/SearchableSelect'
-import { Skeleton } from '@components/ui/Skeleton'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import { resolveAssetUrl } from '@config/constants'
+import SearchableSelect from '@ari/shared/ui/SearchableSelect'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type {
   CandidateProfile,
   ExperienceItem,
   EducationItem,
   CvReview,
-} from '@services/profile/profileService'
-import { useAuthStore } from '@store/auth/authStore'
+} from '@ari/shared/fservices/profile/profileService'
+import { useAuthStore } from '@ari/shared/store/auth'
 
 // Kỹ năng & công nghệ phổ biến hiện nay (gợi ý nhanh để ứng viên thêm bằng 1 cú nhấp)
 const SUGGESTED_SKILLS = [

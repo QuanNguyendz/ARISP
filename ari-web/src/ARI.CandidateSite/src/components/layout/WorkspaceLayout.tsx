@@ -20,14 +20,14 @@ import {
   XCircle,
   X,
 } from 'lucide-react'
-import { useAuthStore } from '@store/auth/authStore'
-import { useThemeStore } from '@store/theme'
-import { LanguageSwitcher } from '@components/common/LanguageSwitcher'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { useThemeStore } from '@ari/shared/store/theme'
+import { LanguageSwitcher } from '@ari/shared/ui/LanguageSwitcher'
 import {
   staffNotificationService,
   STAFF_NOTIF_REFRESH_EVENT,
-} from '@services/notification/notificationService'
-import type { NotificationItem } from '@services/notification/notificationService'
+} from '@ari/shared/fservices/notification/notificationService'
+import type { NotificationItem } from '@ari/shared/fservices/notification/notificationService'
 
 // Thời gian tương đối ngắn gọn (vd "15 phút trước").
 function timeAgo(iso: string): string {

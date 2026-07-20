@@ -2,16 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
+      "@ari/shared/*": ["../ARI.Shared/src/*"],
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
       "@pages/*": ["./src/pages/*"],
       "@hooks/*": ["./src/hooks/*"],
       "@services/*": ["./src/services/*"],
-      "@store/*": ["./src/store/*"],
-      "@types/*": ["./src/types/*"],
       "@utils/*": ["./src/utils/*"],
-      "@config/*": ["./src/config/*"],
-      "@contexts/*": ["./src/contexts/*"],
       "@assets/*": ["./src/assets/*"]
     }
   },

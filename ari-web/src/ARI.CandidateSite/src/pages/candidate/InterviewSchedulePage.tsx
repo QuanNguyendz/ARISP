@@ -14,7 +14,7 @@ import {
   Building2,
   ArrowLeft,
 } from 'lucide-react'
-import { LoadingButton } from '@components/common'
+import { LoadingButton } from '@ari/shared/ui/common'
 
 const mockInterviewData = {
   code: 'INT001',

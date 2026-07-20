@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { useAuthStore } from '@store/auth/authStore'
+import { useAuthStore } from '@ari/shared/store/auth'
 
 // Chuẩn hoá role về định dạng backend (snake_case) — đồng bộ ProtectedRoute / GuestRoute
 function normalizeRole(role: string): string {

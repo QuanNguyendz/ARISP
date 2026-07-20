@@ -10,8 +10,8 @@ import {
   CalendarX,
   Play,
 } from 'lucide-react'
-import { scheduleService } from '@services/schedule'
-import type { AvailabilitySlot } from '@/types/job'
+import { scheduleService } from '@ari/shared/fservices/schedule'
+import type { AvailabilitySlot } from '@ari/shared/types/job'
 import { useQuery } from '@tanstack/react-query'
 
 function errMsg(e: unknown, fallback: string): string {

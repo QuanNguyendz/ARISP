@@ -18,7 +18,7 @@ import '@fontsource/plus-jakarta-sans/600.css'
 import '@fontsource/plus-jakarta-sans/700.css'
 import '@fontsource/plus-jakarta-sans/800.css'
 
-import './index.css'
+import '@ari/shared/styles/index.css'
 
 // Shim `process` cho thư viện đọc `process.env.NODE_ENV` ở runtime
 // (react-grid-layout/react-draggable) — tránh `ReferenceError: process is not defined`.

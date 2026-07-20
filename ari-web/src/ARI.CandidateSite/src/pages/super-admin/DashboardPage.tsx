@@ -11,8 +11,8 @@ import {
   ArrowRight,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert } from '@components/shared'
-import { useAuthStore } from '@store/auth/authStore'
+import { PageHeader, StatsGrid, ErrorAlert } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
 import {
   adminService,
   type AdminStats,

@@ -24,12 +24,12 @@ import {
   ScrollText,
   Sparkles,
 } from 'lucide-react'
-import { ErrorAlert, Pagination } from '@components/shared'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import jobService from '@services/job/jobService'
-import { applicationService } from '@services/application/applicationService'
-import type { JobPosting } from '@/types/job'
-import type { HrApplicationItem } from '@/types/application'
+import { ErrorAlert, Pagination } from '@ari/shared/ui'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import jobService from '@ari/shared/fservices/job'
+import { applicationService } from '@ari/shared/fservices/application'
+import type { JobPosting } from '@ari/shared/types/job'
+import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
   jobStatusBadge,
   jobStatusLabel,
@@ -40,7 +40,7 @@ import {
   timeAgo,
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
-import { resolveAssetUrl } from '@/config/constants'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,

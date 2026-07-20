@@ -16,7 +16,7 @@ import {
   XCircle,
   AlertCircle,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@components/shared'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
 import { RequestListSkeleton } from './_skeletons'
 import {
   accountRequestService,

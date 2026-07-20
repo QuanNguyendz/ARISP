@@ -4,10 +4,10 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Clock, CheckCircle, XCircle, Eye, FileText, MapPin, Loader2 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
-import { jobService } from '@services/job/jobService'
-import type { JobPosting } from '@/types/job'
+import { jobService } from '@ari/shared/fservices/job'
+import type { JobPosting } from '@ari/shared/types/job'
 
 function formatSalary(job: JobPosting, t: (key: string) => string): string {
   if (

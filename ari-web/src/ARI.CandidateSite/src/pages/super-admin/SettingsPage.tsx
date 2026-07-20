@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Shield, Webhook, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
-import { PageHeader, ErrorAlert } from '@components/shared'
+import { PageHeader, ErrorAlert } from '@ari/shared/ui'
 import { adminService, type SystemSettingItem } from '@services/admin'
 import { SettingsSkeleton } from './_skeletons'
 

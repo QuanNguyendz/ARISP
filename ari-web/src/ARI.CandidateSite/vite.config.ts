@@ -11,18 +11,17 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   resolve: {
     alias: {
+      '@ari/shared': path.resolve(__dirname, '../ARI.Shared/src'),
       '@': path.resolve(__dirname, './src'),
       '@components': path.resolve(__dirname, './src/components'),
       '@pages': path.resolve(__dirname, './src/pages'),
       '@hooks': path.resolve(__dirname, './src/hooks'),
       '@services': path.resolve(__dirname, './src/services'),
-      '@store': path.resolve(__dirname, './src/store'),
-      '@types': path.resolve(__dirname, './src/types'),
       '@utils': path.resolve(__dirname, './src/utils'),
-      '@config': path.resolve(__dirname, './src/config'),
-      '@contexts': path.resolve(__dirname, './src/contexts'),
       '@assets': path.resolve(__dirname, './src/assets'),
     },
+    // Đảm bảo chỉ một bản runtime dùng chung cho cả code site và code ARI.Shared.
+    dedupe: ['react', 'react-dom', 'react-router-dom', 'zustand', '@tanstack/react-query'],
   },
   server: {
     port: 3000,

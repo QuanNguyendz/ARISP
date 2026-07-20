@@ -1,1 +1,0 @@
-export { useApplicationStore } from './applicationStore';

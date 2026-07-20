@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Container, ContainerItem } from '../ui/Container';
+import { Container, ContainerItem } from '@ari/shared/ui/Container';
 import { ArrowRight } from 'lucide-react';
 
 export default function CTA() {

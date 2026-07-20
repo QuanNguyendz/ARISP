@@ -31,15 +31,15 @@ import {
   ArrowDownUp,
   Pencil,
 } from 'lucide-react'
-import { applicationService } from '@services/application/applicationService'
-import { profileService } from '@services/profile/profileService'
-import { CANDIDATE_DATA_REFRESH_EVENT } from '@services/notification/notificationService'
-import type { CandidateProfile } from '@services/profile/profileService'
-import { resolveAssetUrl } from '@config/constants'
-import { useAuthStore } from '@store/auth/authStore'
-import { Skeleton } from '@components/ui/Skeleton'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import type { MyApplicationItem, MyApplicationRound } from '../../types/application'
+import { applicationService } from '@ari/shared/fservices/application'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
+import { CANDIDATE_DATA_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
+import type { CandidateProfile } from '@ari/shared/fservices/profile/profileService'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import type { MyApplicationItem, MyApplicationRound } from '@ari/shared/types/application'
 
 type FilterKey = 'all' | 'action' | 'processing' | 'done'
 type TFunction = (key: string, options?: Record<string, unknown>) => string

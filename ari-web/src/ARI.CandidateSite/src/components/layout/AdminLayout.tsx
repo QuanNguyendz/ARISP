@@ -15,7 +15,7 @@ import {
   Menu,
   LogOut,
 } from 'lucide-react';
-import { useAuthStore } from '@store/auth/authStore';
+import { useAuthStore } from '@ari/shared/store/auth';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },

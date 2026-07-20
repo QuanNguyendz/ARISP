@@ -18,9 +18,9 @@ import {
   Bell,
 } from 'lucide-react'
 import { evaluationService } from '@/services/evaluation/evaluationService'
-import type { EvaluationReport } from '@/types/evaluation'
+import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton } from './_skeletons'
-import { Pagination } from '@components/shared'
+import { Pagination } from '@ari/shared/ui'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
 function formatVerdictLabel(verdict?: string, tPass?: string, tNotPass?: string) {

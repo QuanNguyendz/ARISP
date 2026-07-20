@@ -1,31 +1,17 @@
-import i18n from 'i18next'
-import { initReactI18next } from 'react-i18next'
+import {
+  initI18n,
+  supportedLanguages,
+  defaultLanguage,
+  getStoredLanguage,
+  storeLanguage,
+  sharedResources,
+  sharedNamespaces,
+  type SupportedLanguage,
+} from '@ari/shared/i18n'
 
-// ===== COMMON =====
-import commonVi from './locales/vi/common.json'
-import commonEn from './locales/en/common.json'
-
-// ===== AUTH =====
-import authVi from './locales/vi/auth.json'
-import authEn from './locales/en/auth.json'
-
-// ===== ERRORS =====
-import errorsVi from './locales/vi/errors.json'
-import errorsEn from './locales/en/errors.json'
-
-// ===== LANDING (Job Board) =====
-import landingVi from './locales/vi/landing.json'
-import landingEn from './locales/en/landing.json'
+// ===== LANDING (site-specific) =====
 import landingHomeVi from './locales/vi/modules/landing/home.json'
 import landingHomeEn from './locales/en/modules/landing/home.json'
-
-// ===== JOBS (Job Posting) =====
-import jobsVi from './locales/vi/jobs.json'
-import jobsEn from './locales/en/jobs.json'
-
-// ===== INTERVIEW =====
-import interviewVi from './locales/vi/interview.json'
-import interviewEn from './locales/en/interview.json'
 
 // ===== INTERVIEW MODULES =====
 import interviewRoomVi from './locales/vi/modules/interview/room.json'
@@ -117,23 +103,9 @@ import applyEn from './locales/en/modules/job-board/apply.json'
 import candidateApplyVi from './locales/vi/pages/candidateApply.json'
 import candidateApplyEn from './locales/en/pages/candidateApply.json'
 
-// ===== SHARED =====
-import sharedNotificationsVi from './locales/vi/modules/shared/notifications.json'
-import sharedNotificationsEn from './locales/en/modules/shared/notifications.json'
-import sharedLayoutVi from './locales/vi/modules/shared/layout.json'
-import sharedLayoutEn from './locales/en/modules/shared/layout.json'
-import sharedNavVi from './locales/vi/modules/shared/nav.json'
-import sharedNavEn from './locales/en/modules/shared/nav.json'
-
 export const resources = {
   vi: {
-    // Common namespaces (keep existing structure)
-    common: commonVi,
-    auth: authVi,
-    errors: errorsVi,
-    landing: landingVi,
-    jobs: jobsVi,
-    interview: interviewVi,
+    ...sharedResources.vi,
     'modules/landing/home': landingHomeVi,
 
     // Interview module
@@ -188,20 +160,9 @@ export const resources = {
 
     // Pages (top-level)
     'pages/candidateApply': candidateApplyVi,
-
-    // Shared module
-    'modules/shared/notifications': sharedNotificationsVi,
-    'modules/shared/layout': sharedLayoutVi,
-    'modules/shared/nav': sharedNavVi,
   },
   en: {
-    // Common namespaces (keep existing structure)
-    common: commonEn,
-    auth: authEn,
-    errors: errorsEn,
-    landing: landingEn,
-    jobs: jobsEn,
-    interview: interviewEn,
+    ...sharedResources.en,
     'modules/landing/home': landingHomeEn,
 
     // Interview module
@@ -251,11 +212,6 @@ export const resources = {
     'modules/super-admin/pendingUsers': superAdminPendingUsersEn,
     'modules/super-admin/auditLogs': superAdminAuditLogsEn,
 
-    // Shared module
-    'modules/shared/notifications': sharedNotificationsEn,
-    'modules/shared/layout': sharedLayoutEn,
-    'modules/shared/nav': sharedNavEn,
-
     // Job-Board module
     'modules/job-board/apply': applyEn,
 
@@ -264,47 +220,9 @@ export const resources = {
   },
 }
 
-export const supportedLanguages = [
-  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-] as const
-
-export type SupportedLanguage = (typeof supportedLanguages)[number]['code']
-
-export const defaultLanguage: SupportedLanguage = 'vi'
-
-const STORAGE_KEY = 'arisp-language'
-
-export function getStoredLanguage(): SupportedLanguage {
-  if (typeof window === 'undefined') return defaultLanguage
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'vi' || stored === 'en') return stored
-  } catch {
-    // localStorage unavailable
-  }
-  return defaultLanguage
-}
-
-export function storeLanguage(lang: SupportedLanguage): void {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(STORAGE_KEY, lang)
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-// All namespaces for i18next
-const allNamespaces = [
-  // Common namespaces (keep existing structure for backward compatibility)
-  'common',
-  'auth',
-  'errors',
-  'landing',
+// Namespace riêng của site (namespace dùng chung nằm trong sharedNamespaces).
+const siteNamespaces = [
   'modules/landing/home',
-  'jobs',
-  'interview',
   // Interview module
   'modules/interview/room',
   'modules/interview/practice',
@@ -350,24 +268,12 @@ const allNamespaces = [
   'modules/job-board/apply',
   // Pages (top-level)
   'pages/candidateApply',
-  // Shared module
-  'modules/shared/notifications',
-  'modules/shared/layout',
-  'modules/shared/nav',
 ]
 
-i18n.use(initReactI18next).init({
-  resources,
-  lng: getStoredLanguage(),
-  fallbackLng: defaultLanguage,
-  defaultNS: 'common',
-  ns: allNamespaces,
-  interpolation: {
-    escapeValue: false,
-  },
-  react: {
-    useSuspense: false,
-  },
-})
+const allNamespaces = [...sharedNamespaces, ...siteNamespaces]
 
+const i18n = initI18n(resources, allNamespaces)
+
+export { supportedLanguages, defaultLanguage, getStoredLanguage, storeLanguage }
+export type { SupportedLanguage }
 export default i18n

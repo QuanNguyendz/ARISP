@@ -20,10 +20,10 @@ import {
   LogOut,
   Trash2,
 } from 'lucide-react'
-import { useAuthStore } from '@store/auth'
-import { authService } from '@services/auth/authService'
-import { notificationService, resolveNotifLink } from '@/services/notification/notificationService'
-import type { NotificationItem } from '@/services/notification/notificationService'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { authService } from '@ari/shared/fservices/auth'
+import { notificationService, resolveNotifLink } from '@ari/shared/fservices/notification/notificationService'
+import type { NotificationItem } from '@ari/shared/fservices/notification/notificationService'
 import { useQuery } from '@tanstack/react-query'
 
 /** Icon + màu theo loại thông báo. */

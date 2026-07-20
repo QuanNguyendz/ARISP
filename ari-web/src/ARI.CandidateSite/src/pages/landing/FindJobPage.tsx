@@ -20,16 +20,16 @@ import {
   Server,
   BrainCircuit,
 } from 'lucide-react'
-import { useAuthStore } from '@store/auth'
+import { useAuthStore } from '@ari/shared/store/auth'
 import CandidateHeader from '@components/layout/CandidateHeader'
-import jobService from '@/services/job/jobService'
-import type { JobFacets } from '@/services/job/jobService'
+import jobService from '@ari/shared/fservices/job'
+import type { JobFacets } from '@ari/shared/fservices/job'
 import { savedJobService } from '@/services/job/savedJobService'
 import { provinceService } from '@/services/location/provinceService'
 import type { City } from '@/services/location/provinceService'
-import { profileService } from '@/services/profile/profileService'
-import SearchableSelect from '@/components/ui/SearchableSelect'
-import type { JobPosting } from '@/types/job'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
+import SearchableSelect from '@ari/shared/ui/SearchableSelect'
+import type { JobPosting } from '@ari/shared/types/job'
 
 // ============== CONSTANTS ==============
 const POPULAR_KEYWORDS = ['Frontend', 'Backend', 'C# / .NET', 'AI Engineer']

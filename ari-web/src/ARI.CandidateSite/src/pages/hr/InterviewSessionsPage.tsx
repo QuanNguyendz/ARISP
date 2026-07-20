@@ -3,9 +3,9 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Eye, Video, Clock, MonitorPlay } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, SessionListSkeleton } from './_skeletons'
-import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
+import { interviewService, type HrInterviewSessionItem } from '@ari/shared/fservices/interview'
 
 type StatusGroup = 'all' | 'active' | 'completed' | 'pending' | 'aborted'
 

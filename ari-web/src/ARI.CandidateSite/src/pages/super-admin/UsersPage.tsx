@@ -14,8 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@components/shared'
-import { useAuthStore } from '@store/auth/authStore'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
 import {
   adminService,
   type AdminUser,

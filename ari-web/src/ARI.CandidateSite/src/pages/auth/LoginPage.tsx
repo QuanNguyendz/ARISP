@@ -11,8 +11,8 @@ import {
   AlertCircle,
   ShieldAlert,
 } from 'lucide-react'
-import { authService } from '@services/auth/authService'
-import { useAuthStore } from '@store/auth/authStore'
+import { authService } from '@ari/shared/fservices/auth'
+import { useAuthStore } from '@ari/shared/store/auth'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {

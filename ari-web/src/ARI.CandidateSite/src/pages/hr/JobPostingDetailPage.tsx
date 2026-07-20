@@ -25,13 +25,13 @@ import {
   Send,
   ScrollText,
 } from 'lucide-react'
-import jobService from '@/services/job/jobService'
-import { applicationService } from '@/services/application/applicationService'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import { Pagination } from '@components/shared'
-import type { JobPosting } from '@/types/job'
-import type { HrApplicationItem } from '@/types/application'
-import { resolveAssetUrl } from '@/config/constants'
+import jobService from '@ari/shared/fservices/job'
+import { applicationService } from '@ari/shared/fservices/application'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import { Pagination } from '@ari/shared/ui'
+import type { JobPosting } from '@ari/shared/types/job'
+import type { HrApplicationItem } from '@ari/shared/types/application'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { appStatusBadge, appStatusLabel, initials, scoreColor } from '../recruiter/_jobUi'
 
 function toLocalDateStr(d: string | Date | number | undefined | null): string {

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import AISphereDemo from '../three/AISphereDemo';
-import GlassCard from '../ui/GlassCard';
+import GlassCard from '@ari/shared/ui/GlassCard';
 import { Play } from 'lucide-react';
 
 const features = [

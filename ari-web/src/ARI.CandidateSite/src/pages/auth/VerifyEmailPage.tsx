@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight } from 'lucide-react'
-import { authService } from '@services/auth/authService'
+import { authService } from '@ari/shared/fservices/auth'
 
 type VerifyState =
   | { kind: 'loading' }

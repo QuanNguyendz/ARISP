@@ -39,9 +39,9 @@ import {
   CartesianGrid,
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@store/auth/authStore'
+import { useAuthStore } from '@ari/shared/store/auth'
 import { dashboardService } from '@services/dashboard/dashboardService'
-import { ErrorAlert } from '@components/shared'
+import { ErrorAlert } from '@ari/shared/ui'
 import { HrDashboardSkeleton } from './_skeletons'
 import { jobStatusBadge, jobStatusLabel } from '../recruiter/_jobUi'
 

@@ -10,10 +10,10 @@ import {
   ErrorAlert,
   NoticeAlert,
   Pagination,
-} from '@components/shared'
+} from '@ari/shared/ui'
 import { HrStatsSkeleton, CandidatesTableSkeleton } from './_skeletons'
-import { applicationService } from '@services/application/applicationService'
-import type { HrApplicationItem } from '@/types/application'
+import { applicationService } from '@ari/shared/fservices/application'
+import type { HrApplicationItem } from '@ari/shared/types/application'
 
 type Group = 'pending' | 'interviewing' | 'passed' | 'rejected' | 'other'
 

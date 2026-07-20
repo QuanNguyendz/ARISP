@@ -1,4 +1,4 @@
-import { apiClient } from '../apiClient'
+import { apiClient } from '@ari/shared/api/apiClient'
 
 export interface PlaybookItem {
   id: string

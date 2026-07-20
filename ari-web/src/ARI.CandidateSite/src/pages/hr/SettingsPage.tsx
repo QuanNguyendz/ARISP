@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { User, Bell, Lock } from 'lucide-react'
 import { useState } from 'react'
-import { PageHeader } from '@components/shared'
+import { PageHeader } from '@ari/shared/ui'
 
 export default function HrSettingsPage() {
   const { t } = useTranslation('modules/hr/settings')

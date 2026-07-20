@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@components/shared'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
-import { jobService } from '@services/job/jobService'
+import { jobService } from '@ari/shared/fservices/job'
 
 type StatusKey = 'draft' | 'active' | 'paused' | 'closed'
 type FilterKey = 'all' | StatusKey

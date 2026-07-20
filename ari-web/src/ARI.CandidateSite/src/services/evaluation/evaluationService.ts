@@ -1,10 +1,10 @@
-import { apiClient } from '../apiClient'
+import { apiClient } from '@ari/shared/api/apiClient'
 import type {
   EvaluationReport,
   HRReview,
   EvaluationFilter,
   SubmitEvaluationReviewPayload,
-} from '../../types/evaluation'
+} from '@ari/shared/types/evaluation'
 
 interface PaginatedResponse<T> {
   items: T[]

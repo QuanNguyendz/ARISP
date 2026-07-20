@@ -1,20 +1,20 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, lazy, Suspense } from 'react'
-import { useAuthStore } from '@store/auth/authStore'
-import { getDevAuth, isDevMode } from '@utils/devAuth'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { getDevAuth, isDevMode } from '@ari/shared/utils/devAuth'
 
 // Layouts + route guards: giữ eager vì nhỏ và dùng ở mọi route (bọc các page).
 import CandidateLayout from '@components/layout/CandidateLayout'
 import InterviewLayout from '@components/layout/InterviewLayout'
-import ProtectedRoute from '@components/auth/ProtectedRoute'
-import GuestRoute from '@components/auth/GuestRoute'
+import ProtectedRoute from '@ari/shared/guards/ProtectedRoute'
+import GuestRoute from '@ari/shared/guards/GuestRoute'
 import StaffRedirect from '@components/auth/StaffRedirect'
 import SuperAdminLayout from '@components/layout/SuperAdminLayout'
 import HrLayout from '@components/layout/HrLayout'
 import RecruiterLayout from '@components/layout/RecruiterLayout'
 import CandidateAppLayout from '@components/layout/CandidateAppLayout'
-import { DocumentViewerProvider } from '@components/document/DocumentViewer'
-import { useAppNotifications } from '@hooks/useAppNotifications'
+import { DocumentViewerProvider } from '@ari/shared/document/DocumentViewer'
+import { useAppNotifications } from '@ari/shared/realtime/useAppNotifications'
 
 // Pages: lazy-load → mỗi page thành 1 chunk riêng, chỉ tải khi vào route đó
 // (tách cả dep nặng như react-grid-layout ra khỏi bundle chính).
@@ -23,9 +23,9 @@ const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
 const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 const CandidateLoginPage = lazy(() => import('@pages/auth/CandidateLoginPage'))
 const CandidateRegisterPage = lazy(() => import('@pages/auth/CandidateRegisterPage'))
-const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'))
-const OAuthCallbackPage = lazy(() => import('@pages/auth/OAuthCallbackPage'))
+const ForgotPasswordPage = lazy(() => import('@ari/shared/authflows/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@ari/shared/authflows/ResetPasswordPage'))
+const OAuthCallbackPage = lazy(() => import('@ari/shared/authflows/OAuthCallbackPage'))
 const VerifyEmailPage = lazy(() => import('@pages/auth/VerifyEmailPage'))
 
 // Legal
@@ -88,7 +88,7 @@ const FindJobPage = lazy(() => import('@pages/landing/FindJobPage'))
 const JobDetailPage = lazy(() => import('@pages/job-board/JobDetailPage'))
 const JobApplyPage = lazy(() => import('@pages/job-board/ApplyPage'))
 const KioskPage = lazy(() => import('@pages/kiosk/KioskPage'))
-const NotFoundPage = lazy(() => import('@pages/NotFoundPage'))
+const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
 
 /** Fallback nhẹ khi đang tải chunk của page. */
 function RouteFallback() {

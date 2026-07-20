@@ -1,0 +1,133 @@
+/**
+ * ARISP Tailwind preset — theme dùng chung cho mọi site (CandidateSite, StaffSite).
+ * Site config chỉ khai báo `presets: [require('../ARI.Shared/tailwind-preset.cjs')]`
+ * và `content` globs (phải bao gồm cả `../ARI.Shared/src/**`).
+ * @type {import('tailwindcss').Config}
+ */
+module.exports = {
+  darkMode: 'class',
+  content: [],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
+        },
+        secondary: {
+          50: '#faf5ff',
+          100: '#f3e8ff',
+          200: '#e9d5ff',
+          300: '#d8b4fe',
+          400: '#c084fc',
+          500: '#a855f7',
+          600: '#9333ea',
+          700: '#7e22ce',
+          800: '#6b21a8',
+          900: '#581c87',
+        },
+        violet: '#8b5cf6',
+        'accent-primary': '#06b6d4',
+        'accent-secondary': '#8b5cf6',
+        'bg-primary': '#09090b',
+        'bg-secondary': '#18181b',
+        'text-primary': '#fafafa',
+        'text-secondary': '#a1a1aa',
+        'text-tertiary': '#71717a',
+        // Brand colors (from mockup)
+        brand: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
+        },
+        // AI colors (from mockup)
+        ai: {
+          50: '#faf5ff',
+          100: '#f3e8ff',
+          400: '#c084fc',
+          500: '#a855f7',
+          600: '#9333ea',
+          700: '#7e22ce',
+        },
+        // Ink colors (from mockup)
+        ink: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617',
+        },
+      },
+      boxShadow: {
+        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)',
+        'card-hover': '0 8px 30px -8px rgb(79 70 229 / 0.25)',
+      },
+      keyframes: {
+        // Hiệu ứng shimmer cho skeleton loading: dải sáng quét ngang (đổi background-position).
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+        // Hiệu ứng "chỉ dẫn": viền sáng tím pulse để hướng sự chú ý vào một khối.
+        'guide-glow': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgb(168 85 247 / 0)' },
+          '30%': {
+            boxShadow: '0 0 0 4px rgb(168 85 247 / 0.45), 0 0 24px 4px rgb(168 85 247 / 0.35)',
+          },
+          '65%': {
+            boxShadow: '0 0 0 6px rgb(168 85 247 / 0.2), 0 0 36px 10px rgb(168 85 247 / 0.18)',
+          },
+        },
+      },
+      animation: {
+        'guide-glow': 'guide-glow 1.6s ease-in-out 2',
+        shimmer: 'shimmer 1.4s linear infinite',
+      },
+      fontFamily: {
+        sans: [
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+        display: [
+          '"Plus Jakarta Sans"',
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+      },
+    },
+  },
+  plugins: [],
+}

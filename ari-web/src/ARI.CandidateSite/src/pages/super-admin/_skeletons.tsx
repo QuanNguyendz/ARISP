@@ -1,4 +1,4 @@
-import { Skeleton } from '@components/ui/Skeleton'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
 
 const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card'
 

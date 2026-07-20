@@ -14,11 +14,11 @@ import {
   Loader2,
   Download,
 } from 'lucide-react'
-import { useAuthStore } from '@store/auth'
-import { authService } from '@services/auth/authService'
+import { useAuthStore } from '@ari/shared/store/auth'
+import { authService } from '@ari/shared/fservices/auth'
 import { settingsService } from '@services/settings/settingsService'
 import type { CandidateSettings, NotificationChannelPref } from '@services/settings/settingsService'
-import { Skeleton } from '@components/ui/Skeleton'
+import { Skeleton } from '@ari/shared/ui/Skeleton'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 

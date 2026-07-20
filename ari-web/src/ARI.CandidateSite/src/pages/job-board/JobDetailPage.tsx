@@ -18,14 +18,14 @@ import {
   FileText,
   Calendar,
 } from 'lucide-react'
-import jobService from '@/services/job/jobService'
+import jobService from '@ari/shared/fservices/job'
 import { savedJobService } from '@/services/job/savedJobService'
-import { profileService } from '@/services/profile/profileService'
-import type { CvMatchResult } from '@/services/profile/profileService'
-import { applicationService } from '@/services/application/applicationService'
-import { resolveAssetUrl } from '@config/constants'
-import type { JobPosting } from '@/types/job'
-import { useAuthStore } from '@store/auth/authStore'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
+import type { CvMatchResult } from '@ari/shared/fservices/profile/profileService'
+import { applicationService } from '@ari/shared/fservices/application'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
+import type { JobPosting } from '@ari/shared/types/job'
+import { useAuthStore } from '@ari/shared/store/auth'
 import CandidateHeader from '@components/layout/CandidateHeader'
 
 // ============== HELPER FUNCTIONS ==============

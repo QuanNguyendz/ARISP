@@ -19,13 +19,13 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { ErrorAlert } from '@components/shared'
-import { useDocumentViewer } from '@components/document/DocumentViewer'
-import { applicationService } from '@services/application/applicationService'
+import { ErrorAlert } from '@ari/shared/ui'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import { applicationService } from '@ari/shared/fservices/application'
 import { evaluationService } from '@services/evaluation/evaluationService'
-import { interviewService, type HrInterviewSessionItem } from '@services/interview/interviewService'
-import type { HrApplicationItem } from '@/types/application'
-import type { EvaluationReport } from '@/types/evaluation'
+import { interviewService, type HrInterviewSessionItem } from '@ari/shared/fservices/interview'
+import type { HrApplicationItem } from '@ari/shared/types/application'
+import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import {
   appStatusBadge,
   appStatusLabel,
@@ -38,7 +38,7 @@ import {
   timeAgo,
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
-import { resolveAssetUrl } from '@/config/constants'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 
 export default function RecruiterCandidateDetailPage() {
   const { t } = useTranslation('modules/recruiter/candidateDetail')
