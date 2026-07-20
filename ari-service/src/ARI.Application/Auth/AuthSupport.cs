@@ -130,7 +130,8 @@ namespace ARI.Application.Auth
             await unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord, ct);
             await unitOfWork.SaveChangesAsync();
 
-            var frontendUrl = configuration["Authentication:AdminFrontendUrl"] ?? configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+            // ADR-046: trang verify-email nằm ở Candidate site → ưu tiên CandidateBaseUrl.
+            var frontendUrl = configuration["Frontend:CandidateBaseUrl"] ?? configuration["Authentication:AdminFrontendUrl"] ?? configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
             var verifyLink = $"{frontendUrl}/auth/verify-email?token={verifyToken}&email={Uri.EscapeDataString(candidate.Email)}";
 
             var emailBody = $@"

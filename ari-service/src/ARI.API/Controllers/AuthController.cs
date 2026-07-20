@@ -456,15 +456,19 @@ namespace ARI.API.Controllers
         private string BuildRedirectUrl(string returnUrl, (string, string)[]? queryPairs = null, string? fragment = null)
         {
             var adminFrontend = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? string.Empty;
+            // ADR-046: OAuth callback có thể trả về Staff (AdminFrontendUrl) hoặc Candidate (CandidateBaseUrl) origin.
+            var candidateFrontend = _configuration["Frontend:CandidateBaseUrl"] ?? string.Empty;
 
             string target = returnUrl;
             if (string.IsNullOrEmpty(target)) target = "/";
 
             bool isLocal = Url.IsLocalUrl(target);
             bool allowedExternal = false;
-            if (!string.IsNullOrEmpty(adminFrontend) && !string.IsNullOrEmpty(target))
+            if (!string.IsNullOrEmpty(target))
             {
-                allowedExternal = target.StartsWith(adminFrontend, StringComparison.OrdinalIgnoreCase);
+                allowedExternal =
+                    (!string.IsNullOrEmpty(adminFrontend) && target.StartsWith(adminFrontend, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(candidateFrontend) && target.StartsWith(candidateFrontend, StringComparison.OrdinalIgnoreCase));
             }
 
             if (!isLocal && !allowedExternal)

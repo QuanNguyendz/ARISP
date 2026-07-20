@@ -1,1 +1,0 @@
-export { interviewService } from './interviewService';

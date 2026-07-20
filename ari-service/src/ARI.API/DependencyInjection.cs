@@ -201,9 +201,14 @@ namespace ARI.API
                     policy.RequireRole(AppRoles.Candidate));
             });
 
+            // Hai origin FE tách biệt (ADR-046): StaffSite = AdminFrontendUrl, CandidateSite = Frontend:CandidateBaseUrl.
+            // AllowCredentials() nên không dùng wildcard — phải liệt kê đủ mọi origin.
             var allowedOrigins = (builder.Configuration["Authentication:AdminFrontendUrl"] ?? "https://localhost:3000")
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Concat(new[] { "http://127.0.0.1:5500", "http://localhost:5500", "https://localhost:5001", "https://localhost:3000" })
+                .Concat((builder.Configuration["Frontend:CandidateBaseUrl"] ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Concat(new[] { "http://127.0.0.1:5500", "http://localhost:5500", "https://localhost:5001", "https://localhost:3000", "http://localhost:3000", "http://localhost:3001" })
+                .Distinct()
                 .ToArray();
 
             builder.Services.AddCors(options =>
