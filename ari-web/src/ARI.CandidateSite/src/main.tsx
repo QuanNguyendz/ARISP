@@ -2,10 +2,15 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { configureApiClient } from '@ari/shared/api/apiClient'
 import App from './app/App'
 
 // i18n configuration
 import './i18n'
+
+// ADR-046: Candidate refresh token qua endpoint riêng của candidate (sửa lỗi cũ:
+// apiClient mặc định gọi /auth/refresh của staff nên phiên candidate bị đá ra khi refresh).
+configureApiClient({ refreshPath: '/auth/candidate/refresh' })
 
 // Self-hosted fonts (bao gồm subset vietnamese) — đảm bảo render nhất quán trên mọi OS
 import '@fontsource/inter/400.css'

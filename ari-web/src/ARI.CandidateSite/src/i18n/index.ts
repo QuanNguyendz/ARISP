@@ -39,10 +39,6 @@ import legalTermsEn from './locales/en/modules/legal/terms.json'
 import applyVi from './locales/vi/modules/job-board/apply.json'
 import applyEn from './locales/en/modules/job-board/apply.json'
 
-// ===== PAGES (top-level page translations) =====
-import candidateApplyVi from './locales/vi/pages/candidateApply.json'
-import candidateApplyEn from './locales/en/pages/candidateApply.json'
-
 export const resources = {
   vi: {
     ...sharedResources.vi,
@@ -60,8 +56,6 @@ export const resources = {
     'modules/legal/terms': legalTermsVi,
     // Job-Board module
     'modules/job-board/apply': applyVi,
-    // Pages (top-level)
-    'pages/candidateApply': candidateApplyVi,
   },
   en: {
     ...sharedResources.en,
@@ -79,8 +73,6 @@ export const resources = {
     'modules/legal/terms': legalTermsEn,
     // Job-Board module
     'modules/job-board/apply': applyEn,
-    // Pages (top-level)
-    'pages/candidateApply': candidateApplyEn,
   },
 }
 
@@ -96,7 +88,6 @@ const siteNamespaces = [
   'modules/legal/privacyPolicy',
   'modules/legal/terms',
   'modules/job-board/apply',
-  'pages/candidateApply',
 ]
 
 const allNamespaces = [...sharedNamespaces, ...siteNamespaces]
