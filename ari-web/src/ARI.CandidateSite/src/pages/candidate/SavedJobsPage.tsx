@@ -13,8 +13,8 @@ import {
   Server,
   BrainCircuit,
 } from 'lucide-react'
-import { savedJobService } from '@/services/job/savedJobService'
-import type { SavedJobItem } from '@/services/job/savedJobService'
+import { savedJobService } from '@/fservices/job/savedJobService'
+import type { SavedJobItem } from '@/fservices/job/savedJobService'
 
 function formatSalary(job: SavedJobItem, t: (key: string, options?: any) => string): string {
   if (

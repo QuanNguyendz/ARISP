@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import CandidateNav from '@components/layout/CandidateNav'
+import CandidateNav from '@/app/layouts/CandidateNav'
 import GlassCard from '@ari/shared/ui/GlassCard'
 import { Calendar, Clock, Eye, CheckCircle, XCircle } from 'lucide-react'
 

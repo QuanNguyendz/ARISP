@@ -16,8 +16,8 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
-import { settingsService } from '@services/settings/settingsService'
-import type { CandidateSettings, NotificationChannelPref } from '@services/settings/settingsService'
+import { settingsService } from '@/fservices/settings/settingsService'
+import type { CandidateSettings, NotificationChannelPref } from '@/fservices/settings/settingsService'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 
 type ThemeMode = 'light' | 'dark' | 'system'

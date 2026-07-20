@@ -32,8 +32,8 @@ import {
   Download,
 } from 'lucide-react'
 import { profileService } from '@ari/shared/fservices/profile/profileService'
-import { provinceService } from '@services/location/provinceService'
-import type { Province } from '@services/location/provinceService'
+import { provinceService } from '@/fservices/location/provinceService'
+import type { Province } from '@/fservices/location/provinceService'
 import ChangePasswordModal from '@components/profile/ChangePasswordModal'
 import SearchableSelect from '@ari/shared/ui/SearchableSelect'
 import { Skeleton } from '@ari/shared/ui/Skeleton'

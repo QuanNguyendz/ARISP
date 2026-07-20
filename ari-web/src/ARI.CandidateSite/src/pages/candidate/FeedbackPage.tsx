@@ -15,7 +15,7 @@ import {
   ArrowRight,
   Brain,
 } from 'lucide-react'
-import CandidateLayout from '@components/layout/CandidateLayout'
+import CandidateLayout from '@/app/layouts/CandidateLayout'
 
 interface InterviewResult {
   id: string

@@ -4,12 +4,11 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { getDevAuth, isDevMode } from '@ari/shared/utils/devAuth'
 
 // Layouts + route guards: giữ eager vì nhỏ và dùng ở mọi route (bọc các page).
-import CandidateLayout from '@components/layout/CandidateLayout'
-import InterviewLayout from '@components/layout/InterviewLayout'
+import CandidateLayout from '@/app/layouts/CandidateLayout'
+import InterviewLayout from '@/app/layouts/InterviewLayout'
 import ProtectedRoute from '@ari/shared/guards/ProtectedRoute'
 import GuestRoute from '@ari/shared/guards/GuestRoute'
-import StaffRedirect from '@components/auth/StaffRedirect'
-import CandidateAppLayout from '@components/layout/CandidateAppLayout'
+import CandidateAppLayout from '@/app/layouts/CandidateAppLayout'
 import { DocumentViewerProvider } from '@ari/shared/document/DocumentViewer'
 import { useAppNotifications } from '@ari/shared/realtime/useAppNotifications'
 
@@ -80,15 +79,8 @@ function App() {
           <Route path="/403" element={<NotFoundPage />} />
 
           {/* ==================== PUBLIC ROUTES ==================== */}
-          {/* Job board công khai cho khách + ứng viên; staff (admin/hr/recruiter) bị đưa về workspace. */}
-          <Route
-            path="/"
-            element={
-              <StaffRedirect>
-                <FindJobPage />
-              </StaffRedirect>
-            }
-          />
+          {/* Job board công khai cho khách + ứng viên (site này chỉ phục vụ ứng viên — ADR-046). */}
+          <Route path="/" element={<FindJobPage />} />
           <Route path="/employer" element={<HomePage />} />
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route
@@ -114,30 +106,9 @@ function App() {
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           {/* Chọn lịch phỏng vấn từ email mời (token) — không cần đăng nhập đầy đủ */}
           <Route path="/portal/schedule/:applicationId" element={<CandidateSchedulePage />} />
-          <Route
-            path="/jobs"
-            element={
-              <StaffRedirect>
-                <FindJobPage />
-              </StaffRedirect>
-            }
-          />
-          <Route
-            path="/jobs/:id"
-            element={
-              <StaffRedirect>
-                <JobDetailPage />
-              </StaffRedirect>
-            }
-          />
-          <Route
-            path="/jobs/:id/apply"
-            element={
-              <StaffRedirect>
-                <JobApplyPage />
-              </StaffRedirect>
-            }
-          />
+          <Route path="/jobs" element={<FindJobPage />} />
+          <Route path="/jobs/:id" element={<JobDetailPage />} />
+          <Route path="/jobs/:id/apply" element={<JobApplyPage />} />
 
           {/* ========== CANDIDATE ROUTES (redesign — light theme, mockup) ========== */}
           <Route

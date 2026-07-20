@@ -19,14 +19,14 @@ import {
   Calendar,
 } from 'lucide-react'
 import jobService from '@ari/shared/fservices/job'
-import { savedJobService } from '@/services/job/savedJobService'
+import { savedJobService } from '@/fservices/job/savedJobService'
 import { profileService } from '@ari/shared/fservices/profile/profileService'
 import type { CvMatchResult } from '@ari/shared/fservices/profile/profileService'
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { JobPosting } from '@ari/shared/types/job'
 import { useAuthStore } from '@ari/shared/store/auth'
-import CandidateHeader from '@components/layout/CandidateHeader'
+import CandidateHeader from '@/app/layouts/CandidateHeader'
 
 // ============== HELPER FUNCTIONS ==============
 type TFunction = (key: string, options?: Record<string, unknown>) => string
