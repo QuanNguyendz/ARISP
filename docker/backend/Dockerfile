@@ -17,7 +17,7 @@ COPY src/ARI.API/*.csproj ./src/ARI.API/
 COPY src/ARI.Application/*.csproj ./src/ARI.Application/
 COPY src/ARI.Domain/*.csproj ./src/ARI.Domain/
 COPY src/ARI.Infrastructure/*.csproj ./src/ARI.Infrastructure/
-RUN dotnet restore
+RUN dotnet restore src/ARI.API/ARI.API.csproj
 # Copy everything else
 COPY . .
 ENTRYPOINT ["dotnet", "watch", "run", "--project", "src/ARI.API", "--urls", "http://+:5000"]
@@ -30,7 +30,7 @@ COPY src/ARI.API/*.csproj ./src/ARI.API/
 COPY src/ARI.Application/*.csproj ./src/ARI.Application/
 COPY src/ARI.Domain/*.csproj ./src/ARI.Domain/
 COPY src/ARI.Infrastructure/*.csproj ./src/ARI.Infrastructure/
-RUN dotnet restore
+RUN dotnet restore src/ARI.API/ARI.API.csproj
 COPY . .
 RUN dotnet publish src/ARI.API -c Release -o /app/publish --no-restore
 
