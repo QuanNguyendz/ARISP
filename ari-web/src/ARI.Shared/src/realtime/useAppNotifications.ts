@@ -21,15 +21,20 @@ const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications
 export const useAppNotifications = () => {
   const queryClient = useQueryClient()
   const token = useAuthStore((state) => state.tokens?.accessToken)
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const connectionRef = useRef<signalR.HubConnection | null>(null)
   useEffect(() => {
     // Hub yêu cầu [Authorize] — chưa đăng nhập thì không kết nối (tránh 401 + reconnect spam
-    // trên các trang public như Job Board).
-    if (!token) return
+    // trên các trang public như Job Board / màn đăng nhập).
+    if (!token || !isAuthenticated) return
 
-    // Create SignalR connection
+    // Create SignalR connection.
+    // accessTokenFactory đọc token MỚI NHẤT từ store mỗi lần (re)connect — sau khi apiClient
+    // refresh token, reconnect sẽ dùng đúng access token mới thay vì token cũ trong closure.
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(HUB_URL, { accessTokenFactory: () => token })
+      .withUrl(HUB_URL, {
+        accessTokenFactory: () => useAuthStore.getState().tokens?.accessToken ?? '',
+      })
       .withAutomaticReconnect()
       .build()
 
@@ -42,7 +47,19 @@ export const useAppNotifications = () => {
         console.log('[SignalR] Connected to AppNotifications hub')
       })
       .catch((err) => {
-        console.error('[SignalR] Connection error:', err)
+        // 401 = token cũ/hết hạn/không hợp lệ (vd phiên còn sót trong localStorage). Đây là
+        // trạng thái mong đợi, KHÔNG phải lỗi thật: apiClient (REST) sở hữu luồng refresh→logout,
+        // hub chỉ cần im lặng bỏ qua thay vì spam đỏ. Không tự logout ở đây (access token có thể
+        // chỉ hết hạn trong khi refresh token vẫn hợp lệ).
+        const isUnauthorized =
+          (err as { statusCode?: number })?.statusCode === 401 || String(err).includes('401')
+        if (isUnauthorized) {
+          console.warn(
+            '[SignalR] Bỏ qua kết nối notifications — phiên chưa đăng nhập/đã hết hạn (401).'
+          )
+        } else {
+          console.warn('[SignalR] Không kết nối được AppNotifications hub:', err)
+        }
       })
 
     // Listen to SystemEvents
@@ -133,5 +150,5 @@ export const useAppNotifications = () => {
         })
       }
     }
-  }, [token, queryClient])
+  }, [token, isAuthenticated, queryClient])
 }
