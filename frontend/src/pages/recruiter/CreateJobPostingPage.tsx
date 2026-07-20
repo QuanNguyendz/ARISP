@@ -278,7 +278,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         {analyzeMsg && (
           <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${analyzeMsg.type === 'ok' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}>
             {analyzeMsg.type === 'ok' ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />} {analyzeMsg.text}
-        </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="grid max-w-5xl gap-6 lg:grid-cols-3">
