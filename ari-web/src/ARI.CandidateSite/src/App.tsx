@@ -9,9 +9,6 @@ import InterviewLayout from '@components/layout/InterviewLayout'
 import ProtectedRoute from '@ari/shared/guards/ProtectedRoute'
 import GuestRoute from '@ari/shared/guards/GuestRoute'
 import StaffRedirect from '@components/auth/StaffRedirect'
-import SuperAdminLayout from '@components/layout/SuperAdminLayout'
-import HrLayout from '@components/layout/HrLayout'
-import RecruiterLayout from '@components/layout/RecruiterLayout'
 import CandidateAppLayout from '@components/layout/CandidateAppLayout'
 import { DocumentViewerProvider } from '@ari/shared/document/DocumentViewer'
 import { useAppNotifications } from '@ari/shared/realtime/useAppNotifications'
@@ -19,8 +16,6 @@ import { useAppNotifications } from '@ari/shared/realtime/useAppNotifications'
 // Pages: lazy-load → mỗi page thành 1 chunk riêng, chỉ tải khi vào route đó
 // (tách cả dep nặng như react-grid-layout ra khỏi bundle chính).
 // Auth
-const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
-const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 const CandidateLoginPage = lazy(() => import('@pages/auth/CandidateLoginPage'))
 const CandidateRegisterPage = lazy(() => import('@pages/auth/CandidateRegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@ari/shared/authflows/ForgotPasswordPage'))
@@ -31,42 +26,6 @@ const VerifyEmailPage = lazy(() => import('@pages/auth/VerifyEmailPage'))
 // Legal
 const TermsPage = lazy(() => import('@pages/legal/TermsPage'))
 const PrivacyPolicyPage = lazy(() => import('@pages/legal/PrivacyPolicyPage'))
-
-// Super Admin
-const SuperAdminDashboardPage = lazy(() => import('@pages/super-admin/DashboardPage'))
-const SuperAdminUsersPage = lazy(() => import('@pages/super-admin/UsersPage'))
-const SuperAdminPendingUsersPage = lazy(() => import('@pages/super-admin/PendingUsersPage'))
-const SuperAdminAuditLogsPage = lazy(() => import('@pages/super-admin/AuditLogsPage'))
-const SuperAdminSettingsPage = lazy(() => import('@pages/super-admin/SettingsPage'))
-
-// HR Admin
-const HrDashboardPage = lazy(() => import('@pages/hr/DashboardPage'))
-const HrPendingJobsPage = lazy(() => import('@pages/hr/PendingJobsPage'))
-const HrJobsPage = lazy(() => import('@pages/hr/JobsPage'))
-const HrCandidatesPage = lazy(() => import('@pages/hr/CandidatesPage'))
-const HrCandidateDetailPage = lazy(() => import('@pages/hr/CandidateDetailPage'))
-const HrEvaluationsPage = lazy(() => import('@pages/hr/EvaluationReviewPage'))
-const HrReportsPage = lazy(() => import('@pages/hr/ReportsPage'))
-const HrPlaybooksPage = lazy(() => import('@pages/hr/PlaybooksPage'))
-const HrTeamPage = lazy(() => import('@pages/hr/TeamPage'))
-const HrInterviewsPage = lazy(() => import('@pages/hr/InterviewSessionsPage'))
-const HrJobDetailPage = lazy(() => import('@pages/hr/JobPostingDetailPage'))
-const HrSettingsPage = lazy(() => import('@pages/hr/SettingsPage'))
-const HrNotificationsPage = lazy(() => import('@pages/hr/NotificationsPage'))
-
-// Recruiter
-const RecruiterDashboardPage = lazy(() => import('@pages/recruiter/DashboardPage'))
-const RecruiterMyJobsPage = lazy(() => import('@pages/recruiter/MyJobsPage'))
-const RecruiterJobDetailPage = lazy(() => import('@pages/recruiter/JobDetailPage'))
-const RecruiterCreateJobPage = lazy(() => import('@pages/recruiter/CreateJobPostingPage'))
-const RecruiterJobSchedulePage = lazy(() => import('@pages/recruiter/JobScheduleConfigPage'))
-const RecruiterInterviewCodePage = lazy(() => import('@pages/recruiter/InterviewCodePage'))
-const RecruiterCandidatesPage = lazy(() => import('@pages/recruiter/CandidatesPage'))
-const RecruiterCandidateDetailPage = lazy(() => import('@pages/recruiter/CandidateDetailPage'))
-const RecruiterEvaluationsPage = lazy(() => import('@pages/recruiter/EvaluationReviewPage'))
-const RecruiterInterviewsPage = lazy(() => import('@pages/recruiter/InterviewSessionsPage'))
-const RecruiterSettingsPage = lazy(() => import('@pages/recruiter/SettingsPage'))
-const RecruiterNotificationsPage = lazy(() => import('@pages/recruiter/NotificationsPage'))
 
 // Candidate
 const CandidateApplicationsPage = lazy(() => import('@pages/candidate/ApplicationsPage'))
@@ -131,22 +90,6 @@ function App() {
             }
           />
           <Route path="/employer" element={<HomePage />} />
-          <Route
-            path="/auth/login"
-            element={
-              <GuestRoute>
-                <LoginPage />
-              </GuestRoute>
-            }
-          />
-          <Route
-            path="/auth/register"
-            element={
-              <GuestRoute>
-                <RegisterPage />
-              </GuestRoute>
-            }
-          />
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route
             path="/auth/candidate-login"
@@ -244,73 +187,6 @@ function App() {
             path="/candidate/results/:id"
             element={<Navigate to="/candidate/applications" replace />}
           />
-
-          {/* ==================== SUPER ADMIN ROUTES ==================== */}
-          <Route
-            element={
-              <ProtectedRoute allowedRoles={['Super_admin']}>
-                <SuperAdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/super-admin/dashboard" element={<SuperAdminDashboardPage />} />
-            <Route path="/super-admin/users" element={<SuperAdminUsersPage />} />
-            <Route path="/super-admin/users/pending" element={<SuperAdminPendingUsersPage />} />
-            <Route path="/super-admin/audit-logs" element={<SuperAdminAuditLogsPage />} />
-            <Route path="/super-admin/settings" element={<SuperAdminSettingsPage />} />
-          </Route>
-
-          {/* ==================== HR ADMIN ROUTES ==================== */}
-          <Route
-            element={
-              <ProtectedRoute allowedRoles={['Hr_admin']}>
-                <HrLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/hr/dashboard" element={<HrDashboardPage />} />
-            <Route path="/hr/jobs/pending" element={<HrPendingJobsPage />} />
-            <Route path="/hr/jobs" element={<HrJobsPage />} />
-            <Route path="/hr/jobs/:id" element={<HrJobDetailPage />} />
-            <Route path="/hr/candidates" element={<HrCandidatesPage />} />
-            <Route path="/hr/candidates/:id" element={<HrCandidateDetailPage />} />
-            <Route path="/hr/evaluations" element={<HrEvaluationsPage />} />
-            <Route path="/hr/reports" element={<HrReportsPage />} />
-            <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
-            <Route path="/hr/team" element={<HrTeamPage />} />
-            <Route path="/hr/interviews" element={<HrInterviewsPage />} />
-            <Route path="/hr/notifications" element={<HrNotificationsPage />} />
-            <Route path="/hr/settings" element={<HrSettingsPage />} />
-          </Route>
-
-          {/* ==================== RECRUITER ROUTES ==================== */}
-          <Route
-            element={
-              <ProtectedRoute allowedRoles={['Recruiter']}>
-                <RecruiterLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/recruiter/dashboard" element={<RecruiterDashboardPage />} />
-            <Route
-              path="/recruiter/jobs/create"
-              element={<RecruiterCreateJobPage mode="create" />}
-            />
-            <Route path="/recruiter/my-jobs" element={<RecruiterMyJobsPage />} />
-            <Route path="/recruiter/my-jobs/:id" element={<RecruiterJobDetailPage />} />
-            <Route
-              path="/recruiter/my-jobs/:id/edit"
-              element={<RecruiterCreateJobPage mode="edit" />}
-            />
-            <Route path="/recruiter/my-jobs/:id/schedule" element={<RecruiterJobSchedulePage />} />
-            <Route path="/recruiter/candidates" element={<RecruiterCandidatesPage />} />
-            <Route path="/recruiter/candidates/:id" element={<RecruiterCandidateDetailPage />} />
-            <Route path="/recruiter/code" element={<RecruiterInterviewCodePage />} />
-            <Route path="/recruiter/evaluations" element={<RecruiterEvaluationsPage />} />
-            <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
-            <Route path="/recruiter/notifications" element={<RecruiterNotificationsPage />} />
-            <Route path="/recruiter/settings" element={<RecruiterSettingsPage />} />
-          </Route>
 
           {/* ==================== INTERVIEW ROUTES ==================== */}
           <Route
