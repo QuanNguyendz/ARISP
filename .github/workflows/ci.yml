@@ -1,0 +1,79 @@
+# ============================================================
+# ARISP – CI: chặn merge khi code không build được.
+#
+# Chạy trên mọi Pull Request vào develop / main. Bổ sung cho deploy.yml
+# (chỉ chạy khi đã push vào main) — lỗi cú pháp phải bị bắt ở PR, không phải
+# lúc deploy.
+# ============================================================
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+# PR push liên tiếp: huỷ lần chạy cũ, chỉ giữ commit mới nhất.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET 8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore ari-service/ARI.sln
+
+      - name: Build
+        run: dotnet build ari-service/ARI.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test ari-service/ARI.sln -c Release --no-build --verbosity normal
+
+  frontend:
+    name: Frontend (ari-web workspaces)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ari-web/package-lock.json
+
+      - name: Install
+        working-directory: ari-web
+        run: npm ci
+
+      # Build cả 2 site: candidate và staff có thể hỏng độc lập nhau.
+      - name: Build all workspaces
+        working-directory: ari-web
+        run: npm run build --workspaces --if-present
+
+  rag:
+    name: RAG service (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        working-directory: rag-service
+        run: pip install -e ".[dev]"
+
+      # Không cần DB/OpenAI: chỉ xác nhận package import được, bắt lỗi cú pháp
+      # và thiếu dependency trước khi lên image.
+      - name: Import check
+        working-directory: rag-service
+        run: python -c "import app.main; print('rag-service import OK')"

@@ -275,9 +275,11 @@ _Chưa có task nào đang thực hiện._
   - [ ] HR nhận notification khi Candidate schedule/reschedule
 
 ### Phase 12 – Infra & Deploy
-- [ ] GitHub Actions CI/CD pipeline (workflows directory tồn tại nhưng rỗng)
+- [x] GitHub Actions CI/CD pipeline — `ci.yml` (PR → develop/main) + `deploy.yml` (push main → GHCR → VPS pull) — 2026-07-22
 - [x] Docker + docker-compose cho dev và production (`docker-compose.yml`, `docker-compose.prod.yml`)
-- [ ] Deploy lên Ubuntu VPS
+- [x] Deploy lên Ubuntu VPS (arisp.io.vn, Docker Compose + Nginx + Let's Encrypt)
+- [x] Tách config nginx prod ra `nginx/conf.d.prod/` để hết drift giữa repo và VPS — 2026-07-22
+- [x] Đóng cổng redis/rag/backend/frontend khỏi internet ở prod (`ports: !reset []`) — 2026-07-22
 - [x] SSL với Nginx (config đã có)
 - [x] Serilog logging setup (rolling file logs, Serilog integration)
 - [ ] Grafana monitoring (track latency từng bước pipeline)
@@ -302,6 +304,15 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**
+  - **Hotfix `arisp-rag` (đã áp dụng thẳng lên VPS):** container crash-loop **6928 lần**. `docker/.env` chỉ có biến .NET (`ConnectionStrings__DefaultConnection`), trong khi rag-service Python đọc `DATABASE_*` riêng (`app/config.py:19`) → fallback về localhost → `ConnectionRefusedError` khi startup. Thêm `DATABASE_HOST/PORT/NAME/USER/PASSWORD/SSLMODE` (dùng tham số rời thay `DATABASE_URL` vì password chứa `?`, đúng ý `core/db.py:46`). Phát hiện thêm cùng lớp lỗi: thiếu `OPENAI_API_KEY` → service chạy **mock mode sinh câu hỏi giả mà vẫn trả HTTP 200**; thêm `OPENAI_API_KEY` + `APP_ENV=production`. Kết quả: `{"status":"ok","env":"production","mock_mode":false,"db":true}`, RestartCount=0.
+  - **Bug chặn deploy 2-SPA:** `docker/frontend/Dockerfile` stage `build` không truyền `VITE_*`, Vite inline lúc compile nên bundle prod nhúng `http://localhost:5000/api` (`ARI.Shared/src/config/constants.ts:1`). Thêm `ARG VITE_API_BASE_URL=/api` — tương đối vì Nginx proxy `/api/` cùng origin; cả 2 SignalR hub đều dẫn xuất từ `API_BASE_URL` nên cũng thành relative → tự dùng `wss://` theo origin. Verify: bundle chứa `st="/api"`, 0 lần `localhost:5000` trong `.js`.
+  - **`ports: []` không bao giờ có tác dụng:** Compose merge sequence bằng cách nối, không thay thế — đó là lý do `rag-service` vẫn hở `:8000` ra internet dù prod override đã khai báo `ports: []` từ lâu. Đổi sang `ports: !reset []` / `volumes: !reset []`; verify prod chỉ còn publish 80/443, dev giữ nguyên.
+  - **Chấm dứt drift:** 4 file config bị sửa tay trên VPS (`nano`/`sed`) do prod override mount `../nginx/conf.d` vốn chứa config **dev**. Tạo `nginx/conf.d.prod/arisp.conf` (2 origin: `arisp.io.vn` → frontend-candidate:3000, `staff.arisp.io.vn` → frontend-staff:3001; thêm `client_max_body_size 25m` cho CV/JD PDF và `proxy_read_timeout 3600s` cho `/hubs/`), prod compose mount thư mục này. `git reset --hard` trong pipeline giờ an toàn.
+  - **`docker/backend/Dockerfile`:** hợp nhất sửa đổi trên VPS — base `aspnet:8.0` (bỏ `-alpine`, thiếu ICU), `ASPNETCORE_HTTP_PORTS=5000`, restore theo `.csproj`. Bỏ `USER root` mà VPS đang dùng: nguyên nhân thật là `Program.cs:40` gọi `Directory.CreateDirectory("uploads")` lúc khởi động trên `/app` thuộc root → tạo sẵn `/app/uploads` + `chown app:app`, chạy bằng user non-root `app` (UID 1654) có sẵn trong image .NET 8.
+  - **CI/CD:** `ci.yml` build + test .NET (14/14 pass), build cả 2 workspace FE, import-check rag-service trên mọi PR vào develop/main. `deploy.yml` build 4 image song song trên runner rồi push GHCR, VPS chỉ `pull && up -d` (~30s thay vì ~10 phút build trên máy 3.8GB RAM), health-check 2 origin sau deploy, rollback bằng `workflow_dispatch` với `image_tag` cũ.
+  - **`docker/.env.example`:** khôi phục (đã bị xoá khỏi develop), ghi rõ hai hệ tên biến .NET `__` vs Python `UPPER_SNAKE` — chính là gốc của cả 2 sự cố RAG ở trên.
 
 - [x] 2026-07-20: **Refactor Frontend Clean Architecture — `frontend/` → `ari-web/` monorepo, tách ARI.CandidateSite + ARI.StaffSite + ARI.Shared (ADR-046). HOÀN TẤT.**
   - **Wave 0:** `git mv frontend ari-web`; npm workspaces root (`package.json` + `tsconfig.base.json` + scripts `dev:candidate`/`dev:staff`/`build`); app monolith vào `src/ARI.CandidateSite` (`@ari/candidate-site`, port 3000). Kèm sửa 28 lỗi `tsc` có sẵn (JSX thiếu `)}`, type `t` 2-arg, unused vars, `cefrLevel`) để có baseline build xanh.

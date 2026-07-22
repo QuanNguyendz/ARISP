@@ -1,6 +1,15 @@
 # ============================================
 # ARISP – Docker Compose (Production Override)
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Deploy qua CI/CD (GitHub Actions build & push GHCR — mặc định):
+#   IMAGE_TAG=<sha> docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   IMAGE_TAG=<sha> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Build tại chỗ trên VPS (chỉ khi cần chữa cháy, chậm và ngốn RAM):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Cổng ra host ở prod: CHỈ nginx (80/443). backend/frontend/rag/redis giao tiếp
+# nội bộ qua arisp-network — trước đây redis:6379 và rag:8000 bị expose 0.0.0.0.
 # ============================================
 
 services:
@@ -10,7 +19,8 @@ services:
       target: production
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-    volumes: []  # No source mount in production
+    ports: !reset []       # không expose ra host; nginx gọi qua backend:5000
+    volumes: !reset []     # No source mount in production
     deploy:
       resources:
         limits:
@@ -21,7 +31,11 @@ services:
   frontend-candidate:
     build:
       target: production
-    volumes: []  # No source mount in production
+      args:
+        # Tương đối: nginx proxy /api/ cùng origin → image không khoá cứng domain.
+        VITE_API_BASE_URL: /api
+    ports: !reset []
+    volumes: !reset []     # No source mount in production
     deploy:
       resources:
         limits:
@@ -32,7 +46,10 @@ services:
   frontend-staff:
     build:
       target: production
-    volumes: []  # No source mount in production
+      args:
+        VITE_API_BASE_URL: /api
+    ports: !reset []
+    volumes: !reset []     # No source mount in production
     deploy:
       resources:
         limits:
@@ -43,8 +60,8 @@ services:
   rag-service:
     build:
       target: production
-    ports: []        # không expose ra host ở prod (chỉ truy cập nội bộ qua arisp-network)
-    volumes: []      # không mount source ở prod
+    ports: !reset []        # không expose ra host ở prod (chỉ truy cập nội bộ qua arisp-network)
+    volumes: !reset []      # không mount source ở prod
     deploy:
       resources:
         limits:
@@ -53,21 +70,23 @@ services:
 
   # --- Redis ---
   redis:
+    ports: !reset []        # không expose ra internet — chỉ backend trong network dùng
     deploy:
       resources:
         limits:
           memory: 256M
           cpus: "0.25"
 
-  # --- Nginx: add SSL volumes for production ---
+  # --- Nginx: SSL + config prod ---
   nginx:
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      # conf.d.prod (KHÔNG phải conf.d): conf.d chứa config dev localhost/staff.localhost.
+      # Tách 2 thư mục để config prod nằm trong git, không phải sửa tay trên VPS.
+      - ../nginx/conf.d.prod:/etc/nginx/conf.d:ro
       - ../nginx/snippets:/etc/nginx/snippets:ro
       - ../nginx/sites-available:/etc/nginx/sites-available:ro
-      # Uncomment when SSL is configured:
-      # - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro

@@ -5,6 +5,9 @@
 # ARG PKG  = npm workspace name (@ari/candidate-site | @ari/staff-site)
 # ARG SITE = thư mục package (ARI.CandidateSite | ARI.StaffSite)
 # ARG PORT = cổng phục vụ (3000 candidate | 3001 staff)
+# ARG VITE_API_BASE_URL = gốc API nhúng vào bundle lúc build (Vite inline lúc compile,
+#     KHÔNG đọc được ở runtime). Mặc định "/api" (tương đối) vì Nginx proxy /api/ cùng
+#     origin cho cả 2 site → image không khoá cứng vào domain, tái dùng cho staging.
 # ============================================
 
 # --- Stage: development (Vite dev server with HMR) ---
@@ -34,6 +37,12 @@ COPY src/ARI.CandidateSite/package.json ./src/ARI.CandidateSite/package.json
 COPY src/ARI.StaffSite/package.json ./src/ARI.StaffSite/package.json
 RUN npm ci
 COPY . .
+# Vite inline import.meta.env.VITE_* lúc build → phải set TRƯỚC khi build, không phải runtime.
+# Thiếu ARG này thì constants.ts fallback về http://localhost:5000/api và bundle prod hỏng.
+# Hai SignalR hub (usePracticeSession, useAppNotifications) đều dẫn xuất từ API_BASE_URL nên
+# giá trị tương đối "/api" cũng làm hub thành relative → tự dùng wss:// theo origin.
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build -w $PKG
 
 # --- Stage: production (serve static files with nginx) ---
