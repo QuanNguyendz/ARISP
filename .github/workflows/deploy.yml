@@ -1,0 +1,168 @@
+# ============================================================
+# ARISP – CD: build image trên GitHub Actions → đẩy lên GHCR → VPS chỉ pull.
+#
+# KHÔNG build trên VPS: máy 3.8GB RAM không kham nổi 2 bản Vite build + .NET
+# publish + pip install cùng lúc, và site sẽ downtime suốt ~10 phút build.
+# Runner của Actions (7GB, miễn phí cho repo) build song song 4 image, VPS chỉ
+# `pull && up -d` (~30 giây).
+#
+# `main` = production. `develop` = integration (không tự deploy).
+#
+# Secrets cần có trong repo (Settings → Secrets → Actions):
+#   VPS_HOST     161.248.147.38
+#   VPS_USER     root
+#   VPS_SSH_KEY  private key của deploy key riêng cho Actions
+#                (KHÔNG tái dùng key cá nhân trên máy dev)
+# GHCR dùng GITHUB_TOKEN sẵn có — không cần secret thêm.
+# ============================================================
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag image cần deploy (bỏ trống = build từ commit hiện tại). Điền sha cũ để rollback.'
+        required: false
+        type: string
+
+# Không cho 2 lần deploy chồng nhau; không huỷ giữa chừng vì đang đụng prod.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR yêu cầu tên repository viết thường.
+  IMAGE_PREFIX: ghcr.io/quannguyendz
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    # Bỏ qua build khi rollback về tag cũ — image đã có sẵn trên GHCR.
+    if: ${{ github.event.inputs.image_tag == '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: backend
+            image: arisp-backend
+            context: ari-service
+            dockerfile: docker/backend/Dockerfile
+            build_args: ''
+          - name: candidate
+            image: arisp-candidate
+            context: ari-web
+            dockerfile: docker/frontend/Dockerfile
+            # VITE_* bị Vite inline lúc build (không đọc được ở runtime).
+            # "/api" tương đối vì Nginx proxy /api/ cùng origin cho cả 2 site.
+            build_args: |
+              PKG=@ari/candidate-site
+              SITE=ARI.CandidateSite
+              PORT=3000
+              VITE_API_BASE_URL=/api
+          - name: staff
+            image: arisp-staff
+            context: ari-web
+            dockerfile: docker/frontend/Dockerfile
+            build_args: |
+              PKG=@ari/staff-site
+              SITE=ARI.StaffSite
+              PORT=3001
+              VITE_API_BASE_URL=/api
+          - name: rag
+            image: arisp-rag
+            context: rag-service
+            dockerfile: docker/rag/Dockerfile
+            build_args: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: production
+          build-args: ${{ matrix.build_args }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    # Chạy cả khi bỏ qua job build (trường hợp rollback bằng image_tag).
+    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Xác định IMAGE_TAG
+        id: tag
+        run: echo "value=${{ github.event.inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /var/www/ARISP
+
+            # An toàn vì mọi config prod đã nằm trong git (nginx/conf.d.prod,
+            # docker-compose.prod.yml). docker/.env được .gitignore nên sống sót.
+            git fetch origin main
+            git reset --hard origin/main
+
+            cd docker
+            export IMAGE_TAG=${{ steps.tag.outputs.value }}
+            COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+
+            echo "==> Pull image tag $IMAGE_TAG"
+            $COMPOSE pull
+
+            echo "==> Up"
+            $COMPOSE up -d --remove-orphans
+
+            echo "==> Dọn image cũ"
+            docker image prune -f
+
+            echo "==> Trạng thái"
+            $COMPOSE ps
+
+      - name: Health check
+        run: |
+          set -e
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://arisp.io.vn/api/jobs/facets || true)
+            staff=$(curl -s -o /dev/null -w '%{http_code}' https://staff.arisp.io.vn/ || true)
+            echo "attempt $i: candidate-api=$code staff=$staff"
+            if [ "$code" = "200" ] && [ "$staff" = "200" ]; then
+              echo "Deploy OK — tag ${{ steps.tag.outputs.value }}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check thất bại sau 120s."
+          echo "Rollback: chạy lại workflow này (workflow_dispatch) với image_tag = sha của commit trước."
+          exit 1

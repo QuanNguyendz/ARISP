@@ -1,11 +1,18 @@
 # ============================================
 # ARISP – Docker Compose (Development)
 # Usage: docker compose up --build
+#
+# Mỗi service khai báo cả `image:` lẫn `build:`:
+#   - Dev  : `docker compose up --build` → build tại chỗ, gắn tag :dev
+#   - Prod : `IMAGE_TAG=<sha> docker compose ... pull && up -d` → kéo image
+#            GitHub Actions đã build sẵn trên GHCR, KHÔNG build trên VPS
+#            (VPS 3.8GB RAM không kham nổi 2 bản Vite build + .NET + Python).
 # ============================================
 
 services:
   # --- ASP.NET Core Backend ---
   backend:
+    image: ghcr.io/quannguyendz/arisp-backend:${IMAGE_TAG:-dev}
     build:
       context: ../ari-service
       dockerfile: ../docker/backend/Dockerfile
@@ -34,6 +41,7 @@ services:
   # --- RAG Interview Microservice (Python / FastAPI + LangChain) — ADR-039 ---
   # Nội bộ: KHÔNG route qua Nginx. Backend gọi qua http://rag-service:8000.
   rag-service:
+    image: ghcr.io/quannguyendz/arisp-rag:${IMAGE_TAG:-dev}
     build:
       context: ../rag-service
       dockerfile: ../docker/rag/Dockerfile
@@ -51,6 +59,7 @@ services:
 
   # --- React Frontend: Candidate site (public) ---
   frontend-candidate:
+    image: ghcr.io/quannguyendz/arisp-candidate:${IMAGE_TAG:-dev}
     build:
       context: ../ari-web
       dockerfile: ../docker/frontend/Dockerfile
@@ -75,6 +84,7 @@ services:
 
   # --- React Frontend: Staff site (nội bộ) ---
   frontend-staff:
+    image: ghcr.io/quannguyendz/arisp-staff:${IMAGE_TAG:-dev}
     build:
       context: ../ari-web
       dockerfile: ../docker/frontend/Dockerfile
