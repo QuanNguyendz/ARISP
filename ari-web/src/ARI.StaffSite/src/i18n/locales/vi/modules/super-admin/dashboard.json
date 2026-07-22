@@ -1,0 +1,46 @@
+{
+  "greeting": "Xin chào, {{name}}",
+  "greetingFallback": "Super Admin",
+  "description": "Tổng quan quản trị hệ thống ARISP",
+  "settingsButton": "Cài đặt hệ thống",
+  "statCards": {
+    "totalUsers": "Tổng người dùng",
+    "pendingRequests": "YC chờ duyệt",
+    "lockedUsers": "Bị khóa",
+    "recruiters": "Recruiter"
+  },
+  "pendingUsers": {
+    "title": "Yêu cầu tạo tài khoản",
+    "subtitle": "HR Leader gửi · chờ bạn duyệt",
+    "viewAll": "Xem tất cả",
+    "empty": "Không có yêu cầu nào chờ duyệt",
+    "by": "bởi {{name}}",
+    "approve": "Duyệt",
+    "approving": "Đang duyệt..."
+  },
+  "auditLogs": {
+    "title": "Nhật ký hoạt động",
+    "subtitle": "Thay đổi gần đây trong hệ thống",
+    "viewAll": "Xem tất cả",
+    "empty": "Chưa có hoạt động nào",
+    "by": "bởi {{name}}"
+  },
+  "quickActions": {
+    "title": "Thao tác nhanh",
+    "createStaff": "Tạo tài khoản staff",
+    "approveUsers": "Duyệt user mới",
+    "manageUsers": "Quản lý người dùng",
+    "viewAuditLogs": "Xem audit logs"
+  },
+  "accountDistribution": {
+    "title": "Phân bổ tài khoản",
+    "superAdmin": "Super Admin",
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter",
+    "candidate": "Ứng viên"
+  },
+  "errors": {
+    "loadFailed": "Không tải được dữ liệu tổng quan.",
+    "approveFailed": "Không thể duyệt yêu cầu."
+  }
+}

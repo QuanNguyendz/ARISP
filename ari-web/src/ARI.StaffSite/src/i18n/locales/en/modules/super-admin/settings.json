@@ -1,0 +1,48 @@
+{
+  "title": "System Settings",
+  "description": "Global configuration for the ARISP platform (single-tenant)",
+  "saveChanges": "Save Changes",
+  "saving": "Saving...",
+  "saveSuccess": "System settings saved.",
+  "tabs": {
+    "auth": "Login & Email Domains",
+    "integrations": "Integrations & Webhook"
+  },
+  "auth": {
+    "title": "Allowed Email Domains",
+    "description": "List of company email domains allowed to sign in (Google OAuth + pre-provisioning).",
+    "infoLine1": "Only applies to",
+    "infoHighlight": "Google sign-in for staff",
+    "infoLine1End": "(HR · Recruiter · Super Admin). Email + password sign-in and candidate accounts are not restricted by this list.",
+    "infoLine2": "Leave empty = allow all domains. After passing the domain check, accounts must still be pre-provisioned in the system.",
+    "placeholder": "e.g. company.com",
+    "addButton": "Add",
+    "empty": "No domains yet. When empty, all email domains will be blocked from Google sign-in.",
+    "removeDomainAria": "Remove {{domain}}",
+    "invalidDomain": "\"{{domain}}\" is not a valid domain."
+  },
+  "integrations": {
+    "title": "Webhook & Integrations",
+    "description": "Configure event destinations for ATS and internal notification channels.",
+    "atsWebhookUrl": "ATS Webhook URL",
+    "atsWebhookSecret": "ATS Webhook Secret",
+    "slackWebhookUrl": "Slack Incoming Webhook",
+    "teamsWebhookUrl": "Microsoft Teams Webhook",
+    "descriptions": {
+      "atsWebhookUrl": "Webhook URL to send recruitment events to the ATS system.",
+      "atsWebhookSecret": "Secret key used to sign ATS webhook payloads.",
+      "slackWebhookUrl": "Incoming webhook to send notifications to Slack.",
+      "teamsWebhookUrl": "Incoming webhook to send notifications to Microsoft Teams."
+    },
+    "placeholders": {
+      "atsWebhookUrl": "https://ats.example.com/hooks/arisp",
+      "atsWebhookSecret": "••••••••",
+      "slackWebhookUrl": "https://hooks.slack.com/services/...",
+      "teamsWebhookUrl": "https://outlook.office.com/webhook/..."
+    }
+  },
+  "errors": {
+    "loadFailed": "Failed to load system settings.",
+    "saveFailed": "Failed to save settings."
+  }
+}

@@ -155,7 +155,7 @@ Hồ sơ Candidate ứng tuyển cho một Job Posting.
 | `candidate_account_id` | FK → `candidate_accounts.id`; NULL nếu HR tạo thủ công ứng viên |
 | `source` | `job_board` (ứng viên tự apply) \| `invited` (HR chủ động mời) |
 | `status` | Trạng thái ứng tuyển: `invited` → `cv_submitted` → `screening` → `interview` → `pass` / `not_pass` |
-| `practice_session_used` | Flag đánh dấu đã dùng lượt phỏng vấn thử (tối đa 1 lần per Application) |
+| `practice_session_used` | **[Legacy — giữ tương thích ngược]** Flag tổng đã dùng phỏng vấn thử. Điều kiện chặn thật sự đã chuyển sang **1 lượt / VÒNG** (theo `InterviewSession` `session_type='practice'` + `round_number`, ADR-027) — cột này không còn dùng làm gate |
 | `cv_text` | Văn bản trích xuất từ CV để đưa vào RAG pipeline |
 
 ---
@@ -291,7 +291,7 @@ Lưu kết quả nộp bài thi trắc nghiệm của ứng viên. Hệ thống 
 | 5 | **Thay đổi** mặc định `job_postings.interview_mode` | Mặc định chuyển sang `'onsite'` do toàn bộ quy trình phỏng vấn thật bắt buộc tại công ty. |
 | 6 | **Dọn dẹp** toàn bộ indexes liên quan tới `organization_id` | Tối ưu hóa hiệu năng truy vấn, loại bỏ các index partition tenant không còn sử dụng. |
 | 7 | **Thêm** hai bảng `online_test_questions` và `online_test_submissions` | Hỗ trợ vòng thi trắc nghiệm trực tuyến (Online Test - Multiple Choice Test) độc lập, sạch sẽ, không ảnh hưởng đến dữ liệu phỏng vấn AI. |
-| 8 | **Mở rộng** `job_postings` với metadata Job Board Tier 1 | Bổ sung `location`, `work_mode`, lương, loại hình việc làm, cấp kinh nghiệm, skills, job category, hạn nộp, tuyển gấp — phục vụ Job Board IT. Không thêm `experience_years_*`. Seed mẫu tin tuyển dụng: `backend/ARISP.API/Program.cs`. |
+| 8 | **Mở rộng** `job_postings` với metadata Job Board Tier 1 | Bổ sung `location`, `work_mode`, lương, loại hình việc làm, cấp kinh nghiệm, skills, job category, hạn nộp, tuyển gấp — phục vụ Job Board IT. Không thêm `experience_years_*`. Seed mẫu tin tuyển dụng: `ari-service/src/ARI.API/Program.cs`. |
 
 ---
 

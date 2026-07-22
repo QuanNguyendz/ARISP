@@ -1,13 +1,20 @@
 # ============================================
 # ARISP – Docker Compose (Development)
 # Usage: docker compose up --build
+#
+# Mỗi service khai báo cả `image:` lẫn `build:`:
+#   - Dev  : `docker compose up --build` → build tại chỗ, gắn tag :dev
+#   - Prod : `IMAGE_TAG=<sha> docker compose ... pull && up -d` → kéo image
+#            GitHub Actions đã build sẵn trên GHCR, KHÔNG build trên VPS
+#            (VPS 3.8GB RAM không kham nổi 2 bản Vite build + .NET + Python).
 # ============================================
 
 services:
   # --- ASP.NET Core Backend ---
   backend:
+    image: ghcr.io/quannguyendz/arisp-backend:${IMAGE_TAG:-dev}
     build:
-      context: ../backend
+      context: ../ari-service
       dockerfile: ../docker/backend/Dockerfile
       target: development
     container_name: arisp-backend
@@ -18,28 +25,81 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
+      # ADR-039: chọn RAG microservice Python. Đặt AI_PROVIDER=rag để dùng service Python.
+      - RAG_SERVICE_URL=http://rag-service:8000
     volumes:
-      - ../backend:/app/src
+      - ../ari-service:/app/src
     depends_on:
       redis:
         condition: service_healthy
+      rag-service:
+        condition: service_started
     networks:
       - arisp-network
     restart: unless-stopped
 
-  # --- React Frontend ---
-  frontend:
+  # --- RAG Interview Microservice (Python / FastAPI + LangChain) — ADR-039 ---
+  # Nội bộ: KHÔNG route qua Nginx. Backend gọi qua http://rag-service:8000.
+  rag-service:
+    image: ghcr.io/quannguyendz/arisp-rag:${IMAGE_TAG:-dev}
     build:
-      context: ../frontend
+      context: ../rag-service
+      dockerfile: ../docker/rag/Dockerfile
+      target: development
+    container_name: arisp-rag
+    ports:
+      - "8000:8000"   # expose ra host chỉ để dev/test Swagger; prod gỡ bỏ nếu muốn
+    env_file:
+      - .env
+    volumes:
+      - ../rag-service:/app
+    networks:
+      - arisp-network
+    restart: unless-stopped
+
+  # --- React Frontend: Candidate site (public) ---
+  frontend-candidate:
+    image: ghcr.io/quannguyendz/arisp-candidate:${IMAGE_TAG:-dev}
+    build:
+      context: ../ari-web
       dockerfile: ../docker/frontend/Dockerfile
       target: development
-    container_name: arisp-frontend
+      args:
+        PKG: "@ari/candidate-site"
+        SITE: ARI.CandidateSite
+        PORT: "3000"
+    container_name: arisp-frontend-candidate
     ports:
       - "3000:3000"
     env_file:
       - .env
     volumes:
-      - ../frontend:/app
+      - ../ari-web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - arisp-network
+    restart: unless-stopped
+
+  # --- React Frontend: Staff site (nội bộ) ---
+  frontend-staff:
+    image: ghcr.io/quannguyendz/arisp-staff:${IMAGE_TAG:-dev}
+    build:
+      context: ../ari-web
+      dockerfile: ../docker/frontend/Dockerfile
+      target: development
+      args:
+        PKG: "@ari/staff-site"
+        SITE: ARI.StaffSite
+        PORT: "3001"
+    container_name: arisp-frontend-staff
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    volumes:
+      - ../ari-web:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -76,7 +136,8 @@ services:
       - ../nginx/snippets:/etc/nginx/snippets:ro
     depends_on:
       - backend
-      - frontend
+      - frontend-candidate
+      - frontend-staff
     networks:
       - arisp-network
     restart: unless-stopped

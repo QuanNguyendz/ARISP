@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stop: nhắc cập nhật .ai/tasks.md (CLAUDE.md rule #19 — BẮT BUỘC sau mọi task).
-// Heuristic: nếu có thay đổi ở code (backend/ hoặc frontend/) mà .ai/tasks.md chưa đổi -> nhắc.
+// Heuristic: nếu có thay đổi ở code (ari-service/ hoặc frontend/) mà .ai/tasks.md chưa đổi -> nhắc.
 
 import { execFileSync } from "node:child_process";
 
@@ -20,7 +20,7 @@ const files = status
   .map((l) => l.slice(3).trim())
   .filter(Boolean);
 
-const touchedCode = files.some((f) => /^(backend|frontend)\//.test(f.replace(/\\/g, "/")));
+const touchedCode = files.some((f) => /^(ari-service|frontend)\//.test(f.replace(/\\/g, "/")));
 const touchedTasks = files.some((f) => /\.ai\/tasks\.md$/.test(f.replace(/\\/g, "/")));
 
 if (touchedCode && !touchedTasks) {

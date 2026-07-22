@@ -1,0 +1,76 @@
+{
+  "title": "Quản lý người dùng",
+  "description": "Quản lý tài khoản nội bộ và phân quyền",
+  "addStaff": "Thêm staff",
+  "statCards": {
+    "totalUsers": "Tổng người dùng",
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter",
+    "lockedUsers": "Bị khóa"
+  },
+  "searchPlaceholder": "Tìm theo tên hoặc email...",
+  "filters": {
+    "allRoles": "Tất cả vai trò",
+    "superAdmin": "Super Admin",
+    "hrAdmin": "HR Admin",
+    "recruiter": "Recruiter"
+  },
+  "table": {
+    "headers": {
+      "user": "Người dùng",
+      "role": "Vai trò",
+      "status": "Trạng thái",
+      "createdAt": "Ngày tạo",
+      "actions": "Thao tác"
+    },
+    "you": "(bạn)",
+    "emptyName": "—",
+    "lockReason": "Lý do: {{reason}}",
+    "actions": {
+      "lock": "Khóa tài khoản",
+      "unlock": "Kích hoạt tài khoản",
+      "delete": "Xóa tài khoản"
+    },
+    "status": {
+      "active": "Hoạt động",
+      "locked": "Bị khóa"
+    }
+  },
+  "empty": {
+    "title": "Không tìm thấy người dùng",
+    "description": "Không có tài khoản nào khớp với điều kiện lọc.",
+    "action": "Thêm staff"
+  },
+  "pagination": {
+    "summary": "Trang {{page}}/{{totalPages}} · {{total}} tài khoản"
+  },
+  "deleteConfirm": "Xóa tài khoản \"{{name}}\"? Hành động này không thể hoàn tác.",
+  "lockModal": {
+    "title": "Khóa tài khoản",
+    "description": "Nhập lý do khóa \"{{name}}\". Lý do sẽ được lưu lại và hiển thị cho người bị khóa.",
+    "placeholder": "Vd: Vi phạm chính sách, nghỉ việc...",
+    "cancel": "Hủy",
+    "confirm": "Khóa tài khoản"
+  },
+  "createModal": {
+    "title": "Tạo tài khoản staff",
+    "description": "Mật khẩu tạm sẽ được gửi qua email cho nhân viên.",
+    "fullName": "Họ và tên",
+    "fullNamePlaceholder": "Nguyễn Văn A",
+    "email": "Email công ty",
+    "emailPlaceholder": "ban@congty.com",
+    "role": "Vai trò",
+    "department": "Phòng ban",
+    "departmentPlaceholder": "Tùy chọn",
+    "cancel": "Hủy",
+    "submit": "Tạo tài khoản"
+  },
+  "errors": {
+    "loadFailed": "Không tải được danh sách người dùng.",
+    "lockFailed": "Không thể khóa tài khoản.",
+    "unlockFailed": "Không thể mở khóa.",
+    "roleChangeFailed": "Không thể đổi vai trò.",
+    "deleteFailed": "Không thể xóa tài khoản.",
+    "createFailed": "Không thể tạo tài khoản."
+  }
+}

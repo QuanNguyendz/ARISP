@@ -1,0 +1,44 @@
+{
+  "breadcrumb": {
+    "home": "Trang chủ",
+    "notifications": "Thông báo"
+  },
+  "title": "Thông báo",
+  "subtitle": {
+    "unread": "Bạn có {{count}} thông báo chưa đọc",
+    "allRead": "Bạn đã đọc hết thông báo"
+  },
+  "filters": {
+    "all": "Tất cả",
+    "unread": "Chưa đọc",
+    "interview": "Phỏng vấn",
+    "result": "Kết quả",
+    "system": "Hệ thống"
+  },
+  "timeAgo": {
+    "justNow": "Vừa xong",
+    "minutesAgo": "{{count}} phút trước",
+    "hoursAgo": "{{count}} giờ trước",
+    "yesterday": "Hôm qua",
+    "daysAgo": "{{count}} ngày trước"
+  },
+  "groupLabels": {
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "older": "Trước đó"
+  },
+  "actionLabels": {
+    "viewReport": "Xem báo cáo",
+    "viewInterviewCode": "Xem mã phỏng vấn",
+    "viewSchedule": "Xem lịch",
+    "viewDetails": "Xem chi tiết"
+  },
+  "actions": {
+    "markAllRead": "Đánh dấu đã đọc",
+    "settings": "Cài đặt thông báo"
+  },
+  "emptyState": {
+    "title": "Không có thông báo",
+    "description": "Các cập nhật về hồ sơ, lời mời phỏng vấn và kết quả sẽ hiển thị tại đây."
+  }
+}

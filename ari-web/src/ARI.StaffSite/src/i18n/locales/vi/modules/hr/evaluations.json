@@ -1,0 +1,52 @@
+{
+  "title": "Đánh giá & Xác nhận",
+  "subtitle": "Xem và xác nhận kết quả phỏng vấn AI của ứng viên",
+  "loadingError": "Không thể tải danh sách đánh giá từ máy chủ.",
+  "noEvaluations": "Chưa có đánh giá nào để hiển thị.",
+  "candidate": "Ứng viên",
+  "round": "Vòng",
+  "paginationLabel": "đánh giá",
+  "stats": {
+    "total": "Tổng đánh giá",
+    "completed": "Hoàn thành",
+    "pending": "Đang chờ",
+    "highScore": "Đạt (≥80)"
+  },
+  "status": {
+    "pendingHrReview": "Chờ HR xác nhận"
+  },
+  "verdict": {
+    "pass": "Pass",
+    "notPass": "Not Pass"
+  },
+  "evaluations": "Đánh giá",
+  "criterionScores": "Điểm theo tiêu chí",
+  "noCriterionData": "Chưa có dữ liệu điểm tiêu chí.",
+  "languageAssessment": "Đánh giá ngôn ngữ",
+  "cefr": "CEFR",
+  "fluency": "Trôi chảy",
+  "vocabulary": "Từ vựng CN",
+  "questionAnalysis": "Phân tích theo câu hỏi",
+  "aiComment": "AI nhận xét",
+  "recordingTranscript": "Bản ghi & Transcript",
+  "viewFullTranscript": "Xem transcript đầy đủ",
+  "aiVerdict": "Verdict của AI",
+  "recommendation": "Đề xuất",
+  "inviteNextRound": "Mời phỏng vấn Vòng {{round}}",
+  "hrDecision": "Quyết định của HR",
+  "hrDecisionHint": "Xác nhận verdict của AI hoặc ghi đè (bắt buộc nêu lý do).",
+  "confirming": "Đang xác nhận...",
+  "confirmAi": "Xác nhận AI",
+  "override": "Override",
+  "overrideVerdict": "Verdict ghi đè",
+  "overrideReason": "Lý do ghi đè",
+  "overrideReasonPlaceholder": "Bắt buộc — giải thích vì sao thay đổi verdict của AI...",
+  "saveAndSendResult": "Lưu & gửi kết quả",
+  "saveAndInviteNext": "Lưu & mời Round tiếp theo",
+  "confirmed": "Đã xác nhận",
+  "verdict": "Verdict",
+  "cvJdMatch": "Match CV–JD",
+  "confirmError": "Không thể xác nhận kết quả lúc này.",
+  "overrideReasonRequired": "Vui lòng nhập lý do đổi kết quả.",
+  "overrideError": "Không thể đổi kết quả lúc này."
+}

@@ -1,0 +1,28 @@
+{
+  "name": "ari-web",
+  "version": "0.1.0",
+  "description": "ARISP Web — npm workspaces: ARI.Shared, ARI.CandidateSite (public), ARI.StaffSite (internal)",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "src/ARI.Shared",
+    "src/ARI.CandidateSite",
+    "src/ARI.StaffSite"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @ari/candidate-site",
+    "dev:candidate": "npm run dev -w @ari/candidate-site",
+    "dev:staff": "npm run dev -w @ari/staff-site",
+    "build": "npm run build --workspaces --if-present",
+    "build:candidate": "npm run build -w @ari/candidate-site",
+    "build:staff": "npm run build -w @ari/staff-site",
+    "preview:candidate": "npm run preview -w @ari/candidate-site",
+    "preview:staff": "npm run preview -w @ari/staff-site",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/*/src/**/*.{ts,tsx,css}\"",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

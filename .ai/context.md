@@ -54,13 +54,14 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 
 ### Remote Interview (Phỏng vấn thử - Practice Session)
 - **CHỈ DÀNH CHO PHỎNG VẤN THỬ (PRACTICE).**
-- Candidate nhận **magic link** qua email, truy cập vào Candidate Portal từ nhà qua web browser để làm quen với AI.
-- Hệ thống giới hạn tối đa **1 lượt sử dụng cho mỗi hồ sơ ứng tuyển (`application_id`)**.
+- Mở **tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng bằng route Portal (`/practice/:applicationId`) — **không cần Interview Code, không cần magic link riêng**.
+- Giới hạn **1 lượt / VÒNG** (theo `(application_id, round_number)`). Cửa sổ dùng: từ lúc đặt lịch đến giờ phỏng vấn thật của vòng.
+- **Giống hệt buổi thật sắp tới của vòng:** cùng `round_type` (technical → technical, sơ loại/ngôn ngữ → sơ loại/ngôn ngữ) + cùng ngôn ngữ phỏng vấn (chung `InterviewRoundConfig` theo `RoundNumber`). Khác biệt duy nhất so với real: nguồn RAG (JD+CV, không Playbook) + không quay video.
 - RAG pipeline lúc phỏng vấn thử chỉ sử dụng dữ liệu JD và CV ứng viên (không nạp Playbook nội bộ bảo mật của doanh nghiệp).
 
 ### On-site Interview (Phỏng vấn thật tại công ty)
 - **BẮT BUỘC CHO MỌI VÒNG PHỎNG VẤN THẬT.**
-- Candidate đến văn phòng công ty. Recruiter/HR cấp **Interview Code** (one-time-use, có TTL – mặc định 2 giờ).
+- Candidate đến văn phòng công ty **đúng khung giờ đã đặt lịch** (Availability Slot của vòng). Recruiter/HR cấp **Interview Code** (one-time-use, có TTL – mặc định 2 giờ; chỉ dùng cho real, không có `code_type`).
 - Candidate nhập code tại thiết bị Kiosk của công ty → vào phỏng vấn ngay. Code vô hiệu hóa ngay sau khi dùng thành công.
 - RAG pipeline sử dụng toàn bộ dữ liệu: JD + CV + Playbook nội bộ công ty (style guide, question bank, technical scenarios, v.v.).
 
@@ -76,7 +77,7 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 | JD (Job Description) | ✅ | AI phân tích JD để tạo câu hỏi & detect yêu cầu ngôn ngữ |
 | Cấu hình vòng phỏng vấn | ✅ | Số vòng, loại vòng (`screening` - Lọc, `technical` - Chuyên môn, `online_test` - Trắc nghiệm Online), ngôn ngữ |
 | Phỏng vấn thật | ✅ | Mặc định On-site (Tại công ty) |
-| Availability Slots (Practice) | ⬜ | Khung giờ cho phép ứng viên chọn để làm Phỏng vấn thử (Remote) |
+| Availability Slots (per vòng) | ⬜ | Khung giờ cho ứng viên đặt lịch **buổi phỏng vấn thật** của từng vòng; đặt lịch xong mở 1 lượt phỏng vấn thử cho vòng đó |
 | Scoring Rubric | ⬜ | Custom tiêu chí đánh giá per Job Posting |
 | Interview Persona | ⬜ | Tên, giọng, phong cách avatar AI |
 | **Interview Playbook** | ⬜ | Upload tài liệu phỏng vấn nội bộ (câu hỏi, kịch bản, rubric chi tiết, ...) |
@@ -105,10 +106,11 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 5. Dựa trên bảng xếp hạng `matchScore` + review CV thủ công, HR chọn ứng viên và gửi **magic link**.
 - Candidate nhận magic link → truy cập **Candidate Portal** để:
   - Xem thông tin vị trí ứng tuyển.
-  - Chọn khung giờ (Availability Slot) để làm **Phỏng vấn thử (Practice Remote)** (nếu chưa dùng lượt – 1 lần per Application).
+  - **Chọn khung giờ (Availability Slot) cho buổi phỏng vấn thật của vòng đó.**
+  - Đặt lịch xong → mở **1 lượt Phỏng vấn thử (Practice Remote)** cho vòng đó (1 lượt / vòng), dùng được đến giờ phỏng vấn thật.
 
 ### Phase 3: Access Real Interview (On-site)
-- Candidate đến văn phòng công ty theo lịch hẹn miệng/email với HR.
+- Candidate đến văn phòng công ty **đúng khung giờ đã đặt lịch** (Availability Slot của vòng).
 - Recruiter/HR cấp **Interview Code** → Candidate nhập code tại Kiosk của công ty → vào phỏng vấn thật.
 
 ### Phase 4: Multi-round AI Interview
@@ -213,10 +215,11 @@ Khi AI sinh câu hỏi → retrieve từ:
 
 Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước khi bước vào phỏng vấn thực.
 
-- **Truy cập:** Chỉ qua **magic link** – không xuất hiện trên Job Board hay Candidate Portal công cộng
-- **Lượt dùng:** **1 lần per Application** – không reset
+- **Truy cập:** Qua **Portal** (route `/practice/:applicationId`) sau khi pass CV + đặt lịch buổi phỏng vấn thật của vòng — **không cần Interview Code**, không xuất hiện trên Job Board
+- **Lượt dùng:** **1 lượt / VÒNG** (mở lại mỗi khi pass vòng + đặt lịch vòng kế); cửa sổ dùng = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng
 - **Nguồn câu hỏi:** JD + CV (không dùng Playbook – Playbook chỉ áp dụng cho phỏng vấn thực)
-- **Kết quả:** HR **có thể xem** score, recording của Practice Session
+- **Recording:** Không quay video — chỉ lưu transcript + Evaluation Report
+- **Kết quả:** HR **có thể xem** score, transcript của Practice Session
 - **Chi phí:** Doanh nghiệp chịu (không thu từ ứng viên)
 - **Phân biệt:** Practice Session không ảnh hưởng đến verdict/kết quả tuyển dụng
 
@@ -234,10 +237,12 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | **ORM** | Entity Framework Core | |
 | **Auth** | JWT + Role-based Authorization | BCrypt hash cho tài khoản Candidate và mật khẩu phụ; **OAuth2 / OpenID Connect + Domain validation** cho nội bộ công ty |
 | **Cache** | Redis | |
-| **AI/LLM** | OpenAI GPT-4o + RAG (pgvector) | text-embedding-3-small cho embedding |
+| **AI/LLM (phỏng vấn)** | OpenAI GPT-4o | "Bộ não" sinh câu hỏi + đánh giá; Claude là option dành sau (ADR-043) |
+| **RAG Service** | **Python + LangChain + LangGraph + FastAPI** | Microservice riêng `rag-service/`: chunk + embed (text-embedding-3-small) + **Hybrid RAG** (dense pgvector + sparse Postgres FTS + RRF + scope weighting) + sinh câu hỏi/đánh giá. .NET gọi qua HTTP/SSE nội bộ (ADR-039) |
+| **Vector store** | pgvector (PostgreSQL) | `document_chunks` vector(1536), schema do EF Core sở hữu |
 | **CV-JD Analysis** | Google Gemini 2.5 Flash | Phân tích CV vs JD, chấm điểm match, tóm tắt – dành cho candidate xem trước + HR review |
-| **STT** | Google Speech-to-Text | Streaming real-time |
-| **TTS** | ElevenLabs Flash v2.5 | Streaming |
+| **STT + VAD** | **Deepgram Nova-3** | Streaming real-time; **gộp sẵn VAD + endpointing** (`vad_events`/`endpointing`/`utterance_end`) — không cần thư viện VAD riêng |
+| **TTS** | ElevenLabs Flash v2.5 | Streaming (~75ms) |
 | **Avatar** | HeyGen Streaming Avatar | Hybrid Idle Strategy |
 | **Email** | SendGrid / AWS SES | Invite, magic link, kết quả |
 | **File Storage** | `IFileStorageService` – Local disk (dev) / Cloudflare R2 (prod) | S3-compatible qua `AWSSDK.S3`, presigned URL; DB lưu `storageKey` (ADR-036) |
@@ -250,7 +255,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | ** CDN** | Cloudflare CDN | Optional – sau MVP |
 | **Version Control** | GitHub | |
 
-> **Streaming-First:** STT stream → RAG parallel → LLM stream → TTS stream → Avatar stream. Mục tiêu: **~1–1.8 giây** latency sau khi ứng viên dừng nói.
+> **Streaming-First:** Deepgram STT stream (+VAD) → Hybrid RAG parallel → GPT-4o stream → ElevenLabs Flash v2.5 stream → HeyGen Avatar stream. Mục tiêu: **~0.8–1.2 giây** latency sau khi ứng viên dừng nói (cascaded tối ưu — ADR-006/043).
 
 ---
 
@@ -263,7 +268,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 5. **Mọi thay đổi kiến trúc** cập nhật vào `.ai/architecture.md`.
 6. **Trước khi bắt đầu task mới** – kiểm tra `.ai/tasks.md`.
 7. **Khi có quyết định mới** – ghi lại ngay vào file `.ai/` tương ứng.
-8. **AI/LLM:** Business logic không gọi trực tiếp OpenAI SDK – qua `IAIProvider` + `IEmbeddingProvider`. Swap qua env var `AI_PROVIDER=openai|local`.
+8. **AI/LLM:** Business logic không gọi trực tiếp OpenAI SDK – qua `IAIProvider` + `IEmbeddingProvider`. Swap qua cờ `AI:Provider` = `rag` (RAG microservice Python — mặc định khuyến nghị, ADR-039) | `openai` | `local`. Khi `rag`, ingestion qua `IRagIngestionService`.
 9. **WebRTC** chỉ dùng cho media stream. Session events dùng SignalR.
 10. **Streaming-First:** Không chấp nhận batch nếu có alternative streaming khả thi.
 11. **Single-tenant:** Hệ thống phục vụ cho 1 công ty duy nhất. Không sử dụng `organization_id` và không thiết kế cấu trúc multi-tenant.

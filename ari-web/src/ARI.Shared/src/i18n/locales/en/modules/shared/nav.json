@@ -1,0 +1,55 @@
+{
+  "hr": {
+    "workspace": "HR Leader Workspace",
+    "dashboard": "Overview",
+    "jobs": "Job Postings",
+    "candidates": "Candidates",
+    "interviews": "Interview Sessions",
+    "evaluations": "Evaluations",
+    "playbooks": "Playbook",
+    "team": "HR Team",
+    "settings": "Settings",
+    "help": "Help & Documentation",
+    "searchPlaceholder": "Search candidates, job postings...",
+    "createJob": "Create Job",
+    "roleLabel": "HR Leader"
+  },
+  "recruiter": {
+    "workspace": "Recruiter Workspace",
+    "dashboard": "Overview",
+    "jobs": "Job Postings",
+    "candidates": "Candidates",
+    "interviewCode": "Interview Code",
+    "evaluations": "Evaluations",
+    "interviews": "Interviews",
+    "settings": "Settings",
+    "searchPlaceholder": "Search job postings, candidates...",
+    "createJob": "Create Job",
+    "roleLabel": "Recruiter"
+  },
+  "superAdmin": {
+    "workspace": "Super Admin Workspace",
+    "dashboard": "Overview",
+    "users": "User Management",
+    "allUsers": "All Users",
+    "pendingUsers": "Pending Users",
+    "auditLogs": "Audit Logs",
+    "systemSettings": "System Settings",
+    "searchPlaceholder": "Search users, audit logs...",
+    "addStaff": "Add Staff",
+    "roleLabel": "Super Admin"
+  },
+  "shared": {
+    "help": "Help & Documentation",
+    "logout": "Sign out",
+    "myAccount": "My account",
+    "workspaceSettings": "Workspace settings",
+    "systemSettings": "System settings",
+    "notifications": "Notifications",
+    "markAllRead": "Mark all as read",
+    "clearAll": "Clear all",
+    "noNotifications": "No new notifications",
+    "viewAllNotifications": "View all notifications",
+    "openMenu": "Open menu"
+  }
+}

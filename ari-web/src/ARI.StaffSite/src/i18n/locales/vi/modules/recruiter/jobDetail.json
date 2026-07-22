@@ -1,0 +1,123 @@
+{
+  "title": "Chi tiết tin tuyển dụng",
+  "backToList": "Quay lại danh sách",
+  "loadingError": "Không tải được chi tiết tin tuyển dụng.",
+  "notFound": "Không tìm thấy tin tuyển dụng.",
+  "stats": {
+    "totalCandidates": "Tổng ứng viên"
+  },
+  "funnel": {
+    "cvSubmitted": "Mới ứng tuyển",
+    "screening": "Đang sơ loại",
+    "interview": "Phỏng vấn",
+    "pass": "Đạt"
+  },
+  "tabs": {
+    "cvReview": "Duyệt Hồ Sơ",
+    "round": "Vòng"
+  },
+  "noDepartment": "Chưa phân phòng ban",
+  "hiringProgress": "Tuyển {{hired}}/{{total}}",
+  "deadline": "Hạn nộp",
+  "deadlineExpired": "Đã hết hạn",
+  "deadlineToday": "Hết hạn hôm nay",
+  "deadlineDays": "Còn {{days}} ngày",
+  "created": "tạo",
+  "jdFile": "JD gốc",
+  "interviewSchedule": "Lịch phỏng vấn",
+  "editJob": "Sửa tin",
+  "submitForApproval": "Gửi HR duyệt",
+  "closeJob": "Đóng tin",
+  "statusUpdated": "Đã cập nhật trạng thái.",
+  "jobSubmittedForApproval": "Đã gửi tin cho HR Leader duyệt.",
+  "jobClosed": "Đã đóng tin tuyển dụng.",
+  "hrRejected": "HR từ chối",
+  "hrRejectedHint": "{{reason}}. Sửa tin và gửi duyệt lại.",
+  "hiringGoalReached": "Đã tuyển đủ chỉ tiêu ({{hired}}/{{total}}) — cân nhắc đóng tin.",
+  "candidateFunnel": "Ứng viên",
+  "interviewRounds": "Vòng phỏng vấn",
+  "interviewRoundsCount": "({{count}})",
+  "roundTechnical": "Chuyên môn",
+  "roundScreening": "Sơ loại",
+  "noCandidatesForJob": "Chưa có ứng viên nào cho tin này.",
+  "filters": {
+    "filterByDate": "Lọc theo ngày",
+    "filterByDateCv": "Lọc theo ngày nộp",
+    "filterByDateInterview": "Lọc theo ngày thi",
+    "filterByStatus": "Lọc theo trạng thái",
+    "sortBy": "Sắp xếp",
+    "sortByRelevance": "Sắp xếp theo độ phù hợp",
+    "sortByScore": "Sắp xếp theo điểm đánh giá",
+    "allStatuses": "Tất cả trạng thái",
+    "cvSubmitted": "Mới ứng tuyển",
+    "invited": "Được mời (chưa nộp CV)",
+    "cvRejected": "CV bị từ chối",
+    "waitingForInvite": "Chờ gửi lời mời",
+    "invitedWaitingSchedule": "Đã mời, chờ đặt lịch",
+    "scheduledInterview": "Đã đặt lịch / Đang phỏng vấn",
+    "withdrawn": "Đã rút",
+    "sortDesc": "Giảm dần (Cao nhất trước)",
+    "sortAsc": "Tăng dần (Thấp nhất trước)",
+    "sortDefault": "Mặc định (Thời gian nộp)"
+  },
+  "tableHeaders": {
+    "candidate": "Ứng viên",
+    "submittedDate": "Ngày nộp",
+    "noticePeriod": "Báo trước",
+    "matchScore": "Độ Phù Hợp",
+    "status": "Trạng Thái",
+    "actions": "Hành động",
+    "interviewSchedule": "Lịch thi/phỏng vấn",
+    "evaluationScore": "Điểm Đánh Giá"
+  },
+  "batch": {
+    "selected": "Đã chọn {{count}} ứng viên",
+    "approveAll": "Duyệt hàng loạt",
+    "rejectAll": "Từ chối hàng loạt",
+    "inviteAll": "Mời phỏng vấn hàng loạt"
+  },
+  "actions": {
+    "approve": "Duyệt",
+    "reject": "Từ chối",
+    "invite": "Mời",
+    "viewCv": "Xem CV",
+    "viewApplication": "Xem thông tin ứng tuyển"
+  },
+  "noResults": "Không tìm thấy ứng viên nào phù hợp với bộ lọc.",
+  "paginationLabel": "ứng viên",
+  "coverLetterModal": {
+    "title": "Thông tin hồ sơ - {{name}}",
+    "aiSummary": "Tóm tắt CV & Đánh giá AI",
+    "noAiData": "Không có dữ liệu đánh giá AI",
+    "noAiDataHint": "Hồ sơ này chưa có kết quả đánh giá AI (do là hồ sơ thử nghiệm hoặc không có tệp CV hợp lệ).",
+    "matchScore": "Độ phù hợp",
+    "contactInfo": "Thông tin liên hệ",
+    "fullName": "Họ và tên",
+    "phone": "Số điện thoại",
+    "email": "Email",
+    "noticePeriod": "Báo trước khi nghỉ việc",
+    "coverLetter": "Thư giới thiệu",
+    "noCoverLetter": "Ứng viên không gửi thư giới thiệu.",
+    "close": "Đóng"
+  },
+  "confirm": {
+    "approve": "Bạn có chắc chắn muốn duyệt {{count}} hồ sơ đã chọn và chuyển sang Vòng 1?",
+    "reject": "Bạn có chắc chắn muốn từ chối {{count}} hồ sơ đã chọn và gửi thư cảm ơn?",
+    "invite": "Bạn có chắc chắn muốn gửi lời mời phỏng vấn cho {{count}} ứng viên đã chọn?"
+  },
+  "messages": {
+    "approvedSuccess": "Đã duyệt thành công {{count}} hồ sơ.",
+    "approvedFailed": "Thất bại {{count}} hồ sơ.",
+    "rejectedSuccess": "Đã từ chối thành công {{count}} hồ sơ.",
+    "rejectedFailed": "Thất bại {{count}} hồ sơ.",
+    "inviteSentSuccess": "Đã gửi lời mời thành công cho {{count}} ứng viên.",
+    "inviteSentFailed": "Thất bại {{count}} ứng viên.",
+    "singleApproved": "Đã duyệt hồ sơ ứng viên và chuyển sang Vòng 1 thành công.",
+    "singleRejected": "Đã từ chối hồ sơ và gửi email cảm ơn ứng viên thành công.",
+    "singleInviteSent": "Đã gửi lời mời (magic link) cho ứng viên.",
+    "approveError": "Lỗi khi duyệt hồ sơ.",
+    "rejectError": "Lỗi khi từ chối hồ sơ.",
+    "inviteError": "Lỗi khi gửi lời mời."
+  },
+  "statusError": "Không thể cập nhật trạng thái tin."
+}

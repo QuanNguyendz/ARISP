@@ -1,0 +1,9 @@
+{
+  "interviewKiosk": {
+    "title": "Bạn đã có mã phỏng vấn?",
+    "description": "Nhập mã của bạn để bắt đầu phỏng vấn ngay",
+    "placeholder": "Nhập mã",
+    "button": "Bắt đầu",
+    "noCodeHint": "Liên hệ HR nếu bạn chưa có mã"
+  }
+}

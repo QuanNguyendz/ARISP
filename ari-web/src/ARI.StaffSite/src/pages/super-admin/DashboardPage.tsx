@@ -1,0 +1,330 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { motion } from 'framer-motion'
+import {
+  Users,
+  Activity,
+  UserCheck,
+  Shield,
+  UserPlus,
+  ArrowRight,
+  CheckCircle2,
+} from 'lucide-react'
+import { PageHeader, StatsGrid, ErrorAlert } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
+import {
+  adminService,
+  type AdminStats,
+  type AccountRequest,
+  type AuditLogEntry,
+} from '@/fservices/admin'
+import { auditActionLabel, roleLabel, roleBadgeClass, timeAgo } from '@/utils/adminLabels'
+import { DashboardSkeleton } from './_skeletons'
+
+const initials = (name?: string | null) =>
+  (name || 'U')
+    .trim()
+    .split(/\s+/)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+
+export default function SuperAdminDashboardPage() {
+  const { t } = useTranslation('modules/super-admin/dashboard')
+  const { user } = useAuthStore()
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [requests, setRequests] = useState<AccountRequest[]>([])
+  const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [s, p, l] = await Promise.all([
+        adminService.getStats(),
+        adminService.getAccountRequests('pending'),
+        adminService.getAuditLogs({ page: 1, pageSize: 6 }),
+      ])
+      setStats(s)
+      setRequests(p)
+      setLogs(l.items)
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || t('errors.loadFailed'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const handleApprove = async (id: string) => {
+    setApprovingId(id)
+    try {
+      await adminService.approveAccountRequest(id)
+      await load()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || t('errors.approveFailed'))
+    } finally {
+      setApprovingId(null)
+    }
+  }
+
+  if (loading) return <DashboardSkeleton />
+
+  const statCards = [
+    { label: t('statCards.totalUsers'), value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
+    {
+      label: t('statCards.pendingRequests'),
+      value: stats?.pendingRequests ?? 0,
+      color: 'text-amber-600',
+    },
+    { label: t('statCards.lockedUsers'), value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
+    { label: t('statCards.recruiters'), value: stats?.recruiters ?? 0, color: 'text-emerald-600' },
+  ]
+
+  return (
+    <div className="p-6 lg:p-8">
+      <PageHeader
+        title={t('greeting', { name: user?.name || t('greetingFallback') })}
+        description={t('description')}
+        actions={[
+          { label: t('settingsButton'), href: '/super-admin/settings', variant: 'secondary' },
+        ]}
+      />
+
+      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+
+      <StatsGrid stats={statCards} />
+
+      <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+          {/* Pending users */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                  <UserCheck className="w-5 h-5" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">
+                    {t('pendingUsers.title')}
+                  </h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">
+                    {t('pendingUsers.subtitle')}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/super-admin/users/pending"
+                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                {t('pendingUsers.viewAll')}
+              </Link>
+            </div>
+
+            {requests.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('pendingUsers.empty')}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {requests.slice(0, 4).map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 bg-ink-50 dark:bg-white/5 p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
+                        {initials(r.fullName || r.email)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
+                          {r.fullName || r.email}
+                        </p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">
+                          {r.email} · {t('pendingUsers.by', { name: r.requestedBy })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span
+                        className={`hidden sm:inline rounded-full px-2.5 py-0.5 text-xs font-medium ${roleBadgeClass(r.role)}`}
+                      >
+                        {roleLabel(r.role)}
+                      </span>
+                      <button
+                        onClick={() => handleApprove(r.id)}
+                        disabled={approvingId === r.id}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {approvingId === r.id
+                          ? t('pendingUsers.approving')
+                          : t('pendingUsers.approve')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Recent audit logs */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400">
+                  <Activity className="w-5 h-5" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink-900 dark:text-white">
+                    {t('auditLogs.title')}
+                  </h2>
+                  <p className="text-xs text-ink-500 dark:text-ink-400">
+                    {t('auditLogs.subtitle')}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/super-admin/audit-logs"
+                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                {t('auditLogs.viewAll')}
+              </Link>
+            </div>
+
+            {logs.length === 0 ? (
+              <p className="py-8 text-center text-sm text-ink-500 dark:text-ink-400">
+                {t('auditLogs.empty')}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-400">
+                        <Activity className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
+                          {auditActionLabel(log.action)}
+                        </p>
+                        <p className="truncate text-xs text-ink-500 dark:text-ink-400">
+                          {t('auditLogs.by', { name: log.actorName })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs text-ink-400">{timeAgo(log.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Sidebar column */}
+        <div className="space-y-6">
+          {/* Quick actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+          >
+            <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">
+              {t('quickActions.title')}
+            </h2>
+            <div className="space-y-2">
+              {[
+                {
+                  to: '/super-admin/users?create=1',
+                  icon: UserPlus,
+                  label: t('quickActions.createStaff'),
+                  tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20',
+                },
+                {
+                  to: '/super-admin/users/pending',
+                  icon: UserCheck,
+                  label: t('quickActions.approveUsers'),
+                  tint: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20',
+                },
+                {
+                  to: '/super-admin/users',
+                  icon: Users,
+                  label: t('quickActions.manageUsers'),
+                  tint: 'text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-500/20',
+                },
+                {
+                  to: '/super-admin/audit-logs',
+                  icon: Activity,
+                  label: t('quickActions.viewAuditLogs'),
+                  tint: 'text-ai-600 dark:text-ai-400 bg-ai-100 dark:bg-ai-500/20',
+                },
+              ].map((a) => (
+                <Link
+                  key={a.to}
+                  to={a.to}
+                  className="flex items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:border-brand-300 dark:hover:border-brand-500/40 hover:bg-ink-50 dark:hover:bg-white/5"
+                >
+                  <span className={`grid h-8 w-8 place-items-center rounded-lg ${a.tint}`}>
+                    <a.icon className="w-4 h-4" />
+                  </span>
+                  <span className="flex-1 text-sm text-ink-700 dark:text-ink-200">{a.label}</span>
+                  <ArrowRight className="w-4 h-4 text-ink-400" />
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* System status */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-ink-400" />
+              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
+                {t('accountDistribution.title')}
+              </h2>
+            </div>
+            <div className="space-y-3 text-sm">
+              {[
+                { label: t('accountDistribution.superAdmin'), value: stats?.superAdmins ?? 0 },
+                { label: t('accountDistribution.hrAdmin'), value: stats?.hrAdmins ?? 0 },
+                { label: t('accountDistribution.recruiter'), value: stats?.recruiters ?? 0 },
+                { label: t('accountDistribution.candidate'), value: stats?.candidates ?? 0 },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-ink-500 dark:text-ink-400">{row.label}</span>
+                  <span className="font-semibold text-ink-900 dark:text-white">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  )
+}

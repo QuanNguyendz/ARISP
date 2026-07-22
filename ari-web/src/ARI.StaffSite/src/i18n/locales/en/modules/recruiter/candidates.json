@@ -1,0 +1,33 @@
+{
+  "title": "Candidates",
+  "description": "Candidates applying to your job postings",
+  "loadingError": "Unable to load candidate list.",
+  "stats": {
+    "totalCandidates": "Total Candidates",
+    "screening": "Screening",
+    "interview": "Interview",
+    "pass": "Passed"
+  },
+  "searchPlaceholder": "Search candidates, positions...",
+  "filters": {
+    "all": "All",
+    "cvSubmitted": "New Applications",
+    "screening": "Screening",
+    "interview": "Interview",
+    "pass": "Passed"
+  },
+  "noCandidates": "No candidates",
+  "noCandidatesHint": "No candidates match the current filter.",
+  "candidate": "Candidate",
+  "tableHeader": {
+    "candidate": "Candidate",
+    "position": "Position",
+    "status": "Status",
+    "matchScore": "Match Score",
+    "appliedDate": "Applied Date",
+    "actions": "Actions"
+  },
+  "viewCv": "View CV",
+  "viewDetails": "View Details",
+  "paginationLabel": "candidates"
+}

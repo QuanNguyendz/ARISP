@@ -1,0 +1,136 @@
+{
+  "greeting": "Xin chào, {{name}}",
+  "title": "Trang quản lý HR",
+  "subtitle": "Tổng quan tuyển dụng toàn công ty",
+  "date": "Ngày {{date}}",
+  "recruitmentOverview": "Tổng quan tuyển dụng",
+
+  "kpis": {
+    "activeJobs": "Tin đang tuyển",
+    "totalApplications": "Ứng viên đang xử lý",
+    "aiInterviews": "Phỏng vấn AI",
+    "hired": "Đã tuyển",
+    "totalApplicationsShort": "Tổng đơn",
+    "newThisWeek": "Đơn mới tuần này",
+    "interviewsScheduled": "Phỏng vấn đã đặt",
+    "pendingReview": "Chờ duyệt",
+    "passRate": "Tỷ lệ Pass",
+    "avgTimeToHire": "TB thời gian tuyển"
+  },
+
+  "widgets": {
+    "recentApplications": "Đơn ứng tuyển gần đây",
+    "pendingJobs": "Tin chờ duyệt",
+    "interviewsToday": "Phỏng vấn hôm nay",
+    "pendingEvaluations": "Đánh giá chờ duyệt"
+  },
+
+  "quickActions": "Thao tác nhanh",
+  "approveJob": "Duyệt tin",
+  "reviewCandidate": "Review ứng viên",
+  "viewReports": "Xem báo cáo",
+  "createJob": "Tạo tin mới",
+
+  "status": {
+    "active": "Đang đăng",
+    "pending": "Chờ duyệt",
+    "draft": "Nháp",
+    "rejected": "Từ chối",
+    "closed": "Đã đóng"
+  },
+
+  "verdict": {
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "pending": "Chờ duyệt",
+    "confirmed": "Đã duyệt",
+    "overridden": "Ghi đè"
+  },
+
+  "stats": {
+    "total": "Tổng",
+    "new": "Mới",
+    "inProgress": "Đang xử lý",
+    "completed": "Hoàn tất",
+    "pending": "Chờ duyệt"
+  },
+
+  "matchScore": {
+    "excellent": "Xuất sắc",
+    "good": "Tốt",
+    "average": "Trung bình",
+    "below": "Cần cải thiện",
+    "avgScore": "điểm TB",
+    "analyzedProfiles": "hồ sơ đã phân tích",
+    "notAnalyzed": "Chưa có hồ sơ nào được phân tích CV–JD."
+  },
+
+  "charts": {
+    "recruitmentFunnel": "Phễu tuyển dụng",
+    "funnelSubtitle": "Tỉ lệ chuyển đổi qua từng bước",
+    "conversionRate": "Tỉ lệ chuyển đổi từ bước trước",
+    "hireRate": "Tỉ lệ tuyển thành công (Ứng tuyển → Tuyển)",
+    "hired": "tuyển",
+    "dayLabel": "Ngày {{day}}",
+    "points": "điểm",
+    "profiles": "hồ sơ",
+
+    "candidateQuality": "Chất lượng nguồn ứng viên",
+    "matchDistribution": "Phân bố điểm match CV–JD ({{count}} hồ sơ đã phân tích)",
+
+    "applicationTrend": "Xu hướng ứng tuyển",
+    "trendSubtitle": "14 ngày gần nhất · {{count}} hồ sơ",
+    "noData": "Chưa có dữ liệu ứng tuyển.",
+
+    "recruiterPerformance": "Hiệu suất Recruiter",
+    "recruiterSubtitle": "HR Leader theo dõi toàn bộ Recruiter",
+    "noRecruiterData": "Chưa có dữ liệu.",
+    "jobsCount": "Tin tuyển",
+    "applicantsCount": "Ứng viên",
+    "hiredCount": "Đã tuyển",
+
+    "vacancyFill": "Lấp đầy chỉ tiêu",
+    "vacancySubtitle": "Số đã tuyển trên chỉ tiêu (vacancies)",
+    "noQuotaJobs": "Chưa có tin nào đặt chỉ tiêu tuyển.",
+
+    "jobPostings": "Tin tuyển dụng",
+    "jobsSubtitle": "Toàn bộ Recruiter · sắp theo số ứng viên",
+    "noJobPostings": "Chưa có tin tuyển dụng nào.",
+
+    "recentCandidates": "Ứng viên gần đây",
+    "candidatesSubtitle": "Hồ sơ mới nhất trong hệ thống",
+    "noCandidates": "Chưa có ứng viên nào."
+  },
+
+  "table": {
+    "candidate": "Ứng viên",
+    "position": "Vị trí",
+    "round": "Vòng",
+    "verdictAi": "Verdict AI",
+    "view": "Xem",
+    "anonymous": "Ẩn danh",
+    "notAnalyzed": "Chưa phân tích",
+    "matchScore": "Match {{score}}"
+  },
+
+  "prioritySection": {
+    "pendingJobsCount": "Tin chờ bạn duyệt",
+    "noPendingJobs": "Không có tin nào chờ duyệt 🎉",
+    "approveNow": "Duyệt tin ngay",
+
+    "pendingVerdicts": "Verdict chờ xác nhận",
+    "noPendingVerdicts": "Không có verdict nào chờ xác nhận.",
+    "confirmNow": "Xác nhận ngay"
+  },
+
+  "analysisSection": {
+    "title": "Phân tích tuyển dụng",
+    "dragHint": "· kéo để di chuyển, kéo góc dưới–phải để đổi cỡ",
+    "resetLayout": "Khôi phục bố cục",
+    "dragToMove": "Kéo để di chuyển bảng"
+  },
+
+  "loadingError": "Không tải được dữ liệu dashboard.",
+  "viewAll": "Xem tất cả",
+  "noDepartment": "Chưa phân phòng ban"
+}

@@ -1,0 +1,46 @@
+{
+  "title": "Interview Playbook",
+  "description": "Tài liệu phỏng vấn nội bộ — AI nạp vào RAG để hỏi đúng phong cách & nội dung công ty",
+  "uploadPlaybook": "Upload Playbook",
+  "loadingError": "Không tải được danh sách playbook.",
+  "deleteError": "Không thể xoá playbook.",
+  "filters": {
+    "all": "Tất cả"
+  },
+  "scopes": {
+    "org": "Công ty",
+    "jobPosting": "Theo tin",
+    "round": "Theo vòng"
+  },
+  "status": {
+    "ready": "Đã nạp RAG"
+  },
+  "paginationLabel": "tài liệu",
+  "noPlaybooks": "Chưa có playbook",
+  "noPlaybooksHint": "Upload tài liệu phỏng vấn (PDF/DOCX/TXT/MD) để AI phỏng vấn đúng phong cách công ty.",
+  "docTypes": {
+    "styleGuide": "Hướng dẫn phong cách",
+    "questionBank": "Ngân hàng câu hỏi",
+    "competencyFramework": "Khung năng lực",
+    "cultureGuide": "Văn hóa & giá trị",
+    "compliance": "Quy định không được hỏi",
+    "redFlag": "Red Flag Guide",
+    "technicalScenario": "Kịch bản kỹ thuật",
+    "expectedAnswer": "Đáp án mong đợi",
+    "mustAsk": "Câu hỏi bắt buộc",
+    "roundPlaybook": "Playbook theo vòng"
+  },
+  "uploadTitle": "Upload Playbook",
+  "uploadHint": "PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",
+  "selectFile": "Chọn file tài liệu...",
+  "selectFileError": "Vui lòng chọn file.",
+  "selectJob": "Chọn tin",
+  "selectJobError": "Vui lòng chọn tin tuyển dụng.",
+  "uploadError": "Upload thất bại.",
+  "documentType": "Loại tài liệu",
+  "scope": "Phạm vi",
+  "jobPosting": "Tin tuyển dụng",
+  "round": "Vòng",
+  "cancel": "Hủy",
+  "upload": "Upload"
+}

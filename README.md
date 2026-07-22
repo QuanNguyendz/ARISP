@@ -65,11 +65,13 @@ Nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Job Board IT
 
 ```
 ARISP/
-├── backend/                  # ASP.NET Core (.NET 8) – Clean Architecture
-│   ├── ARISP.API/            # Controllers, Middleware, Program.cs
-│   ├── ARISP.Application/    # Use Cases, DTOs, Interfaces, Validators
-│   ├── ARISP.Domain/         # Entities, Value Objects, Domain Events
-│   └── ARISP.Infrastructure/ # EF Core, Repositories, External Services
+├── ari-service/              # ASP.NET Core (.NET 8) – Clean Architecture
+│   ├── src/
+│   │   ├── ARI.API/            # Controllers, Middleware, Program.cs
+│   │   ├── ARI.Application/    # Use Cases (CQRS), DTOs, Interfaces, Validators
+│   │   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
+│   │   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
+│   └── tests/                # Unit / functional tests
 ├── frontend/                 # React + TypeScript + TailwindCSS
 ├── docker/                   # Dockerfile, docker-compose files
 ├── nginx/                    # Nginx config
@@ -104,7 +106,7 @@ cd ARISP
 ### 2. Cấu hình Backend
 
 ```bash
-cd backend/ARISP.API
+cd ari-service/src/ARI.API
 
 # Copy file template, sau đó điền key thật (liên hệ team lead để lấy key)
 cp appsettings.Development.json.example appsettings.Development.json
@@ -115,9 +117,9 @@ Mở `appsettings.Development.json` và thay thế tất cả giá trị `<...>`
 ### 3. Chạy Backend
 
 ```bash
-cd backend
+cd ari-service
 dotnet restore
-dotnet run --project ARISP.API
+dotnet run --project src/ARI.API
 # API chạy tại: http://localhost:5000
 ```
 
@@ -142,7 +144,7 @@ docker-compose up --build
 ## Environment Variables
 
 Tất cả secrets được quản lý qua `appsettings.Development.json` (không commit lên git).
-Template tại: [`backend/ARISP.API/appsettings.Development.json.example`](backend/ARISP.API/appsettings.Development.json.example)
+Template tại: [`ari-service/src/ARI.API/appsettings.Development.json.example`](ari-service/src/ARI.API/appsettings.Development.json.example)
 
 | Key | Mô tả | Lấy từ đâu |
 |---|---|---|

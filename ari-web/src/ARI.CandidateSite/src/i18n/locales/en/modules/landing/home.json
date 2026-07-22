@@ -1,0 +1,9 @@
+{
+  "interviewKiosk": {
+    "title": "Already have an interview code?",
+    "description": "Enter your code to start the interview immediately",
+    "placeholder": "Enter code",
+    "button": "Start",
+    "noCodeHint": "Contact HR if you don't have a code"
+  }
+}

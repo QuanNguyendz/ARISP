@@ -1,0 +1,108 @@
+{
+  "common": {
+    "required": "Trường này là bắt buộc",
+    "invalidEmail": "Email không hợp lệ",
+    "minLength": "Tối thiểu {{min}} ký tự",
+    "maxLength": "Tối đa {{max}} ký tự",
+    "passwordTooWeak": "Mật khẩu quá yếu",
+    "passwordMismatch": "Mật khẩu xác nhận không khớp",
+    "invalidPhone": "Số điện thoại không hợp lệ",
+    "invalidUrl": "URL không hợp lệ",
+    "fileTooLarge": "File quá lớn (tối đa {{size}})",
+    "invalidFileType": "Định dạng file không hợp lệ (chỉ chấp nhận {{types}})"
+  },
+  "auth": {
+    "invalidCredentials": "Email hoặc mật khẩu không đúng",
+    "emailAlreadyExists": "Email đã được sử dụng",
+    "weakPassword": "Mật khẩu quá yếu, vui lòng dùng ít nhất 8 ký tự",
+    "accountNotFound": "Không tìm thấy tài khoản",
+    "accountLocked": "Tài khoản đã bị khoá",
+    "oauthFailed": "Đăng nhập với Google thất bại",
+    "sessionExpired": "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
+    "emailNotVerified": "Email chưa được xác minh",
+    "accountPending": "Tài khoản đang chờ duyệt",
+    "domainNotAllowed": "Email không thuộc domain được phép",
+    "emailRequired": "Email là bắt buộc",
+    "passwordRequired": "Mật khẩu là bắt buộc",
+    "fullNameRequired": "Họ và tên là bắt buộc",
+    "termsRequired": "Bạn phải đồng ý với điều khoản"
+  },
+  "job": {
+    "titleRequired": "Tiêu đề công việc là bắt buộc",
+    "descriptionRequired": "Mô tả công việc là bắt buộc",
+    "departmentRequired": "Phòng ban là bắt buộc",
+    "categoryRequired": "Lĩnh vực là bắt buộc",
+    "levelRequired": "Cấp bậc là bắt buộc",
+    "workModeRequired": "Hình thức làm việc là bắt buộc",
+    "vacanciesRequired": "Số lượng tuyển phải lớn hơn 0",
+    "invalidJdFile": "File JD không hợp lệ (chỉ chấp nhận PDF, DOCX)",
+    "jdAnalysisFailed": "Phân tích JD thất bại, vui lòng nhập thủ công",
+    "jobNotFound": "Không tìm thấy tin tuyển dụng",
+    "jobClosed": "Tin tuyển dụng đã đóng",
+    "jobExpired": "Tin tuyển dụng đã hết hạn",
+    "duplicateApplication": "Bạn đã ứng tuyển vị trí này",
+    "cvRequired": "Vui lòng tải lên CV của bạn"
+  },
+  "application": {
+    "notFound": "Không tìm thấy đơn ứng tuyển",
+    "alreadyApplied": "Bạn đã ứng tuyển vị trí này",
+    "cvUploadFailed": "Tải lên CV thất bại",
+    "cvInvalidType": "CV phải là file PDF hoặc DOCX",
+    "cvTooLarge": "CV quá lớn (tối đa 10MB)"
+  },
+  "interview": {
+    "codeNotFound": "Mã phỏng vấn không tìm thấy",
+    "codeExpired": "Mã phỏng vấn đã hết hạn",
+    "codeUsed": "Mã phỏng vấn đã được sử dụng",
+    "sessionNotFound": "Không tìm thấy phiên phỏng vấn",
+    "sessionEnded": "Phiên phỏng vấn đã kết thúc",
+    "deviceNotReady": "Thiết bị chưa sẵn sàng",
+    "connectionFailed": "Kết nối thất bại"
+  },
+  "schedule": {
+    "slotNotAvailable": "Khung giờ này đã kín",
+    "slotConflict": "Bạn đã có lịch phỏng vấn vào thời gian này",
+    "pastDate": "Không thể đặt lịch trong quá khứ",
+    "invalidCapacity": "Sức chứa phải lớn hơn 0"
+  },
+  "evaluation": {
+    "notFound": "Không tìm thấy đánh giá",
+    "overrideReasonRequired": "Vui lòng nhập lý do thay đổi kết quả",
+    "overrideTooShort": "Lý do phải có ít nhất 10 ký tự"
+  },
+  "hr": {
+    "rejectionReasonRequired": "Vui lòng nhập lý do từ chối",
+    "rejectionReasonTooShort": "Lý do phải có ít nhất 10 ký tự",
+    "cannotRejectApproved": "Không thể từ chối tin đã duyệt",
+    "cannotUnpublishPublished": "Không thể gỡ tin đã đăng"
+  },
+  "recruiter": {
+    "jobNotOwned": "Bạn không có quyền chỉnh sửa tin này",
+    "cannotSubmitUnowned": "Bạn chỉ có thể gửi tin do mình tạo",
+    "roundConfigRequired": "Cấu hình vòng phỏng vấn là bắt buộc"
+  },
+  "candidate": {
+    "profileNotFound": "Không tìm thấy hồ sơ",
+    "cvNotFound": "Chưa có CV trong hồ sơ",
+    "phoneRequired": "Số điện thoại là bắt buộc",
+    "phoneInvalid": "Số điện thoại không hợp lệ",
+    "locationRequired": "Nơi làm việc mong muốn là bắt buộc"
+  },
+  "admin": {
+    "userNotFound": "Không tìm thấy người dùng",
+    "cannotLockSelf": "Bạn không thể khoá tài khoản của chính mình",
+    "cannotDeleteSelf": "Bạn không thể xoá tài khoản của chính mình",
+    "emailDomainRequired": "Vui lòng nhập email domain",
+    "invalidEmailDomain": "Email domain không hợp lệ"
+  },
+  "server": {
+    "internal": "Lỗi máy chủ, vui lòng thử lại sau",
+    "timeout": "Yêu cầu hết thời gian, vui lòng thử lại",
+    "network": "Lỗi mạng, vui lòng kiểm tra kết nối",
+    "unauthorized": "Bạn không có quyền thực hiện thao tác này",
+    "forbidden": "Truy cập bị từ chối",
+    "notFound": "Không tìm thấy tài nguyên",
+    "badRequest": "Yêu cầu không hợp lệ",
+    "conflict": "Xung đột dữ liệu"
+  }
+}

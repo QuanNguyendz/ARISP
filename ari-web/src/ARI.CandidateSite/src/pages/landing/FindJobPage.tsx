@@ -1,0 +1,1197 @@
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import {
+  Search,
+  MapPin,
+  Briefcase,
+  Bookmark,
+  TrendingUp,
+  Loader2,
+  Sparkles,
+  X,
+  ChevronDown,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  Code2,
+  Server,
+  BrainCircuit,
+} from 'lucide-react'
+import { useAuthStore } from '@ari/shared/store/auth'
+import CandidateHeader from '@/app/layouts/CandidateHeader'
+import jobService from '@ari/shared/fservices/job'
+import type { JobFacets } from '@ari/shared/fservices/job'
+import { savedJobService } from '@/fservices/job/savedJobService'
+import { provinceService } from '@/fservices/location/provinceService'
+import type { City } from '@/fservices/location/provinceService'
+import { profileService } from '@ari/shared/fservices/profile/profileService'
+import SearchableSelect from '@ari/shared/ui/SearchableSelect'
+import type { JobPosting } from '@ari/shared/types/job'
+
+// ============== CONSTANTS ==============
+const POPULAR_KEYWORDS = ['Frontend', 'Backend', 'C# / .NET', 'AI Engineer']
+
+// Số tin tuyển dụng hiển thị mỗi trang.
+const JOBS_PER_PAGE = 8
+
+const EMPTY_FACETS: JobFacets = {
+  categories: [],
+  employmentTypes: [],
+  experienceLevels: [],
+  workModes: [],
+  locations: [],
+  skills: [],
+  languages: [],
+  totalJobs: 0,
+}
+
+// ============== TYPE DEFINITIONS ==============
+// Tất cả bộ lọc đều dùng GIÁ TRỊ THÔ (raw value) khớp với dữ liệu trong DB.
+interface FiltersState {
+  categories: string[]
+  employmentTypes: string[]
+  experienceLevels: string[]
+  workModes: string[]
+  locations: string[]
+  skills: string[]
+  languages: string[]
+}
+
+const EMPTY_FILTERS: FiltersState = {
+  categories: [],
+  employmentTypes: [],
+  experienceLevels: [],
+  workModes: [],
+  locations: [],
+  skills: [],
+  languages: [],
+}
+
+// ============== HELPER FUNCTIONS ==============
+type TFunction = (key: string, options?: Record<string, unknown>) => string
+
+function formatSalary(t: TFunction, job: JobPosting): string {
+  if (
+    job.salaryIsNegotiable ||
+    (job.salaryMin == null && job.salaryMax == null) ||
+    (job.salaryMin === 0 && job.salaryMax === 0)
+  ) {
+    return t('jobs.salaryNegotiable')
+  }
+
+  const cur = (job.salaryCurrency || 'VND').toUpperCase()
+
+  const formatVal = (n: number) => {
+    if (cur === 'VND') {
+      return n.toLocaleString('vi-VN')
+    }
+    return n.toLocaleString('en-US')
+  }
+
+  const unit = cur === 'VND' ? ' ₫' : ` ${cur}`
+
+  if (
+    job.salaryMin != null &&
+    job.salaryMax != null &&
+    job.salaryMin !== 0 &&
+    job.salaryMax !== 0
+  ) {
+    return `${formatVal(job.salaryMin)} - ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  if (job.salaryMin != null && job.salaryMin !== 0) {
+    return `${t('jobs.salaryFromShort')} ${formatVal(job.salaryMin)}${unit}`
+  }
+
+  if (job.salaryMax != null && job.salaryMax !== 0) {
+    return `${t('jobs.salaryToShort')} ${formatVal(job.salaryMax)}${unit}`
+  }
+
+  return t('jobs.salaryNegotiable')
+}
+
+function formatWorkMode(t: TFunction, mode?: string): string {
+  if (!mode) return t('jobs.workModeFulltime')
+  const mappings: Record<string, string> = {
+    fulltime: t('jobs.workModeFulltime'),
+    parttime: t('jobs.workModeParttime'),
+    contract: t('jobs.workModeContract'),
+    internship: t('jobs.workModeInternship'),
+  }
+  return mappings[mode.toLowerCase()] || mode
+}
+
+function formatPostedDate(t: TFunction, dateStr: string): string {
+  try {
+    const diffTime = Math.abs(new Date().getTime() - new Date(dateStr).getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    if (diffDays <= 1) return t('jobs.recentlyPosted')
+    if (diffDays <= 2) return t('jobs.yesterday')
+    return t('jobs.daysAgo', { count: diffDays })
+  } catch {
+    return t('jobs.nearby')
+  }
+}
+
+function getJobIcon(department?: string) {
+  const dept = department?.toLowerCase() || ''
+  if (dept.includes('data') || dept.includes('ai') || dept.includes('ml')) {
+    return <BrainCircuit className="w-6 h-6" />
+  }
+  if (dept.includes('backend') || dept.includes('server')) {
+    return <Server className="w-6 h-6" />
+  }
+  return <Code2 className="w-6 h-6" />
+}
+
+function getIconColor(department?: string) {
+  const dept = department?.toLowerCase() || ''
+  if (dept.includes('data') || dept.includes('ai')) {
+    return 'bg-ai-50 text-ai-600'
+  }
+  if (dept.includes('backend') || dept.includes('server')) {
+    return 'bg-emerald-50 text-emerald-600'
+  }
+  return 'bg-brand-50 text-brand-600'
+}
+
+function getDeadlineText(t: TFunction, deadlineStr?: string | null): string {
+  if (!deadlineStr) return ''
+  const d = new Date(deadlineStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const formattedDate = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return t('jobs.expired', { date: formattedDate })
+  if (diffDays === 0) return t('jobs.expireToday', { date: formattedDate })
+  return t('jobs.expireSoon', { date: formattedDate, days: diffDays })
+}
+
+// ============== FILTER SIDEBAR COMPONENT ==============
+type FilterKey = keyof FiltersState
+
+interface FilterSidebarProps {
+  filters: FiltersState
+  setFilters: React.Dispatch<React.SetStateAction<FiltersState>>
+  onClearAll: () => void
+  facets: JobFacets
+  /** Địa điểm đã lọc về chỉ thành phố trực thuộc TW (lấy từ Province Open API) + có trong DB. */
+  locationFacets: JobFacets['locations']
+  minSalary: number
+  setMinSalary: (val: number) => void
+  maxSalary: number
+  setMaxSalary: (val: number) => void
+  salaryIsNegotiable: boolean
+  setSalaryIsNegotiable: (val: boolean) => void
+}
+
+// Số mục tối đa hiển thị trước khi gập bớt một nhóm bộ lọc dài.
+const FILTER_ITEM_LIMIT = 6
+
+/** Một nhóm bộ lọc có thể thu gọn/mở rộng (accordion) để sidebar không bị quá dài. */
+function CollapsibleSection({
+  title,
+  selectedCount,
+  defaultOpen = true,
+  description,
+  children,
+}: {
+  title: string
+  selectedCount: number
+  defaultOpen?: boolean
+  description?: string
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="py-3 first:pt-0 last:pb-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="flex items-center gap-2 font-semibold text-ink-700">
+          {title}
+          {selectedCount > 0 && (
+            <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-brand-100 px-1.5 text-[11px] font-bold text-brand-700">
+              {selectedCount}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-ink-400 transition ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="mt-2.5">
+          {description && <p className="mb-2 text-xs text-ink-400">{description}</p>}
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Danh sách rút gọn: chỉ hiện tối đa `limit` mục, kèm nút "Xem thêm / Thu gọn". */
+function TruncatedList<T>({
+  items,
+  render,
+  limit = FILTER_ITEM_LIMIT,
+  wrapperClassName,
+}: {
+  items: T[]
+  render: (item: T) => React.ReactNode
+  limit?: number
+  wrapperClassName?: string
+}) {
+  const { t } = useTranslation('landing')
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? items : items.slice(0, limit)
+  return (
+    <>
+      <div className={wrapperClassName}>{shown.map(render)}</div>
+      {items.length > limit && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-1.5 text-xs font-medium text-brand-600 hover:underline"
+        >
+          {expanded
+            ? t('jobs.filters.collapse')
+            : t('jobs.filters.viewMore', { count: items.length - limit })}
+        </button>
+      )}
+    </>
+  )
+}
+
+/** Nhóm bộ lọc dạng checkbox (thu gọn được), mỗi dòng hiển thị "Nhãn (số lượng)". */
+function FacetCheckboxGroup({
+  title,
+  items,
+  selected,
+  onToggle,
+  description,
+  defaultOpen = true,
+}: {
+  title: string
+  items: JobFacets['categories']
+  selected: string[]
+  onToggle: (value: string) => void
+  description?: string
+  defaultOpen?: boolean
+}) {
+  if (items.length === 0) return null
+  return (
+    <CollapsibleSection
+      title={title}
+      selectedCount={selected.length}
+      description={description}
+      defaultOpen={defaultOpen || selected.length > 0}
+    >
+      <TruncatedList
+        items={items}
+        render={(item) => (
+          <label
+            key={item.value}
+            className="flex items-center gap-2.5 py-1 text-ink-600 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(item.value)}
+              onChange={() => onToggle(item.value)}
+              className="rounded border-ink-300 text-brand-600"
+            />
+            <span className="flex-1">{item.label}</span>
+            <span className="text-xs text-ink-400">({item.count})</span>
+          </label>
+        )}
+      />
+    </CollapsibleSection>
+  )
+}
+
+function FilterSidebar({
+  filters,
+  setFilters,
+  onClearAll,
+  facets,
+  locationFacets,
+  minSalary,
+  setMinSalary,
+  maxSalary,
+  setMaxSalary,
+  salaryIsNegotiable,
+  setSalaryIsNegotiable,
+}: FilterSidebarProps) {
+  const { t } = useTranslation('landing')
+  const hasActiveFilters =
+    Object.values(filters).some((arr) => arr.length > 0) ||
+    minSalary > 0 ||
+    maxSalary < 220 ||
+    salaryIsNegotiable
+
+  const toggleStringFilter = (key: FilterKey, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: prev[key].includes(value)
+        ? prev[key].filter((v) => v !== value)
+        : [...prev[key], value],
+    }))
+  }
+
+  // Chip cho từ "đang chọn" — tra nhãn hiển thị từ facet.
+  const labelOf = (items: JobFacets['categories'], value: string) =>
+    items.find((i) => i.value === value)?.label ?? value
+
+  const activeChips: { key: string; onClick: () => void; label: string }[] = [
+    ...filters.categories.map((v) => ({
+      key: `categories-${v}`,
+      onClick: () => toggleStringFilter('categories', v),
+      label: labelOf(facets.categories, v),
+    })),
+    ...filters.experienceLevels.map((v) => ({
+      key: `experienceLevels-${v}`,
+      onClick: () => toggleStringFilter('experienceLevels', v),
+      label: labelOf(facets.experienceLevels, v),
+    })),
+    ...filters.locations.map((v) => ({
+      key: `locations-${v}`,
+      onClick: () => toggleStringFilter('locations', v),
+      label: labelOf(locationFacets, v),
+    })),
+    ...filters.skills.map((v) => ({
+      key: `skills-${v}`,
+      onClick: () => toggleStringFilter('skills', v),
+      label: v,
+    })),
+  ]
+
+  if (salaryIsNegotiable) {
+    activeChips.push({
+      key: 'salary-negotiable',
+      onClick: () => setSalaryIsNegotiable(false),
+      label: t('jobs.filters.salaryNegotiable'),
+    })
+  } else if (minSalary > 0 || maxSalary < 220) {
+    activeChips.push({
+      key: 'salary-range',
+      onClick: () => {
+        setMinSalary(0)
+        setMaxSalary(220)
+      },
+      label: `${t('jobs.filters.salaryRange')}: ${minSalary}tr - ${maxSalary === 220 ? '220+tr' : `${maxSalary}tr`}`,
+    })
+  }
+
+  const noFacets =
+    facets.categories.length === 0 &&
+    facets.employmentTypes.length === 0 &&
+    facets.experienceLevels.length === 0 &&
+    facets.workModes.length === 0 &&
+    locationFacets.length === 0 &&
+    facets.skills.length === 0 &&
+    facets.languages.length === 0
+
+  return (
+    <aside className="space-y-6 lg:sticky lg:top-24 max-h-[calc(100vh-120px)] overflow-y-auto filter-sidebar-scroll pr-1">
+      <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-brand-600" />
+            {t('jobs.filters.title')}
+          </span>
+          {hasActiveFilters && (
+            <button
+              onClick={onClearAll}
+              className="text-xs font-medium text-brand-600 hover:underline"
+            >
+              {t('jobs.filters.clearAll')}
+            </button>
+          )}
+        </div>
+
+        {/* Active filters */}
+        {activeChips.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {activeChips.map(({ key, onClick, label }) => (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 cursor-pointer hover:bg-brand-100"
+                onClick={onClick}
+              >
+                {label} <X className="w-3 h-3" />
+              </span>
+            ))}
+          </div>
+        )}
+
+        {noFacets ? (
+          <p className="mt-5 text-sm text-ink-400">{t('jobs.filters.noData')}</p>
+        ) : (
+          <div className="mt-5 divide-y divide-ink-100 text-sm">
+            {/* Lĩnh vực */}
+            <FacetCheckboxGroup
+              title={t('jobs.filters.category')}
+              items={facets.categories}
+              selected={filters.categories}
+              onToggle={(v) => toggleStringFilter('categories', v)}
+            />
+
+            {/* Hình thức */}
+            <FacetCheckboxGroup
+              title={t('jobs.filters.employmentType')}
+              items={facets.employmentTypes}
+              selected={filters.employmentTypes}
+              onToggle={(v) => toggleStringFilter('employmentTypes', v)}
+            />
+
+            {/* Cấp bậc */}
+            <FacetCheckboxGroup
+              title={t('jobs.filters.experienceLevel')}
+              items={facets.experienceLevels}
+              selected={filters.experienceLevels}
+              onToggle={(v) => toggleStringFilter('experienceLevels', v)}
+            />
+
+            {/* Mức lương */}
+            <CollapsibleSection
+              title={t('jobs.filters.salaryRange')}
+              selectedCount={salaryIsNegotiable || minSalary > 0 || maxSalary < 220 ? 1 : 0}
+              defaultOpen={true}
+            >
+              <div className="space-y-4 pt-2 pb-1">
+                {/* Checkbox Lương thỏa thuận */}
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-ink-700">
+                  <input
+                    type="checkbox"
+                    checked={salaryIsNegotiable}
+                    onChange={(e) => setSalaryIsNegotiable(e.target.checked)}
+                    className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                  />
+                  <span>{t('jobs.filters.salaryNegotiable')}</span>
+                </label>
+
+                {/* Slider Lọc giá */}
+                <div
+                  className={`space-y-3 transition-opacity ${salaryIsNegotiable ? 'opacity-40 pointer-events-none' : ''}`}
+                >
+                  <div className="flex items-center justify-between text-xs text-ink-500 font-medium">
+                    <span>
+                      {t('jobs.filters.salaryFrom')}:{' '}
+                      <strong className="text-ink-800">
+                        {minSalary} {t('jobs.salaryMillionShort')}
+                      </strong>
+                    </span>
+                    <span>
+                      {t('jobs.filters.salaryTo')}:{' '}
+                      <strong className="text-ink-800">
+                        {maxSalary === 220
+                          ? t('jobs.filters.salaryPlus')
+                          : `${maxSalary} ${t('jobs.salaryMillionShort')}`}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[11px] text-ink-400 block mb-1">
+                        {t('jobs.filters.salaryMin')}
+                      </span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="220"
+                        step="10"
+                        value={minSalary}
+                        disabled={salaryIsNegotiable}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value)
+                          setMinSalary(Math.min(val, maxSalary))
+                        }}
+                        className="w-full h-1 bg-ink-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-ink-400 block mb-1">
+                        {t('jobs.filters.salaryMax')}
+                      </span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="220"
+                        step="10"
+                        value={maxSalary}
+                        disabled={salaryIsNegotiable}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value)
+                          setMaxSalary(Math.max(val, minSalary))
+                        }}
+                        className="w-full h-1 bg-ink-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleSection>
+
+            {/* Nơi làm việc */}
+            {facets.workModes.length > 0 && (
+              <CollapsibleSection
+                title={t('jobs.filters.workLocation')}
+                selectedCount={filters.workModes.length}
+              >
+                <div className="grid grid-cols-3 gap-1.5">
+                  {facets.workModes.map((mode) => (
+                    <button
+                      key={mode.value}
+                      onClick={() => toggleStringFilter('workModes', mode.value)}
+                      className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+                        filters.workModes.includes(mode.value)
+                          ? 'border-brand-300 bg-brand-50 text-brand-700'
+                          : 'border-ink-200 text-ink-600 hover:border-brand-300'
+                      }`}
+                    >
+                      {mode.label} ({mode.count})
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            )}
+
+            {/* Địa điểm (tỉnh/thành lấy từ Province Open API, chỉ nơi có job) */}
+            <FacetCheckboxGroup
+              title={t('jobs.filters.location')}
+              items={locationFacets}
+              selected={filters.locations}
+              onToggle={(v) => toggleStringFilter('locations', v)}
+            />
+
+            {/* Kỹ năng / Công nghệ — mặc định thu gọn vì có thể rất nhiều */}
+            {facets.skills.length > 0 && (
+              <CollapsibleSection
+                title={t('jobs.filters.skills')}
+                selectedCount={filters.skills.length}
+                defaultOpen={filters.skills.length > 0}
+              >
+                <TruncatedList
+                  items={facets.skills}
+                  wrapperClassName="flex flex-wrap gap-1.5"
+                  render={(skill) => (
+                    <button
+                      key={skill.value}
+                      onClick={() => toggleStringFilter('skills', skill.value)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        filters.skills.includes(skill.value)
+                          ? 'bg-brand-600 text-white'
+                          : 'border border-ink-200 text-ink-600 hover:border-brand-300'
+                      }`}
+                    >
+                      {skill.label} ({skill.count})
+                    </button>
+                  )}
+                />
+              </CollapsibleSection>
+            )}
+
+            {/* Ngôn ngữ phỏng vấn — mặc định thu gọn */}
+            <FacetCheckboxGroup
+              title={t('jobs.filters.interviewLanguage')}
+              description={t('jobs.filters.interviewLanguageHint')}
+              items={facets.languages}
+              selected={filters.languages}
+              onToggle={(v) => toggleStringFilter('languages', v)}
+              defaultOpen={false}
+            />
+          </div>
+        )}
+      </div>
+    </aside>
+  )
+}
+
+// ============== CV TIP BANNER (đầu danh sách job) ==============
+function CvTipBanner({
+  isAuthenticated,
+  onAction,
+}: {
+  isAuthenticated: boolean
+  onAction: () => void
+}) {
+  const { t } = useTranslation('landing')
+  return (
+    <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-ai-200 bg-gradient-to-r from-ai-50/80 to-brand-50/70 p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-ai-600 shadow-sm">
+          <Sparkles className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <div className="font-display font-bold text-ink-900">{t('jobs.cvTip.title')}</div>
+          <p className="text-sm text-ink-500">
+            {isAuthenticated ? t('jobs.cvTip.authenticated') : t('jobs.cvTip.unauthenticated')}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onAction}
+        className="shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+      >
+        {isAuthenticated ? t('jobs.cvTip.uploadCv') : t('jobs.cvTip.login')}
+      </button>
+    </div>
+  )
+}
+
+// ============== JOB CARD COMPONENT ==============
+interface JobCardProps {
+  job: JobPosting
+  isSaved?: boolean
+  onToggleSave?: (jobId: string) => void
+  /** Kỹ năng khớp với hồ sơ ứng viên — có giá trị thì hiển thị badge "gợi ý theo CV". */
+  matchedSkills?: string[]
+}
+
+function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardProps) {
+  const { t } = useTranslation('landing')
+  const navigate = useNavigate()
+  const hasMatch = !!matchedSkills && matchedSkills.length > 0
+
+  return (
+    <article
+      className="group rounded-2xl border border-ink-200 bg-white p-5 shadow-card hover:shadow-card-hover hover:border-brand-200 transition cursor-pointer"
+      onClick={() => navigate(`/jobs/${job.id}`)}
+    >
+      <div className="flex gap-4">
+        <div
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${getIconColor(job.department)}`}
+        >
+          {getJobIcon(job.department)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-ink-900 group-hover:text-brand-700">
+                  {job.title}
+                </h3>
+                {hasMatch && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
+                    title={`Khớp kỹ năng: ${matchedSkills!.join(', ')}`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {t('jobs.skillMatch', { count: matchedSkills!.length })}
+                  </span>
+                )}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
+                <MapPin className="w-3.5 h-3.5" />
+                {job.location || t('jobs.noLocation')} · {job.department || t('jobs.noDepartment')}
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSave?.(job.id)
+              }}
+              title={isSaved ? t('jobs.unsave') : t('jobs.saved')}
+              className={`shrink-0 p-2 rounded-lg transition-colors ${isSaved ? 'text-ai-600' : 'text-ink-300 hover:text-ai-600'}`}
+            >
+              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
+              <Briefcase className="w-3.5 h-3.5" />
+              {formatWorkMode(t, job.workMode || job.employmentType)}
+            </span>
+            <span className="inline-flex items-center rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
+              {formatSalary(t, job)}
+            </span>
+            {job.experienceLevel && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
+                <TrendingUp className="w-3.5 h-3.5" />
+                {job.experienceLevel}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs text-ink-400 font-medium">
+              {t('jobs.postedOn', { date: formatPostedDate(t, job.createdAt) })}
+              {job.applicationDeadline && (
+                <span className="text-amber-600 font-medium">
+                  {' · '}
+                  {t('jobs.deadline', { text: getDeadlineText(t, job.applicationDeadline) })}
+                </span>
+              )}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/jobs/${job.id}`)
+              }}
+              className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+            >
+              {t('jobs.apply')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+// ============== PAGINATION COMPONENT ==============
+/** Tạo dãy số trang có dấu "…" khi quá nhiều trang (luôn giữ trang đầu/cuối + lân cận trang hiện tại). */
+function buildPageList(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | 'ellipsis')[] = [1]
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+  if (start > 2) pages.push('ellipsis')
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < total - 1) pages.push('ellipsis')
+  pages.push(total)
+  return pages
+}
+
+function Pagination({
+  t,
+  page,
+  totalPages,
+  onChange,
+}: {
+  t: TFunction
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+}) {
+  if (totalPages <= 1) return null
+  const pages = buildPageList(page, totalPages)
+
+  return (
+    <nav
+      className="mt-8 flex items-center justify-center gap-1.5"
+      aria-label={t('pagination.label')}
+    >
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+        aria-label={t('pagination.previous')}
+        className="grid h-9 w-9 place-items-center rounded-lg border border-ink-200 bg-white text-ink-600 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:text-ink-600"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      {pages.map((p, i) =>
+        p === 'ellipsis' ? (
+          <span key={`e-${i}`} className="px-1.5 text-sm text-ink-400">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p)}
+            aria-current={p === page ? 'page' : undefined}
+            className={`grid h-9 min-w-[36px] place-items-center rounded-lg px-2 text-sm font-semibold transition ${
+              p === page
+                ? 'bg-brand-600 text-white'
+                : 'border border-ink-200 bg-white text-ink-600 hover:border-brand-300 hover:text-brand-700'
+            }`}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+        aria-label={t('pagination.next')}
+        className="grid h-9 w-9 place-items-center rounded-lg border border-ink-200 bg-white text-ink-600 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:text-ink-600"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </nav>
+  )
+}
+
+// ============== MAIN PAGE COMPONENT ==============
+export default function FindJob() {
+  const { t } = useTranslation('landing')
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
+  const [facets, setFacets] = useState<JobFacets>(EMPTY_FACETS)
+  const [cities, setCities] = useState<City[]>([])
+  const [profileSkills, setProfileSkills] = useState<string[]>([])
+  const [profileHasCv, setProfileHasCv] = useState(false)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const locationNames = new Set(cities.map((c) => c.name))
+  // Kỹ năng hồ sơ (lowercase) — dùng gắn badge "Khớp N kỹ năng" khi sắp xếp theo độ phù hợp CV.
+  const profileSkillsLower = useMemo(
+    () => new Set(profileSkills.map((s) => s.toLowerCase())),
+    [profileSkills]
+  )
+  const [sortBy, setSortBy] = useState<'newest' | 'relevance' | 'salary_desc' | 'salary_asc'>(
+    'newest'
+  )
+  const [minSalary, setMinSalary] = useState<number>(0)
+  const [maxSalary, setMaxSalary] = useState<number>(220)
+  const [salaryIsNegotiable, setSalaryIsNegotiable] = useState<boolean>(false)
+  const [page, setPage] = useState(1)
+  const listTopRef = useRef<HTMLDivElement>(null)
+
+  // Load facets từ API chỉ 1 lần khi mount
+  useEffect(() => {
+    async function loadFacets() {
+      try {
+        const facetData = await jobService.getJobFacets()
+        setFacets(facetData)
+      } catch (err) {
+        console.error('Failed to load facets:', err)
+      }
+    }
+    loadFacets()
+  }, [])
+
+  // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
+  const queryParams = {
+    search: searchQuery || undefined,
+    categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
+    employmentTypes:
+      filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
+    experienceLevels:
+      filters.experienceLevels.length > 0 ? filters.experienceLevels.join(',') : undefined,
+    workModes: filters.workModes.length > 0 ? filters.workModes.join(',') : undefined,
+    locations: filters.locations.length > 0 ? filters.locations.join(',') : undefined,
+    skills: filters.skills.length > 0 ? filters.skills.join(',') : undefined,
+    languages: filters.languages.length > 0 ? filters.languages.join(',') : undefined,
+    sortBy,
+    minSalary: !salaryIsNegotiable && minSalary > 0 ? minSalary * 1000000 : undefined,
+    maxSalary: !salaryIsNegotiable && maxSalary < 220 ? maxSalary * 1000000 : undefined,
+    salaryIsNegotiable: salaryIsNegotiable ? true : undefined,
+    page,
+    pageSize: JOBS_PER_PAGE,
+  }
+
+  const {
+    data: jobsData,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ['public-jobs', queryParams],
+    queryFn: () => jobService.getPublicJobPostings(queryParams),
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60, // 1 minute
+  })
+
+  const jobs = jobsData?.items || []
+  const totalCount = jobsData?.totalCount || 0
+
+  // Khi lọc theo lương thỏa thuận thì khóa/reset sắp xếp lương
+  useEffect(() => {
+    if (salaryIsNegotiable) {
+      if (sortBy === 'salary_desc' || sortBy === 'salary_asc') {
+        setSortBy('newest')
+      }
+    }
+  }, [salaryIsNegotiable, sortBy])
+
+  // Bỏ chọn "Độ phù hợp (theo CV)" khi không còn kỹ năng (đăng xuất / xoá hết skill) — tránh
+  // giữ lựa chọn sort không còn khả dụng trong dropdown.
+  useEffect(() => {
+    if (sortBy === 'relevance' && profileSkills.length === 0) setSortBy('newest')
+  }, [sortBy, profileSkills])
+
+  // Danh sách thành phố trực thuộc TW (Province Open API) — dùng để giới hạn bộ lọc Địa điểm.
+  useEffect(() => {
+    provinceService
+      .getLocations()
+      .then(setCities)
+      .catch((err) => console.error('Failed to load locations:', err))
+  }, [])
+
+  // Kỹ năng từ CV/hồ sơ ứng viên — dùng để gợi ý cá nhân hoá. Lỗi (chưa login/không phải
+  // ứng viên) → bỏ qua, dùng gợi ý phổ biến.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setProfileSkills([])
+      setProfileHasCv(false)
+      setSavedIds(new Set())
+      return
+    }
+    profileService
+      .getProfile()
+      .then((p) => {
+        setProfileSkills(p.skills ?? [])
+        setProfileHasCv(!!p.profileCvUrl)
+      })
+      .catch(() => {
+        setProfileSkills([])
+        setProfileHasCv(false)
+      })
+    savedJobService
+      .getSavedJobIds()
+      .then((ids) => setSavedIds(new Set(ids)))
+      .catch(() => setSavedIds(new Set()))
+  }, [isAuthenticated])
+
+  // Lưu / bỏ lưu việc làm. Cập nhật lạc quan (optimistic), rollback nếu API lỗi.
+  // Chưa đăng nhập → điều hướng tới trang đăng nhập ứng viên.
+  const handleToggleSave = (jobId: string) => {
+    if (!isAuthenticated) {
+      navigate('/auth/candidate-login')
+      return
+    }
+    const wasSaved = savedIds.has(jobId)
+    setSavedIds((prev) => {
+      const next = new Set(prev)
+      if (wasSaved) next.delete(jobId)
+      else next.add(jobId)
+      return next
+    })
+    const action = wasSaved ? savedJobService.unsaveJob(jobId) : savedJobService.saveJob(jobId)
+    action.catch(() => {
+      setSavedIds((prev) => {
+        const next = new Set(prev)
+        if (wasSaved) next.add(jobId)
+        else next.delete(jobId)
+        return next
+      })
+    })
+  }
+
+  // Gợi ý cho ứng viên: ưu tiên kỹ năng trong CV, nếu không có thì lấy kỹ năng phổ biến
+  // (theo số job thực tế), cuối cùng fallback từ khoá mặc định.
+  const suggestions =
+    profileSkills.length > 0
+      ? profileSkills.slice(0, 6)
+      : facets.skills.length > 0
+        ? facets.skills.slice(0, 6).map((s) => s.label)
+        : POPULAR_KEYWORDS
+  const suggestionsArePersonalized = profileSkills.length > 0
+
+  // Bộ lọc Địa điểm ở sidebar = facet location ∩ tỉnh/thành từ Province API (chỉ nơi đang có job).
+  const locationFacets = facets.locations.filter((l) => locationNames.has(l.value))
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / JOBS_PER_PAGE))
+  const currentPage = Math.min(page, totalPages)
+
+  // Đổi bộ lọc / tìm kiếm / sắp xếp → quay về trang 1.
+  useEffect(() => {
+    setPage(1)
+  }, [JSON.stringify(filters), searchQuery, sortBy, minSalary, maxSalary, salaryIsNegotiable])
+
+  const goToPage = (next: number) => {
+    const clamped = Math.min(Math.max(1, next), totalPages)
+    setPage(clamped)
+    // Cuộn lên đầu danh sách để người dùng thấy trang mới từ đầu.
+    listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const clearFilters = () => {
+    setFilters(EMPTY_FILTERS)
+    setSearchQuery('')
+    setMinSalary(0)
+    setMaxSalary(220)
+    setSalaryIsNegotiable(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-ink-50">
+      <CandidateHeader />
+
+      {/* Hero + search */}
+      <section className="relative border-b border-ink-200 bg-white">
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-ai-50" />
+        <div className="relative mx-auto max-w-6xl px-6 py-14">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-ai-50 px-3 py-1 text-xs font-semibold text-ai-700 ring-1 ring-ai-200">
+            <Sparkles className="w-3.5 h-3.5" />
+            {t('jobs.aiInterviewing')}
+          </span>
+          <h1 className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-[1.4] max-w-2xl text-ink-900">
+            {t('jobs.findJobTitle')}
+          </h1>
+          <p className="mt-3 max-w-xl text-ink-500">{t('jobs.findJobSubtitle')}</p>
+
+          {/* Search bar */}
+          <div className="mt-7 rounded-2xl border border-ink-200 bg-white p-2 shadow-card flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 bg-ink-50">
+              <Search className="w-5 h-5 text-ink-400" />
+              <input
+                className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                placeholder={t('jobs.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="hidden sm:block w-px bg-ink-200 my-1.5" />
+            <div className="flex-1">
+              <SearchableSelect
+                options={cities.map((c) => ({ value: c.code, label: c.name }))}
+                value={cities.find((c) => c.name === filters.locations[0])?.code ?? null}
+                onChange={(code) => {
+                  const city = cities.find((c) => c.code === code)
+                  setFilters((prev) => ({
+                    ...prev,
+                    locations: city ? [city.name] : [],
+                  }))
+                }}
+                placeholder={t('jobs.locationPlaceholder')}
+                emptyText={t('jobs.locationNotFound')}
+                icon={<MapPin className="w-5 h-5 shrink-0 text-ink-400" />}
+                onClear={() => setFilters((prev) => ({ ...prev, locations: [] }))}
+              />
+            </div>
+            <button className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+              {t('jobs.searchButton')}
+            </button>
+          </div>
+
+          {/* Gợi ý cho ứng viên (cá nhân hoá theo CV nếu có, hoặc phổ biến) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-500">
+            <span className="inline-flex items-center gap-1.5">
+              {suggestionsArePersonalized && <Sparkles className="w-3.5 h-3.5 text-ai-600" />}
+              {t('jobs.suggestions')}
+            </span>
+            {suggestions.map((keyword) => (
+              <button
+                key={keyword}
+                onClick={() => setSearchQuery(keyword)}
+                className="rounded-full bg-white px-3 py-1 ring-1 ring-ink-200 hover:ring-brand-300 hover:text-brand-700"
+              >
+                {keyword}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Body: filters + list */}
+      <main className="mx-auto max-w-6xl px-6 py-10 grid gap-8 lg:grid-cols-[260px_1fr]">
+        {/* Filters */}
+        <FilterSidebar
+          filters={filters}
+          setFilters={setFilters}
+          onClearAll={clearFilters}
+          facets={facets}
+          locationFacets={locationFacets}
+          minSalary={minSalary}
+          setMinSalary={setMinSalary}
+          maxSalary={maxSalary}
+          setMaxSalary={setMaxSalary}
+          salaryIsNegotiable={salaryIsNegotiable}
+          setSalaryIsNegotiable={setSalaryIsNegotiable}
+        />
+
+        {/* Job List */}
+        <section>
+          {/* Banner gợi ý tải CV — chỉ hiện khi ứng viên chưa có CV */}
+          {!profileHasCv && (
+            <CvTipBanner
+              isAuthenticated={isAuthenticated}
+              onAction={() =>
+                navigate(isAuthenticated ? '/candidate/profile?focus=cv' : '/auth/candidate-login')
+              }
+            />
+          )}
+
+          {/* Section Header */}
+          <div ref={listTopRef} className="flex items-center justify-between scroll-mt-24">
+            <h2 className="font-display text-lg font-bold text-ink-900">
+              {loading ? t('jobs.loading') : t('jobs.jobCount', { count: totalCount })}
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-600 font-medium">{t('jobs.sortBy')}:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
+              >
+                <option value="newest">{t('jobs.sortNewest')}</option>
+                {profileSkills.length > 0 && (
+                  <option value="relevance">{t('jobs.sortRelevance')}</option>
+                )}
+                <option value="salary_desc" disabled={salaryIsNegotiable}>
+                  {salaryIsNegotiable ? t('jobs.sortSalaryHighDisabled') : t('jobs.sortSalaryHigh')}
+                </option>
+                <option value="salary_asc" disabled={salaryIsNegotiable}>
+                  {salaryIsNegotiable ? t('jobs.sortSalaryLowDisabled') : t('jobs.sortSalaryLow')}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+              {error instanceof Error ? error.message : t('jobs.error')}
+            </div>
+          )}
+
+          {/* Job List */}
+          <div className="mt-5 space-y-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
+                <p className="text-sm text-ink-500">{t('jobs.loadingJobs')}</p>
+              </div>
+            ) : totalCount === 0 ? (
+              <div className="rounded-2xl border border-ink-200 bg-white p-12 text-center">
+                <p className="text-ink-500">{t('jobs.noJobs')}</p>
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 px-4 py-2 rounded-lg bg-brand-600 text-sm font-semibold text-white hover:bg-brand-700"
+                >
+                  {t('jobs.clearFilters')}
+                </button>
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  isSaved={savedIds.has(job.id)}
+                  onToggleSave={handleToggleSave}
+                  matchedSkills={
+                    sortBy === 'relevance'
+                      ? (job.skills ?? []).filter((s) => profileSkillsLower.has(s.toLowerCase()))
+                      : undefined
+                  }
+                />
+              ))
+            )}
+          </div>
+
+          {/* Phân trang */}
+          {!loading && totalCount > 0 && (
+            <Pagination t={t} page={currentPage} totalPages={totalPages} onChange={goToPage} />
+          )}
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-ink-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-ink-400 flex items-center justify-between">
+          <span>{t('footer.copyright', { year: new Date().getFullYear() })}</span>
+          <span className="flex items-center gap-1.5">
+            <Check className="w-4 h-4" />
+            {t('footer.transparentEvaluation')}
+          </span>
+        </div>
+      </footer>
+    </div>
+  )
+}

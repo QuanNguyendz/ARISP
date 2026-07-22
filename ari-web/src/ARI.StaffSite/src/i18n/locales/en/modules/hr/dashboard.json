@@ -1,0 +1,136 @@
+{
+  "greeting": "Hello, {{name}}",
+  "title": "HR Dashboard",
+  "subtitle": "Company-wide recruitment overview",
+  "date": "Date {{date}}",
+  "recruitmentOverview": "Recruitment Overview",
+
+  "kpis": {
+    "activeJobs": "Active Jobs",
+    "totalApplications": "Applications in Progress",
+    "aiInterviews": "AI Interviews",
+    "hired": "Hired",
+    "totalApplicationsShort": "Total Applications",
+    "newThisWeek": "New This Week",
+    "interviewsScheduled": "Interviews Scheduled",
+    "pendingReview": "Pending Review",
+    "passRate": "Pass Rate",
+    "avgTimeToHire": "Avg Time to Hire"
+  },
+
+  "widgets": {
+    "recentApplications": "Recent Applications",
+    "pendingJobs": "Pending Jobs",
+    "interviewsToday": "Interviews Today",
+    "pendingEvaluations": "Pending Evaluations"
+  },
+
+  "quickActions": "Quick Actions",
+  "approveJob": "Approve Job",
+  "reviewCandidate": "Review Candidate",
+  "viewReports": "View Reports",
+  "createJob": "Create Job",
+
+  "status": {
+    "active": "Active",
+    "pending": "Pending",
+    "draft": "Draft",
+    "rejected": "Rejected",
+    "closed": "Closed"
+  },
+
+  "verdict": {
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "overridden": "Overridden"
+  },
+
+  "stats": {
+    "total": "Total",
+    "new": "New",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "pending": "Pending"
+  },
+
+  "matchScore": {
+    "excellent": "Excellent",
+    "good": "Good",
+    "average": "Average",
+    "below": "Needs Improvement",
+    "avgScore": "avg score",
+    "analyzedProfiles": "profiles analyzed",
+    "notAnalyzed": "No profiles analyzed for CV-JD match yet."
+  },
+
+  "charts": {
+    "recruitmentFunnel": "Recruitment Funnel",
+    "funnelSubtitle": "Conversion rate at each step",
+    "conversionRate": "Conversion rate from previous step",
+    "hireRate": "Hiring success rate (Applied → Hired)",
+    "hired": "hired",
+    "dayLabel": "Day {{day}}",
+    "points": "points",
+    "profiles": "profiles",
+
+    "candidateQuality": "Candidate Quality",
+    "matchDistribution": "CV-JD Match Score Distribution ({{count}} profiles analyzed)",
+
+    "applicationTrend": "Application Trend",
+    "trendSubtitle": "Last 14 days · {{count}} applications",
+    "noData": "No application data yet.",
+
+    "recruiterPerformance": "Recruiter Performance",
+    "recruiterSubtitle": "HR Leader monitors all Recruiters",
+    "noRecruiterData": "No data yet.",
+    "jobsCount": "Jobs",
+    "applicantsCount": "Applicants",
+    "hiredCount": "Hired",
+
+    "vacancyFill": "Vacancy Fill",
+    "vacancySubtitle": "Hired vs quota (vacancies)",
+    "noQuotaJobs": "No jobs with recruitment quotas.",
+
+    "jobPostings": "Job Postings",
+    "jobsSubtitle": "All Recruiters · sorted by applicants",
+    "noJobPostings": "No job postings yet.",
+
+    "recentCandidates": "Recent Candidates",
+    "candidatesSubtitle": "Latest profiles in the system",
+    "noCandidates": "No candidates yet."
+  },
+
+  "table": {
+    "candidate": "Candidate",
+    "position": "Position",
+    "round": "Round",
+    "verdictAi": "AI Verdict",
+    "view": "View",
+    "anonymous": "Anonymous",
+    "notAnalyzed": "Not analyzed",
+    "matchScore": "Match {{score}}"
+  },
+
+  "prioritySection": {
+    "pendingJobsCount": "Jobs waiting for your approval",
+    "noPendingJobs": "No jobs pending approval 🎉",
+    "approveNow": "Review Jobs Now",
+
+    "pendingVerdicts": "Verdicts Pending Confirmation",
+    "noPendingVerdicts": "No verdicts pending confirmation.",
+    "confirmNow": "Confirm Now"
+  },
+
+  "analysisSection": {
+    "title": "Recruitment Analysis",
+    "dragHint": "· drag to move, drag bottom-right corner to resize",
+    "resetLayout": "Reset Layout",
+    "dragToMove": "Drag to move widget"
+  },
+
+  "loadingError": "Unable to load dashboard data.",
+  "viewAll": "View All",
+  "noDepartment": "Unassigned"
+}

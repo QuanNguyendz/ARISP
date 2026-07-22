@@ -1,0 +1,54 @@
+{
+  "practice": {
+    "introTitle": "ARISP Phỏng vấn thử",
+    "beforeStart": "Trước khi bắt đầu",
+    "badge": "Luyện tập • Không ảnh hưởng kết quả tuyển dụng",
+    "points": {
+      "jdBased": "AI hỏi dựa trên JD của vị trí và CV của bạn.",
+      "sameAsReal": "Cùng dạng vòng & ngôn ngữ với buổi thật sắp tới.",
+      "noRecording": "Không ghi hình — chỉ lưu transcript & nhận xét tham khảo.",
+      "voiceAnswer": "Trả lời bằng giọng nói như phỏng vấn thật."
+    },
+    "deviceCheck": {
+      "title": "Kiểm tra camera & micro",
+      "startLabel": "Vào phỏng vấn thử"
+    },
+    "header": {
+      "title": "Phỏng vấn thử",
+      "subtitle": "Luyện tập · Dựa trên JD + CV"
+    },
+    "noVideo": "Không ghi hình",
+    "statusMessages": {
+      "connecting": "Đang kết nối phỏng vấn AI…",
+      "error": "Lỗi",
+      "aiSpeaking": "AI đang nói…",
+      "listening": "Đang nghe câu trả lời của bạn…",
+      "ready": "Sẵn sàng — hãy trả lời khi AI hỏi xong."
+    },
+    "transcript": {
+      "title": "Transcript",
+      "jdCv": "JD + CV",
+      "waiting": "Cuộc trò chuyện sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.",
+      "aiLabel": "AI phỏng vấn",
+      "candidateLabel": "Bạn",
+      "drafting": "Bạn (đang trả lời — bấm \"Gửi trả lời\" khi xong)"
+    },
+    "controls": {
+      "mute": "Tắt micro",
+      "unmute": "Bật micro",
+      "submitAnswer": "Gửi trả lời",
+      "end": "Kết thúc"
+    },
+    "footer": {
+      "sttEnabled": "Giọng nói của bạn được chuyển thành chữ ở khung Transcript — trả lời xong, bấm \"Gửi trả lời\" để AI tiếp tục.",
+      "sttDisabled": "Buổi thử chỉ để luyện tập — không ảnh hưởng đến kết quả tuyển dụng."
+    },
+    "ended": {
+      "title": "Hoàn thành buổi thử!",
+      "message": "Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Bản nhận xét tham khảo sẽ hiển thị trong mục Kết quả.",
+      "viewResult": "Xem kết quả",
+      "backToApplication": "Về hồ sơ ứng tuyển"
+    },
+    "invalidApplication": "Hồ sơ ứng tuyển không hợp lệ."
+  }
+}

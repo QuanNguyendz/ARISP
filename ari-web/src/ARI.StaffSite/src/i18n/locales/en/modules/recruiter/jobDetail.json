@@ -1,0 +1,123 @@
+{
+  "title": "Job Detail",
+  "backToList": "Back to list",
+  "loadingError": "Unable to load job details.",
+  "notFound": "Job posting not found.",
+  "stats": {
+    "totalCandidates": "Total Candidates"
+  },
+  "funnel": {
+    "cvSubmitted": "New Applications",
+    "screening": "Screening",
+    "interview": "Interview",
+    "pass": "Passed"
+  },
+  "tabs": {
+    "cvReview": "CV Review",
+    "round": "Round"
+  },
+  "noDepartment": "No department assigned",
+  "hiringProgress": "Hiring {{hired}}/{{total}}",
+  "deadline": "Deadline",
+  "deadlineExpired": "Expired",
+  "deadlineToday": "Expires today",
+  "deadlineDays": "{{days}} days left",
+  "created": "created",
+  "jdFile": "Original JD",
+  "interviewSchedule": "Interview Schedule",
+  "editJob": "Edit Job",
+  "submitForApproval": "Submit for HR Approval",
+  "closeJob": "Close Job",
+  "statusUpdated": "Status updated.",
+  "jobSubmittedForApproval": "Job sent for HR Leader approval.",
+  "jobClosed": "Job posting closed.",
+  "hrRejected": "HR Rejected",
+  "hrRejectedHint": "{{reason}}. Edit job and resubmit.",
+  "hiringGoalReached": "Hiring goal reached ({{hired}}/{{total}}) — consider closing.",
+  "candidateFunnel": "Candidates",
+  "interviewRounds": "Interview Rounds",
+  "interviewRoundsCount": "({{count}})",
+  "roundTechnical": "Technical",
+  "roundScreening": "Screening",
+  "noCandidatesForJob": "No candidates for this job yet.",
+  "filters": {
+    "filterByDate": "Filter by date",
+    "filterByDateCv": "Filter by submission date",
+    "filterByDateInterview": "Filter by interview date",
+    "filterByStatus": "Filter by status",
+    "sortBy": "Sort by",
+    "sortByRelevance": "Sort by relevance",
+    "sortByScore": "Sort by score",
+    "allStatuses": "All statuses",
+    "cvSubmitted": "New applications",
+    "invited": "Invited (no CV yet)",
+    "cvRejected": "CV rejected",
+    "waitingForInvite": "Waiting for invite",
+    "invitedWaitingSchedule": "Invited, waiting for scheduling",
+    "scheduledInterview": "Scheduled / Interviewing",
+    "withdrawn": "Withdrawn",
+    "sortDesc": "Highest first",
+    "sortAsc": "Lowest first",
+    "sortDefault": "Default (submission time)"
+  },
+  "tableHeaders": {
+    "candidate": "Candidate",
+    "submittedDate": "Submitted Date",
+    "noticePeriod": "Notice Period",
+    "matchScore": "Match Score",
+    "status": "Status",
+    "actions": "Actions",
+    "interviewSchedule": "Interview Schedule",
+    "evaluationScore": "Evaluation Score"
+  },
+  "batch": {
+    "selected": "{{count}} candidates selected",
+    "approveAll": "Approve All",
+    "rejectAll": "Reject All",
+    "inviteAll": "Invite All"
+  },
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "invite": "Invite",
+    "viewCv": "View CV",
+    "viewApplication": "View Application"
+  },
+  "noResults": "No candidates found matching the filter.",
+  "paginationLabel": "candidates",
+  "coverLetterModal": {
+    "title": "Application Info - {{name}}",
+    "aiSummary": "CV Summary & AI Evaluation",
+    "noAiData": "No AI evaluation data",
+    "noAiDataHint": "This application does not have AI evaluation results (possibly a test application or no valid CV file).",
+    "matchScore": "Match Score",
+    "contactInfo": "Contact Information",
+    "fullName": "Full Name",
+    "phone": "Phone",
+    "email": "Email",
+    "noticePeriod": "Notice Period",
+    "coverLetter": "Cover Letter",
+    "noCoverLetter": "Candidate did not submit a cover letter.",
+    "close": "Close"
+  },
+  "confirm": {
+    "approve": "Are you sure you want to approve {{count}} selected applications and move them to Round 1?",
+    "reject": "Are you sure you want to reject {{count}} selected applications and send thank you emails?",
+    "invite": "Are you sure you want to send interview invitations to {{count}} selected candidates?"
+  },
+  "messages": {
+    "approvedSuccess": "Successfully approved {{count}} applications.",
+    "approvedFailed": "Failed {{count}} applications.",
+    "rejectedSuccess": "Successfully rejected {{count}} applications.",
+    "rejectedFailed": "Failed {{count}} applications.",
+    "inviteSentSuccess": "Successfully sent invitations to {{count}} candidates.",
+    "inviteSentFailed": "Failed {{count}} candidates.",
+    "singleApproved": "Application approved and moved to Round 1.",
+    "singleRejected": "Application rejected and thank you email sent.",
+    "singleInviteSent": "Invitation (magic link) sent to candidate.",
+    "approveError": "Error approving application.",
+    "rejectError": "Error rejecting application.",
+    "inviteError": "Error sending invitation."
+  },
+  "statusError": "Cannot update job status."
+}

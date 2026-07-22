@@ -1,0 +1,6 @@
+@ARI.API_HostAddress = http://localhost:5102
+
+GET {{ARI.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

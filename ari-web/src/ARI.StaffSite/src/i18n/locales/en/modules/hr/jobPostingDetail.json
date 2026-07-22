@@ -1,0 +1,198 @@
+{
+  "back": "Back to list",
+  "loading": "Loading job posting details...",
+  "errorTitle": "An error occurred",
+  "errorNotFound": "Data not found.",
+  "edit": "Edit",
+  "department": "Recruitment department",
+  "noLocation": "Not configured",
+  "workModes": {
+    "fulltime": "Full-time",
+    "parttime": "Part-time",
+    "contract": "Contract",
+    "internship": "Internship"
+  },
+  "deadline": {
+    "label": "Deadline:",
+    "noLimit": "No limit",
+    "expired": "Expired",
+    "today": "Expires today",
+    "daysLeft": "{count} days left"
+  },
+  "vacancies": "Vacancies:",
+  "statusLabels": {
+    "draft": "Draft",
+    "pending": "Pending Approval",
+    "active": "Active",
+    "rejected": "Rejected",
+    "closed": "Closed",
+    "archived": "Archived",
+    "paused": "Paused"
+  },
+  "jdSection": {
+    "title": "JD Document",
+    "originalJd": "Original JD",
+    "approvedJd": "Approved JD with stamp",
+    "noJd": "This posting has no JD file attached."
+  },
+  "description": "Job Description",
+  "skills": "Required Skills",
+  "aiConfig": {
+    "title": "AI Interviewer Persona Configuration",
+    "requiredLanguage": "Required language:",
+    "autoDetect": "Auto-detected language:",
+    "autoDetectLabels": {
+      "vi": "Vietnamese",
+      "other": "English/Other"
+    },
+    "availableHours": "Available interview hours:",
+    "rescheduleDeadline": "Interview reschedule deadline:",
+    "hoursBefore": "hours before appointment",
+    "defaultLang": "Default by system",
+    "onsiteRequired": "On-site required"
+  },
+  "rounds": {
+    "title": "AI Interview Rounds ({count})",
+    "round": "Round {number}",
+    "types": {
+      "technical": "Technical",
+      "screening": "Screening"
+    },
+    "language": "Language:",
+    "languages": {
+      "vi": "Vietnamese",
+      "other": "English/Other"
+    },
+    "duration": "Duration:",
+    "minutes": "{count} minutes",
+    "codeTtl": "Code TTL:",
+    "hours": "hours",
+    "noConfig": "No interview rounds configured."
+  },
+  "funnel": {
+    "title": "Candidate Application Funnel",
+    "description": "Track and approve candidate applications by interview stage",
+    "total": "Total: {count} candidates",
+    "cvReview": "CV Review",
+    "cvReviewSubtitle": "Newly submitted CVs",
+    "cvSubmitted": "Newly applied",
+    "invited": "Invited (CV not submitted)",
+    "cvRejected": "CV rejected",
+    "waiting": "Waiting for invitation",
+    "waitingSchedule": "Invited, waiting to schedule",
+    "interview": "Scheduled / Interviewing",
+    "pass": "Passed",
+    "notPass": "Not Passed",
+    "withdrawn": "Withdrawn"
+  },
+  "table": {
+    "candidate": "Candidate",
+    "appliedDate": "Applied Date",
+    "noticePeriod": "Notice Period",
+    "matchScore": "Match Score",
+    "status": "Status",
+    "actions": "Actions",
+    "interviewSchedule": "Interview Schedule",
+    "interviewScore": "Interview Score",
+    "notScheduled": "Not scheduled",
+    "notProvided": "—"
+  },
+  "filters": {
+    "byDate": "Filter by submission date",
+    "byInterviewDate": "Filter by interview date",
+    "byStatus": "Filter by status",
+    "allStatus": "All statuses",
+    "sortByMatch": "Sort by match score",
+    "sortByScore": "Sort by evaluation score",
+    "sortOptions": {
+      "desc": "Descending (Highest first)",
+      "asc": "Ascending (Lowest first)",
+      "default": "Default (Submission time)"
+    }
+  },
+  "actions": {
+    "accept": "Approve",
+    "reject": "Reject",
+    "invite": "Invite",
+    "viewCv": "View CV",
+    "viewCoverLetter": "View application info & Cover letter"
+  },
+  "batchActions": {
+    "selected": "{count} candidates selected",
+    "acceptBatch": "Batch Approve",
+    "rejectBatch": "Batch Reject",
+    "inviteBatch": "Batch Invite"
+  },
+  "noCandidates": "No candidates have applied to this posting yet.",
+  "noFilterResults": "No candidates match the current filters.",
+  "paginationLabel": "candidates",
+  "pendingApproval": {
+    "title": "This posting is awaiting your approval",
+    "description": "Recruiter {name} submitted this posting with JD file. Approve to publish (JD will be stamped) or reject with reason.",
+    "approve": "Approve & Stamp",
+    "reject": "Reject"
+  },
+  "rejectedBanner": {
+    "label": "Rejected:"
+  },
+  "approvedBanner": {
+    "label": "Approved by",
+    "at": "at"
+  },
+  "confirmRejectModal": {
+    "title": "Reject Job Posting",
+    "description": "Enter rejection reason for \"{title}\". Recruiter will see this reason to edit and resubmit.",
+    "placeholder": "Rejection reason...",
+    "cancel": "Cancel",
+    "confirm": "Confirm Rejection"
+  },
+  "coverLetterModal": {
+    "title": "Application Details - {name}",
+    "aiSummary": "CV Summary & AI Evaluation",
+    "noAiData": "No AI evaluation data",
+    "noAiDataHint": "This application doesn't have AI evaluation results (may be a test application or no valid CV file).",
+    "contactInfo": "Contact Information",
+    "fullName": "Full Name",
+    "phone": "Phone Number",
+    "email": "Email",
+    "noticePeriod": "Notice Period Before Resignation",
+    "coverLetter": "Cover Letter",
+    "noCoverLetter": "Candidate did not submit a cover letter.",
+    "close": "Close",
+    "matchScore": "Match Score: {score}%"
+  },
+  "notices": {
+    "acceptSuccess": "Candidate application approved and Round 1 interview invitation sent successfully.",
+    "rejectSuccess": "Application rejected and thank you email sent to candidate successfully.",
+    "inviteSuccess": "Magic link invitation sent to candidate.",
+    "jobApproveSuccess": "Job posting approved. JD file has been stamped.",
+    "jobRejectSuccess": "Job posting rejected. Recruiter will see the reason to edit.",
+    "batchAcceptSuccess": "Successfully approved {success} applications.{failed, plural, other{ Failed {failed} applications.}}",
+    "batchRejectSuccess": "Successfully rejected {success} applications.{failed, plural, other{ Failed {failed} applications.}}",
+    "batchInviteSuccess": "Successfully sent invitations to {success} candidates.{failed, plural, other{ Failed {failed} candidates.}}",
+    "close": "Close"
+  },
+  "errors": {
+    "loadJob": "Unable to load job posting details. The posting may not exist or you don't have permission to view.",
+    "acceptApplication": "Error approving application.",
+    "rejectApplication": "Error rejecting application.",
+    "sendInvite": "Unable to send invitation.",
+    "approveJob": "Unable to approve. Please try again.",
+    "rejectJob": "Unable to reject. Please try again.",
+    "batchAccept": "Error in batch approval.",
+    "batchReject": "Error in batch rejection.",
+    "batchInvite": "Error sending batch invitations.",
+    "loadCandidates": "Error loading candidates list"
+  },
+  "confirmDialogs": {
+    "batchAccept": "Are you sure you want to approve {count} selected applications and move to Round 1?",
+    "batchReject": "Are you sure you want to reject {count} selected applications and send thank you emails?",
+    "batchInvite": "Are you sure you want to send interview invitations to {count} selected candidates?",
+    "rejectApplication": "Are you sure you want to reject this candidate's application and send a thank you email?"
+  },
+  "salary": {
+    "negotiable": "Negotiable",
+    "from": "From",
+    "to": "To"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Activity Log",
+  "description": "Track every important change in the system",
+  "filters": {
+    "all": "All Actions",
+    "staffAccountCreated": "Create Staff Account",
+    "userApproved": "Approve Account",
+    "userRoleUpdated": "Change Role",
+    "userActivated": "Activate Account",
+    "userDeactivated": "Lock Account",
+    "userDeleted": "Delete Account",
+    "systemSettingsUpdated": "Update Settings"
+  },
+  "empty": {
+    "title": "No activity yet",
+    "description": "No records match the current filters."
+  },
+  "by": "by {{name}}",
+  "pagination": {
+    "summary": "Page {{page}}/{{totalPages}} · {{total}} records"
+  },
+  "errors": {
+    "loadFailed": "Failed to load activity log."
+  }
+}

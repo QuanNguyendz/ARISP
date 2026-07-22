@@ -1,0 +1,46 @@
+{
+  "title": "Interview Sessions",
+  "description": "Track AI interview sessions and view evaluation results",
+  "searchPlaceholder": "Search by candidate name or position...",
+  "stats": {
+    "total": "Total Sessions",
+    "active": "Active",
+    "completed": "Completed",
+    "recorded": "Recorded"
+  },
+  "tabs": {
+    "all": "All",
+    "active": "Active",
+    "completed": "Completed",
+    "pending": "Pending",
+    "aborted": "Aborted"
+  },
+  "status": {
+    "completed": "Completed",
+    "active": "Active",
+    "pending": "Pending",
+    "aborted": "Aborted",
+    "error": "Error"
+  },
+  "verdict": {
+    "pass": "Pass",
+    "notPass": "Not Pass"
+  },
+  "emptyState": {
+    "noSessions": "No interview sessions yet",
+    "noSessionsHint": "AI interview sessions will appear here when candidates start interviewing.",
+    "noResults": "No matching results",
+    "noResultsHint": "Try changing the search keyword or status filter."
+  },
+  "table": {
+    "round": "Round {number}",
+    "practice": "Practice",
+    "real": "Real",
+    "recording": "Recording",
+    "duration": "{duration}",
+    "view": "View"
+  },
+  "paginationLabel": "sessions",
+  "loadError": "Unable to load interview sessions. Please try again.",
+  "unknownPosition": "Position unknown"
+}

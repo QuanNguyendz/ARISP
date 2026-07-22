@@ -1,0 +1,54 @@
+{
+  "practice": {
+    "introTitle": "ARISP Practice Interview",
+    "beforeStart": "Before You Start",
+    "badge": "Practice • Does not affect recruitment results",
+    "points": {
+      "jdBased": "AI asks based on the job position JD and your CV.",
+      "sameAsReal": "Same round type & language as your upcoming real interview.",
+      "noRecording": "No video recording — only transcript & reference notes are saved.",
+      "voiceAnswer": "Answer by voice just like a real interview."
+    },
+    "deviceCheck": {
+      "title": "Check camera & microphone",
+      "startLabel": "Start practice interview"
+    },
+    "header": {
+      "title": "Practice Interview",
+      "subtitle": "Practice · Based on JD + CV"
+    },
+    "noVideo": "No video recording",
+    "statusMessages": {
+      "connecting": "Connecting to AI interview…",
+      "error": "Error",
+      "aiSpeaking": "AI is speaking…",
+      "listening": "Listening to your answer…",
+      "ready": "Ready — answer when AI is done asking."
+    },
+    "transcript": {
+      "title": "Transcript",
+      "jdCv": "JD + CV",
+      "waiting": "The conversation will appear here when the interview starts.",
+      "aiLabel": "AI Interviewer",
+      "candidateLabel": "You",
+      "drafting": "You (answering — click \"Submit answer\" when done)"
+    },
+    "controls": {
+      "mute": "Mute microphone",
+      "unmute": "Unmute microphone",
+      "submitAnswer": "Submit Answer",
+      "end": "End"
+    },
+    "footer": {
+      "sttEnabled": "Your voice is transcribed in the Transcript panel — when done answering, click \"Submit Answer\" for AI to continue.",
+      "sttDisabled": "This practice session is for training only — it does not affect recruitment results."
+    },
+    "ended": {
+      "title": "Practice Session Complete!",
+      "message": "This is a practice session, so it does not affect your recruitment results. The reference notes will be shown in the Results section.",
+      "viewResult": "View Results",
+      "backToApplication": "Back to Application"
+    },
+    "invalidApplication": "Invalid application."
+  }
+}

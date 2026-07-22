@@ -3,7 +3,7 @@
 ## Backend (C# / ASP.NET Core .NET 8)
 
 ### Naming Conventions
-- **Namespace:** `ARISP.<Layer>.<Module>` (ví dụ: `ARISP.Application.Interview`)
+- **Namespace:** `ARI.<Layer>.<Module>` (ví dụ: `ARI.Application.Interview`) — PascalCase
 - **Class:** PascalCase – `InterviewService`, `UserController`
 - **Interface:** prefix `I` – `IInterviewService`, `IUserRepository`
 - **Method:** PascalCase – `CreateSessionAsync`, `GetFeedbackById`
@@ -13,11 +13,14 @@
 
 ### Project Structure (Clean Architecture)
 ```
-backend/
-├── ARISP.API/               # Controllers, Middleware, Program.cs
-├── ARISP.Application/       # Use Cases, DTOs, Interfaces, Validators
-├── ARISP.Domain/            # Entities, Value Objects, Domain Events
-└── ARISP.Infrastructure/    # EF Core, Repositories, External Services
+ari-service/
+├── ARI.sln
+├── src/
+│   ├── ARI.API/             # Controllers, Middleware, Program.cs
+│   ├── ARI.Application/     # Use Cases (CQRS), DTOs, Interfaces, Validators
+│   ├── ARI.Domain/          # Entities, Value Objects, Domain Events
+│   └── ARI.Infrastructure/  # EF Core, Repositories, External Services
+└── tests/                   # Unit / functional tests
 ```
 
 ### Patterns bắt buộc

@@ -44,7 +44,7 @@
        │ EF Core          │ Redis / External APIs
 ┌──────▼──────┐  ┌────────▼──────┐  ┌──────────────────────────────┐
 │ PostgreSQL  │  │  Redis Cache  │  │ OpenAI (GPT-4o + Embeddings) │
-│ (Supabase)  │  └───────────────┘  │ Google STT / ElevenLabs TTS  │
+│ (Supabase)  │  └───────────────┘  │ Deepgram STT / ElevenLabs TTS│
 │ + pgvector  │                     │ HeyGen Avatar / SendGrid     │
 │ (No tenant) │                     │ ATS Webhooks / OAuth2 / Slack│
 └─────────────┘                     └──────────────────────────────┘
@@ -73,20 +73,23 @@
 - **RAG Flow:** JD + CV → chunk → embed → pgvector → retrieve khi sinh câu hỏi → GPT-4o.
 - **Ràng buộc:** abstract qua `IAIProvider` + `IEmbeddingProvider`. Swap qua `AI_PROVIDER=openai|local`.
 
-### ADR-005: TTS & Avatar
-- **Quyết định:** ElevenLabs Flash v2.5 + HeyGen Streaming Avatar với Hybrid Idle Strategy.
-- **Thay thế đã loại:** Azure TTS, D-ID, HeyGen Batch API, ElevenLabs Multilingual v2.
+### ADR-005: STT, TTS & Avatar
+- **Quyết định:** **Deepgram Nova-3** (STT streaming) + **ElevenLabs Flash v2.5** (TTS, ~75ms realtime) + **HeyGen Streaming Avatar** với Hybrid Idle Strategy.
+- **STT:** Deepgram Nova-3 thay Google Speech-to-Text — **gộp luôn VAD + endpointing** (`vad_events`/`endpointing`/`utterance_end`) nên **không cần thư viện VAD riêng** (Silero/WebRTC). Cấu hình live: `interim_results=true`, `vad_events=true`, `endpointing=300`, `utterance_end_ms=1000`.
+- **Thay thế đã loại:** Google STT (chuyển Deepgram), Azure TTS, D-ID, HeyGen Batch API, ElevenLabs Multilingual v2, **ElevenLabs v3** (biểu cảm hơn nhưng trễ cao hơn Flash v2.5 — không hợp live), VAD library rời.
 
 ### ADR-006: Streaming-First Latency Strategy
-- **Mục tiêu:** Ứng viên dừng nói → avatar bắt đầu nói trong **~1–1.8 giây**.
+- **Mục tiêu (đã siết):** Ứng viên dừng nói → avatar bắt đầu nói trong **~0.8–1.2 giây** (cascaded tối ưu — xem ADR-043).
 
   | Bước | Công nghệ | Target latency |
   |------|-----------|---------------|
-  | STT | Google Speech-to-Text streaming | ~300ms sau dừng nói |
-  | RAG | pgvector (parallel với STT) | ~0ms additional |
-  | LLM | GPT-4o streaming | TTFT ~400–800ms |
-  | TTS | ElevenLabs Flash v2.5 streaming | ~150–300ms |
+  | VAD + endpointing | **Deepgram Nova-3** (tích hợp sẵn — `vad_events`/`endpointing`/`utterance_end`) | ~100–300ms |
+  | STT | **Deepgram Nova-3 streaming** (`interim_results` → retrieve sớm) | ~150–300ms sau dừng nói |
+  | RAG | Hybrid RAG service Python (parallel với STT, ADR-039) | ~0ms additional |
+  | LLM | GPT-4o streaming (Claude là option — ADR-043) | TTFT ~400–800ms |
+  | TTS | ElevenLabs Flash v2.5 streaming | ~75–150ms |
   | Avatar | HeyGen Streaming (WebRTC) | ~100–200ms |
+- **Đòn bẩy độ trễ (bất kể chọn LLM nào):** (1) **partial-STT → RAG song song** (bắt đầu retrieve khi VAD báo sắp dứt câu, không đợi final); (2) **TTS first-sentence** — phát audio ngay câu đầu LLM stream ra; (3) **prompt caching** prefix ổn định (JD+CV+Playbook+system) cắt prefill → giảm TTFT mỗi lượt; (4) **TẮT thinking** ở model sinh câu hỏi live (adaptive/extended thinking cộng vài giây vào TTFT); (5) gọi thẳng OpenAI, **không qua Azure** (TTFT GPT-4o Azure ~2.4s vs OpenAI ~0.76s).
 
 ### ADR-007: Containerization
 - **Quyết định:** Docker + Docker Compose.
@@ -126,8 +129,9 @@ public interface IEmbeddingProvider
 - **Global Config:** Các cấu hình toàn doanh nghiệp (tên miền cho phép đăng nhập, webhook ATS, Slack/Teams) được lưu tại bảng `system_settings` hoặc file cấu hình ứng dụng (`appsettings.json`).
 
 ### ADR-013: Candidate Invite Flow
-- HR tạo Job Posting → duyệt CV → gửi magic link cho ứng viên làm quen phỏng vấn thử (Practice Remote).
-- Ứng viên đến văn phòng theo lịch hẹn → HR cấp Interview Code (On-site) cho phỏng vấn thật.
+- HR tạo Job Posting → duyệt CV → gửi **magic link/invite token** mời ứng viên vào Portal **chọn khung giờ (Availability Slot) cho buổi phỏng vấn thật của vòng đó**.
+- **Đặt lịch xong sẽ mở cho ứng viên 1 lượt phỏng vấn thử (Practice Remote) cho vòng đó** — dùng được trong cửa sổ từ lúc đặt lịch đến giờ phỏng vấn thật (xem ADR-020/027).
+- Ứng viên đến văn phòng đúng lịch đã đặt → HR cấp Interview Code (On-site) cho phỏng vấn thật.
 
 ### ADR-014: AI Evaluation & HR Confirm Flow
 - AI generate Evaluation Report sau mỗi Round.
@@ -135,21 +139,19 @@ public interface IEmbeddingProvider
 - Notification: email + in-app (SignalR) khi Evaluation hoàn thành.
 
 ### ADR-015: Interview Mode – Practice (Remote) vs Real (On-site)
-- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser tại nhà để làm quen hệ thống. **[Cập nhật ADR-038]** Chỉ mở cho ứng viên **đã pass vòng CV** và được HR cấp **Interview Code 6 ký tự (type=`practice`)** — không còn dùng magic link cho practice.
-- **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng, nhập **Interview Code** tại thiết bị Kiosk.
+- **Practice Session (Remote):** Candidate phỏng vấn thử từ browser để làm quen hệ thống. **[Cập nhật ADR-020/027/038]** Mở **tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng bằng route Portal (`/practice/:applicationId`) — **KHÔNG cần Interview Code, không cần magic link riêng**. Giới hạn **1 lượt / VÒNG**; cửa sổ dùng: từ lúc đặt lịch đến giờ phỏng vấn thật của vòng.
+- **Real Interview (On-site):** BẮT BUỘC TẠI CÔNG TY. Candidate đến văn phòng đúng lịch đã đặt, nhập **Interview Code** tại thiết bị Kiosk.
 - **On-site Kiosk:** Frontend app chạy ở chế độ kiosk (full-screen, không expose các route khác) trên thiết bị công ty.
 - **Connection Recovery:** Nếu ứng viên mất kết nối, session duy trì trạng thái active. Khi nhập lại code, hệ thống tự resume (dựa vào `must_ask_tracking`).
 
-### ADR-016: Interview Code (Access Control — Practice & Real)
+### ADR-016: Interview Code (Access Control — Real On-site only)
+- **Phạm vi:** Interview Code **CHỈ dùng cho phỏng vấn thật tại Kiosk**. Phỏng vấn thử (Practice) **không dùng code** — vào qua Portal sau khi đặt lịch (ADR-015/020/027). Entity `InterviewCode` **không có** trường `code_type` (đã bỏ — practice là Portal-driven).
 - **Format:** 6 ký tự alphanumeric, case-insensitive (ví dụ: `ARX7K2`).
 - **One-time-use:** Vô hiệu hóa ngay sau khi dùng thành công.
 - **TTL:** Mặc định 2 giờ, cấu hình được per Job Posting.
-- **Binding:** Mỗi code bind với một `application_id` cụ thể.
-- **[Cập nhật ADR-038] Phân loại:** code có `code_type` (`practice` | `real`).
-  - `practice` — mở từ **browser (remote)**, dùng cho phỏng vấn thử; chỉ cấp cho ứng viên đã pass CV.
-  - `real` — chỉ nhập tại **Kiosk on-site** cho phỏng vấn thật.
-- **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt.
-- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id` nào, `code_type` gì.
+- **Binding:** Mỗi code bind với một `application_id` + `round_number` cụ thể.
+- **Generation:** HR Admin/Recruiter tạo thủ công hoặc sinh hàng loạt khi ứng viên đến văn phòng.
+- **Audit:** Ghi lại thời điểm code được tạo, dùng, bởi `application_id`/vòng nào.
 
 ### ADR-017: Multi-round Interview
 - HR cấu hình số vòng và loại vòng per Job Posting (ví dụ: `[{round: 1, type: "screening"}, {round: 2, type: "technical"}]`).
@@ -168,7 +170,7 @@ public interface IEmbeddingProvider
 - **Interview language:** Nếu language requirement được confirm → Round 1 phỏng vấn bằng ngôn ngữ đó.
 - **AI System Prompt:** Tự động điều chỉnh system prompt sang ngôn ngữ tương ứng.
 - **TTS Language:** ElevenLabs hỗ trợ multilingual – chọn voice phù hợp ngôn ngữ.
-- **STT Language:** Google Speech-to-Text config `languageCode` tương ứng.
+- **STT Language:** Deepgram Nova-3 config `language` tương ứng.
 - **Language Assessment:** `IAIProvider.AssessLanguageProficiencyAsync()` đánh giá riêng:
   - Fluency, Grammar accuracy, Vocabulary range, Comprehension score.
   - Được đưa vào Evaluation Report như một criterion độc lập.
@@ -184,11 +186,14 @@ public interface IEmbeddingProvider
 - **Integration:** CheatScore và CheatSignals xuất hiện trong Evaluation Report (section riêng) cho HR xem xét.
 - **Policy:** ARISP không tự động fail ứng viên chỉ dựa trên CheatScore – HR quyết định cuối.
 
-### ADR-020: Scheduling Service (Practice Session Only)
-- HR cấu hình `AvailabilitySlots` per Job Posting: danh sách khung giờ trống để ứng viên làm Phỏng vấn thử (Remote).
-- Candidate chọn slot trên Portal → slot bị giảm capacity → khi hết slot không cho chọn nữa.
-- Reminder email 24h và 1h trước giờ phỏng vấn thử.
-- Đối với Phỏng vấn thật (On-site), tính năng này KHÔNG áp dụng. HR tự điều phối lịch trực tiếp với ứng viên.
+### ADR-020: Scheduling Service (Real Interview per round → unlocks Practice)
+- **[Sửa 2026-06-27 — bản cũ "Practice Session Only" SAI so với code]**
+- HR cấu hình `AvailabilitySlots` **per Job Posting + per `round_number`**: khung giờ trống cho buổi **phỏng vấn thật** của từng vòng (`AvailabilitySlot.RoundNumber`).
+- Sau khi pass CV, ứng viên được mời (magic link/invite token) vào Portal **chọn 1 slot cho buổi phỏng vấn thật của vòng đó**; `InterviewBooking` (cũng có `RoundNumber`) ghi nhận lịch. Chốt chỗ nguyên tử chống overbooking (UPDATE `booked_count` có điều kiện `booked_count < capacity`).
+- **Đặt lịch thành công sẽ MỞ 1 lượt phỏng vấn thử (Practice) cho vòng đó.** Cửa sổ dùng thử = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng (xem ADR-027).
+- **Lặp theo từng vòng:** pass vòng N → mời chọn lịch vòng N+1 → mở 1 lượt thử vòng N+1 → … đến khi được nhận.
+- Reminder email 24h và 1h trước giờ phỏng vấn thật.
+- Buổi phỏng vấn thật vẫn diễn ra **on-site tại Kiosk**: đến đúng lịch đã đặt, HR cấp Interview Code (ADR-016). Lịch đặt qua Portal thay cho điều phối thủ công.
 
 ### ADR-021: Candidate Portal
 - **Auth:** Magic link qua email (không cần password). Magic link có TTL 15 phút, one-time-use.
@@ -251,11 +256,12 @@ public interface IEmbeddingProvider
 - **Thị trường:** Chỉ tập trung IT (không phải job board tổng quát).
 
 ### ADR-027: Practice Interview Session (Phỏng vấn thử)
-- **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity.
-- **Truy cập:** **[Cập nhật ADR-038]** Chỉ ứng viên **đã pass vòng CV** + HR cấp **Interview Code type=`practice`** (remote, mở từ browser). Không xuất hiện công khai trên Job Board / Portal.
-- **Lượt dùng:** 1 lần per `application_id`. `ApplicationService` check và disable nếu đã dùng; code one-time vô hiệu sau lần dùng.
-- **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook).
-- **Công nghệ:** **Đầy đủ pipeline như Real** (Google STT streaming → RAG → GPT-4o → ElevenLabs TTS → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
+- **Quyết định:** Thêm `session_type` enum (`practice` | `real`) vào `InterviewSession` entity (`InterviewSession.SessionType`, `RoundNumber`).
+- **Truy cập:** **[Cập nhật ADR-020 — 2026-06-27]** Mở **tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (ADR-020). Vào qua **Portal** (route `/practice/:applicationId`) — **KHÔNG cần Interview Code**. Không xuất hiện công khai trên Job Board.
+- **Lượt dùng:** **1 lượt / VÒNG** (không phải 1 lượt / hồ sơ). Điều kiện chặn = đã tồn tại `InterviewSession` `session_type='practice'` cho `(application_id, round_number)` (`CheckPracticeEligibilityAsync` / `StartSessionAsync`). Cờ cũ `Application.PracticeSessionUsed` chỉ giữ cho tương thích ngược, **không còn dùng làm điều kiện chặn**.
+- **Cấu hình vòng — practice GIỐNG HỆT buổi thật sắp tới của vòng đó:** practice và real của cùng vòng dùng chung `RoundNumber` → cùng `InterviewRoundConfig`, nên **cùng `round_type`** (vòng thật là `technical` thì practice cũng `technical`; vòng thật là sơ loại/ngôn ngữ thì practice cũng sơ loại/ngôn ngữ) **và cùng ngôn ngữ phỏng vấn**. Mục đích: ứng viên luyện đúng dạng vòng + đúng ngôn ngữ sắp phải thi thật (`StartSessionAsync` set `RoundType`/`InterviewLanguage` theo cùng round).
+- **RAG nguồn:** `practice` – chỉ retrieve JD + CV chunks, không load Playbook. `real` – full RAG (JD + CV + Playbook). (Khác biệt duy nhất giữa practice & real cùng vòng là **nguồn RAG** + **không quay video**; loại vòng và ngôn ngữ thì y hệt.)
+- **Công nghệ:** **Đầy đủ pipeline như Real** (Deepgram Nova-3 STT+VAD → Hybrid RAG → GPT-4o → ElevenLabs Flash v2.5 → HeyGen Avatar + Hybrid Idle). Không cắt giảm tech.
 - **Recording:** Practice **không quay video** — chỉ lưu **transcript** + Evaluation Report (giảm storage). Real lưu đầy đủ.
 - **Kết quả:** Practice Session có Evaluation Report riêng; HR xem được. Không ảnh hưởng đến verdict tuyển dụng.
 
@@ -271,20 +277,20 @@ public interface IEmbeddingProvider
 [Ứng viên ĐANG NÓI]
       │ audio chunks (WebSocket stream)
       ▼
-[Google Speech Streaming STT (language-configured)]
-      │ partial transcripts
-      │ (VAD near-end) → [RAG: retrieve từ JD + CV + Playbook]
-      │ (final transcript ~300ms sau dừng)
+[Deepgram Nova-3 Streaming STT + VAD/endpointing (language-configured)]
+      │ partial transcripts (interim_results)
+      │ (VAD/SpeechStarted near-end) → [Hybrid RAG service: retrieve JD + CV + Playbook]
+      │ (speech_final / UtteranceEnd ~150–300ms sau dừng)
       ▼
-[GPT-4o Streaming] ◄── context + retrieved chunks (JD/CV/Playbook) + system prompt
-      │ token stream
+[GPT-4o Streaming (thinking OFF, prompt-cached)] ◄── context + retrieved chunks + system prompt
+      │ token stream (first-sentence → TTS ngay)
       ▼
-[ElevenLabs Flash Streaming TTS (language voice)]
+[ElevenLabs Flash v2.5 Streaming TTS (language voice)]
       │ audio stream
       ▼
 [HeyGen Streaming Avatar via WebRTC]
       ▼
-[Ứng viên nghe + thấy avatar] ← ~1–1.8 giây sau khi dừng nói
+[Ứng viên nghe + thấy avatar] ← ~0.8–1.2 giây sau khi dừng nói
 ```
 
 ---
@@ -322,7 +328,7 @@ public interface IEmbeddingProvider
 | `AuthService` | JWT, role management, magic link (Candidate Portal), **OAuth2 OIDC Integration & Domain validation** |
 | `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
 | `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona, **JD file upload (PDF/DOCX)** |
-| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (1 lần per application), **đính kèm CV-JD Analysis vào Application** |
+| `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (**1 lượt / vòng**, theo `(application_id, round_number)`), **đính kèm CV-JD Analysis vào Application** |
 | `CvJdAnalysisService` | **[NEW]** Nhận CV file + JD (file/text) → gọi Gemini API phân tích → trả matchScore + summary. Cache kết quả per CV hash + JobPosting |
 | `IGeminiProvider` | **[NEW]** Interface abstract cho Google Gemini API. Method: `AnalyzeCvJdMatchAsync(cvFile, jdContent, ct)` |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
@@ -333,7 +339,7 @@ public interface IEmbeddingProvider
 | `PlaybookService` | Upload, parse, chunk, embed tài liệu Playbook per scope (Company/Job Posting/Round); track must-ask questions đã hỏi |
 | `IAIProvider` | Stream question, analyze answer, generate evaluation, detect language, assess language |
 | `IEmbeddingProvider` | Embed + retrieve từ pgvector (JD/CV/Playbook chunks) - không dùng organization_id |
-| `ISTTProvider` | Google Speech streaming (primary), Whisper (fallback) |
+| `ISTTProvider` | Deepgram Nova-3 streaming + VAD/endpointing (primary), Whisper (fallback) |
 | `RagService` | Chunk JD/CV/Playbook, embed, store, retrieve context theo weighted scope |
 | `LanguageDetectionService` | Gọi AI detect ngôn ngữ từ JD, lưu kết quả vào Job Posting |
 | `TTSService` | ElevenLabs Flash streaming, hỗ trợ multilingual voice |
@@ -475,27 +481,31 @@ public interface IEmbeddingProvider
 - **Dữ liệu cũ:** rows có `location` text tự do trước đây vẫn còn nhưng không map sang code → ứng viên chọn lại tỉnh/phường 1 lần là có dữ liệu chuẩn.
 
 ### ADR-038: Tối ưu chi phí Phỏng vấn thử — gating theo phễu, không cắt công nghệ
-- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Google STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → 1 ứng viên = 2 lượt tính phí phỏng vấn.
+- **Bối cảnh:** Mỗi buổi phỏng vấn (thử & thật) ngốn chi phí streaming đáng kể (HeyGen ~$3/buổi, ElevenLabs TTS, Deepgram STT, GPT-4o). Doanh nghiệp trả tiền cho **cả practice lẫn real** → **mỗi vòng = 1 lượt thử + 1 lượt thật** (multi-round thì nhân theo số vòng ứng viên đi qua).
 - **Nguyên tắc:** Practice **không ảnh hưởng verdict** nhưng vẫn cần **đầy đủ công nghệ** để ứng viên làm quen đúng trải nghiệm thật → **không tối ưu bằng cách cắt tech**, mà tối ưu bằng cách **giảm số lượng buổi (phễu)**.
 - **Quyết định:**
-  1. **Gating:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) và được HR **cấp Interview Code 6 ký tự type=`practice`** (remote). Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ đáng phỏng vấn.
-  2. **1 lần / application**, code one-time, vô hiệu ngay sau dùng.
+  1. **Gating theo phễu:** Practice chỉ mở cho ứng viên **đã pass vòng CV** (HR review matchScore + CV → chọn) **và đã đặt lịch buổi phỏng vấn thật của vòng đó** (ADR-020). Vào qua **Portal, không cấp Interview Code** cho practice. Không mở đại trà cho mọi ứng viên job board → chỉ trả tiền thử cho hồ sơ thật sự đi tiếp.
+  2. **1 lượt / VÒNG** (mở lại mỗi khi pass vòng + đặt lịch vòng kế); điều kiện chặn theo `(application_id, round_number)` (ADR-027).
   3. **Đầy đủ pipeline** cả practice & real (xem ADR-027). Practice RAG = JD + CV; Real RAG = JD + CV + Playbook.
   4. **Hybrid Idle (ADR-011)** áp dụng cho cả 2 mode — tiết kiệm ~90% HeyGen mà UX giữ nguyên (không phải "cắt tech").
   5. **Trần cứng** cho practice: giới hạn số câu hỏi + thời lượng để tránh đốt token/STT-phút.
   6. **Recording practice: không quay video, chỉ transcript** + Evaluation Report.
   7. Tái dùng embeddings JD+CV đã sinh ở bước CV-JD Analysis (không embed lại).
-- **Thay đổi liên quan:** Cập nhật ADR-015 (practice qua code thay vì magic link), ADR-016 (`code_type` practice|real), ADR-027 (truy cập + recording).
+- **Thay đổi liên quan:** Cập nhật ADR-013/015/020 (scheduling = phỏng vấn thật theo vòng, đặt lịch mở practice), ADR-016 (bỏ `code_type`; Interview Code chỉ cho real), ADR-027 (truy cập Portal + 1 lượt/vòng + recording).
 
-### ADR-039: RAG tách thành microservice Python riêng
-- **Quyết định:** Pipeline RAG (chunk + embed + retrieve, pgvector) tách khỏi backend .NET thành **service Python độc lập** (gợi ý: FastAPI). Backend .NET gọi qua HTTP/REST nội bộ.
+### ADR-039: RAG tách thành microservice Python riêng (đã MỞ RỘNG ranh giới)
+- **Quyết định:** Pipeline RAG tách khỏi backend .NET thành **service Python độc lập** (FastAPI + LangChain + LangGraph), ở thư mục `rag-service/`. Backend .NET gọi qua HTTP/REST nội bộ.
 - **Lý do:** Hệ sinh thái RAG/embedding/LLM-tooling phong phú hơn ở Python; tách service để scale & deploy độc lập, không nặng backend chính.
-- **Ranh giới:** .NET vẫn giữ `IAIProvider` (GPT-4o, sinh câu hỏi/đánh giá — OpenAI). Phần **retrieval/embedding** chuyển sang service Python; `IEmbeddingProvider` phía .NET trở thành **client gọi service Python** (giữ nguyên interface để business logic không đổi — tuân ADR-004).
-- **Hợp đồng (dự kiến):** `POST /embed` (text[] → vectors), `POST /retrieve` (query + scope JD/CV/Playbook + filters → chunks xếp hạng). Practice: scope JD+CV; Real: thêm Playbook (ADR-025/027).
-- **Dữ liệu:** pgvector vẫn nằm trên PostgreSQL/Supabase; service Python kết nối trực tiếp (không Supabase SDK — tuân quy tắc dự án). Cân nhắc đặt bảng `document_chunks` thuộc sở hữu service Python.
-- **Hạ tầng:** thêm container Python vào Docker Compose; biến môi trường cho endpoint nội bộ; **không** expose ra ngoài Nginx.
-- **Trạng thái:** Quyết định kiến trúc đã chốt — **chưa triển khai**. Là task backend/infra riêng (Phase 4/4b), không chặn việc dựng UI phỏng vấn.
-- **Ràng buộc:** Không vi phạm "không Node.js cho backend" (đây là Python microservice cho RAG, backend chính vẫn .NET 8).
+- **Ranh giới (MỞ RỘNG 2026-06-26):** Python sở hữu **TOÀN BỘ** pipeline: chunk + embed + **hybrid retrieve** + **sinh câu hỏi/đánh giá/đánh giá ngôn ngữ** (không chỉ retrieval/embedding như bản gốc). .NET chỉ orchestrate session/SignalR/persistence. Giữ nguyên abstraction `IAIProvider` + `IEmbeddingProvider` (ADR-004, rule #8): thêm impl `RagServiceProvider` (HTTP/SSE client → Python) + interface mới `IRagIngestionService`. `OpenAIProvider` giữ làm fallback in-process qua cờ `AI:Provider` (`rag` | `openai` | `local`); khi không dùng rag, ingestion chạy in-process qua `LocalRagIngestionService`. Gemini (CV-JD/JD-extract, ADR-030/042) **không đổi**, vẫn ở .NET.
+- **Lộ trình (3 giai đoạn, cùng 1 LangGraph StateGraph):**
+  - **Giai đoạn 1 (đã làm):** Hybrid RAG = dense (pgvector cosine `<=>`) + sparse (Postgres full-text `ts_rank`) → hợp nhất Reciprocal Rank Fusion + weighting theo scope (ADR-025).
+  - **Giai đoạn 2:** CRAG — chèn node `grade_documents` + corrective (rewrite query / re-retrieve).
+  - **Giai đoạn 3:** Agentic — router/tool nodes (agent quyết định bước tiếp theo).
+- **Hợp đồng (đã triển khai):** `POST /ingest` (chunk+embed+lưu, idempotent theo (source_type, source_id)), `POST /retrieve` (query text + scope → chunks xếp hạng), `POST /next-question` (**SSE stream** token, chạy LangGraph), `POST /analyze-answer` · `/evaluate` · `/detect-language` · `/assess-language` · `/complete-json` · `/embed`. Practice: scope JD+CV; Real: thêm Playbook (ADR-025/027). Wire JSON camelCase.
+- **Dữ liệu:** pgvector vẫn trên PostgreSQL/Supabase; service Python kết nối trực tiếp qua asyncpg (không Supabase SDK). Bảng `document_chunks` **vẫn do EF Core (.NET) sở hữu schema**; Python đọc/ghi dữ liệu. Sparse cần GIN index FTS → migration `20260626000000_AddDocumentChunksFtsIndex` (`to_tsvector('simple', chunk_text)`).
+- **Hạ tầng:** container `rag-service` (port 8000) trong Docker Compose, mạng `arisp-network`; biến `RAG_SERVICE_URL`; **không** expose ra Nginx (chỉ nội bộ).
+- **Trạng thái:** **Giai đoạn 1 đã triển khai** (2026-06-26). Giai đoạn 2 (CRAG) & 3 (Agentic) còn backlog.
+- **Ràng buộc:** Không vi phạm "không Node.js cho backend" (Python microservice cho RAG; backend chính vẫn .NET 8). Mock mode (thiếu `OPENAI_API_KEY`) để test pipeline không cần key.
 
 ### ADR-040: Cổng kiểm tra thiết bị bắt buộc (mic + cam) trước phỏng vấn
 - **Quyết định:** Ứng viên **chỉ được vào phỏng vấn (cả thử & thật)** khi **camera và micro hoạt động**. Bắt buộc qua bước Device Check trước khi vào phòng.
@@ -520,3 +530,84 @@ public interface IEmbeddingProvider
   4. **File JD lưu vào job:** `JobPosting.JdFileUrl/JdFileName/JdFileFormat` được điền qua Create/Update (UpdateJob chỉ ghi đè khi request gửi file mới). FE bắt buộc upload+phân tích JD trước khi **tạo** tin.
 - **FE:** `RecruiterLayout` chuyển sang `WorkspaceLayout` dùng chung (theme sáng/tối). Cụm màn: Dashboard (lưới tin của tôi), Tin tuyển dụng (list + filter trạng thái), **Job Detail mới** (`/recruiter/my-jobs/:id`: phễu ứng viên theo trạng thái + danh sách ứng viên của job + gửi magic link + đổi trạng thái tin), Create/Edit (`/recruiter/my-jobs/:id/edit`) với card upload & phân tích JD auto-fill.
 - **Chưa làm (phase sau):** màn HR Leader duyệt tin (đã có API), màn "Cấp Interview Code", redesign Candidates/Evaluations/Interviews của Recruiter.
+
+### ADR-043: Chốt media stack phỏng vấn realtime — Cascaded, Deepgram Nova-3, Flash v2.5, LLM GPT-4o (Claude là option)
+- **Bối cảnh:** Ứng viên phỏng vấn **trực tiếp** với AI → cần chất lượng + độ trễ càng gần realtime càng tốt. Cân nhắc 2 kiến trúc: **(A) Cascaded** (STT→RAG→LLM→TTS→Avatar, rời) vs **(B) Speech-to-Speech realtime** (OpenAI Realtime / Gemini Live, audio-in→audio-out, ~0.3–0.8s).
+- **Quyết định — chọn (A) Cascaded tối ưu** (~0.8–1.2s), KHÔNG dùng speech-to-speech. Lý do: bảo toàn **kiểm soát RAG/must-ask/đánh giá/language assessment/transcript** và avatar HeyGen — vốn là lõi bài toán phỏng vấn; tận dụng hạ tầng đã có (HeyGen, Hybrid RAG service). Để dành (B) cho thử nghiệm Practice mode sau.
+- **Stack chốt:**
+  - **STT + VAD/endpointing:** **Deepgram Nova-3** — gộp 1 dịch vụ (VAD/endpointing tích hợp sẵn), bỏ thư viện VAD rời (xem ADR-005).
+  - **TTS:** **ElevenLabs Flash v2.5** (~75ms, tối ưu realtime). Loại v3 (trễ cao hơn).
+  - **RAG:** Hybrid RAG microservice Python (ADR-039).
+  - **LLM "bộ não":** **giữ GPT-4o** (ADR-004). **Claude là option chiến lược dành sau** nếu cần cải thiện độ trễ/chất lượng.
+  - **Avatar:** HeyGen Hybrid Idle (ADR-011).
+- **So sánh độ trễ LLM (benchmark 2026, median TTFT — soi theo voice nên TTFT là yếu tố chính, throughput KHÔNG phải nút thắt vì tốc độ nói ~5–8 token/s):**
+
+  | Model | TTFT | Vai trò |
+  |---|---|---|
+  | GPT-4o (hiện tại) | ~0.4–0.8s | Live |
+  | Claude Haiku 4.5 | **~0.28–0.6s** (thấp nhất) | Option live nếu cần TTFT thấp nhất + rẻ |
+  | Claude Sonnet 4.6 | ~0.5–0.8s (≈ GPT-4o) | Option live cân bằng chất lượng |
+  | Claude Opus 4.8 | ~0.8–1.2s+ (×2.5 Fast Mode) | Option cho đánh giá cuối vòng |
+- **Kết luận:** GPT-4o ≈ Claude Sonnet 4.6 về độ trễ → giữ GPT-4o hợp lý. Muốn **giảm trễ thật** → đường nhanh nhất là **Haiku 4.5** (không phải Sonnet/Opus). Lợi thế ẩn của Claude: **tail-latency ổn định** (P50≈P99, ít "đứng hình" giữa buổi) + prompt caching mạnh. Swap-point đã sẵn ở RAG service (`graph.py`/`llm.py` đổi `ChatOpenAI`→`ChatAnthropic`) + .NET `IAIProvider`/`RagServiceProvider`.
+- **Đòn bẩy độ trễ chung (làm trước, không phụ thuộc LLM):** partial-STT→RAG song song; TTS first-sentence; prompt caching prefix ổn định; **TẮT thinking** ở model live; gọi thẳng OpenAI (không Azure). Xem ADR-006.
+
+### ADR-044: Nối media stack thực tế — client-SDK + BE mint token (triển khai phỏng vấn thử)
+- **Bối cảnh:** Triển khai luồng phỏng vấn (bắt đầu với **Practice**) end-to-end với Deepgram + ElevenLabs + HeyGen. Cần mô hình tích hợp chuẩn, độ trễ thấp, **không lộ API key ra FE**.
+- **Quyết định — client-SDK + BE token broker:**
+  - **BE giữ toàn bộ API key thật** (`Media:Deepgram|ElevenLabs|HeyGen` + `AI:OpenAI`), chỉ **mint token ngắn hạn** cho FE qua `GET /api/interview/session/{id}/media-config` (xác thực ứng viên sở hữu phiên).
+  - **STT — Deepgram**: FE dùng `@deepgram/sdk` live, auth bằng **ephemeral token** (`/v1/auth/grant`, TTL ~60s) do `DeepgramTokenService` cấp. FE stream mic (MediaRecorder) thẳng tới Deepgram; final transcript → `SubmitAnswerText` (SignalR).
+  - **Avatar — HeyGen LiveAvatar (cập nhật 2026-06-30):** Streaming Avatar API cũ (`/v1/streaming.*` + `@heygen/streaming-avatar`) đã **sunset (410)** → migrate sang **LiveAvatar** chế độ **LITE**. `HeyGenAvatarService` mint session token: `POST https://api.liveavatar.com/v1/sessions/token` header `X-API-KEY`, body `{mode:"LITE", avatar_id, is_sandbox}` → `data.session_token`. FE dùng `@heygen/liveavatar-web-sdk`: `new LiveAvatarSession(token, {voiceChat:false, apiUrl})` → `session.attach(videoEl)` (SESSION_STREAM_READY) → `session.repeatAudio(pcm24kBase64)`. **LITE = giữ não RAG/GPT-4o của ta** (avatar chỉ lip-sync audio ta cấp), KHÔNG dùng agent built-in. `avatar_id` LiveAvatar là **UUID** (vd `dd73ea75-...`), khác avatar id Streaming cũ. `is_sandbox=true` cho dev.
+  - **TTS — ElevenLabs**: `ElevenLabsTTSService.TextToSpeechBase64PcmAsync` gọi `/v1/text-to-speech/{voice}/with-timestamps?output_format=pcm_24000` → `audio_base64` (PCM 24k) — đúng định dạng `repeatAudio`. Endpoint `POST /session/{id}/tts {text}` → `{audio}`; FE fetch rồi đẩy vào avatar. ElevenLabs là **giọng chính** của avatar (LITE), không còn phụ thuộc TTS nội bộ HeyGen.
+  - **LLM**: giữ `IAIProvider` (OpenAIProvider in-process `AI:Provider=openai`, hoặc RagServiceProvider khi `=rag`). "AI API ở bước cuối" chỉ là điền key.
+  - **Sự kiện realtime**: `SignalRNotificationService` (thật, thay `MockNotificationService`) đẩy `ReceiveQuestion`/`ReceiveSessionStatus` tới `SessionHub` group = `sessionId`.
+- **Fallback mềm:** thiếu HeyGen (key/avatarId) → browser `speechSynthesis` + bot tĩnh; thiếu Deepgram → nhập tay + nút "Gửi trả lời"; thiếu OpenAI key → mock câu hỏi. Mỗi provider bật độc lập theo việc có key hay không (DI chọn real vs `Mock*`).
+- **Vì sao client-SDK thay vì BE relay WebRTC/audio:** đúng cách HeyGen/Deepgram SDK hoạt động, độ trễ thấp nhất, BE nhẹ (không relay media — nhất quán ADR-008). Giữ nguyên abstraction `ISTTProvider`/`ITTSService`/`IAvatarService`.
+- **Recording practice:** không quay video (ADR-027) — chỉ transcript (lưu khi `SubmitAnswerText`) + Evaluation Report.
+- **Ghi chú gói:** đã migrate `@heygen/streaming-avatar` (sunset) → **`@heygen/liveavatar-web-sdk`** (kéo theo `livekit-client`). FE chunk practice ~590KB (lazy-load, chấp nhận được cho trang media).
+
+### ADR-045: Refactor Clean Architecture chuẩn JT template — `ari-service/` + `ARI.*` + CQRS/MediatR
+- **Ngày:** 2026-07-19. **Branch:** `refactor/be/clean-architecture` (base `origin/develop`, tag rollback `pre-clean-arch-refactor`).
+- **Bối cảnh:** Hướng phụ thuộc 4 project đã đúng Clean Architecture nhưng ruột sai layer: 14 controllers (~6.900 dòng) ôm business logic (inline BCrypt/JWT, query + mapping thủ công ~300 call sites, orchestration Gemini/RAG/storage); DI viết tay 521 dòng trong `Program.cs` kèm raw SQL bootstrap bù schema thiếu migration.
+- **Quyết định (refactor thuần cấu trúc — routes/DTO shapes/auth policies/hub paths/DB schema KHÔNG đổi):**
+  1. **Rename:** `backend/` → `ari-service/` layout JT (`src/` + `tests/`); project/namespace `ARISP.*` → `ARI.*` (PascalCase); `ARISPDbContext` → `AriDbContext`. Brand values giữ nguyên (JWT Issuer `ARISP`, cookie `ARISP.External`, swagger title, email templates). Migration IDs + `ef_migrations_history` không đổi.
+  2. **CQRS + MediatR** (pin cứng **[12.5.0]** — bản Apache-2.0 cuối, v13+ commercial license Lucky Penny) + FluentValidation 11.x. **KHÔNG AutoMapper** (v15 cũng commercial; projection thủ công là load-bearing). Vertical-slice feature folders: `Auth/ Admin/ AccountRequests/ Applications/ CandidatePortal/ CvAnalysis/ Dashboard/ Evaluations/ Interviews/ Jobs/ Playbooks/ Scheduling/ StaffNotifications/` (~110 commands/queries). Controllers thin: trích claims + guard IFormFile + `ISender.Send` + map `Result`→HTTP y hệt status/body cũ.
+  3. **Pipeline Behaviours:** UnhandledException → Logging (pre-processor) → **Validation trả `Result.Failure` thay vì throw** (deviation JT có chủ đích — giữ Result Pattern rule) → Performance (warn >500ms). `Result.ErrorCode` (additive) để controller map failure → đúng 401/403/404/409/500 cũ.
+  4. **DI theo JT:** `AddApplication()` / `AddInfrastructure()` / `AddWebServices()`; `Program.cs` 521 → ~60 dòng; `AriDbContextInitialiser` (migrate-retry); `ValidateScopes/ValidateOnBuild` ở Development.
+  5. **Schema 100% do migrations sở hữu:** raw SQL bootstrap gộp vào migration `ReconcileStartupBootstrap` (idempotent `IF NOT EXISTS` — an toàn DB bootstrap đầy đủ/dở dang/trống); 16 index bootstrap khai báo tường minh trong `OnModelCreating`; hợp nhất index trùng `IX_applications_cv_jd_analysis_id`.
+  6. **Service dùng chung sau interface** (rule: 1 consumer → absorb vào handler; ≥2 consumers hoặc hub → giữ service): `IInterviewService` (**SessionHub gọi TRỰC TIẾP, không qua MediatR — critical path ADR-006**), `IInterviewCodeService`, `ICvJdAnalysisService`, `IApplicationService` (deviation: giữ nguyên thay vì dissolve — logic vốn đã ở Application layer; dissolve toàn phần là follow-up). Đã XÓA: `EvaluationService`, `PlaybookService` (1 consumer). Mới: `ITokenService`/`JwtTokenService`, `IPasswordHasher`/`BcryptPasswordHasher` (Infrastructure/Identity), `TokenHashing` (Sha256Base64 cho refresh token, Sha256Hex cho invite token — 2 format cùng tồn tại trong DB).
+- **Không làm (follow-up):** tách `IEntityTypeConfiguration` khỏi `OnModelCreating` (convention loop snake_case chạy trước override là load-bearing — cần fingerprint verification riêng); dissolve toàn phần `ApplicationService`; move các file `DTOs/` còn lại vào feature folders.
+- **Verify từng phase:** build xanh, swagger.json diff = RỖNG so baseline (98 paths — chống vỡ FE), model fingerprint trước/sau rename identical, migration reconcile áp lên dev DB đúng 1 row history + scaffold thử ra migration rỗng, smoke ~90 cases so status/body verbatim bằng JWT tự mint.
+
+### ADR-046: Refactor Frontend — `ari-web/` monorepo + tách ARI.CandidateSite / ARI.StaffSite / ARI.Shared
+- **Ngày:** 2026-07-20. **Branch:** `refactor/fe/clean-architecture` (base `origin/develop`, tag rollback `pre-fe-clean-arch-refactor`). Mirror ADR-045 phía FE.
+- **Bối cảnh:** `frontend/` là 1 SPA Vite/React/TS duy nhất (~177 file, ~34k dòng) trộn mọi role; site ứng viên (public, cần deploy) và site nội bộ (HR/Recruiter/Super Admin) đóng gói chung một bundle. Cần tách 2 site deploy độc lập + tầng dùng chung, khớp Clean Architecture của backend.
+- **Quyết định (refactor thuần cấu trúc — URL routes / API paths / DTO / localStorage keys `arisp-auth`,`theme`,`arisp-language` / hub paths / env var names KHÔNG đổi):**
+  1. **Rename:** `frontend/` → `ari-web/` (mirror `backend/`→`ari-service/`), là **npm workspaces root** (1 `package-lock.json` duy nhất). Ba package dưới `ari-web/src/`: **`ARI.CandidateSite`** (`@ari/candidate-site`, port 3000, public — job board, portal, practice/real interview, **kiosk**, candidate auth); **`ARI.StaffSite`** (`@ari/staff-site`, port 3001, nội bộ — HR/Recruiter/Super Admin, staff auth); **`ARI.Shared`** (`@ari/shared`, không build step, import source-level qua alias). Folder giữ PascalCase `ARI.*`; brand "ARISP" giữ nguyên.
+  2. **Quy tắc "f" prefix:** folder service-like thêm `f` → **`services/` → `fservices/`** (mọi package). Các folder khác giữ tên thường.
+  3. **Tách concern (mỗi folder một nhiệm vụ), 2 site cùng khuôn:** `app/` (composition root: `main.tsx` + `App.tsx` router + `layouts/`) + `pages/` (theo domain/role) + `fservices/` (tầng API) + `components/` (UI tái dùng) + `i18n/`; StaffSite thêm `utils/`. **`fservices` mirror tên feature slice backend** (Jobs/Applications/Evaluations/Dashboard/Playbooks/Admin/AccountRequest/… = tầng API ↔ ARI.Application slices).
+  4. **ARI.Shared** = phần dùng chung đo bằng import thực tế: `api/apiClient` (+ `configureApiClient({refreshPath})`), `fservices/` chung (auth, job, application, interview, notification, schedule, profile), `ui/` (design system `designSystem` + primitives kit + common), `guards/`, `document/`, `media/` (DeviceCheck + practice/room/cheat hooks — pipeline SignalR/Deepgram/HeyGen gom 1 nơi), `realtime/useAppNotifications`, `store/` (auth/theme/interview), `types/`, `config/`, `utils/`, `authflows/` (OAuthCallback/Forgot/Reset — 2 site cùng route), `i18n/` core (`initI18n` + `sharedResources`), `styles/`, `tailwind-preset.cjs`. **Import qua subpath** (`@ari/shared/ui`, `@ari/shared/fservices/job`…), KHÔNG mega-barrel (giữ lazy-chunk, tránh kéo HeyGen SDK vào mọi chunk). Resolution = tsconfig `paths` + vite `alias` + `resolve.dedupe` react runtime; hướng phụ thuộc 1 chiều: site → Shared, Shared không bao giờ import site.
+  5. **`configureApiClient({ refreshPath })`:** apiClient dùng chung, mỗi site cấu hình endpoint refresh lúc bootstrap. Staff = `/auth/refresh`, **Candidate = `/auth/candidate/refresh`** (E-2: sửa lỗi cũ — apiClient mặc định gọi endpoint staff nên phiên candidate bị đá ra khi refresh; backend đã có sẵn endpoint candidate).
+  6. **Router 2 bảng, URL byte-for-byte không đổi:** candidate giữ `/`, `/jobs*`, `/candidate/*`, `/interview/*`, `/kiosk`, `/portal/schedule/*`, candidate auth, legal, landing; staff giữ `/auth/login`, `/hr/*`, `/recruiter/*`, `/super-admin/*`. **Xóa `StaffRedirect`** (2 origin riêng → token staff không tồn tại trên origin candidate → component unreachable); thay bằng **`StaffHomeRedirect`** ở route `/` của StaffSite (đã login → dashboard theo role, chưa → `/auth/login`) — route glue MỚI duy nhất, reuse path `/` sẵn có nên union route == baseline (65).
+  7. **Deploy host-based (không path-prefix):** vì `/auth/*` + `/assets/*` trùng path giữa 2 SPA. Nginx 2 server block: `localhost`→candidate:3000, `staff.localhost`→staff:3001; cùng share `/api/`,`/hubs/`,`/uploads/`. 1 Dockerfile với ARG `PKG/SITE/PORT`, context = workspace root (1 lock, layer-cache manifests trước `npm ci`); compose `frontend-candidate` + `frontend-staff`.
+  8. **CORS/OAuth 2 origin (fallback-safe):** thêm key `Frontend:CandidateBaseUrl` (3000) vào `allowedOrigins` — **KHÔNG comma-list `Authentication:AdminFrontendUrl`** (3001 staff) vì `BuildRedirectUrl`/email builders dùng raw string (StartsWith); `BuildRedirectUrl` chấp nhận returnUrl thuộc AdminFrontendUrl HOẶC CandidateBaseUrl; email candidate (verify-email, reset-password) ưu tiên CandidateBaseUrl. Khi 2 key trỏ cùng origin (prod hiện tại) → behavior y hệt hôm nay.
+- **Waves (mỗi commit build xanh, `git mv` giữ history):** 0 (rename + workspaces) → A (ARI.Shared) → B (ARI.StaffSite carve-out) → C (ARI.CandidateSite tách concern) → D (infra + CORS/OAuth) → E (close-out: xóa stale + fix candidate refresh + docs).
+- **Không làm (follow-up):** thống nhất `authService` (đang raw `fetch`) về apiClient + sửa bug URL logout backslash (`authService.ts` `\auth\logout` → `.../apiauthlogout`, POST fail âm thầm); gỡ `@stomp/stompjs` (không dùng); thêm ESLint `no-restricted-imports` chặn Shared→site; nested `features/<Feature>/{pages,components,fservices}` sâu hơn (hiện dừng ở tách concern top-level do coupling `_jobUi`/`_skeletons` theo role).
+- **Verify từng wave:** `npm run build` mọi package xanh + `npm run lint` 0 error; **route freeze**: union path 2 `App.tsx` == baseline Wave 0 (65=65, không thêm URL mới); **i18n freeze**: namespace mỗi site ⊆ ns đăng ký, không cheo giữa 2 site; backend build 0 error; tailwind emit đúng token từ Shared (`content` glob gồm `../ARI.Shared/src/**`).
+
+### ADR-047: CI/CD GitHub Actions — build ở runner → GHCR → VPS pull; `main` là production
+- **Ngày:** 2026-07-22. **Branch:** `chore/infra/prod-deploy` (base `origin/develop`).
+- **Bối cảnh:** VPS `arisp.io.vn` (4 vCPU / 3.8GB RAM / 4GB swap) deploy **thủ công 100%** từ nhánh `develop`: `git pull && docker compose up -d --build`. Không có workflow nào (`.github/workflows/` rỗng). Bốn file config prod bị sửa trực tiếp trên server bằng `nano`/`sed` và chưa từng quay lại repo — `git reset --hard origin/develop` (đã từng chạy) sẽ xoá sạch và làm sập site. Sau khi merge ADR-046, lần deploy kế tiếp còn là bước nhảy kiến trúc 1 SPA → **2 SPA trên 2 origin**, cần build 2 bản Vite + .NET publish + pip install cùng lúc — vượt khả năng của 3.8GB RAM và gây downtime ~10 phút.
+- **Quyết định:**
+  1. **Build ở GitHub Actions runner, KHÔNG build trên VPS.** `deploy.yml` build song song 4 image (`arisp-backend`, `arisp-candidate`, `arisp-staff`, `arisp-rag`) với buildx + cache `type=gha`, push GHCR tag `:${{ github.sha }}` và `:latest`. VPS chỉ `docker compose pull && up -d` (~30 giây). Auth GHCR bằng `GITHUB_TOKEN` — không cần secret thêm.
+  2. **`main` = production, `develop` = integration.** `deploy.yml` chỉ trigger trên `push: main`. Server đổi upstream từ `develop` sang `main`.
+  3. **Compose khai báo cả `image:` lẫn `build:`.** `image: ghcr.io/quannguyendz/arisp-<svc>:${IMAGE_TAG:-dev}` — dev vẫn `docker compose up --build` như cũ (tag `:dev`), prod `IMAGE_TAG=<sha> ... pull && up -d`.
+  4. **Tách `nginx/conf.d.prod/` khỏi `nginx/conf.d/`.** Nguyên nhân gốc của drift: prod override mount `../nginx/conf.d` vốn chứa config **dev** (`localhost`/`staff.localhost`), buộc phải sửa tại chỗ trên VPS. Prod compose nay mount `../nginx/conf.d.prod` → config prod nằm trong git, `git reset --hard` trong pipeline an toàn. Hai origin: `arisp.io.vn` → `frontend-candidate:3000`, `staff.arisp.io.vn` → `frontend-staff:3001`, dùng chung 1 cert (`certbot --expand`) và chung `/api/`, `/hubs/`, `/uploads/`.
+  5. **`VITE_API_BASE_URL=/api` (tương đối) làm build-arg**, không phải URL tuyệt đối. Vite inline `import.meta.env.VITE_*` lúc compile nên phải truyền ở build time; giá trị tương đối giúp **một image dùng được cho mọi domain** (prod/staging) thay vì khoá cứng. Cả 2 SignalR hub dẫn xuất từ `API_BASE_URL` nên cũng thành relative → tự nâng `wss://` theo origin.
+  6. **`ports: !reset []`** (Compose spec ≥ 2.24) thay cho `ports: []`. Danh sách trong override được **nối thêm chứ không thay thế**, nên `ports: []` chưa bao giờ có tác dụng — đó là lý do `rag-service` và `redis` vẫn hở ra `0.0.0.0` trên prod. Sau khi sửa, prod chỉ publish 80/443.
+  7. **`ci.yml` trên mọi PR vào `develop`/`main`:** build + test .NET, build cả 2 workspace FE, import-check rag-service. Chặn đúng loại lỗi mà PR #66 (`Fix syntax error frontend`) đã phải vá gấp trên `develop`.
+  8. **Rollback = `workflow_dispatch` với `image_tag` = sha cũ** → bỏ qua job build, VPS pull lại image cũ trên GHCR (~30 giây). `deploy.yml` tự health-check cả 2 origin 120 giây sau khi up.
+- **Hệ quả / lưu ý vận hành:**
+  - Secrets cần có: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (deploy key **riêng** cho Actions, không tái dùng key cá nhân).
+  - `docker/.env` vẫn nằm ngoài git và sống sót qua `git reset --hard`. `docker/.env.example` được khôi phục, ghi rõ **hai hệ tên biến**: backend .NET dùng `__` (map sang `IConfiguration`), rag-service Python dùng `UPPER_SNAKE` phẳng (`DATABASE_*`, `OPENAI_API_KEY`, `APP_ENV`). Không suy ra được của nhau — thiếu nhóm Python từng khiến `arisp-rag` crash-loop 6928 lần rồi chạy mock mode âm thầm.
+  - Prerequisite hạ tầng: DNS `A staff.arisp.io.vn → 161.248.147.38` + `certbot --expand -d arisp.io.vn -d www.arisp.io.vn -d staff.arisp.io.vn`; `.env` đặt `Authentication__AdminFrontendUrl=https://staff.arisp.io.vn` (nguồn CORS, `DependencyInjection.cs:206`); Google Console thêm `https://staff.arisp.io.vn` vào JavaScript origins (redirect URI trỏ backend nên không đổi).
+- **Không làm (follow-up):** `vite.config.ts` đang bật `sourcemap: true` nên `.map` chứa toàn bộ source được ship lên prod (đáng lưu ý nhất với StaffSite) — nên tắt hoặc chỉ upload cho error tracking; UI quản lý trực quan (Portainer/Dozzle) tách riêng để không trộn hai thay đổi hạ tầng; siết `sshd` `PasswordAuthentication no` sau khi xác nhận cả 2 key vào được.

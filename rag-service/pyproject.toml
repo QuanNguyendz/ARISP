@@ -1,0 +1,32 @@
+[project]
+name = "arisp-rag-service"
+version = "0.1.0"
+description = "ARISP RAG Interview Microservice (Hybrid RAG -> CRAG -> Agentic) — owns embedding, hybrid retrieval and AI question/evaluation generation. Called by the .NET backend over internal HTTP (ADR-039)."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "asyncpg>=0.30",
+    "langchain>=0.3",
+    "langchain-core>=0.3",
+    "langchain-openai>=0.2",
+    "langgraph>=0.2.50",
+    "pypdf>=5.1",
+    "python-docx>=1.1",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

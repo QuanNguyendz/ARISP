@@ -1,0 +1,37 @@
+{
+  "title": "Đánh giá",
+  "description": "Xem báo cáo đánh giá AI của ứng viên (chỉ xem — duyệt kết quả do HR Leader thực hiện)",
+  "loadingError": "Không tải được danh sách đánh giá.",
+  "loadDetailError": "Không tải được chi tiết đánh giá.",
+  "stats": {
+    "totalEvaluations": "Tổng đánh giá",
+    "passVerdict": "Verdict Đạt",
+    "score80": "Điểm ≥ 80",
+    "hrReviewed": "HR đã duyệt"
+  },
+  "searchPlaceholder": "Tìm ứng viên, vị trí...",
+  "filters": {
+    "all": "Tất cả",
+    "pass": "Đạt",
+    "notPass": "Không đạt"
+  },
+  "noEvaluations": "Chưa có đánh giá",
+  "noEvaluationsHint": "Báo cáo đánh giá sau phỏng vấn của ứng viên sẽ xuất hiện ở đây.",
+  "candidate": "Ứng viên",
+  "position": "Vị trí",
+  "round": "Vòng",
+  "hrReviewed": "HR duyệt",
+  "paginationLabel": "đánh giá",
+  "loadingDetail": "Đang tải chi tiết...",
+  "evaluationDetail": "Chi tiết đánh giá",
+  "aiVerdict": "AI Verdict",
+  "totalScore": "Điểm tổng",
+  "hrReview": "HR review",
+  "reviewed": "Đã duyệt",
+  "pending": "Chờ duyệt",
+  "criterionScores": "Điểm theo tiêu chí",
+  "reasoning": "Nhận định",
+  "questionAnalysis": "Phân tích từng câu hỏi",
+  "score": "Điểm",
+  "readOnlyNote": "Việc xác nhận / đổi kết quả (Override) do HR Leader thực hiện."
+}

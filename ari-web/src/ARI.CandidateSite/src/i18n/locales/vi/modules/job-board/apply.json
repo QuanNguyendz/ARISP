@@ -1,0 +1,99 @@
+{
+  "header": {
+    "back": "Quay lại",
+    "title": "Ứng tuyển"
+  },
+  "jobSummary": {
+    "label": "Bạn đang ứng tuyển vị trí",
+    "department": "Phòng ban",
+    "location": "Remote"
+  },
+  "loading": {
+    "error": "Không tải được thông tin tin tuyển dụng.",
+    "notFound": "Không tìm thấy tin tuyển dụng.",
+    "backToJobs": "Về danh sách việc làm"
+  },
+  "cv": {
+    "title": "CV ứng tuyển",
+    "helpText": "Mặc định dùng CV trong hồ sơ. Bạn có thể nộp CV khác cho riêng tin này.",
+    "profile": {
+      "label": "Dùng CV trong hồ sơ",
+      "noCv": "Hồ sơ chưa có CV",
+      "fallbackName": "CV hồ sơ",
+      "view": "Xem"
+    },
+    "upload": {
+      "label": "Tải CV khác cho tin này",
+      "hint": "PDF hoặc DOCX, tối đa {max}MB",
+      "chooseFile": "Chọn file CV",
+      "removeFile": "Bỏ file"
+    },
+    "errors": {
+      "invalidFormat": "Chỉ chấp nhận CV định dạng PDF hoặc DOCX.",
+      "tooLarge": "Kích thước CV tối đa {max}MB.",
+      "required": "Vui lòng đính kèm file CV (PDF/DOCX).",
+      "noProfileCv": "Hồ sơ chưa có CV — hãy tải CV lên cho tin này."
+    }
+  },
+  "contact": {
+    "title": "Thông tin liên hệ",
+    "fullName": "Họ và tên",
+    "fullNamePlaceholder": "Nguyễn Văn A",
+    "phone": "Số điện thoại",
+    "phonePlaceholder": "09xx xxx xxx",
+    "email": "Email",
+    "errors": {
+      "fullNameRequired": "Vui lòng nhập họ và tên.",
+      "phoneRequired": "Vui lòng nhập số điện thoại.",
+      "phoneInvalid": "Số điện thoại không hợp lệ (chỉ chứa 8–15 chữ số)."
+    }
+  },
+  "aiVerification": {
+    "title": "Xác thực thông tin",
+    "matchBadge": "Trùng khớp",
+    "mismatchBadge": "Phát hiện sai lệch",
+    "verifying": "Đang đối chiếu thông tin liên hệ của bạn với nội dung trong CV bằng AI...",
+    "error": "Không thể đối chiếu thông tin với CV bằng AI.",
+    "matchSuccess": "Họ tên và số điện thoại hoàn toàn trùng khớp với thông tin trong CV của bạn.",
+    "mismatchTitle": "Phát hiện sự khác biệt giữa thông tin biểu mẫu và nội dung CV của bạn:",
+    "mismatchNote": "* Lưu ý: Bạn vẫn có thể nộp hồ sơ, nhưng hãy chắc chắn thông tin liên hệ là chính xác để Nhà tuyển dụng có thể liên lạc với bạn.",
+    "pendingModal": {
+      "title": "AI đang xác thực thông tin...",
+      "description": "Hệ thống đang đối chiếu thông tin liên hệ bạn vừa nhập với nội dung trong CV bằng AI. Điều này giúp đảm bảo nhà tuyển dụng có thể liên hệ chính xác với bạn.",
+      "hint": "Quá trình đối chiếu thường mất từ 2-4 giây. Bạn có muốn đợi thêm hay nộp hồ sơ ngay?",
+      "continueWaiting": "Tiếp tục đợi",
+      "skipAndSubmit": "Nộp ngay (Bỏ qua)"
+    },
+    "mismatchModal": {
+      "title": "Cảnh báo: Sai lệch thông tin CV",
+      "description": "Phát hiện thông tin bạn nhập trên form khác với thông tin cá nhân trong CV:",
+      "hint": "Nếu thông tin không chính xác, nhà tuyển dụng có thể không liên lạc được với bạn. Bạn có muốn điều chỉnh lại không?",
+      "edit": "Chỉnh sửa lại",
+      "submitAnyway": "Vẫn nộp hồ sơ"
+    }
+  },
+  "coverLetter": {
+    "title": "Thư giới thiệu",
+    "question1": "1. Giới thiệu ngắn về kinh nghiệm, kỹ năng chính và vì sao bạn là ứng viên phù hợp?",
+    "optional": "(Không bắt buộc)",
+    "question1Placeholder": "Chia sẻ về kinh nghiệm, kỹ năng nổi bật và lý do bạn phù hợp với vị trí này…",
+    "question2": "2. Thời gian báo trước khi nghỉ việc (notice period) của bạn là bao lâu?",
+    "question2Placeholder": "VD: 30 ngày / 45 ngày / có thể bắt đầu ngay",
+    "errors": {
+      "noticePeriodRequired": "Vui lòng trả lời câu hỏi này."
+    }
+  },
+  "submit": {
+    "submitError": "Gửi hồ sơ thất bại. Vui lòng thử lại.",
+    "submitting": "Đang gửi hồ sơ…",
+    "submitApplication": "Gửi hồ sơ ứng tuyển",
+    "backToJob": "Quay lại tin tuyển dụng",
+    "footerHint": "Hồ sơ sẽ được gửi tới bộ phận nhân sự để xem xét."
+  },
+  "cancelModal": {
+    "title": "Huỷ ứng tuyển?",
+    "description": "Bạn có chắc chắn muốn quay lại? Thông tin đã nhập trong biểu mẫu sẽ không được lưu.",
+    "continue": "Tiếp tục điền",
+    "confirm": "Huỷ & quay lại"
+  }
+}
