@@ -144,6 +144,15 @@ jobs:
             echo "==> Up"
             $COMPOSE up -d --remove-orphans
 
+            # Nginx chỉ resolve hostname upstream MỘT LẦN lúc khởi động (proxy_pass
+            # với hostname tĩnh). Deploy tạo lại frontend-*/backend → container nhận
+            # IP mới trong bridge network, nhưng nginx không được tạo lại (image
+            # không đổi) nên vẫn gọi IP cũ → 502 "Host is unreachable".
+            # Restart để nginx resolve lại; ~1 giây, rẻ hơn nhiều so với đổi toàn bộ
+            # proxy_pass sang biến + resolver (thay đổi ngữ nghĩa rewrite URI).
+            echo "==> Restart nginx để resolve lại IP upstream"
+            $COMPOSE restart nginx
+
             echo "==> Dọn image cũ"
             docker image prune -f
 
