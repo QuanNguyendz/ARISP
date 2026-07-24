@@ -120,8 +120,16 @@ export default function RecruiterCandidateDetailPage() {
     }
   }
 
-  const roundLabel = (num: number, type?: string) =>
-    `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
+  const roundLabel = (num: number, type?: string) => {
+    if (!type) return t('round', { number: num })
+    const typeLabel =
+      type.toLowerCase() === 'technical'
+        ? t('technical')
+        : type.toLowerCase() === 'screening'
+          ? t('screening')
+          : type
+    return `${t('round', { number: num })} (${typeLabel})`
+  }
 
   const sessionTypeLabel = (type?: string) => (type === 'practice' ? t('practice') : t('real'))
 
