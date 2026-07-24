@@ -45,8 +45,10 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 - **Mở tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng route Portal (`/practice/:applicationId`) — **KHÔNG cần Interview Code, không cần magic link riêng**. Giới hạn **1 lượt / VÒNG**; cửa sổ dùng = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng — xem ADR-020/027
 - **Practice giống hệt buổi thật sắp tới của vòng:** cùng `round_type` (technical → technical, sơ loại/ngôn ngữ → sơ loại/ngôn ngữ) + cùng ngôn ngữ (chung `InterviewRoundConfig` theo `RoundNumber`)
 - RAG chỉ dùng JD + CV (không load Playbook nội bộ)
-- **Đầy đủ pipeline công nghệ như Real** (STT/RAG/GPT-4o/TTS/Avatar + Hybrid Idle). **Không quay video — chỉ lưu transcript** + Evaluation Report
-- Chi phí practice **do doanh nghiệp trả** (mỗi vòng = 1 lượt thử + 1 lượt thật). Tối ưu bằng gating theo phễu, không cắt tech — xem ADR-038
+- **Audio-only (ADR-048): KHÔNG avatar** — giữ đủ STT/RAG/GPT-4o + **giọng ElevenLabs** (phát qua WebAudio), bot tĩnh. Bỏ avatar để tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit. **Không quay video — chỉ lưu transcript** + Evaluation Report
+- **Trần 20 phút (ADR-048):** đồng hồ đếm ngược; hết giờ → khoá mic → AI nói 1 câu kết thúc → đóng phiên (`Interview:PracticeMaxDurationMinutes`)
+- **Nhập kép (ADR-048):** thu âm điền vào ô trả lời, ứng viên **sửa/gõ tay** được (mic on/off) trước khi Gửi — sửa đoạn thu âm nghe sai
+- Chi phí practice **do doanh nghiệp trả** (mỗi vòng = 1 lượt thử + 1 lượt thật). Tối ưu bằng gating theo phễu + bỏ avatar practice — xem ADR-038/048
 
 ### Real (Phỏng vấn thật – On-site)
 - Bắt buộc tại văn phòng công ty, đến đúng khung giờ đã đặt lịch (Availability Slot của vòng)
@@ -305,6 +307,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-045 | Refactor Clean Architecture chuẩn JT template: `ari-service/` (src/+tests/), namespace `ARI.*`, CQRS + MediatR **pin [12.5.0]** (v13 commercial), FluentValidation, thin controllers, DI per-project, schema 100% migrations. SessionHub gọi thẳng `IInterviewService` (không qua MediatR — latency ADR-006) |
 | ADR-046 | Refactor FE mirror ADR-045: `frontend/` → `ari-web/` (npm workspaces), tách **ARI.CandidateSite** (public, 3000) + **ARI.StaffSite** (nội bộ, 3001) + **ARI.Shared**. `services/`→`fservices/` (quy tắc "f"). Tách concern app/pages/fservices/components; import Shared qua `@ari/shared/*`. URL/API/DTO/localStorage/hub freeze. Nginx host-based 2 origin (localhost / staff.localhost); CORS thêm `Frontend:CandidateBaseUrl`. `configureApiClient` refresh riêng mỗi site (candidate = `/auth/candidate/refresh`) |
 | ADR-047 | CI/CD GitHub Actions: build 4 image ở runner → GHCR → VPS chỉ `pull && up -d` (không build trên VPS 3.8GB RAM). **`main` = production** (deploy tự động), `develop` = integration. `ci.yml` chặn PR không build được. Config prod hết drift nhờ tách `nginx/conf.d.prod/`; `ports: !reset []` (không phải `ports: []`) mới thực sự đóng cổng. `VITE_API_BASE_URL=/api` tương đối → 1 image dùng mọi domain. 2 origin: `arisp.io.vn` + `staff.arisp.io.vn` |
+| ADR-048 | Practice **audio-only** (bỏ avatar — tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit; giữ đủ STT/RAG/GPT-4o/ElevenLabs qua WebAudio). **Trần 20 phút** (`Interview:PracticeMaxDurationMinutes`) → hết giờ khoá mic + AI câu kết + đóng phiên (2 lớp enforce: FE `NotifyTimeout` + server `forceClosing` theo elapsed; `CloseWithFarewellAsync`/`EndSessionAsync` idempotent). **Nhập kép** voice+keyboard: transcript vào 1 `answerText` sửa/gõ tay được. Real vẫn có avatar. Huỷ ghi âm+xoá 7 ngày (giữ ADR-038 đ.6). SỬA ADR-038 đ.3-4, HIỆN THỰC đ.5 |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 
@@ -322,7 +325,7 @@ _Chưa có task nào đang thực hiện._
 | Magic Link | Link xác thực email không cần mật khẩu, TTL 15 phút, one-time-use |
 | Playbook | Tài liệu phỏng vấn nội bộ doanh nghiệp (style, question bank, rubric...) đưa vào RAG |
 | RAG | Retrieval-Augmented Generation – retrieve chunks từ JD/CV/Playbook trước khi generate câu hỏi |
-| Practice Session | Phỏng vấn thử 1 lượt / vòng (mở sau khi đặt lịch buổi thật của vòng, vào qua Portal không cần code), JD+CV only, không ảnh hưởng verdict |
+| Practice Session | Phỏng vấn thử 1 lượt / vòng (mở sau khi đặt lịch buổi thật của vòng, vào qua Portal không cần code), JD+CV only, không ảnh hưởng verdict. **Audio-only (không avatar), trần 20 phút, nhập kép voice/keyboard** — ADR-048 |
 | Real Session | Phỏng vấn thật On-site, full RAG, kết quả ảnh hưởng tuyển dụng |
 | Match Score | Điểm phù hợp CV-JD (0–100) do Gemini chấm – chỉ tham khảo |
 | Must-ask | Câu hỏi bắt buộc phải hỏi trước khi kết thúc session (định nghĩa trong Playbook) |

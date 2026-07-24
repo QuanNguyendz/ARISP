@@ -24,6 +24,7 @@ namespace ARI.Application.Interfaces
         Task<Result<Answer>> SaveAnswerAsync(Guid sessionId, Guid questionId, string transcript, int? responseTimeMs, CancellationToken ct = default);
         Task AnalyzeAnswerAndAdaptAsync(Guid sessionId, Guid questionId, string transcript, CancellationToken ct = default);
         Task<Result<bool>> EndSessionAsync(Guid sessionId, string status = "completed", CancellationToken ct = default);
+        Task<Result<bool>> PracticeTimeoutCloseAsync(Guid sessionId, CancellationToken ct = default);
         Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default);
     }
 }

@@ -25,6 +25,13 @@ namespace ARI.Application.DTOs
         public Guid SessionId { get; set; }
         public string Language { get; set; } = "vi";
         public string SessionType { get; set; } = "practice";
+
+        /// <summary>Trần thời lượng phiên (giây) để FE vẽ đếm ngược; 0 = không giới hạn (ADR-048).</summary>
+        public int MaxDurationSeconds { get; set; }
+
+        /// <summary>Mốc bắt đầu phiên (UTC) để FE tính thời gian còn lại khớp giờ server.</summary>
+        public DateTimeOffset? StartedAtUtc { get; set; }
+
         public DeepgramConfigDto? Deepgram { get; set; }
         public HeyGenConfigDto? HeyGen { get; set; }
     }

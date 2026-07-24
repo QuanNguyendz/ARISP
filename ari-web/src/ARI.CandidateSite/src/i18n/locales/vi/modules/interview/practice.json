@@ -7,7 +7,8 @@
       "jdBased": "AI hỏi dựa trên JD của vị trí và CV của bạn.",
       "sameAsReal": "Cùng dạng vòng & ngôn ngữ với buổi thật sắp tới.",
       "noRecording": "Không ghi hình — chỉ lưu transcript & nhận xét tham khảo.",
-      "voiceAnswer": "Trả lời bằng giọng nói như phỏng vấn thật."
+      "voiceAnswer": "Trả lời bằng giọng nói hoặc gõ phím — sửa lại được nếu thu âm nghe sai.",
+      "timeLimit": "Buổi thử giới hạn 20 phút; hết giờ AI sẽ kết thúc."
     },
     "deviceCheck": {
       "title": "Kiểm tra camera & micro",
@@ -23,7 +24,16 @@
       "error": "Lỗi",
       "aiSpeaking": "AI đang nói…",
       "listening": "Đang nghe câu trả lời của bạn…",
-      "ready": "Sẵn sàng — hãy trả lời khi AI hỏi xong."
+      "ready": "Sẵn sàng — hãy trả lời khi AI hỏi xong.",
+      "timeUp": "Hết giờ — AI đang kết thúc buổi phỏng vấn…"
+    },
+    "timer": {
+      "label": "Thời gian còn lại"
+    },
+    "answer": {
+      "placeholderVoice": "Nói để điền tự động, hoặc gõ trực tiếp tại đây…",
+      "placeholderType": "Mic đang tắt — gõ câu trả lời của bạn tại đây…",
+      "editHint": "Có thể sửa lại nội dung trước khi bấm Gửi."
     },
     "transcript": {
       "title": "Transcript",

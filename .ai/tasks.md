@@ -305,6 +305,14 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-24: **Nâng cấp Phỏng vấn thử (Practice) — audio-only + trần 20 phút + nhập kép (ADR-048).**
+  - **Audio-only (bỏ avatar):** `GetMediaConfigAsync` không mint avatar token khi `SessionType=="practice"` (cờ `Interview:PracticeUseAvatar=false`) → `heyGen=null` → FE phát giọng ElevenLabs qua WebAudio + bot tĩnh, giữ đủ STT/RAG/GPT-4o. Lý do: tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán. Real vẫn có avatar.
+  - **Trần 20 phút** (`Interview:PracticeMaxDurationMinutes`): media-config trả `MaxDurationSeconds` → FE đếm ngược (giờ máy). Hết giờ → khoá mic (`stopMic`) → `NotifyTimeout` (SignalR) → AI nói câu kết → đóng phiên. 2 lớp enforce: FE trigger (im lặng) + server `forceClosing` khi `elapsed≥cap` (nói quá giờ). Tách `CloseWithFarewellAsync` (idempotent) từ khối closing inline; `EndSessionAsync` guard `Status=="completed"` chống race double-end.
+  - **Nhập kép (voice+keyboard):** transcript Deepgram append vào 1 nguồn `answerText` trong `<textarea>` sửa/gõ tay được; nút Mic on/off (tắt = gõ tự do, gate gửi audio + append theo `micEnabledRef`); `submitAnswer` đọc `answerText`. Đúng "nhập tay" ADR-044 hứa nhưng chưa build.
+  - **Bỏ** (user chốt giữa chừng): ghi âm practice → R2 + tự xoá 7 ngày → giữ nguyên ADR-038 điểm 6.
+  - **Khuyến nghị gói LiveAvatar** (ghi lại, chưa mua): giữ sandbox/Free giờ; khi real chạy thật → Essential $99 (nếu Hybrid Idle + vòng ≤20') hoặc Business $475. Free/Starter loại vì có watermark.
+  - File: BE `InterviewService.cs`, `InterviewOptions.cs`, `InterviewDTOs.cs`, `SessionHub.cs`, `IInterviewService.cs`, `appsettings.json`, `docker/.env.example`; FE `usePracticeSession.ts`, `PracticeSessionPage.tsx`, `interviewService.ts`, i18n `practice.json` (vi/en). Backend build+14 test xanh; FE 2 site build xanh. ADR-048 + ADR-038 note + CLAUDE.md + docs/practice-interview-setup.md.
+
 - [x] 2026-07-22: **Fix `502` staff site sau deploy tự động — nginx cache IP upstream.** Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
 
 - [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**
