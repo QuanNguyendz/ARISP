@@ -402,17 +402,20 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr]">
-        {/* Section nav */}
-        <aside className="self-start sticky top-20 lg:top-24">
-          <nav className="rounded-2xl border border-ink-200 bg-white p-2 text-sm shadow-card">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
+        {/* Section nav — horizontal scroll trên mobile, sticky aside từ lg */}
+        <aside className="lg:self-start lg:sticky lg:top-24">
+          <nav
+            aria-label="Profile sections"
+            className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
+          >
             {SECTIONS.map((s) => {
               const Icon = s.icon
               return (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"
+                  className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-sm text-ink-600 hover:bg-ink-50 lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5 lg:text-sm lg:hover:bg-ink-100"
                 >
                   <Icon className="h-4 w-4 text-ink-400" /> {s.label}
                 </a>
@@ -986,14 +989,17 @@ function ProfileSkeleton() {
         <Skeleton className="h-4 w-48" />
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
         {/* Section nav + completeness */}
         <aside className="space-y-4 self-start">
-          <div className="rounded-2xl border border-ink-200 bg-white p-2 shadow-card">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+              <div
+                key={i}
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3.5 py-1.5 lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5"
+              >
                 <Skeleton className="h-4 w-4 rounded" />
-                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
               </div>
             ))}
           </div>

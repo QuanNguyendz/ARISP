@@ -17,14 +17,14 @@
 ### Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (~12 giờ)
 
 > **Mục tiêu:** Fix responsive cho các sidebar cố định không collapse trên mobile. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm A.
-> **PR đề xuất:** 1 PR `feature/fe/fix-responsive` → `develop`.
+> **Trạng thái:** 2026-07-24 ✅ HOÀN THÀNH (1 commit, 6 file). Sang Nhóm B.
 
-- [ ] `pages/recruiter/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình)
-- [ ] `pages/super-admin/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình)
-- [ ] `pages/hr/SettingsPage.tsx` — Sidebar `lg:w-64` (settings ít dùng) (Trung bình / Thấp)
-- [ ] `pages/candidate/ProfilePage.tsx` — Section nav sidebar không collapse (Khó / Trung bình)
-- [ ] `pages/candidate/ApplicationDetailPage.tsx` — Round buttons sidebar không collapse (Trung bình / Trung bình)
-- [ ] `pages/candidate/InterviewRoomPage.tsx` — Transcript panel không collapse → floating drawer (Khó / Cao — phải test với WebRTC)
+- [x] `pages/recruiter/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình) ✅
+- [x] `pages/super-admin/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình) ✅
+- [x] `pages/hr/SettingsPage.tsx` — Sidebar `lg:w-64` (settings ít dùng) (Trung bình / Thấp) ✅
+- [x] `pages/candidate/ProfilePage.tsx` — Section nav sidebar không collapse (Khó / Trung bình) ✅
+- [x] `pages/candidate/ApplicationDetailPage.tsx` — Round buttons sidebar không collapse (Trung bình / Trung bình) ✅
+- [x] `pages/candidate/InterviewRoomPage.tsx` — Transcript panel không collapse → floating drawer (Khó / Cao — phải test với WebRTC) ✅
 
 ---
 
@@ -315,7 +315,20 @@
 
 ## Completed
 
-- [x] 2026-07-24: **Phase 1 (FE Responsive) – P0 + P1 — 16 commit responsive fix (`feature/fe/fix-responsive`).** Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai:
+- [x] 2026-07-24: **Phase 1 (FE Responsive) – P0 + P1 — 16 commit responsive fix (`feature/fe/fix-responsive`).** Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai: `SchedulePage` (Candidate P0), `HrDashboardPage`, `HrEvaluationReviewPage`, `HrJobPostingDetailPage`, `RecruiterJobDetailPage`, `ApplicationsPage`, `FindJobPage`, `HomePage`, `InterviewSchedulePage`, `ApplicationDetailPage`, `CandidateJobDetailPage`, `ProfilePage`, `ApplyPage`, `HrCandidatesPage`, `HrCandidateDetailPage`, `RecruiterCreateJobPostingPage`, `RecruiterMyJobsPage`. JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr). Tổng 17 commit, 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
+
+- [x] 2026-07-24: **Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (6 file, 1 commit).** Hoàn tất Phase 2 Nhóm A theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 6 file sidebar cố định `lg:w-64` / `lg:grid-cols-[...]` không collapse trên mobile đã chuyển sang **horizontal scroll pills dưới lg, sidebar dọc từ lg**:
+  - `ARI.StaffSite/src/pages/recruiter/SettingsPage.tsx` — dark theme (amber-500). Tabs dọc 256px → horizontal scroll.
+  - `ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` — ink/brand theme. Tabs 256px → horizontal scroll.
+  - `ARI.StaffSite/src/pages/hr/SettingsPage.tsx` — ink/brand theme. Tabs 256px → horizontal scroll.
+  - `ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` — aside 240px (sticky `top-24`) → horizontal scroll pills dưới lg. Skeleton tương ứng cũng fix.
+  - `ARI.CandidateSite/src/pages/candidate/ApplicationDetailPage.tsx` — sidebar 320px chứa upcoming interview + round list → horizontal scroll ngang dưới lg, dọc từ lg. Skeleton tương ứng.
+  - `ARI.CandidateSite/src/pages/interview/InterviewRoomPage.tsx` — mock page. Avatar `h-44 w-44` → responsive `h-28 w-28 sm:h-36 sm:w-36 lg:h-44 lg:w-44`. Transcript aside 380px → **floating drawer** trên mobile (toggle bằng Captions button + backdrop + X close), inline từ lg. Controls footer padding `px-6` → `px-3 sm:px-6` + button size `h-12 w-12` → `h-10 w-10 sm:h-12 sm:w-12`.
+  - **Pattern dùng chung:** thẻ `<nav>` với `flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:bg-white lg:p-2 lg:shadow-card` — pills ngang mobile, column dọc từ lg. Tránh drawer collapse UX không quen.
+  - **Typecheck:** `npx tsc --noEmit` chỉ trên 6 file Phase 2 = pass. (Lỗi JSX trong `recruiter/JobDetailPage.tsx` là pre-existing, đã có trong HEAD, xử lý ở task riêng ngoài Phase 2.)
+  - **Lint:** 0 lỗi trên 6 file.
+  - **Còn lại Phase 2:** Nhóm B Form (5 file), Nhóm C Table (3 file), Nhóm D Layout phức tạp (CandidateJobDetailPage, ScrollStorytelling), Nhóm E Chart & Modal nhỏ (2 file).
+ Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai:
   - `SchedulePage` (Candidate) — modal `max-w-2xl` thiếu `w-[90%]` (P0)
   - `HrDashboardPage` — `p-6` → `p-4 sm:p-6 lg:p-8` + priority cards grid (P1)
   - `HrEvaluationReviewPage` — `xl:grid-cols-[1fr_360px]` → `lg:` + score `text-5xl` → `text-4xl sm:text-5xl` (P1)

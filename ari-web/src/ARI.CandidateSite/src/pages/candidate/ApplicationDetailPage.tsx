@@ -440,11 +440,17 @@ function RoundButton({
 
 function DetailSkeleton() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
       <div className="space-y-5">
         <Skeleton className="h-40 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
+        <div className="hidden space-y-2 lg:block">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+        </div>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 lg:hidden">
+          <Skeleton className="h-24 w-64 shrink-0 rounded-2xl" />
+          <Skeleton className="h-24 w-64 shrink-0 rounded-2xl" />
+        </div>
       </div>
       <div className="space-y-6">
         <Skeleton className="h-64 w-full rounded-2xl" />
@@ -519,7 +525,7 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       ) : !detail ? null : (
-        <main className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr]">
+        <main className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
           <div className="space-y-5">
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
@@ -560,26 +566,41 @@ export default function ApplicationDetailPage() {
               </div>
             )}
 
+            {/* Round list — dọc từ lg, horizontal scroll dưới lg */}
             <div>
               <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
                 {t('roundList.title')}
               </div>
               {detail.sessions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center text-sm text-ink-500 shadow-card">
+                <div className="hidden rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center text-sm text-ink-500 shadow-card lg:block">
                   {t('roundList.empty')}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {detail.sessions.map((s) => (
-                    <RoundButton
-                      key={s.id}
-                      s={s}
-                      active={s.id === selectedId}
-                      onClick={() => setSelectedId(s.id)}
-                      t={t}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:hidden">
+                    {detail.sessions.map((s) => (
+                      <div key={`m-${s.id}`} className="w-64 shrink-0">
+                        <RoundButton
+                          s={s}
+                          active={s.id === selectedId}
+                          onClick={() => setSelectedId(s.id)}
+                          t={t}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden space-y-2 lg:block">
+                    {detail.sessions.map((s) => (
+                      <RoundButton
+                        key={s.id}
+                        s={s}
+                        active={s.id === selectedId}
+                        onClick={() => setSelectedId(s.id)}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
