@@ -364,29 +364,29 @@ export default function JobDetailPage() {
       <CandidateHeader />
 
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('jobDetail.breadcrumb')}
           </Link>
           <ChevronRight className="w-4 h-4" />
-          <span className="text-ink-600 font-medium">{job.title}</span>
+          <span className="text-ink-600 font-medium truncate max-w-[180px] sm:max-w-none">{job.title}</span>
         </div>
       </div>
 
-      <main className="mx-auto max-w-6xl px-6 py-6 grid gap-8 lg:grid-cols-[1fr_360px]">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 grid gap-8 lg:grid-cols-[1fr_360px]">
         {/* Left: content */}
         <div className="space-y-6">
           {/* Header card */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
-            <div className="flex items-start gap-4">
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
+            <div className="flex items-start gap-3 sm:gap-4">
               <div
-                className={`grid h-16 w-16 shrink-0 place-items-center rounded-2xl ${getIconBg(job.department)}`}
+                className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl sm:h-16 sm:w-16 ${getIconBg(job.department)}`}
               >
                 {getJobIcon(job.department)}
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="font-display text-2xl font-extrabold leading-snug">{job.title}</h1>
+                <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-snug">{job.title}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
                   <span className="inline-flex items-center gap-1.5">
                     <Users className="w-4 h-4" />{' '}
@@ -546,7 +546,7 @@ export default function JobDetailPage() {
                 {match.analysis ? (
                   <>
                     <div className="mt-4 flex items-end gap-2">
-                      <div className="font-display text-5xl font-extrabold text-ai-700 leading-none">
+                      <div className="font-display text-4xl sm:text-5xl font-extrabold text-ai-700 leading-none">
                         {match.analysis.matchScore}
                       </div>
                       <div className="pb-1 text-sm text-ink-500">
