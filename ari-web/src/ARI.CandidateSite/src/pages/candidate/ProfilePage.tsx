@@ -379,7 +379,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-10">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4" /> {error || t('profile.saveFailed')}
         </div>
@@ -392,7 +392,7 @@ export default function ProfilePage() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/" className="hover:text-brand-600">
             {t('profile.home')}
@@ -402,9 +402,9 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr]">
         {/* Section nav */}
-        <aside className="self-start lg:sticky lg:top-24">
+        <aside className="self-start sticky top-20 lg:top-24">
           <nav className="rounded-2xl border border-ink-200 bg-white p-2 text-sm shadow-card">
             {SECTIONS.map((s) => {
               const Icon = s.icon
@@ -450,14 +450,14 @@ export default function ProfilePage() {
             className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card scroll-mt-24"
           >
             <div className="h-24 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
-            <div className="px-6 pb-2">
+            <div className="px-4 sm:px-6 pb-2">
               <div className="-mt-10">
-                <span className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900">
+                <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
                   {initials}
                 </span>
               </div>
               <div className="mt-3">
-                <h1 className="font-display text-2xl font-extrabold leading-tight">
+                <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-tight">
                   {profile.fullName || t('profile.candidate')}
                 </h1>
                 <p className="text-sm text-ink-500">
@@ -683,7 +683,7 @@ export default function ProfilePage() {
               ))}
               <div className="inline-flex items-center gap-1 rounded-lg border border-dashed border-ink-300 px-2 py-1">
                 <input
-                  className="w-28 bg-transparent px-1 text-sm outline-none placeholder:text-ink-400"
+                  className="w-20 sm:w-28 bg-transparent px-1 text-sm outline-none placeholder:text-ink-400"
                   placeholder={t('profile.skillPlaceholder')}
                   value={skillInput}
                   onChange={(e) => setSkillInput(e.target.value)}
@@ -982,11 +982,11 @@ function ProfileSkeleton() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <Skeleton className="h-4 w-48" />
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr]">
         {/* Section nav + completeness */}
         <aside className="space-y-4 self-start">
           <div className="rounded-2xl border border-ink-200 bg-white p-2 shadow-card">
@@ -1012,8 +1012,8 @@ function ProfileSkeleton() {
           {/* Personal card with banner */}
           <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
             <Skeleton className="h-24 rounded-none" />
-            <div className="px-6 pb-2">
-              <Skeleton className="-mt-10 h-20 w-20 rounded-2xl ring-4 ring-white dark:ring-ink-900" />
+            <div className="px-4 sm:px-6 pb-2">
+              <Skeleton className="-mt-10 h-16 w-16 rounded-2xl ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20" />
               <div className="mt-3 space-y-2">
                 <Skeleton className="h-6 w-48" />
                 <Skeleton className="h-4 w-36" />
