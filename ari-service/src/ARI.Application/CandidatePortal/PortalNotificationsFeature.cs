@@ -88,7 +88,7 @@ namespace ARI.Application.CandidatePortal
             // 1. Đã nộp hồ sơ
             foreach (var a in apps)
                 Add($"applied:{a.Id}", "applied", "Đã nộp hồ sơ ứng tuyển",
-                    JobTitle(a.JobPostingId), "/candidate/applications", a.CreatedAt);
+                    JobTitle(a.JobPostingId), $"/candidate/applications/{a.Id}", a.CreatedAt);
 
             // 2. Lời mời phỏng vấn (mã On-site còn hiệu lực)
             var codes = (await _unitOfWork.Repository<InterviewCode>()
@@ -98,7 +98,7 @@ namespace ARI.Application.CandidatePortal
                 var app = apps.FirstOrDefault(a => a.Id == c.ApplicationId);
                 Add($"invite:{c.Id}", "invite", $"Lời mời phỏng vấn vòng {c.RoundNumber}",
                     $"{(app != null ? JobTitle(app.JobPostingId) : "")} · On-site — mã phỏng vấn đã sẵn sàng tại Hồ sơ ứng tuyển.",
-                    "/candidate/applications", c.CreatedAt);
+                    app != null ? $"/candidate/applications/{app.Id}" : "/candidate/applications", c.CreatedAt);
             }
 
             // 3. Kết quả vòng đã được HR chia sẻ
@@ -138,7 +138,7 @@ namespace ARI.Application.CandidatePortal
                 var app = apps.FirstOrDefault(a => a.Id == b.ApplicationId);
                 Add($"schedule:{b.Id}", "schedule", $"Lịch phỏng vấn vòng {b.RoundNumber} sắp tới",
                     $"{(app != null ? JobTitle(app.JobPostingId) : "")} · {slot.StartTime:dd/MM HH:mm}",
-                    "/candidate/applications", b.CreatedAt);
+                    $"/candidate/applications/{b.ApplicationId}", b.CreatedAt);
             }
 
             if (toAdd.Count > 0)

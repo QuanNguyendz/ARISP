@@ -40,6 +40,12 @@ namespace ARI.Application.Jobs.Queries.GetJobById
             var roundDtos = rounds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();
             var jobResponse = JobPostingResponse.FromEntity(job, roundDtos);
 
+            var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+            if (creator != null)
+            {
+                jobResponse.CreatedByName = string.IsNullOrWhiteSpace(creator.FullName) ? creator.Email : creator.FullName;
+            }
+
             // Staff: resolve storageKey của file JD -> URL dùng được (để xem/tải file JD gốc + bản đã đóng dấu)
             if (request.IsStaff)
             {

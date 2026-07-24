@@ -81,6 +81,7 @@ namespace ARI.Application.DTOs
     {
         public Guid Id { get; set; }
         public Guid CreatedByUserId { get; set; }
+        public string? CreatedByName { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
