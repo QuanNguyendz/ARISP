@@ -150,7 +150,7 @@ function ReportPanel({
               {isPass ? t('badge.pass') : t('badge.notPass')}
             </div>
             {score !== null && (
-              <div className="mt-2 font-display text-4xl font-extrabold text-ink-900">
+              <div className="mt-2 font-display text-3xl sm:text-4xl font-extrabold text-ink-900">
                 {score}
                 <span className="text-lg text-ink-400">/100</span>
               </div>
@@ -440,7 +440,7 @@ function RoundButton({
 
 function DetailSkeleton() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr]">
       <div className="space-y-5">
         <Skeleton className="h-40 w-full rounded-2xl" />
         <Skeleton className="h-24 w-full rounded-2xl" />
@@ -496,7 +496,7 @@ export default function ApplicationDetailPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('breadcrumb.home')}
@@ -513,13 +513,13 @@ export default function ApplicationDetailPage() {
       {loading ? (
         <DetailSkeleton />
       ) : error ? (
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6">
           <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <XCircle className="h-4 w-4" /> {error}
           </div>
         </div>
       ) : !detail ? null : (
-        <main className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
+        <main className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-5">
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
