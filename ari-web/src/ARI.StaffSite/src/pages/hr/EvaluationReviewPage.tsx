@@ -322,7 +322,7 @@ export default function EvaluationReviewPage() {
         </button>
       </header>
 
-      <main className="p-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+      <main className="p-4 sm:p-6 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT: report */}
         <div className="space-y-6">
           {/* Candidate header */}
@@ -497,7 +497,7 @@ export default function EvaluationReviewPage() {
                 t('verdict.notPass')
               )}
             </div>
-            <div className="mt-4 font-display text-5xl font-extrabold leading-none">
+            <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none">
               {selectedEvaluation.overallScore ?? 0}
               <span className="text-lg text-ink-400">/100</span>
             </div>
