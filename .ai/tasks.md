@@ -7,14 +7,24 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-07-18
+**Phase:** Phase 2 (FE Responsive) – Nhóm A Sidebar & Settings (~12 giờ, 6 file)  
+**Last updated:** 2026-07-24
 
 ---
 
 ## Đang làm (In Progress)
 
-_Chưa có task nào đang thực hiện._
+### Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (~12 giờ)
+
+> **Mục tiêu:** Fix responsive cho các sidebar cố định không collapse trên mobile. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm A.
+> **PR đề xuất:** 1 PR `feature/fe/fix-responsive` → `develop`.
+
+- [ ] `pages/recruiter/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình)
+- [ ] `pages/super-admin/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình)
+- [ ] `pages/hr/SettingsPage.tsx` — Sidebar `lg:w-64` (settings ít dùng) (Trung bình / Thấp)
+- [ ] `pages/candidate/ProfilePage.tsx` — Section nav sidebar không collapse (Khó / Trung bình)
+- [ ] `pages/candidate/ApplicationDetailPage.tsx` — Round buttons sidebar không collapse (Trung bình / Trung bình)
+- [ ] `pages/candidate/InterviewRoomPage.tsx` — Transcript panel không collapse → floating drawer (Khó / Cao — phải test với WebRTC)
 
 ---
 
@@ -305,7 +315,27 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
-- [x] 2026-07-22: **Fix `502` staff site sau deploy tự động — nginx cache IP upstream.** Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
+- [x] 2026-07-24: **Phase 1 (FE Responsive) – P0 + P1 — 16 commit responsive fix (`feature/fe/fix-responsive`).** Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai:
+  - `SchedulePage` (Candidate) — modal `max-w-2xl` thiếu `w-[90%]` (P0)
+  - `HrDashboardPage` — `p-6` → `p-4 sm:p-6 lg:p-8` + priority cards grid (P1)
+  - `HrEvaluationReviewPage` — `xl:grid-cols-[1fr_360px]` → `lg:` + score `text-5xl` → `text-4xl sm:text-5xl` (P1)
+  - `HrJobPostingDetailPage` — Application table wrapper + `w-36` actions + cover letter modal grid (P1)
+  - `RecruiterJobDetailPage` — Application table wrapper + `w-36` actions + cover letter modal grid (P1)
+  - `ApplicationsPage` (Candidate) — Main grid collapse + sidebar ẩn mobile (P1)
+  - `FindJobPage` — Work modes grid + FilterSidebar mobile drawer (P1)
+  - `HomePage` — InterviewKioskSection input+button wrap dọc trên mobile (P1)
+  - `InterviewSchedulePage` (Candidate) — Refactor toàn page từ dark-glass → design system ink/brand/ai (P1)
+  - `ApplicationDetailPage` — Round sidebar + score font responsive (P2)
+  - `CandidateJobDetailPage` — Layout + match score responsive (P2)
+  - `ProfilePage` — Padding + avatar responsive (P2)
+  - `ApplyPage` — Contact grid mobile fallback (P2)
+  - `HrCandidatesPage` — Page padding responsive (P2)
+  - `HrCandidateDetailPage` — Padding + avatar + code responsive (P2)
+  - `RecruiterCreateJobPostingPage` — Grids + padding responsive (P2)
+  - `RecruiterMyJobsPage` — Page padding responsive (P2)
+  - JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr) — 2 file sửa cùng đợt.
+  - **Tổng:** 16 commit + 1 fix JSX (17 commit), 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
+ Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
 
 - [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**
   - **Hotfix `arisp-rag` (đã áp dụng thẳng lên VPS):** container crash-loop **6928 lần**. `docker/.env` chỉ có biến .NET (`ConnectionStrings__DefaultConnection`), trong khi rag-service Python đọc `DATABASE_*` riêng (`app/config.py:19`) → fallback về localhost → `ConnectionRefusedError` khi startup. Thêm `DATABASE_HOST/PORT/NAME/USER/PASSWORD/SSLMODE` (dùng tham số rời thay `DATABASE_URL` vì password chứa `?`, đúng ý `core/db.py:46`). Phát hiện thêm cùng lớp lỗi: thiếu `OPENAI_API_KEY` → service chạy **mock mode sinh câu hỏi giả mà vẫn trả HTTP 200**; thêm `OPENAI_API_KEY` + `APP_ENV=production`. Kết quả: `{"status":"ok","env":"production","mock_mode":false,"db":true}`, RestartCount=0.
