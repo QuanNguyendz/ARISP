@@ -274,9 +274,17 @@ export default function JobPostingDetailPage() {
       .sort((a, b) => a.roundNumber - b.roundNumber)
       .map((rc) => {
         const candidates = apps.filter((a) => a.currentRound === rc.roundNumber)
+        const roundTypeStr = rc.roundType
+          ? rc.roundType.toLowerCase() === 'screening'
+            ? t('rounds.types.screening')
+            : rc.roundType.toLowerCase() === 'technical'
+              ? t('rounds.types.technical')
+              : rc.roundType
+          : ''
+        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
           id: `round_${rc.roundNumber}`,
-          title: t('rounds.round', { number: rc.roundNumber }),
+          title: `${t('rounds.round', { number: rc.roundNumber })}${typeText}`,
           subtitle:
             rc.roundType === 'technical'
               ? t('rounds.types.technical')

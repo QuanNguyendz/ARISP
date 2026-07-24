@@ -59,9 +59,9 @@ function getDeadlineText(
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (${t('deadline.expired')})`
-  if (diffDays === 0) return `${formattedDate} (${t('deadline.today')})`
-  return `${formattedDate} (${t('deadline.days', { count: diffDays })})`
+  if (diffDays < 0) return `${formattedDate} (${t('deadlineExpired')})`
+  if (diffDays === 0) return `${formattedDate} (${t('deadlineToday')})`
+  return `${formattedDate} (${t('deadlineDays', { days: diffDays })})`
 }
 
 function toLocalDateStr(d: string | Date | number | undefined | null): string {
@@ -172,9 +172,17 @@ export default function RecruiterJobDetailPage() {
       .sort((a, b) => a.roundNumber - b.roundNumber)
       .map((rc) => {
         const count = apps.filter((a) => a.currentRound === rc.roundNumber).length
+        const roundTypeStr = rc.roundType
+          ? rc.roundType.toLowerCase() === 'screening'
+            ? t('roundScreening')
+            : rc.roundType.toLowerCase() === 'technical'
+              ? t('roundTechnical')
+              : rc.roundType
+          : ''
+        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
           id: `round_${rc.roundNumber}`,
-          label: `${t('tabs.round')} ${rc.roundNumber}`,
+          label: `${t('tabs.round')} ${rc.roundNumber}${typeText}`,
           count,
         }
       })
@@ -380,14 +388,14 @@ export default function RecruiterJobDetailPage() {
       await jobService.updateJobStatus(id, status)
       setNotice(
         status === 'pending'
-          ? t('messages.jobSubmittedForApproval')
+          ? t('jobSubmittedForApproval')
           : status === 'closed'
-            ? t('messages.jobClosed')
-            : t('messages.statusUpdated')
+            ? t('jobClosed')
+            : t('statusUpdated')
       )
       await load()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('messages.statusError'))
+      setMutationError(e?.response?.data?.message || t('statusError'))
     } finally {
       setBusy(false)
     }
@@ -583,7 +591,7 @@ export default function RecruiterJobDetailPage() {
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <b>{t('hrRejected')}:</b> {job.rejectionReason}. {t('hrRejectedHint', { reason: '' })}
+              <b>{t('hrRejected')}:</b> {t('hrRejectedHint', { reason: job.rejectionReason })}
             </span>
           </div>
         )}
