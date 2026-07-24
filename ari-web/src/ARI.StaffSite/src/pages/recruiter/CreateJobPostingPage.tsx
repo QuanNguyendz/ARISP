@@ -222,7 +222,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <button onClick={() => navigate(-1)} className="mb-3 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white">
           <ArrowLeft className="h-4 w-4" /> {t('back')}
@@ -282,7 +282,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="grid max-w-5xl gap-6 lg:grid-cols-3">
+      <form onSubmit={handleSubmit} className="grid max-w-5xl gap-6 grid-cols-1 lg:grid-cols-3">
         {/* Left */}
         <div className="space-y-6 lg:col-span-2">
           <div className={`${card} space-y-5`}>
@@ -293,7 +293,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('form.jobTitlePlaceholder')} className={input} required />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className={label}>{t('form.department')}</label>
                 <input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder={t('form.departmentPlaceholder')} className={input} />
@@ -367,7 +367,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           <div className={`${card} space-y-5`}>
             <h2 className="border-b border-ink-100 dark:border-white/10 pb-2 text-base font-semibold text-ink-900 dark:text-white">{t('form.compensationLocation')}</h2>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className={label}>{t('form.employmentType')}</label>
                 <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className={input}>
@@ -425,7 +425,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 </label>
               </div>
               {!salaryIsNegotiable && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMin')} className={input} />
                   <input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMax')} className={input} />
                   <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)} className={input}>
@@ -470,7 +470,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                         <option value="technical">{t('form.technical')}</option>
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.language')}</label>
                         <select value={round.interviewLanguage} onChange={(e) => changeRound(idx, 'interviewLanguage', e.target.value)} className={`${input} py-2`}>
