@@ -552,20 +552,20 @@ export default function JobPostingDetailPage() {
         </button>
 
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-          <div className="flex items-start gap-6">
-            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-2xl font-bold text-white">
+          <div className="flex items-start gap-4 sm:gap-6">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-xl sm:text-2xl font-bold text-white">
               {job.title.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-semibold text-ink-900 dark:text-white">{job.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <h1 className="text-2xl sm:text-3xl font-semibold text-ink-900 dark:text-white">{job.title}</h1>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(job.status)}`}
                 >
                   {getStatusLabel(job.status)}
                 </span>
               </div>
-              <p className="text-xl text-ink-600 dark:text-ink-400 mb-4">
+              <p className="text-base sm:text-xl text-ink-600 dark:text-ink-400 mb-4 sm:mb-4">
                 {job.department || t('department')}
               </p>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600 dark:text-ink-400">
@@ -594,7 +594,7 @@ export default function JobPostingDetailPage() {
           <button
             type="button"
             onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
-            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center gap-2 px-3 py-2 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
           >
             <Edit2 className="w-4 h-4" /> {t('edit')}
           </button>
@@ -1151,7 +1151,7 @@ export default function JobPostingDetailPage() {
                           </span>
                         </div>
                         <div className="flex items-center justify-center gap-1 shrink-0">
-                          <div className="w-36 flex gap-2 shrink-0 justify-center">
+                          <div className="flex w-auto min-w-[8rem] max-w-full gap-2 shrink-0 justify-center">
                             {!a.currentRound || a.currentRound === 0 ? (
                               <>
                                 <button
@@ -1370,7 +1370,7 @@ export default function JobPostingDetailPage() {
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
                   {t('coverLetterModal.contactInfo')}
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                   <div>
                     <span className="text-ink-400 block mb-0.5">
                       {t('coverLetterModal.fullName')}
