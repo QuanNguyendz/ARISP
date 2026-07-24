@@ -86,7 +86,7 @@ export default function CandidateSchedulePage() {
 
   return (
     <div className="min-h-screen bg-ink-50 px-4 py-10">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto w-[90%] max-w-2xl">
         <div className="mb-6 flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-600 text-white">
             <CalendarCheck className="h-6 w-6" />
