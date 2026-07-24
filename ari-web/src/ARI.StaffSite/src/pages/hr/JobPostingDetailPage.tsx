@@ -1027,9 +1027,11 @@ export default function JobPostingDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card">
-                  <div
-                    className={`grid gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
-                  >
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[700px]">
+                      <div
+                        className={`grid gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
+                      >
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -1244,6 +1246,8 @@ export default function JobPostingDetailPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                    </div>
                   </div>
                 </div>
               )}

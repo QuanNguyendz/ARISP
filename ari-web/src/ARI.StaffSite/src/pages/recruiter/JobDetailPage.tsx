@@ -813,44 +813,46 @@ export default function RecruiterJobDetailPage() {
             ) : (
               <>
                 {/* Table Headers */}
-                {activeTab === 'cv_review' ? (
-                  <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        disabled={pageSelectableCandidates.length === 0}
-                        onChange={handleSelectAll}
-                        className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
-                      />
-                    </div>
-                    <div>{t('tableHeaders.candidate')}</div>
-                    <div className="text-center">{t('tableHeaders.submittedDate')}</div>
-                    <div className="text-center">{t('tableHeaders.noticePeriod')}</div>
-                    <div className="text-center">{t('tableHeaders.matchScore')}</div>
-                    <div className="text-center">{t('tableHeaders.status')}</div>
-                    <div className="text-center">{t('tableHeaders.actions')}</div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        disabled={pageSelectableCandidates.length === 0}
-                        onChange={handleSelectAll}
-                        className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
-                      />
-                    </div>
-                    <div>{t('tableHeaders.candidate')}</div>
-                    <div className="text-center">{t('tableHeaders.interviewSchedule')}</div>
-                    <div className="text-center">{t('tableHeaders.evaluationScore')}</div>
-                    <div className="text-center">{t('tableHeaders.status')}</div>
-                    <div className="text-center">{t('tableHeaders.actions')}</div>
-                  </div>
-                )}
+                <div className="overflow-x-auto">
+                  <div className="min-w-[700px]">
+                    {activeTab === 'cv_review' ? (
+                      <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            disabled={pageSelectableCandidates.length === 0}
+                            onChange={handleSelectAll}
+                            className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                          />
+                        </div>
+                        <div>{t('tableHeaders.candidate')}</div>
+                        <div className="text-center">{t('tableHeaders.submittedDate')}</div>
+                        <div className="text-center">{t('tableHeaders.noticePeriod')}</div>
+                        <div className="text-center">{t('tableHeaders.matchScore')}</div>
+                        <div className="text-center">{t('tableHeaders.status')}</div>
+                        <div className="text-center">{t('tableHeaders.actions')}</div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            disabled={pageSelectableCandidates.length === 0}
+                            onChange={handleSelectAll}
+                            className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                          />
+                        </div>
+                        <div>{t('tableHeaders.candidate')}</div>
+                        <div className="text-center">{t('tableHeaders.interviewSchedule')}</div>
+                        <div className="text-center">{t('tableHeaders.evaluationScore')}</div>
+                        <div className="text-center">{t('tableHeaders.status')}</div>
+                        <div className="text-center">{t('tableHeaders.actions')}</div>
+                      </div>
+                    )}
 
-                <div className="divide-y divide-ink-100 dark:divide-white/10">
+                    <div className="divide-y divide-ink-100 dark:divide-white/10">
                   {pagedApps.map((a) => (
                     <div
                       key={a.id}
@@ -1035,11 +1037,12 @@ export default function RecruiterJobDetailPage() {
                     </div>
                   ))}
                 </div>
+                </div>
+                </div>
               </>
             )}
-          </>
+          </div>
         )}
-      </div>
 
       {processedApps.length > 0 && (
         <Pagination
