@@ -423,14 +423,14 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
 /** Khung skeleton (shimmer) mô phỏng bố cục trang khi đang tải. */
 function ApplicationsSkeleton() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[1fr_320px]">
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[1fr_320px]">
       {/* LEFT */}
       <div className="space-y-6">
         {/* Profile banner */}
         <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
           <Skeleton className="h-20 rounded-none" />
-          <div className="px-6 pb-6">
-            <Skeleton className="-mt-10 h-20 w-20 rounded-2xl ring-4 ring-white dark:ring-ink-900" />
+          <div className="px-4 sm:px-6 pb-6">
+            <Skeleton className="-mt-10 h-16 w-16 rounded-2xl ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20" />
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="space-y-2">
                 <Skeleton className="h-6 w-48" />
@@ -617,7 +617,7 @@ export default function ApplicationsPage() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('profile.home')}
@@ -630,15 +630,15 @@ export default function ApplicationsPage() {
       {loading ? (
         <ApplicationsSkeleton />
       ) : (
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[1fr_320px]">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[1fr_320px]">
           {/* LEFT */}
           <div className="space-y-6">
             {/* Profile banner */}
             <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
               <div className="h-20 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
-              <div className="px-6 pb-6">
+              <div className="px-4 sm:px-6 pb-6">
                 <div className="-mt-10">
-                  <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900">
+                  <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
                     {initials}
                   </span>
                 </div>
