@@ -483,11 +483,11 @@ export default function RecruiterJobDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+        className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
       >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 sm:h-12 sm:w-12">
               <Briefcase className="h-6 w-6" />
             </span>
             <div className="min-w-0">
@@ -937,7 +937,7 @@ export default function RecruiterJobDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center justify-center gap-1 shrink-0">
-                        <div className="w-36 flex gap-2 shrink-0 justify-center">
+                        <div className="flex w-auto min-w-[8rem] max-w-full gap-2 shrink-0 justify-center">
                           {!a.currentRound || a.currentRound === 0 ? (
                             <>
                               <button
@@ -1105,7 +1105,7 @@ export default function RecruiterJobDetailPage() {
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
                   {t('coverLetterModal.contactInfo')}
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                   <div>
                     <span className="text-ink-400 block mb-0.5">
                       {t('coverLetterModal.fullName')}
