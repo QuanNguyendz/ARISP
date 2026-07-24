@@ -87,7 +87,7 @@ export default function InterviewSchedulePage() {
 
   return (
     <div className="min-h-screen bg-bg-primary py-8">
-      <div className="max-w-3xl mx-auto px-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <button
             onClick={() => navigate(-1)}
@@ -123,7 +123,7 @@ export default function InterviewSchedulePage() {
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
                   onKeyPress={handleKeyPress}
                   placeholder={t('enterCode.placeholder')}
-                  className="w-full px-6 py-4 rounded-xl bg-white/5 border border-white/10 text-white text-center text-2xl font-mono placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                  className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-xl bg-white/5 border border-white/10 text-white text-center text-lg sm:text-2xl font-mono placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                   maxLength={10}
                 />
               </div>
@@ -190,7 +190,7 @@ export default function InterviewSchedulePage() {
                 <User className="w-5 h-5 text-accent-primary" />
                 <h3 className="text-lg font-semibold text-white">{t('candidateInfo.title')}</h3>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-sm text-text-tertiary mb-1">{t('candidateInfo.fullName')}</p>
                   <p className="text-white">{interviewData.candidate.name}</p>
@@ -277,12 +277,12 @@ export default function InterviewSchedulePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <button
                 onClick={handleStartInterview}
-                className="p-6 rounded-2xl bg-gradient-to-br from-accent-primary to-violet hover:opacity-90 transition-opacity text-left group"
+                className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-accent-primary to-violet hover:opacity-90 transition-opacity text-left group"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                   <Play className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-1">
@@ -293,9 +293,9 @@ export default function InterviewSchedulePage() {
 
               <button
                 onClick={handlePracticeInterview}
-                className="p-6 rounded-2xl bg-bg-secondary border border-white/10 hover:border-white/20 transition-colors text-left group"
+                className="p-5 sm:p-6 rounded-2xl bg-bg-secondary border border-white/10 hover:border-white/20 transition-colors text-left group"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4 group-hover:bg-white/20 transition-colors">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/10 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/20 transition-colors">
                   <Briefcase className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-1">
