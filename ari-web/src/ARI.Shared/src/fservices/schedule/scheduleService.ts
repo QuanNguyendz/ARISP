@@ -38,25 +38,16 @@ export const scheduleService = {
     return data
   },
 
-  // ===== Candidate: chọn lịch / xem lịch (Phase B2) =====
-  async getOpenSlots(
-    applicationId: string,
-    round: number,
-    token?: string
-  ): Promise<AvailabilitySlot[]> {
-    const { data } = await apiClient.get<AvailabilitySlot[]>(`/schedule/${applicationId}/slots`, {
-      params: { round, token },
-    })
-    return data
+  // ===== HR: gán cứng 1 khung giờ trong kho cho 1 ứng viên (ADR-048) =====
+  async assign(payload: {
+    applicationId: string
+    slotId: string
+    round: number
+  }): Promise<void> {
+    await apiClient.post('/schedules/assign', payload)
   },
 
-  async book(
-    applicationId: string,
-    payload: { slotId: string; round: number; token?: string }
-  ): Promise<void> {
-    await apiClient.post(`/schedule/${applicationId}/book`, payload)
-  },
-
+  // ===== Candidate: xem lịch đã được nhân sự xếp (read-only) =====
   async getMySchedule(): Promise<{
     upcomingSlots: AvailabilitySlot[]
     pastSlots: AvailabilitySlot[]
