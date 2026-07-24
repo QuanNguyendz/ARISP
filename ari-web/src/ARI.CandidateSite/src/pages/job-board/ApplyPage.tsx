@@ -421,7 +421,7 @@ export default function ApplyPage() {
           {/* Thông tin liên hệ */}
           <section className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <h2 className="font-display text-base font-bold">{t('contact.title')}</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-700">
                   {t('contact.fullName')}
