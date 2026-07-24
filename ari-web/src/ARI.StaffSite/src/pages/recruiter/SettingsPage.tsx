@@ -1,13 +1,33 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { User, Bell, Lock } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@ari/shared/ui'
+import { profileService, StaffSettings } from '../../fservices/profile/profileService'
 
 export default function RecruiterSettingsPage() {
   const { t } = useTranslation('modules/recruiter/settings')
 
   const [activeTab, setActiveTab] = useState('profile')
+  const [settings, setSettings] = useState<StaffSettings>({ receiveEmail: true, receivePush: true })
+  const [loadingSettings, setLoadingSettings] = useState(true)
+
+  useEffect(() => {
+    profileService.getSettings().then((res) => {
+      setSettings(res)
+      setLoadingSettings(false)
+    })
+  }, [])
+
+  const toggleSetting = async (key: keyof StaffSettings) => {
+    const newSettings = { ...settings, [key]: !settings[key] }
+    setSettings(newSettings)
+    try {
+      await profileService.updateSettings(newSettings)
+    } catch {
+      setSettings(settings) // revert on fail
+    }
+  }
 
   const tabs = [
     { id: 'profile', label: t('tabs.profile'), icon: User },
@@ -84,14 +104,36 @@ export default function RecruiterSettingsPage() {
                   <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5">
                     <div>
                       <p className="text-sm font-medium text-white">
-                        {t('notifications.email.title')}
+                        {t('notifications.email.title', 'Nhận email thông báo')}
                       </p>
                       <p className="text-xs text-white/40">
-                        {t('notifications.email.description')}
+                        {t('notifications.email.description', 'Nhận thông báo qua email cho các sự kiện quan trọng')}
                       </p>
                     </div>
-                    <button className="relative w-12 h-6 rounded-full bg-amber-500">
-                      <span className="absolute right-1 top-1 w-4 h-4 rounded-full bg-white transition-transform" />
+                    <button 
+                      disabled={loadingSettings}
+                      onClick={() => toggleSetting('receiveEmail')}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${settings.receiveEmail ? 'bg-amber-500' : 'bg-white/20'}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${settings.receiveEmail ? 'right-1' : 'left-1'}`} />
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        Nhận thông báo hệ thống
+                      </p>
+                      <p className="text-xs text-white/40">
+                        Nhận thông báo trên biểu tượng chuông của hệ thống
+                      </p>
+                    </div>
+                    <button 
+                      disabled={loadingSettings}
+                      onClick={() => toggleSetting('receivePush')}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${settings.receivePush ? 'bg-amber-500' : 'bg-white/20'}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${settings.receivePush ? 'right-1' : 'left-1'}`} />
                     </button>
                   </div>
                 </div>
