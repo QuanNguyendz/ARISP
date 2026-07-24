@@ -28,6 +28,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
         private readonly IJdStampService _jdStampService;
         private readonly IDocumentParserService _documentParser;
         private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
         private readonly ILogger<UpdateJobStatusCommandHandler> _logger;
 
         public UpdateJobStatusCommandHandler(
@@ -36,6 +37,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             IJdStampService jdStampService,
             IDocumentParserService documentParser,
             INotificationService notificationService,
+            IEmailService emailService,
             ILogger<UpdateJobStatusCommandHandler> logger)
         {
             _unitOfWork = unitOfWork;
@@ -43,6 +45,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             _jdStampService = jdStampService;
             _documentParser = documentParser;
             _notificationService = notificationService;
+            _emailService = emailService;
             _logger = logger;
         }
 
@@ -107,8 +110,8 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                 if (!isSuperOrHrAdmin)
                     return Result.Failure<JobPostingResponse>("Chỉ HrAdmin hoặc SuperAdmin mới có quyền kích hoạt/phê duyệt bài viết.", CommonErrorCodes.Forbidden);
 
-                if (currentStatus != "pending" && currentStatus != "closed")
-                    return Result.Failure<JobPostingResponse>("Chỉ có thể kích hoạt (active) từ trạng thái chờ duyệt (pending) hoặc đã đóng (closed).");
+                if (currentStatus != "pending" && currentStatus != "closed" && currentStatus != "draft")
+                    return Result.Failure<JobPostingResponse>("Chỉ có thể kích hoạt (active) từ trạng thái chờ duyệt (pending), nháp (draft) hoặc đã đóng (closed).");
 
                 if (job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
                     return Result.Failure<JobPostingResponse>("Hạn nộp hồ sơ của Job này đã ở quá khứ. Hãy cập nhật lại gia hạn Deadline trước khi chuyển sang Active.");
@@ -116,8 +119,8 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                 if (job.PublishedAt == null) job.PublishedAt = DateTimeOffset.UtcNow;
                 job.RejectionReason = null;
 
-                // Ghi nhận phê duyệt + đóng dấu duyệt lên file JD — chỉ khi duyệt từ pending.
-                if (currentStatus == "pending")
+                // Ghi nhận phê duyệt + đóng dấu duyệt lên file JD — chỉ khi duyệt từ pending hoặc draft (HR Leader tự publish).
+                if (currentStatus == "pending" || currentStatus == "draft")
                 {
                     var approver = await _unitOfWork.Repository<User>().GetByIdAsync(userId, ct);
                     var approverName = approver != null
@@ -235,14 +238,77 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             if (!string.IsNullOrEmpty(statusResponse.SignedJdFileUrl))
                 statusResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.SignedJdFileUrl, ct);
 
-            // Gửi thông báo SignalR tương ứng
+            // Gửi thông báo SignalR và Email tương ứng
             if (targetStatus == "pending")
             {
                 await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = "pending", Title = job.Title }, ct);
+
+                var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+                var creatorName = creator != null
+                    ? (string.IsNullOrWhiteSpace(creator.FullName) ? creator.Email : creator.FullName)
+                    : "Nhân viên";
+
+                var hrAdmins = await _unitOfWork.Repository<User>().FindAsync(u => u.Role == "hr_admin" || u.Role == "super_admin", ct);
+                var notifRepo = _unitOfWork.Repository<Notification>();
+                var dedupKey = $"job_pending:{job.Id}:{DateTimeOffset.UtcNow.Ticks}";
+
+                foreach (var hr in hrAdmins)
+                {
+                    var hrSettings = !string.IsNullOrEmpty(hr.SettingsJson)
+                        ? System.Text.Json.JsonSerializer.Deserialize<StaffSettingsDto>(hr.SettingsJson) ?? new StaffSettingsDto()
+                        : new StaffSettingsDto();
+
+                    if (hrSettings.ReceivePush)
+                    {
+                        await notifRepo.AddAsync(new Notification
+                        {
+                            RecipientUserId = hr.Id,
+                            DedupKey = dedupKey,
+                            Type = "pending",
+                            Title = "Tin tuyển dụng chờ duyệt",
+                            Body = $"Tin tuyển dụng \"{job.Title}\" do {creatorName} gửi cần được phê duyệt.",
+                            Link = $"/hr/jobs/{job.Id}",
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    }
+
+                    if (hrSettings.ReceiveEmail && !string.IsNullOrWhiteSpace(hr.Email))
+                    {
+                        var subject = $"[ARISP] - Yêu cầu phê duyệt tin tuyển dụng: {job.Title}";
+                        var htmlMessage = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <h2 style='color: #1e293b; margin-top: 0;'>Yêu cầu phê duyệt tin tuyển dụng</h2>
+            <p style='color: #475569; font-size: 15px;'>Xin chào <strong>{hr.FullName ?? hr.Email}</strong>,</p>
+            <p style='color: #475569; font-size: 15px;'>Nhân viên <strong>{creatorName}</strong> ({creator?.Email ?? "N/A"}) vừa gửi yêu cầu phê duyệt tin tuyển dụng mới:</p>
+            <div style='background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 16px; margin: 20px 0; border-radius: 8px;'>
+                <p style='margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #1e293b;'>{job.Title}</p>
+                {(string.IsNullOrEmpty(job.Department) ? "" : $"<p style='margin: 0 0 4px 0; color: #64748b; font-size: 14px;'>Phòng ban: {job.Department}</p>")}
+                <p style='margin: 0; color: #64748b; font-size: 14px;'>Người tạo tin: <strong>{creatorName}</strong></p>
+            </div>
+            <p style='color: #475569; font-size: 15px;'>Vui lòng bấm vào nút bên dưới để xem chi tiết và phê duyệt tin tuyển dụng này:</p>
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='http://localhost:3001/hr/jobs/{job.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem &amp; Duyệt tin tuyển dụng</a>
+            </div>
+            <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
+            <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Hệ thống tuyển dụng ARISP.</p>
+        </div>";
+                        try { await _emailService.SendEmailAsync(hr.Email, subject, htmlMessage); } catch { }
+                    }
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
             }
             else if (targetStatus == "active" || targetStatus == "rejected")
             {
-                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = targetStatus, Title = job.Title }, ct);
+                var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+                var creatorSettings = creator != null && !string.IsNullOrEmpty(creator.SettingsJson)
+                    ? System.Text.Json.JsonSerializer.Deserialize<StaffSettingsDto>(creator.SettingsJson) ?? new StaffSettingsDto()
+                    : new StaffSettingsDto();
+
+                if (creatorSettings.ReceivePush)
+                {
+                    await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = targetStatus, Title = job.Title }, ct);
+                }
             }
 
             if (targetStatus == "active" || targetStatus == "closed" || targetStatus == "archived")
@@ -279,20 +345,63 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             var link = isRecruiter ? $"/recruiter/my-jobs/{job.Id}" : $"/hr/jobs/{job.Id}";
             var now = DateTimeOffset.UtcNow;
 
-            await _unitOfWork.Repository<Notification>().AddAsync(new Notification
+            var creatorSettings = !string.IsNullOrEmpty(creator.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<StaffSettingsDto>(creator.SettingsJson) ?? new StaffSettingsDto()
+                : new StaffSettingsDto();
+
+            if (creatorSettings.ReceivePush)
             {
-                RecipientUserId = job.CreatedByUserId,
-                // Ticks ở khóa chống trùng → mỗi lần duyệt/từ chối là một sự kiện riêng, hỗ trợ nhiều vòng nộp lại.
-                DedupKey = $"{(approved ? "job_approved" : "job_rejected")}:{job.Id}:{now.Ticks}",
-                Type = approved ? "approved" : "rejected",
-                Title = approved ? "Tin tuyển dụng đã được duyệt" : "Tin tuyển dụng bị từ chối",
-                Body = approved
-                    ? $"\"{job.Title}\" đã được {reviewerName} phê duyệt và đăng công khai."
-                    : $"\"{job.Title}\" bị {reviewerName} từ chối. Lý do: {reason}",
-                Link = link,
-                CreatedAt = now,
-                UpdatedAt = now,
-            }, ct);
+                await _unitOfWork.Repository<Notification>().AddAsync(new Notification
+                {
+                    RecipientUserId = job.CreatedByUserId,
+                    // Ticks ở khóa chống trùng → mỗi lần duyệt/từ chối là một sự kiện riêng, hỗ trợ nhiều vòng nộp lại.
+                    DedupKey = $"{(approved ? "job_approved" : "job_rejected")}:{job.Id}:{now.Ticks}",
+                    Type = approved ? "approved" : "rejected",
+                    Title = approved ? "Tin tuyển dụng đã được duyệt" : "Tin tuyển dụng bị từ chối",
+                    Body = approved
+                        ? $"\"{job.Title}\" đã được {reviewerName} phê duyệt và đăng công khai."
+                        : $"\"{job.Title}\" bị {reviewerName} từ chối. Lý do: {reason}",
+                    Link = link,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                }, ct);
+            }
+
+            // Gửi email thông báo kết quả duyệt bài cho Recruiter (creator)
+            if (creatorSettings.ReceiveEmail && !string.IsNullOrWhiteSpace(creator.Email))
+            {
+                var subject = approved
+                    ? $"[ARISP] - Tin tuyển dụng \"{job.Title}\" đã được phê duyệt"
+                    : $"[ARISP] - Tin tuyển dụng \"{job.Title}\" đã bị từ chối";
+
+                var htmlMessage = approved ? $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <h2 style='color: #059669; margin-top: 0;'>Tin tuyển dụng đã được phê duyệt!</h2>
+            <p style='color: #475569; font-size: 15px;'>Xin chào <strong>{creator.FullName ?? creator.Email}</strong>,</p>
+            <p style='color: #475569; font-size: 15px;'>Tin tuyển dụng <strong>{job.Title}</strong> của bạn đã được <strong>{reviewerName}</strong> phê duyệt và đăng công khai trên Job Board.</p>
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='http://localhost:3001{link}' style='background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem tin tuyển dụng</a>
+            </div>
+            <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
+            <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ HR ARISP.</p>
+        </div>" : $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <h2 style='color: #dc2626; margin-top: 0;'>Tin tuyển dụng bị từ chối</h2>
+            <p style='color: #475569; font-size: 15px;'>Xin chào <strong>{creator.FullName ?? creator.Email}</strong>,</p>
+            <p style='color: #475569; font-size: 15px;'>Tin tuyển dụng <strong>{job.Title}</strong> của bạn đã bị <strong>{reviewerName}</strong> từ chối phê duyệt.</p>
+            <div style='background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0; border-radius: 8px;'>
+                <p style='margin: 0; color: #991b1b; font-size: 14px;'><strong>Lý do từ chối:</strong> {reason}</p>
+            </div>
+            <p style='color: #475569; font-size: 15px;'>Vui lòng kiểm tra và cập nhật lại thông tin bài đăng:</p>
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='http://localhost:3001{link}' style='background-color: #dc2626; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Chỉnh sửa tin tuyển dụng</a>
+            </div>
+            <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
+            <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ HR ARISP.</p>
+        </div>";
+
+                try { await _emailService.SendEmailAsync(creator.Email, subject, htmlMessage); } catch { }
+            }
         }
     }
 }
