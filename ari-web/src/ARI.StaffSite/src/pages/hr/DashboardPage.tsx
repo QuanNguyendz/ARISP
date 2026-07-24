@@ -812,7 +812,7 @@ export default function HrDashboardPage() {
     : {}
 
   return (
-    <main className="min-h-screen space-y-6 bg-ink-50 p-6 dark:bg-ink-950">
+    <main className="min-h-screen space-y-6 bg-ink-50 p-4 sm:p-6 lg:p-8 dark:bg-ink-950">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-extrabold leading-snug text-ink-900 dark:text-white">
@@ -830,7 +830,7 @@ export default function HrDashboardPage() {
 
       {!loading && !errorMessage && data && (
         <>
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="flex flex-col rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-5 shadow-card dark:border-amber-500/30 dark:from-amber-500/10 dark:to-transparent">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
@@ -839,7 +839,7 @@ export default function HrDashboardPage() {
                   </span>
                   {t('prioritySection.pendingJobsCount')}
                 </span>
-                <span className="font-display text-3xl font-extrabold leading-none text-amber-700 dark:text-amber-400">
+                <span className="font-display text-2xl sm:text-3xl font-extrabold leading-none text-amber-700 dark:text-amber-400">
                   {data.pendingJobsCount}
                 </span>
               </div>
@@ -882,7 +882,7 @@ export default function HrDashboardPage() {
                   </span>
                   {t('prioritySection.pendingVerdicts')}
                 </span>
-                <span className="font-display text-3xl font-extrabold leading-none text-brand-700 dark:text-brand-400">
+                <span className="font-display text-2xl sm:text-3xl font-extrabold leading-none text-brand-700 dark:text-brand-400">
                   {data.pendingReviews}
                 </span>
               </div>
