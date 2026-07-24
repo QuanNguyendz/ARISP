@@ -141,7 +141,7 @@ export default function HrCandidateDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 p-6 dark:bg-ink-950 lg:p-8">
+    <div className="min-h-screen bg-ink-50 p-4 sm:p-6 dark:bg-ink-950 lg:p-8">
       <Link
         to="/hr/candidates"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
@@ -156,9 +156,9 @@ export default function HrCandidateDetailPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-lg font-bold text-white">
+      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-base sm:text-lg font-bold text-white sm:h-16 sm:w-16">
             {initials(app.candidateName || app.candidateEmail)}
           </span>
           <div className="min-w-0">
@@ -356,7 +356,7 @@ export default function HrCandidateDetailPage() {
                   </p>
                   <button
                     onClick={copyCode}
-                    className="flex w-full items-center justify-between font-mono text-lg font-bold tracking-widest text-emerald-700 dark:text-emerald-300"
+                    className="flex w-full items-center justify-between font-mono text-base sm:text-lg font-bold tracking-widest text-emerald-700 dark:text-emerald-300"
                   >
                     {code.code}
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
