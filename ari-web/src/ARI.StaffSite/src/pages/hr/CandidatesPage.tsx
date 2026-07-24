@@ -240,7 +240,7 @@ export default function CandidatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 dark:bg-ink-950 p-6 lg:p-8">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {notice && <NoticeAlert message={notice} onDismiss={() => setNotice('')} />}
