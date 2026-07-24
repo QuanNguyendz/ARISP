@@ -24,7 +24,7 @@ function InterviewKioskSection() {
           </h2>
           <p className="text-white/40 mb-8 font-light">{t('interviewKiosk.description')}</p>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <input
               type="text"
               value={code}
@@ -39,7 +39,7 @@ function InterviewKioskSection() {
                   navigate('/interview')
                 }
               }}
-              className="px-6 py-3.5 rounded-xl bg-white text-bg-primary font-medium text-sm hover:bg-white/90 transition-colors flex items-center gap-2"
+              className="px-6 py-3.5 rounded-xl bg-white text-bg-primary font-medium text-sm hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
             >
               {t('interviewKiosk.button')}
               <ArrowRight className="w-4 h-4" />
