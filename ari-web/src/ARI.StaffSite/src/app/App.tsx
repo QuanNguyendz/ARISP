@@ -51,6 +51,8 @@ const RecruiterMyJobsPage = lazy(() => import('@/pages/recruiter/MyJobsPage'))
 const RecruiterJobDetailPage = lazy(() => import('@/pages/recruiter/JobDetailPage'))
 const RecruiterCreateJobPage = lazy(() => import('@/pages/recruiter/CreateJobPostingPage'))
 const RecruiterJobSchedulePage = lazy(() => import('@/pages/recruiter/JobScheduleConfigPage'))
+const JobOnlineTestPage = lazy(() => import('@/pages/recruiter/JobOnlineTestPage'))
+const JobOnlineTestResultsPage = lazy(() => import('@/pages/recruiter/JobOnlineTestResultsPage'))
 const RecruiterInterviewCodePage = lazy(() => import('@/pages/recruiter/InterviewCodePage'))
 const RecruiterCandidatesPage = lazy(() => import('@/pages/recruiter/CandidatesPage'))
 const RecruiterCandidateDetailPage = lazy(() => import('@/pages/recruiter/CandidateDetailPage'))
@@ -142,6 +144,8 @@ function App() {
             <Route path="/hr/jobs/pending" element={<HrPendingJobsPage />} />
             <Route path="/hr/jobs" element={<HrJobsPage />} />
             <Route path="/hr/jobs/:id" element={<HrJobDetailPage />} />
+            <Route path="/hr/jobs/:id/online-test" element={<JobOnlineTestPage />} />
+            <Route path="/hr/jobs/:id/online-test/results" element={<JobOnlineTestResultsPage />} />
             <Route path="/hr/candidates" element={<HrCandidatesPage />} />
             <Route path="/hr/candidates/:id" element={<HrCandidateDetailPage />} />
             <Route path="/hr/evaluations" element={<HrEvaluationsPage />} />
@@ -167,6 +171,11 @@ function App() {
             <Route path="/recruiter/my-jobs/:id" element={<RecruiterJobDetailPage />} />
             <Route path="/recruiter/my-jobs/:id/edit" element={<RecruiterCreateJobPage mode="edit" />} />
             <Route path="/recruiter/my-jobs/:id/schedule" element={<RecruiterJobSchedulePage />} />
+            <Route path="/recruiter/my-jobs/:id/online-test" element={<JobOnlineTestPage />} />
+            <Route
+              path="/recruiter/my-jobs/:id/online-test/results"
+              element={<JobOnlineTestResultsPage />}
+            />
             <Route path="/recruiter/candidates" element={<RecruiterCandidatesPage />} />
             <Route path="/recruiter/candidates/:id" element={<RecruiterCandidateDetailPage />} />
             <Route path="/recruiter/code" element={<RecruiterInterviewCodePage />} />

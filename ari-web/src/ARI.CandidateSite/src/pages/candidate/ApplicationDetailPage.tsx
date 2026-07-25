@@ -23,6 +23,7 @@ import {
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
+import OnlineTestEntry from '@components/OnlineTestEntry'
 import type {
   MyApplicationDetail,
   MyApplicationSession,
@@ -521,6 +522,7 @@ export default function ApplicationDetailPage() {
       ) : !detail ? null : (
         <main className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-5">
+            {id && <OnlineTestEntry applicationId={id} />}
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
                 <div className="flex items-center gap-2 text-sm font-semibold">
