@@ -662,18 +662,20 @@ namespace ARI.Application.Services
             };
             await _unitOfWork.Repository<InterviewInvite>().AddAsync(invite, ct);
 
-            var scheduleLink = $"{baseUrl}/portal/schedule/{applicationId}?token={rawToken}&round={roundNumber}";
+            // ADR-048: ứng viên KHÔNG tự chọn lịch nữa — nhân sự sẽ gán giờ cụ thể. Email chỉ báo qua vòng CV
+            // + hướng dẫn theo dõi Portal; giờ hẹn thật sẽ gửi ở email "Lịch phỏng vấn đã được xếp".
+            var portalLink = $"{baseUrl}/candidate/applications";
 
-            var subject = "[ARISP] - Lời mời phỏng vấn: chọn lịch hẹn";
+            var subject = "[ARISP] - Hồ sơ của bạn đã qua vòng duyệt CV";
             var htmlMessage = $@"
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
             <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
-            <p>Chúc mừng bạn! Hồ sơ ứng tuyển của bạn đã thông qua vòng duyệt hồ sơ (CV Review).</p>
-            <p>Vui lòng truy cập đường dẫn dưới đây trên thiết bị cá nhân của bạn để <strong>chọn khung giờ phỏng vấn</strong> (vòng {roundNumber}). Sau khi chọn lịch, bạn có thể luyện tập với chế độ <em>phỏng vấn thử</em> trước ngày hẹn.</p>
+            <p>Chúc mừng bạn! Hồ sơ ứng tuyển của bạn đã thông qua vòng duyệt hồ sơ (CV Review) — vòng {roundNumber}.</p>
+            <p><strong>Bộ phận nhân sự sẽ xếp lịch phỏng vấn</strong> và gửi thông báo giờ hẹn cụ thể cho bạn trong thời gian tới. Vui lòng theo dõi email và Candidate Portal.</p>
             <p style='text-align: center; margin: 30px 0;'>
-                <a href='{scheduleLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Chọn lịch phỏng vấn</a>
+                <a href='{portalLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Vào Candidate Portal</a>
             </p>
-            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Buổi phỏng vấn thật diễn ra tại văn phòng — bạn sẽ nhập mã phỏng vấn (Interview Code) do nhân sự cấp tại chỗ, không cần đăng nhập email. Đường dẫn này dành riêng cho bạn, hết hạn sau {ttlHours} giờ.</i></p>
+            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Buổi phỏng vấn thật diễn ra tại văn phòng — bạn sẽ nhập mã phỏng vấn (Interview Code) do nhân sự cấp tại chỗ. Sau khi có lịch, bạn có thể luyện tập với chế độ phỏng vấn thử trước ngày hẹn.</i></p>
             <br/>
             <p>Trân trọng,</p>
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>

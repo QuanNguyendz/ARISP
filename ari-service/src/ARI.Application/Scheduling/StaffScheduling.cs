@@ -164,4 +164,159 @@ namespace ARI.Application.Scheduling
             return Result.Success(AvailabilitySlotResponse.FromEntity(slot));
         }
     }
+
+    // ============================================================
+    // POST /api/schedules/assign — HR gán cứng 1 khung giờ cho 1 ứng viên (ADR-048)
+    // Thay cho luồng ứng viên tự chọn: staff chọn slot trong kho rồi ấn định cho hồ sơ.
+    // ============================================================
+
+    public record AssignSlotResultDto(Guid BookingId, AvailabilitySlotResponse Slot);
+
+    public record AssignSlotCommand(Guid ApplicationId, Guid SlotId, int Round, Guid? UserId, string? Role)
+        : IRequest<Result<AssignSlotResultDto>>;
+
+    public class AssignSlotCommandHandler : IRequestHandler<AssignSlotCommand, Result<AssignSlotResultDto>>
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
+
+        public AssignSlotCommandHandler(IUnitOfWork unitOfWork, INotificationService notificationService)
+        {
+            _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
+        }
+
+        public async Task<Result<AssignSlotResultDto>> Handle(AssignSlotCommand request, CancellationToken ct)
+        {
+            var round = request.Round > 0 ? request.Round : 1;
+            var applicationId = request.ApplicationId;
+
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
+            if (app == null) return Result.Failure<AssignSlotResultDto>("Không tìm thấy hồ sơ ứng tuyển.", CommonErrorCodes.NotFound);
+
+            // Chỉ xếp lịch khi ứng viên đã qua vòng duyệt CV (>= screening). Không gán khi mới nộp/bị từ chối.
+            var status = (app.Status ?? string.Empty).ToLowerInvariant();
+            if (status is "cv_submitted" or "invited" or "cv_rejected" or "not_pass" or "rejected")
+                return Result.Failure<AssignSlotResultDto>("Chỉ có thể xếp lịch khi ứng viên đã qua vòng duyệt CV. Hãy gửi lời mời phỏng vấn trước.");
+
+            var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(request.SlotId, ct);
+            if (slot == null) return Result.Failure<AssignSlotResultDto>("Không tìm thấy khung giờ.", CommonErrorCodes.NotFound);
+
+            // Quyền quản lý slot = quyền quản lý job của slot (chủ tin hoặc admin).
+            var (ok, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, slot.JobPostingId, request.UserId, request.Role, ct);
+            if (!ok) return Result.Failure<AssignSlotResultDto>("Bạn không có quyền xếp lịch cho tin này.", CommonErrorCodes.Forbidden);
+
+            if (slot.JobPostingId != app.JobPostingId || slot.RoundNumber != round)
+                return Result.Failure<AssignSlotResultDto>("Khung giờ không thuộc tin tuyển dụng/vòng phỏng vấn của ứng viên này.");
+            if (slot.StartTime <= DateTimeOffset.UtcNow)
+                return Result.Failure<AssignSlotResultDto>("Khung giờ đã ở quá khứ.");
+
+            // Đã có lịch cho vòng này rồi? (một booking "scheduled" / vòng)
+            var existing = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                b => b.ApplicationId == applicationId && b.RoundNumber == round && b.Status == "scheduled", ct);
+            if (existing.Any())
+                return Result.Failure<AssignSlotResultDto>("Ứng viên đã có lịch cho vòng này. Hãy huỷ lịch cũ trước khi gán lại.");
+
+            // Chốt chỗ NGUYÊN TỬ chống overbooking (DB row-lock 1 câu lệnh, không mutate entity đang được EF theo dõi).
+            var incremented = await _unitOfWork.ExecuteSqlRawAsync(
+                "UPDATE availability_slots SET booked_count = booked_count + 1, updated_at = {0} WHERE id = {1} AND booked_count < capacity",
+                new object[] { DateTimeOffset.UtcNow, slot.Id }, ct);
+            if (incremented == 0)
+                return Result.Failure<AssignSlotResultDto>("Khung giờ đã đầy. Vui lòng chọn khung giờ khác hoặc tăng sức chứa.");
+
+            var booking = new InterviewBooking
+            {
+                ApplicationId = applicationId,
+                AvailabilitySlotId = slot.Id,
+                RoundNumber = round,
+                Status = "scheduled",
+            };
+            await _unitOfWork.Repository<InterviewBooking>().AddAsync(booking, ct);
+
+            // Đã xếp lịch buổi thật → chuyển "screening" (đang sàng lọc) sang "interview". Vòng 2+ vốn đã ở "interview".
+            if (string.Equals(app.Status, "screening", StringComparison.OrdinalIgnoreCase))
+            {
+                app.Status = "interview";
+                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
+            }
+
+            // Đánh dấu lời mời của vòng đã có lịch (nếu có).
+            var invites = await _unitOfWork.Repository<InterviewInvite>().FindAsync(
+                i => i.ApplicationId == applicationId && i.RoundNumber == round && i.ScheduledAt == null, ct);
+            foreach (var inv in invites)
+            {
+                inv.ScheduledAt = DateTimeOffset.UtcNow;
+                _unitOfWork.Repository<InterviewInvite>().Update(inv);
+            }
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            catch (Exception)
+            {
+                // Bù trừ chỗ đã chiếm nếu lưu thất bại (vd trùng vòng do double-click — chặn bởi unique index).
+                await _unitOfWork.ExecuteSqlRawAsync(
+                    "UPDATE availability_slots SET booked_count = GREATEST(booked_count - 1, 0), updated_at = {0} WHERE id = {1}",
+                    new object[] { DateTimeOffset.UtcNow, slot.Id }, ct);
+                return Result.Failure<AssignSlotResultDto>("Không thể hoàn tất xếp lịch (có thể ứng viên đã có lịch vòng này). Vui lòng tải lại và thử lại.");
+            }
+
+            var slotDto = AvailabilitySlotResponse.FromEntity(slot);
+            slotDto.BookedCount += 1;
+
+            // Giờ hiển thị theo múi giờ VN (+7) cho notification/email.
+            var local = slot.StartTime.ToOffset(TimeSpan.FromHours(7));
+            var whenText = $"{local:HH:mm} ngày {local:dd/MM/yyyy} (giờ VN)";
+
+            // Thông báo ứng viên: DB notification (bell) + realtime.
+            if (app.CandidateAccountId.HasValue)
+            {
+                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
+                var dedupKey = $"schedule_assigned:{applicationId}:{round}";
+                var already = await notifRepo.FindAsync(
+                    n => n.CandidateAccountId == app.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                if (!already.Any())
+                {
+                    await notifRepo.AddAsync(new ARI.Domain.Entities.Notification
+                    {
+                        CandidateAccountId = app.CandidateAccountId.Value,
+                        DedupKey = dedupKey,
+                        Type = "schedule",
+                        Title = "Lịch phỏng vấn đã được xếp",
+                        Body = $"Nhân sự đã xếp lịch phỏng vấn (vòng {round}) cho bạn: {whenText}. Vui lòng đến đúng giờ; bạn có thể luyện tập với phỏng vấn thử trước ngày hẹn.",
+                        Link = "/candidate/applications",
+                        IsRead = false
+                    }, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+
+                await _notificationService.PublishUserEventAsync(app.CandidateAccountId.Value, "ReceiveUserNotification",
+                    new { Type = "InterviewScheduled", ApplicationId = applicationId, RoundNumber = round }, ct);
+            }
+
+            // Email thông báo lịch (best-effort — không chặn kết quả nếu gửi lỗi).
+            try
+            {
+                var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+                var jobTitle = job?.Title ?? "vị trí ứng tuyển";
+                var subject = "[ARISP] - Lịch phỏng vấn của bạn đã được xếp";
+                var html = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
+            <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
+            <p>Bộ phận nhân sự đã xếp lịch phỏng vấn <strong>vòng {round}</strong> cho vị trí <strong>{jobTitle}</strong> của bạn:</p>
+            <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
+            <p>Vui lòng đến văn phòng đúng khung giờ trên. Nhân sự sẽ cấp <strong>Mã phỏng vấn (Interview Code)</strong> tại chỗ để bạn vào phòng phỏng vấn.</p>
+            <p>Bạn có thể đăng nhập Candidate Portal để xem chi tiết và luyện tập với chế độ <em>phỏng vấn thử</em> trước ngày hẹn.</p>
+            <br/>
+            <p>Trân trọng,</p>
+            <p><strong>Đội ngũ nhân sự ARISP</strong></p>
+        </div>";
+                await _notificationService.SendEmailAsync(app.CandidateEmail, subject, html, ct);
+            }
+            catch { /* best-effort */ }
+
+            return Result.Success(new AssignSlotResultDto(booking.Id, slotDto));
+        }
+    }
 }
