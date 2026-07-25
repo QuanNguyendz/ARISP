@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using DocumentFormat.OpenXml;

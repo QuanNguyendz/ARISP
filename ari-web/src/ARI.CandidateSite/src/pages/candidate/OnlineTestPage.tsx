@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Send,
   Clock,
+  Lock,
 } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 import type { OnlineTestResult } from '@ari/shared/types/onlineTest'
@@ -163,6 +164,20 @@ export default function CandidateOnlineTestPage() {
           <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{' '}
             {errMsg(error, t('page.loadError'), t('page.unauthorized'))}
+          </div>
+        ) : data && !data.cvPassed ? (
+          <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
+            <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-ink-100 text-ink-400">
+              <Lock className="h-7 w-7" />
+            </span>
+            <h2 className="text-base font-bold text-ink-800">{t('page.lockedTitle')}</h2>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-500">{t('page.lockedDetail')}</p>
+            <Link
+              to="/candidate/applications"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" /> {t('page.back')}
+            </Link>
           </div>
         ) : result ? (
           <ResultCard

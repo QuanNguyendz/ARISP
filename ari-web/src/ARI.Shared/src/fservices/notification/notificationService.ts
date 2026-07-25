@@ -30,6 +30,13 @@ export const STAFF_NOTIF_REFRESH_EVENT = 'staff-notifications:refresh'
 export const CANDIDATE_DATA_REFRESH_EVENT = 'candidate-data:refresh'
 
 /**
+ * Sự kiện DOM phát khi ứng viên nộp bài thi trắc nghiệm (push SignalR `ReceiveOnlineTestSubmitted`).
+ * Trang bảng điểm trắc nghiệm của nhân sự (`JobOnlineTestResultsPage`, dùng state cục bộ) lắng nghe
+ * để tải lại danh sách điểm tức thời.
+ */
+export const STAFF_ONLINE_TEST_REFRESH_EVENT = 'staff-online-test:refresh'
+
+/**
  * Chuẩn hoá link thông báo về route hiện hành. Xử lý dữ liệu tồn đọng của thông báo "Phân tích CV
  * hoàn tất": các link cũ `/candidate/find-jobs/{id}/apply` (route không tồn tại) và `/jobs/{id}/apply`
  * (trang nộp đơn — không hiển thị kết quả phân tích) → đưa về `/jobs/{id}` (trang chi tiết tin, nơi

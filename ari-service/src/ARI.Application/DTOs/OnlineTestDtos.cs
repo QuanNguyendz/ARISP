@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ARI.Application.OnlineTest
+namespace ARI.Application.DTOs
 {
     // ============================================================
     // DTOs — Ngân hàng câu hỏi trắc nghiệm (Online Test) per Job Posting
@@ -36,7 +36,8 @@ namespace ARI.Application.OnlineTest
         bool AlreadySubmitted,
         decimal? Score,
         bool? IsPassed,
-        DateTimeOffset? SubmittedAt);
+        DateTimeOffset? SubmittedAt,
+        bool CvPassed);
 
     /// <summary>Kết quả chấm bài trắc nghiệm.</summary>
     public record OnlineTestResultDto(
