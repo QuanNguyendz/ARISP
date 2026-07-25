@@ -7,14 +7,27 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** FE Responsive – Hotfix 5 lỗi mobile báo cáo ngày 2026-07-25  
+**Phase:** FE Responsive – Hotfix Round 6 (4 lỗi mobile báo cáo 2026-07-25 23:46)  
 **Last updated:** 2026-07-25
 
 ---
 
 ## Đang làm (In Progress)
 
-### FE Responsive – Hotfix Round 5 (2026-07-25, 1 commit, 5 file)
+### FE Responsive – Hotfix Round 6 (2026-07-25, 1 commit, 4 file)
+
+> **Mục tiêu:** Sửa tiếp 4 lỗi mobile báo cáo sau Round 5: thiếu icon ngôn ngữ mobile, filter chip vẫn tràn, job card footer không tự xuống dòng theo kích thước, Recruiter CandidateDetailPage xấu.
+>
+> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 4 file). TypeScript pass cả 2 site.
+
+- [x] `ARI.CandidateSite/src/app/layouts/CandidateHeader.tsx` — Thêm 1 button `Globe` icon-only riêng cho mobile (`sm:hidden` chỉ icon h-9 w-9) trước button cũ `hidden sm:block` icon+text. Mobile <640px trước đó bị ẩn hoàn toàn không đổi được ngôn ngữ.
+- [x] `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Filter tab `flex flex-wrap items-center gap-2` (bỏ `overflow-x-auto` đang ép 1 dòng) + button `px-3.5 py-1.5 text-xs sm:px-4 sm:text-sm` + label "Mới nhất" `order-last` để tự đổi xuống dòng khi hết chỗ.
+- [x] `ARI.StaffSite/src/pages/recruiter/MyJobsPage.tsx` — Job card footer `flex-col gap-1.5 sm:flex-row sm:flex-wrap` (2 dòng mobile: line 1 = applicants+time, line 2 = salary+chevron; desktop 1 dòng ngang). Mỗi line có `justify-between` riêng để dàn đều khoảng cách.
+- [x] `ARI.StaffSite/src/pages/recruiter/CandidateDetailPage.tsx` — Tổng thể responsive: page `p-4 sm:p-6 lg:p-8` + header card `p-4 sm:p-6` + avatar `h-12 w-12 sm:h-16 sm:w-16` + email/jobTitle `flex-col gap-1 sm:flex-row sm:flex-wrap` (mobile stack dọc) + match score box chuyển từ `text-center` cố định sang inline `justify-between` với label (mobile) → `flex-col sm:items-center` (desktop) + status badge `whitespace-nowrap` + evaluation/session items `flex-col gap-2 sm:flex-row sm:items-center sm:justify-between` (mobile stack dọc: title trên, score+badge dưới) + verdict/session badge `whitespace-nowrap` + action/info card `p-4 sm:p-5` + info dl `flex-col gap-1 sm:flex-row sm:justify-between`.
+- **Pattern dùng chung:** Item dùng `flex-col gap-N sm:flex-row sm:items-center sm:justify-between` (stack dọc mobile, ngang desktop) + badge/date `whitespace-nowrap` + container parent `min-w-0 flex-1` để text dài truncate đúng cách.
+- **Lint:** `tsc --noEmit` 0 lỗi trên cả `ARI.CandidateSite` và `ARI.StaffSite`.
+
+---
 
 > **Mục tiêu:** Sửa 5 lỗi mobile báo cáo bởi user (qua ảnh screenshot 320-768px). Nguyên nhân chính: dropdown header Candidate dùng `absolute` thuần (không có mobile fixed full-width như HR) → tràn mobile; job card footer 4 items dính dòng; table cell chèn text; tab pill dài không scroll-snap.
 >

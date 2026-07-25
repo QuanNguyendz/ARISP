@@ -196,17 +196,21 @@ export default function RecruiterMyJobsPage() {
                       </p>
                     )}
 
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink-100 dark:border-white/10 pt-3 text-xs">
-                      <span className="flex items-center gap-1.5 whitespace-nowrap font-medium text-ink-600 dark:text-ink-300">
-                        <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1 whitespace-nowrap text-ink-400">
-                        <Clock className="h-3 w-3" /> {timeAgo(j.createdAt)}
-                      </span>
-                      <span className="min-w-0 flex-1 whitespace-nowrap text-right text-ink-400 sm:flex-none">
-                        {formatSalary(j)}
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5" />
+                    <div className="mt-4 flex flex-col gap-1.5 border-t border-ink-100 dark:border-white/10 pt-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-2">
+                      <div className="flex items-center justify-between gap-2 sm:flex-1 sm:justify-start">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap font-medium text-ink-600 dark:text-ink-300">
+                          <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1 whitespace-nowrap text-ink-400">
+                          <Clock className="h-3 w-3" /> {timeAgo(j.createdAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 sm:flex-1 sm:justify-end">
+                        <span className="min-w-0 truncate whitespace-nowrap text-ink-400 sm:text-right">
+                          {formatSalary(j)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5" />
+                      </div>
                     </div>
                   </Link>
                 </motion.div>

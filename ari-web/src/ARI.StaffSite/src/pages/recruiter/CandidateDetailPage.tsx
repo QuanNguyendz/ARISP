@@ -141,7 +141,7 @@ export default function RecruiterCandidateDetailPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Link
         to="/recruiter/candidates"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
@@ -157,19 +157,19 @@ export default function RecruiterCandidateDetailPage() {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-lg font-bold text-white">
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-base font-bold text-white sm:h-16 sm:w-16 sm:text-lg">
             {initials(app.candidateName || app.candidateEmail)}
           </span>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-ink-900 dark:text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg font-bold text-ink-900 dark:text-white sm:text-xl">
               {app.candidateName || t('candidate')}
             </h1>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
-              <span className="flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5" />
-                {app.candidateEmail}
+            <p className="mt-0.5 flex flex-col gap-1 text-sm text-ink-500 dark:text-ink-400 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1">
+              <span className="flex min-w-0 items-center gap-1">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{app.candidateEmail}</span>
               </span>
               {app.candidatePhone ? (
                 <span className="flex items-center gap-1">
@@ -177,14 +177,14 @@ export default function RecruiterCandidateDetailPage() {
                   {app.candidatePhone}
                 </span>
               ) : null}
-              <span className="flex items-center gap-1">
-                <Briefcase className="h-3.5 w-3.5" />
-                {app.jobTitle || t('position')}
+              <span className="flex min-w-0 items-center gap-1">
+                <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{app.jobTitle || t('position')}</span>
               </span>
             </p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${appStatusBadge(app.status)}`}
+                className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${appStatusBadge(app.status)}`}
               >
                 {appStatusLabel(app.status)}
               </span>
@@ -195,11 +195,12 @@ export default function RecruiterCandidateDetailPage() {
           </div>
         </div>
         {app.matchScore != null && (
-          <div className="text-center">
-            <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
+          <div className="flex items-center justify-between gap-2 self-stretch rounded-xl bg-ink-50 px-3 py-2 dark:bg-white/[0.03] sm:flex-col sm:items-center sm:justify-center sm:bg-transparent sm:px-0 sm:py-0 sm:dark:bg-transparent">
+            <span className="text-xs text-ink-400 sm:hidden">{t('matchCVJD')}</span>
+            <div className={`text-2xl font-bold sm:text-3xl ${scoreColor(app.matchScore)}`}>
               {app.matchScore}%
             </div>
-            <div className="text-xs text-ink-400">{t('matchCVJD')}</div>
+            <div className="hidden text-xs text-ink-400 sm:block">{t('matchCVJD')}</div>
           </div>
         )}
       </div>
@@ -222,9 +223,9 @@ export default function RecruiterCandidateDetailPage() {
                 {evals.map((ev) => (
                   <div
                     key={ev.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3"
+                    className="flex flex-col gap-2 rounded-xl border border-ink-100 dark:border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
                         {roundLabel(ev.roundNumber)} · {sessionTypeLabel(ev.sessionType)}
                       </p>
@@ -233,14 +234,14 @@ export default function RecruiterCandidateDetailPage() {
                         {ev.hrReview ? ` · ${t('hrReviewed')}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 sm:shrink-0">
                       {ev.overallScore != null && (
-                        <span className={`text-lg font-bold ${scoreColor(ev.overallScore)}`}>
+                        <span className={`whitespace-nowrap text-lg font-bold ${scoreColor(ev.overallScore)}`}>
                           {ev.overallScore}
                         </span>
                       )}
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(ev.finalVerdict ?? ev.aiVerdict)}`}
+                        className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(ev.finalVerdict ?? ev.aiVerdict)}`}
                       >
                         {verdictLabel(ev.finalVerdict ?? ev.aiVerdict)}
                       </span>
@@ -266,9 +267,9 @@ export default function RecruiterCandidateDetailPage() {
                 {mySessions.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3"
+                    className="flex flex-col gap-2 rounded-xl border border-ink-100 dark:border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
                         {roundLabel(s.roundNumber, s.roundType)} · {sessionTypeLabel(s.sessionType)}
                       </p>
@@ -280,16 +281,16 @@ export default function RecruiterCandidateDetailPage() {
                         · {timeAgo(s.createdAt)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                       {s.verdict && (
                         <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(s.verdict)}`}
+                          className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(s.verdict)}`}
                         >
                           {verdictLabel(s.verdict)}
                         </span>
                       )}
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${sessionStatusBadge(s.status)}`}
+                        className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${sessionStatusBadge(s.status)}`}
                       >
                         {sessionStatusLabel(s.status)}
                       </span>
@@ -304,7 +305,7 @@ export default function RecruiterCandidateDetailPage() {
         {/* Right */}
         <div className="space-y-6">
           {/* Actions */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card sm:p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">
               {t('actions')}
             </h2>
@@ -373,22 +374,22 @@ export default function RecruiterCandidateDetailPage() {
           </div>
 
           {/* Info */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card sm:p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">{t('info')}</h2>
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                 <dt className="text-ink-500 dark:text-ink-400">{t('source')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
                   {app.source === 'job_board' ? t('jobBoard') : t('invited')}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                 <dt className="text-ink-500 dark:text-ink-400">{t('practiceUsed')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
                   {app.practiceSessionUsed ? t('used') : t('notUsed')}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                 <dt className="text-ink-500 dark:text-ink-400">{t('appliedDate')}</dt>
                 <dd className="font-medium text-ink-900 dark:text-white">
                   {new Date(app.createdAt).toLocaleDateString()}

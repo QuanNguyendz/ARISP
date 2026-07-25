@@ -707,12 +707,12 @@ export default function ApplicationsPage() {
             </div>
 
             {/* Filter tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2 pb-1 text-sm">
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`shrink-0 rounded-full px-4 py-1.5 font-medium ${
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium sm:px-4 sm:text-sm ${
                     filter === f.key
                       ? 'bg-brand-600 font-semibold text-white'
                       : 'border border-ink-200 bg-white text-ink-600 hover:border-brand-300'
@@ -724,7 +724,7 @@ export default function ApplicationsPage() {
                   </span>
                 </button>
               ))}
-              <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-ink-400 sm:flex">
+              <span className="order-last ml-auto flex shrink-0 items-center gap-1.5 text-ink-400">
                 <ArrowDownUp className="h-4 w-4" /> {t('applications.newest')}
               </span>
             </div>
