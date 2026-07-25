@@ -7,24 +7,21 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** Phase 2 (FE Responsive) – Nhóm A Sidebar & Settings (~12 giờ, 6 file)  
-**Last updated:** 2026-07-24
+**Phase:** Phase 2 (FE Responsive) – Nhóm C Table (~6 giờ, 3 file)  
+**Last updated:** 2026-07-25
 
 ---
 
 ## Đang làm (In Progress)
 
-### Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (~12 giờ)
+### Phase 2 (FE Responsive) – Nhóm C: Table (~6 giờ, 3 file)
 
-> **Mục tiêu:** Fix responsive cho các sidebar cố định không collapse trên mobile. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm A.
-> **Trạng thái:** 2026-07-24 ✅ HOÀN THÀNH (1 commit, 6 file). Sang Nhóm B.
+> **Mục tiêu:** Fix responsive cho các table thiếu `min-w` wrapper + cell text overflow trên mobile. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm C.
+> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 3 file). Sang Nhóm D.
 
-- [x] `pages/recruiter/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình) ✅
-- [x] `pages/super-admin/SettingsPage.tsx` — Sidebar `lg:w-64` cố định không collapsible (Khó / Trung bình) ✅
-- [x] `pages/hr/SettingsPage.tsx` — Sidebar `lg:w-64` (settings ít dùng) (Trung bình / Thấp) ✅
-- [x] `pages/candidate/ProfilePage.tsx` — Section nav sidebar không collapse (Khó / Trung bình) ✅
-- [x] `pages/candidate/ApplicationDetailPage.tsx` — Round buttons sidebar không collapse (Trung bình / Trung bình) ✅
-- [x] `pages/candidate/InterviewRoomPage.tsx` — Transcript panel không collapse → floating drawer (Khó / Cao — phải test với WebRTC) ✅
+- [x] `pages/hr/DashboardPage.tsx` — Candidates table `min-w-[600px]` + cell padding `px-4 sm:px-5` + jobTitle cell `max-w-[160px] truncate` (Dễ / Thấp) ✅
+- [x] `pages/recruiter/CandidatesPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[600px]` + filter button `whitespace-nowrap` + status badge `whitespace-nowrap` + jobTitle cell `max-w-[180px] truncate` + date cell `whitespace-nowrap` (Trung bình / Thấp) ✅
+- [x] `pages/super-admin/UsersPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[700px]` + cell padding `px-4 sm:px-6` + role select `max-w-[140px]` + badge `whitespace-nowrap` + LockReason/CreateStaff modal OK; CreateStaff form grid `grid-cols-1 sm:grid-cols-2` (Dễ / Thấp) ✅
 
 ---
 
@@ -348,6 +345,32 @@
   - `RecruiterMyJobsPage` — Page padding responsive (P2)
   - JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr) — 2 file sửa cùng đợt.
   - **Tổng:** 16 commit + 1 fix JSX (17 commit), 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
+
+- [x] 2026-07-25: **Phase 2 (FE Responsive) – Nhóm B: Form & Input (5 file, 1 commit).** Hoàn tất Phase 2 Nhóm B theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 5 file form/input thiếu responsive đã fix:
+  - `ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` — Experience form `grid-cols-1 sm:grid-cols-2` + Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete.
+  - `ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` — Salary grid `grid-cols-1 sm:grid-cols-2 md:grid-cols-3` + `min-w-0` + select span.
+  - `ARI.StaffSite/src/pages/recruiter/InterviewCodePage.tsx` — Search input `min-w-0` + `shrink-0` icon + `w-full`.
+  - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — Batch action bar `flex-col sm:flex-row` + actions `flex-wrap`. Filter bar, table grid, pending approval banner, header job info — đã OK sẵn.
+  - **Lint:** 0 lỗi trên 5 file.
+
+- [x] 2026-07-25: **Phase 2 (FE Responsive) – Nhóm C: Table (3 file, 1 commit).** Hoàn tất Phase 2 Nhóm C theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 3 file table thiếu `min-w` wrapper + cell text overflow đã fix:
+  - `ARI.StaffSite/src/pages/hr/DashboardPage.tsx` — Candidates table `min-w-[600px]` (bump từ 560px) + cell padding `px-4 sm:px-5` + jobTitle cell `max-w-[160px] truncate` + candidate name cell `min-w-0` chứa truncate.
+  - `ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[600px]` (bump từ 640px) + filter button + status badge `whitespace-nowrap` + jobTitle cell `max-w-[180px] truncate` + date cell `whitespace-nowrap` + cell padding `px-3 sm:px-4`.
+  - `ARI.StaffSite/src/pages/super-admin/UsersPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[700px]` (bump từ 640px theo plan) + cell padding `px-4 sm:px-6` + role select `w-full max-w-[140px]` + badge `whitespace-nowrap` + CreateStaff form grid `grid-cols-1 sm:grid-cols-2` (mobile 1-col, desktop 2-col).
+  - **Pattern dùng chung:** Table wrapper `overflow-x-auto` + `min-w-[600-700px]` giữ scroll ngang gọn; cell padding `px-3/4 sm:px-4/5/6` theo density từng bảng; cell có text dài thêm `max-w-[N] truncate` + parent `min-w-0`; badge/date thêm `whitespace-nowrap` để không gãy icon dot.
+  - **Lint:** 0 lỗi trên 3 file.
+  - **Còn lại Phase 2:** Nhóm D Layout phức tạp (Candidate JobDetailPage sticky aside, ScrollStorytelling), Nhóm E Chart & Modal nhỏ (DashboardPage YAxis, JobPostingDetailPage reject modal).
+
+- [x] 2026-07-25: **Phase 3 Modal/Dialog + Phase 4 Card/Stat/Widget + Phase 5 Navigation/Header + Phase 6 Job List/Detail (commit thứ 2 của ngày).** Patch responsive nhiều phase trong 1 commit:
+  - `ARI.Shared/src/ui/designSystem.tsx` — PageHeader `flex-col sm:flex-row` + title `text-xl sm:text-2xl` + button `px-3 sm:px-4`.
+  - `ARI.Shared/src/ui/LanguageSwitcher.tsx` — Text label `hidden sm:inline` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
+  - `ARI.StaffSite/src/app/layouts/WorkspaceLayout.tsx` — Header padding `px-3 sm:px-6` + dropdowns `w-[calc(100vw-1.5rem)] max-w-xs/sm` + search bar `hidden sm:flex` + icon button `sm:hidden` + dividers `hidden sm:inline-block` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
+  - `ARI.StaffSite/src/app/layouts/HrLayout.tsx` — Padding `px-3 sm:px-6` + dropdown `w-[calc(100vw-1.5rem)] max-w-xs` + search `hidden sm:flex` + icon `sm:hidden` + dividers `hidden sm:inline-block` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
+  - `ARI.StaffSite/src/pages/hr/JobsPage.tsx` — Container `p-4 sm:p-6 lg:p-8` + card `p-3 sm:p-4 lg:p-6` + body `flex-col gap-3 sm:flex-row sm:items-center sm:justify-between` + avatar `w-10 h-10 sm:w-12 sm:h-12` + title `text-base sm:text-lg` + button Eye icon + label "Xem" mobile / "Xem chi tiết" desktop.
+  - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — Container `p-4 sm:p-6 lg:p-8` + hero outer `gap-4 sm:gap-6` + inner `gap-3 sm:gap-4 lg:gap-6 min-w-0` + avatar `w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 shrink-0` + title block `min-w-0 flex-1` + title `text-xl sm:text-2xl lg:text-3xl break-words` + button "Chỉnh sửa" `w-full sm:w-auto self-stretch sm:self-start`.
+  - `.ai/responsive-fix-plan-2026-07-24.md` — Update section 0.4 trạng thái thực thi + section 6.2 cột "Trạng thái" cho HR (Phase 5x6 hoàn thành).
+  - **Root cause chính trên mobile <640px:** Outer padding 24px ngốm 48/320=15% viewport; card padding 16px ngốm thêm 32px; hero avatar không `shrink-0` + title block không `min-w-0` → avatar bị content overflow ép xuống ~24px thay vì giữ 56px.
+  - **Lint:** 0 lỗi trên 7 file.
  Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
 
 - [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**

@@ -744,38 +744,38 @@ export default function HrDashboardPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[560px]">
+                <div className="min-w-[600px]">
                 <table className="w-full text-sm">
                   <thead className="bg-ink-50/50 text-left dark:bg-white/5">
                     <tr>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.candidate')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.position')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.round')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.verdictAi')}
                       </th>
-                      <th className="px-5 py-3" />
+                      <th className="px-4 py-3 sm:px-5" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100 dark:divide-white/10">
                     {data.recentCandidates.map((c) => (
                       <tr key={c.id} className="hover:bg-ink-50/60 dark:hover:bg-white/5">
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <div className="flex items-center gap-3">
-                            <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
+                            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
                               {initials(c.candidateName)}
                             </div>
-                            <div>
-                              <div className="font-medium text-ink-900 dark:text-white">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-ink-900 dark:text-white">
                                 {c.candidateName || t('table.anonymous')}
                               </div>
-                              <div className="text-xs text-ink-400">
+                              <div className="truncate text-xs text-ink-400">
                                 {typeof c.matchScore === 'number'
                                   ? t('table.matchScore', { score: c.matchScore })
                                   : t('table.notAnalyzed')}
@@ -783,18 +783,18 @@ export default function HrDashboardPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-ink-600 dark:text-ink-400">
+                        <td className="px-4 py-3 text-ink-600 dark:text-ink-400 sm:px-5 max-w-[160px] truncate">
                           {c.jobTitle || '—'}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600 dark:bg-white/10 dark:text-ink-400">
                             {c.latestRound ? `R${c.latestRound}` : '—'}
                           </span>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <VerdictBadge verdict={c.latestVerdict} />
                         </td>
-                        <td className="px-5 py-3 text-right">
+                        <td className="px-4 py-3 text-right sm:px-5">
                           <Link
                             to={`/hr/candidates/${c.id}`}
                             className="rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10"

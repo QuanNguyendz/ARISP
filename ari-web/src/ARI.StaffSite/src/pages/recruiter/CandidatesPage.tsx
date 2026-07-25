@@ -88,7 +88,7 @@ export default function RecruiterCandidatesPage() {
   ]
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title={t('title')} description={t('description')} />
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
@@ -117,7 +117,7 @@ export default function RecruiterCandidatesPage() {
                 <button
                   key={f.value}
                   onClick={() => setFilter(f.value)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                     filter === f.value
                       ? 'bg-brand-600 text-white'
                       : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'
@@ -138,7 +138,7 @@ export default function RecruiterCandidatesPage() {
           ) : (
             <div className="p-2 sm:p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
               <div className="overflow-x-auto">
-                <div className="min-w-[640px]">
+                <div className="min-w-[600px]">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-ink-200 dark:border-white/10">
@@ -151,12 +151,12 @@ export default function RecruiterCandidatesPage() {
                       ].map((h) => (
                         <th
                           key={h}
-                          className="text-left py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400"
+                          className="text-left py-3 px-3 text-sm font-medium text-ink-600 dark:text-ink-400 sm:px-4"
                         >
                           {h}
                         </th>
                       ))}
-                      <th className="text-right py-3 px-4 text-sm font-medium text-ink-600 dark:text-ink-400">
+                      <th className="text-right py-3 px-3 text-sm font-medium text-ink-600 dark:text-ink-400 sm:px-4">
                         {t('tableHeader.actions')}
                       </th>
                     </tr>
@@ -171,7 +171,7 @@ export default function RecruiterCandidatesPage() {
                         onClick={() => navigate(`/recruiter/candidates/${a.id}`)}
                         className="border-b border-ink-100 dark:border-white/5 hover:bg-ink-50 dark:hover:bg-white/[0.02] cursor-pointer transition-colors"
                       >
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-3 sm:px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
                               {initials(a.candidateName || a.candidateEmail)}
@@ -186,17 +186,17 @@ export default function RecruiterCandidatesPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-ink-700 dark:text-ink-200">
+                        <td className="py-4 px-3 sm:px-4 text-ink-700 dark:text-ink-200 max-w-[180px] truncate">
                           {a.jobTitle || '—'}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-3 sm:px-4">
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${appStatusBadge(a.status)}`}
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${appStatusBadge(a.status)}`}
                           >
                             {appStatusLabel(a.status)}
                           </span>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-3 sm:px-4">
                           {typeof a.matchScore === 'number' ? (
                             <span className={`font-semibold ${scoreColor(a.matchScore)}`}>
                               {a.matchScore}
@@ -205,14 +205,14 @@ export default function RecruiterCandidatesPage() {
                             <span className="text-ink-400">—</span>
                           )}
                         </td>
-                        <td className="py-4 px-4 text-ink-600 dark:text-ink-400">
+                        <td className="py-4 px-3 sm:px-4 text-ink-600 dark:text-ink-400 whitespace-nowrap">
                           {new Date(a.createdAt).toLocaleDateString('vi-VN', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric',
                           })}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-3 sm:px-4">
                           <div className="flex items-center justify-end gap-2">
                             {a.cvFileUrl && (
                               <button
