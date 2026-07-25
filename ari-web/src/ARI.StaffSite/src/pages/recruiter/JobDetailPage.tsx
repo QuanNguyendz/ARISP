@@ -1041,8 +1041,9 @@ export default function RecruiterJobDetailPage() {
                 </div>
               </>
             )}
-          </div>
+          </>
         )}
+      </div>
 
       {processedApps.length > 0 && (
         <Pagination
