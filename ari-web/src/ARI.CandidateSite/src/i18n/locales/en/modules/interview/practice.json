@@ -7,7 +7,8 @@
       "jdBased": "AI asks based on the job position JD and your CV.",
       "sameAsReal": "Same round type & language as your upcoming real interview.",
       "noRecording": "No video recording — only transcript & reference notes are saved.",
-      "voiceAnswer": "Answer by voice just like a real interview."
+      "voiceAnswer": "Answer by voice or keyboard — you can fix any mis-heard transcript.",
+      "timeLimit": "Practice is limited to 20 minutes; AI wraps up when time runs out."
     },
     "deviceCheck": {
       "title": "Check camera & microphone",
@@ -23,7 +24,16 @@
       "error": "Error",
       "aiSpeaking": "AI is speaking…",
       "listening": "Listening to your answer…",
-      "ready": "Ready — answer when AI is done asking."
+      "ready": "Ready — answer when AI is done asking.",
+      "timeUp": "Time's up — AI is wrapping up the interview…"
+    },
+    "timer": {
+      "label": "Time remaining"
+    },
+    "answer": {
+      "placeholderVoice": "Speak to auto-fill, or type directly here…",
+      "placeholderType": "Mic is off — type your answer here…",
+      "editHint": "You can edit the text before clicking Submit."
     },
     "transcript": {
       "title": "Transcript",

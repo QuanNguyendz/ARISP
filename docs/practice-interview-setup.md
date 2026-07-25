@@ -1,6 +1,9 @@
 # Phỏng vấn thử (Practice) — Hướng dẫn cắm API key để test
 
-Luồng phỏng vấn thử đã được nối **end-to-end**. Code không chứa secret — bạn chỉ cần điền **4 API key** rồi chạy là test được.
+Luồng phỏng vấn thử đã được nối **end-to-end**. Code không chứa secret — bạn chỉ cần điền các API key rồi chạy là test được.
+
+> **⚠️ ADR-048 — Practice nay AUDIO-ONLY (không avatar).** `media-config` trả `heyGen=null` cho phiên `practice` **theo thiết kế** (không phải do thiếu key) → FE phát giọng ElevenLabs qua WebAudio + bot tĩnh, KHÔNG dựng LiveAvatar. Lý do: tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán. Để test practice **không cần** HeyGen/LiveAvatar key (mục 4 bên dưới chỉ cần cho phỏng vấn **thật**). Bật lại avatar cho practice: `Interview:PracticeUseAvatar=true`.
+> Thêm: practice có **trần 20 phút** (`Interview:PracticeMaxDurationMinutes`) — hết giờ AI nói câu kết rồi dừng; và **nhập kép** — thu âm điền vào ô trả lời, sửa/gõ tay được (nút Mic on/off).
 
 ## Pipeline thực tế (ADR-043/044)
 
@@ -101,7 +104,7 @@ cd ari-service/src/ARI.API && dotnet run
 cd frontend && npm install && npm run dev
 ```
 
-Vào phòng → qua cổng kiểm tra mic/cam (ADR-040) → AI hỏi (avatar nói) → bạn trả lời bằng giọng (Deepgram nhận) → dừng ~1s để AI nhận, hoặc bấm **"Gửi trả lời"** → AI hỏi tiếp → bấm **Kết thúc** sinh Evaluation Report.
+Vào phòng → qua cổng kiểm tra mic/cam (ADR-040) → **đồng hồ 20 phút bắt đầu đếm ngược** → AI hỏi (audio-only, không avatar — ADR-048) → bạn trả lời bằng giọng (Deepgram điền vào ô, **sửa/gõ tay được**) → bấm **"Gửi trả lời"** → AI hỏi tiếp → **hết 20 phút** thì mic khoá, AI nói câu kết rồi dừng (hoặc bấm **Kết thúc**) → sinh Evaluation Report.
 
 ## Endpoint/Hub liên quan
 - `POST /api/interview/session/start` (CandidateOnly) — tạo phiên practice.
