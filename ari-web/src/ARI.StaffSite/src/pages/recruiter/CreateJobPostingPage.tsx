@@ -425,10 +425,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 </label>
               </div>
               {!salaryIsNegotiable && (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMin')} className={input} />
-                  <input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMax')} className={input} />
-                  <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)} className={input}>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  <input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMin')} className={`${input} min-w-0`} />
+                  <input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMax')} className={`${input} min-w-0`} />
+                  <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)} className={`${input} min-w-0 sm:col-span-2 md:col-span-1`}>
                     <option value="VND">VND</option>
                     <option value="USD">USD</option>
                   </select>

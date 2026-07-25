@@ -326,7 +326,7 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 **PR #2.2 — Form & Input (~10 giờ)** 🔜 Đang thực thi
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Experience form `grid-cols-1 sm:grid-cols-2` (Dễ, 30 phút)
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-3` (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-2 md:grid-cols-3` + `min-w-0` + select span (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/InterviewCodePage.tsx` :: Search input responsive (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Filter bar overflow-x-auto + responsive (Trung bình, 2 giờ)
 
