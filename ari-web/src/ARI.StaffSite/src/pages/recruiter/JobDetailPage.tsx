@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { ErrorAlert, Pagination } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
@@ -87,11 +88,14 @@ export default function RecruiterJobDetailPage() {
   const { t } = useTranslation('modules/recruiter/jobDetail')
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
+  const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
 
   const {
     data: job,
     isLoading: loadingJob,
     error: jobError,
+    refetch: refetchJob,
   } = useQuery({
     queryKey: ['job', id],
     queryFn: () => jobService.getJobPostingById(id!),
@@ -394,6 +398,7 @@ export default function RecruiterJobDetailPage() {
             : t('statusUpdated')
       )
       await load()
+      await refetchJob()
     } catch (e: any) {
       setMutationError(e?.response?.data?.message || t('statusError'))
     } finally {
@@ -447,11 +452,25 @@ export default function RecruiterJobDetailPage() {
     }
   }
 
+  const handleToggleDisplay = async (field: 'isUrgent' | 'isPublicListing', value: boolean) => {
+    if (!id || !job) return
+    const originalValue = job[field]
+    if (originalValue === value) return
+
+    queryClient.setQueryData(['job', id], (old: any) => (old ? { ...old, [field]: value } : old))
+    try {
+      await jobService.updateJobDisplay(id, { [field]: value })
+    } catch (err: unknown) {
+      queryClient.setQueryData(['job', id], (old: any) => (old ? { ...old, [field]: originalValue } : old))
+      setMutationError(t(`messages.toggleFailed`))
+    }
+  }
+
   if (loading) return <JobDetailSkeleton />
-  if (!job) {
+  if (!job || (user?.role === 'recruiter' && job.createdByUserId && job.createdByUserId !== user.id)) {
     return (
       <div className="p-6 lg:p-8">
-        <ErrorAlert message={error || t('notFound')} />
+        <ErrorAlert message="Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại." />
         <Link
           to="/recruiter/my-jobs"
           className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
@@ -502,13 +521,21 @@ export default function RecruiterJobDetailPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-xl font-bold text-ink-900 dark:text-white">{job.title}</h1>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(job.status)}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(job.status, job.applicationDeadline)}`}
                 >
-                  {jobStatusLabel(job.status)}
+                  {jobStatusLabel(job.status, job.applicationDeadline)}
                 </span>
               </div>
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
-                <span>{job.department || t('noDepartment')}</span>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-sm font-medium text-ink-700 dark:text-ink-300">
+                  {job.department || t('noDepartment')}
+                </span>
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                  <input type="checkbox" checked={job.isUrgent} onChange={(e) => handleToggleDisplay('isUrgent', e.target.checked)} className="accent-brand-600" />
+                  Tuyển gấp
+                </label>
+              </div>
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
                 {job.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />

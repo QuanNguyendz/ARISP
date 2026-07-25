@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -19,6 +19,7 @@ import {
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@ari/shared/fservices/job'
+import { useAuthStore } from '@ari/shared/store/auth'
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -51,6 +52,7 @@ function getDeadlineText(
 
 export default function HrJobsPage() {
   const { t } = useTranslation('modules/hr/jobs')
+  const user = useAuthStore((s) => s.user)
   const {
     data: jobsData,
     isLoading: loading,
@@ -110,12 +112,21 @@ export default function HrJobsPage() {
     return Array.from(set)
   }, [jobs])
 
+  const getEffectiveStatus = useCallback((j: any) => {
+    if (j.status === 'active' && j.applicationDeadline && new Date(j.applicationDeadline).getTime() < Date.now()) {
+      return 'closed'
+    }
+    return j.status
+  }, [])
+
   const stats = useMemo(() => {
-    // Lọc bỏ nháp ra khỏi thống kê
-    const nonDraftJobs = jobs.filter((j) => j.status !== 'draft')
-    const count = (s: string) => nonDraftJobs.filter((j) => j.status === s).length
+    // Bao gồm các tin không phải nháp VÀ các tin nháp của chính HR Admin này
+    const validJobs = jobs.filter(
+      (j) => getEffectiveStatus(j) !== 'draft' || j.createdByUserId === user?.id
+    )
+    const count = (s: string) => validJobs.filter((j) => getEffectiveStatus(j) === s).length
     return [
-      { label: t('stats.total'), value: nonDraftJobs.length, color: 'text-blue-600 dark:text-blue-400' },
+      { label: t('stats.total'), value: validJobs.length, color: 'text-blue-600 dark:text-blue-400' },
       {
         label: t('status.active'),
         value: count('active'),
@@ -127,17 +138,24 @@ export default function HrJobsPage() {
         color: 'text-indigo-600 dark:text-indigo-400',
       },
       {
+        label: t('status.draft'),
+        value: count('draft'),
+        color: 'text-ink-500 dark:text-ink-400',
+      },
+      {
         label: t('status.closed'),
         value: count('closed'),
         color: 'text-ink-600 dark:text-ink-400',
       },
     ]
-  }, [jobs, t])
+  }, [jobs, t, getEffectiveStatus, user?.id])
 
   const filtered = useMemo(() => {
     return jobs.filter((j) => {
-      // Exclude draft jobs from HR Admin dashboard
-      if (j.status === 'draft') return false
+      const effectiveStatus = getEffectiveStatus(j)
+
+      // Chỉ hiển thị tin nháp của chính mình
+      if (effectiveStatus === 'draft' && j.createdByUserId !== user?.id) return false
 
       // 1. Search term
       if (searchTerm.trim()) {
@@ -150,7 +168,7 @@ export default function HrJobsPage() {
       }
 
       // 2. Status filter
-      if (selectedStatus !== 'all' && j.status !== selectedStatus) return false
+      if (selectedStatus !== 'all' && effectiveStatus !== selectedStatus) return false
 
       // 3. Employee filter
       if (selectedEmployee !== 'all' && j.createdByName !== selectedEmployee) return false
@@ -254,6 +272,7 @@ export default function HrJobsPage() {
                 <option value="all">Tất cả trạng thái</option>
                 <option value="active">{t('status.active')}</option>
                 <option value="pending">{t('status.pending')}</option>
+                <option value="draft">{t('status.draft')}</option>
                 <option value="paused">{t('status.paused')}</option>
                 <option value="closed">{t('status.closed')}</option>
                 <option value="rejected">{t('status.rejected')}</option>
@@ -267,7 +286,7 @@ export default function HrJobsPage() {
                 onChange={(e) => setSelectedEmployee(e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               >
-                <option value="all">Tất cả nhân viên</option>
+                <option value="all">Lọc theo người phụ trách</option>
                 {uniqueEmployees.map((emp) => (
                   <option key={emp} value={emp}>
                     {emp}
@@ -337,9 +356,15 @@ export default function HrJobsPage() {
                           {job.title}
                         </h3>
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            job.status === 'active' && job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now()
+                              ? 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400'
+                              : meta.badge
+                          }`}
                         >
-                          {meta.label}
+                          {job.status === 'active' && job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now()
+                            ? 'Hết hạn (Đã đóng)'
+                            : meta.label}
                         </span>
                         {job.isUrgent && (
                           <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-1">
