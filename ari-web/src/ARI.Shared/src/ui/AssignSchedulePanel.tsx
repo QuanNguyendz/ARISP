@@ -23,6 +23,10 @@ export interface AssignSchedulePanelProps {
   hasScheduled: boolean
   /** Giờ đã được xếp (ISO) — hiển thị khi hasScheduled. */
   scheduledAt?: string | null
+  /** Phản hồi của ứng viên với lịch hiện tại: pending | confirmed (khi hasScheduled). */
+  confirmationStatus?: string | null
+  /** Lý do ứng viên báo bận lần gần nhất — hiển thị khi đang chờ xếp lại (không còn lịch). */
+  declineReason?: string | null
   /** Trạng thái hồ sơ (screening/interview mới được xếp lịch). */
   status: string
   /** Gọi sau khi gán thành công để trang cha refetch hồ sơ. */
@@ -66,6 +70,8 @@ export default function AssignSchedulePanel({
   round,
   hasScheduled,
   scheduledAt,
+  confirmationStatus,
+  declineReason,
   status,
   onAssigned,
 }: AssignSchedulePanelProps) {
@@ -128,6 +134,18 @@ export default function AssignSchedulePanel({
         Xếp lịch phỏng vấn · Vòng {round}
       </h2>
 
+      {!hasScheduled && canAssign && declineReason && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <AlertCircle className="h-3.5 w-3.5" /> Ứng viên đã báo bận lịch trước
+          </p>
+          <p className="mt-1 text-sm italic text-amber-800 dark:text-amber-300">“{declineReason}”</p>
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            Hãy chọn một khung giờ khác phù hợp hơn cho ứng viên.
+          </p>
+        </div>
+      )}
+
       {hasScheduled ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
           <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
@@ -136,6 +154,15 @@ export default function AssignSchedulePanel({
           <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
             {scheduledAt ? fullDateTime(scheduledAt) : 'Đã có lịch phỏng vấn thật'}
           </p>
+          {confirmationStatus === 'confirmed' ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Ứng viên đã xác nhận tham dự
+            </p>
+          ) : (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-3.5 w-3.5" /> Đang chờ ứng viên xác nhận
+            </p>
+          )}
         </div>
       ) : !canAssign ? (
         <p className="flex items-start gap-1.5 text-xs text-ink-400">

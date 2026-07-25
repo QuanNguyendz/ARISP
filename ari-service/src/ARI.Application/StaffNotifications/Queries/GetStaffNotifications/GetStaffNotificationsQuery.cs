@@ -161,6 +161,38 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                 }
             }
 
+            // 5. Ứng viên phản hồi lịch phỏng vấn (xác nhận / báo bận) — 30 ngày gần nhất.
+            if (appIds.Count > 0)
+            {
+                var responses = await _unitOfWork.Repository<InterviewBooking>()
+                    .QueryAsync(q => q
+                        .Where(b => appIds.Contains(b.ApplicationId)
+                            && b.RespondedAt >= since
+                            && (b.ConfirmationStatus == "confirmed" || b.ConfirmationStatus == "declined"))
+                        .Select(b => new { b.Id, b.ApplicationId, b.RoundNumber, b.ConfirmationStatus, b.DeclineReason, b.RespondedAt }), ct);
+                if (responses.Count > 0)
+                {
+                    var respAppIds = responses.Select(r => r.ApplicationId).Distinct().ToList();
+                    var respApps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                            .QueryAsync(q => q.Where(a => respAppIds.Contains(a.Id))
+                                .Select(a => new { a.Id, a.JobPostingId, a.CandidateName }), ct))
+                        .ToDictionary(a => a.Id);
+                    foreach (var r in responses)
+                    {
+                        respApps.TryGetValue(r.ApplicationId, out var a);
+                        var jid = a?.JobPostingId ?? Guid.Empty;
+                        var name = a?.CandidateName ?? "Ứng viên";
+                        var declined = string.Equals(r.ConfirmationStatus, "declined", StringComparison.OrdinalIgnoreCase);
+                        Add($"schedule_response:{r.Id}", "schedule",
+                            declined ? "Ứng viên báo bận lịch phỏng vấn" : "Ứng viên xác nhận lịch phỏng vấn",
+                            declined
+                                ? $"{name} · {Title(jid)} · vòng {r.RoundNumber}: {r.DeclineReason}"
+                                : $"{name} · {Title(jid)} · vòng {r.RoundNumber}",
+                            $"{linkBase}/candidates/{r.ApplicationId}", r.RespondedAt ?? nowUtc);
+                    }
+                }
+            }
+
             // 3. Tin chờ duyệt — chỉ HR Admin. (Đã tạo thực tế qua UpdateJobStatusCommand nên bỏ qua tạo ảo để tránh lặp)
             // if (isHrAdmin)
             // {

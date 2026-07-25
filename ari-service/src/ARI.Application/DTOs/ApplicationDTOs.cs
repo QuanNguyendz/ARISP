@@ -52,6 +52,18 @@ namespace ARI.Application.DTOs
         public string? NoticePeriod { get; set; }
         public decimal? InterviewScore { get; set; }
         public DateTimeOffset? InterviewDate { get; set; }
+
+        /// <summary>
+        /// Phản hồi của ứng viên với lịch vòng hiện tại đang được xếp: pending | confirmed.
+        /// Null nếu chưa có lịch "scheduled" cho vòng hiện tại (ADR-048).
+        /// </summary>
+        public string? ScheduleConfirmationStatus { get; set; }
+
+        /// <summary>
+        /// Lý do ứng viên báo bận ở lần xếp lịch gần nhất của vòng hiện tại — hiển thị cho nhân sự
+        /// khi đang chờ xếp lại (chỉ set khi hiện KHÔNG còn lịch "scheduled").
+        /// </summary>
+        public string? ScheduleDeclineReason { get; set; }
     }
 
     public class UpdateApplicationStatusRequest

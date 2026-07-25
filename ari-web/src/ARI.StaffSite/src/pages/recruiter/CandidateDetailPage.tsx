@@ -393,6 +393,8 @@ export default function RecruiterCandidateDetailPage() {
             round={app.currentRound || 1}
             hasScheduled={!!app.hasScheduledInterview}
             scheduledAt={app.interviewDate}
+            confirmationStatus={app.scheduleConfirmationStatus}
+            declineReason={app.scheduleDeclineReason}
             status={app.status}
             onAssigned={refreshApp}
           />

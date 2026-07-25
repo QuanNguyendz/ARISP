@@ -207,4 +207,8 @@ export interface HrApplicationItem {
   noticePeriod?: string
   interviewScore?: number | null
   interviewDate?: string
+  /** Phản hồi của ứng viên với lịch vòng hiện tại: pending | confirmed (null nếu chưa có lịch). */
+  scheduleConfirmationStatus?: string | null
+  /** Lý do ứng viên báo bận lần xếp lịch gần nhất (khi đang chờ nhân sự xếp lại). */
+  scheduleDeclineReason?: string | null
 }

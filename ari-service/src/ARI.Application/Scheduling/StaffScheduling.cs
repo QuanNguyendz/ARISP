@@ -224,12 +224,19 @@ namespace ARI.Application.Scheduling
             if (incremented == 0)
                 return Result.Failure<AssignSlotResultDto>("Khung giờ đã đầy. Vui lòng chọn khung giờ khác hoặc tăng sức chứa.");
 
+            // Nếu đây là lần xếp lại sau khi ứng viên từ chối, liên kết về booking đã từ chối gần nhất.
+            var priorDeclined = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                    b => b.ApplicationId == applicationId && b.RoundNumber == round && b.Status == "declined", ct))
+                .OrderByDescending(b => b.RespondedAt ?? b.UpdatedAt).FirstOrDefault();
+
             var booking = new InterviewBooking
             {
                 ApplicationId = applicationId,
                 AvailabilitySlotId = slot.Id,
                 RoundNumber = round,
                 Status = "scheduled",
+                ConfirmationStatus = "pending",
+                RescheduledFromId = priorDeclined?.Id,
             };
             await _unitOfWork.Repository<InterviewBooking>().AddAsync(booking, ct);
 
@@ -273,7 +280,8 @@ namespace ARI.Application.Scheduling
             if (app.CandidateAccountId.HasValue)
             {
                 var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
-                var dedupKey = $"schedule_assigned:{applicationId}:{round}";
+                // Dedup theo booking.Id: mỗi lần xếp/xếp-lại là booking mới → luôn thông báo lại.
+                var dedupKey = $"schedule_assigned:{booking.Id}";
                 var already = await notifRepo.FindAsync(
                     n => n.CandidateAccountId == app.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
                 if (!already.Any())
@@ -284,8 +292,8 @@ namespace ARI.Application.Scheduling
                         DedupKey = dedupKey,
                         Type = "schedule",
                         Title = "Lịch phỏng vấn đã được xếp",
-                        Body = $"Nhân sự đã xếp lịch phỏng vấn (vòng {round}) cho bạn: {whenText}. Vui lòng đến đúng giờ; bạn có thể luyện tập với phỏng vấn thử trước ngày hẹn.",
-                        Link = "/candidate/applications",
+                        Body = $"Nhân sự đã xếp lịch phỏng vấn (vòng {round}) cho bạn: {whenText}. Vui lòng XÁC NHẬN nếu bạn tham dự được, hoặc báo bận kèm lý do để được xếp lịch khác.",
+                        Link = $"/portal/schedule/{applicationId}",
                         IsRead = false
                     }, ct);
                     await _unitOfWork.SaveChangesAsync(ct);
@@ -306,8 +314,9 @@ namespace ARI.Application.Scheduling
             <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
             <p>Bộ phận nhân sự đã xếp lịch phỏng vấn <strong>vòng {round}</strong> cho vị trí <strong>{jobTitle}</strong> của bạn:</p>
             <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
+            <p>Vui lòng đăng nhập Candidate Portal để <strong>xác nhận lịch</strong>. Nếu bạn bận vào khung giờ này, hãy <strong>báo bận kèm lý do</strong> để nhân sự xếp lịch khác phù hợp hơn.</p>
             <p>Vui lòng đến văn phòng đúng khung giờ trên. Nhân sự sẽ cấp <strong>Mã phỏng vấn (Interview Code)</strong> tại chỗ để bạn vào phòng phỏng vấn.</p>
-            <p>Bạn có thể đăng nhập Candidate Portal để xem chi tiết và luyện tập với chế độ <em>phỏng vấn thử</em> trước ngày hẹn.</p>
+            <p>Bạn cũng có thể luyện tập với chế độ <em>phỏng vấn thử</em> trên Portal trước ngày hẹn.</p>
             <br/>
             <p>Trân trọng,</p>
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>

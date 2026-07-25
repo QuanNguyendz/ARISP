@@ -590,6 +590,8 @@ namespace ARI.Application.Services
 
             decimal? score = null;
             DateTimeOffset? interviewDate = null;
+            string? scheduleConfirmationStatus = null;
+            string? scheduleDeclineReason = null;
             if (currentRound.HasValue)
             {
                 var eval = (await _unitOfWork.Repository<Evaluation>()
@@ -605,6 +607,16 @@ namespace ARI.Application.Services
                 {
                     var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
                     interviewDate = slot?.StartTime;
+                    scheduleConfirmationStatus = booking.ConfirmationStatus;
+                }
+                else
+                {
+                    // Không còn lịch scheduled → nếu vừa bị ứng viên báo bận, đưa lý do lên cho nhân sự xếp lại.
+                    var declined = (await _unitOfWork.Repository<InterviewBooking>()
+                        .FindAsync(b => b.ApplicationId == id && b.RoundNumber == currentRound.Value && b.Status == "declined", ct))
+                        .OrderByDescending(b => b.RespondedAt ?? b.UpdatedAt)
+                        .FirstOrDefault();
+                    scheduleDeclineReason = declined?.DeclineReason;
                 }
             }
 
@@ -613,6 +625,8 @@ namespace ARI.Application.Services
             var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
                 b => b.ApplicationId == id && b.Status != null && b.Status.ToLower() == "scheduled", ct);
             response.HasScheduledInterview = scheduled.Any();
+            response.ScheduleConfirmationStatus = scheduleConfirmationStatus;
+            response.ScheduleDeclineReason = scheduleDeclineReason;
             return Result.Success(response);
         }
 

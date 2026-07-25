@@ -138,7 +138,7 @@ namespace ARI.Application.CandidatePortal
                 var app = apps.FirstOrDefault(a => a.Id == b.ApplicationId);
                 Add($"schedule:{b.Id}", "schedule", $"Lịch phỏng vấn vòng {b.RoundNumber} sắp tới",
                     $"{(app != null ? JobTitle(app.JobPostingId) : "")} · {slot.StartTime:dd/MM HH:mm}",
-                    $"/candidate/applications/{b.ApplicationId}", b.CreatedAt);
+                    $"/portal/schedule/{b.ApplicationId}", b.CreatedAt);
             }
 
             // 5. Kết quả bài thi trắc nghiệm online (Online Test)
