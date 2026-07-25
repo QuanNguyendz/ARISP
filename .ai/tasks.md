@@ -7,20 +7,20 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** Phase 2 (FE Responsive) – Nhóm D Layout phức tạp (~8 giờ, 2 file)  
+**Phase:** Phase 2 (FE Responsive) – Nhóm E Chart & Modal nhỏ (~4 giờ, 2 file)  
 **Last updated:** 2026-07-25
 
 ---
 
 ## Đang làm (In Progress)
 
-### Phase 2 (FE Responsive) – Nhóm D: Layout phức tạp (~8 giờ, 2 file)
+### Phase 2 (FE Responsive) – Nhóm E: Chart & Modal nhỏ (~4 giờ, 2 file)
 
-> **Mục tiêu:** Fix responsive cho layout phức tạp — sticky aside chuyển thành bottom fixed bar mobile, scroll storytelling sections co giãn theo viewport. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm D.
-> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 2 file). Sang Nhóm E.
+> **Mục tiêu:** Fix responsive cho chart YAxis tràn trên mobile + reject modal thiếu max-h/overflow-y. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm E.
+> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 2 file). Phase 2 xong → sang Phase 3.
 
-- [x] `pages/job-board/JobDetailPage.tsx` (Candidate) — Sticky aside → bottom fixed bar mobile: aside `hidden lg:block` desktop, bottom bar `lg:hidden` mobile (Apply + Save buttons). Match card duplicate inline trong content mobile (lg:hidden) để không mất tính năng + `hidden lg:block` ở desktop. Header card title `break-words` + meta icons `shrink-0` + `truncate` cho text dài. Salary badge `whitespace-nowrap` (Dễ-trung bình / Trung bình) ✅
-- [x] `components/sections/ScrollStorytelling.tsx` — Sections: `py-40` → `py-20 sm:py-32 lg:py-40`, `gap-20` → `gap-10 sm:gap-12 lg:gap-20`, `px-6` → `px-4 sm:px-6 lg:px-8`, headings `text-4xl` → `text-3xl sm:text-5xl md:text-6xl` (mobile 36px thay vì 36px), paragraph `text-lg` → `text-base sm:text-lg`, visual containers `w-24 h-24` → `w-16 h-16 sm:w-24 sm:h-24`, `aspect-square max-w-sm` → `max-w-[12rem] sm:max-w-sm`, score display `gap-8` → `gap-4 sm:gap-8` + `text-4xl` → `text-3xl sm:text-4xl` + dividers `h-12` → `h-10 sm:h-12` (Dễ / Thấp) ✅
+- [x] `pages/hr/DashboardPage.tsx` — RecruiterBarChart YAxis `width={96}` → `width={60}` + tick fontSize 11 → 10 (Dễ / Thấp) ✅
+- [x] `pages/hr/JobPostingDetailPage.tsx` — Reject modal thêm `max-h-[90vh] overflow-y-auto` + padding `p-5 sm:p-6` (giam mobile 24->20px) (Dễ / Thấp) ✅
 
 ---
 

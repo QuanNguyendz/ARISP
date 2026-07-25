@@ -1273,7 +1273,7 @@ export default function JobPostingDetailPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-5 sm:p-6 shadow-card-hover"
           >
             <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">
               {t('confirmRejectModal.title')}

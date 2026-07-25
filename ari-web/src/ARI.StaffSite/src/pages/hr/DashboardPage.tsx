@@ -352,8 +352,8 @@ function RecruiterBarChart({
           <YAxis
             type="category"
             dataKey="name"
-            width={96}
-            tick={{ fontSize: 11, fill: CHART_AXIS }}
+            width={60}
+            tick={{ fontSize: 10, fill: CHART_AXIS }}
             tickLine={false}
             axisLine={false}
           />
