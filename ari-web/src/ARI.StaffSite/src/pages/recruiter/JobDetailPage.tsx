@@ -442,7 +442,7 @@ export default function RecruiterJobDetailPage() {
   if (loading) return <JobDetailSkeleton />
   if (!job) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <ErrorAlert message={error || t('notFound')} />
         <Link
           to="/recruiter/my-jobs"
@@ -459,7 +459,7 @@ export default function RecruiterJobDetailPage() {
   const canEdit = job.status !== 'archived'
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Link
         to="/recruiter/my-jobs"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
@@ -492,7 +492,7 @@ export default function RecruiterJobDetailPage() {
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-xl font-bold text-ink-900 dark:text-white">{job.title}</h1>
+                <h1 className="text-lg font-bold text-ink-900 dark:text-white sm:text-xl">{job.title}</h1>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(job.status)}`}
                 >
@@ -606,12 +606,12 @@ export default function RecruiterJobDetailPage() {
       </motion.div>
 
       {/* Candidate Funnel */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
           <span className="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
             <Users className="h-4 w-4" /> {t('stats.totalCandidates')}
           </span>
-          <div className="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400">
+          <div className="mt-2 text-xl font-bold text-brand-600 dark:text-brand-400 sm:text-2xl">
             {apps.length}
           </div>
         </div>
@@ -621,7 +621,7 @@ export default function RecruiterJobDetailPage() {
             className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
           >
             <span className="text-sm text-ink-500 dark:text-ink-400">{f.label}</span>
-            <div className="mt-2 text-2xl font-bold text-ink-900 dark:text-white">{f.count}</div>
+            <div className="mt-2 text-xl font-bold text-ink-900 dark:text-white sm:text-2xl">{f.count}</div>
           </div>
         ))}
       </div>

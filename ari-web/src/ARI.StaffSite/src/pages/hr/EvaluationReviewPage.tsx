@@ -199,7 +199,7 @@ export default function EvaluationReviewPage() {
               key={stat.label}
               className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
             >
-              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
+              <div className="font-display text-xl font-extrabold text-ink-900 dark:text-white sm:text-2xl">
                 {stat.value}
               </div>
               <div className="text-sm text-ink-500 dark:text-ink-400 mt-1">{stat.label}</div>
@@ -300,23 +300,23 @@ export default function EvaluationReviewPage() {
   // Detail view
   return (
     <>
-      <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-6 h-16">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-4 sm:px-6 h-14 sm:h-16">
         <button
           onClick={closeDetail}
-          className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2 text-sm text-ink-400">
-          <Link to="#" onClick={closeDetail} className="hover:text-brand-600 dark:text-brand-400">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-400">
+          <Link to="#" onClick={closeDetail} className="shrink-0 hover:text-brand-600 dark:text-brand-400">
             {t('evaluations')}
           </Link>
-          <ChevronRight className="w-4 h-4" />
-          <span className="text-ink-600 dark:text-ink-300 font-medium">
+          <ChevronRight className="h-4 w-4 shrink-0" />
+          <span className="truncate text-ink-600 dark:text-ink-300 font-medium">
             {selectedEvaluation.candidateName} · {selectedEvaluation.jobTitle}
           </span>
         </div>
-        <button className="ml-auto relative grid h-10 w-10 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
+        <button className="ml-auto relative grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
           <Bell className="w-5 h-5 text-ink-600 dark:text-ink-400" />
           <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
         </button>
@@ -405,21 +405,21 @@ export default function EvaluationReviewPage() {
                   <Languages className="w-4 h-4" />
                   {t('languageAssessment')} ({selectedEvaluation.languageAssessment.language})
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-3 text-center text-sm">
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs sm:gap-3 sm:text-sm">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.cefrLevel ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('cefr')}</div>
                   </div>
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.fluency ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('fluency')}</div>
                   </div>
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.vocabulary ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('vocabulary')}</div>

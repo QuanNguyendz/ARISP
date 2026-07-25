@@ -119,7 +119,7 @@ export default function RecruiterEvaluationReviewPage() {
           <StatsGrid stats={statCards} />
 
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 sm:max-w-xs sm:flex-1">
+            <div className="flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 sm:max-w-sm sm:flex-1">
               <Search className="h-4 w-4 text-ink-400" />
               <input
                 value={q}
@@ -287,7 +287,7 @@ export default function RecruiterEvaluationReviewPage() {
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
                       {t('reasoning')}
                     </h3>
-                    <p className="whitespace-pre-wrap rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm leading-7 text-ink-700 dark:text-ink-200">
+                    <p className="whitespace-pre-wrap rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm leading-6 text-ink-700 dark:text-ink-200">
                       {detail.reasoning}
                     </p>
                   </section>

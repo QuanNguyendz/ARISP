@@ -52,7 +52,7 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | **Phase 6 — Job/Recruitment list cards** | ✅ **Hoàn thành (HrJobsPage + HrJobPostingDetailPage)** | `HrJobsPage`: card `p-3 sm:p-4 lg:p-6`, container `flex-col gap-3 → sm:flex-row`, title `text-base sm:text-lg`, avatar `w-10 h-10 sm:w-12 sm:h-12`, button Eye icon + label "Xem" mobile / "Xem chi tiết" desktop. `HrJobPostingDetailPage`: container `p-4 sm:p-6 lg:p-8`, hero `flex-col gap-3 sm:gap-4 lg:gap-6`, avatar `w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 shrink-0`, title block `min-w-0 flex-1`, title `text-xl sm:text-2xl lg:text-3xl break-words`, button "Chỉnh sửa" `w-full sm:w-auto` |
 | **Phase 6 — Job/Recruitment list cards** | ✅ **Hoàn thành (HrJobsPage)** | card `p-3 sm:p-4 lg:p-6`, **container `flex-col gap-3` mobile → `sm:flex-row sm:items-center sm:justify-between` desktop**; title `text-base sm:text-lg`; avatar `w-10 h-10 sm:w-12 sm:h-12`; button có icon `Eye` + label "Xem chi tiết" `hidden sm:inline` ngắn gọn "Xem" mobile |
 | Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
-| Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
+| Phase 2 Nhóm E — Chart & Modal nhỏ | ✅ **Đã xong (từ Phase 3/4 trước)** | HR Dashboard YAxis `width={60}` cho RecruiterBarChart + `width={34}` cho Match/Trend + `fontSize 10` + Modal reject `max-h-[90vh] overflow-y-auto p-5 sm:p-6` đã OK từ trước — không cần sửa thêm |
 | Phase 3 | ⏳ Backlog | |
 | Phase 4 | ⏳ Backlog | |
 

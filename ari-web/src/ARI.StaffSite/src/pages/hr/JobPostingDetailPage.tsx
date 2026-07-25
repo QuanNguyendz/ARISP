@@ -771,7 +771,7 @@ export default function JobPostingDetailPage() {
                 <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />{' '}
                 {t('aiConfig.title')}
               </h2>
-              <div className="grid md:grid-cols-2 gap-6 text-sm">
+              <div className="grid grid-cols-1 gap-6 text-sm sm:grid-cols-2">
                 <div className="space-y-3">
                   <p className="text-ink-600 dark:text-ink-400">
                     <strong className="text-ink-900 dark:text-white">

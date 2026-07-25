@@ -68,7 +68,7 @@ function KpiCard({
         <div className="font-display text-3xl font-extrabold leading-none text-ink-900 dark:text-white">
           {value}
         </div>
-        <svg viewBox="0 0 72 28" className="h-7 w-20 text-brand-500">
+        <svg viewBox="0 0 72 28" className="h-5 w-14 text-brand-500 sm:h-7 sm:w-20">
           <polyline
             fill="none"
             stroke="currentColor"
@@ -548,8 +548,7 @@ export default function HrDashboardPage() {
                       <div className="w-10 shrink-0 text-right text-sm font-bold text-ink-900 dark:text-white">
                         {item.value}
                       </div>
-                      <div
-                        className="w-16 shrink-0 text-right text-xs text-ink-400 dark:text-ink-500"
+                      <div className="w-10 shrink-0 text-right text-xs text-ink-400 dark:text-ink-500 sm:w-16 sm:text-xs"
                         title={t('charts.conversionRate')}
                       >
                         {i === 0

@@ -7,14 +7,28 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** FE Responsive – Hotfix Round 6 (4 lỗi mobile báo cáo 2026-07-25 23:46)  
-**Last updated:** 2026-07-25
+**Phase:** FE Responsive – Đã xong Phase 2 Nhóm E (Chart & Modal nhỏ) qua khảo sát  
+**Last updated:** 2026-07-26
 
 ---
 
 ## Đang làm (In Progress)
 
-### FE Responsive – Hotfix Round 6 (2026-07-25, 1 commit, 4 file)
+### Khảo sát Phase 2 Nhóm E — Chart & Modal nhỏ (2026-07-26)
+
+> **Mục tiêu:** Xác nhận Phase 2 Nhóm E (2 file trong plan) đã OK từ các commit trước, không cần sửa thêm.
+>
+> **Trạng thái:** 2026-07-26 ✅ HOÀN THÀNH (khảo sát, không có thay đổi code).
+>
+> Update file `.ai/responsive-fix-plan-2026-07-24.md` dòng 56: `Phase 2 Nhóm E — Chart & Modal nhỏ` từ ⏳ Backlog → ✅ Đã xong (qua Phase 3/4 trước).
+
+- [x] **Khảo sát `pages/hr/DashboardPage.tsx`** — 3 YAxis đều OK: RecruiterBarChart `width={60} fontSize={10}` (line 352-359), MatchScoreChart `width={34} fontSize={10}` (line 277-283), TrendChart `width={34} fontSize={10}` (line 193-199). Đúng spec plan → không sửa.
+- [x] **Khảo sát `pages/hr/JobPostingDetailPage.tsx`** — Modal reject (line 1271-1276) đã có `max-h-[90vh] overflow-y-auto rounded-2xl ... p-5 sm:p-6 shadow-card-hover`. Đúng spec plan → không sửa.
+- **Kết luận:** Cả 2 file mục tiêu trong Phase 2 Nhóm E đã được sửa từ các round Phase 3 Modal/Dialog và Phase 4 Card/Stat/Widget trước đó. Không có thay đổi code.
+- **Lint:** Không có file nào được sửa → không cần `tsc --noEmit`.
+- **Bước tiếp theo:** Chờ user commit update plan + tasks.md. Sau đó sang **Phase 2 Nhóm D** (Candidate JobDetailPage sticky aside → bottom fixed bar + ScrollStorytelling visual size) hoặc **Phase 3** (CTA/Demo/Hero polish + HR/Recruiter job detail polish).
+
+---
 
 > **Mục tiêu:** Sửa tiếp 4 lỗi mobile báo cáo sau Round 5: thiếu icon ngôn ngữ mobile, filter chip vẫn tràn, job card footer không tự xuống dòng theo kích thước, Recruiter CandidateDetailPage xấu.
 >
@@ -340,7 +354,23 @@
   - **TypeScript:** `tsc --noEmit` pass cả 2 site.
   - **Còn lại:** Tiếp tục theo plan (Phase 7 widget polish / Phase 8 page-level audit) hoặc theo lỗi user báo tiếp theo.
 
-- [x] 2026-07-24: **Phase 1 (FE Responsive) – P0 + P1 — 16 commit responsive fix (`feature/fe/fix-responsive`).** Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai: `SchedulePage` (Candidate P0), `HrDashboardPage`, `HrEvaluationReviewPage`, `HrJobPostingDetailPage`, `RecruiterJobDetailPage`, `ApplicationsPage`, `FindJobPage`, `HomePage`, `InterviewSchedulePage`, `ApplicationDetailPage`, `CandidateJobDetailPage`, `ProfilePage`, `ApplyPage`, `HrCandidatesPage`, `HrCandidateDetailPage`, `RecruiterCreateJobPostingPage`, `RecruiterMyJobsPage`. JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr). Tổng 17 commit, 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
+- [x] 2026-07-25: **FE Responsive – Hotfix Round 6 (4 file, 1 commit).** Patch tiếp 4 lỗi mobile báo cáo sau Round 5:
+  1. `CandidateHeader.tsx` — Thêm Globe icon-only riêng cho mobile (`sm:hidden` chỉ icon h-9 w-9) — pattern tách button theo breakpoint (sau này gộp lại ở commit `f4e64e13`).
+  2. `ApplicationsPage.tsx` (Candidate) — Filter chip `flex flex-wrap items-center gap-2` (bỏ `overflow-x-auto` đang ép 1 dòng) + button thu nhỏ mobile + label "Mới nhất" `order-last`.
+  3. `MyJobsPage.tsx` (Recruiter) — Job card footer cấu trúc lại 2 dòng mobile (line 1 = applicants+time, line 2 = salary+chevron, mỗi line `justify-between`); desktop vẫn 1 dòng ngang `sm:flex-row sm:flex-wrap`.
+  4. `CandidateDetailPage.tsx` (Recruiter) — Tổng thể responsive: page p-4→lg:p-8 + header card padding p-4→sm:p-6 + avatar h-12→sm:h-16 + contact info `flex-col gap-1 sm:flex-row sm:flex-wrap` (mobile stack dọc) + match score box inline mobile (label trái, % phải) → sm:flex-col sm:items-center (desktop) + evaluation/session items `flex-col gap-2 sm:flex-row sm:items-center sm:justify-between` (title trên, score+badge dưới) + verdict/session badge `whitespace-nowrap sm:shrink-0` + action/info card `p-4 sm:p-5` + info dl `flex-col gap-1 sm:flex-row sm:justify-between`.
+  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+
+- [x] 2026-07-25: **FE Responsive – Hotfix Globe dropdown mobile (1 file, 1 commit `f4e64e13`).** Round 6 tách language thành 2 div riêng (mobile `sm:hidden` + desktop `hidden sm:block`) nhưng quên dropdown chỉ nằm trong div desktop → bấm Globe mobile không hiện gì. Gộp thành 1 div duy nhất: 1 button responsive (class `h-9 w-9 sm:flex sm:h-auto sm:w-auto sm:items-center sm:gap-1 sm:px-2 sm:py-2 sm:text-sm sm:font-medium` + Globe luôn + label/chevron `hidden sm:inline`/`sm:block`) + 1 dropdown ngôn ngữ chung (`fixed top-[calc(4rem+0.5rem)] z-50 sm:absolute sm:right-0 sm:mt-2 sm:w-40`). Pattern giống HR WorkspaceLayout.
+  - **TypeScript:** `tsc --noEmit` pass ARI.CandidateSite.
+
+- [x] 2026-07-26: **FE Responsive – Phase 2 Nhóm E đã xong (khảo sát, 0 commit code).** Khảo sát lại 2 file mục tiêu trong plan `.ai/responsive-fix-plan-2026-07-24.md`:
+  - `pages/hr/DashboardPage.tsx` — 3 YAxis đều OK: RecruiterBarChart `width={60} fontSize={10}` (line 352-359), MatchScoreChart `width={34} fontSize={10}` (line 277-283), TrendChart `width={34} fontSize={10}` (line 193-199). Đúng spec plan.
+  - `pages/hr/JobPostingDetailPage.tsx` — Modal reject (line 1271-1276) đã có `max-h-[90vh] overflow-y-auto rounded-2xl ... p-5 sm:p-6 shadow-card-hover`. Đúng spec plan.
+  - **Kết luận:** Cả 2 đã được sửa từ các commit Phase 3 Modal/Dialog + Phase 4 Card/Stat/Widget trước. Cập nhật plan dòng 56 ⏳ Backlog → ✅ Đã xong.
+  - **TypeScript:** Không có file sửa → không cần check.
+  - **Bước tiếp theo:** Sang Phase 2 Nhóm D (Candidate JobDetailPage sticky aside → bottom fixed bar) hoặc Phase 3 polish (CTA/Hero/Demo + HR/Recruiter job detail polish).
+
 
 - [x] 2026-07-24: **Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (6 file, 1 commit).** Hoàn tất Phase 2 Nhóm A theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 6 file sidebar cố định `lg:w-64` / `lg:grid-cols-[...]` không collapse trên mobile đã chuyển sang **horizontal scroll pills dưới lg, sidebar dọc từ lg**:
   - `ARI.StaffSite/src/pages/recruiter/SettingsPage.tsx` — dark theme (amber-500). Tabs dọc 256px → horizontal scroll.
