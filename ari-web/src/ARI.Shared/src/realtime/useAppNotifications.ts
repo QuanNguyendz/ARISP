@@ -83,6 +83,17 @@ export const useAppNotifications = () => {
           refreshStaffBell() // Chuông nhân sự: ứng viên mới ứng tuyển
           break
 
+        case 'ReceiveScheduleResponse':
+          // Ứng viên xác nhận/báo bận lịch phỏng vấn → cập nhật hồ sơ + chuông nhân sự.
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({ queryKey: ['application', payload?.applicationId] })
+          queryClient.invalidateQueries({
+            queryKey: ['job', payload?.jobPostingId, 'applications'],
+          })
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          refreshStaffBell() // Chuông nhân sự: ứng viên phản hồi lịch phỏng vấn
+          break
+
         case 'ReceiveOnlineTestSubmitted':
           // Ứng viên hoàn thành bài thi trắc nghiệm → cập nhật bảng điểm + danh sách + chuông nhân sự.
           queryClient.invalidateQueries({ queryKey: ['applications'] })
@@ -132,6 +143,7 @@ export const useAppNotifications = () => {
           // Đồng thời cập nhật dữ liệu hồ sơ ứng tuyển (mã phỏng vấn mới, đổi trạng thái...):
           // react-query cho trang dùng cache + DOM event cho trang dùng state cục bộ.
           queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({ queryKey: ['my-schedule'] }) // Trang lịch phỏng vấn (xếp/xếp lại)
           refreshCandidateData()
           break
 
