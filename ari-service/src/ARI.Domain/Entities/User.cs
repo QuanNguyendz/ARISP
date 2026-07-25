@@ -14,6 +14,7 @@ namespace ARI.Domain.Entities
         /// <summary>Lý do tài khoản bị khóa (set khi Super Admin khóa). Null nếu đang hoạt động.</summary>
         public string? LockReason { get; set; }
         public DateTimeOffset? LastLoginAt { get; set; }
+        public string? SettingsJson { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? DeletedAt { get; set; }

@@ -1,13 +1,33 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { User, Bell, Lock } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@ari/shared/ui'
+import { profileService, StaffSettings } from '../../fservices/profile/profileService'
 
 export default function HrSettingsPage() {
   const { t } = useTranslation('modules/hr/settings')
 
   const [activeTab, setActiveTab] = useState('profile')
+  const [settings, setSettings] = useState<StaffSettings>({ receiveEmail: true, receivePush: true })
+  const [loadingSettings, setLoadingSettings] = useState(true)
+
+  useEffect(() => {
+    profileService.getSettings().then((res) => {
+      setSettings(res)
+      setLoadingSettings(false)
+    })
+  }, [])
+
+  const toggleSetting = async (key: keyof StaffSettings) => {
+    const newSettings = { ...settings, [key]: !settings[key] }
+    setSettings(newSettings)
+    try {
+      await profileService.updateSettings(newSettings)
+    } catch {
+      setSettings(settings) // revert on fail
+    }
+  }
 
   const tabs = [
     { id: 'profile', label: t('tabs.profile'), icon: User },
@@ -96,21 +116,29 @@ export default function HrSettingsPage() {
                         {t('notifications.email.description')}
                       </p>
                     </div>
-                    <button className="relative w-12 h-6 rounded-full bg-brand-600">
-                      <span className="absolute right-1 top-1 w-4 h-4 rounded-full bg-white transition-transform" />
+                    <button 
+                      disabled={loadingSettings}
+                      onClick={() => toggleSetting('receiveEmail')}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${settings.receiveEmail ? 'bg-brand-600' : 'bg-ink-300 dark:bg-white/20'}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${settings.receiveEmail ? 'right-1' : 'left-1'}`} />
                     </button>
                   </div>
                   <div className="flex items-center justify-between p-4 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
                     <div>
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {t('notifications.browser.title')}
+                        {t('notifications.browser.title', 'Nhận thông báo hệ thống')}
                       </p>
                       <p className="text-xs text-ink-500 dark:text-ink-400">
-                        {t('notifications.browser.description')}
+                        {t('notifications.browser.description', 'Nhận thông báo trên biểu tượng chuông của hệ thống')}
                       </p>
                     </div>
-                    <button className="relative w-12 h-6 rounded-full bg-brand-600">
-                      <span className="absolute right-1 top-1 w-4 h-4 rounded-full bg-white transition-transform" />
+                    <button 
+                      disabled={loadingSettings}
+                      onClick={() => toggleSetting('receivePush')}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${settings.receivePush ? 'bg-brand-600' : 'bg-ink-300 dark:bg-white/20'}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${settings.receivePush ? 'right-1' : 'left-1'}`} />
                     </button>
                   </div>
                 </div>

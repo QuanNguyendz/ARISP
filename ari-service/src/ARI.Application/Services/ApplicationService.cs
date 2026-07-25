@@ -210,38 +210,85 @@ namespace ARI.Application.Services
             };
 
             // Trigger Realtime Notifications
-            // Notify specific recruiter (creator of job posting) and hr_admins
-            await _notificationService.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveNewApplication", response, ct);
-            await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveNewApplication", response, ct);
+            // For real-time toast, fetch settings if possible. 
+            // In GetStaffNotificationsQuery, we already sync DB notifications.
             
+            var recruiter = await _unitOfWork.Repository<User>().GetByIdAsync(jobPosting.CreatedByUserId, ct);
+            var recSettings = recruiter != null && !string.IsNullOrEmpty(recruiter.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.StaffSettingsDto>(recruiter.SettingsJson) ?? new ARI.Application.DTOs.StaffSettingsDto()
+                : new ARI.Application.DTOs.StaffSettingsDto();
+
+            if (recSettings.ReceivePush)
+            {
+                await _notificationService.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveNewApplication", response, ct);
+            }
+            
+            // Note: Since hr_admin group push goes to all hr_admins, we can't easily filter by individual push settings here for the realtime toast.
+            // But GetStaffNotificationsQuery will respect their push settings when generating DB notifications.
+            await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveNewApplication", response, ct);
+
             // Notify the candidate themselves if they are logged in (self-applied)
             if (request.CandidateAccountId.HasValue)
             {
-                // Trigger application status update
-                await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
-                
-                // Add a Notification record so it shows up in the bell
-                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
-                var dedupKey = $"applied:{application.Id}";
-                var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == request.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
-                if (existingNotifs.FirstOrDefault() == null)
-                {
-                    var newNotif = new ARI.Domain.Entities.Notification
-                    {
-                        CandidateAccountId = request.CandidateAccountId.Value,
-                        DedupKey = dedupKey,
-                        Type = "applied",
-                        Title = "Ứng tuyển thành công",
-                        Body = $"Bạn đã nộp hồ sơ thành công vào vị trí {jobPosting?.Title}.",
-                        Link = $"/candidate/applications",
-                        IsRead = false
-                    };
-                    await notifRepo.AddAsync(newNotif, ct);
-                    await _unitOfWork.SaveChangesAsync(ct);
-                }
+                var candidateAccount = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(request.CandidateAccountId.Value, ct);
+                var settings = candidateAccount != null && !string.IsNullOrEmpty(candidateAccount.SettingsJson)
+                    ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(candidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
+                    : new ARI.Application.DTOs.CandidateSettingsDto();
 
-                // Trigger bell update
-                await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "ApplicationSubmitted" }, ct);
+                if (settings.ApplicationUpdate.Push)
+                {
+                    // Trigger application status update
+                    await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
+                    
+                    // Add a Notification record so it shows up in the bell
+                    var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
+                    var dedupKey = $"applied:{application.Id}";
+                    var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == request.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
+                    if (existingNotifs.FirstOrDefault() == null)
+                    {
+                        var newNotif = new ARI.Domain.Entities.Notification
+                        {
+                            CandidateAccountId = request.CandidateAccountId.Value,
+                            DedupKey = dedupKey,
+                            Type = "applied",
+                            Title = "Ứng tuyển thành công",
+                            Body = $"Bạn đã nộp hồ sơ thành công vào vị trí {jobPosting?.Title}.",
+                            Link = $"/candidate/applications/{application.Id}",
+                            IsRead = false
+                        };
+                        await notifRepo.AddAsync(newNotif, ct);
+                        await _unitOfWork.SaveChangesAsync(ct);
+                    }
+
+                    // Trigger bell update
+                    await _notificationService.PublishUserEventAsync(request.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "ApplicationSubmitted" }, ct);
+                }
+            }
+
+            var emailCandidateAccount = application.CandidateAccountId.HasValue 
+                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
+                : null;
+            var emailSettings = emailCandidateAccount != null && !string.IsNullOrEmpty(emailCandidateAccount.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(emailCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
+                : new ARI.Application.DTOs.CandidateSettingsDto();
+
+            if (emailSettings.ApplicationUpdate.Email)
+            {
+                var candidateSubject = $"[ARISP] - Xác nhận nộp hồ sơ ứng tuyển vị trí {jobPosting?.Title}";
+                var candidateHtmlMessage = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <h2 style='color: #4f46e5; margin-top: 0;'>Xác nhận nộp hồ sơ ứng tuyển</h2>
+            <p style='color: #475569; font-size: 15px;'>Chào <strong>{application.CandidateName}</strong>,</p>
+            <p style='color: #475569; font-size: 15px;'>Chúc mừng bạn đã nộp hồ sơ ứng tuyển thành công vào vị trí <strong>{jobPosting?.Title}</strong>.</p>
+            <p style='color: #475569; font-size: 15px;'>Hồ sơ của bạn đã được chuyển tới bộ phận Tuyển dụng của chúng tôi. Chúng tôi sẽ xem xét và phản hồi lại cho bạn trong thời gian sớm nhất.</p>
+            <p style='color: #475569; font-size: 15px;'>Bạn có thể theo dõi trạng thái hồ sơ của mình trực tiếp trên Candidate Portal:</p>
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='http://localhost:3000/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ ứng tuyển</a>
+            </div>
+            <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
+            <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ nhân sự ARISP.</p>
+        </div>";
+                try { await _emailService.SendEmailAsync(application.CandidateEmail, candidateSubject, candidateHtmlMessage); } catch { }
             }
 
             return Result.Success(response);
@@ -681,9 +728,19 @@ namespace ARI.Application.Services
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>
         </div>";
 
+            var emailCandidateAccount = application.CandidateAccountId.HasValue 
+                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
+                : null;
+            var settings = emailCandidateAccount != null && !string.IsNullOrEmpty(emailCandidateAccount.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(emailCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
+                : new ARI.Application.DTOs.CandidateSettingsDto();
+
             try
             {
-                await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
+                if (settings.InterviewInvite.Email)
+                {
+                    await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
+                }
 
                 // Mời phỏng vấn = đã qua CV → mở giai đoạn sơ loại/phỏng vấn (và bật phỏng vấn thử).
                 // Nâng từ invited/cv_submitted → screening để PracticeAvailable = true.
@@ -726,9 +783,16 @@ namespace ARI.Application.Services
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             var jobTitle = job?.Title ?? "Vị trí tuyển dụng";
 
+            var pushCandidateAccount = application.CandidateAccountId.HasValue 
+                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
+                : null;
+            var pushSettings = pushCandidateAccount != null && !string.IsNullOrEmpty(pushCandidateAccount.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(pushCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
+                : new ARI.Application.DTOs.CandidateSettingsDto();
+
             // Tạo Notification trong database cho ứng viên
             var response = MapToResponse(application, job, 1);
-            if (application.CandidateAccountId.HasValue)
+            if (application.CandidateAccountId.HasValue && pushSettings.InterviewInvite.Push)
             {
                 var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
                 var dedupKey = $"cv_accepted:{application.Id}";
@@ -742,7 +806,7 @@ namespace ARI.Application.Services
                         Type = "result",
                         Title = "Hồ sơ ứng tuyển được chấp nhận",
                         Body = $"Chúc mừng hồ sơ ứng tuyển vị trí {jobTitle} đã được chấp nhận. Vui lòng kiểm tra email để đặt lịch phỏng vấn.",
-                        Link = $"/candidate/applications",
+                        Link = $"/candidate/applications/{application.Id}",
                         IsRead = false
                     };
                     await notifRepo.AddAsync(newNotif, ct);
@@ -779,32 +843,37 @@ namespace ARI.Application.Services
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             var jobTitle = job?.Title ?? "Vị trí tuyển dụng";
+            
+            var emailCandidateAccount = application.CandidateAccountId.HasValue 
+                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
+                : null;
+            var settings = emailCandidateAccount != null && !string.IsNullOrEmpty(emailCandidateAccount.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(emailCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
+                : new ARI.Application.DTOs.CandidateSettingsDto();
 
-            var subject = $"[ARISP] - Thư cảm ơn ứng tuyển vị trí {jobTitle}";
-            var htmlMessage = $@"
+            if (settings.ApplicationUpdate.Email)
+            {
+                var subject = $"[ARISP] - Thư cảm ơn ứng tuyển vị trí {jobTitle}";
+                var htmlMessage = $@"
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
             <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
             <p>Cảm ơn bạn đã quan tâm đến cơ hội nghề nghiệp tại ARISP và dành thời gian nộp hồ sơ ứng tuyển cho vị trí <strong>{jobTitle}</strong>.</p>
             <p>Chúng tôi rất ấn tượng với hồ sơ và kinh nghiệm của bạn. Tuy nhiên, sau khi xem xét kỹ lưỡng các yêu cầu hiện tại của công việc, chúng tôi rất tiếc chưa thể tiến xa hơn với bạn trong đợt tuyển dụng này.</p>
             <p>Thông tin của bạn sẽ được lưu giữ trong hệ thống cơ sở dữ liệu tài năng của chúng tôi. Nếu có các cơ hội phù hợp hơn trong tương lai, chúng tôi sẽ chủ động liên hệ lại.</p>
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='http://localhost:3000/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ của bạn</a>
+            </div>
             <p>Chúc bạn luôn nhiều sức khỏe và may mắn trên con đường sự nghiệp của mình.</p>
             <br/>
             <p>Trân trọng,</p>
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>
         </div>";
-
-            try
-            {
-                await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
-            }
-            catch (Exception)
-            {
-                // Vẫn cho phép hoàn tất cập nhật status dù lỗi gửi mail.
+                try { await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage); } catch { }
             }
 
             // Gửi SignalR thông báo và tạo Notification trong database cho ứng viên
             var response = MapToResponse(application, job);
-            if (application.CandidateAccountId.HasValue)
+            if (application.CandidateAccountId.HasValue && settings.ApplicationUpdate.Push)
             {
                 await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveApplicationStatusUpdate", response, ct);
 
@@ -820,7 +889,7 @@ namespace ARI.Application.Services
                         Type = "result",
                         Title = "Kết quả ứng tuyển",
                         Body = $"Thư cảm ơn ứng tuyển vị trí {jobTitle} đã được gửi tới email của bạn.",
-                        Link = $"/candidate/applications",
+                        Link = $"/candidate/applications/{application.Id}",
                         IsRead = false
                     };
                     await notifRepo.AddAsync(newNotif, ct);

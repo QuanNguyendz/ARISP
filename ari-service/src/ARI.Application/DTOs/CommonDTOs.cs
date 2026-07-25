@@ -10,4 +10,10 @@ namespace ARI.Application.DTOs
         public int PageSize { get; set; }
         public int TotalPages { get; set; }
     }
+    
+    public class StaffSettingsDto
+    {
+        public bool ReceiveEmail { get; set; } = true;
+        public bool ReceivePush { get; set; } = true;
+    }
 }

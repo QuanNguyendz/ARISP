@@ -57,6 +57,7 @@ export interface DashboardJob {
   createdByName?: string | null
   applicantCount: number
   status: string
+  applicationDeadline?: string | null
 }
 
 export interface PendingJob {

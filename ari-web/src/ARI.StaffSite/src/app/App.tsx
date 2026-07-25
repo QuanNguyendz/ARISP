@@ -143,6 +143,8 @@ function App() {
             <Route path="/hr/dashboard" element={<HrDashboardPage />} />
             <Route path="/hr/jobs/pending" element={<HrPendingJobsPage />} />
             <Route path="/hr/jobs" element={<HrJobsPage />} />
+            <Route path="/hr/jobs/create" element={<RecruiterCreateJobPage mode="create" />} />
+            <Route path="/hr/jobs/:id/edit" element={<RecruiterCreateJobPage mode="edit" />} />
             <Route path="/hr/jobs/:id" element={<HrJobDetailPage />} />
             <Route path="/hr/jobs/:id/online-test" element={<JobOnlineTestPage />} />
             <Route path="/hr/jobs/:id/online-test/results" element={<JobOnlineTestResultsPage />} />

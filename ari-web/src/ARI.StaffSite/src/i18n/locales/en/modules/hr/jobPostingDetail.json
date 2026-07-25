@@ -18,7 +18,7 @@
     "noLimit": "No limit",
     "expired": "Expired",
     "today": "Expires today",
-    "daysLeft": "{count} days left"
+    "daysLeft": "{{count}} days left"
   },
   "vacancies": "Vacancies:",
   "statusLabels": {
@@ -53,8 +53,8 @@
     "onsiteRequired": "On-site required"
   },
   "rounds": {
-    "title": "AI Interview Rounds ({count})",
-    "round": "Round {number}",
+    "title": "AI Interview Rounds ({{count}})",
+    "round": "Round {{number}}",
     "types": {
       "technical": "Technical",
       "screening": "Screening"
@@ -65,7 +65,7 @@
       "other": "English/Other"
     },
     "duration": "Duration:",
-    "minutes": "{count} minutes",
+    "minutes": "{{count}} minutes",
     "codeTtl": "Code TTL:",
     "hours": "hours",
     "noConfig": "No interview rounds configured."
@@ -73,7 +73,7 @@
   "funnel": {
     "title": "Candidate Application Funnel",
     "description": "Track and approve candidate applications by interview stage",
-    "total": "Total: {count} candidates",
+    "total": "Total: {{count}} candidates",
     "cvReview": "CV Review",
     "cvReviewSubtitle": "Newly submitted CVs",
     "cvSubmitted": "Newly applied",
@@ -119,7 +119,7 @@
     "viewCoverLetter": "View application info & Cover letter"
   },
   "batchActions": {
-    "selected": "{count} candidates selected",
+    "selected": "{{count}} candidates selected",
     "acceptBatch": "Batch Approve",
     "rejectBatch": "Batch Reject",
     "inviteBatch": "Batch Invite"
@@ -129,7 +129,7 @@
   "paginationLabel": "candidates",
   "pendingApproval": {
     "title": "This posting is awaiting your approval",
-    "description": "Recruiter {name} submitted this posting with JD file. Approve to publish (JD will be stamped) or reject with reason.",
+    "description": "Recruiter {{name}} submitted this posting with JD file. Approve to publish (JD will be stamped) or reject with reason.",
     "approve": "Approve & Stamp",
     "reject": "Reject"
   },
@@ -142,13 +142,13 @@
   },
   "confirmRejectModal": {
     "title": "Reject Job Posting",
-    "description": "Enter rejection reason for \"{title}\". Recruiter will see this reason to edit and resubmit.",
+    "description": "Enter rejection reason for \"{{title}}\". Recruiter will see this reason to edit and resubmit.",
     "placeholder": "Rejection reason...",
     "cancel": "Cancel",
     "confirm": "Confirm Rejection"
   },
   "coverLetterModal": {
-    "title": "Application Details - {name}",
+    "title": "Application Details - {{name}}",
     "aiSummary": "CV Summary & AI Evaluation",
     "noAiData": "No AI evaluation data",
     "noAiDataHint": "This application doesn't have AI evaluation results (may be a test application or no valid CV file).",
@@ -160,7 +160,7 @@
     "coverLetter": "Cover Letter",
     "noCoverLetter": "Candidate did not submit a cover letter.",
     "close": "Close",
-    "matchScore": "Match Score: {score}%"
+    "matchScore": "Match Score: {{score}}%"
   },
   "notices": {
     "acceptSuccess": "Candidate application approved and Round 1 interview invitation sent successfully.",
@@ -168,9 +168,9 @@
     "inviteSuccess": "Magic link invitation sent to candidate.",
     "jobApproveSuccess": "Job posting approved. JD file has been stamped.",
     "jobRejectSuccess": "Job posting rejected. Recruiter will see the reason to edit.",
-    "batchAcceptSuccess": "Successfully approved {success} applications.{failed, plural, other{ Failed {failed} applications.}}",
-    "batchRejectSuccess": "Successfully rejected {success} applications.{failed, plural, other{ Failed {failed} applications.}}",
-    "batchInviteSuccess": "Successfully sent invitations to {success} candidates.{failed, plural, other{ Failed {failed} candidates.}}",
+    "batchAcceptSuccess": "Successfully approved {{success}} applications.",
+    "batchRejectSuccess": "Successfully rejected {{success}} applications.",
+    "batchInviteSuccess": "Successfully sent invitations to {{success}} candidates.",
     "close": "Close"
   },
   "errors": {
@@ -186,9 +186,9 @@
     "loadCandidates": "Error loading candidates list"
   },
   "confirmDialogs": {
-    "batchAccept": "Are you sure you want to approve {count} selected applications and move to Round 1?",
-    "batchReject": "Are you sure you want to reject {count} selected applications and send thank you emails?",
-    "batchInvite": "Are you sure you want to send interview invitations to {count} selected candidates?",
+    "batchAccept": "Are you sure you want to approve {{count}} selected applications and move to Round 1?",
+    "batchReject": "Are you sure you want to reject {{count}} selected applications and send thank you emails?",
+    "batchInvite": "Are you sure you want to send interview invitations to {{count}} selected candidates?",
     "rejectApplication": "Are you sure you want to reject this candidate's application and send a thank you email?"
   },
   "salary": {

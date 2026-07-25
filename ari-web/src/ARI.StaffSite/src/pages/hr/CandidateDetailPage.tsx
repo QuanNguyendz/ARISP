@@ -62,24 +62,24 @@ export default function HrCandidateDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const [a, ev, ss] = await Promise.all([
-          applicationService.getHrApplicationById(id),
-          evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
-          interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
-        ])
-        setApp(a)
-        setEvals(ev)
-        setSessions(ss)
-      } catch (e) {
-        setError(apiErr(e, t('loadingError')))
-      } finally {
-        setLoading(false)
-      }
-    })()
+      ; (async () => {
+        setLoading(true)
+        setError('')
+        try {
+          const [a, ev, ss] = await Promise.all([
+            applicationService.getHrApplicationById(id),
+            evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
+            interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
+          ])
+          setApp(a)
+          setEvals(ev)
+          setSessions(ss)
+        } catch (e) {
+          setError(apiErr(e, t('loadingError')))
+        } finally {
+          setLoading(false)
+        }
+      })()
   }, [id, t])
 
   const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])

@@ -33,7 +33,7 @@
     "noResultsHint": "Try changing the search keyword or status filter."
   },
   "table": {
-    "round": "Round {number}",
+    "round": "Round {{number}}",
     "practice": "Practice",
     "real": "Real",
     "recording": "Recording",

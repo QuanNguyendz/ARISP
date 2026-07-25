@@ -1,10 +1,10 @@
 {
   "title": "Interview Schedule Configuration",
-  "description": "{jobTitle} — each time slot defaults to 1 candidate. Candidates will select available slots after receiving the invitation.",
+  "description": "{{jobTitle}} — each time slot defaults to 1 candidate. Candidates will select available slots after receiving the invitation.",
   "back": "Back to job detail",
   "loadError": "Unable to load job posting.",
   "slotsLoadError": "Unable to load time slots.",
-  "roundLabel": "Round {number} · {type}",
+  "roundLabel": "Round {{number}} · {{type}}",
   "screening": "Screening",
   "technical": "Technical",
   "addSlot": "Add Time Slot",
@@ -20,9 +20,9 @@
     "endAfterStart": "End time must be after start time."
   },
   "slotList": {
-    "title": "Time Slots for Round {round} ({count})",
+    "title": "Time Slots for Round {{round}} ({{count}})",
     "empty": "No time slots for this round yet.",
-    "booked": "Booked {booked}/{capacity}",
+    "booked": "Booked {{booked}}/{{capacity}}",
     "full": "Full",
     "decreaseCapacity": "Decrease capacity",
     "increaseCapacity": "Increase capacity",

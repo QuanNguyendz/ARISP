@@ -115,5 +115,14 @@ export const jobService = {
   ): Promise<void> {
     await apiClient.patch(`/jobs/${id}/status`, { status, rejectionReason })
   },
+
+  // Update display settings without changing status or full job content
+  async updateJobDisplay(
+    id: string,
+    payload: { isUrgent?: boolean; isPublicListing?: boolean }
+  ): Promise<JobPosting> {
+    const { data } = await apiClient.patch<JobPosting>(`/jobs/${id}/display`, payload)
+    return data
+  },
 }
 export default jobService

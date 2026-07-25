@@ -147,6 +147,7 @@ export interface MyApplicationSession {
   roundType: string
   sessionType: string
   status: string
+  scheduledAt?: string | null
   startedAt?: string | null
   endedAt?: string | null
   durationSeconds?: number | null

@@ -30,7 +30,15 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
 
         public async Task<Result<StaffNotificationListDto>> Handle(GetStaffNotificationsQuery request, CancellationToken ct)
         {
-            await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.UserId, ct);
+            var settings = user != null && !string.IsNullOrEmpty(user.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.StaffSettingsDto>(user.SettingsJson) ?? new ARI.Application.DTOs.StaffSettingsDto()
+                : new ARI.Application.DTOs.StaffSettingsDto();
+
+            if (settings.ReceivePush)
+            {
+                await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+            }
 
             var items = (await _unitOfWork.Repository<Notification>()
                     .FindAsync(n => n.RecipientUserId == request.UserId, ct))
@@ -96,7 +104,7 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                     .Select(a => new { a.Id, a.JobPostingId, a.CandidateName, a.CreatedAt }), ct);
             foreach (var a in apps)
                 Add($"applied:{a.Id}", "applied", "Ứng viên mới ứng tuyển",
-                    $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates", a.CreatedAt);
+                    $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates/{a.Id}", a.CreatedAt);
 
             // 2. Đánh giá AI chờ HR xác nhận (chưa có HrReview) cho tin trong phạm vi.
             var appIds = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
@@ -120,13 +128,13 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                 }
             }
 
-            // 3. Tin chờ duyệt — chỉ HR Admin.
-            if (isHrAdmin)
-            {
-                foreach (var j in jobs.Where(j => j.Status == "pending"))
-                    Add($"jobapproval:{j.Id}", "approval", "Tin tuyển dụng chờ duyệt",
-                        Title(j.Id), "/hr/jobs/pending", nowUtc);
-            }
+            // 3. Tin chờ duyệt — chỉ HR Admin. (Đã tạo thực tế qua UpdateJobStatusCommand nên bỏ qua tạo ảo để tránh lặp)
+            // if (isHrAdmin)
+            // {
+            //     foreach (var j in jobs.Where(j => j.Status == "pending"))
+            //         Add($"jobapproval:{j.Id}", "approval", "Tin tuyển dụng chờ duyệt",
+            //             Title(j.Id), "/hr/jobs/pending", nowUtc);
+            // }
 
             if (toAdd.Count > 0)
             {

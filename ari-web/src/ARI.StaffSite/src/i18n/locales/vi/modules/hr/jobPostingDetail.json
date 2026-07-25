@@ -18,7 +18,7 @@
     "noLimit": "Không giới hạn",
     "expired": "Đã hết hạn",
     "today": "Hết hạn hôm nay",
-    "daysLeft": "Còn {count} ngày"
+    "daysLeft": "Còn {{count}} ngày"
   },
   "vacancies": "Chỉ tiêu:",
   "statusLabels": {
@@ -53,8 +53,8 @@
     "onsiteRequired": "Bắt buộc On-site"
   },
   "rounds": {
-    "title": "Các vòng phỏng vấn AI ({count})",
-    "round": "Vòng {number}",
+    "title": "Các vòng phỏng vấn AI ({{count}})",
+    "round": "Vòng {{number}}",
     "types": {
       "technical": "Technical",
       "screening": "Screening"
@@ -65,7 +65,7 @@
       "other": "Tiếng Anh/Khác"
     },
     "duration": "Thời gian:",
-    "minutes": "{count} phút",
+    "minutes": "{{count}} phút",
     "codeTtl": "TTL Code:",
     "hours": "giờ",
     "noConfig": "Chưa cấu hình các vòng phỏng vấn."
@@ -73,7 +73,7 @@
   "funnel": {
     "title": "Tiến trình ứng tuyển của ứng viên",
     "description": "Theo dõi và phê duyệt hồ sơ ứng viên theo từng giai đoạn phỏng vấn",
-    "total": "Tổng cộng: {count} ứng viên",
+    "total": "Tổng cộng: {{count}} ứng viên",
     "cvReview": "Duyệt Hồ Sơ",
     "cvReviewSubtitle": "CV mới nộp",
     "cvSubmitted": "Mới ứng tuyển",
@@ -119,7 +119,7 @@
     "viewCoverLetter": "Xem thông tin ứng tuyển & Thư giới thiệu"
   },
   "batchActions": {
-    "selected": "Đã chọn {count} ứng viên",
+    "selected": "Đã chọn {{count}} ứng viên",
     "acceptBatch": "Duyệt hàng loạt",
     "rejectBatch": "Từ chối hàng loạt",
     "inviteBatch": "Mời phỏng vấn hàng loạt"
@@ -129,7 +129,7 @@
   "paginationLabel": "ứng viên",
   "pendingApproval": {
     "title": "Tin đang chờ bạn duyệt",
-    "description": "Recruiter {name} đã gửi tin kèm file JD. Duyệt để đăng tin (JD sẽ được đóng dấu xác nhận) hoặc từ chối kèm lý do.",
+    "description": "Recruiter {{name}} đã gửi tin kèm file JD. Duyệt để đăng tin (JD sẽ được đóng dấu xác nhận) hoặc từ chối kèm lý do.",
     "approve": "Duyệt & đóng dấu",
     "reject": "Từ chối"
   },
@@ -142,13 +142,13 @@
   },
   "confirmRejectModal": {
     "title": "Từ chối tin tuyển dụng",
-    "description": "Nhập lý do từ chối tin \"{title}\". Recruiter sẽ thấy lý do này để chỉnh sửa và gửi duyệt lại.",
+    "description": "Nhập lý do từ chối tin \"{{title}}\". Recruiter sẽ thấy lý do này để chỉnh sửa và gửi duyệt lại.",
     "placeholder": "Lý do từ chối...",
     "cancel": "Hủy",
     "confirm": "Xác nhận từ chối"
   },
   "coverLetterModal": {
-    "title": "Thông tin hồ sơ - {name}",
+    "title": "Thông tin hồ sơ - {{name}}",
     "aiSummary": "Tóm tắt CV & Đánh giá AI",
     "noAiData": "Không có dữ liệu đánh giá AI",
     "noAiDataHint": "Hồ sơ này chưa có kết quả đánh giá AI (do là hồ sơ thử nghiệm hoặc không có tệp CV hợp lệ).",
@@ -160,7 +160,7 @@
     "coverLetter": "Thư giới thiệu",
     "noCoverLetter": "Ứng viên không gửi thư giới thiệu.",
     "close": "Đóng",
-    "matchScore": "Độ phù hợp: {score}%"
+    "matchScore": "Độ phù hợp: {{score}}%"
   },
   "notices": {
     "acceptSuccess": "Đã duyệt hồ sơ ứng viên và gửi lời mời phỏng vấn Vòng 1 thành công.",
@@ -168,9 +168,9 @@
     "inviteSuccess": "Đã gửi lời mời (magic link) cho ứng viên.",
     "jobApproveSuccess": "Đã duyệt tin tuyển dụng. File JD đã được đóng dấu xác nhận.",
     "jobRejectSuccess": "Đã từ chối tin tuyển dụng. Recruiter sẽ thấy lý do để chỉnh sửa.",
-    "batchAcceptSuccess": "Đã duyệt thành công {success} hồ sơ.{failed, plural, other{ Thất bại {failed} hồ sơ.}}",
-    "batchRejectSuccess": "Đã từ chối thành công {success} hồ sơ.{failed, plural, other{ Thất bại {failed} hồ sơ.}}",
-    "batchInviteSuccess": "Đã gửi lời mời thành công cho {success} ứng viên.{failed, plural, other{ Thất bại {failed} ứng viên.}}",
+    "batchAcceptSuccess": "Đã duyệt thành công {{success}} hồ sơ.",
+    "batchRejectSuccess": "Đã từ chối thành công {{success}} hồ sơ.",
+    "batchInviteSuccess": "Đã gửi lời mời thành công cho {{success}} ứng viên.",
     "close": "Đóng"
   },
   "errors": {
@@ -186,9 +186,9 @@
     "loadCandidates": "Lỗi khi tải danh sách ứng viên"
   },
   "confirmDialogs": {
-    "batchAccept": "Bạn có chắc chắn muốn duyệt {count} hồ sơ đã chọn và chuyển sang Vòng 1?",
-    "batchReject": "Bạn có chắc chắn muốn từ chối {count} hồ sơ đã chọn và gửi thư cảm ơn?",
-    "batchInvite": "Bạn có chắc chắn muốn gửi lời mời phỏng vấn cho {count} ứng viên đã chọn?",
+    "batchAccept": "Bạn có chắc chắn muốn duyệt {{count}} hồ sơ đã chọn và chuyển sang Vòng 1?",
+    "batchReject": "Bạn có chắc chắn muốn từ chối {{count}} hồ sơ đã chọn và gửi thư cảm ơn?",
+    "batchInvite": "Bạn có chắc chắn muốn gửi lời mời phỏng vấn cho {{count}} ứng viên đã chọn?",
     "rejectApplication": "Bạn có chắc chắn muốn từ chối hồ sơ ứng viên này và gửi thư cảm ơn?"
   },
   "salary": {
