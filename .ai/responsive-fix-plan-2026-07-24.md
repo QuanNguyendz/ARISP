@@ -44,7 +44,7 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | Phase 1 | ✅ Đã commit (16 commits fix) | Hoàn thành |
 | Phase 2 Nhóm A — Sidebar & Settings | ✅ Đã commit (5 files) | Hoàn thành |
 | Phase 2 Nhóm A bổ sung — ProfilePage iOS auto-shrink | ✅ Đã commit | Fix text thu nhỏ 320px |
-| **Phase 2 Nhóm B — Form & Input** | 🔜 **Đang thực thi** | Tiếp theo |
+| **Phase 2 Nhóm B — Form & Input** | 🔜 **Đang thực thi** | 2/5 file (ProfilePage Experience + Education) đã xong |
 | Phase 2 Nhóm C — Table | ⏳ Backlog | |
 | Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
 | Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
@@ -324,8 +324,8 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Nav pills `w-max min-w-full` + ẩn scrollbar + `shrink-0` cho mỗi pill
 
 **PR #2.2 — Form & Input (~10 giờ)** 🔜 Đang thực thi
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Experience form `grid-cols-1 sm:grid-cols-2` (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form tương tự (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Experience form `grid-cols-1 sm:grid-cols-2` (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-3` (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/InterviewCodePage.tsx` :: Search input responsive (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Filter bar overflow-x-auto + responsive (Trung bình, 2 giờ)

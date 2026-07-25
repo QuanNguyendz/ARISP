@@ -814,7 +814,7 @@ export default function ProfilePage() {
                 {profile.education.map((edu, i) => (
                   <div
                     key={i}
-                    className="grid gap-3 rounded-xl border border-ink-200 p-4 sm:grid-cols-2"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-ink-200 p-4 sm:grid-cols-2"
                   >
                     <input
                       className={`${inputWrap} text-sm`}
@@ -834,9 +834,9 @@ export default function ProfilePage() {
                       value={edu.period}
                       onChange={(e) => updateEdu(i, 'period', e.target.value)}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex min-w-0 gap-2">
                       <input
-                        className={`${inputWrap} flex-1 text-sm`}
+                        className={`${inputWrap} min-w-0 flex-1 text-sm`}
                         placeholder={t('profile.notes')}
                         value={edu.note || ''}
                         onChange={(e) => updateEdu(i, 'note', e.target.value)}
