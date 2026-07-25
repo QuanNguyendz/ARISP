@@ -407,7 +407,7 @@ export default function ProfilePage() {
         <aside className="lg:self-start lg:sticky lg:top-24">
           <nav
             aria-label="Profile sections"
-            className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
+            className="-mx-4 flex w-max min-w-full gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-0 sm:w-auto lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
           >
             {SECTIONS.map((s) => {
               const Icon = s.icon
@@ -415,7 +415,7 @@ export default function ProfilePage() {
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-sm text-ink-600 hover:bg-ink-50 lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5 lg:text-sm lg:hover:bg-ink-100"
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-50 sm:gap-2 sm:px-3.5 lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5 lg:text-sm lg:hover:bg-ink-100"
                 >
                   <Icon className="h-4 w-4 text-ink-400" /> {s.label}
                 </a>
@@ -992,7 +992,7 @@ function ProfileSkeleton() {
       <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
         {/* Section nav + completeness */}
         <aside className="space-y-4 self-start">
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
+          <div className="-mx-4 flex w-max min-w-full gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-0 sm:w-auto lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
             {Array.from({ length: 7 }).map((_, i) => (
               <div
                 key={i}

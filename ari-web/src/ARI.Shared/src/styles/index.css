@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Mobile font/text autosizing =====
+ * iOS Safari + 1 số trình duyệt mobile sẽ tự động co nhỏ text (và đôi khi thu nhỏ
+ * cả viewport) khi phát hiện phần tử có nội dung rộng hơn viewport (ví dụ pill
+ * nav cuộn ngang, bảng). Gây ra text "biến mất" trên 320px dù đã dùng class
+ * responsive. Ép text-size-adjust = 100% + ngăn page scaling mặc định. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+}
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 /* ===== react-grid-layout: theming khớp giao diện sáng/tối ===== */
 /* Ô gợi ý vị trí khi kéo (mặc định là khối đỏ) → đổi sang tông brand */
 .react-grid-item.react-grid-placeholder {
