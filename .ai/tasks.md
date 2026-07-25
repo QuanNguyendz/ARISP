@@ -305,6 +305,12 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-07-23: **Đảo chiều luồng đặt lịch phỏng vấn — HR gán cứng 1 giờ cho 1 ứng viên, bỏ ứng viên tự chọn (ADR-048).**
+  - **Backend:** thêm `POST /api/schedules/assign` (`AssignSlotCommand` + handler, policy `InternalStaff`) — staff chọn 1 slot trong kho ấn định cho `application_id`+vòng; giữ nguyên side-effects của booking cũ (chốt chỗ nguyên tử chống overbooking, chặn trùng vòng, `screening→interview`, đánh dấu `InterviewInvite.ScheduledAt`) + đẩy realtime `InterviewScheduled` + tạo `Notification` bell + email giờ hẹn (giờ VN). Gỡ `GET /schedule/{id}/slots` + `POST /schedule/{id}/book` (handler `GetOpenSlotsQuery`/`BookSlotCommand`), gỡ helper `AuthorizeCandidateAsync`; `CandidateScheduleController` còn mỗi `GET /candidate/schedule` (read-only). Email "duyệt CV" (`SendInterviewInviteAsync`) bỏ pick-link, đổi thành "nhân sự sẽ xếp lịch".
+  - **Frontend:** `scheduleService` thêm `assign()`, gỡ `getOpenSlots`/`book`. Component chung `@ari/shared/ui/AssignSchedulePanel` (chọn slot từ kho, lọc slot tương lai còn chỗ, gán → refetch hồ sơ) chèn vào cột thao tác trang chi tiết ứng viên HR + Recruiter. `SchedulePage` (candidate) chuyển sang read-only, hiển thị giờ đã gán qua `getMySchedule()`, bỏ nút tự chọn.
+  - **Docs:** ADR-048 (architecture.md) + bảng ADR CLAUDE.md.
+  - **Follow-up chưa làm:** luồng huỷ/đổi lịch phía staff (hiện chặn nếu vòng đã có booking `scheduled`); dọn invalidate `open-slots` thừa trong `useAppNotifications`.
+
 - [x] 2026-07-22: **Fix `502` staff site sau deploy tự động — nginx cache IP upstream.** Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
 
 - [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**

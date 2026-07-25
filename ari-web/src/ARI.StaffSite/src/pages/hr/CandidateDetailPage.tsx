@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
+import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
@@ -40,6 +41,10 @@ import {
 import { JobDetailSkeleton } from '../recruiter/_skeletons'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 
+function apiErr(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
+}
+
 export default function HrCandidateDetailPage() {
   const { t } = useTranslation('modules/hr/candidateDetail')
   const { id } = useParams<{ id: string }>()
@@ -57,24 +62,24 @@ export default function HrCandidateDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const [a, ev, ss] = await Promise.all([
-          applicationService.getHrApplicationById(id),
-          evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
-          interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
-        ])
-        setApp(a)
-        setEvals(ev)
-        setSessions(ss)
-      } catch (e: any) {
-        setError(e?.response?.data?.message || t('loadingError'))
-      } finally {
-        setLoading(false)
-      }
-    })()
+      ; (async () => {
+        setLoading(true)
+        setError('')
+        try {
+          const [a, ev, ss] = await Promise.all([
+            applicationService.getHrApplicationById(id),
+            evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
+            interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
+          ])
+          setApp(a)
+          setEvals(ev)
+          setSessions(ss)
+        } catch (e) {
+          setError(apiErr(e, t('loadingError')))
+        } finally {
+          setLoading(false)
+        }
+      })()
   }, [id, t])
 
   const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])
@@ -87,8 +92,8 @@ export default function HrCandidateDetailPage() {
     try {
       await applicationService.sendInvite(id)
       setNotice(t('sent'))
-    } catch (e: any) {
-      setError(e?.response?.data?.message || t('sendError'))
+    } catch (e) {
+      setError(apiErr(e, t('sendError')))
     } finally {
       setInviting(false)
     }
@@ -102,8 +107,8 @@ export default function HrCandidateDetailPage() {
     try {
       const r = await interviewService.generateCode(id)
       setCode({ code: r.code, expiresAt: r.expiresAt })
-    } catch (e: any) {
-      setError(e?.response?.data?.message || t('codeError'))
+    } catch (e) {
+      setError(apiErr(e, t('codeError')))
     } finally {
       setCoding(false)
     }
@@ -120,16 +125,17 @@ export default function HrCandidateDetailPage() {
     }
   }
 
-  const roundLabel = (num: number, type?: string) => {
-    if (!type) return t('round', { number: num })
-    const typeLabel =
-      type.toLowerCase() === 'technical'
-        ? t('technical')
-        : type.toLowerCase() === 'screening'
-          ? t('screening')
-          : type
-    return `${t('round', { number: num })} (${typeLabel})`
+  const refreshApp = async () => {
+    if (!id) return
+    try {
+      setApp(await applicationService.getHrApplicationById(id))
+    } catch {
+      /* giữ nguyên hồ sơ hiện tại nếu refetch lỗi */
+    }
   }
+
+  const roundLabel = (num: number, type?: string) =>
+    `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
 
   const sessionTypeLabel = (type?: string) => (type === 'practice' ? t('practice') : t('real'))
 
@@ -373,6 +379,17 @@ export default function HrCandidateDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Xếp lịch phỏng vấn (HR gán cứng 1 giờ cho ứng viên — ADR-048) */}
+          <AssignSchedulePanel
+            applicationId={app.id}
+            jobPostingId={app.jobPostingId}
+            round={app.currentRound || 1}
+            hasScheduled={!!app.hasScheduledInterview}
+            scheduledAt={app.interviewDate}
+            status={app.status}
+            onAssigned={refreshApp}
+          />
 
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
             <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">{t('info')}</h2>
