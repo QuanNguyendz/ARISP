@@ -237,10 +237,10 @@ export default function RecruiterEvaluationReviewPage() {
                   </p>
                 </div>
 
-                <div className="mb-5 grid grid-cols-3 gap-3">
+                <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
                     <p className="mb-1 text-xs text-ink-400">{t('aiVerdict')}</p>
-                    <p className="text-sm font-semibold text-ink-900 dark:text-white">
+                    <p className="text-sm font-semibold text-ink-900 dark:text-white truncate">
                       {verdictLabel(detail.aiVerdict)}
                     </p>
                   </div>
@@ -252,7 +252,7 @@ export default function RecruiterEvaluationReviewPage() {
                   </div>
                   <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
                     <p className="mb-1 text-xs text-ink-400">{t('hrReview')}</p>
-                    <p className="text-sm font-semibold text-ink-900 dark:text-white">
+                    <p className="text-sm font-semibold text-ink-900 dark:text-white truncate">
                       {detail.hrReview ? t('reviewed') : t('pending')}
                     </p>
                   </div>
@@ -263,14 +263,19 @@ export default function RecruiterEvaluationReviewPage() {
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
                       {t('criterionScores')}
                     </h3>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {Object.entries(detail.criterionScores).map(([k, v]) => (
                         <div
                           key={k}
-                          className="flex items-center justify-between rounded-lg border border-ink-100 dark:border-white/10 px-3 py-2"
+                          className="flex items-center justify-between gap-2 rounded-lg border border-ink-100 dark:border-white/10 px-3 py-2"
                         >
-                          <span className="text-sm text-ink-600 dark:text-ink-300">{k}</span>
-                          <span className={`text-sm font-bold ${scoreColor(v)}`}>{v}</span>
+                          <span
+                            className="min-w-0 truncate text-sm text-ink-600 dark:text-ink-300"
+                            title={k}
+                          >
+                            {k}
+                          </span>
+                          <span className={`shrink-0 text-sm font-bold ${scoreColor(v)}`}>{v}</span>
                         </div>
                       ))}
                     </div>
