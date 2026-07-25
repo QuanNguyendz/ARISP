@@ -89,6 +89,9 @@ namespace ARI.Application.Admin
                     <div style='background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin: 16px 0;'>
                         <p style='margin: 0; color: #92400e; font-size: 14px;'>⚠️ Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên để đảm bảo an toàn tài khoản.</p>
                     </div>
+                    <div style='text-align: center; margin: 28px 0;'>
+                        <a href='http://localhost:3001/login' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Đăng nhập cổng nhân sự</a>
+                    </div>
                     <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;'/>
                     <p style='font-size: 12px; color: #94a3b8; text-align: center;'>Email này được gửi tự động từ hệ thống ARISP. Vui lòng không trả lời.</p>
                 </div>";

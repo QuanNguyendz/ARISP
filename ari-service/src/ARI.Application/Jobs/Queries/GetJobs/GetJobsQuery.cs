@@ -169,7 +169,9 @@ namespace ARI.Application.Jobs.Queries.GetJobs
                 }
                 else
                 {
-                    query = query.OrderByDescending(j => j.PublishedAt ?? j.CreatedAt);
+                    query = query
+                        .OrderByDescending(j => j.IsUrgent == true ? 1 : 0)
+                        .ThenByDescending(j => j.PublishedAt ?? j.CreatedAt);
                 }
 
                 // Phân trang
@@ -184,6 +186,7 @@ namespace ARI.Application.Jobs.Queries.GetJobs
                 var skillSet = new HashSet<string>(candidateSkillsLower);
                 items = items
                     .OrderByDescending(j => j.Skills.Count(s => skillSet.Contains(s.ToLowerInvariant())))
+                    .ThenByDescending(j => j.IsUrgent)
                     .ThenByDescending(j => j.PublishedAt ?? j.CreatedAt)
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)

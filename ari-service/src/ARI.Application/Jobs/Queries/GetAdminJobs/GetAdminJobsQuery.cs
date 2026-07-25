@@ -42,11 +42,12 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
                         Title = j.Title,
                         Department = j.Department,
                         InterviewMode = j.InterviewMode,
-                        Status = j.Status,
+                        Status = (j.Status == "active" && j.ApplicationDeadline.HasValue && j.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : j.Status,
                         DetectedLanguage = j.DetectedLanguage,
                         LanguageRequirement = j.LanguageRequirement,
                         CreatedAt = j.CreatedAt,
                         PublishedAt = j.PublishedAt,
+                        ApplicationDeadline = j.ApplicationDeadline,
                         Location = j.Location,
                         WorkMode = j.WorkMode,
                         EmploymentType = j.EmploymentType,
@@ -75,8 +76,14 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
             // Tên người tạo tin (batch, chỉ cột cần)
             var creatorIds = jobList.Select(j => j.CreatedByUserId).Distinct().ToList();
             var creatorNameById = (await _unitOfWork.Repository<User>()
-                    .QueryAsync(q => q.Where(u => creatorIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email }), ct))
-                .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
+                    .QueryAsync(q => q.Where(u => creatorIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email, u.Role }), ct))
+                .ToDictionary(u => u.Id, u => {
+                    var name = string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName;
+                    var roleDisplay = string.Equals(u.Role, "hr_admin", StringComparison.OrdinalIgnoreCase) ? "HR Admin" :
+                                      string.Equals(u.Role, "recruiter", StringComparison.OrdinalIgnoreCase) ? "Recruiter" :
+                                      string.Equals(u.Role, "super_admin", StringComparison.OrdinalIgnoreCase) ? "Super Admin" : u.Role;
+                    return $"{name} ({roleDisplay})";
+                });
 
             foreach (var dto in jobList)
             {

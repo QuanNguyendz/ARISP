@@ -23,6 +23,12 @@ namespace ARI.Domain.Entities
         public int? RescheduleDeadlineHours { get; set; } = 24;
         public int InviteTokenTtlHours { get; set; } = 48;
         public string? ScoringRubric { get; set; } // JSON array of criteria
+        /// <summary>Điểm sàn (%) để ĐẠT bài thi trắc nghiệm online (Online Test) của job này. Mặc định 70.</summary>
+        public int OnlineTestPassScore { get; set; } = 70;
+        /// <summary>Số câu bốc ngẫu nhiên từ ngân hàng cho mỗi lượt thi. Mặc định 20.</summary>
+        public int OnlineTestQuestionsPerTest { get; set; } = 20;
+        /// <summary>Thời lượng làm bài (phút). Mặc định 30.</summary>
+        public int OnlineTestDurationMinutes { get; set; } = 30;
         public string? PersonaName { get; set; }
         public string? PersonaVoiceId { get; set; }
         public string? PersonaStyle { get; set; }

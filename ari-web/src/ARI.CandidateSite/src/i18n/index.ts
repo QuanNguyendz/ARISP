@@ -28,6 +28,8 @@ import candidateInterviewScheduleVi from './locales/vi/modules/candidate/intervi
 import candidateInterviewScheduleEn from './locales/en/modules/candidate/interviewSchedule.json'
 import candidateNotificationsVi from './locales/vi/modules/candidate/notifications.json'
 import candidateNotificationsEn from './locales/en/modules/candidate/notifications.json'
+import candidateOnlineTestVi from './locales/vi/modules/candidate/onlineTest.json'
+import candidateOnlineTestEn from './locales/en/modules/candidate/onlineTest.json'
 
 // ===== MODULES: LEGAL =====
 import legalPrivacyPolicyVi from './locales/vi/modules/legal/privacyPolicy.json'
@@ -51,6 +53,7 @@ export const resources = {
     'modules/candidate/applicationDetail': candidateApplicationDetailVi,
     'modules/candidate/interviewSchedule': candidateInterviewScheduleVi,
     'modules/candidate/notifications': candidateNotificationsVi,
+    'modules/candidate/onlineTest': candidateOnlineTestVi,
     // Legal module
     'modules/legal/privacyPolicy': legalPrivacyPolicyVi,
     'modules/legal/terms': legalTermsVi,
@@ -68,6 +71,7 @@ export const resources = {
     'modules/candidate/applicationDetail': candidateApplicationDetailEn,
     'modules/candidate/interviewSchedule': candidateInterviewScheduleEn,
     'modules/candidate/notifications': candidateNotificationsEn,
+    'modules/candidate/onlineTest': candidateOnlineTestEn,
     // Legal module
     'modules/legal/privacyPolicy': legalPrivacyPolicyEn,
     'modules/legal/terms': legalTermsEn,
@@ -85,6 +89,7 @@ const siteNamespaces = [
   'modules/candidate/applicationDetail',
   'modules/candidate/interviewSchedule',
   'modules/candidate/notifications',
+  'modules/candidate/onlineTest',
   'modules/legal/privacyPolicy',
   'modules/legal/terms',
   'modules/job-board/apply',

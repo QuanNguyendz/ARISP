@@ -1,0 +1,98 @@
+{
+  "bank": {
+    "back": "Quay lại tin tuyển dụng",
+    "title": "Ngân hàng câu hỏi trắc nghiệm",
+    "jobLabel": "Tin: {{title}}",
+    "subtitle": "Quản lý bộ câu hỏi thi trắc nghiệm cho ứng viên.",
+    "results": "Bảng điểm ứng viên",
+    "settings": {
+      "title": "Cấu hình bài thi",
+      "hint": "Ứng viên bốc ngẫu nhiên số câu bên dưới từ ngân hàng, đạt tối thiểu điểm sàn thì được tính ĐẠT.",
+      "passScore": "Điểm đạt (%)",
+      "questionsPerTest": "Số câu mỗi bài",
+      "duration": "Thời lượng (phút)",
+      "save": "Lưu cấu hình"
+    },
+    "import": {
+      "title": "Nhập từ file Excel",
+      "hint": "Tải file mẫu, điền câu hỏi rồi tải lên để thêm hàng loạt (định dạng .xlsx).",
+      "upload": "Tải lên file Excel",
+      "template": "Tải file mẫu",
+      "templateError": "Không tải được file mẫu.",
+      "importError": "Không nhập được file. Kiểm tra lại định dạng .xlsx.",
+      "resultSummary": "Đã thêm {{imported}} câu · {{failed}} dòng lỗi.",
+      "rowError": "Dòng {{row}}: {{message}}"
+    },
+    "form": {
+      "addTitle": "Thêm câu hỏi",
+      "editTitle": "Sửa câu hỏi",
+      "questionLabel": "Nội dung câu hỏi",
+      "questionPlaceholder": "Nhập câu hỏi…",
+      "typeLabel": "Loại câu hỏi",
+      "typeSingle": "Chọn 1 đáp án",
+      "typeMultiple": "Chọn nhiều đáp án",
+      "optionsSingle": "Phương án trả lời (chọn ô tròn = đáp án đúng)",
+      "optionsMultiple": "Phương án trả lời (tick các ô = đáp án đúng)",
+      "optionPlaceholder": "Phương án {{n}}",
+      "correctTitle": "Đáp án đúng",
+      "removeOption": "Xoá phương án",
+      "addOption": "Thêm phương án",
+      "submitAdd": "Thêm câu hỏi",
+      "submitEdit": "Lưu thay đổi",
+      "cancel": "Huỷ"
+    },
+    "list": {
+      "title": "Danh sách câu hỏi ({{count}})",
+      "empty": "Chưa có câu hỏi nào. Thêm câu hỏi ở cột bên trái.",
+      "edit": "Sửa",
+      "delete": "Xoá",
+      "typeSingle": "1 đáp án",
+      "typeMultiple": "Nhiều đáp án"
+    },
+    "errors": {
+      "loadBank": "Không tải được ngân hàng câu hỏi.",
+      "saveSettings": "Không lưu được cấu hình.",
+      "settingsRange": "Điểm sàn 0–100, số câu 1–200, thời lượng 1–300 phút.",
+      "saveQuestion": "Không lưu được câu hỏi.",
+      "deleteQuestion": "Không xoá được câu hỏi."
+    },
+    "validation": {
+      "emptyQuestion": "Vui lòng nhập nội dung câu hỏi.",
+      "minOptions": "Câu hỏi cần ít nhất 2 phương án trả lời.",
+      "noCorrect": "Vui lòng chọn ít nhất 1 đáp án đúng.",
+      "singleOne": "Câu hỏi 1 đáp án chỉ được chọn đúng 1 đáp án đúng."
+    }
+  },
+  "results": {
+    "back": "Ngân hàng câu hỏi",
+    "title": "Bảng điểm trắc nghiệm",
+    "jobLabel": "Tin: {{title}}",
+    "subtitle": "Tổng hợp điểm bài thi của ứng viên.",
+    "loadError": "Không tải được bảng điểm.",
+    "exportError": "Không xuất được Excel.",
+    "export": "Tải Excel",
+    "noQuestions": "Tin này chưa có câu hỏi trắc nghiệm.",
+    "createLink": "Tạo ngân hàng câu hỏi →",
+    "stats": {
+      "taken": "Đã thi",
+      "takenValue": "{{count}} ứng viên",
+      "passed": "Đạt (điểm sàn {{score}})",
+      "passedValue": "{{count}} · {{rate}}%",
+      "notPassed": "Chưa đạt",
+      "avgHigh": "Điểm TB · cao nhất",
+      "avgHighValue": "{{avg}} · {{high}}"
+    },
+    "table": {
+      "index": "#",
+      "candidate": "Ứng viên",
+      "round": "Vòng",
+      "correct": "Đúng",
+      "score": "Điểm",
+      "result": "Kết quả",
+      "submittedAt": "Nộp lúc"
+    },
+    "passed": "Đạt",
+    "notPassed": "Chưa đạt",
+    "empty": "Chưa có ứng viên nào nộp bài thi."
+  }
+}

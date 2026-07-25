@@ -1,0 +1,28 @@
+{
+  "passed": "Đạt",
+  "notPassed": "Chưa đạt",
+  "page": {
+    "title": "Bài thi trắc nghiệm",
+    "subtitle": "Chọn 1 đáp án cho mỗi câu, sau đó nộp bài.",
+    "passScoreLine": "Điểm sàn: {{score}}/100",
+    "back": "Về hồ sơ ứng tuyển",
+    "resultDetail": "Đúng {{correct}}/{{total}} câu.",
+    "alreadyDone": "Bạn đã hoàn thành bài thi này.",
+    "noTest": "Vị trí này chưa có bài thi trắc nghiệm. Bạn không cần làm bài.",
+    "progress": "Đã trả lời {{answered}}/{{total}} câu · Điểm đạt: {{pass}}/100",
+    "timeLeft": "Thời gian còn lại: {{time}}",
+    "multiHint": "Chọn nhiều đáp án",
+    "question": "Câu {{n}}.",
+    "submit": "Nộp bài",
+    "remaining": "Còn {{n}} câu chưa trả lời",
+    "loadError": "Không tải được bài thi.",
+    "submitError": "Không nộp được bài thi.",
+    "unauthorized": "Vui lòng đăng nhập Portal ứng viên để làm bài thi."
+  },
+  "entry": {
+    "resultTitle": "Bài thi trắc nghiệm: {{result}}",
+    "resultDetail": "Điểm {{score}}/100 · điểm sàn {{pass}}/100",
+    "cta": "Làm bài thi trắc nghiệm",
+    "ctaSub": "{{count}} câu · điểm đạt {{pass}}/100"
+  }
+}

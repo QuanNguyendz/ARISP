@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -49,8 +49,15 @@ export default function RecruiterMyJobsPage() {
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
 
+  const getEffectiveStatus = useCallback((j: any) => {
+    if (j.status === 'active' && j.applicationDeadline && new Date(j.applicationDeadline).getTime() < Date.now()) {
+      return 'closed'
+    }
+    return j.status
+  }, [])
+
   const counts = useMemo(() => {
-    const by = (s: string) => jobs.filter((j) => j.status === s).length
+    const by = (s: string) => jobs.filter((j) => getEffectiveStatus(j) === s).length
     return {
       all: jobs.length,
       active: by('active'),
@@ -59,11 +66,11 @@ export default function RecruiterMyJobsPage() {
       draft: by('draft'),
       closed: by('closed'),
     }
-  }, [jobs])
+  }, [jobs, getEffectiveStatus])
 
   const filtered = useMemo(
-    () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
-    [jobs, filter]
+    () => (filter === 'all' ? jobs : jobs.filter((j) => getEffectiveStatus(j) === filter)),
+    [jobs, filter, getEffectiveStatus]
   )
 
   const PAGE_SIZE = 10
@@ -161,9 +168,9 @@ export default function RecruiterMyJobsPage() {
                         <Briefcase className="h-5 w-5" />
                       </span>
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status)}`}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status, j.applicationDeadline)}`}
                       >
-                        {jobStatusLabel(j.status)}
+                        {jobStatusLabel(j.status, j.applicationDeadline)}
                       </span>
                     </div>
                     <h3 className="truncate font-semibold text-ink-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">

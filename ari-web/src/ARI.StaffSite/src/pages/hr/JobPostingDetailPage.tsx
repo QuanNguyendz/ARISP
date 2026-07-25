@@ -29,6 +29,7 @@ import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { Pagination } from '@ari/shared/ui'
+import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
@@ -120,6 +121,14 @@ export default function JobPostingDetailPage() {
 
   useEffect(() => {
     void load()
+
+    const onRefresh = () => {
+      void load()
+    }
+    window.addEventListener(STAFF_NOTIF_REFRESH_EVENT, onRefresh)
+    return () => {
+      window.removeEventListener(STAFF_NOTIF_REFRESH_EVENT, onRefresh)
+    }
   }, [load])
 
   useEffect(() => {
@@ -274,9 +283,17 @@ export default function JobPostingDetailPage() {
       .sort((a, b) => a.roundNumber - b.roundNumber)
       .map((rc) => {
         const candidates = apps.filter((a) => a.currentRound === rc.roundNumber)
+        const roundTypeStr = rc.roundType
+          ? rc.roundType.toLowerCase() === 'screening'
+            ? t('rounds.types.screening')
+            : rc.roundType.toLowerCase() === 'technical'
+              ? t('rounds.types.technical')
+              : rc.roundType
+          : ''
+        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
           id: `round_${rc.roundNumber}`,
-          title: t('rounds.round', { number: rc.roundNumber }),
+          title: `${t('rounds.round', { number: rc.roundNumber })}${typeText}`,
           subtitle:
             rc.roundType === 'technical'
               ? t('rounds.types.technical')
@@ -438,6 +455,20 @@ export default function JobPostingDetailPage() {
     }
   }
 
+  const handleToggleDisplay = async (field: 'isUrgent' | 'isPublicListing', value: boolean) => {
+    if (!id || !job) return
+    const originalValue = job[field]
+    if (originalValue === value) return
+
+    setJob({ ...job, [field]: value })
+    try {
+      await jobService.updateJobDisplay(id, { [field]: value })
+    } catch (err: unknown) {
+      setJob({ ...job, [field]: originalValue }) // Revert on failure
+      setActionError(t(`errors.toggleFailed`))
+    }
+  }
+
   const getDeadlineText = (deadlineStr?: string | null): string => {
     if (!deadlineStr) return t('deadline.noLimit')
     const d = new Date(deadlineStr)
@@ -497,11 +528,17 @@ export default function JobPostingDetailPage() {
     return mappings[mode.toLowerCase()] || mode
   }
 
-  const getStatusLabel = (status: string): string => {
+  const getStatusLabel = (status: string, deadline?: string | null): string => {
+    if (status === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+      return 'Hết hạn (Đã đóng)'
+    }
     return t(`statusLabels.${status}`) || status
   }
 
-  const getStatusBadge = (status: string): string => {
+  const getStatusBadge = (status: string, deadline?: string | null): string => {
+    if (status === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+      return 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400'
+    }
     const badges: Record<string, string> = {
       draft: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
       pending: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
@@ -560,14 +597,27 @@ export default function JobPostingDetailPage() {
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-semibold text-ink-900 dark:text-white">{job.title}</h1>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(job.status)}`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(job.status, job.applicationDeadline)}`}
                 >
-                  {getStatusLabel(job.status)}
+                  {getStatusLabel(job.status, job.applicationDeadline)}
                 </span>
               </div>
-              <p className="text-xl text-ink-600 dark:text-ink-400 mb-4">
-                {job.department || t('department')}
-              </p>
+              <div className="flex items-center gap-4 mb-4 flex-wrap">
+                <p className="text-xl text-ink-600 dark:text-ink-400">
+                  {job.department || t('department')}
+                </p>
+                
+                <div className="flex items-center gap-4 border-l border-ink-200 dark:border-white/10 pl-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                    <input type="checkbox" checked={job.isUrgent} onChange={(e) => handleToggleDisplay('isUrgent', e.target.checked)} className="accent-brand-600" />
+                    Tuyển gấp
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                    <input type="checkbox" checked={job.isPublicListing} onChange={(e) => handleToggleDisplay('isPublicListing', e.target.checked)} className="accent-brand-600" />
+                    Public Website
+                  </label>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600 dark:text-ink-400">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-brand-600 dark:text-brand-400" />
@@ -591,13 +641,22 @@ export default function JobPostingDetailPage() {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
-            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
-          >
-            <Edit2 className="w-4 h-4" /> {t('edit')}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+              className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <Edit2 className="w-4 h-4" /> {t('edit')}
+            </button>
+          </div>
         </div>
 
         {notice && (
@@ -656,6 +715,49 @@ export default function JobPostingDetailPage() {
                   className="inline-flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
                 >
                   <XCircle className="h-4 w-4" /> {t('pendingApproval.reject')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {job.status === 'draft' && (
+          <div className="mb-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/60 dark:bg-blue-500/10 p-5 shadow-card">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                  <Edit2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold text-ink-900 dark:text-white">
+                    Bản nháp của bạn
+                  </h3>
+                  <p className="mt-0.5 text-sm text-ink-600 dark:text-ink-400">
+                    Đây là tin tuyển dụng nháp. Bạn có thể kích hoạt trực tiếp mà không cần duyệt, hoặc tiếp tục chỉnh sửa.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={approve}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50"
+                >
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Target className="h-4 w-4" />
+                  )}{' '}
+                  Kích hoạt luôn
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/30 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50"
+                >
+                  <Edit2 className="h-4 w-4" /> Sửa tin
                 </button>
               </div>
             </div>

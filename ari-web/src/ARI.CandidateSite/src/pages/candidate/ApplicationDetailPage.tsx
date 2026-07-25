@@ -23,6 +23,7 @@ import {
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
+import OnlineTestEntry from '@components/OnlineTestEntry'
 import type {
   MyApplicationDetail,
   MyApplicationSession,
@@ -124,7 +125,7 @@ function ReportPanel({
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
                 {t('report.roundBadge', {
                   number: s.roundNumber,
-                  type: roundType || t('report.interview'),
+                  type: roundType ? ` (${roundType})` : '',
                 })}
               </span>
               {lang && (
@@ -352,6 +353,55 @@ function RoundPlaceholder({
       </div>
     )
   }
+  if (s.status === 'scheduled') {
+    return (
+      <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-10 text-center shadow-card">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-blue-100 text-blue-600">
+          <CalendarClock className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-800">
+          Vòng {s.roundNumber}: Lịch phỏng vấn đã được xếp
+        </p>
+        {s.scheduledAt && (
+          <p className="mt-2 text-base font-bold text-blue-700">
+            {formatDate(s.scheduledAt)}{' '}
+            {new Date(s.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+        <p className="mt-2 text-xs text-ink-500">
+          Vui lòng chuẩn bị thiết bị, microphone/camera và mã phỏng vấn trước thời gian bắt đầu.
+        </p>
+      </div>
+    )
+  }
+  if (s.status === 'invited') {
+    return (
+      <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-10 text-center shadow-card">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-purple-100 text-purple-600">
+          <CalendarPlus className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-800">
+          Vòng {s.roundNumber}: Lời mời phỏng vấn
+        </p>
+        <p className="mt-1 text-sm text-ink-500">
+          Bạn đã nhận được lời mời cho vòng phỏng vấn này. Vui lòng kiểm tra email hoặc đăng ký lịch phỏng vấn.
+        </p>
+      </div>
+    )
+  }
+  if (s.status === 'not_started') {
+    return (
+      <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
+          <Video className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-700">Vòng {s.roundNumber}: Chưa diễn ra</p>
+        <p className="mt-1 text-sm text-ink-500">
+          Vòng phỏng vấn này chưa bắt đầu. Bạn sẽ nhận được thông báo khi kết quả vòng trước được phê duyệt.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
@@ -392,6 +442,15 @@ function RoundButton({
     if (s.status === 'in_progress' || s.status === 'active') {
       return { cls: 'bg-brand-50 text-brand-700', icon: Clock, label: t('badge.inProgress') }
     }
+    if (s.status === 'scheduled') {
+      return { cls: 'bg-blue-50 text-blue-700', icon: CalendarClock, label: 'Đã xếp lịch' }
+    }
+    if (s.status === 'invited') {
+      return { cls: 'bg-purple-50 text-purple-700', icon: CalendarPlus, label: 'Được mời' }
+    }
+    if (s.status === 'not_started') {
+      return { cls: 'bg-ink-100 text-ink-400', icon: Clock, label: 'Chưa phỏng vấn' }
+    }
     return { cls: 'bg-ink-100 text-ink-500', icon: Clock, label: t('badge.noResult') }
   }
 
@@ -405,6 +464,8 @@ function RoundButton({
   }
   const roundType = roundTypeLabels[(s.roundType || '').toLowerCase()] || s.roundType || ''
 
+  const displayDate = s.endedAt || s.startedAt || s.scheduledAt
+
   return (
     <button
       onClick={onClick}
@@ -412,7 +473,7 @@ function RoundButton({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-ink-900">
-          {t('report.roundBadge', { number: s.roundNumber, type: roundType })}
+          {t('report.roundBadge', { number: s.roundNumber, type: roundType ? ` (${roundType})` : '' })}
         </span>
         <span
           className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}
@@ -428,9 +489,10 @@ function RoundButton({
           {typeof score === 'number' ? `${Math.round(score)}/100` : '—'}
         </span>
       </div>
-      {(s.endedAt || s.startedAt) && (
+      {displayDate && (
         <div className="mt-1 text-[11px] text-ink-400">
-          {formatDate(s.endedAt || s.startedAt)}
+          {formatDate(displayDate)}
+          {s.scheduledAt && !s.endedAt && !s.startedAt ? ` · ${new Date(s.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
           {formatDuration(s.durationSeconds) ? ` · ${formatDuration(s.durationSeconds)}` : ''}
         </div>
       )}
@@ -474,8 +536,11 @@ export default function ApplicationDetailPage() {
         if (!active) return
         setDetail(d)
         const withEval = [...d.sessions].reverse().find((s) => s.evaluation)
-        const fallback = d.sessions.length ? d.sessions[d.sessions.length - 1] : null
-        setSelectedId((withEval || fallback)?.id ?? null)
+        const activeOrScheduled = d.sessions.find(
+          (s) => s.status === 'scheduled' || s.status === 'in_progress' || s.status === 'invited'
+        )
+        const fallback = d.sessions.length ? d.sessions[0] : null
+        setSelectedId((withEval || activeOrScheduled || fallback)?.id ?? null)
       })
       .catch(
         (err: any) =>
@@ -521,6 +586,7 @@ export default function ApplicationDetailPage() {
       ) : !detail ? null : (
         <main className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-5">
+            {id && <OnlineTestEntry applicationId={id} />}
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
                 <div className="flex items-center gap-2 text-sm font-semibold">

@@ -1,0 +1,98 @@
+{
+  "bank": {
+    "back": "Back to job posting",
+    "title": "Online Test Question Bank",
+    "jobLabel": "Job: {{title}}",
+    "subtitle": "Manage the multiple-choice question set for candidates.",
+    "results": "Candidate scores",
+    "settings": {
+      "title": "Test settings",
+      "hint": "Each candidate draws the number of questions below at random from the bank; reaching the pass score counts as PASSED.",
+      "passScore": "Pass score (%)",
+      "questionsPerTest": "Questions per test",
+      "duration": "Duration (min)",
+      "save": "Save settings"
+    },
+    "import": {
+      "title": "Import from Excel",
+      "hint": "Download the template, fill in questions, then upload to add them in bulk (.xlsx format).",
+      "upload": "Upload Excel file",
+      "template": "Download template",
+      "templateError": "Failed to download the template.",
+      "importError": "Failed to import the file. Check that it is a valid .xlsx.",
+      "resultSummary": "Added {{imported}} question(s) · {{failed}} row error(s).",
+      "rowError": "Row {{row}}: {{message}}"
+    },
+    "form": {
+      "addTitle": "Add question",
+      "editTitle": "Edit question",
+      "questionLabel": "Question text",
+      "questionPlaceholder": "Enter the question…",
+      "typeLabel": "Question type",
+      "typeSingle": "Single answer",
+      "typeMultiple": "Multiple answers",
+      "optionsSingle": "Answer options (select the radio = correct answer)",
+      "optionsMultiple": "Answer options (tick the boxes = correct answers)",
+      "optionPlaceholder": "Option {{n}}",
+      "correctTitle": "Correct answer",
+      "removeOption": "Remove option",
+      "addOption": "Add option",
+      "submitAdd": "Add question",
+      "submitEdit": "Save changes",
+      "cancel": "Cancel"
+    },
+    "list": {
+      "title": "Question list ({{count}})",
+      "empty": "No questions yet. Add one from the left column.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "typeSingle": "Single",
+      "typeMultiple": "Multiple"
+    },
+    "errors": {
+      "loadBank": "Failed to load the question bank.",
+      "saveSettings": "Failed to save settings.",
+      "settingsRange": "Pass score 0–100, questions 1–200, duration 1–300 min.",
+      "saveQuestion": "Failed to save the question.",
+      "deleteQuestion": "Failed to delete the question."
+    },
+    "validation": {
+      "emptyQuestion": "Please enter the question text.",
+      "minOptions": "A question needs at least 2 answer options.",
+      "noCorrect": "Please select at least 1 correct answer.",
+      "singleOne": "A single-answer question must have exactly 1 correct answer."
+    }
+  },
+  "results": {
+    "back": "Question bank",
+    "title": "Online Test Scores",
+    "jobLabel": "Job: {{title}}",
+    "subtitle": "Aggregated candidate test scores.",
+    "loadError": "Failed to load the scoreboard.",
+    "exportError": "Failed to export Excel.",
+    "export": "Export Excel",
+    "noQuestions": "This job has no test questions yet.",
+    "createLink": "Create the question bank →",
+    "stats": {
+      "taken": "Took the test",
+      "takenValue": "{{count}} candidates",
+      "passed": "Passed (pass score {{score}})",
+      "passedValue": "{{count}} · {{rate}}%",
+      "notPassed": "Not passed",
+      "avgHigh": "Average · highest",
+      "avgHighValue": "{{avg}} · {{high}}"
+    },
+    "table": {
+      "index": "#",
+      "candidate": "Candidate",
+      "round": "Round",
+      "correct": "Correct",
+      "score": "Score",
+      "result": "Result",
+      "submittedAt": "Submitted"
+    },
+    "passed": "Passed",
+    "notPassed": "Not passed",
+    "empty": "No candidate has submitted the test yet."
+  }
+}

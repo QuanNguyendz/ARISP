@@ -63,6 +63,7 @@
   },
   "report": {
     "title": "Nhận định tổng quan",
+    "roundBadge": "Vòng {{number}}{{type}}",
     "scoresByCriteria": "Điểm theo tiêu chí",
     "downloadRecording": "Tải bản ghi",
     "footer": "Báo cáo do AI tạo · HR đã xác nhận · Một số phần có thể được HR điều chỉnh hiển thị"
