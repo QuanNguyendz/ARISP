@@ -407,7 +407,7 @@ export default function ProfilePage() {
         <aside className="lg:self-start lg:sticky lg:top-24">
           <nav
             aria-label="Profile sections"
-            className="-mx-4 flex w-max min-w-full gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-0 sm:w-auto lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
+            className="-mx-4 -mr-2 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mr-0 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
           >
             {SECTIONS.map((s) => {
               const Icon = s.icon
@@ -755,7 +755,7 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 {profile.experience.map((exp, i) => (
                   <div key={i} className="rounded-xl border border-ink-200 p-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <input
                         className={`${inputWrap} text-sm`}
                         placeholder={t('profile.jobTitle')}
@@ -992,7 +992,7 @@ function ProfileSkeleton() {
       <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
         {/* Section nav + completeness */}
         <aside className="space-y-4 self-start">
-          <div className="-mx-4 flex w-max min-w-full gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-0 sm:w-auto lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
+          <div className="-mx-4 -mr-2 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mr-0 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
             {Array.from({ length: 7 }).map((_, i) => (
               <div
                 key={i}

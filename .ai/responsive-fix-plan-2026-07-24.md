@@ -1,6 +1,6 @@
 # Kế Hoạch Sửa Frontend — Responsive Design
 
-> **Ngày lập:** 2026-07-24
+> **Ngày lập:** 2026-07-24 (cập nhật 2026-07-25: thêm mục 6 — Bản đồ theo Role để dễ test)
 > **Dựa trên:** `.ai/responsive-audit-2026-07-24.md`
 > **Nguyên tắc:** Chia 4 Phase — fix theo thứ tự ưu tiên, không sửa code trong giai đoạn lập kế hoạch.
 
@@ -36,6 +36,20 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | **Trung bình** | Đổi layout có thể cần test lại ở nhiều breakpoint | Table grid + overflow wrapper |
 | **Khó** | Refactor component lớn hoặc thêm state/logic mới | Sidebar collapsible với drawer |
 | **Rủi ro cao** | Đụng design system, ảnh hưởng nhiều page | Refactor InterviewSchedulePage |
+
+### 0.4. Trạng thái thực thi (cập nhật 2026-07-25)
+
+| Phase / Nhóm | Trạng thái | Ghi chú |
+|---|---|---|
+| Phase 1 | ✅ Đã commit (16 commits fix) | Hoàn thành |
+| Phase 2 Nhóm A — Sidebar & Settings | ✅ Đã commit (5 files) | Hoàn thành |
+| Phase 2 Nhóm A bổ sung — ProfilePage iOS auto-shrink | ✅ Đã commit | Fix text thu nhỏ 320px |
+| **Phase 2 Nhóm B — Form & Input** | 🔜 **Đang thực thi** | Tiếp theo |
+| Phase 2 Nhóm C — Table | ⏳ Backlog | |
+| Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
+| Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
+| Phase 3 | ⏳ Backlog | |
+| Phase 4 | ⏳ Backlog | |
 
 ---
 
@@ -199,18 +213,18 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 #### 3.1.4. Checklist Phase 1
 
 **PR #1.1 — Fix nhanh P0 + P1 đơn giản (~8 giờ)**
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/SchedulePage.tsx` :: Thêm `w-[90%]` cho modal container (Dễ, 5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Đổi `xl:grid-cols-[1fr_360px]` → `lg:grid-cols-[1fr_360px]` (Dễ, 10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Đổi `text-5xl` score → `text-4xl sm:text-5xl` (Dễ, 5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Đổi page padding `p-6` → `p-4 sm:p-6 lg:p-8` (Dễ, 5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Priority cards grid thêm `md:grid-cols-2` (Dễ, 10 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/landing/HomePage.tsx` :: InterviewKioskSection input+button row → `flex-col sm:flex-row` (Dễ, 15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Application table thêm wrapper `overflow-x-auto min-w-[700px]` (Trung bình, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Actions column `w-36` → `w-auto min-w-[144px]` (Dễ, 10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Cover letter modal inner grid `grid-cols-2` → `grid-cols-1 sm:grid-cols-2` (Dễ, 10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Application table thêm wrapper tương tự HR (Trung bình, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Actions column `w-36` (Dễ, 10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Cover letter modal inner grid (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/SchedulePage.tsx` :: Thêm `w-[90%]` cho modal container (Dễ, 5 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Đổi `xl:grid-cols-[1fr_360px]` → `lg:grid-cols-[1fr_360px]` (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Đổi `text-5xl` score → `text-4xl sm:text-5xl` (Dễ, 5 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Đổi page padding `p-6` → `p-4 sm:p-6 lg:p-8` (Dễ, 5 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Priority cards grid thêm `md:grid-cols-2` (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/landing/HomePage.tsx` :: InterviewKioskSection input+button row → `flex-col sm:flex-row` (Dễ, 15 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Application table thêm wrapper `overflow-x-auto min-w-[700px]` (Trung bình, 30 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Actions column `w-36` → `w-auto min-w-[144px]` (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Cover letter modal inner grid `grid-cols-2` → `grid-cols-1 sm:grid-cols-2` (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Application table thêm wrapper tương tự HR (Trung bình, 30 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Actions column `w-36` (Dễ, 10 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Cover letter modal inner grid (Dễ, 10 phút)
 
 **PR #1.2 — Refactor layout phức tạp P1 (~20 giờ)**
 - [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` :: Collapse sidebar trên mobile (Khó, 6 giờ — cần thêm state + drawer)
@@ -228,7 +242,7 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 
 #### 3.2.1. File cần sửa (theo nhóm con)
 
-**Nhóm A — Sidebar & Settings (~12 giờ)**
+**Nhóm A — Sidebar & Settings (~12 giờ)** ✅ Đã xong
 
 | # | File | Issue chính | Component | Độ khó | Rủi ro |
 |---|---|---|---|---|---|
@@ -239,7 +253,7 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 | 5 | `pages/candidate/ApplicationDetailPage.tsx` | Round buttons sidebar không collapse | ApplicationDetailPage round sidebar | Trung bình | Trung bình |
 | 6 | `pages/candidate/InterviewRoomPage.tsx` | Transcript panel không collapse (chuyển thành floating drawer) | InterviewRoomPage layout | Khó | Cao — phải test với WebRTC |
 
-**Nhóm B — Form & Input (~10 giờ)**
+**Nhóm B — Form & Input (~10 giờ)** 🔜 Đang thực thi
 
 | # | File | Issue chính | Component | Độ khó | Rủi ro |
 |---|---|---|---|---|---|
@@ -295,15 +309,21 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 
 #### 3.2.4. Checklist Phase 2
 
-**PR #2.1 — Sidebar & Settings (~12 giờ)**
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/SettingsPage.tsx` :: Sidebar collapse với drawer hoặc `xl:w-64` (Khó, 4 giờ)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` :: Sidebar tương tự (Khó, 4 giờ)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/SettingsPage.tsx` :: Sidebar `xl:w-64` đơn giản (Trung bình, 1 giờ)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Section nav → horizontal scroll (Khó, 2 giờ)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ApplicationDetailPage.tsx` :: Round sidebar → horizontal scroll tabs (Trung bình, 1 giờ)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/interview/InterviewRoomPage.tsx` :: Transcript panel → floating drawer (Khó, 4 giờ — test với WebRTC)
+**PR #2.1 — Sidebar & Settings (~12 giờ)** ✅ Đã xong
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/SettingsPage.tsx` :: Sidebar collapse với drawer hoặc `xl:w-64` (Khó, 4 giờ)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` :: Sidebar tương tự (Khó, 4 giờ)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/SettingsPage.tsx` :: Sidebar `xl:w-64` đơn giản (Trung bình, 1 giờ)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Section nav → horizontal scroll (Khó, 2 giờ)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ApplicationDetailPage.tsx` :: Round sidebar → horizontal scroll tabs (Trung bình, 1 giờ)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/interview/InterviewRoomPage.tsx` :: Transcript panel → floating drawer (Khó, 4 giờ — test với WebRTC)
 
-**PR #2.2 — Form & Input (~10 giờ)**
+**PR #2.1 bổ sung — iOS Safari auto-shrink fix** ✅ Đã xong
+- [x] `ari-web/src/ARI.Shared/src/styles/index.css` :: Thêm `-webkit-text-size-adjust: 100%` cho `html`/`body`
+- [x] `ari-web/src/ARI.CandidateSite/index.html` :: Thêm `viewport-fit=cover, maximum-scale=5.0`
+- [x] `ari-web/src/ARI.StaffSite/index.html` :: Thêm `viewport-fit=cover, maximum-scale=5.0`
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Nav pills `w-max min-w-full` + ẩn scrollbar + `shrink-0` cho mỗi pill
+
+**PR #2.2 — Form & Input (~10 giờ)** 🔜 Đang thực thi
 - [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Experience form `grid-cols-1 sm:grid-cols-2` (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form tương tự (Dễ, 30 phút)
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-3` (Dễ, 30 phút)
@@ -511,12 +531,12 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 
 ```
 Tuần 1:
-  Day 1-2  →  Phase 1 PR #1.1 (P0 + P1 đơn giản, ~8h)
-  Day 2-4  →  Phase 1 PR #1.2 (P1 layout phức tạp, ~20h)
+  Day 1-2  →  Phase 1 PR #1.1 (P0 + P1 đơn giản, ~8h) ✅
+  Day 2-4  →  Phase 1 PR #1.2 (P1 layout phức tạp, ~20h) — Remaining: ApplicationsPage, FindJobPage, InterviewSchedulePage
 
 Tuần 2:
-  Day 5-6  →  Phase 2 PR #2.1 (Sidebar & Settings, ~12h)
-  Day 7-8  →  Phase 2 PR #2.2 (Form & Input, ~10h)
+  Day 5-6  →  Phase 2 PR #2.1 (Sidebar & Settings, ~12h) ✅
+  Day 7-8  →  Phase 2 PR #2.2 (Form & Input, ~10h) 🔜
   Day 9-10 →  Phase 2 PR #2.3 (Table, Layout, Chart, ~18h)
 
 Tuần 3:
@@ -535,6 +555,256 @@ Tuần 3:
 
 ---
 
+## 6. Bản đồ theo Role (Test matrix)
+
+> **Mục đích:** Mục này được tạo 2026-07-25 theo yêu cầu — tổ chức lại toàn bộ file cần test theo **role người dùng** thay vì theo Phase, để dễ dàng chạy test matrix thực tế. Cấu trúc Phase ở mục 3 vẫn giữ nguyên — mục 6 chỉ là **view khác** để hỗ trợ test.
+
+### 6.1. Cấu trúc Role → Site → Page
+
+```
+HR            →  StaffSite (port 3001) →  routes /hr/*
+Recruiter     →  StaffSite (port 3001) →  routes /recruiter/*
+Super Admin   →  StaffSite (port 3001) →  routes /super-admin/*
+Candidate     →  CandidateSite (port 3000) →  routes /candidate/*, /interview/*, /kiosk, /schedule/*, /practice/*
+Landing       →  CandidateSite (port 3000) →  routes /, /jobs/*, /login, /register
+Shared        →  Cả 2 site →  components trong ARI.Shared
+```
+
+### 6.2. Test paths theo Role
+
+#### 👑 ROLE: HR (StaffSite)
+
+| Route | Page | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|---|
+| `/hr` | `DashboardPage` | P1: padding, priority grid P3: funnel, svg, count | 1, 2, 3 | ✅ Phase 1 xong |
+| `/hr/jobs` | `JobsPage` | (chưa list) | — | — |
+| `/hr/jobs/pending` | `PendingJobsPage` | (chưa list) | — | — |
+| `/hr/jobs/:id` | `JobPostingDetailPage` | P1: table wrapper, w-36, modal grid P2: filter bar P3: avatar, button, JD grid, tabs overflow | 1, 2, 3 | ✅ Phase 1 xong |
+| `/hr/candidates` | `CandidatesPage` | (chưa list) | — | — |
+| `/hr/candidates/:id` | `CandidateDetailPage` | Mobile 320px text tràn | 2 bổ sung | ✅ Phase 2 nhóm A xong |
+| `/hr/evaluations/:id` | `EvaluationReviewPage` | P1: `xl:` → `lg:`, text-5xl P3: sticky header, breadcrumb, language grid, stats | 1, 3 | ✅ Phase 1 xong |
+| `/hr/interview-sessions` | `InterviewSessionsPage` | (chưa list) | — | — |
+| `/hr/playbooks` | `PlaybooksPage` | (chưa list) | — | — |
+| `/hr/reports` | `ReportsPage` | (chưa list) | — | — |
+| `/hr/team` | `TeamPage` | (chưa list) | — | — |
+| `/hr/notifications` | `NotificationsPage` | (chưa list) | — | — |
+| `/hr/settings` | `SettingsPage` | P3: sidebar `lg:w-64` | 2 | ✅ Đã xong |
+
+**Test thực tế HR:**
+```bash
+# Mobile viewport checklist HR (320, 375, 768, 1024, 1440)
+1. /hr → DashboardPage xem priority cards, funnel
+2. /hr/jobs/:id → table ứng viên, modal cover letter
+3. /hr/evaluations/:id → score 96px, sidebar 360px
+4. /hr/candidates/:id → text tràn box mobile
+5. /hr/settings → pills horizontal scroll
+```
+
+---
+
+#### 🎯 ROLE: Recruiter (StaffSite)
+
+| Route | Page | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|---|
+| `/recruiter` | `DashboardPage` | (chưa list) | — | — |
+| `/recruiter/my-jobs` | `MyJobsPage` | Mobile 375px lệch trái (padding thừa) | 2 bổ sung | ✅ Phase 2 nhóm A xong |
+| `/recruiter/jobs/new` | `CreateJobPostingPage` | P2: salary grid 3-col Mobile 375px lệch trái (padding thừa) | 2 | ✅ Phase 2 nhóm A xong |
+| `/recruiter/jobs/:id` | `JobDetailPage` | P1: table wrapper, w-36, modal grid P3: padding, avatar, title, stats grid, tabs overflow, modal truncate | 1, 3 | ✅ Phase 1 xong |
+| `/recruiter/candidates` | `CandidatesPage` | P2: table cell overflow | 2 | ⏳ Phase 2 Nhóm C |
+| `/recruiter/candidates/:id` | `CandidateDetailPage` | (chưa list) | — | — |
+| `/recruiter/interview-codes` | `InterviewCodePage` | P2: search input responsive | 2 | ⏳ Phase 2 Nhóm B |
+| `/recruiter/interview-sessions` | `InterviewSessionsPage` | (chưa list) | — | — |
+| `/recruiter/evaluations/:id` | `EvaluationReviewPage` | P3: search, modal header, leading-7 | 3 | ⏳ Phase 3 |
+| `/recruiter/job-schedule/:id` | `JobScheduleConfigPage` | (chưa list) | — | — |
+| `/recruiter/notifications` | `NotificationsPage` | (chưa list) | — | — |
+| `/recruiter/settings` | `SettingsPage` | P2: sidebar `lg:w-64` | 2 | ✅ Đã xong |
+
+**Test thực tế Recruiter:**
+```bash
+# Mobile viewport checklist Recruiter (320, 375, 768, 1024, 1440)
+1. /recruiter/my-jobs → list job, padding đúng
+2. /recruiter/jobs/new → form salary 3-col collapse thành 1-col
+3. /recruiter/jobs/:id → table ứng viên, modal cover letter, tabs overflow
+4. /recruiter/interview-codes → search bar full-width mobile
+5. /recruiter/settings → pills horizontal scroll
+```
+
+---
+
+#### 🛡️ ROLE: Super Admin (StaffSite)
+
+| Route | Page | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|---|
+| `/super-admin` | `DashboardPage` | (chưa list) | — | — |
+| `/super-admin/users` | `UsersPage` | P2: table `min-w-[700px]` | 2 | ⏳ Phase 2 Nhóm C |
+| `/super-admin/users/pending` | `PendingUsersPage` | (chưa list) | — | — |
+| `/super-admin/audit-logs` | `AuditLogsPage` | (chưa list) | — | — |
+| `/super-admin/settings` | `SettingsPage` | P2: sidebar `lg:w-64` | 2 | ✅ Đã xong |
+
+**Test thực tế Super Admin:**
+```bash
+# Mobile viewport checklist Super Admin (320, 375, 768, 1024, 1440)
+1. /super-admin/users → table scroll ngang với min-w 700px
+2. /super-admin/settings → pills horizontal scroll
+```
+
+---
+
+#### 👤 ROLE: Candidate (CandidateSite)
+
+| Route | Page | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|---|
+| `/` | `HomePage` (Landing) | (chuyển xuống Landing) | — | — |
+| `/jobs` | `FindJobPage` (Landing) | (chuyển xuống Landing) | — | — |
+| `/jobs/:id` | `JobDetailPage` (job-board) | P2: sticky aside → bottom fixed bar | 2 | ⏳ Phase 2 Nhóm D |
+| `/jobs/:id/apply` | `ApplyPage` | Text tràn box validation | 2 bổ sung | ✅ Phase 2 nhóm A xong |
+| `/jobs/login` | `CandidateLoginPage` | (chưa list) | — | — |
+| `/jobs/register` | `CandidateRegisterPage` | (chưa list) | — | — |
+| `/candidate` | `ApplicationsPage` | P1: main grid collapse | 1 | ⏳ Phase 1 PR #1.2 |
+| `/candidate/applications/:id` | `ApplicationDetailPage` | P2: round sidebar → horizontal scroll | 2 | ✅ Phase 2 nhóm A xong |
+| `/candidate/profile` | `ProfilePage` | P2: section nav → horizontal scroll P2: Experience/Education form grid P2 bổ sung: iOS auto-shrink fix | 2 | ✅ Phase 2 nhóm A xong |
+| `/candidate/saved-jobs` | `SavedJobsPage` | (chưa list) | — | — |
+| `/candidate/schedule` | `SchedulePage` | **P0**: modal thiếu `w-[90%]` | 1 | ✅ Phase 1 xong |
+| `/candidate/schedule/:appId` | `InterviewSchedulePage` | P1: refactor dark-glass → design system | 1 | ⏳ Phase 1 PR #1.2 |
+| `/candidate/notifications` | `NotificationsPage` | (chưa list) | — | — |
+| `/candidate/settings` | `SettingsPage` | (chưa list) | — | — |
+| `/interview/practice/:appId` | `PracticeSessionPage` | (chưa list) | — | — |
+| `/interview/room/:id` | `InterviewRoomPage` | P2: transcript panel → floating drawer P2: avatar responsive | 2 | ✅ Phase 2 nhóm A xong |
+| `/kiosk` | `KioskPage` | (chưa list) | — | — |
+| `/verify-email` | `VerifyEmailPage` | (chưa list) | — | — |
+| `/privacy`, `/terms` | `PrivacyPolicyPage`, `TermsPage` | (chưa list) | — | — |
+
+**Test thực tế Candidate:**
+```bash
+# Mobile viewport checklist Candidate (320, 375, 768, 1024, 1440)
+1. /candidate/applications → sidebar collapse thành drawer
+2. /candidate/applications/:id → horizontal scroll tabs cho rounds
+3. /candidate/profile → nav pills horizontal scroll, experience form 1-col
+4. /candidate/schedule → modal full-width 90% với max-w-2xl
+5. /candidate/schedule/:appId → redesigned sang ink/brand/ai theme
+6. /interview/room/:id → transcript drawer, avatar responsive
+7. /jobs/:id → bottom fixed bar CTA thay sticky aside
+```
+
+---
+
+#### 🌐 ROLE: Landing (CandidateSite, public)
+
+| Route | Page | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|---|
+| `/` | `HomePage` | P1: InterviewKioskSection input+button row | 1 | ✅ Phase 1 xong |
+| `/jobs` | `FindJobPage` | P1: FilterSidebar collapse + work modes grid | 1 | ⏳ Phase 1 PR #1.2 |
+| `/jobs/:id` | `JobDetailPage` (job-board) | (xem Candidate) | — | — |
+
+**Test thực tế Landing:**
+```bash
+# Mobile viewport checklist Landing (320, 375, 768, 1024, 1440)
+1. / → Kiosk section input full-width mobile
+2. /jobs → Sidebar filter collapse thành drawer, work modes grid responsive
+```
+
+---
+
+#### 🔧 SHARED (cả 2 site)
+
+| File | Issues sửa | Phase | Trạng thái |
+|---|---|---|---|
+| `tailwind-preset.cjs` | Thêm `xs: '480px'` breakpoint | 4 | ⏳ Phase 4 |
+| `index.css` (Shared) | Thêm `-webkit-text-size-adjust: 100%` | 2 bổ sung | ✅ Phase 2 nhóm A xong |
+| `Container.tsx` (Shared) | Verify padding responsive | 4 | ⏳ Phase 4 |
+| `Button.tsx` (Shared) | Size variants mobile | 4 | ⏳ Phase 4 |
+| `NotFoundPage.tsx` (Shared) | Smooth font scale | 3 | ⏳ Phase 3 |
+| `_skeletons.tsx` (×3) | Đồng bộ breakpoints | 4 | ⏳ Phase 4 |
+| `Footer.tsx` (Candidate) | Brand paragraph `min-w-0 break-words` | 3 | ⏳ Phase 3 |
+| `CTA.tsx` (Candidate) | `py-20 sm:py-32 lg:py-40` | 3 | ⏳ Phase 3 |
+| `Demo.tsx` (Candidate) | `h-[400px]` responsive, grid collapse | 3 | ⏳ Phase 3 |
+| `Hero.tsx` (Candidate) | Safe area overlay | 3 | ⏳ Phase 3 |
+| `AISphereDemo.tsx` (Candidate) | `w-40 h-40 sm:w-64 sm:h-64` | 3 | ⏳ Phase 3 |
+| `ScrollStorytelling.tsx` (Candidate) | Visual + gap responsive | 2 | ⏳ Phase 2 Nhóm D |
+| `ChangePasswordModal.tsx` (Candidate) | `w-[90%] max-w-md` | 3 | ⏳ Phase 3 |
+
+---
+
+### 6.3. Test matrix tổng hợp theo Role
+
+> **Cách dùng:** Mỗi lần chạy test, vào `cd ari-web && npm run dev:staff` (port 3001) hoặc `npm run dev:candidate` (port 3000), mở DevTools → toggle device toolbar → chọn iPhone SE (320), iPhone 12 (390), iPad (768), iPad Pro (1024), Desktop (1440). Lần lượt đi theo route của role.
+
+#### Checklist test 320px (iPhone SE) — Critical
+```
+[ ] HR       /hr                          → 2 priority cards, không tràn
+[ ] HR       /hr/jobs/:id                 → table scroll ngang, modal cover letter
+[ ] HR       /hr/evaluations/:id          → score nhỏ gọn, sidebar collapse
+[ ] HR       /hr/candidates/:id           → text không tràn box
+[ ] HR       /hr/settings                 → pills horizontal scroll
+[ ] Recruiter /recruiter/my-jobs          → list job, padding đúng
+[ ] Recruiter /recruiter/jobs/new         → salary grid 1-col
+[ ] Recruiter /recruiter/jobs/:id         → table scroll, modal overflow
+[ ] Recruiter /recruiter/interview-codes  → search full-width
+[ ] Recruiter /recruiter/settings         → pills horizontal scroll
+[ ] SA       /super-admin/users           → table scroll ngang
+[ ] SA       /super-admin/settings        → pills horizontal scroll
+[ ] Candidate /candidate/profile          → nav pills cuộn ngang, text size chuẩn
+[ ] Candidate /candidate/applications/:id → horizontal scroll tabs cho rounds
+[ ] Candidate /candidate/schedule         → modal w-[90%]
+[ ] Candidate /candidate/schedule/:appId  → design system mới
+[ ] Candidate /interview/room/:id         → transcript drawer, avatar nhỏ
+[ ] Candidate /jobs/:id                   → bottom fixed bar CTA
+[ ] Landing  /                             → Kiosk input full-width
+[ ] Landing  /jobs                         → sidebar filter drawer
+```
+
+#### Checklist test 768px (iPad) — Tablet
+```
+[ ] HR       /hr                          → 2 priority cards layout ngang
+[ ] HR       /hr/jobs/:id                 → table hiển thị 1 phần
+[ ] HR       /hr/settings                 → nav vẫn vertical hoặc horizontal scroll
+[ ] Recruiter /recruiter/jobs/:id         → table 7-col hiển thị đầy đủ
+[ ] Candidate /candidate/profile          → pills wrap thành 2 hàng
+[ ] Candidate /interview/room/:id         → transcript panel inline
+[ ] Candidate /jobs/:id                   → sticky aside visible
+```
+
+#### Checklist test 1024px (laptop nhỏ)
+```
+[ ] Tất cả route: kiểm tra sidebar/layout desktop, KHÔNG dùng `xl:` thuần
+```
+
+#### Checklist test 1440px+ (desktop)
+```
+[ ] Container max-w-6xl / max-w-7xl center
+[ ] KHÔNG tràn viền 2 bên
+[ ] Grid 3-col / 4-col hoạt động đúng
+```
+
+---
+
+### 6.4. Mapping Phase ↔ Role (dễ đối chiếu)
+
+| Phase | HR | Recruiter | Super Admin | Candidate | Landing | Shared |
+|---|---|---|---|---|---|---|
+| **Phase 1** | Dashboard, JobPostingDetail, EvaluationReview | JobDetail, JobDetail, JobDetail | — | Schedule, Applications, InterviewSchedule | HomePage, FindJob | — |
+| **Phase 2 Nhóm A** ✅ | SettingsPage | SettingsPage, CreateJobPosting, MyJobs | SettingsPage | ProfilePage, ApplicationDetail, InterviewRoom | — | index.css, 2× index.html |
+| **Phase 2 Nhóm B** 🔜 | JobPostingDetail (filter bar) | CreateJobPosting (salary), InterviewCodePage | — | ProfilePage (Experience form, Education form) | — | — |
+| **Phase 2 Nhóm C** | Dashboard (candidates table) | CandidatesPage | UsersPage | — | — | — |
+| **Phase 2 Nhóm D** | — | — | — | JobDetailPage (job-board), InterviewRoom | — | ScrollStorytelling |
+| **Phase 2 Nhóm E** | Dashboard (chart), JobPostingDetail (reject modal) | — | — | — | — | — |
+| **Phase 3** | JobPostingDetail (avatar, tabs), EvaluationReview, Dashboard (funnel) | JobDetail (padding, avatar, title, stats, tabs), EvaluationReview | — | — | — | Footer, CTA, Demo, Hero, AISphereDemo, ChangePasswordModal, NotFoundPage |
+| **Phase 4** | — | — | — | — | — | tailwind-preset, Container, Button, _skeletons×3 |
+
+---
+
+### 6.5. Quy ước Test theo Role
+
+Khi đến bước "xong Phase X", tôi sẽ:
+1. **Liệt kê đúng các file thuộc role đó** trong Phase đó (theo mục 6.2)
+2. **Ghi hướng dẫn test theo route + breakpoint** (theo mục 6.3)
+3. **Đánh dấu trạng thái** vào bảng mục 6.2 (✅ / ⏳)
+4. **Update section 4.4** (theo component) nếu phát sinh file mới
+
+Bạn chỉ cần click vào role cần test, mở theo route, test theo breakpoint — không cần đọc lại toàn bộ Phase.
+
+---
+
 **Người lập:** Cursor Agent
 **File nguồn:** `.ai/responsive-audit-2026-07-24.md`
-**Trạng thái:** Kế hoạch — chưa thực thi
+**Trạng thái:** Kế hoạch — đang thực thi Phase 2 Nhóm B
