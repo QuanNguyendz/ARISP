@@ -7,21 +7,20 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** Phase 2 (FE Responsive) – Nhóm C Table (~6 giờ, 3 file)  
+**Phase:** Phase 2 (FE Responsive) – Nhóm D Layout phức tạp (~8 giờ, 2 file)  
 **Last updated:** 2026-07-25
 
 ---
 
 ## Đang làm (In Progress)
 
-### Phase 2 (FE Responsive) – Nhóm C: Table (~6 giờ, 3 file)
+### Phase 2 (FE Responsive) – Nhóm D: Layout phức tạp (~8 giờ, 2 file)
 
-> **Mục tiêu:** Fix responsive cho các table thiếu `min-w` wrapper + cell text overflow trên mobile. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm C.
-> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 3 file). Sang Nhóm D.
+> **Mục tiêu:** Fix responsive cho layout phức tạp — sticky aside chuyển thành bottom fixed bar mobile, scroll storytelling sections co giãn theo viewport. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm D.
+> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 2 file). Sang Nhóm E.
 
-- [x] `pages/hr/DashboardPage.tsx` — Candidates table `min-w-[600px]` + cell padding `px-4 sm:px-5` + jobTitle cell `max-w-[160px] truncate` (Dễ / Thấp) ✅
-- [x] `pages/recruiter/CandidatesPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[600px]` + filter button `whitespace-nowrap` + status badge `whitespace-nowrap` + jobTitle cell `max-w-[180px] truncate` + date cell `whitespace-nowrap` (Trung bình / Thấp) ✅
-- [x] `pages/super-admin/UsersPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[700px]` + cell padding `px-4 sm:px-6` + role select `max-w-[140px]` + badge `whitespace-nowrap` + LockReason/CreateStaff modal OK; CreateStaff form grid `grid-cols-1 sm:grid-cols-2` (Dễ / Thấp) ✅
+- [x] `pages/job-board/JobDetailPage.tsx` (Candidate) — Sticky aside → bottom fixed bar mobile: aside `hidden lg:block` desktop, bottom bar `lg:hidden` mobile (Apply + Save buttons). Match card duplicate inline trong content mobile (lg:hidden) để không mất tính năng + `hidden lg:block` ở desktop. Header card title `break-words` + meta icons `shrink-0` + `truncate` cho text dài. Salary badge `whitespace-nowrap` (Dễ-trung bình / Trung bình) ✅
+- [x] `components/sections/ScrollStorytelling.tsx` — Sections: `py-40` → `py-20 sm:py-32 lg:py-40`, `gap-20` → `gap-10 sm:gap-12 lg:gap-20`, `px-6` → `px-4 sm:px-6 lg:px-8`, headings `text-4xl` → `text-3xl sm:text-5xl md:text-6xl` (mobile 36px thay vì 36px), paragraph `text-lg` → `text-base sm:text-lg`, visual containers `w-24 h-24` → `w-16 h-16 sm:w-24 sm:h-24`, `aspect-square max-w-sm` → `max-w-[12rem] sm:max-w-sm`, score display `gap-8` → `gap-4 sm:gap-8` + `text-4xl` → `text-3xl sm:text-4xl` + dividers `h-12` → `h-10 sm:h-12` (Dễ / Thấp) ✅
 
 ---
 

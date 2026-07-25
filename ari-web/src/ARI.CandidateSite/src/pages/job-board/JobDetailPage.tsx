@@ -386,22 +386,22 @@ export default function JobDetailPage() {
                 {getJobIcon(job.department)}
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-snug">{job.title}</h1>
+                <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-snug break-words">{job.title}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
                   <span className="inline-flex items-center gap-1.5">
-                    <Users className="w-4 h-4" />{' '}
-                    {job.department || t('jobDetail.header.department')}
+                    <Users className="w-4 h-4 shrink-0" />{' '}
+                    <span className="truncate">{job.department || t('jobDetail.header.department')}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" /> {job.location || t('jobs.noLocation')}
+                    <MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">{job.location || t('jobs.noLocation')}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" />{' '}
+                    <Clock className="w-4 h-4 shrink-0" />{' '}
                     {t('jobDetail.header.posted', { date: formatPostedDate(t, job.createdAt) })}
                   </span>
                   {job.applicationDeadline && (
                     <span className="inline-flex items-center gap-1.5 text-amber-600 font-medium">
-                      <Calendar className="w-4 h-4" />{' '}
+                      <Calendar className="w-4 h-4 shrink-0" />{' '}
                       {t('jobDetail.header.deadline', {
                         text: getDeadlineText(t, job.applicationDeadline),
                       })}
@@ -413,7 +413,7 @@ export default function JobDetailPage() {
                     <Briefcase className="w-3.5 h-3.5" />{' '}
                     {formatWorkMode(t, job.workMode || job.employmentType)}
                   </span>
-                  <span className="inline-flex items-center rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600">
+                  <span className="inline-flex items-center rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600 whitespace-nowrap">
                     {formatSalary(t, job)}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2.5 py-1 text-ink-600 capitalize">
@@ -461,10 +461,143 @@ export default function JobDetailPage() {
               </section>
             )}
           </div>
+
+          {/* CV-JD Match - mobile inline (desktop uses sticky aside version) */}
+          <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-4 shadow-card sm:p-6 lg:hidden">
+            <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
+              <Sparkles className="w-4 h-4" /> {t('jobDetail.match.title')}
+            </div>
+
+            {!isAuthenticated || matchAuthError ? (
+              <div className="mt-3">
+                <p className="text-sm text-ink-500">{t('jobDetail.match.loginRequired')}</p>
+                <Link
+                  to="/auth/candidate-login"
+                  className="mt-3 block w-full rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
+                >
+                  {t('jobDetail.match.login')}
+                </Link>
+              </div>
+            ) : matchLoading ? (
+              <div className="mt-4 flex items-start gap-2 text-sm text-ink-500">
+                <Loader2 className="w-4 h-4 mt-0.5 shrink-0 animate-spin text-ai-600" />
+                <span>{t('jobDetail.match.analyzing')}</span>
+              </div>
+            ) : match && !match.hasCv ? (
+              <div className="mt-3">
+                <p className="text-sm text-ink-500">{t('jobDetail.match.noCv')}</p>
+                <Link
+                  to="/candidate/profile?focus=cv"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  <FileText className="w-4 h-4" /> {t('jobDetail.match.uploadCv')}
+                </Link>
+              </div>
+            ) : match && match.hasCv ? (
+              <div>
+                <a
+                  href={resolveAssetUrl(match.cvUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-sm text-ink-700 hover:border-ai-300"
+                >
+                  <FileText className="w-4 h-4 shrink-0 text-ai-600" />
+                  <span className="flex-1 truncate">{match.cvFileName}</span>
+                  <span className="shrink-0 text-xs font-medium text-ai-700">
+                    {t('jobDetail.match.viewCv')}
+                  </span>
+                </a>
+
+                {match.analysis ? (
+                  <>
+                    <div className="mt-4 flex items-end gap-2">
+                      <div className="font-display text-4xl font-extrabold text-ai-700 leading-none">
+                        {match.analysis.matchScore}
+                      </div>
+                      <div className="pb-1 text-sm text-ink-500">
+                        {t('jobDetail.match.scoreLabel')}
+                      </div>
+                    </div>
+                    <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ai-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-brand-600 to-ai-600"
+                        style={{ width: `${match.analysis.matchScore}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-ink-400">
+                      <Sparkles className="h-3 w-3" />{' '}
+                      {t('jobDetail.match.aiAnalysis', {
+                        name: match.analysis.reviewedBy ?? 'Gemini',
+                      })}
+                    </div>
+                    {match.analysis.skillsMatched.length > 0 && (
+                      <div className="mt-4">
+                        <div className="mb-1.5 text-xs font-semibold text-ink-500">
+                          {t('jobDetail.match.skillsMatched')}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {match.analysis.skillsMatched.map((s, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {match.analysis.skillsGaps.length > 0 && (
+                      <div className="mt-3">
+                        <div className="mb-1.5 text-xs font-semibold text-ink-500">
+                          {t('jobDetail.match.skillsGaps')}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {match.analysis.skillsGaps.map((s, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {match.analysis.summary && (
+                      <div className="mt-4 rounded-xl border border-ink-200 bg-white p-3 text-sm leading-relaxed text-ink-600">
+                        {parseMatchSummary(match.analysis.summary).strengths && (
+                          <div className="mb-2">
+                            <span className="font-semibold text-emerald-700">
+                              {t('jobDetail.match.strengthsLabel')}
+                            </span>{' '}
+                            {parseMatchSummary(match.analysis.summary).strengths}
+                          </div>
+                        )}
+                        {parseMatchSummary(match.analysis.summary).gaps && (
+                          <div>
+                            <span className="font-semibold text-amber-700">
+                              {t('jobDetail.match.gapsLabel')}
+                            </span>{' '}
+                            {parseMatchSummary(match.analysis.summary).gaps}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-ink-500">{t('jobDetail.match.noAnalysis')}</p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-ink-500">{t('jobDetail.match.loadError')}</p>
+            )}
+          </div>
         </div>
 
-        {/* Right: sticky apply + match */}
-        <aside className="space-y-5 lg:sticky lg:top-24 self-start">
+        {/* Right: sticky apply + match (desktop only - mobile uses bottom fixed bar) */}
+        <aside className="hidden space-y-5 lg:sticky lg:top-24 lg:block self-start">
           {/* Apply card */}
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
             {appliedId ? (
@@ -670,6 +803,39 @@ export default function JobDetailPage() {
           </div>
         </aside>
       </main>
+
+      {/* Bottom fixed Apply bar — mobile only (<lg). Desktop uses sticky aside. */}
+      <div className="sticky bottom-0 z-30 border-t border-ink-200 bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur sm:p-4 lg:hidden dark:border-white/10 dark:bg-ink-900/95">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <button
+            onClick={handleToggleSave}
+            disabled={savePending}
+            aria-label={isSaved ? t('jobDetail.apply.saved') : t('jobDetail.apply.saveJob')}
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border disabled:opacity-60 sm:h-12 sm:w-12 ${
+              isSaved
+                ? 'border-ai-200 bg-ai-50 text-ai-700'
+                : 'border-ink-200 text-ink-700'
+            }`}
+          >
+            <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
+          </button>
+          {appliedId ? (
+            <button
+              onClick={() => navigate('/candidate/applications')}
+              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 sm:h-12"
+            >
+              <CheckCircle2 className="h-4 w-4" /> {t('jobDetail.apply.applied')}
+            </button>
+          ) : (
+            <button
+              onClick={handleApply}
+              className="h-11 flex-1 rounded-xl bg-brand-600 px-4 text-sm font-bold text-white hover:bg-brand-700 sm:h-12"
+            >
+              {t('jobDetail.apply.applyNow')}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
