@@ -42,7 +42,7 @@ export function JobsGridSkeleton({ count = 4 }: { count?: number }) {
 
 export function DashboardSkeleton() {
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <Skeleton className="mb-2 h-7 w-64" />
         <Skeleton className="h-4 w-48" />
@@ -90,9 +90,9 @@ export function ApplicantsSkeleton({ rows = 5 }: { rows?: number }) {
 
 export function JobDetailSkeleton() {
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Skeleton className="mb-4 h-4 w-32" />
-      <div className={`${card} mb-6 p-6`}>
+      <div className={`${card} mb-6 p-4 sm:p-6`}>
         <Skeleton className="mb-2 h-6 w-64" />
         <Skeleton className="h-4 w-40" />
       </div>

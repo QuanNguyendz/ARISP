@@ -7,7 +7,7 @@ export default function CTA() {
   const navigate = useNavigate();
 
   return (
-    <Container id="pricing" className="py-40 relative">
+    <Container id="pricing" className="py-20 sm:py-32 lg:py-40 relative">
       <ContainerItem>
         <motion.div
           initial={{ opacity: 0, y: 30 }}

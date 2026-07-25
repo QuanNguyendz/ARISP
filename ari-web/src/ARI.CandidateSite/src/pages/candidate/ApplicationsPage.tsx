@@ -495,7 +495,7 @@ function ApplicationsSkeleton() {
       </div>
 
       {/* RIGHT sidebar */}
-      <aside className="space-y-5">
+      <aside className="hidden space-y-5 lg:block">
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <Skeleton className="h-4 w-32" />
@@ -760,7 +760,7 @@ export default function ApplicationsPage() {
           </div>
 
           {/* RIGHT sidebar */}
-          <aside className="space-y-5 self-start lg:sticky lg:top-24">
+          <aside className="hidden space-y-5 self-start lg:sticky lg:top-24 lg:block">
             {/* CV card */}
             <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
               <div className="flex items-center justify-between">

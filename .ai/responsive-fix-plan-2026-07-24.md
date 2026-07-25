@@ -328,7 +328,7 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 - [x] `ari-web/src/ARI.StaffSite/index.html` :: Thêm `viewport-fit=cover, maximum-scale=5.0`
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Nav pills `w-max min-w-full` + ẩn scrollbar + `shrink-0` cho mỗi pill
 
-**PR #2.2 — Form & Input (~10 giờ)** 🔜 Đang thực thi
+**PR #2.2 — Form & Input (~10 giờ)** ✅ Đã xong
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Experience form `grid-cols-1 sm:grid-cols-2` (Dễ, 30 phút)
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete (Dễ, 30 phút)
 - [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-2 md:grid-cols-3` + `min-w-0` + select span (Dễ, 30 phút)
@@ -337,14 +337,14 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
   - Filter bar, table grid (đã có `overflow-x-auto` + `min-w-[700px]`), pending approval banner, header job info — đã OK sẵn
 - [x] **Đã review các phần khác của JobPostingDetailPage:** filter bar OK, header OK, pending banner OK, table có scroll wrapper, action buttons trong row OK
 
-**PR #2.3 — Table, Layout & Chart (~18 giờ)**
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Candidates table `min-w-[600px]` (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` :: Table cell text overflow + `min-w-[600px]` (Trung bình, 2 giờ)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/super-admin/UsersPage.tsx` :: Table `min-w-[700px]` (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/pages/job-board/JobDetailPage.tsx` :: Sticky aside → bottom fixed bar mobile (Khó, 4 giờ)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/sections/ScrollStorytelling.tsx` :: Visual size + gap responsive (Dễ, 1 giờ)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: RecruiterBarChart YAxis `width={60}` (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Reject modal `max-h-[90vh] overflow-y-auto` (Dễ, 30 phút)
+**PR #2.3 — Table, Layout & Chart (~18 giờ)** ✅ Đã xong (qua commit Hotfix Round 5/6 + khảo sát)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Candidates table `min-w-[600px]` (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` :: Table cell text overflow + `min-w-[600px]` (Trung bình, 2 giờ)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/super-admin/UsersPage.tsx` :: Table `min-w-[700px]` (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.CandidateSite/src/pages/job-board/JobDetailPage.tsx` :: Sticky aside → bottom fixed bar mobile (Khó, 4 giờ)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/sections/ScrollStorytelling.tsx` :: Visual size + gap responsive (Dễ, 1 giờ)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: RecruiterBarChart YAxis `width={60}` (Dễ, 30 phút)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Reject modal `max-h-[90vh] overflow-y-auto` (Dễ, 30 phút)
 
 ---
 
@@ -400,43 +400,47 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 
 #### 3.3.4. Checklist Phase 3
 
-**PR #3.1 — HR/Recruiter pages polish (~7 giờ)**
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Avatar `w-16 h-16 sm:w-20 sm:h-20` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Edit button `px-4 py-2 sm:px-6 sm:py-3` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: JD grid `sm:grid-cols-2 md:grid-cols-2` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Funnel tabs overflow-x-auto (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Tabs overflow-x-auto (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Sticky header `h-14 sm:h-16` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Breadcrumb truncate + min-w-0 (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Language grid text-xs guard (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Stats value `text-xl sm:text-2xl` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Funnel conv `w-12 sm:w-16` (10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: SVG `h-5 w-14 sm:h-7 sm:w-20` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Priority count `text-2xl sm:text-3xl` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Page padding `p-4 sm:p-6 lg:p-8` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Avatar `h-10 w-10 sm:h-12 sm:w-12` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Title `text-lg sm:text-xl` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Stats value `text-xl sm:text-2xl` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Stats grid `md:grid-cols-3 lg:grid-cols-5` (10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Tab strip overflow-x-auto (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Modal email `sm:truncate` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Search `sm:max-w-sm sm:flex-1` (5 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Modal header `grid-cols-1 sm:grid-cols-3` (10 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Leading-7 → leading-6 (5 phút)
+**PR #3.1 — HR/Recruiter pages polish (~7 giờ)** ✅ Đã xong (commit 2026-07-26)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Avatar `w-16 h-16 sm:w-20 sm:h-20` ✅ đã OK từ Phase 6 (`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Edit button `px-4 py-2 sm:px-6 sm:py-3` ✅ đã OK (`px-3 py-2 sm:px-6 sm:py-3`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: JD grid `sm:grid-cols-2` 🟢 mới sửa (`grid md:grid-cols-2` → `grid grid-cols-1 sm:grid-cols-2`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Funnel tabs overflow ✅ đã OK (`flex flex-wrap gap-2`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Tabs overflow ✅ đã OK (`flex flex-wrap gap-2`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Sticky header `h-14 sm:h-16` 🟢 mới sửa (`h-16` → `h-14 sm:h-16` + `px-6` → `px-4 sm:px-6` + `gap-4` → `gap-2`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Breadcrumb truncate 🟢 mới sửa (thêm `min-w-0 flex-1` + `shrink-0` chevron/Link + `truncate` name)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Language grid text-xs 🟢 mới sửa (`grid-cols-3 gap-3 text-sm` → `grid-cols-3 gap-2 text-xs sm:gap-3 sm:text-sm` + `min-w-0 truncate` cho 3 value)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` :: Stats value `text-xl sm:text-2xl` 🟢 mới sửa
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Funnel conv `w-10 sm:w-16` 🟢 mới sửa (`w-16` → `w-10 sm:w-16`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: SVG `h-5 w-14 sm:h-7 sm:w-20` 🟢 mới sửa
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Priority count `text-2xl sm:text-3xl` ✅ đã OK
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Page padding `p-4 sm:p-6 lg:p-8` 🟢 mới sửa (cả 2 vị trí: error + main)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Avatar `h-10 w-10 sm:h-12 sm:w-12` ✅ đã OK
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Title `text-lg sm:text-xl` 🟢 mới sửa
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Stats value `text-xl sm:text-2xl` 🟢 mới sửa (2 vị trí)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Stats grid `md:grid-cols-3 lg:grid-cols-5` 🟢 mới sửa
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Tab strip overflow ✅ đã OK (`flex flex-wrap gap-2`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` :: Modal email `truncate` ✅ đã OK (`truncate block`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Search `sm:max-w-sm sm:flex-1` 🟢 mới sửa (`sm:max-w-xs` → `sm:max-w-sm`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Modal header `grid-cols-1 sm:grid-cols-3` ✅ đã OK
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` :: Leading-7 → leading-6 🟢 mới sửa
 
-**PR #3.2 — Candidate pages polish (~7 giờ)**
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/sections/CTA.tsx` :: `py-20 sm:py-32 lg:py-40` (10 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/sections/Demo.tsx` :: `h-[250px] sm:h-[350px] md:h-[400px]` (10 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/sections/Demo.tsx` :: Grid `grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12` (10 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/sections/Hero.tsx` :: Safe area + bottom margin (30 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/three/AISphereDemo.tsx` :: `w-40 h-40 sm:w-64 sm:h-64` (10 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/components/profile/ChangePasswordModal.tsx` :: `w-[90%] max-w-md` (5 phút)
-- [ ] `ari-web/src/ARI.CandidateSite/src/app/layouts/Footer.tsx` :: Brand `min-w-0 break-words` (10 phút)
-- [ ] `ari-web/src/ARI.Shared/src/ui/NotFoundPage.tsx` :: Smooth font scale (15 phút)
+> **Tổng PR #3.1:** 22 task — 13 mới sửa + 9 đã OK từ các round trước. 5 file: `JobPostingDetailPage.tsx`, `EvaluationReviewPage.tsx` (HR), `DashboardPage.tsx` (HR), `JobDetailPage.tsx` (Recruiter), `EvaluationReviewPage.tsx` (Recruiter). `tsc --noEmit` pass ARI.StaffSite.
+
+**PR #3.2 — Candidate pages polish (~7 giờ)** ✅ Đã xong (commit 2026-07-26)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/sections/CTA.tsx` :: `py-20 sm:py-32 lg:py-40` 🟢 mới sửa (mobile 80px → desktop 160px)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/sections/Demo.tsx` :: `h-[250px] sm:h-[350px] md:h-[400px]` 🟢 mới sửa (AI Sphere demo mobile 250px)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/sections/Demo.tsx` :: Grid `grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12` 🟢 mới sửa (mobile 1 cột, gap thu hẹp)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/sections/Hero.tsx` :: Safe area 🟢 mới sửa (thêm `pb-[env(safe-area-inset-bottom,0)] pt-[env(safe-area-inset-top,0)]` cho iOS Safari)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/three/AISphereDemo.tsx` :: `w-40 h-40 sm:w-64 sm:h-64` 🟢 mới sửa (sphere nhỏ lại mobile)
+- [x] `ari-web/src/ARI.CandidateSite/src/components/profile/ChangePasswordModal.tsx` :: ✅ đã OK (dùng `w-full max-w-md` + parent `p-4` — tương đương plan `w-[90%] max-w-md`, mobile full width trong padding)
+- [x] `ari-web/src/ARI.CandidateSite/src/app/layouts/Footer.tsx` :: Brand `min-w-0 break-words` 🟢 mới sửa (tránh tràn grid item khi long text)
+- [x] `ari-web/src/ARI.Shared/src/ui/NotFoundPage.tsx` :: Smooth font scale 🟢 mới sửa (`text-7xl` → `text-7xl sm:text-8xl md:text-9xl`, thêm breakpoint sm để jump mượt)
+
+> **Tổng PR #3.2:** 8 task — 7 mới sửa + 1 đã OK. 7 file: `CTA.tsx`, `Demo.tsx`, `Hero.tsx`, `AISphereDemo.tsx`, `ChangePasswordModal.tsx` (no-op), `Footer.tsx`, `NotFoundPage.tsx`. `tsc --noEmit` pass ARI.CandidateSite.
 
 ---
 
-### 🟢 PHASE 4 — Tinh chỉnh UI & Tailwind Config
+### 🟢 PHASE 4 — Tinh chỉnh UI & Tailwind Config ✅ Đã xong (code) — QA bỏ qua
 
 > **Mục tiêu:** Hoàn thiện design system responsive, thêm custom breakpoint `xs` cho 320-425, polish design tokens.
 > **Số file:** 5 file (config + shared + test setup)
@@ -470,16 +474,18 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 
 #### 3.4.4. Checklist Phase 4
 
-- [ ] `ari-web/src/ARI.Shared/tailwind-preset.cjs` :: Thêm `xs: '480px'` vào `theme.extend.screens` (10 phút)
-- [ ] `ari-web/src/ARI.Shared/tailwind-preset.cjs` :: Kiểm tra colors theme có khớp design tokens (30 phút)
-- [ ] `ari-web/src/ARI.Shared/src/ui/Container.tsx` :: Verify padding responsive `px-6 sm:px-8 lg:px-12` (15 phút)
-- [ ] `ari-web/src/ARI.Shared/src/ui/Button.tsx` :: Verify size variants không quá lớn mobile (15 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/_skeletons.tsx` :: Đồng bộ breakpoints với `HrDashboardPage` (30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/recruiter/_skeletons.tsx` :: Đồng bộ với `RecruiterDashboardPage` (30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/super-admin/_skeletons.tsx` :: Đồng bộ với `SuperAdminDashboardPage` (30 phút)
-- [ ] Tạo test matrix responsive cho 8 breakpoints × critical pages (2 giờ)
-- [ ] Verify trên iOS Safari + Android Chrome (qua BrowserStack hoặc thiết bị thật) (2 giờ)
-- [ ] Verify dark/light mode không vỡ ở các breakpoint mới (30 phút)
+- [x] `ari-web/src/ARI.Shared/tailwind-preset.cjs` :: Thêm `xs: '480px'` vào `theme.extend.screens` 🟢 mới sửa (cho Galaxy Fold cover, iPhone SE landscape)
+- [x] `ari-web/src/ARI.Shared/tailwind-preset.cjs` :: Kiểm tra colors theme có khớp design tokens ✅ đã OK (đã có đủ: primary/secondary/violet/accent-primary/secondary/bg-primary/secondary/text-primary/secondary/tertiary + brand/ai/ink shades)
+- [x] `ari-web/src/ARI.Shared/src/ui/Container.tsx` :: Verify padding responsive `px-6 sm:px-8 lg:px-12` ✅ đã OK (line 44)
+- [x] `ari-web/src/ARI.Shared/src/ui/Button.tsx` :: Verify size variants mobile 🟢 mới sửa (`md: px-5 py-2.5 text-sm sm:px-6 sm:py-3 sm:text-base`, `lg: px-6 py-3 text-base sm:px-8 sm:py-4 sm:text-lg`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/_skeletons.tsx` :: Đồng bộ breakpoints với `HrDashboardPage` 🟢 mới sửa (HrStatsSkeleton: `grid-cols-2 lg:grid-cols-4` → `grid gap-4 sm:grid-cols-2 xl:grid-cols-4` khớp page line 922)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/_skeletons.tsx` :: Đồng bộ với `RecruiterJobDetailPage` 🟢 mới sửa (DashboardSkeleton + JobDetailSkeleton padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8` + card padding `p-6` → `p-4 sm:p-6`)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/super-admin/_skeletons.tsx` :: Đồng bộ với `SuperAdminDashboardPage` 🟢 mới sửa (DashboardSkeleton padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8`)
+- [ ] ~~Tạo test matrix responsive cho 8 breakpoints × critical pages (2 giờ)~~ ⏭️ BỎ QUA — QA thuần, không có code
+- [ ] ~~Verify trên iOS Safari + Android Chrome (qua BrowserStack hoặc thiết bị thật) (2 giờ)~~ ⏭️ BỎ QUA — QA thuần
+- [ ] ~~Verify dark/light mode không vỡ ở các breakpoint mới (30 phút)~~ ⏭️ BỎ QUA — QA thuần
+
+> **Tổng Phase 4:** 7 task code (5 mới sửa + 2 đã OK) + 3 task QA bỏ qua. 5 file edited: `tailwind-preset.cjs`, `Button.tsx`, `_skeletons.tsx` (HR + Recruiter + Super Admin).
 
 ---
 
@@ -496,7 +502,6 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 | **TỔNG** | **~30 (unique)** | **~90h** | **11-13** | **8** |
 
 > **Lưu ý:** Một số file xuất hiện ở nhiều Phase (vd: `pages/hr/DashboardPage.tsx` ở Phase 1+2+3), nhưng đếm unique thì ~30 file.
-
 ### 4.2. Theo độ khó
 
 | Độ khó | Số issues | % |

@@ -5,7 +5,7 @@ export default function NotFoundPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-      <p className="text-7xl font-bold text-gray-300 md:text-9xl">404</p>
+      <p className="text-7xl font-bold text-gray-300 sm:text-8xl md:text-9xl">404</p>
       <h1 className="mt-4 text-2xl font-semibold text-gray-700">{t('notFoundPage.title')}</h1>
       <a
         href="/"

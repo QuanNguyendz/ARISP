@@ -82,9 +82,9 @@ export default function Demo() {
           className="mb-32"
         >
           <GlassCard className="p-8 md:p-12" hoverEnabled={false}>
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="grid grid-cols-1 gap-8 items-center lg:grid-cols-2 lg:gap-12">
               {/* AI Sphere */}
-              <div className="relative h-[400px]">
+              <div className="relative h-[250px] sm:h-[350px] md:h-[400px]">
                 <AISphereDemo className="absolute inset-0" />
               </div>
 

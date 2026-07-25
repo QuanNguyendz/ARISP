@@ -52,7 +52,7 @@ function PanelSkeleton({ rows = 4 }: { rows?: number }) {
 
 export function DashboardSkeleton() {
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <Skeleton className="mb-2 h-7 w-64" />
         <Skeleton className="h-4 w-48" />

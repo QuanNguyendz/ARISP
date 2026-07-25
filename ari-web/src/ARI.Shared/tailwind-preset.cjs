@@ -9,6 +9,11 @@ module.exports = {
   content: [],
   theme: {
     extend: {
+      screens: {
+        // Custom breakpoint cho các thiết bị 320-425px (Galaxy Fold cover, iPhone SE).
+        // xs: 480px — nhỏ hơn sm (640px) để target tablet dọc & phone lớn.
+        xs: '480px',
+      },
       colors: {
         primary: {
           50: '#f0f9ff',

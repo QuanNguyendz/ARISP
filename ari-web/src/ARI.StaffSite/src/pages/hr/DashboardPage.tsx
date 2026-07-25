@@ -536,7 +536,7 @@ export default function HrDashboardPage() {
                   const percent = funnelMax > 0 ? Math.round((item.value / funnelMax) * 100) : 0
                   return (
                     <div key={item.label} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0 text-sm font-medium text-ink-600 dark:text-ink-400">
+                      <div className="w-20 shrink-0 text-sm font-medium text-ink-600 dark:text-ink-400 sm:w-24 lg:w-32">
                         {item.label}
                       </div>
                       <div className="h-8 flex-1 rounded-lg bg-ink-100 dark:bg-white/10">

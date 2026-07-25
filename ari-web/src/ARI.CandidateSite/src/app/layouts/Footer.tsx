@@ -14,7 +14,7 @@ export default function Footer() {
               </div>
               <span className="text-xl font-semibold text-white">ARISP</span>
             </Link>
-            <p className="text-text-secondary text-sm mb-4">
+            <p className="min-w-0 break-words text-text-secondary text-sm mb-4">
               Nền tảng tuyển dụng thông minh với AI giúp kết nối nhà tuyển dụng và ứng viên hiệu quả
               hơn.
             </p>
