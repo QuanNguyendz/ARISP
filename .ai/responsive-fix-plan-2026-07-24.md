@@ -45,7 +45,7 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | Phase 2 Nhóm A — Sidebar & Settings | ✅ Đã commit (5 files) | Hoàn thành |
 | Phase 2 Nhóm A bổ sung — ProfilePage iOS auto-shrink | ✅ Đã commit | Fix text thu nhỏ 320px |
 | **Phase 2 Nhóm B — Form & Input** | ✅ **Hoàn thành** | 5/5 file đã xong: Profile (Experience, Education), CreateJob (Salary), InterviewCode (Search), JobPostingDetail (Batch actions) |
-| Phase 2 Nhóm C — Table | ⏳ Backlog | |
+| **Phase 2 Nhóm C — Table** | ✅ **Hoàn thành** | 5/5 file: UsersPage, CandidatesPage (hr + recruiter), DashboardPage (hr), AuditLogsPage. Thêm `min-w-[560-640px]` cho table + fix pagination `flex-col sm:flex-row` |
 | Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
 | Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
 | Phase 3 | ⏳ Backlog | |

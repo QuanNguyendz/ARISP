@@ -744,6 +744,7 @@ export default function HrDashboardPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
+                <div className="min-w-[560px]">
                 <table className="w-full text-sm">
                   <thead className="bg-ink-50/50 text-left dark:bg-white/5">
                     <tr>
@@ -805,6 +806,7 @@ export default function HrDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ),
         },

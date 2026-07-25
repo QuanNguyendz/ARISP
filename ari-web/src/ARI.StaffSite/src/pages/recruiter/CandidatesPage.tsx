@@ -138,6 +138,7 @@ export default function RecruiterCandidatesPage() {
           ) : (
             <div className="p-2 sm:p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
               <div className="overflow-x-auto">
+                <div className="min-w-[640px]">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-ink-200 dark:border-white/10">
@@ -246,6 +247,7 @@ export default function RecruiterCandidatesPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

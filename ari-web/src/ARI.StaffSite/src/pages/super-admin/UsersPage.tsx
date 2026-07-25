@@ -244,6 +244,7 @@ export default function UsersPage() {
           className="overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card"
         >
           <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-ink-100 dark:border-white/10 text-xs uppercase tracking-wider text-ink-400">
@@ -364,11 +365,12 @@ export default function UsersPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-ink-100 dark:border-white/10 px-6 py-3 text-sm">
+            <div className="flex flex-col gap-2 border-t border-ink-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10">
               <span className="text-ink-500 dark:text-ink-400">
                 {t('pagination.summary', { page, totalPages, total })}
               </span>
