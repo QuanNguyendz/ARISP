@@ -205,7 +205,7 @@ export default function HrCandidateDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
               <ClipboardList className="h-5 w-5 text-brand-600 dark:text-brand-400" />{' '}
               {t('reportTitle')} {t('reportCount', { count: evals.length })}
@@ -249,7 +249,7 @@ export default function HrCandidateDetailPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
               <Video className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('sessionTitle')}{' '}
               {t('sessionCount', { count: mySessions.length })}

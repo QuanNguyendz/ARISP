@@ -47,6 +47,7 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | **Phase 2 Nhóm B — Form & Input** | ✅ **Hoàn thành** | 5/5 file đã xong: Profile (Experience, Education), CreateJob (Salary), InterviewCode (Search), JobPostingDetail (Batch actions) |
 | **Phase 2 Nhóm C — Table** | ✅ **Hoàn thành** | 5/5 file: UsersPage, CandidatesPage (hr + recruiter), DashboardPage (hr), AuditLogsPage. Thêm `min-w-[560-640px]` cho table + fix pagination `flex-col sm:flex-row` |
 | **Phase 3 — Modal/Dialog** | ✅ **Hoàn thành** | 1 file: recruiter/EvaluationReviewPage stat cards `grid-cols-1 sm:grid-cols-3` + criterion scores truncate. 9/10 modal khác đã OK từ trước (có `p-4`, `max-w-*`, `max-h-[88-90vh]`, `overflow-y-auto`, `grid-cols-1 sm:grid-cols-2`) |
+| **Phase 4 — Card/Stat/Widget** | ✅ **Hoàn thành** | 9 files: card padding responsive `p-4 sm:p-6` cho 18 card (JobPostingDetail x5, EvaluationReview x7, CreateJob const, CandidateDetail hr+recruiter x4, Settings hr+super-admin x2, Dashboard super-admin x2, Jobs/PendingJobs/Reports hr x3) |
 | Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
 | Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
 | Phase 3 | ⏳ Backlog | |

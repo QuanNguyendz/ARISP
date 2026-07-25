@@ -222,7 +222,7 @@ export default function EvaluationReviewPage() {
             {evaluations.map((evaluation) => (
               <div
                 key={evaluation.id}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card hover:shadow-card-hover transition cursor-pointer"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card hover:shadow-card-hover transition cursor-pointer"
                 onClick={() => handleOpenDetail(evaluation.id)}
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -326,7 +326,7 @@ export default function EvaluationReviewPage() {
         {/* LEFT: report */}
         <div className="space-y-6">
           {/* Candidate header */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 font-display text-lg font-extrabold">
@@ -374,7 +374,7 @@ export default function EvaluationReviewPage() {
           </div>
 
           {/* Scores */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
               {t('criterionScores')}
             </h2>
@@ -432,7 +432,7 @@ export default function EvaluationReviewPage() {
           {/* Per-question */}
           {selectedEvaluation.questionAnalyses &&
             selectedEvaluation.questionAnalyses.length > 0 && (
-              <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+              <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
                 <h2 className="font-display text-lg font-bold mb-4">{t('questionAnalysis')}</h2>
                 <div className="space-y-3">
                   {selectedEvaluation.questionAnalyses.map((item, index) => (
@@ -469,7 +469,7 @@ export default function EvaluationReviewPage() {
             )}
 
           {/* Recording / transcript */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
             <h2 className="font-display text-lg font-bold mb-4">{t('recordingTranscript')}</h2>
             <div className="aspect-video rounded-xl bg-ink-900 grid place-items-center text-ink-400">
               <button className="grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
@@ -485,7 +485,7 @@ export default function EvaluationReviewPage() {
         {/* RIGHT: verdict & decision */}
         <aside className="space-y-5 xl:sticky xl:top-24 self-start">
           {/* AI verdict */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card text-center">
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card text-center">
             <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700">
               <Sparkles className="w-4 h-4" /> {t('aiVerdict')}
             </div>
@@ -511,7 +511,7 @@ export default function EvaluationReviewPage() {
 
           {/* HR decision */}
           {!selectedEvaluation.hrReview ? (
-            <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
               <h3 className="font-display font-bold">{t('hrDecision')}</h3>
               <p className="mt-1 text-sm text-ink-500">{t('hrDecisionHint')}</p>
 
@@ -589,7 +589,7 @@ export default function EvaluationReviewPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-card">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6 shadow-card">
               <h3 className="font-display font-bold text-emerald-800">{t('confirmed')}</h3>
               <p className="mt-1 text-sm text-emerald-700">
                 {t('verdict')}:{' '}

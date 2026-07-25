@@ -169,7 +169,7 @@ export default function SuperAdminSettingsPage() {
             key={tab}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex-1 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+            className="flex-1 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
           >
             {tab === 'auth' && (
               <div className="space-y-5">

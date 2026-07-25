@@ -82,7 +82,7 @@ export default function ReportsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card flex items-center justify-between hover:shadow-card-hover transition-all">
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card flex items-center justify-between hover:shadow-card-hover transition-all">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center">
                   <FileText className="w-6 h-6 text-brand-600 dark:text-brand-400" />

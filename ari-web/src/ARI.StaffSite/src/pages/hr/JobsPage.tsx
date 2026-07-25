@@ -177,7 +177,7 @@ export default function HrJobsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.04, 0.3) }}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card hover:shadow-card-hover transition-all"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card hover:shadow-card-hover transition-all"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 min-w-0">

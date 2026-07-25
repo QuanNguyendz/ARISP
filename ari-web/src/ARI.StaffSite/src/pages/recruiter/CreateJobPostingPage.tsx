@@ -17,7 +17,7 @@ interface CreateJobPostingPageProps {
 const input =
   'w-full px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-ink-200 dark:border-white/10 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:border-brand-400 dark:focus:border-brand-500/50 text-sm'
 const label = 'block text-sm font-medium text-ink-700 dark:text-ink-200 mb-1.5'
-const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card'
+const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card'
 
 export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps) {
   const { t } = useTranslation('modules/recruiter/createJob')
