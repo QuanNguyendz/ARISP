@@ -44,7 +44,7 @@ P0 (1) → P1 (11) → P2 (34) → P3 (22)  =  68 issues
 | Phase 1 | ✅ Đã commit (16 commits fix) | Hoàn thành |
 | Phase 2 Nhóm A — Sidebar & Settings | ✅ Đã commit (5 files) | Hoàn thành |
 | Phase 2 Nhóm A bổ sung — ProfilePage iOS auto-shrink | ✅ Đã commit | Fix text thu nhỏ 320px |
-| **Phase 2 Nhóm B — Form & Input** | 🔜 **Đang thực thi** | 2/5 file (ProfilePage Experience + Education) đã xong |
+| **Phase 2 Nhóm B — Form & Input** | ✅ **Hoàn thành** | 5/5 file đã xong: Profile (Experience, Education), CreateJob (Salary), InterviewCode (Search), JobPostingDetail (Batch actions) |
 | Phase 2 Nhóm C — Table | ⏳ Backlog | |
 | Phase 2 Nhóm D — Layout phức tạp | ⏳ Backlog | |
 | Phase 2 Nhóm E — Chart & Modal nhỏ | ⏳ Backlog | |
@@ -328,7 +328,9 @@ _(Xem báo cáo audit mục 4 — padding `py-40`, decorative SVG, leading-7, av
 - [x] `ari-web/src/ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` :: Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete (Dễ, 30 phút)
 - [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` :: Salary grid `grid-cols-1 sm:grid-cols-2 md:grid-cols-3` + `min-w-0` + select span (Dễ, 30 phút)
 - [x] `ari-web/src/ARI.StaffSite/src/pages/recruiter/InterviewCodePage.tsx` :: Search input `min-w-0` + `shrink-0` icon + `w-full` (Dễ, 30 phút)
-- [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Filter bar overflow-x-auto + responsive (Trung bình, 2 giờ)
+- [x] `ari-web/src/ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` :: Batch action bar `flex-col sm:flex-row` + actions `flex-wrap` (Trung bình, 2 giờ)
+  - Filter bar, table grid (đã có `overflow-x-auto` + `min-w-[700px]`), pending approval banner, header job info — đã OK sẵn
+- [x] **Đã review các phần khác của JobPostingDetailPage:** filter bar OK, header OK, pending banner OK, table có scroll wrapper, action buttons trong row OK
 
 **PR #2.3 — Table, Layout & Chart (~18 giờ)**
 - [ ] `ari-web/src/ARI.StaffSite/src/pages/hr/DashboardPage.tsx` :: Candidates table `min-w-[600px]` (Dễ, 30 phút)

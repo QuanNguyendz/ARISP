@@ -974,19 +974,19 @@ export default function JobPostingDetailPage() {
               </div>
 
               {selectedIds.length > 0 && (
-                <div className="flex items-center justify-between p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in">
+                <div className="flex flex-col gap-3 p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-brand-900 dark:text-brand-400">
                       {t('batchActions.selected', { count: selectedIds.length })}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {activeTab === 'cv_review' ? (
                       <>
                         <button
                           disabled={batchProcessing}
                           onClick={handleBatchAccept}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
                         >
                           {batchProcessing ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -998,7 +998,7 @@ export default function JobPostingDetailPage() {
                         <button
                           disabled={batchProcessing}
                           onClick={handleBatchReject}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
                         >
                           <X className="w-3.5 h-3.5" /> {t('batchActions.rejectBatch')}
                         </button>
@@ -1007,7 +1007,7 @@ export default function JobPostingDetailPage() {
                       <button
                         disabled={batchProcessing}
                         onClick={handleBatchInvite}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
                       >
                         {batchProcessing ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
