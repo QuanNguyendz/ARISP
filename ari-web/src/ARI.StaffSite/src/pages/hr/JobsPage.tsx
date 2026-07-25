@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
+import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap, Eye } from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@ari/shared/fservices/job'
@@ -124,7 +124,7 @@ export default function HrJobsPage() {
   }, [filter])
 
   return (
-    <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {loading && <HrStatsSkeleton />}
@@ -177,16 +177,16 @@ export default function HrJobsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.04, 0.3) }}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card hover:shadow-card-hover transition-all"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-3 sm:p-4 lg:p-6 shadow-card hover:shadow-card-hover transition-all"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex items-center gap-3 min-w-0 sm:gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0 sm:w-12 sm:h-12">
                       {job.title.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <h3 className="text-lg font-semibold text-ink-900 dark:text-white truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap sm:gap-3">
+                        <h3 className="text-base font-semibold text-ink-900 dark:text-white truncate sm:text-lg">
                           {job.title}
                         </h3>
                         <span
@@ -236,12 +236,14 @@ export default function HrJobsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 sm:self-auto">
                     <Link
                       to={`/hr/jobs/${job.id}`}
-                      className="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 transition-colors text-sm font-medium"
+                      className="flex-1 sm:flex-initial grid place-items-center gap-2 px-3 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 transition-colors text-sm font-medium sm:px-4"
                     >
-                      {t('viewDetails')}
+                      <Eye className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('viewDetails')}</span>
+                      <span className="sm:hidden">{t('approval.view')}</span>
                     </Link>
                   </div>
                 </div>
