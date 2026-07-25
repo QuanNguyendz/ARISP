@@ -669,6 +669,49 @@ export default function JobPostingDetailPage() {
             </div>
           </div>
         )}
+        
+        {job.status === 'draft' && (
+          <div className="mb-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/60 dark:bg-blue-500/10 p-5 shadow-card">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                  <Edit2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold text-ink-900 dark:text-white">
+                    Bản nháp của bạn
+                  </h3>
+                  <p className="mt-0.5 text-sm text-ink-600 dark:text-ink-400">
+                    Đây là tin tuyển dụng nháp. Bạn có thể kích hoạt trực tiếp mà không cần duyệt, hoặc tiếp tục chỉnh sửa.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={approve}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50"
+                >
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Target className="h-4 w-4" />
+                  )}{' '}
+                  Kích hoạt luôn
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/30 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50"
+                >
+                  <Edit2 className="h-4 w-4" /> Sửa tin
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {job.status === 'rejected' && job.rejectionReason && (
           <div className="mb-6 flex items-start gap-2 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ReactQuill from 'react-quill'
@@ -23,6 +23,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const { t } = useTranslation('modules/recruiter/createJob')
   const { id: jobId } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const routerLocation = useLocation()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(mode === 'edit')
   const [error, setError] = useState<string | null>(null)
@@ -204,7 +205,12 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       let saved: JobPosting
       if (mode === 'edit' && jobId) saved = await jobService.updateJob(jobId, payload)
       else saved = await jobService.createJobPosting(payload)
-      navigate(`/recruiter/my-jobs/${saved.id}`)
+      
+      if (routerLocation.pathname.startsWith('/hr')) {
+        navigate(`/hr/jobs/${saved.id}`)
+      } else {
+        navigate(`/recruiter/my-jobs/${saved.id}`)
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || err.message || t('validation.saveError'))
     } finally {
