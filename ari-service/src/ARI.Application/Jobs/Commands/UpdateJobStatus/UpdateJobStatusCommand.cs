@@ -227,6 +227,17 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             _unitOfWork.Repository<JobPosting>().Update(job);
             await _unitOfWork.SaveChangesAsync(ct);
 
+            // Gửi thông báo SignalR cho Recruiter (creator) nếu có quyết định Duyệt / Từ chối
+            // Phải gọi SAU KHI SaveChanges để frontend fetch lại lấy được trạng thái mới nhất!
+            if ((targetStatus == "active" || targetStatus == "rejected") && job.CreatedByUserId != userId)
+            {
+                await _notificationService.PublishUserEventAsync(
+                    job.CreatedByUserId,
+                    "ReceiveJobPostingUpdate",
+                    new { JobId = job.Id, Status = targetStatus, Title = job.Title },
+                    ct);
+            }
+
             // Lấy lại danh sách rounds trả về cho đồng bộ cấu trúc Response
             var rds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == command.Id, ct);
             var roundDtos = rds.OrderBy(r => r.RoundNumber).Select(RoundConfigDto.FromEntity).ToList();

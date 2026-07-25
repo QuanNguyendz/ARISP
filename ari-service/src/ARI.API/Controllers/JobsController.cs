@@ -13,6 +13,7 @@ using ARI.Application.Jobs.Commands.CreateJobSlots;
 using ARI.Application.Jobs.Commands.DeleteJob;
 using ARI.Application.Jobs.Commands.UpdateJob;
 using ARI.Application.Jobs.Commands.UpdateJobStatus;
+using ARI.Application.Jobs.Commands.UpdateJobDisplay;
 using ARI.Application.Jobs.Queries.GetAdminJobs;
 using ARI.Application.Jobs.Queries.GetJobApplications;
 using ARI.Application.Jobs.Queries.GetJobById;
@@ -117,7 +118,10 @@ namespace ARI.API.Controllers
             var isStaff = User.Identity?.IsAuthenticated == true &&
                           (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.HrAdmin) || User.IsInRole(AppRoles.Recruiter));
 
-            var result = await _sender.Send(new GetJobByIdQuery(id, isStaff), ct);
+            var currentUserId = _currentUserService.UserId;
+            var role = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
+
+            var result = await _sender.Send(new GetJobByIdQuery(id, isStaff, currentUserId, role), ct);
             if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }
@@ -202,6 +206,22 @@ namespace ARI.API.Controllers
                 return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
 
             var result = await _sender.Send(new UpdateJobStatusCommand(id, request, userId, _currentUserService.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// Cập nhật cờ hiển thị (Urgent, Public) của tin tuyển dụng.
+        /// HR Admin có thể sửa cả 2 bất cứ lúc nào. Recruiter chỉ sửa được Urgent (và Public nếu tin còn là Draft).
+        /// </summary>
+        [HttpPatch("{id:guid}/display")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> UpdateJobDisplay(Guid id, [FromBody] UpdateJobDisplayRequest request, CancellationToken ct)
+        {
+            if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng. Đăng nhập HR và gửi Bearer token." });
+
+            var result = await _sender.Send(new UpdateJobDisplayCommand(id, request, userId, _currentUserService.Role), ct);
             if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }

@@ -45,6 +45,7 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
             public Guid CreatedByUserId { get; set; }
             public int? Vacancies { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
+            public DateTimeOffset? ApplicationDeadline { get; set; }
         }
 
         private sealed class AppLite
@@ -80,7 +81,7 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
                 .QueryAsync(q => q.Select(j => new JobLite
                 {
                     Id = j.Id, Title = j.Title, Department = j.Department, Status = j.Status,
-                    CreatedByUserId = j.CreatedByUserId, Vacancies = j.Vacancies, CreatedAt = j.CreatedAt,
+                    CreatedByUserId = j.CreatedByUserId, Vacancies = j.Vacancies, CreatedAt = j.CreatedAt, ApplicationDeadline = j.ApplicationDeadline,
                 }), ct));
             var appsTask = RunScopedAsync(uow => uow.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Select(a => new AppLite
@@ -115,7 +116,7 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
             // KPI + phễu
             var response = new HrDashboardResponse
             {
-                ActiveJobs = jobs.Count(j => j.Status == "active"),
+                ActiveJobs = jobs.Count(j => j.Status == "active" && (!j.ApplicationDeadline.HasValue || j.ApplicationDeadline.Value > DateTimeOffset.UtcNow)),
                 DraftJobs = jobs.Count(j => j.Status == "draft"),
                 TotalApplications = apps.Count,
                 AiInterviews = sessionAppIds.Count,
@@ -261,7 +262,8 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
                     Department = j.Department,
                     CreatedByName = CreatorName(j.CreatedByUserId),
                     ApplicantCount = ApplicantsOf(j.Id),
-                    Status = j.Status,
+                    Status = j.Status == "active" && j.ApplicationDeadline.HasValue && j.ApplicationDeadline.Value <= DateTimeOffset.UtcNow ? "closed" : j.Status,
+                    ApplicationDeadline = j.ApplicationDeadline,
                 })
                 .ToList();
 

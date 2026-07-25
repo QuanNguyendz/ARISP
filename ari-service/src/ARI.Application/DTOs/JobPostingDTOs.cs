@@ -52,6 +52,12 @@ namespace ARI.Application.DTOs
         public string? RejectionReason { get; set; } // Chỉ bắt buộc khi đổi status sang 'rejected'
     }
 
+    public class UpdateJobDisplayRequest
+    {
+        public bool? IsUrgent { get; set; }
+        public bool? IsPublicListing { get; set; }
+    }
+
     /// <summary>
     /// DTO cấu hình thông tin chi tiết cho từng vòng phỏng vấn (Interview Round) thuộc Job Posting.
     /// </summary>
@@ -131,7 +137,7 @@ namespace ARI.Application.DTOs
                 JdFileName = job.JdFileName,
                 JdFileFormat = job.JdFileFormat,
                 InterviewMode = job.InterviewMode,
-                Status = job.Status,
+                Status = (job.Status == "active" && job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : job.Status,
                 RejectionReason = job.RejectionReason,
                 IsPublicListing = job.IsPublicListing,
                 DetectedLanguage = job.DetectedLanguage,
@@ -174,6 +180,7 @@ namespace ARI.Application.DTOs
         public string? LanguageRequirement { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? PublishedAt { get; set; }
+        public DateTimeOffset? ApplicationDeadline { get; set; }
         public string? Location { get; set; }
         public string? WorkMode { get; set; }
         public string? EmploymentType { get; set; }
@@ -204,11 +211,12 @@ namespace ARI.Application.DTOs
                 Title = job.Title,
                 Department = job.Department,
                 InterviewMode = job.InterviewMode,
-                Status = job.Status,
+                Status = (job.Status == "active" && job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : job.Status,
                 DetectedLanguage = job.DetectedLanguage,
                 LanguageRequirement = job.LanguageRequirement,
                 CreatedAt = job.CreatedAt,
                 PublishedAt = job.PublishedAt,
+                ApplicationDeadline = job.ApplicationDeadline,
                 Location = job.Location,
                 WorkMode = job.WorkMode,
                 EmploymentType = job.EmploymentType,
