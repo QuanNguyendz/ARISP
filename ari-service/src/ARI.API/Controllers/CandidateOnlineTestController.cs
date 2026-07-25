@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.DTOs;
 using ARI.Application.OnlineTest;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

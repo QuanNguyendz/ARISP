@@ -43,6 +43,8 @@ export interface CandidateOnlineTest {
   score: number | null
   isPassed: boolean | null
   submittedAt: string | null
+  /** Hồ sơ đã qua vòng duyệt CV chưa — chưa pass thì không được làm bài (chỉ hiện "Chờ duyệt CV"). */
+  cvPassed: boolean
 }
 
 /** Kết quả chấm bài trắc nghiệm. */

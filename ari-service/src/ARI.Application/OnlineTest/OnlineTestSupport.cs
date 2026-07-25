@@ -49,6 +49,17 @@ namespace ARI.Application.OnlineTest
             return (byAccount || byEmail, app);
         }
 
+        /// <summary>
+        /// Các trạng thái hồ sơ được coi là "CV đã pass" (đã qua vòng duyệt CV) — điều kiện để làm bài thi trắc nghiệm.
+        /// Chặn: cv_submitted (chưa duyệt), cv_rejected (bị loại CV), withdrawn (đã rút) và mọi trạng thái lạ khác.
+        /// </summary>
+        private static readonly HashSet<string> CvPassedStatuses =
+            new(StringComparer.OrdinalIgnoreCase) { "invited", "screening", "interview", "pass", "not_pass" };
+
+        /// <summary>Hồ sơ đã qua vòng duyệt CV chưa (đủ điều kiện làm bài thi trắc nghiệm).</summary>
+        public static bool IsCvPassed(string? status) =>
+            !string.IsNullOrWhiteSpace(status) && CvPassedStatuses.Contains(status);
+
         /// <summary>Vòng (RoundNumber) được cấu hình là online_test cho job — mặc định 1 nếu không có.</summary>
         public static async Task<int> ResolveRoundAsync(IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
         {

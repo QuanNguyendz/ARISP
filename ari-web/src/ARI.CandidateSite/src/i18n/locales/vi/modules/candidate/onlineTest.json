@@ -17,12 +17,15 @@
     "remaining": "Còn {{n}} câu chưa trả lời",
     "loadError": "Không tải được bài thi.",
     "submitError": "Không nộp được bài thi.",
-    "unauthorized": "Vui lòng đăng nhập Portal ứng viên để làm bài thi."
+    "unauthorized": "Vui lòng đăng nhập Portal ứng viên để làm bài thi.",
+    "lockedTitle": "Chờ duyệt CV",
+    "lockedDetail": "Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm."
   },
   "entry": {
     "resultTitle": "Bài thi trắc nghiệm: {{result}}",
     "resultDetail": "Điểm {{score}}/100 · điểm sàn {{pass}}/100",
     "cta": "Làm bài thi trắc nghiệm",
-    "ctaSub": "{{count}} câu · điểm đạt {{pass}}/100"
+    "ctaSub": "{{count}} câu · điểm đạt {{pass}}/100",
+    "locked": "Chờ duyệt CV"
   }
 }

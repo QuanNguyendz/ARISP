@@ -17,12 +17,15 @@
     "remaining": "{{n}} question(s) left unanswered",
     "loadError": "Failed to load the test.",
     "submitError": "Failed to submit the test.",
-    "unauthorized": "Please sign in to the Candidate Portal to take the test."
+    "unauthorized": "Please sign in to the Candidate Portal to take the test.",
+    "lockedTitle": "Awaiting CV approval",
+    "lockedDetail": "Your application must pass the CV screening round before you can take the online test."
   },
   "entry": {
     "resultTitle": "Online test: {{result}}",
     "resultDetail": "Score {{score}}/100 · pass score {{pass}}/100",
     "cta": "Take the online test",
-    "ctaSub": "{{count}} questions · pass score {{pass}}/100"
+    "ctaSub": "{{count}} questions · pass score {{pass}}/100",
+    "locked": "Awaiting CV approval"
   }
 }

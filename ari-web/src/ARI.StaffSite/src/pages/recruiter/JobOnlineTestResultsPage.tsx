@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { ErrorAlert } from '@ari/shared/ui'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
+import { STAFF_ONLINE_TEST_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { OnlineTestJobResults } from '@ari/shared/types/onlineTest'
 
 function errMsg(e: unknown, fallback: string): string {
@@ -114,6 +115,20 @@ export default function JobOnlineTestResultsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Live update khi có ứng viên nộp bài (SignalR → window event) — refetch nền, không nháy spinner.
+  useEffect(() => {
+    const handler = async () => {
+      if (!jobId) return
+      try {
+        setData(await onlineTestService.getJobResults(jobId))
+      } catch {
+        /* giữ nguyên bảng hiện tại nếu refetch nền lỗi */
+      }
+    }
+    window.addEventListener(STAFF_ONLINE_TEST_REFRESH_EVENT, handler)
+    return () => window.removeEventListener(STAFF_ONLINE_TEST_REFRESH_EVENT, handler)
+  }, [jobId])
 
   const passRate =
     data && data.submissionCount > 0

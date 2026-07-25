@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList, CheckCircle2, XCircle, ChevronRight } from 'lucide-react'
+import { ClipboardList, CheckCircle2, XCircle, ChevronRight, Lock } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 
 /**
  * Ô "Bài thi trắc nghiệm" trên trang chi tiết hồ sơ ứng tuyển của ứng viên.
  * Chỉ hiển thị khi vị trí CÓ đề thi (totalQuestions > 0). Tự ẩn nếu chưa có đề / lỗi.
+ * Chưa qua vòng duyệt CV (`cvPassed === false`) → ô mờ khoá "Chờ duyệt CV".
  */
 export default function OnlineTestEntry({ applicationId }: { applicationId: string }) {
   const { t } = useTranslation('modules/candidate/onlineTest')
@@ -18,6 +19,21 @@ export default function OnlineTestEntry({ applicationId }: { applicationId: stri
   })
 
   if (!data || data.totalQuestions === 0) return null
+
+  // Chưa qua vòng duyệt CV → ô mờ khoá, chưa cho vào làm bài.
+  if (!data.cvPassed) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-ink-200 bg-ink-50 p-4 shadow-card opacity-80">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-ink-200 text-ink-500">
+          <Lock className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-ink-600">{t('page.title')}</p>
+          <p className="text-xs text-ink-400">{t('entry.locked')}</p>
+        </div>
+      </div>
+    )
+  }
 
   if (data.alreadySubmitted) {
     const passed = !!data.isPassed

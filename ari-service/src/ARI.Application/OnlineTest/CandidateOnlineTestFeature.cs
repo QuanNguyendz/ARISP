@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
@@ -38,14 +39,20 @@ namespace ARI.Application.OnlineTest
             var bank = (await _unitOfWork.Repository<OnlineTestQuestion>()
                 .FindAsync(q => q.JobPostingId == app.JobPostingId, ct)).ToList();
 
-            // Bốc ngẫu nhiên (deterministic theo hồ sơ + vòng) — cùng ứng viên luôn nhận cùng bộ đề.
-            var drawn = OnlineTestSupport.DrawQuestions(bank, app.Id, round, job.OnlineTestQuestionsPerTest)
-                .Select(q => new CandidateTestQuestionDto(
-                    q.Id,
-                    q.QuestionText,
-                    OnlineTestSupport.ParseOptions(q.Options),
-                    string.IsNullOrWhiteSpace(q.QuestionType) ? "single" : q.QuestionType))
-                .ToList();
+            // Bộ đề đã bốc (deterministic theo hồ sơ + vòng) — cùng ứng viên luôn nhận cùng bộ đề.
+            var drawnQuestions = OnlineTestSupport.DrawQuestions(bank, app.Id, round, job.OnlineTestQuestionsPerTest);
+
+            // Chỉ trả câu hỏi khi hồ sơ ĐÃ qua vòng duyệt CV. Chưa pass → trả metadata (số câu, điểm sàn…)
+            // để FE hiện ô "Chờ duyệt CV", nhưng KHÔNG lộ câu hỏi/đáp án.
+            var cvPassed = OnlineTestSupport.IsCvPassed(app.Status);
+            var questions = cvPassed
+                ? drawnQuestions.Select(q => new CandidateTestQuestionDto(
+                        q.Id,
+                        q.QuestionText,
+                        OnlineTestSupport.ParseOptions(q.Options),
+                        string.IsNullOrWhiteSpace(q.QuestionType) ? "single" : q.QuestionType))
+                    .ToList()
+                : new List<CandidateTestQuestionDto>();
 
             var submission = (await _unitOfWork.Repository<OnlineTestSubmission>()
                     .FindAsync(s => s.ApplicationId == app.Id && s.RoundNumber == round, ct))
@@ -59,12 +66,13 @@ namespace ARI.Application.OnlineTest
                 round,
                 job.OnlineTestPassScore,
                 job.OnlineTestDurationMinutes,
-                drawn.Count,
-                drawn,
+                drawnQuestions.Count,   // tổng số câu của bài — luôn có để FE biết job có đề (kể cả khi chưa pass)
+                questions,              // rỗng khi chưa duyệt CV
                 submission != null,
                 submission?.Score,
                 submission?.IsPassed,
-                submission?.CreatedAt);
+                submission?.CreatedAt,
+                cvPassed);
 
             return Result.Success(dto);
         }
@@ -97,6 +105,10 @@ namespace ARI.Application.OnlineTest
 
             if (string.Equals(app.Status, "withdrawn", StringComparison.OrdinalIgnoreCase))
                 return Result.Failure<OnlineTestResultDto>("Hồ sơ đã rút — không thể làm bài thi.");
+
+            // Chỉ cho nộp bài khi hồ sơ đã qua vòng duyệt CV (chặn cv_submitted/cv_rejected).
+            if (!OnlineTestSupport.IsCvPassed(app.Status))
+                return Result.Failure<OnlineTestResultDto>("Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm.");
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             if (job == null) return Result.Failure<OnlineTestResultDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
@@ -158,6 +170,25 @@ namespace ARI.Application.OnlineTest
                 }
                 catch { /* best-effort */ }
             }
+
+            // Realtime cho STAFF: recruiter chủ tin + nhóm hr_admin nhận toast + refetch bảng điểm/chuông
+            // (đồng bộ chuông staff qua SyncNotificationsAsync, dedupKey "onlinetest:{submissionId}").
+            try
+            {
+                var staffPayload = new
+                {
+                    Type = "OnlineTestSubmitted",
+                    applicationId = app.Id,
+                    jobPostingId = app.JobPostingId,
+                    candidateName = app.CandidateName,
+                    roundNumber = round,
+                    score,
+                    isPassed,
+                };
+                await _notificationService.PublishUserEventAsync(job.CreatedByUserId, "ReceiveOnlineTestSubmitted", staffPayload, ct);
+                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveOnlineTestSubmitted", staffPayload, ct);
+            }
+            catch { /* best-effort */ }
 
             return Result.Success(new OnlineTestResultDto(
                 score, isPassed, job.OnlineTestPassScore, correct, total, submission.CreatedAt));
