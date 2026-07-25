@@ -110,7 +110,7 @@ export default function SuperAdminSettingsPage() {
     'w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400'
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={t('title')}
         description={t('description')}
@@ -138,12 +138,12 @@ export default function SuperAdminSettingsPage() {
       {loading ? (
         <SettingsSkeleton />
       ) : (
-        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-          {/* Tabs — horizontal scroll trên mobile, sidebar dọc từ lg */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+          {/* Tabs — pill ngang scroll-snap trên mobile, sidebar dọc từ lg */}
           <div className="-mx-4 sm:mx-0 lg:w-64 lg:shrink-0">
             <nav
               aria-label="Settings tabs"
-              className="flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card dark:lg:border-white/10 dark:lg:bg-white/5"
+              className="flex gap-2 overflow-x-auto scroll-px-4 px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card dark:lg:border-white/10 dark:lg:bg-white/5"
             >
               {tabs.map((tb) => {
                 const TabIcon = tb.icon
@@ -151,13 +151,14 @@ export default function SuperAdminSettingsPage() {
                   <button
                     key={tb.id}
                     onClick={() => setTab(tb.id)}
-                    className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-4 lg:py-3 ${
+                    className={`inline-flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors sm:px-3.5 sm:text-sm lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-4 lg:py-3 ${
                       tab === tb.id
                         ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/20 dark:text-brand-400'
                         : 'border-ink-200 bg-white text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:bg-white/5 dark:text-ink-400 dark:hover:bg-white/10'
                     }`}
                   >
-                    <TabIcon className="h-4 w-4" /> {tb.label}
+                    <TabIcon className="h-4 w-4" />
+                    <span className="truncate max-w-[180px] sm:max-w-none">{tb.label}</span>
                   </button>
                 )
               })}

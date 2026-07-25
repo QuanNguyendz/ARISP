@@ -7,20 +7,27 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** Phase 2 (FE Responsive) – Nhóm E Chart & Modal nhỏ (~4 giờ, 2 file)  
+**Phase:** FE Responsive – Hotfix 5 lỗi mobile báo cáo ngày 2026-07-25  
 **Last updated:** 2026-07-25
 
 ---
 
 ## Đang làm (In Progress)
 
-### Phase 2 (FE Responsive) – Nhóm E: Chart & Modal nhỏ (~4 giờ, 2 file)
+### FE Responsive – Hotfix Round 5 (2026-07-25, 1 commit, 5 file)
 
-> **Mục tiêu:** Fix responsive cho chart YAxis tràn trên mobile + reject modal thiếu max-h/overflow-y. Plan: `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1 Nhóm E.
-> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 2 file). Phase 2 xong → sang Phase 3.
+> **Mục tiêu:** Sửa 5 lỗi mobile báo cáo bởi user (qua ảnh screenshot 320-768px). Nguyên nhân chính: dropdown header Candidate dùng `absolute` thuần (không có mobile fixed full-width như HR) → tràn mobile; job card footer 4 items dính dòng; table cell chèn text; tab pill dài không scroll-snap.
+>
+> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 5 file). TypeScript pass cả 2 site.
 
-- [x] `pages/hr/DashboardPage.tsx` — RecruiterBarChart YAxis `width={96}` → `width={60}` + tick fontSize 11 → 10 (Dễ / Thấp) ✅
-- [x] `pages/hr/JobPostingDetailPage.tsx` — Reject modal thêm `max-h-[90vh] overflow-y-auto` + padding `p-5 sm:p-6` (giam mobile 24->20px) (Dễ / Thấp) ✅
+- [x] `ARI.CandidateSite/src/app/layouts/CandidateHeader.tsx` — 3 dropdown (notif/user/lang) chuyển sang `fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50` mobile + revert `sm:absolute sm:right-0 sm:mt-2` desktop. Mobile fixed full-width tránh bị stacking-context header sticky cắt (giống pattern đã làm cho HR WorkspaceLayout).
+- [x] `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Card body `flex-col gap-2 sm:flex-row sm:items-start sm:justify-between` (status + match badge wrap xuống dưới title ở mobile) + `whitespace-nowrap` cho status badge + Match badge `whitespace-nowrap` + CardFooter `flex-col gap-2 sm:flex-row` (date + button stack dọc mobile) + card padding `p-4 sm:p-5` + alert banner padding `px-4 sm:px-5` + avatar `h-11 w-11 sm:h-12 sm:w-12` + title `break-words` + truncate map location.
+- [x] `ARI.StaffSite/src/pages/recruiter/MyJobsPage.tsx` — Job card footer `flex-wrap items-center justify-between gap-x-3 gap-y-2` + `whitespace-nowrap` cho 3 item (count/time/salary) + salary `min-w-0 flex-1 text-right sm:flex-none` + chevron `shrink-0`. 4 item giờ wrap gọn khi 320px thay vì dính 1 dòng.
+- [x] `ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` — Table `min-w-[560px]` (giảm từ 600px) + jobTitle cell `max-w-[160px]` + `<span className="block truncate" title={...}>` cho tooltip khi hover + matchScore + appliedDate cell `whitespace-nowrap text-xs sm:text-sm` + candidate name/email `max-w-[180px] truncate`. Tổng table width giảm ~80px, scroll ngang ít hơn.
+- [x] `ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` — Tabs `flex gap-2 overflow-x-auto scroll-px-4` với `snap-start` (kéo có snap) + `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` (ẩn scrollbar cho gọn) + button `px-3 py-1.5 text-xs sm:px-3.5 sm:text-sm` (thu nhỏ mobile) + label `truncate max-w-[180px] sm:max-w-none` + container gap `gap-4 lg:gap-8` (giảm gap mobile) + page padding `p-4 sm:p-6 lg:p-8`.
+- **Pattern dùng chung:** Dropdown header dùng `fixed top-[calc(4rem+0.5rem)] z-50` mobile; horizontal pill `overflow-x-auto + snap-start`; table cell `max-w-[N] truncate` + tooltip `title` attribute; card body `flex-col sm:flex-row` để badge/button wrap khi viewport hẹp.
+- **Lint:** `tsc --noEmit` 0 lỗi trên cả `ARI.CandidateSite` và `ARI.StaffSite`.
+- **Còn lại:** Sau commit, tiếp tục theo plan (Phase 7 widget polish / Phase 8 page-level audit) hoặc theo lỗi user báo tiếp theo.
 
 ---
 
@@ -310,6 +317,15 @@
 ---
 
 ## Completed
+
+- [x] 2026-07-25: **FE Responsive – Hotfix Round 5 (1 commit, 5 file).** Patch 5 lỗi mobile báo cáo bởi user qua screenshot 320-768px:
+  1. **CandidateHeader dropdown** (Candidate Site, 3000) — 3 dropdown (notif/user/lang) dùng `absolute` thuần → mobile bị stacking-context header sticky cắt. Đồng bộ sang `fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50` mobile + `sm:absolute sm:right-0 sm:mt-2` desktop (giống pattern HR WorkspaceLayout/HrLayout).
+  2. **Applications list chèn nhau** (Candidate) — Card body dùng `flex items-start justify-between gap-3` cố định → 320px không đủ chỗ cho avatar (48) + title + 2 badge (status + match). Stack dọc mobile: `flex-col gap-2 sm:flex-row sm:items-start sm:justify-between`, title `break-words`, status badge `whitespace-nowrap`, Match badge `whitespace-nowrap`, alert banner padding `px-4 sm:px-5`, card padding `p-4 sm:p-5`, CardFooter `flex-col gap-2 sm:flex-row` (date + button stack dọc mobile).
+  3. **MyJobs job card footer dính nhau** (Recruiter) — 4 item (applicants/time/salary/chevron) dùng `flex items-center justify-between` cố định, 320px quá hẹp. Thêm `flex-wrap items-center justify-between gap-x-3 gap-y-2` + `whitespace-nowrap` cho 3 item text + salary `min-w-0 flex-1 text-right sm:flex-none` + chevron `shrink-0`.
+  4. **Recruiter Candidates jobTitle bị ẩn** — Table `min-w-[600px]` quá rộng + jobTitle `max-w-[180px] truncate` không có tooltip. Giảm xuống `min-w-[560px]`, jobTitle `max-w-[160px]` + `<span className="block truncate" title={...}>` để hiện full text khi hover, matchScore/date `whitespace-nowrap text-xs sm:text-sm`, candidate name/email `max-w-[180px] truncate`. Tổng table width giảm ~80px, scroll ngang ít hơn.
+  5. **SA Settings 2 tab pill tràn ngang** (Super Admin, 3001) — 2 button tab text dài "Đăng nhập & miền email" + "Tích hợp & Webhook" + `overflow-x-auto` mobile → người dùng phải kéo ngang. Thêm `flex-shrink-0 snap-start` + `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` (ẩn scrollbar cho gọn) + button `px-3 py-1.5 text-xs sm:px-3.5 sm:text-sm` (thu nhỏ mobile) + label `truncate max-w-[180px] sm:max-w-none` + page padding `p-4 sm:p-6 lg:p-8` (thu nhỏ từ `p-6 lg:p-8`).
+  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+  - **Còn lại:** Tiếp tục theo plan (Phase 7 widget polish / Phase 8 page-level audit) hoặc theo lỗi user báo tiếp theo.
 
 - [x] 2026-07-24: **Phase 1 (FE Responsive) – P0 + P1 — 16 commit responsive fix (`feature/fe/fix-responsive`).** Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai: `SchedulePage` (Candidate P0), `HrDashboardPage`, `HrEvaluationReviewPage`, `HrJobPostingDetailPage`, `RecruiterJobDetailPage`, `ApplicationsPage`, `FindJobPage`, `HomePage`, `InterviewSchedulePage`, `ApplicationDetailPage`, `CandidateJobDetailPage`, `ProfilePage`, `ApplyPage`, `HrCandidatesPage`, `HrCandidateDetailPage`, `RecruiterCreateJobPostingPage`, `RecruiterMyJobsPage`. JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr). Tổng 17 commit, 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
 

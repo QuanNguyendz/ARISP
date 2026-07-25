@@ -209,7 +209,7 @@ function RoundStepper({ t, rounds }: { t: (key: string) => string; rounds: MyApp
 function MatchBadge({ score }: { score?: number | null }) {
   if (typeof score !== 'number') return null
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ai-50 px-2.5 py-1 text-xs font-bold text-ai-700 ring-1 ring-ai-200">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-ai-50 px-2.5 py-1 text-xs font-bold text-ai-700 ring-1 ring-ai-200">
       <Sparkles className="h-3.5 w-3.5" /> Match {score}
     </span>
   )
@@ -225,7 +225,7 @@ function CardFooter({
   action?: React.ReactNode
 }) {
   return (
-    <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
+    <div className="mt-3 flex flex-col gap-2 border-t border-ink-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-xs text-ink-400">
         {t('applications.appliedTime')} {formatDate(app.createdAt)}
         {app.updatedAt &&
@@ -235,7 +235,7 @@ function CardFooter({
       {action ?? (
         <Link
           to={`/candidate/applications/${app.id}`}
-          className="inline-flex items-center gap-1 rounded-xl border border-ink-200 px-4 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 sm:w-auto sm:py-1.5"
         >
           {t('applications.viewDetail')} <ChevronRight className="h-4 w-4" />
         </Link>
@@ -282,37 +282,39 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
       className={`group overflow-hidden rounded-2xl border bg-white shadow-card transition ${borderCls}`}
     >
       {hasCode && (
-        <div className="flex items-center gap-2 bg-amber-50 px-5 py-2 text-xs font-semibold text-amber-700">
+        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 sm:px-5">
           <AlertCircle className="h-4 w-4" />{' '}
           {t('applications.actionNeeded', { round: app.interviewCode!.roundNumber })}
         </div>
       )}
-      <div className="p-5">
-        <div className="flex gap-4">
+      <div className="p-4 sm:p-5">
+        <div className="flex gap-3 sm:gap-4">
           <div
-            className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl sm:h-12 sm:w-12 ${
               isClosed ? 'bg-ink-100 text-ink-400' : 'bg-brand-50 text-brand-600'
             }`}
           >
-            <Icon className="h-6 w-6" />
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1">
                 <h3
-                  className={`font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
+                  className={`break-words font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
                 >
                   {app.jobTitle || t('applications.jobPosting')}
                 </h3>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {[app.location, app.department].filter(Boolean).join(' · ') ||
-                    t('applications.locationUnknown')}
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {[app.location, app.department].filter(Boolean).join(' · ') ||
+                      t('applications.locationUnknown')}
+                  </span>
                 </div>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="flex shrink-0 flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
                 >
                   <StatusIcon className="h-3.5 w-3.5" /> {meta.label}
                 </span>

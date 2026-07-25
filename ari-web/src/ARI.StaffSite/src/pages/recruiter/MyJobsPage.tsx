@@ -196,15 +196,17 @@ export default function RecruiterMyJobsPage() {
                       </p>
                     )}
 
-                    <div className="mt-4 flex items-center justify-between border-t border-ink-100 dark:border-white/10 pt-3 text-xs">
-                      <span className="flex items-center gap-1.5 font-medium text-ink-600 dark:text-ink-300">
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink-100 dark:border-white/10 pt-3 text-xs">
+                      <span className="flex items-center gap-1.5 whitespace-nowrap font-medium text-ink-600 dark:text-ink-300">
                         <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
                       </span>
-                      <span className="flex items-center gap-1 text-ink-400">
+                      <span className="flex items-center gap-1 whitespace-nowrap text-ink-400">
                         <Clock className="h-3 w-3" /> {timeAgo(j.createdAt)}
                       </span>
-                      <span className="text-ink-400">{formatSalary(j)}</span>
-                      <ChevronRight className="h-4 w-4 text-ink-300 transition-transform group-hover:translate-x-0.5" />
+                      <span className="min-w-0 flex-1 whitespace-nowrap text-right text-ink-400 sm:flex-none">
+                        {formatSalary(j)}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5" />
                     </div>
                   </Link>
                 </motion.div>

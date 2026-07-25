@@ -297,7 +297,7 @@ export default function CandidateHeader() {
             </button>
             {open === 'lang' && (
               <div
-                className="absolute right-0 mt-2 w-40 rounded-xl border border-ink-200 bg-white p-1 shadow-xl"
+                className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-w-xs rounded-2xl border border-ink-200 bg-white p-1 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-40"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -358,7 +358,7 @@ export default function CandidateHeader() {
               </button>
               {open === 'notif' && (
                 <div
-                  className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-ink-200 bg-white shadow-xl"
+                  className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[calc(100vh-6rem)]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
@@ -463,7 +463,7 @@ export default function CandidateHeader() {
                 </button>
                 {open === 'user' && (
                   <div
-                    className="absolute right-0 mt-2 w-64 rounded-2xl border border-ink-200 bg-white shadow-xl"
+                    className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-64 sm:max-h-[calc(100vh-6rem)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3 border-b border-ink-100 px-4 py-3">

@@ -138,7 +138,7 @@ export default function RecruiterCandidatesPage() {
           ) : (
             <div className="p-2 sm:p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card">
               <div className="overflow-x-auto">
-                <div className="min-w-[600px]">
+                <div className="min-w-[560px]">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-ink-200 dark:border-white/10">
@@ -177,17 +177,19 @@ export default function RecruiterCandidatesPage() {
                               {initials(a.candidateName || a.candidateEmail)}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium text-ink-900 dark:text-white truncate">
+                              <p className="font-medium text-ink-900 dark:text-white truncate max-w-[180px]">
                                 {a.candidateName || t('candidate')}
                               </p>
-                              <p className="text-sm text-ink-600 dark:text-ink-400 truncate">
+                              <p className="text-sm text-ink-600 dark:text-ink-400 truncate max-w-[180px]">
                                 {a.candidateEmail}
                               </p>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-3 sm:px-4 text-ink-700 dark:text-ink-200 max-w-[180px] truncate">
-                          {a.jobTitle || '—'}
+                        <td className="py-4 px-3 sm:px-4 text-ink-700 dark:text-ink-200 max-w-[160px]">
+                          <span className="block truncate" title={a.jobTitle || ''}>
+                            {a.jobTitle || '—'}
+                          </span>
                         </td>
                         <td className="py-4 px-3 sm:px-4">
                           <span
@@ -196,7 +198,7 @@ export default function RecruiterCandidatesPage() {
                             {appStatusLabel(a.status)}
                           </span>
                         </td>
-                        <td className="py-4 px-3 sm:px-4">
+                        <td className="py-4 px-3 sm:px-4 whitespace-nowrap">
                           {typeof a.matchScore === 'number' ? (
                             <span className={`font-semibold ${scoreColor(a.matchScore)}`}>
                               {a.matchScore}
@@ -205,7 +207,7 @@ export default function RecruiterCandidatesPage() {
                             <span className="text-ink-400">—</span>
                           )}
                         </td>
-                        <td className="py-4 px-3 sm:px-4 text-ink-600 dark:text-ink-400 whitespace-nowrap">
+                        <td className="py-4 px-3 sm:px-4 text-ink-600 dark:text-ink-400 whitespace-nowrap text-xs sm:text-sm">
                           {new Date(a.createdAt).toLocaleDateString('vi-VN', {
                             day: '2-digit',
                             month: '2-digit',
