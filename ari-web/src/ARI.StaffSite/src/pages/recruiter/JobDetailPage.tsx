@@ -544,6 +544,12 @@ export default function RecruiterJobDetailPage() {
             >
               <CalendarClock className="h-4 w-4" /> {t('interviewSchedule')}
             </Link>
+            <Link
+              to={`/recruiter/my-jobs/${job.id}/online-test`}
+              className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+            >
+              <ScrollText className="h-4 w-4" /> {t('onlineTestBank')}
+            </Link>
             {canEdit && (
               <Link
                 to={`/recruiter/my-jobs/${job.id}/edit`}

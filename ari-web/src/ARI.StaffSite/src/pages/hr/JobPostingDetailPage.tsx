@@ -591,13 +591,22 @@ export default function JobPostingDetailPage() {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
-            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
-          >
-            <Edit2 className="w-4 h-4" /> {t('edit')}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+              className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <Edit2 className="w-4 h-4" /> {t('edit')}
+            </button>
+          </div>
         </div>
 
         {notice && (

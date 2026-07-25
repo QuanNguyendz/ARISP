@@ -141,6 +141,18 @@ namespace ARI.Application.CandidatePortal
                     "/candidate/applications", b.CreatedAt);
             }
 
+            // 5. Kết quả bài thi trắc nghiệm online (Online Test)
+            var submissions = (await _unitOfWork.Repository<OnlineTestSubmission>()
+                .FindAsync(s => appIds.Contains(s.ApplicationId), ct)).ToList();
+            foreach (var s in submissions)
+            {
+                var app = apps.FirstOrDefault(a => a.Id == s.ApplicationId);
+                Add($"online_test:{s.Id}", "result",
+                    $"Kết quả bài trắc nghiệm: {(s.IsPassed ? "Đạt" : "Chưa đạt")}",
+                    $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Điểm {Math.Round(s.Score)}/100.",
+                    $"/candidate/applications/{s.ApplicationId}", s.CreatedAt);
+            }
+
             if (toAdd.Count > 0)
             {
                 foreach (var n in toAdd) await _unitOfWork.Repository<Notification>().AddAsync(n, ct);

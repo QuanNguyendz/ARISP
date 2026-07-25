@@ -35,6 +35,7 @@ const CandidateNotificationsPage = lazy(() => import('@pages/candidate/Notificat
 const CandidateSettingsPage = lazy(() => import('@pages/candidate/SettingsPage'))
 const InterviewSchedulePage = lazy(() => import('@pages/candidate/InterviewSchedulePage'))
 const CandidateSchedulePage = lazy(() => import('@pages/candidate/SchedulePage'))
+const CandidateOnlineTestPage = lazy(() => import('@pages/candidate/OnlineTestPage'))
 
 // Interview
 const InterviewRoomPage = lazy(() => import('@pages/interview/InterviewRoomPage'))
@@ -127,6 +128,10 @@ function App() {
             <Route path="/candidate/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/candidate/notifications" element={<CandidateNotificationsPage />} />
             <Route path="/candidate/settings" element={<CandidateSettingsPage />} />
+            <Route
+              path="/candidate/online-test/:applicationId"
+              element={<CandidateOnlineTestPage />}
+            />
           </Route>
 
           {/* Redirect các route ứng viên cũ (đã bị thay bằng job board / hồ sơ ứng tuyển mới) */}

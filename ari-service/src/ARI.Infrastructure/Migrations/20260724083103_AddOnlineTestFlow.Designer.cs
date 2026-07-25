@@ -5,6 +5,7 @@ using System.Net;
 using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -13,9 +14,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ARI.Infrastructure.Migrations
 {
     [DbContext(typeof(AriDbContext))]
-    partial class AriDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260724083103_AddOnlineTestFlow")]
+    partial class AddOnlineTestFlow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1167,17 +1170,9 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("location");
 
-                    b.Property<int>("OnlineTestDurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("online_test_duration_minutes");
-
                     b.Property<int>("OnlineTestPassScore")
                         .HasColumnType("integer")
                         .HasColumnName("online_test_pass_score");
-
-                    b.Property<int>("OnlineTestQuestionsPerTest")
-                        .HasColumnType("integer")
-                        .HasColumnName("online_test_questions_per_test");
 
                     b.Property<string>("PersonaName")
                         .HasColumnType("text")
@@ -1416,11 +1411,6 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("correct_option");
 
-                    b.Property<string>("CorrectOptions")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("correct_options");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1438,11 +1428,6 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("question_text");
-
-                    b.Property<string>("QuestionType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("question_type");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1464,10 +1449,6 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
 
-                    b.Property<int>("CorrectCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("correct_count");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1488,10 +1469,6 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("selected_answers");
-
-                    b.Property<int>("TotalQuestions")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_questions");
 
                     b.HasKey("Id");
 
