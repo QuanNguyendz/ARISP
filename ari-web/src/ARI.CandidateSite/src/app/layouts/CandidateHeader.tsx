@@ -286,25 +286,18 @@ export default function CandidateHeader() {
             <Bookmark className="h-5 w-5" />
           </button>
 
-          {/* Language (mobile — icon only) */}
-          <div className="relative sm:hidden">
+          {/* Language — 1 button responsive (icon-only mobile, icon+label desktop) + 1 dropdown chung */}
+          <div className="relative">
             <button
               onClick={toggle('lang')}
               aria-label={t('header.changeLanguage') || 'Đổi ngôn ngữ'}
-              className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100"
+              className="grid place-items-center rounded-lg text-ink-600 hover:bg-ink-100 h-9 w-9 sm:flex sm:h-auto sm:w-auto sm:items-center sm:gap-1 sm:px-2 sm:py-2 sm:text-sm sm:font-medium"
             >
               <Globe className="h-[18px] w-[18px]" />
-            </button>
-          </div>
-
-          {/* Language (sm+ — icon + label) */}
-          <div className="relative hidden sm:block">
-            <button
-              onClick={toggle('lang')}
-              className="flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
-            >
-              <Globe className="h-[18px] w-[18px]" />
-              {langMap[i18n.language] || 'VI'} <ChevronDown className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {langMap[i18n.language] || 'VI'}
+              </span>
+              <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
             </button>
             {open === 'lang' && (
               <div
