@@ -39,24 +39,29 @@ export default function RecruiterSettingsPage() {
     <div className="p-6 lg:p-8">
       <PageHeader title={t('title')} description={t('description')} />
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="lg:w-64 shrink-0">
-          <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.08] p-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-amber-500/20 text-amber-400'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+        <div className="-mx-4 sm:mx-0 lg:w-64 lg:shrink-0">
+          <nav
+            aria-label="Settings tabs"
+            className="flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-white/[0.08] lg:bg-white/[0.03] lg:p-2 lg:backdrop-blur-xl"
+          >
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-4 lg:py-3 ${
+                    activeTab === tab.id
+                      ? 'border-amber-500/40 bg-amber-500/20 text-amber-400'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <TabIcon className="h-4 w-4" /> {tab.label}
+                </button>
+              )
+            })}
+          </nav>
         </div>
 
         <div className="flex-1">

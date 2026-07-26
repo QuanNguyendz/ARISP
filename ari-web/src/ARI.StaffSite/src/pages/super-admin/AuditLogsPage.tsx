@@ -152,7 +152,7 @@ export default function AuditLogsPage() {
           </ul>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-ink-100 dark:border-white/10 px-6 py-3 text-sm">
+            <div className="flex flex-col gap-2 border-t border-ink-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10">
               <span className="text-ink-500 dark:text-ink-400">
                 {t('pagination.summary', { page, totalPages, total })}
               </span>

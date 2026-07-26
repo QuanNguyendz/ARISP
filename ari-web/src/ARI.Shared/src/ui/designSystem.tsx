@@ -26,11 +26,11 @@ export function PageHeader({ title, description, actions, badge }: PageHeaderPro
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center justify-between mb-8"
+      className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
     >
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl font-semibold text-ink-900 dark:text-white">{title}</h1>
+      <div className="min-w-0">
+        <div className="mb-1 flex flex-wrap items-center gap-3">
+          <h1 className="text-xl font-semibold text-ink-900 dark:text-white sm:text-2xl">{title}</h1>
           {badge && (
             <span
               className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color || 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'}`}
@@ -42,13 +42,13 @@ export function PageHeader({ title, description, actions, badge }: PageHeaderPro
         {description && <p className="text-sm text-ink-500 dark:text-ink-400">{description}</p>}
       </div>
       {actions && actions.length > 0 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {actions.map((action, index) =>
             action.href ? (
               <Link
                 key={index}
                 to={action.href}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all sm:px-4 sm:py-2.5 ${
                   action.variant === 'secondary'
                     ? 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10'
                     : 'bg-gradient-to-r from-brand-600 to-ai-600 text-white hover:opacity-90'
@@ -61,7 +61,7 @@ export function PageHeader({ title, description, actions, badge }: PageHeaderPro
               <button
                 key={index}
                 onClick={action.onClick}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all sm:px-4 sm:py-2.5 ${
                   action.variant === 'secondary'
                     ? 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10'
                     : 'bg-gradient-to-r from-brand-600 to-ai-600 text-white hover:opacity-90'

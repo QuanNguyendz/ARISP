@@ -200,7 +200,7 @@ export default function SavedJobsPage() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('profile.home')}
@@ -210,7 +210,7 @@ export default function SavedJobsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-6">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-extrabold leading-tight">
@@ -237,7 +237,7 @@ export default function SavedJobsPage() {
             <AlertCircle className="h-4 w-4" /> {error}
           </div>
         ) : jobs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-10 text-center shadow-card">
+          <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center shadow-card sm:p-10">
             <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-ai-50 text-ai-600">
               <Bookmark className="h-6 w-6" />
             </span>

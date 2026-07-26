@@ -118,7 +118,7 @@ function ReportPanel({
     <div className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
         <div
-          className={`flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 bg-gradient-to-r p-6 ${isPass ? 'from-emerald-50' : 'from-red-50'} to-white`}
+          className={`flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 bg-gradient-to-r p-4 sm:p-6 ${isPass ? 'from-emerald-50' : 'from-red-50'} to-white`}
         >
           <div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-ink-500">
@@ -151,7 +151,7 @@ function ReportPanel({
               {isPass ? t('badge.pass') : t('badge.notPass')}
             </div>
             {score !== null && (
-              <div className="mt-2 font-display text-4xl font-extrabold text-ink-900">
+              <div className="mt-2 font-display text-3xl sm:text-4xl font-extrabold text-ink-900">
                 {score}
                 <span className="text-lg text-ink-400">/100</span>
               </div>
@@ -160,7 +160,7 @@ function ReportPanel({
         </div>
 
         {s.recordingUrl && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <video
               src={resolveAssetUrl(s.recordingUrl)}
               controls
@@ -180,7 +180,7 @@ function ReportPanel({
       </div>
 
       {ev.reasoning && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-2 font-display text-lg font-bold">{t('report.title')}</h2>
           <p className="text-sm text-ink-600">{ev.reasoning}</p>
         </div>
@@ -204,7 +204,7 @@ function ReportPanel({
       )}
 
       {tab === 'criteria' && ev.criterionScores.length > 0 && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-4 font-display text-lg font-bold">{t('report.scoresByCriteria')}</h2>
           <div className="space-y-4">
             {ev.criterionScores.map((c, i) => (
@@ -215,7 +215,7 @@ function ReportPanel({
       )}
 
       {tab === 'questions' && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-4 font-display text-lg font-bold">{t('questionAnalysis.title')}</h2>
           {ev.questionAnalyses.length === 0 ? (
             <p className="text-sm text-ink-500">{t('questionAnalysis.empty')}</p>
@@ -275,7 +275,7 @@ function ReportPanel({
       )}
 
       {lang && (
-        <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-4 shadow-card sm:p-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
             <Languages className="h-4 w-4" /> {t('languageAssessment.title', { lang: langCode })}
           </div>
@@ -342,7 +342,7 @@ function RoundPlaceholder({
 }) {
   if (s.pendingHrReview) {
     return (
-      <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+      <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-600">
           <Clock className="h-6 w-6" />
         </div>
@@ -403,7 +403,7 @@ function RoundPlaceholder({
     )
   }
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+    <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
         <Video className="h-6 w-6" />
       </div>
@@ -502,11 +502,17 @@ function RoundButton({
 
 function DetailSkeleton() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
       <div className="space-y-5">
         <Skeleton className="h-40 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
+        <div className="hidden space-y-2 lg:block">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+        </div>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 lg:hidden">
+          <Skeleton className="h-24 w-64 shrink-0 rounded-2xl" />
+          <Skeleton className="h-24 w-64 shrink-0 rounded-2xl" />
+        </div>
       </div>
       <div className="space-y-6">
         <Skeleton className="h-64 w-full rounded-2xl" />
@@ -561,7 +567,7 @@ export default function ApplicationDetailPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('breadcrumb.home')}
@@ -578,13 +584,13 @@ export default function ApplicationDetailPage() {
       {loading ? (
         <DetailSkeleton />
       ) : error ? (
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6">
           <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <XCircle className="h-4 w-4" /> {error}
           </div>
         </div>
       ) : !detail ? null : (
-        <main className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[320px_1fr]">
+        <main className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
           <div className="space-y-5">
             {id && <OnlineTestEntry applicationId={id} />}
             {detail.upcomingInterview && (
@@ -626,33 +632,48 @@ export default function ApplicationDetailPage() {
               </div>
             )}
 
+            {/* Round list — dọc từ lg, horizontal scroll dưới lg */}
             <div>
               <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
                 {t('roundList.title')}
               </div>
               {detail.sessions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center text-sm text-ink-500 shadow-card">
+                <div className="hidden rounded-2xl border border-dashed border-ink-300 bg-white p-4 text-center text-sm text-ink-500 shadow-card sm:p-6 lg:block">
                   {t('roundList.empty')}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {detail.sessions.map((s) => (
-                    <RoundButton
-                      key={s.id}
-                      s={s}
-                      active={s.id === selectedId}
-                      onClick={() => setSelectedId(s.id)}
-                      t={t}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:hidden">
+                    {detail.sessions.map((s) => (
+                      <div key={`m-${s.id}`} className="w-64 shrink-0">
+                        <RoundButton
+                          s={s}
+                          active={s.id === selectedId}
+                          onClick={() => setSelectedId(s.id)}
+                          t={t}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden space-y-2 lg:block">
+                    {detail.sessions.map((s) => (
+                      <RoundButton
+                        key={s.id}
+                        s={s}
+                        active={s.id === selectedId}
+                        onClick={() => setSelectedId(s.id)}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
 
           <div>
             {!selected ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+              <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                   <FileText className="h-6 w-6" />
                 </div>

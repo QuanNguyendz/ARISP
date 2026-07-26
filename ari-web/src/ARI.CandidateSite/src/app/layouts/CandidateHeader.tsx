@@ -286,18 +286,22 @@ export default function CandidateHeader() {
             <Bookmark className="h-5 w-5" />
           </button>
 
-          {/* Language */}
-          <div className="relative hidden sm:block">
+          {/* Language — 1 button responsive (icon-only mobile, icon+label desktop) + 1 dropdown chung */}
+          <div className="relative">
             <button
               onClick={toggle('lang')}
-              className="flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
+              aria-label={t('header.changeLanguage') || 'Đổi ngôn ngữ'}
+              className="grid place-items-center rounded-lg text-ink-600 hover:bg-ink-100 h-9 w-9 sm:flex sm:h-auto sm:w-auto sm:items-center sm:gap-1 sm:px-2 sm:py-2 sm:text-sm sm:font-medium"
             >
               <Globe className="h-[18px] w-[18px]" />
-              {langMap[i18n.language] || 'VI'} <ChevronDown className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {langMap[i18n.language] || 'VI'}
+              </span>
+              <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
             </button>
             {open === 'lang' && (
               <div
-                className="absolute right-0 mt-2 w-40 rounded-xl border border-ink-200 bg-white p-1 shadow-xl"
+                className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-w-xs rounded-2xl border border-ink-200 bg-white p-1 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-40"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -358,7 +362,7 @@ export default function CandidateHeader() {
               </button>
               {open === 'notif' && (
                 <div
-                  className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-ink-200 bg-white shadow-xl"
+                  className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[calc(100vh-6rem)]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
@@ -463,7 +467,7 @@ export default function CandidateHeader() {
                 </button>
                 {open === 'user' && (
                   <div
-                    className="absolute right-0 mt-2 w-64 rounded-2xl border border-ink-200 bg-white shadow-xl"
+                    className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-64 sm:max-h-[calc(100vh-6rem)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3 border-b border-ink-100 px-4 py-3">

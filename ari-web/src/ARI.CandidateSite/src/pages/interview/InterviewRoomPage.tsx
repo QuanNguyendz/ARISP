@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Captions, Phone, Settings, Wifi, Bot, MessageSquare } from 'lucide-react'
+import { Mic, MicOff, Captions, Phone, Settings, Wifi, Bot, MessageSquare, X } from 'lucide-react'
 
 // Mock data for demo
 const mockSession = {
@@ -54,6 +54,7 @@ export default function InterviewRoomPage() {
   const [conversation] = useState(mockConversation)
   const [isAiSpeaking, setIsAiSpeaking] = useState(false)
   const [isInterviewEnded, setIsInterviewEnded] = useState(false)
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
 
   // Simulate recording timer
   useEffect(() => {
@@ -183,8 +184,8 @@ export default function InterviewRoomPage() {
               animate={{ opacity: isAiSpeaking ? [0.5, 0.7, 0.5] : 0.3 }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-            <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
-              <Bot className="w-20 h-20 text-white" />
+            <div className="relative grid h-28 w-28 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl sm:h-36 sm:w-36 lg:h-44 lg:w-44">
+              <Bot className="w-12 h-12 text-white sm:w-16 sm:h-16 lg:w-20 lg:h-20" />
             </div>
           </motion.div>
 
@@ -208,11 +209,25 @@ export default function InterviewRoomPage() {
           </div>
         </section>
 
-        {/* Transcript panel */}
-        <aside className="border-l border-white/5 bg-ink-900/60 flex flex-col">
+        {/* Transcript panel — drawer trên mobile (toggle bằng Captions button), inline từ lg */}
+        <aside
+          className={`fixed inset-y-0 right-0 z-40 flex w-[85%] max-w-sm flex-col border-l border-white/5 bg-ink-900/95 backdrop-blur-md transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none lg:bg-ink-900/60 lg:backdrop-blur-none lg:translate-x-0 ${
+            transcriptOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+          }`}
+        >
           <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
             <span className="font-display font-bold text-white">{t('room.transcript.title')}</span>
-            <span className="text-xs text-slate-400">{t('room.transcript.streaming')}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400">{t('room.transcript.streaming')}</span>
+              <button
+                type="button"
+                onClick={() => setTranscriptOpen(false)}
+                className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white lg:hidden"
+                aria-label={t('room.transcript.close')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
             {conversation.map((msg, index) => (
@@ -247,14 +262,24 @@ export default function InterviewRoomPage() {
             ))}
           </div>
         </aside>
+
+        {/* Backdrop để đóng drawer khi bấm ra ngoài (mobile only) */}
+        {transcriptOpen && (
+          <button
+            type="button"
+            onClick={() => setTranscriptOpen(false)}
+            aria-label={t('room.transcript.close')}
+            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+          />
+        )}
       </main>
 
       {/* Controls */}
-      <footer className="border-t border-white/5 px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-center gap-3">
+      <footer className="border-t border-white/5 px-3 py-3 sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-center gap-2 sm:gap-3">
           <button
             onClick={() => setIsMuted(!isMuted)}
-            className="grid h-12 w-12 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition"
+            className="grid h-10 w-10 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition sm:h-12 sm:w-12"
           >
             {isMuted ? (
               <MicOff className="w-5 h-5 text-red-400" />
@@ -263,22 +288,27 @@ export default function InterviewRoomPage() {
             )}
           </button>
           <button
-            onClick={() => setIsCaptionsOn(!isCaptionsOn)}
-            className={`grid h-12 w-12 place-items-center rounded-full transition ${
+            onClick={() => {
+              setIsCaptionsOn(!isCaptionsOn)
+              if (isCaptionsOn) setTranscriptOpen(false)
+              else setTranscriptOpen(true)
+            }}
+            className={`grid h-10 w-10 place-items-center rounded-full transition sm:h-12 sm:w-12 ${
               isCaptionsOn
                 ? 'bg-brand-500/30 text-brand-400'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
+            title={t('room.transcript.toggle')}
           >
             <Captions className="w-5 h-5" />
           </button>
           <button
             onClick={handleEndInterview}
-            className="flex items-center gap-2 rounded-full bg-red-600 hover:bg-red-700 px-6 h-12 font-semibold transition text-white"
+            className="flex items-center gap-2 rounded-full bg-red-600 hover:bg-red-700 px-4 sm:px-6 h-10 sm:h-12 text-sm font-semibold transition text-white"
           >
             <Phone className="w-5 h-5" /> {t('room.controls.endInterview')}
           </button>
-          <button className="grid h-12 w-12 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition">
+          <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition sm:h-12 sm:w-12">
             <Settings className="w-5 h-5 text-white" />
           </button>
         </div>

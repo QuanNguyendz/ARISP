@@ -579,7 +579,7 @@ export default function JobPostingDetailPage() {
   const isPending = job.status === 'pending'
 
   return (
-    <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <button
           onClick={() => navigate('/hr/jobs')}
@@ -873,7 +873,7 @@ export default function JobPostingDetailPage() {
                 <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />{' '}
                 {t('aiConfig.title')}
               </h2>
-              <div className="grid md:grid-cols-2 gap-6 text-sm">
+              <div className="grid grid-cols-1 gap-6 text-sm sm:grid-cols-2">
                 <div className="space-y-3">
                   <p className="text-ink-600 dark:text-ink-400">
                     <strong className="text-ink-900 dark:text-white">
@@ -1468,7 +1468,7 @@ export default function JobPostingDetailPage() {
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
                   {t('coverLetterModal.contactInfo')}
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                   <div>
                     <span className="text-ink-400 block mb-0.5">
                       {t('coverLetterModal.fullName')}

@@ -33,14 +33,14 @@ export function LanguageSwitcher() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label={t('changeLanguage')}
-        className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 transition-colors"
+        className="flex items-center gap-1.5 rounded-xl px-2.5 h-10 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 transition-colors sm:px-3"
       >
         <Globe className="w-4 h-4" />
-        <span className="text-sm font-medium">{shortCode}</span>
+        <span className="hidden text-sm font-medium sm:inline">{shortCode}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-ink-900 rounded-xl shadow-lg border border-ink-200 dark:border-white/10 z-50">
+        <div className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-48 sm:max-h-[calc(100vh-6rem)] sm:py-2">
           {supportedLanguages.map((lang) => (
             <button
               key={lang.code}

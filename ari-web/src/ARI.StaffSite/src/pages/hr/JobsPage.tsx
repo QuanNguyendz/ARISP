@@ -224,7 +224,7 @@ export default function HrJobsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {loading && <HrStatsSkeleton />}
@@ -345,14 +345,14 @@ export default function HrJobsPage() {
                 transition={{ delay: Math.min(index * 0.04, 0.3) }}
                 className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card hover:shadow-card-hover transition-all"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex items-center gap-3 min-w-0 sm:gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0 sm:w-12 sm:h-12">
                       {job.title.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3 mb-1.5 flex-wrap">
-                        <h3 className="text-lg font-semibold text-ink-900 dark:text-white truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap sm:gap-3">
+                        <h3 className="text-base font-semibold text-ink-900 dark:text-white truncate sm:text-lg">
                           {job.title}
                         </h3>
                         <span

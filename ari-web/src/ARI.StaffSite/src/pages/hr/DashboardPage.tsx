@@ -68,7 +68,7 @@ function KpiCard({
         <div className="font-display text-3xl font-extrabold leading-none text-ink-900 dark:text-white">
           {value}
         </div>
-        <svg viewBox="0 0 72 28" className="h-7 w-20 text-brand-500">
+        <svg viewBox="0 0 72 28" className="h-5 w-14 text-brand-500 sm:h-7 sm:w-20">
           <polyline
             fill="none"
             stroke="currentColor"
@@ -352,8 +352,8 @@ function RecruiterBarChart({
           <YAxis
             type="category"
             dataKey="name"
-            width={96}
-            tick={{ fontSize: 11, fill: CHART_AXIS }}
+            width={60}
+            tick={{ fontSize: 10, fill: CHART_AXIS }}
             tickLine={false}
             axisLine={false}
           />
@@ -536,7 +536,7 @@ export default function HrDashboardPage() {
                   const percent = funnelMax > 0 ? Math.round((item.value / funnelMax) * 100) : 0
                   return (
                     <div key={item.label} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0 text-sm font-medium text-ink-600 dark:text-ink-400">
+                      <div className="w-20 shrink-0 text-sm font-medium text-ink-600 dark:text-ink-400 sm:w-24 lg:w-32">
                         {item.label}
                       </div>
                       <div className="h-8 flex-1 rounded-lg bg-ink-100 dark:bg-white/10">
@@ -548,8 +548,7 @@ export default function HrDashboardPage() {
                       <div className="w-10 shrink-0 text-right text-sm font-bold text-ink-900 dark:text-white">
                         {item.value}
                       </div>
-                      <div
-                        className="w-16 shrink-0 text-right text-xs text-ink-400 dark:text-ink-500"
+                      <div className="w-10 shrink-0 text-right text-xs text-ink-400 dark:text-ink-500 sm:w-16 sm:text-xs"
                         title={t('charts.conversionRate')}
                       >
                         {i === 0
@@ -744,37 +743,38 @@ export default function HrDashboardPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
                 <table className="w-full text-sm">
                   <thead className="bg-ink-50/50 text-left dark:bg-white/5">
                     <tr>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.candidate')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.position')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.round')}
                       </th>
-                      <th className="px-5 py-3 font-medium text-ink-600 dark:text-ink-400">
+                      <th className="px-4 py-3 font-medium text-ink-600 dark:text-ink-400 sm:px-5">
                         {t('table.verdictAi')}
                       </th>
-                      <th className="px-5 py-3" />
+                      <th className="px-4 py-3 sm:px-5" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100 dark:divide-white/10">
                     {data.recentCandidates.map((c) => (
                       <tr key={c.id} className="hover:bg-ink-50/60 dark:hover:bg-white/5">
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <div className="flex items-center gap-3">
-                            <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
+                            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
                               {initials(c.candidateName)}
                             </div>
-                            <div>
-                              <div className="font-medium text-ink-900 dark:text-white">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-ink-900 dark:text-white">
                                 {c.candidateName || t('table.anonymous')}
                               </div>
-                              <div className="text-xs text-ink-400">
+                              <div className="truncate text-xs text-ink-400">
                                 {typeof c.matchScore === 'number'
                                   ? t('table.matchScore', { score: c.matchScore })
                                   : t('table.notAnalyzed')}
@@ -782,18 +782,18 @@ export default function HrDashboardPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-ink-600 dark:text-ink-400">
+                        <td className="px-4 py-3 text-ink-600 dark:text-ink-400 sm:px-5 max-w-[160px] truncate">
                           {c.jobTitle || '—'}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600 dark:bg-white/10 dark:text-ink-400">
                             {c.latestRound ? `R${c.latestRound}` : '—'}
                           </span>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-4 py-3 sm:px-5">
                           <VerdictBadge verdict={c.latestVerdict} />
                         </td>
-                        <td className="px-5 py-3 text-right">
+                        <td className="px-4 py-3 text-right sm:px-5">
                           <Link
                             to={`/hr/candidates/${c.id}`}
                             className="rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10"
@@ -805,6 +805,7 @@ export default function HrDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ),
         },
@@ -812,7 +813,7 @@ export default function HrDashboardPage() {
     : {}
 
   return (
-    <main className="min-h-screen space-y-6 bg-ink-50 p-6 dark:bg-ink-950">
+    <main className="min-h-screen space-y-6 bg-ink-50 p-4 sm:p-6 lg:p-8 dark:bg-ink-950">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-extrabold leading-snug text-ink-900 dark:text-white">
@@ -830,7 +831,7 @@ export default function HrDashboardPage() {
 
       {!loading && !errorMessage && data && (
         <>
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="flex flex-col rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-5 shadow-card dark:border-amber-500/30 dark:from-amber-500/10 dark:to-transparent">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
@@ -839,7 +840,7 @@ export default function HrDashboardPage() {
                   </span>
                   {t('prioritySection.pendingJobsCount')}
                 </span>
-                <span className="font-display text-3xl font-extrabold leading-none text-amber-700 dark:text-amber-400">
+                <span className="font-display text-2xl sm:text-3xl font-extrabold leading-none text-amber-700 dark:text-amber-400">
                   {data.pendingJobsCount}
                 </span>
               </div>
@@ -882,7 +883,7 @@ export default function HrDashboardPage() {
                   </span>
                   {t('prioritySection.pendingVerdicts')}
                 </span>
-                <span className="font-display text-3xl font-extrabold leading-none text-brand-700 dark:text-brand-400">
+                <span className="font-display text-2xl sm:text-3xl font-extrabold leading-none text-brand-700 dark:text-brand-400">
                   {data.pendingReviews}
                 </span>
               </div>

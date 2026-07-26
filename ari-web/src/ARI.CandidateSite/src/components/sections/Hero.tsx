@@ -6,7 +6,7 @@ export default function Hero() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-bg-primary">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-bg-primary pb-[env(safe-area-inset-bottom,0)] pt-[env(safe-area-inset-top,0)]">
       {/* Video full screen background */}
       <div className="absolute inset-0 z-0">
         <video

@@ -39,25 +39,30 @@ export default function HrSettingsPage() {
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader title={t('title')} description={t('description')} />
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Tabs Sidebar */}
-        <div className="lg:w-64 shrink-0">
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-2 shadow-card">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
-                    : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-white/5'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+        {/* Tabs — horizontal scroll trên mobile, sidebar dọc từ lg */}
+        <div className="-mx-4 sm:mx-0 lg:w-64 lg:shrink-0">
+          <nav
+            aria-label="Settings tabs"
+            className="flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card dark:lg:border-white/10 dark:lg:bg-white/5"
+          >
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-4 lg:py-3 ${
+                    activeTab === tab.id
+                      ? 'border-brand-200 bg-brand-100 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/20 dark:text-brand-400'
+                      : 'border-ink-200 bg-white text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:bg-white/5 dark:text-ink-400 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <TabIcon className="h-4 w-4" /> {tab.label}
+                </button>
+              )
+            })}
+          </nav>
         </div>
 
         {/* Content */}
@@ -66,7 +71,7 @@ export default function HrSettingsPage() {
             key={activeTab}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
           >
             {activeTab === 'profile' && (
               <div className="space-y-6">

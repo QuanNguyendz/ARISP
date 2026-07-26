@@ -469,7 +469,7 @@ export default function RecruiterJobDetailPage() {
   if (loading) return <JobDetailSkeleton />
   if (!job || (user?.role === 'recruiter' && job.createdByUserId && job.createdByUserId !== user.id)) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <ErrorAlert message="Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại." />
         <Link
           to="/recruiter/my-jobs"
@@ -647,7 +647,7 @@ export default function RecruiterJobDetailPage() {
       </motion.div>
 
       {/* Candidate Funnel */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
           <span className="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
             <Users className="h-4 w-4" /> {t('stats.totalCandidates')}
@@ -976,7 +976,7 @@ export default function RecruiterJobDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center justify-center gap-1 shrink-0">
-                        <div className="w-36 flex gap-2 shrink-0 justify-center">
+                        <div className="w-auto min-w-[144px] flex gap-2 shrink-0 justify-center">
                           {!a.currentRound || a.currentRound === 0 ? (
                             <>
                               <button

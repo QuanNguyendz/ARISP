@@ -184,7 +184,7 @@ export default function UsersPage() {
   const isSuperAdmin = (role: string) => role.toLowerCase().replace(/\s+/g, '_') === 'super_admin'
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={t('title')}
         description={t('description')}
@@ -244,14 +244,17 @@ export default function UsersPage() {
           className="overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card"
         >
           <div className="overflow-x-auto">
+            <div className="min-w-[700px]">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-ink-100 dark:border-white/10 text-xs uppercase tracking-wider text-ink-400">
-                  <th className="px-6 py-3 font-medium">{t('table.headers.user')}</th>
-                  <th className="px-6 py-3 font-medium">{t('table.headers.role')}</th>
-                  <th className="px-6 py-3 font-medium">{t('table.headers.status')}</th>
-                  <th className="px-6 py-3 font-medium">{t('table.headers.createdAt')}</th>
-                  <th className="px-6 py-3 text-right font-medium">{t('table.headers.actions')}</th>
+                  <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.user')}</th>
+                  <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.role')}</th>
+                  <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.status')}</th>
+                  <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.createdAt')}</th>
+                  <th className="px-4 py-3 text-right font-medium sm:px-6">
+                    {t('table.headers.actions')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100 dark:divide-white/10">
@@ -260,7 +263,7 @@ export default function UsersPage() {
                   const superAdmin = isSuperAdmin(u.role)
                   return (
                     <tr key={u.id} className="hover:bg-ink-50 dark:hover:bg-white/5">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 sm:px-6">
                         <div className="flex items-center gap-3">
                           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
                             {initials(u.fullName || u.email)}
@@ -278,10 +281,10 @@ export default function UsersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 sm:px-6">
                         {superAdmin || self ? (
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(u.role)}`}
+                            className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(u.role)}`}
                           >
                             {roleLabel(u.role)}
                           </span>
@@ -292,22 +295,22 @@ export default function UsersPage() {
                             onChange={(e) =>
                               handleChangeRole(u, e.target.value as 'hr_admin' | 'recruiter')
                             }
-                            className="rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs text-ink-700 dark:text-ink-200 outline-none focus:border-brand-400 disabled:opacity-50"
+                            className="w-full max-w-[140px] rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs text-ink-700 dark:text-ink-200 outline-none focus:border-brand-400 disabled:opacity-50"
                           >
                             <option value="hr_admin">{t('filters.hrAdmin')}</option>
                             <option value="recruiter">{t('filters.recruiter')}</option>
                           </select>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 sm:px-6">
                         {u.isActive ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{' '}
                             {t('table.status.active')}
                           </span>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                            <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-400">
                               <span className="h-1.5 w-1.5 rounded-full bg-red-500" />{' '}
                               {t('table.status.locked')}
                             </span>
@@ -322,10 +325,10 @@ export default function UsersPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-ink-500 dark:text-ink-400">
+                      <td className="px-4 py-4 text-sm text-ink-500 dark:text-ink-400 whitespace-nowrap sm:px-6">
                         {new Date(u.createdAt).toLocaleDateString('vi-VN')}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-end gap-1">
                           {busyId === u.id ? (
                             <Loader2 className="h-4 w-4 animate-spin text-ink-400" />
@@ -364,11 +367,12 @@ export default function UsersPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-ink-100 dark:border-white/10 px-6 py-3 text-sm">
+            <div className="flex flex-col gap-2 border-t border-ink-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10">
               <span className="text-ink-500 dark:text-ink-400">
                 {t('pagination.summary', { page, totalPages, total })}
               </span>
@@ -568,7 +572,7 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
               className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
                 {t('createModal.role')}

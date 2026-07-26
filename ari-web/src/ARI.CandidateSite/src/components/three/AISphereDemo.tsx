@@ -3,7 +3,7 @@ export default function AISphereDemo({ className = '' }: { className?: string })
     <div className={`relative ${className}`}>
       <div className="absolute inset-0 bg-gradient-radial from-accent-primary/20 via-transparent to-transparent" />
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-64 h-64 rounded-full bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
+        <div className="w-40 h-40 rounded-full bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center sm:w-64 sm:h-64">
           <span className="text-6xl">🤖</span>
         </div>
       </div>

@@ -132,7 +132,7 @@ export default function CandidateSchedulePage() {
             <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
           </div>
         ) : upcoming.length === 0 && awaiting.length === 0 ? (
-          <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
+          <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm sm:p-10">
             <CalendarX className="mx-auto mb-3 h-12 w-12 text-ink-300" />
             <p className="text-sm text-ink-600">
               Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo khi có lịch.

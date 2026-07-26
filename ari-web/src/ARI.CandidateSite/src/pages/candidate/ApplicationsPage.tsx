@@ -209,7 +209,7 @@ function RoundStepper({ t, rounds }: { t: (key: string) => string; rounds: MyApp
 function MatchBadge({ score }: { score?: number | null }) {
   if (typeof score !== 'number') return null
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ai-50 px-2.5 py-1 text-xs font-bold text-ai-700 ring-1 ring-ai-200">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-ai-50 px-2.5 py-1 text-xs font-bold text-ai-700 ring-1 ring-ai-200">
       <Sparkles className="h-3.5 w-3.5" /> Match {score}
     </span>
   )
@@ -225,7 +225,7 @@ function CardFooter({
   action?: React.ReactNode
 }) {
   return (
-    <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
+    <div className="mt-3 flex flex-col gap-2 border-t border-ink-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-xs text-ink-400">
         {t('applications.appliedTime')} {formatDate(app.createdAt)}
         {app.updatedAt &&
@@ -235,7 +235,7 @@ function CardFooter({
       {action ?? (
         <Link
           to={`/candidate/applications/${app.id}`}
-          className="inline-flex items-center gap-1 rounded-xl border border-ink-200 px-4 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50 sm:w-auto sm:py-1.5"
         >
           {t('applications.viewDetail')} <ChevronRight className="h-4 w-4" />
         </Link>
@@ -282,37 +282,39 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
       className={`group overflow-hidden rounded-2xl border bg-white shadow-card transition ${borderCls}`}
     >
       {hasCode && (
-        <div className="flex items-center gap-2 bg-amber-50 px-5 py-2 text-xs font-semibold text-amber-700">
+        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 sm:px-5">
           <AlertCircle className="h-4 w-4" />{' '}
           {t('applications.actionNeeded', { round: app.interviewCode!.roundNumber })}
         </div>
       )}
-      <div className="p-5">
-        <div className="flex gap-4">
+      <div className="p-4 sm:p-5">
+        <div className="flex gap-3 sm:gap-4">
           <div
-            className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl sm:h-12 sm:w-12 ${
               isClosed ? 'bg-ink-100 text-ink-400' : 'bg-brand-50 text-brand-600'
             }`}
           >
-            <Icon className="h-6 w-6" />
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1">
                 <h3
-                  className={`font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
+                  className={`break-words font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
                 >
                   {app.jobTitle || t('applications.jobPosting')}
                 </h3>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {[app.location, app.department].filter(Boolean).join(' · ') ||
-                    t('applications.locationUnknown')}
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {[app.location, app.department].filter(Boolean).join(' · ') ||
+                      t('applications.locationUnknown')}
+                  </span>
                 </div>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="flex shrink-0 flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
                 >
                   <StatusIcon className="h-3.5 w-3.5" /> {meta.label}
                 </span>
@@ -423,14 +425,14 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
 /** Khung skeleton (shimmer) mô phỏng bố cục trang khi đang tải. */
 function ApplicationsSkeleton() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[1fr_320px]">
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[1fr_320px]">
       {/* LEFT */}
       <div className="space-y-6">
         {/* Profile banner */}
         <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
           <Skeleton className="h-20 rounded-none" />
-          <div className="px-6 pb-6">
-            <Skeleton className="-mt-10 h-20 w-20 rounded-2xl ring-4 ring-white dark:ring-ink-900" />
+          <div className="px-4 sm:px-6 pb-6">
+            <Skeleton className="-mt-10 h-16 w-16 rounded-2xl ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20" />
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="space-y-2">
                 <Skeleton className="h-6 w-48" />
@@ -493,7 +495,7 @@ function ApplicationsSkeleton() {
       </div>
 
       {/* RIGHT sidebar */}
-      <aside className="space-y-5">
+      <aside className="hidden space-y-5 lg:block">
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <Skeleton className="h-4 w-32" />
@@ -617,7 +619,7 @@ export default function ApplicationsPage() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/jobs" className="hover:text-brand-600">
             {t('profile.home')}
@@ -630,15 +632,15 @@ export default function ApplicationsPage() {
       {loading ? (
         <ApplicationsSkeleton />
       ) : (
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[1fr_320px]">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 py-6 lg:grid-cols-[1fr_320px]">
           {/* LEFT */}
           <div className="space-y-6">
             {/* Profile banner */}
             <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
               <div className="h-20 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
-              <div className="px-6 pb-6">
+              <div className="px-4 sm:px-6 pb-6">
                 <div className="-mt-10">
-                  <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900">
+                  <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
                     {initials}
                   </span>
                 </div>
@@ -705,12 +707,12 @@ export default function ApplicationsPage() {
             </div>
 
             {/* Filter tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2 pb-1 text-sm">
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`shrink-0 rounded-full px-4 py-1.5 font-medium ${
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium sm:px-4 sm:text-sm ${
                     filter === f.key
                       ? 'bg-brand-600 font-semibold text-white'
                       : 'border border-ink-200 bg-white text-ink-600 hover:border-brand-300'
@@ -722,7 +724,7 @@ export default function ApplicationsPage() {
                   </span>
                 </button>
               ))}
-              <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-ink-400 sm:flex">
+              <span className="order-last ml-auto flex shrink-0 items-center gap-1.5 text-ink-400">
                 <ArrowDownUp className="h-4 w-4" /> {t('applications.newest')}
               </span>
             </div>
@@ -733,7 +735,7 @@ export default function ApplicationsPage() {
                 <AlertCircle className="h-4 w-4" /> {error}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-10 text-center shadow-card">
+              <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center shadow-card sm:p-10">
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                   <FileText className="h-6 w-6" />
                 </div>
@@ -758,7 +760,7 @@ export default function ApplicationsPage() {
           </div>
 
           {/* RIGHT sidebar */}
-          <aside className="space-y-5 self-start lg:sticky lg:top-24">
+          <aside className="hidden space-y-5 self-start lg:sticky lg:top-24 lg:block">
             {/* CV card */}
             <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
               <div className="flex items-center justify-between">
