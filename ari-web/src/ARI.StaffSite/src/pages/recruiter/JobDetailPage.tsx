@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { ErrorAlert, Pagination } from '@ari/shared/ui'
+import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
@@ -59,9 +60,9 @@ function getDeadlineText(
   const target = new Date(d)
   target.setHours(0, 0, 0, 0)
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return `${formattedDate} (${t('deadline.expired')})`
-  if (diffDays === 0) return `${formattedDate} (${t('deadline.today')})`
-  return `${formattedDate} (${t('deadline.days', { count: diffDays })})`
+  if (diffDays < 0) return `${formattedDate} (${t('deadlineExpired')})`
+  if (diffDays === 0) return `${formattedDate} (${t('deadlineToday')})`
+  return `${formattedDate} (${t('deadlineDays', { days: diffDays })})`
 }
 
 function toLocalDateStr(d: string | Date | number | undefined | null): string {
@@ -87,11 +88,14 @@ export default function RecruiterJobDetailPage() {
   const { t } = useTranslation('modules/recruiter/jobDetail')
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
+  const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
 
   const {
     data: job,
     isLoading: loadingJob,
     error: jobError,
+    refetch: refetchJob,
   } = useQuery({
     queryKey: ['job', id],
     queryFn: () => jobService.getJobPostingById(id!),
@@ -172,9 +176,17 @@ export default function RecruiterJobDetailPage() {
       .sort((a, b) => a.roundNumber - b.roundNumber)
       .map((rc) => {
         const count = apps.filter((a) => a.currentRound === rc.roundNumber).length
+        const roundTypeStr = rc.roundType
+          ? rc.roundType.toLowerCase() === 'screening'
+            ? t('roundScreening')
+            : rc.roundType.toLowerCase() === 'technical'
+              ? t('roundTechnical')
+              : rc.roundType
+          : ''
+        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
           id: `round_${rc.roundNumber}`,
-          label: `${t('tabs.round')} ${rc.roundNumber}`,
+          label: `${t('tabs.round')} ${rc.roundNumber}${typeText}`,
           count,
         }
       })
@@ -380,14 +392,15 @@ export default function RecruiterJobDetailPage() {
       await jobService.updateJobStatus(id, status)
       setNotice(
         status === 'pending'
-          ? t('messages.jobSubmittedForApproval')
+          ? t('jobSubmittedForApproval')
           : status === 'closed'
-            ? t('messages.jobClosed')
-            : t('messages.statusUpdated')
+            ? t('jobClosed')
+            : t('statusUpdated')
       )
       await load()
+      await refetchJob()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('messages.statusError'))
+      setMutationError(e?.response?.data?.message || t('statusError'))
     } finally {
       setBusy(false)
     }
@@ -439,11 +452,25 @@ export default function RecruiterJobDetailPage() {
     }
   }
 
+  const handleToggleDisplay = async (field: 'isUrgent' | 'isPublicListing', value: boolean) => {
+    if (!id || !job) return
+    const originalValue = job[field]
+    if (originalValue === value) return
+
+    queryClient.setQueryData(['job', id], (old: any) => (old ? { ...old, [field]: value } : old))
+    try {
+      await jobService.updateJobDisplay(id, { [field]: value })
+    } catch (err: unknown) {
+      queryClient.setQueryData(['job', id], (old: any) => (old ? { ...old, [field]: originalValue } : old))
+      setMutationError(t(`messages.toggleFailed`))
+    }
+  }
+
   if (loading) return <JobDetailSkeleton />
-  if (!job) {
+  if (!job || (user?.role === 'recruiter' && job.createdByUserId && job.createdByUserId !== user.id)) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <ErrorAlert message={error || t('notFound')} />
+        <ErrorAlert message="Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại." />
         <Link
           to="/recruiter/my-jobs"
           className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
@@ -459,7 +486,7 @@ export default function RecruiterJobDetailPage() {
   const canEdit = job.status !== 'archived'
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-6 lg:p-8">
       <Link
         to="/recruiter/my-jobs"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
@@ -483,24 +510,32 @@ export default function RecruiterJobDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+        className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
       >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 sm:h-12 sm:w-12">
+          <div className="flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
               <Briefcase className="h-6 w-6" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-lg font-bold text-ink-900 dark:text-white sm:text-xl">{job.title}</h1>
+                <h1 className="text-xl font-bold text-ink-900 dark:text-white">{job.title}</h1>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(job.status)}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(job.status, job.applicationDeadline)}`}
                 >
-                  {jobStatusLabel(job.status)}
+                  {jobStatusLabel(job.status, job.applicationDeadline)}
                 </span>
               </div>
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
-                <span>{job.department || t('noDepartment')}</span>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-sm font-medium text-ink-700 dark:text-ink-300">
+                  {job.department || t('noDepartment')}
+                </span>
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                  <input type="checkbox" checked={job.isUrgent} onChange={(e) => handleToggleDisplay('isUrgent', e.target.checked)} className="accent-brand-600" />
+                  Tuyển gấp
+                </label>
+              </div>
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
                 {job.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />
@@ -544,6 +579,12 @@ export default function RecruiterJobDetailPage() {
             >
               <CalendarClock className="h-4 w-4" /> {t('interviewSchedule')}
             </Link>
+            <Link
+              to={`/recruiter/my-jobs/${job.id}/online-test`}
+              className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+            >
+              <ScrollText className="h-4 w-4" /> {t('onlineTestBank')}
+            </Link>
             {canEdit && (
               <Link
                 to={`/recruiter/my-jobs/${job.id}/edit`}
@@ -583,7 +624,7 @@ export default function RecruiterJobDetailPage() {
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <b>{t('hrRejected')}:</b> {job.rejectionReason}. {t('hrRejectedHint', { reason: '' })}
+              <b>{t('hrRejected')}:</b> {t('hrRejectedHint', { reason: job.rejectionReason })}
             </span>
           </div>
         )}
@@ -606,12 +647,12 @@ export default function RecruiterJobDetailPage() {
       </motion.div>
 
       {/* Candidate Funnel */}
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
           <span className="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
             <Users className="h-4 w-4" /> {t('stats.totalCandidates')}
           </span>
-          <div className="mt-2 text-xl font-bold text-brand-600 dark:text-brand-400 sm:text-2xl">
+          <div className="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400">
             {apps.length}
           </div>
         </div>
@@ -621,7 +662,7 @@ export default function RecruiterJobDetailPage() {
             className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
           >
             <span className="text-sm text-ink-500 dark:text-ink-400">{f.label}</span>
-            <div className="mt-2 text-xl font-bold text-ink-900 dark:text-white sm:text-2xl">{f.count}</div>
+            <div className="mt-2 text-2xl font-bold text-ink-900 dark:text-white">{f.count}</div>
           </div>
         ))}
       </div>
@@ -813,46 +854,44 @@ export default function RecruiterJobDetailPage() {
             ) : (
               <>
                 {/* Table Headers */}
-                <div className="overflow-x-auto">
-                  <div className="min-w-[700px]">
-                    {activeTab === 'cv_review' ? (
-                      <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={isAllSelected}
-                            disabled={pageSelectableCandidates.length === 0}
-                            onChange={handleSelectAll}
-                            className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
-                          />
-                        </div>
-                        <div>{t('tableHeaders.candidate')}</div>
-                        <div className="text-center">{t('tableHeaders.submittedDate')}</div>
-                        <div className="text-center">{t('tableHeaders.noticePeriod')}</div>
-                        <div className="text-center">{t('tableHeaders.matchScore')}</div>
-                        <div className="text-center">{t('tableHeaders.status')}</div>
-                        <div className="text-center">{t('tableHeaders.actions')}</div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={isAllSelected}
-                            disabled={pageSelectableCandidates.length === 0}
-                            onChange={handleSelectAll}
-                            className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
-                          />
-                        </div>
-                        <div>{t('tableHeaders.candidate')}</div>
-                        <div className="text-center">{t('tableHeaders.interviewSchedule')}</div>
-                        <div className="text-center">{t('tableHeaders.evaluationScore')}</div>
-                        <div className="text-center">{t('tableHeaders.status')}</div>
-                        <div className="text-center">{t('tableHeaders.actions')}</div>
-                      </div>
-                    )}
+                {activeTab === 'cv_review' ? (
+                  <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        disabled={pageSelectableCandidates.length === 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                      />
+                    </div>
+                    <div>{t('tableHeaders.candidate')}</div>
+                    <div className="text-center">{t('tableHeaders.submittedDate')}</div>
+                    <div className="text-center">{t('tableHeaders.noticePeriod')}</div>
+                    <div className="text-center">{t('tableHeaders.matchScore')}</div>
+                    <div className="text-center">{t('tableHeaders.status')}</div>
+                    <div className="text-center">{t('tableHeaders.actions')}</div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px] gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center">
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        disabled={pageSelectableCandidates.length === 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                      />
+                    </div>
+                    <div>{t('tableHeaders.candidate')}</div>
+                    <div className="text-center">{t('tableHeaders.interviewSchedule')}</div>
+                    <div className="text-center">{t('tableHeaders.evaluationScore')}</div>
+                    <div className="text-center">{t('tableHeaders.status')}</div>
+                    <div className="text-center">{t('tableHeaders.actions')}</div>
+                  </div>
+                )}
 
-                    <div className="divide-y divide-ink-100 dark:divide-white/10">
+                <div className="divide-y divide-ink-100 dark:divide-white/10">
                   {pagedApps.map((a) => (
                     <div
                       key={a.id}
@@ -937,7 +976,7 @@ export default function RecruiterJobDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center justify-center gap-1 shrink-0">
-                        <div className="flex w-auto min-w-[8rem] max-w-full gap-2 shrink-0 justify-center">
+                        <div className="w-auto min-w-[144px] flex gap-2 shrink-0 justify-center">
                           {!a.currentRound || a.currentRound === 0 ? (
                             <>
                               <button
@@ -1037,8 +1076,6 @@ export default function RecruiterJobDetailPage() {
                     </div>
                   ))}
                 </div>
-                </div>
-                </div>
               </>
             )}
           </>
@@ -1106,7 +1143,7 @@ export default function RecruiterJobDetailPage() {
                 <h4 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-2">
                   {t('coverLetterModal.contactInfo')}
                 </h4>
-                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-ink-400 block mb-0.5">
                       {t('coverLetterModal.fullName')}

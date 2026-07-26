@@ -712,9 +712,9 @@ export default function HrDashboardPage() {
                       <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
                     </span>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${jobStatusBadge(j.status)}`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${jobStatusBadge(j.status, j.applicationDeadline)}`}
                     >
-                      {jobStatusLabel(j.status)}
+                      {jobStatusLabel(j.status, j.applicationDeadline)}
                     </span>
                     <ChevronRight className="h-4 w-4 text-ink-300 dark:text-ink-500" />
                   </Link>

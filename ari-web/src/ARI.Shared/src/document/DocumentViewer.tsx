@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 import { renderAsync } from 'docx-preview'
 import { Download, FileText, Loader2, X, AlertCircle } from 'lucide-react'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 
 type DocKind = 'pdf' | 'docx' | 'image' | 'other'
 
@@ -189,7 +190,7 @@ export function DocumentViewerProvider({ children }: { children: ReactNode }) {
 
   const openDocument = useCallback((url: string, fileName?: string) => {
     if (!url) return
-    setDoc({ url, fileName: fileName ?? '' })
+    setDoc({ url: resolveAssetUrl(url), fileName: fileName ?? '' })
   }, [])
 
   const value = useMemo(() => ({ openDocument }), [openDocument])

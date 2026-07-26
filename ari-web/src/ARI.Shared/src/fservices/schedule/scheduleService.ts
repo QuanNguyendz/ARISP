@@ -10,6 +10,26 @@ export interface CreateSlotRequest {
   capacity?: number
 }
 
+/** Một mục lịch phỏng vấn của ứng viên (kèm booking để xác nhận/từ chối) — ADR-048. */
+export interface CandidateScheduleItem {
+  bookingId: string
+  applicationId: string
+  jobTitle?: string | null
+  roundNumber: number
+  startTime: string
+  endTime: string
+  timezone: string
+  /** pending | confirmed | declined */
+  confirmationStatus: string
+  declineReason?: string | null
+}
+
+export interface CandidateSchedule {
+  upcoming: CandidateScheduleItem[]
+  past: CandidateScheduleItem[]
+  awaitingReschedule: CandidateScheduleItem[]
+}
+
 export const scheduleService = {
   // ===== Recruiter/HR: quản lý khung giờ phỏng vấn của job =====
   async getSlots(jobPostingId: string, round?: number): Promise<AvailabilitySlot[]> {
@@ -38,31 +58,29 @@ export const scheduleService = {
     return data
   },
 
-  // ===== Candidate: chọn lịch / xem lịch (Phase B2) =====
-  async getOpenSlots(
-    applicationId: string,
-    round: number,
-    token?: string
-  ): Promise<AvailabilitySlot[]> {
-    const { data } = await apiClient.get<AvailabilitySlot[]>(`/schedule/${applicationId}/slots`, {
-      params: { round, token },
-    })
+  // ===== HR: gán cứng 1 khung giờ trong kho cho 1 ứng viên (ADR-048) =====
+  async assign(payload: {
+    applicationId: string
+    slotId: string
+    round: number
+  }): Promise<void> {
+    await apiClient.post('/schedules/assign', payload)
+  },
+
+  // ===== Candidate: xem lịch đã được nhân sự xếp + xác nhận/từ chối (ADR-048) =====
+  async getMySchedule(): Promise<CandidateSchedule> {
+    const { data } = await apiClient.get<CandidateSchedule>('/candidate/schedule')
     return data
   },
 
-  async book(
-    applicationId: string,
-    payload: { slotId: string; round: number; token?: string }
-  ): Promise<void> {
-    await apiClient.post(`/schedule/${applicationId}/book`, payload)
+  /** Ứng viên xác nhận sẽ tham dự khung giờ đã xếp. */
+  async confirmSchedule(bookingId: string): Promise<void> {
+    await apiClient.post(`/candidate/schedule/${bookingId}/confirm`)
   },
 
-  async getMySchedule(): Promise<{
-    upcomingSlots: AvailabilitySlot[]
-    pastSlots: AvailabilitySlot[]
-  }> {
-    const { data } = await apiClient.get('/candidate/schedule')
-    return data
+  /** Ứng viên bận → từ chối kèm lý do để nhân sự xếp lịch khác. */
+  async declineSchedule(bookingId: string, reason: string): Promise<void> {
+    await apiClient.post(`/candidate/schedule/${bookingId}/decline`, { reason })
   },
 }
 

@@ -139,15 +139,30 @@ namespace ARI.Application.Services
             try { deepgram = await _deepgramTokenService.CreateTemporaryTokenAsync(ct); }
             catch { /* STT tuỳ chọn */ }
 
+            // ADR-050: Practice audio-only — KHÔNG mint avatar (giữ đủ STT/RAG/LLM/ElevenLabs).
+            // Tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán.
+            // Real luôn có avatar. Cờ PracticeUseAvatar cho phép bật lại khi cần.
             AvatarStreamingToken? avatar = null;
-            try { avatar = await _avatarService.CreateStreamingTokenAsync(null, jobPosting?.PersonaVoiceId, ct); }
-            catch { /* avatar tuỳ chọn — FE fallback browser TTS + bot tĩnh */ }
+            var useAvatar = session.SessionType != "practice" || _interviewOptions.PracticeUseAvatar;
+            if (useAvatar)
+            {
+                try { avatar = await _avatarService.CreateStreamingTokenAsync(null, jobPosting?.PersonaVoiceId, ct); }
+                catch { /* avatar tuỳ chọn — FE fallback WebAudio (ElevenLabs) + bot tĩnh */ }
+            }
+
+            // Trần thời lượng để FE vẽ đếm ngược khớp giờ server (ADR-050). Practice = config;
+            // real = 0 (không chặn — tới Phase 7). StartedAtUtc để FE tính remaining chính xác.
+            var maxDurationSeconds = session.SessionType == "practice" && _interviewOptions.PracticeMaxDurationMinutes > 0
+                ? _interviewOptions.PracticeMaxDurationMinutes * 60
+                : 0;
 
             return Result.Success(new PracticeMediaConfigResponse
             {
                 SessionId = session.Id,
                 Language = session.InterviewLanguage,
                 SessionType = session.SessionType,
+                MaxDurationSeconds = maxDurationSeconds,
+                StartedAtUtc = session.StartedAt,
                 Deepgram = deepgram == null ? null : new DeepgramConfigDto
                 {
                     Token = deepgram.AccessToken,
@@ -344,9 +359,16 @@ namespace ARI.Application.Services
             var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
             var sequenceNumber = questions.Count() + 1;
 
-            // Cap an toàn: quá số câu tối đa → KHÔNG cắt phụt; buộc AI sinh lời cảm ơn kết thúc
-            // (ForceClosing) rồi mới đóng phiên — ứng viên luôn nhận được lời chào tạm biệt.
-            var forceClosing = sequenceNumber > 12;
+            // Cap an toàn: quá số câu tối đa HOẶC vượt trần thời lượng (ADR-050, practice 20')
+            // → KHÔNG cắt phụt; buộc AI sinh lời cảm ơn kết thúc (ForceClosing) rồi mới đóng phiên
+            // — ứng viên luôn nhận được lời chào tạm biệt. Đây là lớp enforce server-side độc lập
+            // với đồng hồ FE (ứng viên nói quá giờ → câu kế tiếp thành lời chào kết thúc).
+            var elapsedMinutes = session.StartedAt.HasValue
+                ? (DateTimeOffset.UtcNow - session.StartedAt.Value).TotalMinutes
+                : 0;
+            var maxMinutes = session.SessionType == "practice" ? _interviewOptions.PracticeMaxDurationMinutes : 0;
+            var timeExceeded = maxMinutes > 0 && elapsedMinutes >= maxMinutes;
+            var forceClosing = sequenceNumber > 12 || timeExceeded;
 
             // 1. Gather Weighted RAG Context.
             // CHỈ project ChunkText — KHÔNG load full entity (cột `embedding` kiểu pgvector không
@@ -429,32 +451,10 @@ namespace ARI.Application.Services
             const string endMarker = "[END_INTERVIEW]";
             if (forceClosing || generatedQuestion.Contains(endMarker, StringComparison.OrdinalIgnoreCase))
             {
-                var farewell = generatedQuestion
+                var aiText = generatedQuestion
                     .Replace(endMarker, "", StringComparison.OrdinalIgnoreCase)
                     .Trim();
-                if (string.IsNullOrWhiteSpace(farewell))
-                {
-                    farewell = (session.InterviewLanguage ?? "vi").StartsWith("vi", StringComparison.OrdinalIgnoreCase)
-                        ? "Cảm ơn bạn đã dành thời gian tham gia buổi phỏng vấn hôm nay. Kết quả sẽ được gửi tới bạn trong thời gian sớm nhất. Chúc bạn một ngày tốt lành!"
-                        : "Thank you for taking the time to join this interview. Your results will be shared with you soon. Have a great day!";
-                }
-
-                await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosing", new { text = farewell }, ct);
-
-                try
-                {
-                    var closingAudio = await _ttsService.TextToSpeechBase64PcmAsync(farewell, string.Empty, ct);
-                    if (!string.IsNullOrEmpty(closingAudio))
-                    {
-                        await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosingAudio", new { audio = closingAudio }, ct);
-                    }
-                }
-                catch
-                {
-                    // TTS best-effort — FE tự fallback browser TTS.
-                }
-
-                await EndSessionAsync(sessionId, "completed", ct);
+                var farewell = await CloseWithFarewellAsync(sessionId, session.InterviewLanguage, aiText, ct);
                 return Result.Success(farewell);
             }
 
@@ -586,6 +586,11 @@ namespace ARI.Application.Services
             if (session == null)
                 return Result.Failure<bool>("Session not found.");
 
+            // Idempotent: phiên đã "completed" là trạng thái cuối — không đóng/sinh evaluation lần hai
+            // (chống race khi enforce server + NotifyTimeout FE cùng bắn — ADR-050).
+            if (session.Status == "completed")
+                return Result.Success(true);
+
             session.Status = status;
             session.EndedAt = DateTimeOffset.UtcNow;
             if (session.StartedAt.HasValue)
@@ -604,6 +609,74 @@ namespace ARI.Application.Services
 
             await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveSessionStatus", new { status }, ct);
 
+            return Result.Success(true);
+        }
+
+        /// <summary>
+        /// Gửi lời chào kết thúc (text + TTS best-effort) rồi đóng phiên "completed" (ADR-050).
+        /// Dùng chung cho: cap câu hỏi / trần thời lượng (GenerateAndSendNextQuestionAsync) và
+        /// hết giờ phía FE (PracticeTimeoutCloseAsync). IDEMPOTENT — phiên đã "completed" thì no-op
+        /// (chống race khi cả enforce server lẫn trigger FE cùng bắn).
+        /// Trả về câu chào đã dùng.
+        /// </summary>
+        private async Task<string> CloseWithFarewellAsync(Guid sessionId, string? language, string? aiText, CancellationToken ct = default)
+        {
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null || session.Status == "completed")
+                return string.Empty; // idempotent: đã đóng rồi thì không gửi closing/evaluation lần hai
+
+            var farewell = (aiText ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(farewell))
+            {
+                farewell = (language ?? "vi").StartsWith("vi", StringComparison.OrdinalIgnoreCase)
+                    ? "Cảm ơn bạn đã dành thời gian tham gia buổi phỏng vấn hôm nay. Kết quả sẽ được gửi tới bạn trong thời gian sớm nhất. Chúc bạn một ngày tốt lành!"
+                    : "Thank you for taking the time to join this interview. Your results will be shared with you soon. Have a great day!";
+            }
+
+            await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosing", new { text = farewell }, ct);
+
+            try
+            {
+                var closingAudio = await _ttsService.TextToSpeechBase64PcmAsync(farewell, string.Empty, ct);
+                if (!string.IsNullOrEmpty(closingAudio))
+                {
+                    await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosingAudio", new { audio = closingAudio }, ct);
+                }
+            }
+            catch
+            {
+                // TTS best-effort — FE tự fallback browser TTS.
+            }
+
+            await EndSessionAsync(sessionId, "completed", ct);
+            return farewell;
+        }
+
+        /// <summary>
+        /// FE báo hết giờ (đồng hồ đếm ngược chạm 0) → AI nói 1 câu kết thúc rồi đóng phiên (ADR-050).
+        /// Guard server-side: chỉ chấp nhận khi ĐÃ chạm ~95% trần thời lượng — FE không thể kết thúc
+        /// sớm để né phần còn lại. Chỉ áp dụng phiên "practice".
+        /// </summary>
+        public async Task<Result<bool>> PracticeTimeoutCloseAsync(Guid sessionId, CancellationToken ct = default)
+        {
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<bool>("Session not found.");
+            if (session.Status == "completed")
+                return Result.Success(true); // đã đóng — idempotent
+
+            if (session.SessionType != "practice")
+                return Result.Failure<bool>("Timeout close chỉ áp dụng cho phỏng vấn thử.");
+
+            var maxMinutes = _interviewOptions.PracticeMaxDurationMinutes;
+            if (maxMinutes > 0 && session.StartedAt.HasValue)
+            {
+                var elapsedMinutes = (DateTimeOffset.UtcNow - session.StartedAt.Value).TotalMinutes;
+                if (elapsedMinutes < maxMinutes * 0.95)
+                    return Result.Failure<bool>("Chưa hết thời gian phỏng vấn thử.");
+            }
+
+            await CloseWithFarewellAsync(sessionId, session.InterviewLanguage, null, ct);
             return Result.Success(true);
         }
 
@@ -774,6 +847,9 @@ namespace ARI.Application.Services
                                     <p>Đội ngũ tuyển dụng đánh giá rất cao năng lực chuyên môn, phong cách làm việc cũng như sự phù hợp của Anh/Chị với định hướng phát triển của chúng tôi.</p>
                                     <p>Đại diện bộ phận Nhân sự (HR) sẽ liên hệ trực tiếp với Anh/Chị trong vòng 1-2 ngày làm việc tới để trao đổi chi tiết về kế hoạch công việc, mức đãi ngộ và gửi Thư mời nhận việc chính thức (Offer Letter).</p>
                                     <p>Cảm ơn Anh/Chị đã luôn dành sự quan tâm và nỗ lực trong suốt hành trình tuyển dụng cùng ARISP.</p>
+                                    <div style="text-align: center; margin: 30px 0;">
+                                        <a href="http://localhost:3000/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
+                                    </div>
                                     <p style="margin-bottom: 0;">Trân trọng,<br><strong>Trưởng Ban Tuyển Dụng ARISP</strong></p>
                                 </div>
                                 <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
@@ -795,6 +871,9 @@ namespace ARI.Application.Services
                                     <p>Đội ngũ tuyển dụng ARISP chân thành cảm ơn Anh/Chị đã dành thời gian và tâm huyết tham gia quy trình ứng tuyển vào vị trí <strong>{{jobTitle}}</strong>.</p>
                                     <p>Sau khi cân nhắc kỹ lưỡng dựa trên kết quả phỏng vấn và so sánh với định hướng hiện tại của vị trí, chúng tôi rất tiếc phải thông báo rằng chưa thể đồng hành cùng Anh/Chị trong dự án lần này.</p>
                                     <p>Hồ sơ năng lực của Anh/Chị sẽ được lưu trữ bảo mật trong Cơ sở dữ liệu ứng viên tiềm năng của ARISP. Chúng tôi sẽ chủ động liên hệ ngay khi có những cơ hội nghề nghiệp mới phù hợp hơn với thế mạnh của Anh/Chị.</p>
+                                    <div style="text-align: center; margin: 30px 0;">
+                                        <a href="http://localhost:3000/candidate/applications/{{application.Id}}" style="background-color: #4b5563; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(75,85,99,0.2);">Xem thông tin hồ sơ</a>
+                                    </div>
                                     <p>Chúc Anh/Chị luôn dồi dào sức khỏe, may mắn và gặt hái được nhiều thành công rực rỡ trên con đường sự nghiệp sắp tới.</p>
                                     <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
                                 </div>
@@ -832,7 +911,7 @@ namespace ARI.Application.Services
                             Type = "result",
                             Title = "Kết quả phỏng vấn",
                             Body = isPass ? "Chúc mừng bạn đã vượt qua vòng phỏng vấn!" : "Rất tiếc, bạn chưa phù hợp với vị trí này.",
-                            Link = $"/candidate/applications",
+                            Link = $"/candidate/applications/{application.Id}",
                             IsRead = false
                         };
                         await notifRepo.AddAsync(newNotif, ct);

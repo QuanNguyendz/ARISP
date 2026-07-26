@@ -67,6 +67,7 @@ namespace ARI.Application.DTOs
         public string? CreatedByName { get; set; }
         public int ApplicantCount { get; set; }
         public string Status { get; set; } = string.Empty;
+        public DateTimeOffset? ApplicationDeadline { get; set; }
     }
 
     /// <summary>Tin chờ HR duyệt (zone ưu tiên).</summary>

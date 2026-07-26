@@ -12,10 +12,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
+    /// <summary>Body: HR gán 1 khung giờ trong kho cho 1 hồ sơ ứng viên (ADR-048).</summary>
+    public class AssignSlotRequest
+    {
+        public Guid ApplicationId { get; set; }
+        public Guid SlotId { get; set; }
+        public int Round { get; set; } = 1;
+    }
+
     /// <summary>
-    /// Quản lý khung giờ phỏng vấn (Availability Slots) cho Recruiter/HR.
+    /// Quản lý khung giờ phỏng vấn (Availability Slots) cho Recruiter/HR + gán lịch cho ứng viên.
     /// Recruiter chỉ thao tác trên slot của job mình tạo; HrAdmin/SuperAdmin mọi job.
-    /// (Phần đặt lịch của ứng viên nằm ở các endpoint /api/schedule/* — Phase B2.)
+    /// Ứng viên KHÔNG tự chọn lịch — HR gán trực tiếp qua POST /api/schedules/assign (ADR-048).
     /// </summary>
     [ApiController]
     [Route("api/schedules")]
@@ -75,6 +83,21 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new UpdateSlotCapacityCommand(id, request.Capacity, _currentUser.UserId, _currentUser.Role), ct);
             if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
+        }
+
+        /// <summary>HR gán 1 khung giờ trong kho cho 1 ứng viên (ấn định lịch phỏng vấn thật).</summary>
+        [HttpPost("assign")]
+        public async Task<IActionResult> AssignSlot([FromBody] AssignSlotRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new AssignSlotCommand(request.ApplicationId, request.SlotId, request.Round, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(new
+            {
+                message = "Đã xếp lịch phỏng vấn cho ứng viên.",
+                bookingId = result.Value.BookingId,
+                slot = result.Value.Slot,
+            });
         }
     }
 }

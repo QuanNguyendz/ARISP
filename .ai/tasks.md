@@ -7,15 +7,14 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** FE Responsive – Phase 3 (HR/Recruiter & Candidate polish) + Phase 4 (Tailwind config + Skeletons) đã xong (2026-07-26). Branch `feature/fe/fix-responsive` ready để merge về `develop`.
-**Last updated:** 2026-07-26
-**Branch:** `feature/fe/fix-responsive`
+**Phase:** 0 – Setup & Foundation  
+**Last updated:** 2026-07-18
 
 ---
 
 ## Đang làm (In Progress)
 
-> Không có task nào đang thực hiện — Phase 3 + Phase 4 đã xong, chờ user commit các thay đổi tài liệu (`.ai/responsive-fix-plan-2026-07-24.md` + `.ai/tasks.md`) trên branch `feature/fe/fix-responsive`, sau đó tạo PR về `develop`. Khi plan sửa xong sẽ chốt hết backlog responsive.
+_Chưa có task nào đang thực hiện._
 
 ---
 
@@ -137,12 +136,12 @@
   - [ ] Disable nút "Phỏng vấn thử" sau khi đã dùng 1 lần
 
 ### Phase 2c – Online Test (Multiple Choice Quiz)
-- [ ] Database schema: `online_test_questions`, `online_test_submissions`
-- [ ] EF Core migrations
-- [ ] HR Admin / Recruiter: CRUD câu hỏi trắc nghiệm per Job Posting
-- [ ] Candidate: Thực hiện làm bài trắc nghiệm trên Candidate Portal (Giao diện web trắc nghiệm)
-- [ ] Backend: Tự động chấm điểm (Auto-scoring) sau khi nộp bài và so khớp đạt/không đạt dựa trên điểm sàn
-- [ ] Auto-progression: Nếu ứng viên đạt trắc nghiệm -> Cho phép HR tạo Interview Code cho vòng phỏng vấn tiếp theo
+- [x] Database schema: `online_test_questions`, `online_test_submissions` (đã có từ InitialCreate) ✅ 2026-07-24
+- [x] EF Core migrations — `AddOnlineTestFlow`: `job_postings.online_test_pass_score`, `online_test_questions.updated_at`, unique index `(application_id, round_number)` ✅ 2026-07-24
+- [x] HR Admin / Recruiter: CRUD câu hỏi trắc nghiệm per Job Posting — `OnlineTestController` + trang `JobOnlineTestPage` ✅ 2026-07-24
+- [x] Candidate: Thực hiện làm bài trắc nghiệm trên Candidate Portal (Giao diện web trắc nghiệm) — `OnlineTestPage` + `CandidateOnlineTestController` ✅ 2026-07-24
+- [x] Backend: Tự động chấm điểm (Auto-scoring) sau khi nộp bài và so khớp đạt/không đạt dựa trên điểm sàn (`OnlineTestPassScore` trên JobPosting) ✅ 2026-07-24
+- [x] Auto-progression (mềm): nộp bài → lưu `IsPassed` + realtime `OnlineTestGraded` + notification; kết quả hiện cho HR (`GET /online-test/applications/{id}/result`) để HR cấp Interview Code vòng tiếp — không tự đổi status (ADR-049) ✅ 2026-07-24
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
 - [x] Database schema: `availability_slots`, `interview_codes` (entities đã có)
@@ -306,135 +305,41 @@
 
 ## Completed
 
-- [x] 2026-07-26: **FE Responsive – Post-Phase 4 audit cleanup (9 file, 1 commit).** Audit lại 66 file (56 page + 10 component/shared) trên cả 2 site phát hiện 14 issue còn sót sau 4 phase. Sửa 9 file (P0 3 + P1 5 + P2 1). Không phát sinh thêm commit ngoài commit này:
-  - **P0 #1 — `InterviewSchedulePage.tsx` (Candidate):** Refactor toàn page từ dark-glass theme cũ (`bg-bg-primary`, `bg-bg-secondary`, `text-text-secondary`, `text-text-tertiary`, `border-white/10`, `text-white` — 33 occurrence) sang light theme ink/brand/ai. Plan `.ai/responsive-fix-plan-2026-07-24.md:237` đánh dấu `✅ đã đồng bộ light theme` nhưng code chưa bao giờ được sửa (gap tài liệu vs thực tế). Toàn page giờ dùng `bg-ink-50`, cards `bg-white border border-ink-200`, text `text-ink-900`/`text-ink-700`/`text-ink-500`. Thêm responsive cho key icon (`h-16 w-16 sm:h-20 sm:w-20`), heading (`text-2xl sm:text-3xl`), input (`text-lg sm:text-2xl`), padding card (`p-5 sm:p-8` / `p-4 sm:p-6`), candidate info grid truncate (`min-w-0`), confirm box dùng `bg-brand-50 border-brand-200`, button "Vào phỏng vấn/Practice" (Practice card giờ light theme `bg-white border border-ink-200` thay vì dark glass). File giờ khớp design system.
-  - **P0 #2 — `p-10` / `p-12` empty states (7 instances, 6 file):** Tất cả empty state cố định `p-10` / `p-12` chiếm ~30% chiều dọc trên 320px đổi thành `p-6 sm:p-10` / `p-6 sm:p-12` (mobile 24px → desktop 40-48px). Touch: `landing/FindJobPage.tsx:1212` (`p-12` → `p-6 sm:p-12`), `candidate/SchedulePage.tsx:129` (`p-10` → `p-6 sm:p-10`), `candidate/NotificationsPage.tsx:267` (`p-12` → `p-6 sm:p-12`), `candidate/SavedJobsPage.tsx:240` (`p-10` → `p-6 sm:p-10`), `candidate/ApplicationsPage.tsx:738` (`p-10` → `p-6 sm:p-10`), `candidate/ApplicationDetailPage.tsx:344, 356, 610` (3× `p-10` → `p-6 sm:p-10`).
-  - **P0 #3 — `candidate/ProfilePage.tsx:1047`:** Skeleton card `p-6 shadow-card` → `p-4 sm:p-6 shadow-card` đồng bộ pattern với các skeleton card khác trong cùng page.
-  - **P1 — Outer page padding không responsive (3 file):** `candidate/SavedJobsPage.tsx:203,213` (`px-6 pt-6` → `px-4 pt-6 sm:px-6`; `px-6 py-6` → `px-4 py-6 sm:px-6 sm:py-8`); `candidate/NotificationsPage.tsx:194` (`px-6 py-6` → `px-4 py-6 sm:px-6 sm:py-8`); `landing/FindJobPage.tsx:1247` (footer `px-6 py-8` → `px-4 py-8 sm:px-6`).
-  - **P1 — `p-6` section cards không responsive (2 file):** `candidate/SettingsPage.tsx` 4 instances (×4 `scroll-mt-24 ... p-6 shadow-card` → `p-4 sm:p-6 shadow-card`); `candidate/ApplicationDetailPage.tsx` 7 instances (banner header `p-6` → `p-4 sm:p-6`, 3× report card `p-6 shadow-card` → `p-4 sm:p-6`, language card `p-6` → `p-4 sm:p-6`, recording wrapper `p-6` → `p-4 sm:p-6`, empty round list `p-6` → `p-4 sm:p-6 lg:block`).
-  - **P2 — `components/sections/Stats.tsx:67`:** `py-40` cố định 160px → `py-20 sm:py-32 lg:py-40` (mobile 80px → desktop 160px, đồng bộ với `CTA.tsx`).
-  - **Tổng:** 9 file, ~12 dòng code đổi (nhưng `InterviewSchedulePage.tsx` là refactor 170 dòng), `tsc --noEmit` pass.
-  - **Lưu ý lịch sử:** Plan file `.ai/responsive-fix-plan-2026-07-24.md:54` vẫn ghi `Phase 2 Nhóm D ⏳ Backlog` và `Phase 1 PR #1.2` đã check ✅ lúc trước — nhưng thực tế `InterviewSchedulePage` chưa bao giờ được sửa dù plan claim đã xong. Entry này đánh dấu thực tế audit lại 2026-07-26, không cần đảo lại plan file (plan file giữ nguyên để trace lịch sử).
+- [x] 2026-07-26: **Dev-only seed endpoint test Phỏng vấn thử + dọn trùng số ADR (practice 048→050).**
+  - **Seed:** `POST /api/dev/seed-practice` (`DevController`, gated `IWebHostEnvironment.IsDevelopment()` → prod 404; `AllowAnonymous`) → `SeedPracticeCommand`/handler (MediatR auto-discovered) tạo idempotent `CandidateAccount` (`EmailVerified=true`) + `JobPosting` (`active`, JD vi, **`SalaryCurrency="VND"`**) + `Application` (`Status="interview"` → `PracticeEligible`) + `AvailabilitySlot`/`InterviewBooking` (mirror `StaffScheduling.AssignSlotCommand`); trả `practiceUrl` + tài khoản. `?fresh=true` tạo app mới. Kết hợp `Interview:PracticeAttemptsPerRound=0` để test lặp vô hạn. Không migration.
+  - **E2E thật (Supabase):** bắt bug `job_postings.salary_currency` NOT NULL nhưng entity nullable không `HasDefaultValue` → EF gửi NULL → 500; fix đặt `SalaryCurrency="VND"`. Verify: seed OK, gọi lại idempotent (cùng applicationId), `?fresh=true` ra app mới.
+  - **Dọn ADR trùng:** develop có ADR-048 TRÙNG (practice PR #72 + lịch #71) và ADR-049 đã bị Online Test chiếm → đổi **practice 048→050** trong code + docs (giữ 048=lịch, 049=online-test). Bảng ADR CLAUDE.md xếp lại thứ tự tăng dần.
+  - File: `ari-service/src/ARI.Application/Dev/SeedPractice/SeedPracticeCommand.cs`, `ari-service/src/ARI.API/Controllers/DevController.cs`; renumber các file practice (InterviewService/Options/DTOs/SessionHub/usePracticeSession/PracticeSessionPage/interviewService.ts/.env.example); docs architecture.md (ADR-050) + CLAUDE.md + practice-interview-setup.md. Backend build + 14 test xanh; FE 2 site build xanh.
 
-- [x] 2026-07-26: **FE Responsive – Phase 3 (HR/Recruiter & Candidate polish, 8 file trong 2 commit).** Polish components toàn site (P3 trong plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.3.1):
-  - **PR #3.1 — HR/Recruiter pages polish (5 file, 22 task):**
-    - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — JD grid `grid md:grid-cols-2` → `grid grid-cols-1 sm:grid-cols-2` (mobile 1-col → desktop 2-col). Đã OK từ trước: avatar `w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20`, button `px-3 py-2 sm:px-6 sm:py-3`, tabs `flex flex-wrap gap-2`.
-    - `ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` — Sticky header `h-16` → `h-14 sm:h-16` + padding `px-6` → `px-4 sm:px-6` + gap `gap-4` → `gap-2` + breadcrumb `min-w-0 flex-1` + chevron `shrink-0` + name `truncate` + language grid `grid-cols-3 gap-3 text-sm` → `grid-cols-3 gap-2 text-xs sm:gap-3 sm:text-sm` + 3 value `min-w-0 truncate` + stats value `text-2xl` → `text-xl sm:text-2xl`.
-    - `ARI.StaffSite/src/pages/hr/DashboardPage.tsx` — Funnel conv `w-16` → `w-10 sm:w-16` + SVG `h-7 w-20` → `h-5 w-14 sm:h-7 sm:w-20` + priority count `text-2xl sm:text-3xl` (đã OK từ trước).
-    - `ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` — Page padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8` (cả 2 vị trí: error + main) + title `text-lg sm:text-xl` + stats value `text-xl sm:text-2xl` (2 vị trí) + stats grid `grid-cols-2 lg:grid-cols-5` → `grid-cols-2 md:grid-cols-3 lg:grid-cols-5`. Đã OK từ trước: avatar `h-10 w-10 sm:h-12 sm:w-12`, tabs `flex flex-wrap gap-2`, modal email `truncate`.
-    - `ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` — Search `sm:max-w-xs` → `sm:max-w-sm sm:flex-1` + leading-7 → leading-6. Đã OK từ trước: modal header `grid-cols-1 sm:grid-cols-3`.
-  - **PR #3.2 — Candidate pages polish (7 file, 8 task):**
-    - `ARI.CandidateSite/src/components/sections/CTA.tsx` — `py-40` → `py-20 sm:py-32 lg:py-40` (mobile 80px → desktop 160px).
-    - `ARI.CandidateSite/src/components/sections/Demo.tsx` — `h-[400px]` → `h-[250px] sm:h-[350px] md:h-[400px]` (AI Sphere mobile 250px) + grid `lg:grid-cols-2 lg:gap-12` → `grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12`.
-    - `ARI.CandidateSite/src/components/sections/Hero.tsx` — Safe area overlay `pb-[env(safe-area-inset-bottom,0)] pt-[env(safe-area-inset-top,0)]` cho iOS Safari.
-    - `ARI.CandidateSite/src/components/three/AISphereDemo.tsx` — `w-64 h-64` → `w-40 h-40 sm:w-64 sm:h-64`.
-    - `ARI.CandidateSite/src/components/profile/ChangePasswordModal.tsx` — No-op (đã OK từ trước: `w-full max-w-md` + parent `p-4`).
-    - `ARI.CandidateSite/src/app/layouts/Footer.tsx` — Brand paragraph `min-w-0 break-words` (tránh tràn grid item khi long text).
-    - `ARI.Shared/src/ui/NotFoundPage.tsx` — `text-7xl md:text-9xl` → `text-7xl sm:text-8xl md:text-9xl` (smooth font scale).
-  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
-  - **Pattern dùng chung:** `p-4 sm:p-6 lg:p-8` cho page padding; `text-xl sm:text-2xl` cho stats value; `grid-cols-1 sm:grid-cols-2` cho inner form grid; `min-w-0 flex-1` + `truncate` cho breadcrumb/header text; `h-X w-X sm:h-Y sm:w-Y` cho avatar cố định.
+- [x] 2026-07-25: **Ứng viên xác nhận / báo bận lịch phỏng vấn — staff xếp lại (ADR-048 điểm 6).** Sau khi HR gán lịch, ứng viên **XÁC NHẬN** hoặc **TỪ CHỐI kèm lý do** (bận) để nhân sự sắp khung giờ khác.
+  - **Backend:** 3 cột mới trên `InterviewBooking` (`confirmation_status` default `pending` | `decline_reason` | `responded_at`), migration `AddBookingConfirmation` (backfill `pending`). 2 endpoint ứng viên `POST /api/candidate/schedule/{bookingId}/confirm|decline` (`ConfirmScheduleCommand`/`DeclineScheduleCommand`, `CandidateOnly`, guard booking thuộc hồ sơ ứng viên; decline yêu cầu lý do ≥3 ký tự). **Decline** set `Status="declined"` + trả 1 chỗ slot (`GREATEST(booked_count-1,0)`) → gỡ khỏi partial-unique `ux_..._scheduled` nên staff gán lại bình thường qua chính `AssignSlotCommand` (**không cần luồng huỷ riêng** — giải quyết follow-up cũ); assign lần sau set `RescheduledFromId`. `GET /candidate/schedule` đổi shape `{upcoming, past, awaitingReschedule}` (kèm `bookingId`/`confirmationStatus`/`declineReason`). `ApplicationResponse` thêm `scheduleConfirmationStatus`/`scheduleDeclineReason` (detail path). Realtime nhân sự `ReceiveScheduleResponse` (chủ tin + `hr_admin`) + staff bell sync mục `schedule_response:{bookingId}`. `AssignSlotCommand` đổi dedup notification → `schedule_assigned:{booking.Id}` (xếp-lại luôn báo lại) + link ứng viên `/portal/schedule/{app}` + email nhắc xác nhận/báo bận.
+  - **Frontend:** `scheduleService` đổi `getMySchedule()` (shape mới) + thêm `confirmSchedule`/`declineSchedule`; candidate `SchedulePage` render nút **Xác nhận tham dự** / **"Tôi bận, đổi lịch"** (nhập lý do) + mục "chờ xếp lại". `AssignSchedulePanel` nhận `confirmationStatus`/`declineReason` → hiện trạng thái xác nhận khi đã xếp + **banner lý do báo bận** khi chờ xếp lại (truyền từ 2 trang chi tiết ứng viên HR + Recruiter). `useAppNotifications`: case `ReceiveScheduleResponse` (chuông nhân sự) + invalidate `my-schedule` khi ứng viên nhận push xếp/xếp-lại. Cả `SchedulePage` + `AssignSchedulePanel` giữ hardcoded VI đúng phong cách sẵn có (không thêm i18n JSON).
+  - **Verify:** `dotnet ef migrations add` build 0 error (toàn backend compile), tsc 2 site 0 error, eslint file đổi 0 warning mới (1 warning `payload: any` dòng 71 `useAppNotifications` là code cũ, ngoài diff).
+  - **Docs:** ADR-048 điểm 6 (architecture.md) + entry này.
 
-- [x] 2026-07-26: **FE Responsive – Phase 4 (Tailwind config + Skeletons, 5 file trong 1 commit).** Hoàn thiện design system responsive, thêm custom `xs` breakpoint 480px cho Galaxy Fold cover / iPhone SE landscape, polish shared components, đồng bộ skeletons với page chính (P4 trong plan mục 3.4.1):
-  - `ARI.Shared/tailwind-preset.cjs` — Thêm `xs: '480px'` vào `theme.extend.screens` (đặt dưới `sm` 480 < 640, an toàn utility khác). Verify colors theme `ink/brand/ai` đầy đủ.
-  - `ARI.Shared/src/ui/Container.tsx` — Verify padding responsive `px-6 sm:px-8 lg:px-12` (line 44) — đã OK.
-  - `ARI.Shared/src/ui/Button.tsx` — Size variants mobile: `md: px-5 py-2.5 text-sm sm:px-6 sm:py-3 sm:text-base`, `lg: px-6 py-3 text-base sm:px-8 sm:py-4 sm:text-lg`.
-  - `ARI.StaffSite/src/pages/hr/_skeletons.tsx` — `HrStatsSkeleton`: `grid-cols-2 lg:grid-cols-4` → `grid gap-4 sm:grid-cols-2 xl:grid-cols-4` (khớp dashboard line 922).
-  - `ARI.StaffSite/src/pages/recruiter/_skeletons.tsx` — `DashboardSkeleton` + `JobDetailSkeleton` padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8` + card padding `p-6` → `p-4 sm:p-6`.
-  - `ARI.StaffSite/src/pages/super-admin/_skeletons.tsx` — `DashboardSkeleton` padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8`.
-  - **Bỏ qua 3 task QA** (test matrix 8 breakpoints × critical pages, verify iOS Safari + Android Chrome qua BrowserStack, verify dark/light mode ở breakpoint mới) — thuần QA, không có code.
-  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+- [x] 2026-07-24: **Nâng cấp Phỏng vấn thử (Practice) — audio-only + trần 20 phút + nhập kép (ADR-050).**
+  - **Audio-only (bỏ avatar):** `GetMediaConfigAsync` không mint avatar token khi `SessionType=="practice"` (cờ `Interview:PracticeUseAvatar=false`) → `heyGen=null` → FE phát giọng ElevenLabs qua WebAudio + bot tĩnh, giữ đủ STT/RAG/GPT-4o. Lý do: tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán. Real vẫn có avatar.
+  - **Trần 20 phút** (`Interview:PracticeMaxDurationMinutes`): media-config trả `MaxDurationSeconds` → FE đếm ngược (giờ máy). Hết giờ → khoá mic (`stopMic`) → `NotifyTimeout` (SignalR) → AI nói câu kết → đóng phiên. 2 lớp enforce: FE trigger (im lặng) + server `forceClosing` khi `elapsed≥cap` (nói quá giờ). Tách `CloseWithFarewellAsync` (idempotent) từ khối closing inline; `EndSessionAsync` guard `Status=="completed"` chống race double-end.
+  - **Nhập kép (voice+keyboard):** transcript Deepgram append vào 1 nguồn `answerText` trong `<textarea>` sửa/gõ tay được; nút Mic on/off (tắt = gõ tự do, gate gửi audio + append theo `micEnabledRef`); `submitAnswer` đọc `answerText`. Đúng "nhập tay" ADR-044 hứa nhưng chưa build.
+  - **Bỏ** (user chốt giữa chừng): ghi âm practice → R2 + tự xoá 7 ngày → giữ nguyên ADR-038 điểm 6.
+  - **Khuyến nghị gói LiveAvatar** (ghi lại, chưa mua): giữ sandbox/Free giờ; khi real chạy thật → Essential $99 (nếu Hybrid Idle + vòng ≤20') hoặc Business $475. Free/Starter loại vì có watermark.
+  - File: BE `InterviewService.cs`, `InterviewOptions.cs`, `InterviewDTOs.cs`, `SessionHub.cs`, `IInterviewService.cs`, `appsettings.json`, `docker/.env.example`; FE `usePracticeSession.ts`, `PracticeSessionPage.tsx`, `interviewService.ts`, i18n `practice.json` (vi/en). Backend build+14 test xanh; FE 2 site build xanh. ADR-050 (ban đầu 048, đổi do trùng) + ADR-038 note + CLAUDE.md + docs/practice-interview-setup.md.
 
-- [x] 2026-07-26: **FE Responsive – Phase 1 PR #1.2 (Residue 3 file, verify-only).** Verify các file còn lại trong plan Phrase 1 layout phức tạp đã xử lý từ các round trước:
-  - `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Sidebar `hidden lg:block` (ẩn mobile, collapse đơn giản). Plan gốc yêu cầu drawer nhưng sidebar chỉ chứa CV card tham khảo, ẩn hẳn mobile OK.
-  - `ARI.CandidateSite/src/pages/landing/FindJobPage.tsx` — FilterSidebar sticky desktop (line 1087 `hidden lg:block`) + mobile drawer riêng (line 1134 ngoài hidden).
-  - `ARI.CandidateSite/src/pages/candidate/InterviewSchedulePage.tsx` — Đã refactor dark-glass → design system ink/brand/ai từ trước (Phase 5/6).
-  - **TypeScript:** `tsc --noEmit` pass.
+- [x] 2026-07-24: **Online Test — HrAdmin xem điểm & xuất Excel ngang Recruiter (ADR-049 cập nhật).** Backend + route `/hr/jobs/:id/online-test[/results]` + `JobOnlineTestPage`/`JobOnlineTestResultsPage` (nhận `isHr` từ path) đã hỗ trợ sẵn HrAdmin (quyền admin qua `CanManageAsync` cho mọi job, endpoint `InternalStaff`), nhưng `pages/hr/JobPostingDetailPage` **thiếu link điều hướng** (recruiter đã có) → HrAdmin phải gõ URL tay. Thêm nút "Ngân hàng câu hỏi" cạnh nút Chỉnh sửa trên trang HR job detail (→ `/hr/jobs/:id/online-test`; từ đó có link Bảng điểm ứng viên + nút Tải Excel). i18n key `onlineTestBank` cho namespace `modules/hr/jobPostingDetail` (VI/EN). Verify: tsc StaffSite 0 error, i18n HR parity OK (149/149), phần thêm 0 lint warning (1 warning `any` ở dòng 237 là code cũ, không đụng tới).
 
-- [x] 2026-07-25: **FE Responsive – Hotfix Round 5 (1 commit, 5 file).** Patch 5 lỗi mobile báo cáo bởi user qua screenshot 320-768px:
-  1. **CandidateHeader dropdown** (Candidate Site, 3000) — 3 dropdown (notif/user/lang) dùng `absolute` thuần → mobile bị stacking-context header sticky cắt. Đồng bộ sang `fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50` mobile + `sm:absolute sm:right-0 sm:mt-2` desktop (giống pattern HR WorkspaceLayout/HrLayout).
-  2. **Applications list chèn nhau** (Candidate) — Card body dùng `flex items-start justify-between gap-3` cố định → 320px không đủ chỗ cho avatar (48) + title + 2 badge (status + match). Stack dọc mobile: `flex-col gap-2 sm:flex-row sm:items-start sm:justify-between`, title `break-words`, status badge `whitespace-nowrap`, Match badge `whitespace-nowrap`, alert banner padding `px-4 sm:px-5`, card padding `p-4 sm:p-5`, CardFooter `flex-col gap-2 sm:flex-row` (date + button stack dọc mobile).
-  3. **MyJobs job card footer dính nhau** (Recruiter) — 4 item (applicants/time/salary/chevron) dùng `flex items-center justify-between` cố định, 320px quá hẹp. Thêm `flex-wrap items-center justify-between gap-x-3 gap-y-2` + `whitespace-nowrap` cho 3 item text + salary `min-w-0 flex-1 text-right sm:flex-none` + chevron `shrink-0`.
-  4. **Recruiter Candidates jobTitle bị ẩn** — Table `min-w-[600px]` quá rộng + jobTitle `max-w-[180px] truncate` không có tooltip. Giảm xuống `min-w-[560px]`, jobTitle `max-w-[160px]` + `<span className="block truncate" title={...}>` để hiện full text khi hover, matchScore/date `whitespace-nowrap text-xs sm:text-sm`, candidate name/email `max-w-[180px] truncate`. Tổng table width giảm ~80px, scroll ngang ít hơn.
-  5. **SA Settings 2 tab pill tràn ngang** (Super Admin, 3001) — 2 button tab text dài "Đăng nhập & miền email" + "Tích hợp & Webhook" + `overflow-x-auto` mobile → người dùng phải kéo ngang. Thêm `flex-shrink-0 snap-start` + `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` (ẩn scrollbar cho gọn) + button `px-3 py-1.5 text-xs sm:px-3.5 sm:text-sm` (thu nhỏ mobile) + label `truncate max-w-[180px] sm:max-w-none` + page padding `p-4 sm:p-6 lg:p-8` (thu nhỏ từ `p-6 lg:p-8`).
-  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
-  - **Còn lại:** Tiếp tục theo plan (Phase 7 widget polish / Phase 8 page-level audit) hoặc theo lỗi user báo tiếp theo.
+- [x] 2026-07-24: **Online Test — Import ngân hàng câu hỏi từ Excel (giảm nhập tay, ADR-049 cập nhật).** Thay vì HR gõ từng câu, thêm luồng **upload file `.xlsx`** để thêm hàng loạt: `OnlineTestImportFeature.cs` (`ImportOnlineTestQuestionsCommand` + `GetOnlineTestImportTemplateQuery`), 2 endpoint `POST /online-test/jobs/{id}/questions/import` (multipart `IFormFile`, ≤5MB, chỉ `.xlsx`) + `GET .../questions/template`. Đọc worksheet đầu bằng OpenXML SDK (đã có sẵn) — xử lý SharedString/InlineString, map cell theo cột từ `CellReference`. Layout: A=Câu hỏi · B=Loại (single/multiple, trống→suy từ số đáp án đúng) · C–H=Phương án A–F · I=Đáp án đúng (`A` hoặc `A,C`, nhận cả số). Nén phương án rỗng + **remap chỉ số đáp án đúng**, dùng lại `ValidateQuestion`/`NormalizeType`/`NormalizeCorrect`; mỗi dòng lỗi trả `{row,message}`, chỉ ghi dòng hợp lệ → `OnlineTestImportResultDto(imported, failed, errors[])`. File mẫu OpenXML (header + 2 ví dụ single/multiple). FE: shared type `OnlineTestImportResult` + service `importQuestions`/`downloadTemplate`; `JobOnlineTestPage` thêm card "Nhập từ file Excel" (nút upload + tải mẫu + hiển thị kết quả imported/failed + danh sách lỗi dòng); i18n `bank.import.*` VI/EN. Verify: Application + API compile 0 error (build ra thư mục tạm vì API đang chạy khoá DLL), tsc StaffSite 0 error, eslint file đổi 0 warning, i18n staff parity OK (76/76 key).
 
-- [x] 2026-07-25: **FE Responsive – Hotfix Round 6 (4 file, 1 commit).** Patch tiếp 4 lỗi mobile báo cáo sau Round 5:
-  1. `CandidateHeader.tsx` — Thêm Globe icon-only riêng cho mobile (`sm:hidden` chỉ icon h-9 w-9) — pattern tách button theo breakpoint (sau này gộp lại ở commit `f4e64e13`).
-  2. `ApplicationsPage.tsx` (Candidate) — Filter chip `flex flex-wrap items-center gap-2` (bỏ `overflow-x-auto` đang ép 1 dòng) + button thu nhỏ mobile + label "Mới nhất" `order-last`.
-  3. `MyJobsPage.tsx` (Recruiter) — Job card footer cấu trúc lại 2 dòng mobile (line 1 = applicants+time, line 2 = salary+chevron, mỗi line `justify-between`); desktop vẫn 1 dòng ngang `sm:flex-row sm:flex-wrap`.
-  4. `CandidateDetailPage.tsx` (Recruiter) — Tổng thể responsive: page p-4→lg:p-8 + header card padding p-4→sm:p-6 + avatar h-12→sm:h-16 + contact info `flex-col gap-1 sm:flex-row sm:flex-wrap` (mobile stack dọc) + match score box inline mobile (label trái, % phải) → sm:flex-col sm:items-center (desktop) + evaluation/session items `flex-col gap-2 sm:flex-row sm:items-center sm:justify-between` (title trên, score+badge dưới) + verdict/session badge `whitespace-nowrap sm:shrink-0` + action/info card `p-4 sm:p-5` + info dl `flex-col gap-1 sm:flex-row sm:justify-between`.
-  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+- [x] 2026-07-24: **Online Test — Screening Test nâng cấp (ADR-049 cập nhật).** Bổ sung đúng mô tả yêu cầu: (1) **bốc N câu ngẫu nhiên/lượt** (mặc định 20) deterministic theo (câu, hồ sơ, vòng) — cùng ứng viên nhận cùng bộ đề, chấm lại đúng bộ; (2) **câu 1 đáp án & nhiều đáp án** (`QuestionType` + `CorrectOptions` jsonb), chấm all-or-nothing khớp hoàn toàn tập đáp án; (3) **hẹn giờ (mặc định 30')** — FE đếm ngược + tự nộp khi hết giờ; (4) **export bảng điểm .xlsx** (OpenXML SDK, `GET .../results/export`). Thêm cấu hình per-job `OnlineTestQuestionsPerTest`/`DurationMinutes` + `Submission.CorrectCount`/`TotalQuestions`; endpoint `pass-score` → `settings` (3 tham số). Migration `AddOnlineTestScreening`. FE: bank page có type toggle + multi-correct (radio/checkbox) + 3 field cấu hình (mặc định 4 phương án); results page có nút Tải Excel; candidate page radio/checkbox + đồng hồ; i18n VI/EN (staff 68 key, candidate 22 key). Verify: backend build 0 error, tsc 2 site 0 error, eslint file mới 0 warning, key parity OK.
 
-- [x] 2026-07-25: **FE Responsive – Hotfix Globe dropdown mobile (1 file, 1 commit `f4e64e13`).** Round 6 tách language thành 2 div riêng (mobile `sm:hidden` + desktop `hidden sm:block`) nhưng quên dropdown chỉ nằm trong div desktop → bấm Globe mobile không hiện gì. Gộp thành 1 div duy nhất: 1 button responsive (class `h-9 w-9 sm:flex sm:h-auto sm:w-auto sm:items-center sm:gap-1 sm:px-2 sm:py-2 sm:text-sm sm:font-medium` + Globe luôn + label/chevron `hidden sm:inline`/`sm:block`) + 1 dropdown ngôn ngữ chung (`fixed top-[calc(4rem+0.5rem)] z-50 sm:absolute sm:right-0 sm:mt-2 sm:w-40`). Pattern giống HR WorkspaceLayout.
-  - **TypeScript:** `tsc --noEmit` pass ARI.CandidateSite.
+- [x] 2026-07-24: **Online Test (thi trắc nghiệm) — Phase 2c end-to-end (ADR-049).** Trước đó chỉ có 2 entity + 2 bảng chờ suông, 0 dòng logic. Bổ sung: (BE) migration `AddOnlineTestFlow` (`job_postings.online_test_pass_score` mặc định 70, `online_test_questions.updated_at`, unique index `(application_id, round_number)` = 1 lượt/vòng); feature CQRS `ARI.Application/OnlineTest/` — HR CRUD câu hỏi + điểm sàn + xem kết quả (`OnlineTestController`, `InternalStaff`, quyền chủ tin/admin), ứng viên lấy đề (ẩn đáp án) + nộp bài tự chấm `score = correct/total*100`, `isPassed = score >= passScore` (`CandidateOnlineTestController`, `CandidateOnly`); auto-progression mềm: realtime `OnlineTestGraded` + notification idempotent qua `SyncNotificationsAsync` (dedupKey `online_test:{id}`), không tự đổi status. (FE) shared `types/onlineTest` + `fservices/onlineTest`; StaffSite `JobOnlineTestPage` (route recruiter+hr, link từ trang chi tiết job); CandidateSite `OnlineTestPage` + `OnlineTestEntry` (chỉ hiện khi job có đề) trong trang chi tiết hồ sơ. **Bảng tổng hợp điểm theo job cho HR:** `GetOnlineTestResultsByJobQuery` → `GET /online-test/jobs/{id}/results` (summary + từng ứng viên, sort điểm giảm dần) + trang `JobOnlineTestResultsPage` (route `.../online-test/results`, link từ trang ngân hàng câu hỏi). Verify: backend build 0 error, migration tạo OK, tsc 2 site 0 error, eslint file mới 0 warning.
 
-- [x] 2026-07-26: **FE Responsive – Phase 2 Nhóm E đã xong (khảo sát, 0 commit code).** Khảo sát lại 2 file mục tiêu trong plan `.ai/responsive-fix-plan-2026-07-24.md`:
-  - `pages/hr/DashboardPage.tsx` — 3 YAxis đều OK: RecruiterBarChart `width={60} fontSize={10}` (line 352-359), MatchScoreChart `width={34} fontSize={10}` (line 277-283), TrendChart `width={34} fontSize={10}` (line 193-199). Đúng spec plan.
-  - `pages/hr/JobPostingDetailPage.tsx` — Modal reject (line 1271-1276) đã có `max-h-[90vh] overflow-y-auto rounded-2xl ... p-5 sm:p-6 shadow-card-hover`. Đúng spec plan.
-  - **Kết luận:** Cả 2 đã được sửa từ các commit Phase 3 Modal/Dialog + Phase 4 Card/Stat/Widget trước. Cập nhật plan dòng 56 ⏳ Backlog → ✅ Đã xong.
-  - **TypeScript:** Không có file sửa → không cần check.
-  - **Bước tiếp theo:** Sang Phase 2 Nhóm D (Candidate JobDetailPage sticky aside → bottom fixed bar) hoặc Phase 3 polish (CTA/Hero/Demo + HR/Recruiter job detail polish).
+- [x] 2026-07-23: **Đảo chiều luồng đặt lịch phỏng vấn — HR gán cứng 1 giờ cho 1 ứng viên, bỏ ứng viên tự chọn (ADR-048).**
+  - **Backend:** thêm `POST /api/schedules/assign` (`AssignSlotCommand` + handler, policy `InternalStaff`) — staff chọn 1 slot trong kho ấn định cho `application_id`+vòng; giữ nguyên side-effects của booking cũ (chốt chỗ nguyên tử chống overbooking, chặn trùng vòng, `screening→interview`, đánh dấu `InterviewInvite.ScheduledAt`) + đẩy realtime `InterviewScheduled` + tạo `Notification` bell + email giờ hẹn (giờ VN). Gỡ `GET /schedule/{id}/slots` + `POST /schedule/{id}/book` (handler `GetOpenSlotsQuery`/`BookSlotCommand`), gỡ helper `AuthorizeCandidateAsync`; `CandidateScheduleController` còn mỗi `GET /candidate/schedule` (read-only). Email "duyệt CV" (`SendInterviewInviteAsync`) bỏ pick-link, đổi thành "nhân sự sẽ xếp lịch".
+  - **Frontend:** `scheduleService` thêm `assign()`, gỡ `getOpenSlots`/`book`. Component chung `@ari/shared/ui/AssignSchedulePanel` (chọn slot từ kho, lọc slot tương lai còn chỗ, gán → refetch hồ sơ) chèn vào cột thao tác trang chi tiết ứng viên HR + Recruiter. `SchedulePage` (candidate) chuyển sang read-only, hiển thị giờ đã gán qua `getMySchedule()`, bỏ nút tự chọn.
+  - **Docs:** ADR-048 (architecture.md) + bảng ADR CLAUDE.md.
+  - **Follow-up:** ~~luồng huỷ/đổi lịch phía staff~~ → đã giải bằng ứng viên báo bận (2026-07-25, xem trên); còn lại: nút staff **tự huỷ** lịch đã xác nhận (không do ứng viên báo bận); dọn invalidate `open-slots` thừa trong `useAppNotifications`.
 
-
-- [x] 2026-07-24: **Phase 2 (FE Responsive) – Nhóm A: Sidebar & Settings (6 file, 1 commit).** Hoàn tất Phase 2 Nhóm A theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 6 file sidebar cố định `lg:w-64` / `lg:grid-cols-[...]` không collapse trên mobile đã chuyển sang **horizontal scroll pills dưới lg, sidebar dọc từ lg**:
-  - `ARI.StaffSite/src/pages/recruiter/SettingsPage.tsx` — dark theme (amber-500). Tabs dọc 256px → horizontal scroll.
-  - `ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` — ink/brand theme. Tabs 256px → horizontal scroll.
-  - `ARI.StaffSite/src/pages/hr/SettingsPage.tsx` — ink/brand theme. Tabs 256px → horizontal scroll.
-  - `ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` — aside 240px (sticky `top-24`) → horizontal scroll pills dưới lg. Skeleton tương ứng cũng fix.
-  - `ARI.CandidateSite/src/pages/candidate/ApplicationDetailPage.tsx` — sidebar 320px chứa upcoming interview + round list → horizontal scroll ngang dưới lg, dọc từ lg. Skeleton tương ứng.
-  - `ARI.CandidateSite/src/pages/interview/InterviewRoomPage.tsx` — mock page. Avatar `h-44 w-44` → responsive `h-28 w-28 sm:h-36 sm:w-36 lg:h-44 lg:w-44`. Transcript aside 380px → **floating drawer** trên mobile (toggle bằng Captions button + backdrop + X close), inline từ lg. Controls footer padding `px-6` → `px-3 sm:px-6` + button size `h-12 w-12` → `h-10 w-10 sm:h-12 sm:w-12`.
-  - **Pattern dùng chung:** thẻ `<nav>` với `flex gap-2 overflow-x-auto px-4 py-1 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:bg-white lg:p-2 lg:shadow-card` — pills ngang mobile, column dọc từ lg. Tránh drawer collapse UX không quen.
-  - **Typecheck:** `npx tsc --noEmit` chỉ trên 6 file Phase 2 = pass. (Lỗi JSX trong `recruiter/JobDetailPage.tsx` là pre-existing, đã có trong HEAD, xử lý ở task riêng ngoài Phase 2.)
-  - **Lint:** 0 lỗi trên 6 file.
-  - **Còn lại Phase 2:** Nhóm B Form (5 file), Nhóm C Table (3 file), Nhóm D Layout phức tạp (CandidateJobDetailPage, ScrollStorytelling), Nhóm E Chart & Modal nhỏ (2 file).
- Hoàn tất toàn bộ vấn đề nghiêm trọng (P0=1) + layout bị vỡ (P1=11) theo plan `.ai/responsive-fix-plan-2026-07-24.md`. 16 commit, 16 page chính đã được responsive fix theo design system ink/brand/ai:
-  - `SchedulePage` (Candidate) — modal `max-w-2xl` thiếu `w-[90%]` (P0)
-  - `HrDashboardPage` — `p-6` → `p-4 sm:p-6 lg:p-8` + priority cards grid (P1)
-  - `HrEvaluationReviewPage` — `xl:grid-cols-[1fr_360px]` → `lg:` + score `text-5xl` → `text-4xl sm:text-5xl` (P1)
-  - `HrJobPostingDetailPage` — Application table wrapper + `w-36` actions + cover letter modal grid (P1)
-  - `RecruiterJobDetailPage` — Application table wrapper + `w-36` actions + cover letter modal grid (P1)
-  - `ApplicationsPage` (Candidate) — Main grid collapse + sidebar ẩn mobile (P1)
-  - `FindJobPage` — Work modes grid + FilterSidebar mobile drawer (P1)
-  - `HomePage` — InterviewKioskSection input+button wrap dọc trên mobile (P1)
-  - `InterviewSchedulePage` (Candidate) — Refactor toàn page từ dark-glass → design system ink/brand/ai (P1)
-  - `ApplicationDetailPage` — Round sidebar + score font responsive (P2)
-  - `CandidateJobDetailPage` — Layout + match score responsive (P2)
-  - `ProfilePage` — Padding + avatar responsive (P2)
-  - `ApplyPage` — Contact grid mobile fallback (P2)
-  - `HrCandidatesPage` — Page padding responsive (P2)
-  - `HrCandidateDetailPage` — Padding + avatar + code responsive (P2)
-  - `RecruiterCreateJobPostingPage` — Grids + padding responsive (P2)
-  - `RecruiterMyJobsPage` — Page padding responsive (P2)
-  - JSX syntax fix: `JobDetailPage` (recruiter) + `JobPostingDetailPage` (hr) — 2 file sửa cùng đợt.
-  - **Tổng:** 16 commit + 1 fix JSX (17 commit), 16 page, 11 issue P1 + 1 P0 đã giải quyết. Layout không còn vỡ trên mobile 320px.
-
-- [x] 2026-07-25: **Phase 2 (FE Responsive) – Nhóm B: Form & Input (5 file, 1 commit).** Hoàn tất Phase 2 Nhóm B theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 5 file form/input thiếu responsive đã fix:
-  - `ARI.CandidateSite/src/pages/candidate/ProfilePage.tsx` — Experience form `grid-cols-1 sm:grid-cols-2` + Education form `grid-cols-1 sm:grid-cols-2` + `min-w-0` cho flex notes+delete.
-  - `ARI.StaffSite/src/pages/recruiter/CreateJobPostingPage.tsx` — Salary grid `grid-cols-1 sm:grid-cols-2 md:grid-cols-3` + `min-w-0` + select span.
-  - `ARI.StaffSite/src/pages/recruiter/InterviewCodePage.tsx` — Search input `min-w-0` + `shrink-0` icon + `w-full`.
-  - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — Batch action bar `flex-col sm:flex-row` + actions `flex-wrap`. Filter bar, table grid, pending approval banner, header job info — đã OK sẵn.
-  - **Lint:** 0 lỗi trên 5 file.
-
-- [x] 2026-07-25: **Phase 2 (FE Responsive) – Nhóm C: Table (3 file, 1 commit).** Hoàn tất Phase 2 Nhóm C theo plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.2.1. 3 file table thiếu `min-w` wrapper + cell text overflow đã fix:
-  - `ARI.StaffSite/src/pages/hr/DashboardPage.tsx` — Candidates table `min-w-[600px]` (bump từ 560px) + cell padding `px-4 sm:px-5` + jobTitle cell `max-w-[160px] truncate` + candidate name cell `min-w-0` chứa truncate.
-  - `ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[600px]` (bump từ 640px) + filter button + status badge `whitespace-nowrap` + jobTitle cell `max-w-[180px] truncate` + date cell `whitespace-nowrap` + cell padding `px-3 sm:px-4`.
-  - `ARI.StaffSite/src/pages/super-admin/UsersPage.tsx` — Page padding `p-4 sm:p-6 lg:p-8` + table `min-w-[700px]` (bump từ 640px theo plan) + cell padding `px-4 sm:px-6` + role select `w-full max-w-[140px]` + badge `whitespace-nowrap` + CreateStaff form grid `grid-cols-1 sm:grid-cols-2` (mobile 1-col, desktop 2-col).
-  - **Pattern dùng chung:** Table wrapper `overflow-x-auto` + `min-w-[600-700px]` giữ scroll ngang gọn; cell padding `px-3/4 sm:px-4/5/6` theo density từng bảng; cell có text dài thêm `max-w-[N] truncate` + parent `min-w-0`; badge/date thêm `whitespace-nowrap` để không gãy icon dot.
-  - **Lint:** 0 lỗi trên 3 file.
-  - **Còn lại Phase 2:** Nhóm D Layout phức tạp (Candidate JobDetailPage sticky aside, ScrollStorytelling), Nhóm E Chart & Modal nhỏ (DashboardPage YAxis, JobPostingDetailPage reject modal).
-
-- [x] 2026-07-25: **Phase 3 Modal/Dialog + Phase 4 Card/Stat/Widget + Phase 5 Navigation/Header + Phase 6 Job List/Detail (commit thứ 2 của ngày).** Patch responsive nhiều phase trong 1 commit:
-  - `ARI.Shared/src/ui/designSystem.tsx` — PageHeader `flex-col sm:flex-row` + title `text-xl sm:text-2xl` + button `px-3 sm:px-4`.
-  - `ARI.Shared/src/ui/LanguageSwitcher.tsx` — Text label `hidden sm:inline` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
-  - `ARI.StaffSite/src/app/layouts/WorkspaceLayout.tsx` — Header padding `px-3 sm:px-6` + dropdowns `w-[calc(100vw-1.5rem)] max-w-xs/sm` + search bar `hidden sm:flex` + icon button `sm:hidden` + dividers `hidden sm:inline-block` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
-  - `ARI.StaffSite/src/app/layouts/HrLayout.tsx` — Padding `px-3 sm:px-6` + dropdown `w-[calc(100vw-1.5rem)] max-w-xs` + search `hidden sm:flex` + icon `sm:hidden` + dividers `hidden sm:inline-block` + dropdown `fixed top-[4.5rem] sm:absolute sm:top-auto`.
-  - `ARI.StaffSite/src/pages/hr/JobsPage.tsx` — Container `p-4 sm:p-6 lg:p-8` + card `p-3 sm:p-4 lg:p-6` + body `flex-col gap-3 sm:flex-row sm:items-center sm:justify-between` + avatar `w-10 h-10 sm:w-12 sm:h-12` + title `text-base sm:text-lg` + button Eye icon + label "Xem" mobile / "Xem chi tiết" desktop.
-  - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — Container `p-4 sm:p-6 lg:p-8` + hero outer `gap-4 sm:gap-6` + inner `gap-3 sm:gap-4 lg:gap-6 min-w-0` + avatar `w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 shrink-0` + title block `min-w-0 flex-1` + title `text-xl sm:text-2xl lg:text-3xl break-words` + button "Chỉnh sửa" `w-full sm:w-auto self-stretch sm:self-start`.
-  - `.ai/responsive-fix-plan-2026-07-24.md` — Update section 0.4 trạng thái thực thi + section 6.2 cột "Trạng thái" cho HR (Phase 5x6 hoàn thành).
-  - **Root cause chính trên mobile <640px:** Outer padding 24px ngốm 48/320=15% viewport; card padding 16px ngốm thêm 32px; hero avatar không `shrink-0` + title block không `min-w-0` → avatar bị content overflow ép xuống ~24px thay vì giữ 56px.
-  - **Lint:** 0 lỗi trên 7 file.
- Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
+- [x] 2026-07-22: **Fix `502` staff site sau deploy tự động — nginx cache IP upstream.** Lần chạy `deploy.yml` đầu tiên: 4 image build + push GHCR thành công, VPS pull và up xong, nhưng health-check báo đỏ vì `staff.arisp.io.vn` trả 502 suốt 12 lần thử (candidate 200). Nguyên nhân: nginx resolve hostname upstream một lần lúc khởi động; deploy tạo lại `frontend-staff` (IP mới `172.18.0.5`) nhưng nginx không được tạo lại nên vẫn gọi `172.18.0.7` → `connect() failed (113: Host is unreachable)`. Candidate thoát nạn do trùng IP ngẫu nhiên. Thêm `docker compose restart nginx` sau `up -d` trong `deploy.yml`. Ghi nhận: health-check trong pipeline đã làm đúng việc — bắt lỗi và fail build thay vì báo xanh giả.
 
 - [x] 2026-07-22: **CI/CD GitHub Actions + chuyển production sang nhánh `main` + chấm dứt config drift trên VPS (ADR-047).**
   - **Hotfix `arisp-rag` (đã áp dụng thẳng lên VPS):** container crash-loop **6928 lần**. `docker/.env` chỉ có biến .NET (`ConnectionStrings__DefaultConnection`), trong khi rag-service Python đọc `DATABASE_*` riêng (`app/config.py:19`) → fallback về localhost → `ConnectionRefusedError` khi startup. Thêm `DATABASE_HOST/PORT/NAME/USER/PASSWORD/SSLMODE` (dùng tham số rời thay `DATABASE_URL` vì password chứa `?`, đúng ý `core/db.py:46`). Phát hiện thêm cùng lớp lỗi: thiếu `OPENAI_API_KEY` → service chạy **mock mode sinh câu hỏi giả mà vẫn trả HTTP 200**; thêm `OPENAI_API_KEY` + `APP_ENV=production`. Kết quả: `{"status":"ok","env":"production","mock_mode":false,"db":true}`, RestartCount=0.

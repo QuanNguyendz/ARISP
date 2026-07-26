@@ -29,6 +29,7 @@ import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { Pagination } from '@ari/shared/ui'
+import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
@@ -120,6 +121,14 @@ export default function JobPostingDetailPage() {
 
   useEffect(() => {
     void load()
+
+    const onRefresh = () => {
+      void load()
+    }
+    window.addEventListener(STAFF_NOTIF_REFRESH_EVENT, onRefresh)
+    return () => {
+      window.removeEventListener(STAFF_NOTIF_REFRESH_EVENT, onRefresh)
+    }
   }, [load])
 
   useEffect(() => {
@@ -274,9 +283,17 @@ export default function JobPostingDetailPage() {
       .sort((a, b) => a.roundNumber - b.roundNumber)
       .map((rc) => {
         const candidates = apps.filter((a) => a.currentRound === rc.roundNumber)
+        const roundTypeStr = rc.roundType
+          ? rc.roundType.toLowerCase() === 'screening'
+            ? t('rounds.types.screening')
+            : rc.roundType.toLowerCase() === 'technical'
+              ? t('rounds.types.technical')
+              : rc.roundType
+          : ''
+        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
           id: `round_${rc.roundNumber}`,
-          title: t('rounds.round', { number: rc.roundNumber }),
+          title: `${t('rounds.round', { number: rc.roundNumber })}${typeText}`,
           subtitle:
             rc.roundType === 'technical'
               ? t('rounds.types.technical')
@@ -438,6 +455,20 @@ export default function JobPostingDetailPage() {
     }
   }
 
+  const handleToggleDisplay = async (field: 'isUrgent' | 'isPublicListing', value: boolean) => {
+    if (!id || !job) return
+    const originalValue = job[field]
+    if (originalValue === value) return
+
+    setJob({ ...job, [field]: value })
+    try {
+      await jobService.updateJobDisplay(id, { [field]: value })
+    } catch (err: unknown) {
+      setJob({ ...job, [field]: originalValue }) // Revert on failure
+      setActionError(t(`errors.toggleFailed`))
+    }
+  }
+
   const getDeadlineText = (deadlineStr?: string | null): string => {
     if (!deadlineStr) return t('deadline.noLimit')
     const d = new Date(deadlineStr)
@@ -497,11 +528,17 @@ export default function JobPostingDetailPage() {
     return mappings[mode.toLowerCase()] || mode
   }
 
-  const getStatusLabel = (status: string): string => {
+  const getStatusLabel = (status: string, deadline?: string | null): string => {
+    if (status === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+      return 'Hết hạn (Đã đóng)'
+    }
     return t(`statusLabels.${status}`) || status
   }
 
-  const getStatusBadge = (status: string): string => {
+  const getStatusBadge = (status: string, deadline?: string | null): string => {
+    if (status === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+      return 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400'
+    }
     const badges: Record<string, string> = {
       draft: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
       pending: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
@@ -551,23 +588,36 @@ export default function JobPostingDetailPage() {
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </button>
 
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8 sm:gap-6">
-          <div className="flex items-start gap-3 min-w-0 sm:gap-4 lg:gap-6">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 shrink-0 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-lg sm:text-xl lg:text-2xl font-bold text-white">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+          <div className="flex items-start gap-6">
+            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-2xl font-bold text-white">
               {job.title.substring(0, 2).toUpperCase()}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 mb-1 sm:gap-3 sm:mb-2">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-ink-900 dark:text-white break-words">{job.title}</h1>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-semibold text-ink-900 dark:text-white">{job.title}</h1>
                 <span
-                  className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-semibold ${getStatusBadge(job.status)}`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(job.status, job.applicationDeadline)}`}
                 >
-                  {getStatusLabel(job.status)}
+                  {getStatusLabel(job.status, job.applicationDeadline)}
                 </span>
               </div>
-              <p className="text-sm sm:text-base lg:text-xl text-ink-600 dark:text-ink-400 mb-3 sm:mb-4">
-                {job.department || t('department')}
-              </p>
+              <div className="flex items-center gap-4 mb-4 flex-wrap">
+                <p className="text-xl text-ink-600 dark:text-ink-400">
+                  {job.department || t('department')}
+                </p>
+                
+                <div className="flex items-center gap-4 border-l border-ink-200 dark:border-white/10 pl-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                    <input type="checkbox" checked={job.isUrgent} onChange={(e) => handleToggleDisplay('isUrgent', e.target.checked)} className="accent-brand-600" />
+                    Tuyển gấp
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300 bg-white dark:bg-white/5 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 shadow-sm transition-colors hover:bg-ink-50 dark:hover:bg-white/10">
+                    <input type="checkbox" checked={job.isPublicListing} onChange={(e) => handleToggleDisplay('isPublicListing', e.target.checked)} className="accent-brand-600" />
+                    Public Website
+                  </label>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600 dark:text-ink-400">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-brand-600 dark:text-brand-400" />
@@ -591,13 +641,22 @@ export default function JobPostingDetailPage() {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
-            className="w-full sm:w-auto self-stretch sm:self-start flex items-center justify-center gap-2 px-3 py-2 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
-          >
-            <Edit2 className="w-4 h-4" /> {t('edit')}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+              className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <Edit2 className="w-4 h-4" /> {t('edit')}
+            </button>
+          </div>
         </div>
 
         {notice && (
@@ -661,6 +720,49 @@ export default function JobPostingDetailPage() {
             </div>
           </div>
         )}
+        
+        {job.status === 'draft' && (
+          <div className="mb-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/60 dark:bg-blue-500/10 p-5 shadow-card">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                  <Edit2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold text-ink-900 dark:text-white">
+                    Bản nháp của bạn
+                  </h3>
+                  <p className="mt-0.5 text-sm text-ink-600 dark:text-ink-400">
+                    Đây là tin tuyển dụng nháp. Bạn có thể kích hoạt trực tiếp mà không cần duyệt, hoặc tiếp tục chỉnh sửa.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={approve}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50"
+                >
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Target className="h-4 w-4" />
+                  )}{' '}
+                  Kích hoạt luôn
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/30 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50"
+                >
+                  <Edit2 className="h-4 w-4" /> Sửa tin
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {job.status === 'rejected' && job.rejectionReason && (
           <div className="mb-6 flex items-start gap-2 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
@@ -687,7 +789,7 @@ export default function JobPostingDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
             >
               <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-brand-600 dark:text-brand-400" />{' '}
@@ -727,7 +829,7 @@ export default function JobPostingDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
             >
               <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4">
                 {t('description')}
@@ -743,7 +845,7 @@ export default function JobPostingDetailPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
               >
                 <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4">
                   {t('skills')}
@@ -765,7 +867,7 @@ export default function JobPostingDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
             >
               <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />{' '}
@@ -811,7 +913,7 @@ export default function JobPostingDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 }}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
             >
               <h2 className="text-xl font-semibold text-ink-900 dark:text-white mb-4">
                 {t('rounds.title', { count: job.roundConfigs?.length || 0 })}
@@ -974,19 +1076,19 @@ export default function JobPostingDetailPage() {
               </div>
 
               {selectedIds.length > 0 && (
-                <div className="flex flex-col gap-3 p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center justify-between p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-brand-900 dark:text-brand-400">
                       {t('batchActions.selected', { count: selectedIds.length })}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-2">
                     {activeTab === 'cv_review' ? (
                       <>
                         <button
                           disabled={batchProcessing}
                           onClick={handleBatchAccept}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
                         >
                           {batchProcessing ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -998,7 +1100,7 @@ export default function JobPostingDetailPage() {
                         <button
                           disabled={batchProcessing}
                           onClick={handleBatchReject}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
                         >
                           <X className="w-3.5 h-3.5" /> {t('batchActions.rejectBatch')}
                         </button>
@@ -1007,7 +1109,7 @@ export default function JobPostingDetailPage() {
                       <button
                         disabled={batchProcessing}
                         onClick={handleBatchInvite}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
                       >
                         {batchProcessing ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1027,11 +1129,9 @@ export default function JobPostingDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card">
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[700px]">
-                      <div
-                        className={`grid gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
-                      >
+                  <div
+                    className={`grid gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
+                  >
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -1151,7 +1251,7 @@ export default function JobPostingDetailPage() {
                           </span>
                         </div>
                         <div className="flex items-center justify-center gap-1 shrink-0">
-                          <div className="flex w-auto min-w-[8rem] max-w-full gap-2 shrink-0 justify-center">
+                          <div className="w-36 flex gap-2 shrink-0 justify-center">
                             {!a.currentRound || a.currentRound === 0 ? (
                               <>
                                 <button
@@ -1247,8 +1347,6 @@ export default function JobPostingDetailPage() {
                       </div>
                     ))}
                   </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1273,7 +1371,7 @@ export default function JobPostingDetailPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-5 sm:p-6 shadow-card-hover"
+            className="w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover"
           >
             <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">
               {t('confirmRejectModal.title')}

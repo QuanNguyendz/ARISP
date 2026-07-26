@@ -3,8 +3,11 @@ import type { JobPosting } from '@ari/shared/types/job'
 // ===== Trạng thái Job (khớp backend: draft|pending|active|rejected|closed|archived) =====
 export type JobStatus = JobPosting['status']
 
-export const jobStatusLabel = (s: string): string =>
-  ({
+export const jobStatusLabel = (s: string, deadline?: string | null): string => {
+  if (s === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+    return 'Hết hạn (Đã đóng)'
+  }
+  return ({
     draft: 'Nháp',
     pending: 'Chờ HR duyệt',
     active: 'Đang đăng',
@@ -13,9 +16,13 @@ export const jobStatusLabel = (s: string): string =>
     archived: 'Lưu trữ',
     paused: 'Tạm dừng',
   } as Record<string, string>)[s] || s
+}
 
-export const jobStatusBadge = (s: string): string =>
-  ({
+export const jobStatusBadge = (s: string, deadline?: string | null): string => {
+  if (s === 'active' && deadline && new Date(deadline).getTime() < Date.now()) {
+    return 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300' // Same as closed
+  }
+  return ({
     draft: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300',
     pending: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
     active: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
@@ -24,6 +31,7 @@ export const jobStatusBadge = (s: string): string =>
     archived: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400',
     paused: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
   } as Record<string, string>)[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
+}
 
 // ===== Trạng thái Application (khớp backend: invited|cv_submitted|screening|interview|pass|not_pass|withdrawn) =====
 export const appStatusLabel = (s: string): string =>

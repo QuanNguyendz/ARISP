@@ -55,6 +55,10 @@ export interface PracticeMediaConfig {
   sessionId: string;
   language: string;
   sessionType: string;
+  /** Trần thời lượng phiên (giây) để vẽ đếm ngược; 0 = không giới hạn (ADR-050). */
+  maxDurationSeconds?: number;
+  /** Mốc bắt đầu phiên (ISO UTC) để tính thời gian còn lại khớp giờ server. */
+  startedAtUtc?: string | null;
   deepgram?: { token: string; expiresInSeconds: number; model: string } | null;
   heyGen?: { token: string; serverUrl: string; avatarId?: string | null; voiceId?: string | null } | null;
 }

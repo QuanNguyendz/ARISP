@@ -30,7 +30,15 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
 
         public async Task<Result<StaffNotificationListDto>> Handle(GetStaffNotificationsQuery request, CancellationToken ct)
         {
-            await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.UserId, ct);
+            var settings = user != null && !string.IsNullOrEmpty(user.SettingsJson)
+                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.StaffSettingsDto>(user.SettingsJson) ?? new ARI.Application.DTOs.StaffSettingsDto()
+                : new ARI.Application.DTOs.StaffSettingsDto();
+
+            if (settings.ReceivePush)
+            {
+                await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+            }
 
             var items = (await _unitOfWork.Repository<Notification>()
                     .FindAsync(n => n.RecipientUserId == request.UserId, ct))
@@ -60,6 +68,10 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
             string Title(Guid jid) => jobTitle.TryGetValue(jid, out var t) ? t : "Vị trí tuyển dụng";
 
             var linkBase = isRecruiter && !isHrAdmin ? "/recruiter" : "/hr";
+            // Trang bảng điểm trắc nghiệm khác route giữa recruiter (/my-jobs) và HR (/jobs).
+            string OnlineTestResultsLink(Guid jid) => isRecruiter && !isHrAdmin
+                ? $"/recruiter/my-jobs/{jid}/online-test/results"
+                : $"/hr/jobs/{jid}/online-test/results";
             var nowUtc = DateTimeOffset.UtcNow;
             var since = nowUtc.AddDays(-30);
 
@@ -96,7 +108,7 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                     .Select(a => new { a.Id, a.JobPostingId, a.CandidateName, a.CreatedAt }), ct);
             foreach (var a in apps)
                 Add($"applied:{a.Id}", "applied", "Ứng viên mới ứng tuyển",
-                    $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates", a.CreatedAt);
+                    $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates/{a.Id}", a.CreatedAt);
 
             // 2. Đánh giá AI chờ HR xác nhận (chưa có HrReview) cho tin trong phạm vi.
             var appIds = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
@@ -120,13 +132,74 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                 }
             }
 
-            // 3. Tin chờ duyệt — chỉ HR Admin.
-            if (isHrAdmin)
+            // 4. Ứng viên hoàn thành bài thi trắc nghiệm (30 ngày gần nhất) cho tin trong phạm vi.
+            if (appIds.Count > 0)
             {
-                foreach (var j in jobs.Where(j => j.Status == "pending"))
-                    Add($"jobapproval:{j.Id}", "approval", "Tin tuyển dụng chờ duyệt",
-                        Title(j.Id), "/hr/jobs/pending", nowUtc);
+                var submissions = await _unitOfWork.Repository<OnlineTestSubmission>()
+                    .QueryAsync(q => q
+                        .Where(s => appIds.Contains(s.ApplicationId) && s.CreatedAt >= since)
+                        .Select(s => new { s.Id, s.ApplicationId, s.Score, s.IsPassed, s.RoundNumber, s.CreatedAt }), ct);
+                if (submissions.Count > 0)
+                {
+                    var subAppIds = submissions.Select(s => s.ApplicationId).Distinct().ToList();
+                    var subApps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                            .QueryAsync(q => q.Where(a => subAppIds.Contains(a.Id))
+                                .Select(a => new { a.Id, a.JobPostingId, a.CandidateName }), ct))
+                        .ToDictionary(a => a.Id);
+                    foreach (var s in submissions)
+                    {
+                        subApps.TryGetValue(s.ApplicationId, out var a);
+                        var jid = a?.JobPostingId ?? Guid.Empty;
+                        var name = a?.CandidateName ?? "Ứng viên";
+                        var verdict = s.IsPassed ? "Đạt" : "Chưa đạt";
+                        Add($"onlinetest:{s.Id}", "online_test",
+                            $"Ứng viên hoàn thành bài thi trắc nghiệm ({verdict})",
+                            $"{name} · {Title(jid)} · {(int)Math.Round(s.Score)}/100",
+                            jid != Guid.Empty ? OnlineTestResultsLink(jid) : $"{linkBase}/candidates/{s.ApplicationId}",
+                            s.CreatedAt);
+                    }
+                }
             }
+
+            // 5. Ứng viên phản hồi lịch phỏng vấn (xác nhận / báo bận) — 30 ngày gần nhất.
+            if (appIds.Count > 0)
+            {
+                var responses = await _unitOfWork.Repository<InterviewBooking>()
+                    .QueryAsync(q => q
+                        .Where(b => appIds.Contains(b.ApplicationId)
+                            && b.RespondedAt >= since
+                            && (b.ConfirmationStatus == "confirmed" || b.ConfirmationStatus == "declined"))
+                        .Select(b => new { b.Id, b.ApplicationId, b.RoundNumber, b.ConfirmationStatus, b.DeclineReason, b.RespondedAt }), ct);
+                if (responses.Count > 0)
+                {
+                    var respAppIds = responses.Select(r => r.ApplicationId).Distinct().ToList();
+                    var respApps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                            .QueryAsync(q => q.Where(a => respAppIds.Contains(a.Id))
+                                .Select(a => new { a.Id, a.JobPostingId, a.CandidateName }), ct))
+                        .ToDictionary(a => a.Id);
+                    foreach (var r in responses)
+                    {
+                        respApps.TryGetValue(r.ApplicationId, out var a);
+                        var jid = a?.JobPostingId ?? Guid.Empty;
+                        var name = a?.CandidateName ?? "Ứng viên";
+                        var declined = string.Equals(r.ConfirmationStatus, "declined", StringComparison.OrdinalIgnoreCase);
+                        Add($"schedule_response:{r.Id}", "schedule",
+                            declined ? "Ứng viên báo bận lịch phỏng vấn" : "Ứng viên xác nhận lịch phỏng vấn",
+                            declined
+                                ? $"{name} · {Title(jid)} · vòng {r.RoundNumber}: {r.DeclineReason}"
+                                : $"{name} · {Title(jid)} · vòng {r.RoundNumber}",
+                            $"{linkBase}/candidates/{r.ApplicationId}", r.RespondedAt ?? nowUtc);
+                    }
+                }
+            }
+
+            // 3. Tin chờ duyệt — chỉ HR Admin. (Đã tạo thực tế qua UpdateJobStatusCommand nên bỏ qua tạo ảo để tránh lặp)
+            // if (isHrAdmin)
+            // {
+            //     foreach (var j in jobs.Where(j => j.Status == "pending"))
+            //         Add($"jobapproval:{j.Id}", "approval", "Tin tuyển dụng chờ duyệt",
+            //             Title(j.Id), "/hr/jobs/pending", nowUtc);
+            // }
 
             if (toAdd.Count > 0)
             {

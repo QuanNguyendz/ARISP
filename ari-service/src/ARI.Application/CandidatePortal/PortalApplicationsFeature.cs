@@ -257,8 +257,17 @@ namespace ARI.Application.CandidatePortal
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId);
 
+            // Round configs của job (nếu có)
+            var roundConfigs = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == app.JobPostingId))
+                .OrderBy(r => r.RoundNumber)
+                .ToList();
+
             var sessionsResult = await _unitOfWork.Repository<InterviewSession>().FindAsync(s => s.ApplicationId == id);
             var sessions = sessionsResult.OrderBy(s => s.RoundNumber).ToList();
+
+            var invites = (await _unitOfWork.Repository<InterviewInvite>()
+                .FindAsync(i => i.ApplicationId == id)).ToList();
 
             // Optimize query: Fetch all evaluations and HR reviews in batch
             var sessionIds = sessions.Select(s => s.Id).ToList();
@@ -269,30 +278,52 @@ namespace ARI.Application.CandidatePortal
             var reviews = await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId));
             var reviewDict = reviews.ToDictionary(r => r.EvaluationId, r => r);
 
-            // Lịch phỏng vấn sắp tới (booking đã đặt) cho hồ sơ này — để hiển thị "Lịch sắp tới".
+            // Lịch phỏng vấn sắp tới (booking đã đặt) cho hồ sơ này
             var nowUtc = DateTimeOffset.UtcNow;
             var bookings = (await _unitOfWork.Repository<InterviewBooking>()
-                .FindAsync(b => b.ApplicationId == id && b.Status == "scheduled")).ToList();
+                .FindAsync(b => b.ApplicationId == id)).ToList();
             var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
             var slots = slotIds.Any()
                 ? (await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id))).ToList()
                 : new List<AvailabilitySlot>();
             var slotById = slots.ToDictionary(s => s.Id, s => s);
+
             var upcoming = bookings
-                .Where(b => slotById.ContainsKey(b.AvailabilitySlotId) && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
+                .Where(b => b.Status == "scheduled" && slotById.ContainsKey(b.AvailabilitySlotId) && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
                 .OrderBy(b => slotById[b.AvailabilitySlotId].StartTime)
                 .Select(b => slotById[b.AvailabilitySlotId])
                 .FirstOrDefault();
 
-            // Mã phỏng vấn On-site còn hiệu lực (để liên kết qua trang Hồ sơ ứng tuyển).
+            // Mã phỏng vấn On-site còn hiệu lực
             var activeCode = (await _unitOfWork.Repository<InterviewCode>()
                 .FindAsync(c => c.ApplicationId == id && c.UsedAt == null && c.ExpiresAt > nowUtc))
                 .OrderByDescending(c => c.RoundNumber).ThenByDescending(c => c.CreatedAt)
                 .FirstOrDefault();
 
-            var sessionDetails = new List<object>();
-            foreach (var s in sessions)
+            // Tổng hợp các roundNumber của job
+            var roundNumbers = new SortedSet<int>();
+            if (roundConfigs.Any())
             {
+                foreach (var rc in roundConfigs) roundNumbers.Add(rc.RoundNumber);
+            }
+            foreach (var s in sessions) roundNumbers.Add(s.RoundNumber);
+            foreach (var i in invites) roundNumbers.Add(i.RoundNumber);
+            foreach (var b in bookings)
+            {
+                if (slotById.TryGetValue(b.AvailabilitySlotId, out var sl))
+                    roundNumbers.Add(sl.RoundNumber);
+            }
+            if (!roundNumbers.Any()) roundNumbers.Add(1);
+
+            var sessionDetails = new List<object>();
+            foreach (var rNum in roundNumbers)
+            {
+                var s = sessions.FirstOrDefault(x => x.RoundNumber == rNum);
+                var rc = roundConfigs.FirstOrDefault(x => x.RoundNumber == rNum);
+                var inv = invites.FirstOrDefault(x => x.RoundNumber == rNum);
+                var bk = bookings.FirstOrDefault(x => slotById.TryGetValue(x.AvailabilitySlotId, out var sl) && sl.RoundNumber == rNum);
+                var slot = bk != null && slotById.TryGetValue(bk.AvailabilitySlotId, out var sl2) ? sl2 : null;
+
                 object? evalData = null;
                 string? recordingUrl = null;
                 bool transcriptShared = false;
@@ -300,52 +331,72 @@ namespace ARI.Application.CandidatePortal
                 string? hrFinalVerdict = null;
                 bool pendingHrReview = false;
 
-                if (evalDict.TryGetValue(s.Id, out var evaluation))
+                string status;
+                DateTimeOffset? scheduledAt = slot?.StartTime;
+
+                if (s != null)
                 {
-                    reviewDict.TryGetValue(evaluation.Id, out var review);
-                    bool sharedEval = review != null && review.ShareEvaluation;
-
-                    // Vòng đã hoàn tất + AI đã chấm nhưng HR chưa chia sẻ → đang chờ HR xác nhận.
-                    if (s.Status == "completed" && !sharedEval)
-                        pendingHrReview = true;
-
-                    if (review != null)
+                    status = s.Status;
+                    if (evalDict.TryGetValue(s.Id, out var evaluation))
                     {
-                        hrFinalVerdict = sharedEval ? review.FinalVerdict : null;
-                        transcriptShared = review.ShareTranscript;
-                        if (review.ShareRecording && !string.IsNullOrEmpty(s.RecordingUrl))
-                            recordingUrl = await _fileStorage.GetUrlAsync(s.RecordingUrl);
-                        if (review.ShareFeedback && !string.IsNullOrWhiteSpace(review.CandidateFeedback))
-                            hrFeedback = review.CandidateFeedback;
-                    }
+                        reviewDict.TryGetValue(evaluation.Id, out var review);
+                        bool sharedEval = review != null && review.ShareEvaluation;
 
-                    if (sharedEval)
-                    {
-                        evalData = new
+                        // Vòng đã hoàn tất + AI đã chấm nhưng HR chưa chia sẻ → đang chờ HR xác nhận.
+                        if (s.Status == "completed" && !sharedEval)
+                            pendingHrReview = true;
+
+                        if (review != null)
                         {
-                            evaluation.Id,
-                            evaluation.RoundNumber,
-                            evaluation.AiVerdict,
-                            evaluation.OverallScore,
-                            evaluation.Reasoning,
-                            evaluation.RecommendedNextStep,
-                            CriterionScores = PortalSupport.ParseCriterionScores(evaluation.CriterionScores),
-                            QuestionAnalyses = PortalSupport.ParseQuestionAnalyses(evaluation.QuestionAnalyses),
-                            LanguageAssessment = PortalSupport.ParseLanguageAssessment(evaluation.LanguageAssessment)
-                        };
+                            hrFinalVerdict = sharedEval ? review.FinalVerdict : null;
+                            transcriptShared = review.ShareTranscript;
+                            if (review.ShareRecording && !string.IsNullOrEmpty(s.RecordingUrl))
+                                recordingUrl = await _fileStorage.GetUrlAsync(s.RecordingUrl);
+                            if (review.ShareFeedback && !string.IsNullOrWhiteSpace(review.CandidateFeedback))
+                                hrFeedback = review.CandidateFeedback;
+                        }
+
+                        if (sharedEval)
+                        {
+                            evalData = new
+                            {
+                                evaluation.Id,
+                                evaluation.RoundNumber,
+                                evaluation.AiVerdict,
+                                evaluation.OverallScore,
+                                evaluation.Reasoning,
+                                evaluation.RecommendedNextStep,
+                                CriterionScores = PortalSupport.ParseCriterionScores(evaluation.CriterionScores),
+                                QuestionAnalyses = PortalSupport.ParseQuestionAnalyses(evaluation.QuestionAnalyses),
+                                LanguageAssessment = PortalSupport.ParseLanguageAssessment(evaluation.LanguageAssessment)
+                            };
+                        }
                     }
+                }
+                else if (slot != null && bk?.Status == "scheduled")
+                {
+                    status = "scheduled";
+                }
+                else if (inv != null)
+                {
+                    status = "invited";
+                }
+                else
+                {
+                    status = "not_started";
                 }
 
                 sessionDetails.Add(new
                 {
-                    s.Id,
-                    s.RoundNumber,
-                    s.RoundType,
-                    s.SessionType,
-                    s.Status,
-                    s.StartedAt,
-                    s.EndedAt,
-                    s.DurationSeconds,
+                    Id = s?.Id.ToString() ?? $"virtual_round_{app.Id}_{rNum}",
+                    RoundNumber = rNum,
+                    RoundType = s?.RoundType ?? rc?.RoundType ?? "screening",
+                    SessionType = s?.SessionType ?? "real",
+                    Status = status,
+                    ScheduledAt = scheduledAt,
+                    StartedAt = s?.StartedAt,
+                    EndedAt = s?.EndedAt,
+                    DurationSeconds = s?.DurationSeconds,
                     RecordingUrl = recordingUrl,
                     TranscriptShared = transcriptShared,
                     PendingHrReview = pendingHrReview,

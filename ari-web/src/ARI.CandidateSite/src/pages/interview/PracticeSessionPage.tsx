@@ -15,11 +15,19 @@ import {
   Send,
   Loader2,
   AlertTriangle,
+  Clock,
+  Keyboard,
 } from 'lucide-react'
 import DeviceCheck from '@ari/shared/media/DeviceCheck'
 import { usePracticeSession } from '@ari/shared/media/usePracticeSession'
 
 type Phase = 'intro' | 'live' | 'ended'
+
+/** Giây → M:SS cho đồng hồ đếm ngược. */
+function mmss(total: number): string {
+  const s = Math.max(0, Math.floor(total))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
 
 function Logo() {
   return (
@@ -54,7 +62,6 @@ export default function PracticeSessionPage() {
   const { t } = useTranslation('modules/interview/practice')
 
   const [phase, setPhase] = useState<Phase>('intro')
-  const [isMuted, setIsMuted] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
   const selfVideoRef = useRef<HTMLVideoElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
@@ -65,7 +72,7 @@ export default function PracticeSessionPage() {
   useEffect(() => {
     const el = transcriptRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [practice.messages, practice.draft, practice.interim])
+  }, [practice.messages, practice.answerText, practice.interim])
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -92,16 +99,8 @@ export default function PracticeSessionPage() {
 
   const handleReady = (stream: MediaStream) => {
     streamRef.current = stream
-    setIsMuted(false)
     setPhase('live')
     void practice.start(stream)
-  }
-
-  const toggleMute = () => {
-    const track = streamRef.current?.getAudioTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setIsMuted(!track.enabled)
   }
 
   const endSession = async () => {
@@ -156,6 +155,10 @@ export default function PracticeSessionPage() {
               <li className="flex items-start gap-2">
                 <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" />{' '}
                 {t('practice.points.voiceAnswer')}
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />{' '}
+                {t('practice.points.timeLimit')}
               </li>
             </ul>
           </div>
@@ -222,9 +225,26 @@ export default function PracticeSessionPage() {
             <span className="text-slate-400"> · {t('practice.header.subtitle')}</span>
           </div>
         </div>
-        <span className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-300">
-          <ShieldCheck className="h-4 w-4" /> {t('practice.noVideo')}
-        </span>
+        <div className="flex items-center gap-3">
+          {/* Đồng hồ đếm ngược trần thời lượng (ADR-050) — vàng <2', đỏ <30" */}
+          {practice.remainingSeconds !== null && (
+            <span
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${
+                practice.remainingSeconds <= 30
+                  ? 'bg-red-500/15 text-red-300'
+                  : practice.remainingSeconds <= 120
+                    ? 'bg-amber-500/15 text-amber-300'
+                    : 'bg-white/10 text-slate-200'
+              }`}
+              aria-label={t('practice.timer.label')}
+            >
+              <Clock className="h-4 w-4" /> {mmss(practice.remainingSeconds)}
+            </span>
+          )}
+          <span className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-300">
+            <ShieldCheck className="h-4 w-4" /> {t('practice.noVideo')}
+          </span>
+        </div>
       </header>
 
       {/* Main — min-h-0 để grid con không đẩy chiều cao vượt viewport */}
@@ -263,6 +283,11 @@ export default function PracticeSessionPage() {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />{' '}
                   {t('practice.statusMessages.connecting')}
+                </>
+              ) : practice.timeUp ? (
+                <>
+                  <Clock className="h-4 w-4 text-amber-300" />{' '}
+                  {t('practice.statusMessages.timeUp')}
                 </>
               ) : practice.status === 'error' ? (
                 <>
@@ -304,7 +329,7 @@ export default function PracticeSessionPage() {
               playsInline
               className="h-full w-full -scale-x-100 object-cover"
             />
-            {isMuted && (
+            {!practice.micEnabled && (
               <span className="absolute bottom-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-500/80">
                 <MicOff className="h-3.5 w-3.5 text-white" />
               </span>
@@ -343,15 +368,15 @@ export default function PracticeSessionPage() {
                 {m.text}
               </div>
             ))}
-            {(practice.draft || practice.interim) && (
+            {(practice.answerText || practice.interim) && (
               <div className="ml-6 rounded-xl border border-dashed border-brand-400/40 bg-white/5 px-3.5 py-2.5 text-sm text-slate-300">
                 <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-brand-300">
                   {t('practice.transcript.drafting')}
                 </span>
-                {practice.draft}
+                {practice.answerText}
                 {practice.interim && (
                   <span className="italic text-slate-400">
-                    {practice.draft ? ' ' : ''}
+                    {practice.answerText ? ' ' : ''}
                     {practice.interim}…
                   </span>
                 )}
@@ -361,37 +386,67 @@ export default function PracticeSessionPage() {
         </aside>
       </main>
 
-      {/* Controls */}
+      {/* Controls — nhập kép (ADR-050): thu âm điền vào ô, ứng viên sửa/gõ tay rồi Gửi */}
       <footer className="border-t border-white/5 px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-center gap-3">
-          <button
-            onClick={toggleMute}
-            className="grid h-12 w-12 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
-            aria-label={isMuted ? t('practice.controls.unmute') : t('practice.controls.mute')}
-          >
-            {isMuted ? (
-              <MicOff className="h-5 w-5 text-red-400" />
-            ) : (
-              <Mic className="h-5 w-5 text-white" />
-            )}
-          </button>
-          <button
-            onClick={practice.submitAnswer}
-            disabled={starting || !(practice.draft || practice.interim)}
-            className={`flex h-12 items-center gap-2 rounded-full px-5 font-semibold text-white transition disabled:opacity-40 ${
-              practice.draft || practice.interim
-                ? 'bg-gradient-to-r from-brand-600 to-ai-600 hover:opacity-90'
-                : 'bg-white/10 hover:bg-white/20'
-            }`}
-          >
-            <Send className="h-4 w-4" /> {t('practice.controls.submitAnswer')}
-          </button>
-          <button
-            onClick={endSession}
-            className="flex h-12 items-center gap-2 rounded-full bg-red-600 px-6 font-semibold text-white transition hover:bg-red-700"
-          >
-            <Phone className="h-5 w-5" /> {t('practice.controls.end')}
-          </button>
+        <div className="mx-auto max-w-3xl space-y-3">
+          {/* Ô trả lời có thể sửa: transcript Deepgram append vào đây, sửa được trước khi gửi */}
+          <div>
+            <textarea
+              value={practice.answerText}
+              onChange={(e) => practice.setAnswerText(e.target.value)}
+              disabled={starting || practice.timeUp}
+              rows={2}
+              placeholder={
+                practice.micEnabled
+                  ? t('practice.answer.placeholderVoice')
+                  : t('practice.answer.placeholderType')
+              }
+              className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-400/60 focus:outline-none disabled:opacity-50"
+            />
+            <div className="mt-1 flex items-center justify-between px-1 text-xs text-slate-500">
+              <span className="truncate italic text-slate-400">
+                {practice.interim ? `${practice.interim}…` : t('practice.answer.editHint')}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            {/* Mic on/off (nhập kép): tắt = ngừng thu, gõ phím tự do */}
+            <button
+              onClick={practice.toggleMic}
+              disabled={!practice.sttEnabled || practice.timeUp}
+              className="grid h-12 w-12 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 disabled:opacity-40"
+              aria-label={
+                practice.micEnabled ? t('practice.controls.mute') : t('practice.controls.unmute')
+              }
+              title={
+                practice.micEnabled ? t('practice.controls.mute') : t('practice.controls.unmute')
+              }
+            >
+              {practice.micEnabled ? (
+                <Mic className="h-5 w-5 text-white" />
+              ) : (
+                <Keyboard className="h-5 w-5 text-amber-300" />
+              )}
+            </button>
+            <button
+              onClick={practice.submitAnswer}
+              disabled={starting || practice.timeUp || !(practice.answerText.trim() || practice.interim)}
+              className={`flex h-12 items-center gap-2 rounded-full px-5 font-semibold text-white transition disabled:opacity-40 ${
+                practice.answerText.trim() || practice.interim
+                  ? 'bg-gradient-to-r from-brand-600 to-ai-600 hover:opacity-90'
+                  : 'bg-white/10 hover:bg-white/20'
+              }`}
+            >
+              <Send className="h-4 w-4" /> {t('practice.controls.submitAnswer')}
+            </button>
+            <button
+              onClick={endSession}
+              className="flex h-12 items-center gap-2 rounded-full bg-red-600 px-6 font-semibold text-white transition hover:bg-red-700"
+            >
+              <Phone className="h-5 w-5" /> {t('practice.controls.end')}
+            </button>
+          </div>
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">
           {practice.sttEnabled ? t('practice.footer.sttEnabled') : t('practice.footer.sttDisabled')}

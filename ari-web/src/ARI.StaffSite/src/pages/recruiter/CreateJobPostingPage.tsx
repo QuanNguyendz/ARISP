@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ReactQuill from 'react-quill'
@@ -7,7 +7,9 @@ import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
 } from 'lucide-react'
+import { useAuthStore } from '@ari/shared/store/auth'
 import jobService from '@ari/shared/fservices/job'
+import { ErrorAlert } from '@ari/shared/ui'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
 interface CreateJobPostingPageProps {
@@ -23,9 +25,12 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const { t } = useTranslation('modules/recruiter/createJob')
   const { id: jobId } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const routerLocation = useLocation()
+  const user = useAuthStore((state) => state.user)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(mode === 'edit')
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [title, setTitle] = useState('')
@@ -44,6 +49,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const [vacancies, setVacancies] = useState<number | ''>('')
   const [isUrgent, setIsUrgent] = useState(false)
   const [isPublicListing, setIsPublicListing] = useState(true)
+  const [jobStatus, setJobStatus] = useState<string>('draft')
   const [languageRequirement, setLanguageRequirement] = useState('')
   const [skillInput, setSkillInput] = useState('')
   const [skills, setSkills] = useState<string[]>([])
@@ -64,6 +70,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         try {
           setLoading(true)
           const job: JobPosting = await jobService.getJobPostingById(jobId)
+          if (user?.role === 'recruiter' && job.createdByUserId && job.createdByUserId !== user.id) {
+            setLoadError('Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.')
+            return
+          }
           setTitle(job.title || '')
           setDepartment(job.department || '')
           setJobDescription(job.jobDescription || '')
@@ -80,6 +90,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setVacancies(job.vacancies ?? '')
           setIsUrgent(job.isUrgent || false)
           setIsPublicListing(job.isPublicListing ?? true)
+          setJobStatus(job.status || 'draft')
           setLanguageRequirement(job.languageRequirement || '')
           setSkills(job.skills || [])
           setJdFileName(job.jdFileName)
@@ -87,7 +98,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
         } catch (err) {
-          setError(t('validation.loadError'))
+          setLoadError('Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.')
         } finally {
           setLoading(false)
         }
@@ -204,7 +215,12 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       let saved: JobPosting
       if (mode === 'edit' && jobId) saved = await jobService.updateJob(jobId, payload)
       else saved = await jobService.createJobPosting(payload)
-      navigate(`/recruiter/my-jobs/${saved.id}`)
+      
+      if (routerLocation.pathname.startsWith('/hr')) {
+        navigate(`/hr/jobs/${saved.id}`)
+      } else {
+        navigate(`/recruiter/my-jobs/${saved.id}`)
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || err.message || t('validation.saveError'))
     } finally {
@@ -220,6 +236,23 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       </div>
     )
   }
+
+  if (mode === 'edit' && loadError) {
+    return (
+      <div className="p-6 lg:p-8">
+        <ErrorAlert message={loadError || 'Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.'} />
+        <Link
+          to="/recruiter/my-jobs"
+          className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
+        >
+          ← Quay lại danh sách
+        </Link>
+      </div>
+    )
+  }
+
+  const isHr = routerLocation.pathname.startsWith('/hr')
+  const canTogglePublic = mode === 'create' || isHr || jobStatus === 'draft'
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -504,13 +537,13 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 className={input}
               />
             </div>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink-700 dark:text-ink-200">
-              <input type="checkbox" checked={isPublicListing} onChange={(e) => setIsPublicListing(e.target.checked)} className="accent-brand-600" />
-              {t('form.publicOnJobBoard')}
-            </label>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink-700 dark:text-ink-200">
+            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink-700 dark:text-ink-300">
               <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="accent-brand-600" />
               {t('form.urgent')}
+            </label>
+            <label className={`flex items-center gap-2 text-sm font-medium text-ink-700 dark:text-ink-300 ${!canTogglePublic ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`} title={!canTogglePublic ? 'Chỉ HR Admin mới có quyền bật/tắt tin Public khi tin đã được gửi duyệt.' : ''}>
+              <input type="checkbox" checked={isPublicListing} onChange={(e) => setIsPublicListing(e.target.checked)} disabled={!canTogglePublic} className="accent-brand-600" />
+              {t('form.publicOnJobBoard')}
             </label>
 
             <div className="flex gap-3 pt-2">

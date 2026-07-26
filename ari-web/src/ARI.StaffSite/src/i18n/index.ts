@@ -56,6 +56,8 @@ import recruiterScheduleConfigVi from './locales/vi/modules/recruiter/scheduleCo
 import recruiterScheduleConfigEn from './locales/en/modules/recruiter/scheduleConfig.json'
 import recruiterCreateJobVi from './locales/vi/modules/recruiter/createJob.json'
 import recruiterCreateJobEn from './locales/en/modules/recruiter/createJob.json'
+import recruiterOnlineTestVi from './locales/vi/modules/recruiter/onlineTest.json'
+import recruiterOnlineTestEn from './locales/en/modules/recruiter/onlineTest.json'
 
 // ===== MODULES: SUPER-ADMIN =====
 import superAdminDashboardVi from './locales/vi/modules/super-admin/dashboard.json'
@@ -96,6 +98,7 @@ export const resources = {
     'modules/recruiter/interviewCode': recruiterInterviewCodeVi,
     'modules/recruiter/scheduleConfig': recruiterScheduleConfigVi,
     'modules/recruiter/createJob': recruiterCreateJobVi,
+    'modules/recruiter/onlineTest': recruiterOnlineTestVi,
     // Super-Admin module
     'modules/super-admin/dashboard': superAdminDashboardVi,
     'modules/super-admin/settings': superAdminSettingsVi,
@@ -129,6 +132,7 @@ export const resources = {
     'modules/recruiter/interviewCode': recruiterInterviewCodeEn,
     'modules/recruiter/scheduleConfig': recruiterScheduleConfigEn,
     'modules/recruiter/createJob': recruiterCreateJobEn,
+    'modules/recruiter/onlineTest': recruiterOnlineTestEn,
     // Super-Admin module
     'modules/super-admin/dashboard': superAdminDashboardEn,
     'modules/super-admin/settings': superAdminSettingsEn,
@@ -162,6 +166,7 @@ const siteNamespaces = [
   'modules/recruiter/interviewCode',
   'modules/recruiter/scheduleConfig',
   'modules/recruiter/createJob',
+  'modules/recruiter/onlineTest',
   'modules/super-admin/dashboard',
   'modules/super-admin/settings',
   'modules/super-admin/users',

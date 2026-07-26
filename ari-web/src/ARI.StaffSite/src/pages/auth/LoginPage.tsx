@@ -260,7 +260,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-sm text-ink-500">
+        <p className="mt-6 text-center text-sm text-ink-500 hidden">
           {t('login.candidatePrompt')}
           <Link to="/auth/candidate-login" className="font-semibold text-brand-600 hover:underline">
             {t('login.jobBoardLink')}

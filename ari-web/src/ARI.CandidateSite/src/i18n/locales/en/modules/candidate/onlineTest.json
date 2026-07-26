@@ -1,0 +1,31 @@
+{
+  "passed": "Passed",
+  "notPassed": "Not passed",
+  "page": {
+    "title": "Online Test",
+    "subtitle": "Pick one answer for each question, then submit.",
+    "passScoreLine": "Pass score: {{score}}/100",
+    "back": "Back to my application",
+    "resultDetail": "{{correct}}/{{total}} correct.",
+    "alreadyDone": "You have already completed this test.",
+    "noTest": "This position has no online test. You don't need to take one.",
+    "progress": "Answered {{answered}}/{{total}} questions · Pass score: {{pass}}/100",
+    "timeLeft": "Time left: {{time}}",
+    "multiHint": "Select multiple",
+    "question": "Q{{n}}.",
+    "submit": "Submit",
+    "remaining": "{{n}} question(s) left unanswered",
+    "loadError": "Failed to load the test.",
+    "submitError": "Failed to submit the test.",
+    "unauthorized": "Please sign in to the Candidate Portal to take the test.",
+    "lockedTitle": "Awaiting CV approval",
+    "lockedDetail": "Your application must pass the CV screening round before you can take the online test."
+  },
+  "entry": {
+    "resultTitle": "Online test: {{result}}",
+    "resultDetail": "Score {{score}}/100 · pass score {{pass}}/100",
+    "cta": "Take the online test",
+    "ctaSub": "{{count}} questions · pass score {{pass}}/100",
+    "locked": "Awaiting CV approval"
+  }
+}

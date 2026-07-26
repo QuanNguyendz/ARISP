@@ -157,9 +157,18 @@ namespace ARI.Infrastructure.Data
                 .Property(q => q.Options)
                 .HasColumnType("jsonb");
 
+            modelBuilder.Entity<OnlineTestQuestion>()
+                .Property(q => q.CorrectOptions)
+                .HasColumnType("jsonb");
+
             modelBuilder.Entity<OnlineTestSubmission>()
                 .Property(s => s.SelectedAnswers)
                 .HasColumnType("jsonb");
+
+            // Mỗi hồ sơ chỉ nộp bài trắc nghiệm 1 lần / vòng (single-attempt).
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .HasIndex(s => new { s.ApplicationId, s.RoundNumber })
+                .IsUnique();
 
             modelBuilder.Entity<InterviewRoundConfig>()
                 .HasIndex(r => new { r.JobPostingId, r.RoundNumber })
