@@ -126,7 +126,7 @@ export default function CandidateSchedulePage() {
                 <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
               </div>
             ) : slots.length === 0 ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
+              <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm sm:p-10">
                 <CalendarX className="mx-auto mb-3 h-12 w-12 text-ink-300" />
                 <p className="text-sm text-ink-600">{t('schedule.noSlotsHint')}</p>
               </div>

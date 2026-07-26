@@ -185,7 +185,7 @@ export default function SettingsPage() {
           {/* Appearance */}
           <section
             id="appearance"
-            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-6 shadow-card"
+            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
               <Palette className="h-5 w-5 text-brand-600" /> Giao diện
@@ -239,7 +239,7 @@ export default function SettingsPage() {
           {/* Notifications */}
           <section
             id="notifications"
-            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-6 shadow-card"
+            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-1 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
               <Bell className="h-5 w-5 text-brand-600" /> Thông báo
@@ -288,7 +288,7 @@ export default function SettingsPage() {
           {/* Privacy */}
           <section
             id="privacy"
-            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-6 shadow-card"
+            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
               <Lock className="h-5 w-5 text-brand-600" /> Quyền riêng tư
@@ -354,7 +354,7 @@ export default function SettingsPage() {
           {/* Sessions */}
           <section
             id="sessions"
-            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-6 shadow-card"
+            className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
               <MonitorSmartphone className="h-5 w-5 text-brand-600" /> Phiên đăng nhập

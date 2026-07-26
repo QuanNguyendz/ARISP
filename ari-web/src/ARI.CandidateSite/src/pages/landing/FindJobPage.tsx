@@ -1209,7 +1209,7 @@ export default function FindJob() {
                 <p className="text-sm text-ink-500">{t('jobs.loadingJobs')}</p>
               </div>
             ) : totalCount === 0 ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-12 text-center">
+              <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center sm:p-12">
                 <p className="text-ink-500">{t('jobs.noJobs')}</p>
                 <button
                   onClick={clearFilters}
@@ -1244,7 +1244,7 @@ export default function FindJob() {
 
       {/* Footer */}
       <footer className="border-t border-ink-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-ink-400 flex items-center justify-between">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-8 text-sm text-ink-400 sm:px-6">
           <span>{t('footer.copyright', { year: new Date().getFullYear() })}</span>
           <span className="flex items-center gap-1.5">
             <Check className="w-4 h-4" />

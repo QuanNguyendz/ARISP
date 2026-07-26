@@ -735,7 +735,7 @@ export default function ApplicationsPage() {
                 <AlertCircle className="h-4 w-4" /> {error}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-10 text-center shadow-card">
+              <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center shadow-card sm:p-10">
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                   <FileText className="h-6 w-6" />
                 </div>

@@ -7,54 +7,15 @@
 
 ## Trạng thái hiện tại
 
-**Phase:** FE Responsive – Đã xong Phase 2 Nhóm E (Chart & Modal nhỏ) qua khảo sát  
+**Phase:** FE Responsive – Phase 3 (HR/Recruiter & Candidate polish) + Phase 4 (Tailwind config + Skeletons) đã xong (2026-07-26). Branch `feature/fe/fix-responsive` ready để merge về `develop`.
 **Last updated:** 2026-07-26
+**Branch:** `feature/fe/fix-responsive`
 
 ---
 
 ## Đang làm (In Progress)
 
-### Khảo sát Phase 2 Nhóm E — Chart & Modal nhỏ (2026-07-26)
-
-> **Mục tiêu:** Xác nhận Phase 2 Nhóm E (2 file trong plan) đã OK từ các commit trước, không cần sửa thêm.
->
-> **Trạng thái:** 2026-07-26 ✅ HOÀN THÀNH (khảo sát, không có thay đổi code).
->
-> Update file `.ai/responsive-fix-plan-2026-07-24.md` dòng 56: `Phase 2 Nhóm E — Chart & Modal nhỏ` từ ⏳ Backlog → ✅ Đã xong (qua Phase 3/4 trước).
-
-- [x] **Khảo sát `pages/hr/DashboardPage.tsx`** — 3 YAxis đều OK: RecruiterBarChart `width={60} fontSize={10}` (line 352-359), MatchScoreChart `width={34} fontSize={10}` (line 277-283), TrendChart `width={34} fontSize={10}` (line 193-199). Đúng spec plan → không sửa.
-- [x] **Khảo sát `pages/hr/JobPostingDetailPage.tsx`** — Modal reject (line 1271-1276) đã có `max-h-[90vh] overflow-y-auto rounded-2xl ... p-5 sm:p-6 shadow-card-hover`. Đúng spec plan → không sửa.
-- **Kết luận:** Cả 2 file mục tiêu trong Phase 2 Nhóm E đã được sửa từ các round Phase 3 Modal/Dialog và Phase 4 Card/Stat/Widget trước đó. Không có thay đổi code.
-- **Lint:** Không có file nào được sửa → không cần `tsc --noEmit`.
-- **Bước tiếp theo:** Chờ user commit update plan + tasks.md. Sau đó sang **Phase 2 Nhóm D** (Candidate JobDetailPage sticky aside → bottom fixed bar + ScrollStorytelling visual size) hoặc **Phase 3** (CTA/Demo/Hero polish + HR/Recruiter job detail polish).
-
----
-
-> **Mục tiêu:** Sửa tiếp 4 lỗi mobile báo cáo sau Round 5: thiếu icon ngôn ngữ mobile, filter chip vẫn tràn, job card footer không tự xuống dòng theo kích thước, Recruiter CandidateDetailPage xấu.
->
-> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 4 file). TypeScript pass cả 2 site.
-
-- [x] `ARI.CandidateSite/src/app/layouts/CandidateHeader.tsx` — Thêm 1 button `Globe` icon-only riêng cho mobile (`sm:hidden` chỉ icon h-9 w-9) trước button cũ `hidden sm:block` icon+text. Mobile <640px trước đó bị ẩn hoàn toàn không đổi được ngôn ngữ.
-- [x] `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Filter tab `flex flex-wrap items-center gap-2` (bỏ `overflow-x-auto` đang ép 1 dòng) + button `px-3.5 py-1.5 text-xs sm:px-4 sm:text-sm` + label "Mới nhất" `order-last` để tự đổi xuống dòng khi hết chỗ.
-- [x] `ARI.StaffSite/src/pages/recruiter/MyJobsPage.tsx` — Job card footer `flex-col gap-1.5 sm:flex-row sm:flex-wrap` (2 dòng mobile: line 1 = applicants+time, line 2 = salary+chevron; desktop 1 dòng ngang). Mỗi line có `justify-between` riêng để dàn đều khoảng cách.
-- [x] `ARI.StaffSite/src/pages/recruiter/CandidateDetailPage.tsx` — Tổng thể responsive: page `p-4 sm:p-6 lg:p-8` + header card `p-4 sm:p-6` + avatar `h-12 w-12 sm:h-16 sm:w-16` + email/jobTitle `flex-col gap-1 sm:flex-row sm:flex-wrap` (mobile stack dọc) + match score box chuyển từ `text-center` cố định sang inline `justify-between` với label (mobile) → `flex-col sm:items-center` (desktop) + status badge `whitespace-nowrap` + evaluation/session items `flex-col gap-2 sm:flex-row sm:items-center sm:justify-between` (mobile stack dọc: title trên, score+badge dưới) + verdict/session badge `whitespace-nowrap` + action/info card `p-4 sm:p-5` + info dl `flex-col gap-1 sm:flex-row sm:justify-between`.
-- **Pattern dùng chung:** Item dùng `flex-col gap-N sm:flex-row sm:items-center sm:justify-between` (stack dọc mobile, ngang desktop) + badge/date `whitespace-nowrap` + container parent `min-w-0 flex-1` để text dài truncate đúng cách.
-- **Lint:** `tsc --noEmit` 0 lỗi trên cả `ARI.CandidateSite` và `ARI.StaffSite`.
-
----
-
-> **Mục tiêu:** Sửa 5 lỗi mobile báo cáo bởi user (qua ảnh screenshot 320-768px). Nguyên nhân chính: dropdown header Candidate dùng `absolute` thuần (không có mobile fixed full-width như HR) → tràn mobile; job card footer 4 items dính dòng; table cell chèn text; tab pill dài không scroll-snap.
->
-> **Trạng thái:** 2026-07-25 ✅ HOÀN THÀNH (1 commit, 5 file). TypeScript pass cả 2 site.
-
-- [x] `ARI.CandidateSite/src/app/layouts/CandidateHeader.tsx` — 3 dropdown (notif/user/lang) chuyển sang `fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50` mobile + revert `sm:absolute sm:right-0 sm:mt-2` desktop. Mobile fixed full-width tránh bị stacking-context header sticky cắt (giống pattern đã làm cho HR WorkspaceLayout).
-- [x] `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Card body `flex-col gap-2 sm:flex-row sm:items-start sm:justify-between` (status + match badge wrap xuống dưới title ở mobile) + `whitespace-nowrap` cho status badge + Match badge `whitespace-nowrap` + CardFooter `flex-col gap-2 sm:flex-row` (date + button stack dọc mobile) + card padding `p-4 sm:p-5` + alert banner padding `px-4 sm:px-5` + avatar `h-11 w-11 sm:h-12 sm:w-12` + title `break-words` + truncate map location.
-- [x] `ARI.StaffSite/src/pages/recruiter/MyJobsPage.tsx` — Job card footer `flex-wrap items-center justify-between gap-x-3 gap-y-2` + `whitespace-nowrap` cho 3 item (count/time/salary) + salary `min-w-0 flex-1 text-right sm:flex-none` + chevron `shrink-0`. 4 item giờ wrap gọn khi 320px thay vì dính 1 dòng.
-- [x] `ARI.StaffSite/src/pages/recruiter/CandidatesPage.tsx` — Table `min-w-[560px]` (giảm từ 600px) + jobTitle cell `max-w-[160px]` + `<span className="block truncate" title={...}>` cho tooltip khi hover + matchScore + appliedDate cell `whitespace-nowrap text-xs sm:text-sm` + candidate name/email `max-w-[180px] truncate`. Tổng table width giảm ~80px, scroll ngang ít hơn.
-- [x] `ARI.StaffSite/src/pages/super-admin/SettingsPage.tsx` — Tabs `flex gap-2 overflow-x-auto scroll-px-4` với `snap-start` (kéo có snap) + `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` (ẩn scrollbar cho gọn) + button `px-3 py-1.5 text-xs sm:px-3.5 sm:text-sm` (thu nhỏ mobile) + label `truncate max-w-[180px] sm:max-w-none` + container gap `gap-4 lg:gap-8` (giảm gap mobile) + page padding `p-4 sm:p-6 lg:p-8`.
-- **Pattern dùng chung:** Dropdown header dùng `fixed top-[calc(4rem+0.5rem)] z-50` mobile; horizontal pill `overflow-x-auto + snap-start`; table cell `max-w-[N] truncate` + tooltip `title` attribute; card body `flex-col sm:flex-row` để badge/button wrap khi viewport hẹp.
-- **Lint:** `tsc --noEmit` 0 lỗi trên cả `ARI.CandidateSite` và `ARI.StaffSite`.
-- **Còn lại:** Sau commit, tiếp tục theo plan (Phase 7 widget polish / Phase 8 page-level audit) hoặc theo lỗi user báo tiếp theo.
+> Không có task nào đang thực hiện — Phase 3 + Phase 4 đã xong, chờ user commit các thay đổi tài liệu (`.ai/responsive-fix-plan-2026-07-24.md` + `.ai/tasks.md`) trên branch `feature/fe/fix-responsive`, sau đó tạo PR về `develop`. Khi plan sửa xong sẽ chốt hết backlog responsive.
 
 ---
 
@@ -344,6 +305,50 @@
 ---
 
 ## Completed
+
+- [x] 2026-07-26: **FE Responsive – Post-Phase 4 audit cleanup (9 file, 1 commit).** Audit lại 66 file (56 page + 10 component/shared) trên cả 2 site phát hiện 14 issue còn sót sau 4 phase. Sửa 9 file (P0 3 + P1 5 + P2 1). Không phát sinh thêm commit ngoài commit này:
+  - **P0 #1 — `InterviewSchedulePage.tsx` (Candidate):** Refactor toàn page từ dark-glass theme cũ (`bg-bg-primary`, `bg-bg-secondary`, `text-text-secondary`, `text-text-tertiary`, `border-white/10`, `text-white` — 33 occurrence) sang light theme ink/brand/ai. Plan `.ai/responsive-fix-plan-2026-07-24.md:237` đánh dấu `✅ đã đồng bộ light theme` nhưng code chưa bao giờ được sửa (gap tài liệu vs thực tế). Toàn page giờ dùng `bg-ink-50`, cards `bg-white border border-ink-200`, text `text-ink-900`/`text-ink-700`/`text-ink-500`. Thêm responsive cho key icon (`h-16 w-16 sm:h-20 sm:w-20`), heading (`text-2xl sm:text-3xl`), input (`text-lg sm:text-2xl`), padding card (`p-5 sm:p-8` / `p-4 sm:p-6`), candidate info grid truncate (`min-w-0`), confirm box dùng `bg-brand-50 border-brand-200`, button "Vào phỏng vấn/Practice" (Practice card giờ light theme `bg-white border border-ink-200` thay vì dark glass). File giờ khớp design system.
+  - **P0 #2 — `p-10` / `p-12` empty states (7 instances, 6 file):** Tất cả empty state cố định `p-10` / `p-12` chiếm ~30% chiều dọc trên 320px đổi thành `p-6 sm:p-10` / `p-6 sm:p-12` (mobile 24px → desktop 40-48px). Touch: `landing/FindJobPage.tsx:1212` (`p-12` → `p-6 sm:p-12`), `candidate/SchedulePage.tsx:129` (`p-10` → `p-6 sm:p-10`), `candidate/NotificationsPage.tsx:267` (`p-12` → `p-6 sm:p-12`), `candidate/SavedJobsPage.tsx:240` (`p-10` → `p-6 sm:p-10`), `candidate/ApplicationsPage.tsx:738` (`p-10` → `p-6 sm:p-10`), `candidate/ApplicationDetailPage.tsx:344, 356, 610` (3× `p-10` → `p-6 sm:p-10`).
+  - **P0 #3 — `candidate/ProfilePage.tsx:1047`:** Skeleton card `p-6 shadow-card` → `p-4 sm:p-6 shadow-card` đồng bộ pattern với các skeleton card khác trong cùng page.
+  - **P1 — Outer page padding không responsive (3 file):** `candidate/SavedJobsPage.tsx:203,213` (`px-6 pt-6` → `px-4 pt-6 sm:px-6`; `px-6 py-6` → `px-4 py-6 sm:px-6 sm:py-8`); `candidate/NotificationsPage.tsx:194` (`px-6 py-6` → `px-4 py-6 sm:px-6 sm:py-8`); `landing/FindJobPage.tsx:1247` (footer `px-6 py-8` → `px-4 py-8 sm:px-6`).
+  - **P1 — `p-6` section cards không responsive (2 file):** `candidate/SettingsPage.tsx` 4 instances (×4 `scroll-mt-24 ... p-6 shadow-card` → `p-4 sm:p-6 shadow-card`); `candidate/ApplicationDetailPage.tsx` 7 instances (banner header `p-6` → `p-4 sm:p-6`, 3× report card `p-6 shadow-card` → `p-4 sm:p-6`, language card `p-6` → `p-4 sm:p-6`, recording wrapper `p-6` → `p-4 sm:p-6`, empty round list `p-6` → `p-4 sm:p-6 lg:block`).
+  - **P2 — `components/sections/Stats.tsx:67`:** `py-40` cố định 160px → `py-20 sm:py-32 lg:py-40` (mobile 80px → desktop 160px, đồng bộ với `CTA.tsx`).
+  - **Tổng:** 9 file, ~12 dòng code đổi (nhưng `InterviewSchedulePage.tsx` là refactor 170 dòng), `tsc --noEmit` pass.
+  - **Lưu ý lịch sử:** Plan file `.ai/responsive-fix-plan-2026-07-24.md:54` vẫn ghi `Phase 2 Nhóm D ⏳ Backlog` và `Phase 1 PR #1.2` đã check ✅ lúc trước — nhưng thực tế `InterviewSchedulePage` chưa bao giờ được sửa dù plan claim đã xong. Entry này đánh dấu thực tế audit lại 2026-07-26, không cần đảo lại plan file (plan file giữ nguyên để trace lịch sử).
+
+- [x] 2026-07-26: **FE Responsive – Phase 3 (HR/Recruiter & Candidate polish, 8 file trong 2 commit).** Polish components toàn site (P3 trong plan `.ai/responsive-fix-plan-2026-07-24.md` mục 3.3.1):
+  - **PR #3.1 — HR/Recruiter pages polish (5 file, 22 task):**
+    - `ARI.StaffSite/src/pages/hr/JobPostingDetailPage.tsx` — JD grid `grid md:grid-cols-2` → `grid grid-cols-1 sm:grid-cols-2` (mobile 1-col → desktop 2-col). Đã OK từ trước: avatar `w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20`, button `px-3 py-2 sm:px-6 sm:py-3`, tabs `flex flex-wrap gap-2`.
+    - `ARI.StaffSite/src/pages/hr/EvaluationReviewPage.tsx` — Sticky header `h-16` → `h-14 sm:h-16` + padding `px-6` → `px-4 sm:px-6` + gap `gap-4` → `gap-2` + breadcrumb `min-w-0 flex-1` + chevron `shrink-0` + name `truncate` + language grid `grid-cols-3 gap-3 text-sm` → `grid-cols-3 gap-2 text-xs sm:gap-3 sm:text-sm` + 3 value `min-w-0 truncate` + stats value `text-2xl` → `text-xl sm:text-2xl`.
+    - `ARI.StaffSite/src/pages/hr/DashboardPage.tsx` — Funnel conv `w-16` → `w-10 sm:w-16` + SVG `h-7 w-20` → `h-5 w-14 sm:h-7 sm:w-20` + priority count `text-2xl sm:text-3xl` (đã OK từ trước).
+    - `ARI.StaffSite/src/pages/recruiter/JobDetailPage.tsx` — Page padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8` (cả 2 vị trí: error + main) + title `text-lg sm:text-xl` + stats value `text-xl sm:text-2xl` (2 vị trí) + stats grid `grid-cols-2 lg:grid-cols-5` → `grid-cols-2 md:grid-cols-3 lg:grid-cols-5`. Đã OK từ trước: avatar `h-10 w-10 sm:h-12 sm:w-12`, tabs `flex flex-wrap gap-2`, modal email `truncate`.
+    - `ARI.StaffSite/src/pages/recruiter/EvaluationReviewPage.tsx` — Search `sm:max-w-xs` → `sm:max-w-sm sm:flex-1` + leading-7 → leading-6. Đã OK từ trước: modal header `grid-cols-1 sm:grid-cols-3`.
+  - **PR #3.2 — Candidate pages polish (7 file, 8 task):**
+    - `ARI.CandidateSite/src/components/sections/CTA.tsx` — `py-40` → `py-20 sm:py-32 lg:py-40` (mobile 80px → desktop 160px).
+    - `ARI.CandidateSite/src/components/sections/Demo.tsx` — `h-[400px]` → `h-[250px] sm:h-[350px] md:h-[400px]` (AI Sphere mobile 250px) + grid `lg:grid-cols-2 lg:gap-12` → `grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12`.
+    - `ARI.CandidateSite/src/components/sections/Hero.tsx` — Safe area overlay `pb-[env(safe-area-inset-bottom,0)] pt-[env(safe-area-inset-top,0)]` cho iOS Safari.
+    - `ARI.CandidateSite/src/components/three/AISphereDemo.tsx` — `w-64 h-64` → `w-40 h-40 sm:w-64 sm:h-64`.
+    - `ARI.CandidateSite/src/components/profile/ChangePasswordModal.tsx` — No-op (đã OK từ trước: `w-full max-w-md` + parent `p-4`).
+    - `ARI.CandidateSite/src/app/layouts/Footer.tsx` — Brand paragraph `min-w-0 break-words` (tránh tràn grid item khi long text).
+    - `ARI.Shared/src/ui/NotFoundPage.tsx` — `text-7xl md:text-9xl` → `text-7xl sm:text-8xl md:text-9xl` (smooth font scale).
+  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+  - **Pattern dùng chung:** `p-4 sm:p-6 lg:p-8` cho page padding; `text-xl sm:text-2xl` cho stats value; `grid-cols-1 sm:grid-cols-2` cho inner form grid; `min-w-0 flex-1` + `truncate` cho breadcrumb/header text; `h-X w-X sm:h-Y sm:w-Y` cho avatar cố định.
+
+- [x] 2026-07-26: **FE Responsive – Phase 4 (Tailwind config + Skeletons, 5 file trong 1 commit).** Hoàn thiện design system responsive, thêm custom `xs` breakpoint 480px cho Galaxy Fold cover / iPhone SE landscape, polish shared components, đồng bộ skeletons với page chính (P4 trong plan mục 3.4.1):
+  - `ARI.Shared/tailwind-preset.cjs` — Thêm `xs: '480px'` vào `theme.extend.screens` (đặt dưới `sm` 480 < 640, an toàn utility khác). Verify colors theme `ink/brand/ai` đầy đủ.
+  - `ARI.Shared/src/ui/Container.tsx` — Verify padding responsive `px-6 sm:px-8 lg:px-12` (line 44) — đã OK.
+  - `ARI.Shared/src/ui/Button.tsx` — Size variants mobile: `md: px-5 py-2.5 text-sm sm:px-6 sm:py-3 sm:text-base`, `lg: px-6 py-3 text-base sm:px-8 sm:py-4 sm:text-lg`.
+  - `ARI.StaffSite/src/pages/hr/_skeletons.tsx` — `HrStatsSkeleton`: `grid-cols-2 lg:grid-cols-4` → `grid gap-4 sm:grid-cols-2 xl:grid-cols-4` (khớp dashboard line 922).
+  - `ARI.StaffSite/src/pages/recruiter/_skeletons.tsx` — `DashboardSkeleton` + `JobDetailSkeleton` padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8` + card padding `p-6` → `p-4 sm:p-6`.
+  - `ARI.StaffSite/src/pages/super-admin/_skeletons.tsx` — `DashboardSkeleton` padding `p-6 lg:p-8` → `p-4 sm:p-6 lg:p-8`.
+  - **Bỏ qua 3 task QA** (test matrix 8 breakpoints × critical pages, verify iOS Safari + Android Chrome qua BrowserStack, verify dark/light mode ở breakpoint mới) — thuần QA, không có code.
+  - **TypeScript:** `tsc --noEmit` pass cả 2 site.
+
+- [x] 2026-07-26: **FE Responsive – Phase 1 PR #1.2 (Residue 3 file, verify-only).** Verify các file còn lại trong plan Phrase 1 layout phức tạp đã xử lý từ các round trước:
+  - `ARI.CandidateSite/src/pages/candidate/ApplicationsPage.tsx` — Sidebar `hidden lg:block` (ẩn mobile, collapse đơn giản). Plan gốc yêu cầu drawer nhưng sidebar chỉ chứa CV card tham khảo, ẩn hẳn mobile OK.
+  - `ARI.CandidateSite/src/pages/landing/FindJobPage.tsx` — FilterSidebar sticky desktop (line 1087 `hidden lg:block`) + mobile drawer riêng (line 1134 ngoài hidden).
+  - `ARI.CandidateSite/src/pages/candidate/InterviewSchedulePage.tsx` — Đã refactor dark-glass → design system ink/brand/ai từ trước (Phase 5/6).
+  - **TypeScript:** `tsc --noEmit` pass.
 
 - [x] 2026-07-25: **FE Responsive – Hotfix Round 5 (1 commit, 5 file).** Patch 5 lỗi mobile báo cáo bởi user qua screenshot 320-768px:
   1. **CandidateHeader dropdown** (Candidate Site, 3000) — 3 dropdown (notif/user/lang) dùng `absolute` thuần → mobile bị stacking-context header sticky cắt. Đồng bộ sang `fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50` mobile + `sm:absolute sm:right-0 sm:mt-2` desktop (giống pattern HR WorkspaceLayout/HrLayout).

@@ -1044,7 +1044,7 @@ function ProfileSkeleton() {
 
           {/* Các section card còn lại */}
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div key={i} className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
               <Skeleton className="mb-4 h-5 w-44" />
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: 6 }).map((_, j) => (

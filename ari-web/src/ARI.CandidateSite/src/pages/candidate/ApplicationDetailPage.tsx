@@ -117,7 +117,7 @@ function ReportPanel({
     <div className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
         <div
-          className={`flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 bg-gradient-to-r p-6 ${isPass ? 'from-emerald-50' : 'from-red-50'} to-white`}
+          className={`flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 bg-gradient-to-r p-4 sm:p-6 ${isPass ? 'from-emerald-50' : 'from-red-50'} to-white`}
         >
           <div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-ink-500">
@@ -159,7 +159,7 @@ function ReportPanel({
         </div>
 
         {s.recordingUrl && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <video
               src={resolveAssetUrl(s.recordingUrl)}
               controls
@@ -179,7 +179,7 @@ function ReportPanel({
       </div>
 
       {ev.reasoning && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-2 font-display text-lg font-bold">{t('report.title')}</h2>
           <p className="text-sm text-ink-600">{ev.reasoning}</p>
         </div>
@@ -203,7 +203,7 @@ function ReportPanel({
       )}
 
       {tab === 'criteria' && ev.criterionScores.length > 0 && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-4 font-display text-lg font-bold">{t('report.scoresByCriteria')}</h2>
           <div className="space-y-4">
             {ev.criterionScores.map((c, i) => (
@@ -214,7 +214,7 @@ function ReportPanel({
       )}
 
       {tab === 'questions' && (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
           <h2 className="mb-4 font-display text-lg font-bold">{t('questionAnalysis.title')}</h2>
           {ev.questionAnalyses.length === 0 ? (
             <p className="text-sm text-ink-500">{t('questionAnalysis.empty')}</p>
@@ -274,7 +274,7 @@ function ReportPanel({
       )}
 
       {lang && (
-        <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-6 shadow-card">
+        <div className="rounded-2xl border border-ai-200 bg-gradient-to-b from-ai-50/70 to-white p-4 shadow-card sm:p-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
             <Languages className="h-4 w-4" /> {t('languageAssessment.title', { lang: langCode })}
           </div>
@@ -341,7 +341,7 @@ function RoundPlaceholder({
 }) {
   if (s.pendingHrReview) {
     return (
-      <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+      <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-600">
           <Clock className="h-6 w-6" />
         </div>
@@ -353,7 +353,7 @@ function RoundPlaceholder({
     )
   }
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+    <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
         <Video className="h-6 w-6" />
       </div>
@@ -572,7 +572,7 @@ export default function ApplicationDetailPage() {
                 {t('roundList.title')}
               </div>
               {detail.sessions.length === 0 ? (
-                <div className="hidden rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center text-sm text-ink-500 shadow-card lg:block">
+                <div className="hidden rounded-2xl border border-dashed border-ink-300 bg-white p-4 text-center text-sm text-ink-500 shadow-card sm:p-6 lg:block">
                   {t('roundList.empty')}
                 </div>
               ) : (
@@ -607,7 +607,7 @@ export default function ApplicationDetailPage() {
 
           <div>
             {!selected ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+              <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                   <FileText className="h-6 w-6" />
                 </div>
