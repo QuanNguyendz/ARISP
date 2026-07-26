@@ -130,51 +130,8 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 
 ## Coding Rules
 
-### Backend (C# / ASP.NET Core .NET 8)
-
-**Naming:**
-- Namespace: `ARI.<Layer>.<Module>` (ví dụ: `ARI.Application.Interview`) — PascalCase
-- Class: PascalCase | Interface: prefix `I` | Method: PascalCase + suffix `Async` cho async
-- Private field: `_camelCase` | Constant: `UPPER_SNAKE_CASE`
-
-**Project Structure (Clean Architecture):**
-```
-ari-service/
-├── ARI.sln
-├── src/
-│   ├── ARI.API/            # Controllers, Middleware, Program.cs
-│   ├── ARI.Application/    # Use Cases (CQRS), DTOs, Interfaces, Validators
-│   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
-│   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
-└── tests/                # Unit / functional tests
-```
-
-**Patterns bắt buộc:** Repository Pattern, CQRS (MediatR nếu phức tạp), Result Pattern (không throw exception cho business errors), Dependency Injection, Async/Await cho mọi I/O.
-
-**Security:** Không hardcode secrets – luôn dùng `appsettings.json` + env vars. JWT bắt buộc mọi protected endpoint. CORS chặt – chỉ allow frontend domain.
-
-### Frontend (React + TypeScript)
-
-**Naming:** Component: PascalCase | Hook: prefix `use` | Util: camelCase | Type/Interface: PascalCase
-
-**File Structure (`ari-web/` — npm workspaces, 3 package — ADR-046):**
-```
-ari-web/                         # workspaces root (1 package-lock.json), tsconfig.base.json
-├── src/ARI.Shared/              # @ari/shared — dùng chung, import source-level qua @ari/shared/*
-│   ├── tailwind-preset.cjs      # theme (ink/brand/ai) dùng chung
-│   └── src/{api, fservices, ui, guards, document, media, realtime,
-│            store, types, config, utils, authflows, i18n, styles}
-├── src/ARI.CandidateSite/       # @ari/candidate-site (port 3000, public deploy)
-│   └── src/{app(main+App+layouts), pages(theo domain), components, fservices, i18n}
-└── src/ARI.StaffSite/           # @ari/staff-site (port 3001, nội bộ)
-    └── src/{app(main+App+layouts), pages(hr/recruiter/super-admin), components, fservices, utils, i18n}
-```
-- **`services/` → `fservices/`** (quy tắc "f" prefix). `fservices` mirror tên feature slice backend (tầng API).
-- **Mỗi folder một nhiệm vụ:** `app/` = routing+layouts, `pages/` = màn theo domain, `fservices/` = gọi API, `components/` = UI tái dùng.
-- Code dùng chung ở `ARI.Shared`; hướng phụ thuộc 1 chiều: site → Shared (Shared không import site).
-- Dev: `npm run dev:candidate` (3000) / `npm run dev:staff` (3001).
-
-**Patterns:** Không fetch API trong component – qua `fservices/`. Dùng custom hook cho logic tái sử dụng. Không dùng `any`.
+> **Backend** (C# / ASP.NET Core .NET 8): quy ước chi tiết ở [ari-service/CLAUDE.md](ari-service/CLAUDE.md) — tự nạp khi làm trong `ari-service/`.
+> **Frontend** (React + TypeScript, npm workspaces): quy ước chi tiết ở [ari-web/CLAUDE.md](ari-web/CLAUDE.md) — tự nạp khi làm trong `ari-web/`.
 
 ### Database (PostgreSQL + EF Core)
 
