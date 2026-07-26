@@ -139,7 +139,7 @@ namespace ARI.Application.Services
             try { deepgram = await _deepgramTokenService.CreateTemporaryTokenAsync(ct); }
             catch { /* STT tuỳ chọn */ }
 
-            // ADR-048: Practice audio-only — KHÔNG mint avatar (giữ đủ STT/RAG/LLM/ElevenLabs).
+            // ADR-050: Practice audio-only — KHÔNG mint avatar (giữ đủ STT/RAG/LLM/ElevenLabs).
             // Tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán.
             // Real luôn có avatar. Cờ PracticeUseAvatar cho phép bật lại khi cần.
             AvatarStreamingToken? avatar = null;
@@ -150,7 +150,7 @@ namespace ARI.Application.Services
                 catch { /* avatar tuỳ chọn — FE fallback WebAudio (ElevenLabs) + bot tĩnh */ }
             }
 
-            // Trần thời lượng để FE vẽ đếm ngược khớp giờ server (ADR-048). Practice = config;
+            // Trần thời lượng để FE vẽ đếm ngược khớp giờ server (ADR-050). Practice = config;
             // real = 0 (không chặn — tới Phase 7). StartedAtUtc để FE tính remaining chính xác.
             var maxDurationSeconds = session.SessionType == "practice" && _interviewOptions.PracticeMaxDurationMinutes > 0
                 ? _interviewOptions.PracticeMaxDurationMinutes * 60
@@ -359,7 +359,7 @@ namespace ARI.Application.Services
             var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
             var sequenceNumber = questions.Count() + 1;
 
-            // Cap an toàn: quá số câu tối đa HOẶC vượt trần thời lượng (ADR-048, practice 20')
+            // Cap an toàn: quá số câu tối đa HOẶC vượt trần thời lượng (ADR-050, practice 20')
             // → KHÔNG cắt phụt; buộc AI sinh lời cảm ơn kết thúc (ForceClosing) rồi mới đóng phiên
             // — ứng viên luôn nhận được lời chào tạm biệt. Đây là lớp enforce server-side độc lập
             // với đồng hồ FE (ứng viên nói quá giờ → câu kế tiếp thành lời chào kết thúc).
@@ -587,7 +587,7 @@ namespace ARI.Application.Services
                 return Result.Failure<bool>("Session not found.");
 
             // Idempotent: phiên đã "completed" là trạng thái cuối — không đóng/sinh evaluation lần hai
-            // (chống race khi enforce server + NotifyTimeout FE cùng bắn — ADR-048).
+            // (chống race khi enforce server + NotifyTimeout FE cùng bắn — ADR-050).
             if (session.Status == "completed")
                 return Result.Success(true);
 
@@ -613,7 +613,7 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// Gửi lời chào kết thúc (text + TTS best-effort) rồi đóng phiên "completed" (ADR-048).
+        /// Gửi lời chào kết thúc (text + TTS best-effort) rồi đóng phiên "completed" (ADR-050).
         /// Dùng chung cho: cap câu hỏi / trần thời lượng (GenerateAndSendNextQuestionAsync) và
         /// hết giờ phía FE (PracticeTimeoutCloseAsync). IDEMPOTENT — phiên đã "completed" thì no-op
         /// (chống race khi cả enforce server lẫn trigger FE cùng bắn).
@@ -653,7 +653,7 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// FE báo hết giờ (đồng hồ đếm ngược chạm 0) → AI nói 1 câu kết thúc rồi đóng phiên (ADR-048).
+        /// FE báo hết giờ (đồng hồ đếm ngược chạm 0) → AI nói 1 câu kết thúc rồi đóng phiên (ADR-050).
         /// Guard server-side: chỉ chấp nhận khi ĐÃ chạm ~95% trần thời lượng — FE không thể kết thúc
         /// sớm để né phần còn lại. Chỉ áp dụng phiên "practice".
         /// </summary>

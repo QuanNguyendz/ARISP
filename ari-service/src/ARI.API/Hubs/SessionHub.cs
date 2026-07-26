@@ -51,7 +51,7 @@ namespace ARI.API.Hubs
         }
 
         /// <summary>
-        /// FE báo hết giờ (đồng hồ đếm ngược chạm 0, ADR-048) → AI nói 1 câu kết thúc rồi đóng phiên.
+        /// FE báo hết giờ (đồng hồ đếm ngược chạm 0, ADR-050) → AI nói 1 câu kết thúc rồi đóng phiên.
         /// Guard elapsed nằm trong service (FE không kết thúc sớm được). Dùng SignalR vì phòng đang
         /// giữ sẵn kết nối — không thêm HTTP round-trip.
         /// </summary>

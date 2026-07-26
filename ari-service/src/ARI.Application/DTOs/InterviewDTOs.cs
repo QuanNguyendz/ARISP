@@ -26,7 +26,7 @@ namespace ARI.Application.DTOs
         public string Language { get; set; } = "vi";
         public string SessionType { get; set; } = "practice";
 
-        /// <summary>Trần thời lượng phiên (giây) để FE vẽ đếm ngược; 0 = không giới hạn (ADR-048).</summary>
+        /// <summary>Trần thời lượng phiên (giây) để FE vẽ đếm ngược; 0 = không giới hạn (ADR-050).</summary>
         public int MaxDurationSeconds { get; set; }
 
         /// <summary>Mốc bắt đầu phiên (UTC) để FE tính thời gian còn lại khớp giờ server.</summary>
