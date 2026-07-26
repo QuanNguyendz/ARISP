@@ -226,7 +226,7 @@ export default function PracticeSessionPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Đồng hồ đếm ngược trần thời lượng (ADR-048) — vàng <2', đỏ <30" */}
+          {/* Đồng hồ đếm ngược trần thời lượng (ADR-050) — vàng <2', đỏ <30" */}
           {practice.remainingSeconds !== null && (
             <span
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${
@@ -386,7 +386,7 @@ export default function PracticeSessionPage() {
         </aside>
       </main>
 
-      {/* Controls — nhập kép (ADR-048): thu âm điền vào ô, ứng viên sửa/gõ tay rồi Gửi */}
+      {/* Controls — nhập kép (ADR-050): thu âm điền vào ô, ứng viên sửa/gõ tay rồi Gửi */}
       <footer className="border-t border-white/5 px-6 py-4">
         <div className="mx-auto max-w-3xl space-y-3">
           {/* Ô trả lời có thể sửa: transcript Deepgram append vào đây, sửa được trước khi gửi */}

@@ -11,14 +11,14 @@ namespace ARI.Application.Options
         public int PracticeAttemptsPerRound { get; set; } = 1;
 
         /// <summary>
-        /// Trần thời lượng phỏng vấn THỬ (phút) — ADR-048 (hiện thực hoá ADR-038 điểm 5).
+        /// Trần thời lượng phỏng vấn THỬ (phút) — ADR-050 (hiện thực hoá ADR-038 điểm 5).
         /// Hết giờ → khoá mic, AI nói 1 câu kết thúc rồi đóng phiên. &lt;= 0 = không giới hạn.
         /// Cấu hình toàn cục (ops), không phải HR-knob per-job. Real dùng cấu hình riêng ở Phase 7.
         /// </summary>
         public int PracticeMaxDurationMinutes { get; set; } = 20;
 
         /// <summary>
-        /// ADR-048: Practice mặc định KHÔNG dùng avatar (audio-only) để tránh cạnh tranh
+        /// ADR-050: Practice mặc định KHÔNG dùng avatar (audio-only) để tránh cạnh tranh
         /// concurrency LiveAvatar với buổi thật + đốt credit không dự đoán được. Đặt true để
         /// bật lại avatar cho practice khi tài khoản LiveAvatar đủ quota. Real luôn có avatar.
         /// </summary>

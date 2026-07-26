@@ -46,14 +46,14 @@ const QUESTION_AUDIO_TIMEOUT_MS = 6000
  * Watchdog speaking: HeyGen đôi khi KHÔNG bắn AVATAR_SPEAK_ENDED → cờ aiSpeaking kẹt true
  * và nuốt toàn bộ transcript ứng viên; đặt timer theo độ dài audio để tự nhả cờ.
  *
- * Gửi trả lời THỦ CÔNG (ADR-048 nhập kép): transcript Deepgram append vào answerText hiển thị
+ * Gửi trả lời THỦ CÔNG (ADR-050 nhập kép): transcript Deepgram append vào answerText hiển thị
  * trong <textarea> ứng viên SỬA/GÕ TAY được (mic tắt = gõ tự do); bấm "Gửi trả lời" mới submit —
  * không auto-submit khi im lặng (UtteranceEnd chỉ flush interim).
  *
- * Trần thời lượng (ADR-048): media-config trả maxDurationSeconds → đếm ngược; hết giờ khoá mic +
+ * Trần thời lượng (ADR-050): media-config trả maxDurationSeconds → đếm ngược; hết giờ khoá mic +
  * NotifyTimeout → server cho AI nói câu kết rồi đóng phiên.
  *
- * Practice AUDIO-ONLY (ADR-048): media-config trả heyGen=null → không avatar; audio ElevenLabs
+ * Practice AUDIO-ONLY (ADR-050): media-config trả heyGen=null → không avatar; audio ElevenLabs
  * phát qua WebAudio (playPcmViaWebAudio). Thiếu Deepgram → nhập tay + nút "Gửi trả lời".
  */
 export function usePracticeSession(applicationId: string, roundNumber = 1) {
@@ -61,14 +61,14 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const [error, setError] = useState<string | null>(null)
   const [messages, setMessages] = useState<TranscriptItem[]>([])
   const [interim, setInterim] = useState('')
-  // Nhập kép (ADR-048): MỘT nguồn duy nhất cho câu trả lời — Deepgram final append vào đây,
+  // Nhập kép (ADR-050): MỘT nguồn duy nhất cho câu trả lời — Deepgram final append vào đây,
   // ứng viên sửa/gõ tay cũng ghi vào đây; nút "Gửi trả lời" đọc từ đây.
   const [answerText, setAnswerState] = useState('')
   const [aiSpeaking, setAiSpeaking] = useState(false)
   const [listening, setListening] = useState(false)
   const [avatarReady, setAvatarReady] = useState(false)
   const [sttEnabled, setSttEnabled] = useState(false)
-  const [micEnabled, setMicEnabled] = useState(true) // tắt mic = chuyển sang gõ phím tự do (ADR-048)
+  const [micEnabled, setMicEnabled] = useState(true) // tắt mic = chuyển sang gõ phím tự do (ADR-050)
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null) // đếm ngược trần thời lượng
   const [timeUp, setTimeUp] = useState(false) // hết giờ — đang chờ AI nói câu kết thúc
 
@@ -174,7 +174,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     currentQuestionRef.current = null
   }, [updateInterim, setAnswer])
 
-  /** Nhập kép: bật/tắt mic. Tắt = ngừng gửi audio + ngừng append transcript → gõ phím tự do (ADR-048). */
+  /** Nhập kép: bật/tắt mic. Tắt = ngừng gửi audio + ngừng append transcript → gõ phím tự do (ADR-050). */
   const toggleMic = useCallback(() => {
     const next = !micEnabledRef.current
     micEnabledRef.current = next
@@ -571,7 +571,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   }, [playQuestionAudio, speakBrowserTts, updateInterim, setAnswer])
 
   /**
-   * Hết giờ (đếm ngược chạm 0, ADR-048): khoá mic + báo server. Server (PracticeTimeoutCloseAsync)
+   * Hết giờ (đếm ngược chạm 0, ADR-050): khoá mic + báo server. Server (PracticeTimeoutCloseAsync)
    * cho AI nói 1 câu kết thúc rồi đóng phiên — closing chảy về qua ReceiveClosing/SessionStatus.
    */
   const onTimeUp = useCallback(() => {
@@ -641,7 +641,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
 
         setStatus('live')
 
-        // Đồng hồ đếm ngược trần thời lượng (ADR-048). Đếm theo giờ MÁY (tránh lệch clock server);
+        // Đồng hồ đếm ngược trần thời lượng (ADR-050). Đếm theo giờ MÁY (tránh lệch clock server);
         // server enforce trần độc lập nên lệch nhỏ không ảnh hưởng tính đúng đắn.
         const cap = media.maxDurationSeconds ?? 0
         if (cap > 0) {
