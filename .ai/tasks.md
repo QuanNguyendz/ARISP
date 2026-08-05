@@ -106,6 +106,7 @@ _Chưa có task nào đang thực hiện._
   - [ ] Check đã có analysis cho cùng CV hash + JobPosting chưa → trả kết quả cũ (không gọi lại Gemini)
   - [ ] Khi candidate submit Application: link `cv_jd_analysis_id` vào Application
   - [ ] Nếu chưa có analysis khi submit → tự động chạy 1 lần rồi đính kèm
+  - [x] Unit test `CvJdAnalysisService` — reuse theo (job + CvHash) không gọi lại Gemini, CV không hợp lệ lưu bản "failed", lỗi AI không persist, enrich reasoning từ RawResponse cache, truy vấn theo id/application, kiểm tra sở hữu, xoá cache — **13 test mới, 93/93 pass** ✅ 2026-08-05
 - [ ] API endpoints:
   - [ ] `POST /api/cv-analysis/analyze` – Candidate upload CV + jobPostingId → nhận kết quả phân tích (public, không cần login)
   - [ ] `GET /api/cv-analysis/{id}` – Lấy kết quả đã phân tích
@@ -306,6 +307,10 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test CV-JD Match Analysis (Gemini, ADR-030) — 13 test mới, tổng 93/93 pass.**
+  - **`CvJdAnalysisService`** với `FakeGeminiProvider` (đếm số lần gọi AI + nạp sẵn kết quả) + `FakeDocumentParser`: chốt reuse theo `(JobPostingId, CvHash MD5)` — bản "completed" cùng hash trả thẳng KHÔNG gọi Gemini (`AnalyzeCallCount==0`), gọi lần 2 cùng CV → cache hit (AI chỉ chạy 1 lần); CV không hợp lệ (`IsValidCv=false`) lưu bản `failed` (MatchScore 0 + ErrorMessage) rồi trả Failure; lỗi AI → Failure "Lỗi AI" không persist; bản `failed` KHÔNG chặn cache → chạy lại; cache hit enrich `analysis_reasoning`/`seniority_alignment`/`tech_depth_analysis` từ envelope `RawResponse`; `GetById`/`GetByApplication` (link `cv_jd_analysis_id`), `CheckCandidateOwnership` (đúng cả analysis + account), `ClearAllCache`.
+  - File: `tests/ARI.Application.UnitTests/CvAnalysis/{CvAnalysisFakes,CvJdAnalysisServiceTests}.cs`. `dotnet test`: **93/93 pass**.
 
 - [x] 2026-08-05: **Unit test luồng chính Scheduling (ADR-048) — 36 test mới, tổng 80/80 pass.**
   - **Mở rộng hạ tầng test dùng chung:** `InMemoryUnitOfWork` thêm hook `OnExecuteSqlRaw` (giả lập SQL thô) + `ThrowOnSaveChanges` (test đường bù trừ). `Scheduling/SchedulingData.cs` factory + `SlotSqlEmulator` — giả lập 2 lệnh SQL nguyên tử chốt/nhả chỗ, giữ `booked_count` ở "DB ảo" tách khỏi entity EF nên guard chống overbooking + DTO trả về khớp production.
