@@ -91,6 +91,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
 - [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
 - [x] CV upload & parse (PDF → text extraction) (Backend with CV parser stub)
+- [x] Unit test luồng Application (`ApplicationService`) — `SubmitApplicationAsync` (chặn tin đóng/hết hạn, tạo cv_submitted, auto-link CV-JD theo hash, đẩy CV vào RAG, báo hr_admin/recruiter + ứng viên tự ứng tuyển), `UpdateApplicationStatusAsync` (bảng chuyển trạng thái hợp lệ, withdrawn điểm cuối, not_pass mở lại, case-insensitive), duyệt/từ chối vòng CV (`Accept`/`Reject`/`SendInterviewInvite` — screening + InterviewInvite + email + xoá invite cũ chưa dùng), `CheckPracticeEligibilityAsync` (1 lượt/vòng) — **36 test mới, 145/145 pass** ✅ 2026-08-05
 
 ### Phase 2a – CV-JD Match Analysis (Gemini AI)
 - [x] Database schema: thêm `jd_file_url`, `jd_file_name`, `jd_file_format` vào `job_postings` (2026-06-15 – migration `AddJdFileFieldsToJobPosting`)
@@ -106,6 +107,7 @@ _Chưa có task nào đang thực hiện._
   - [ ] Check đã có analysis cho cùng CV hash + JobPosting chưa → trả kết quả cũ (không gọi lại Gemini)
   - [ ] Khi candidate submit Application: link `cv_jd_analysis_id` vào Application
   - [ ] Nếu chưa có analysis khi submit → tự động chạy 1 lần rồi đính kèm
+  - [x] Unit test `CvJdAnalysisService` — reuse theo (job + CvHash) không gọi lại Gemini, CV không hợp lệ lưu bản "failed", lỗi AI không persist, enrich reasoning từ RawResponse cache, truy vấn theo id/application, kiểm tra sở hữu, xoá cache — **13 test mới, 93/93 pass** ✅ 2026-08-05
 - [ ] API endpoints:
   - [ ] `POST /api/cv-analysis/analyze` – Candidate upload CV + jobPostingId → nhận kết quả phân tích (public, không cần login)
   - [ ] `GET /api/cv-analysis/{id}` – Lấy kết quả đã phân tích
@@ -149,6 +151,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Database schema: `interview_bookings` (entity đã có nhưng chưa migration)
 - [ ] EF Core migrations
 - [ ] **Practice (Remote):** Candidate chọn slot → booking → nhận nhắc nhở 24h/1h
+- [x] Unit test luồng Scheduling (ADR-048) — HR gán slot (chốt chỗ nguyên tử/chống overbooking, screening→interview, bù trừ khi lưu lỗi, liên kết xếp-lại sau decline), ứng viên confirm/decline (trả chỗ slot, validate lý do), phân loại lịch Upcoming/Past/AwaitingReschedule — **36 test mới, 80/80 pass** ✅ 2026-08-05
 - [x] HR generate Interview Code (format `ARX7K2`, 6 ký tự alphanumeric) cho thi thật
   - [x] One-time-use: vô hiệu hóa sau khi dùng
   - [x] TTL: mặc định 2 giờ, cấu hình per Job Posting
@@ -207,6 +210,7 @@ _Chưa có task nào đang thực hiện._
   - [x] Danh sách Application per Job Posting (filter, sort) – `EvaluationsController`
   - [x] Xem Evaluation Report + recording per Application per Round
   - [ ] Confirm / Override verdict (HrReview entity có, endpoint `/evaluations/{id}/review` cần kiểm tra)
+  - [x] Unit test `SubmitHrReviewAsync` — Confirm (mọi nhân sự) vs Override (chỉ HR Admin/Super Admin + bắt buộc lý do, Recruiter bị chặn), cập nhật status hồ sơ pass/not_pass, auto-progression sang vòng kế (chỉ real + có RoundConfig → tạo InterviewInvite, status→interview; practice/not_pass không progress), thông báo ứng viên realtime + Notification chống trùng (DedupKey), audit log hr_confirm/hr_override — **16 test mới, 109/109 pass** ✅ 2026-08-05
 - [x] `AuditLogService`: entity `AuditLog` đã có, ghi lại mọi action
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
 - [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
@@ -305,6 +309,26 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test luồng chính Application (Phase 2) — 36 test mới, tổng 145/145 pass.**
+  - **`ApplicationService`** với `RecordingEmailService` + `RecordingRagIngestionService` + `ApplicationServiceFactory` (cắm `IServiceScopeFactory` stub — tác vụ phân tích CV nền fire-and-forget bị né bằng input CvFileUrl=null): **`SubmitApplicationAsync` (12)** chặn job không tồn tại/không active/quá hạn, tạo Application `cv_submitted` + Source, **auto-link `CvJdAnalysis` theo `(JobPostingId, CvHash)`** (không khớp → để trống), đẩy CV vào RAG (`IngestAsync("cv", …)`, bỏ qua khi không có CvText), báo nhóm `hr_admin` + recruiter, ứng viên tự ứng tuyển nhận `Notification` `applied:{id}` + realtime, hồ sơ ẩn danh không tạo notification.
+  - **`UpdateApplicationStatusAsync` (8)** — bảng chuyển trạng thái hợp lệ (rỗng/không hợp lệ/trùng/bước cấm đều Failure), `withdrawn` là điểm cuối, `not_pass` mở lại được về screening, chuyển hợp lệ case-insensitive + báo realtime ứng viên. **CV decision (12)** — `SendInterviewInviteAsync` (tạo InterviewInvite TTL theo job, nâng cv_submitted/invited→screening, gửi email, xoá invite cũ **chưa dùng** cùng vòng nhưng giữ invite đã đặt lịch), `AcceptApplicationAsync` (chỉ từ cv_submitted/invited → screening + invite + `Notification` `cv_accepted:{id}` + email), `RejectApplicationAsync` (→ `cv_rejected` + thư cảm ơn + `Notification` `cv_rejected:{id}`). **`CheckPracticeEligibilityAsync` (4)** — 1 lượt/vòng, phiên practice vòng khác không chặn.
+  - File: `tests/ARI.Application.UnitTests/ApplicationFlow/{ApplicationData,SubmitApplicationTests,UpdateApplicationStatusTests,CvDecisionTests,PracticeEligibilityTests}.cs` + `TestSupport/{RecordingEmailService,ApplicationServiceFactory}.cs`. `dotnet test`: **145/145 pass**.
+
+- [x] 2026-08-05: **Unit test luồng chính HR Review & Confirm/Override (Phase 6) — 16 test mới, tổng 109/109 pass.**
+  - **`InterviewService.SubmitHrReviewAsync`** với `InterviewServiceFactory` (dựng service 8 dependency, cắm stub ném lỗi cho 6 dependency media/AI không dùng trong luồng review) + `RecordingNotificationService`: **Confirm** (verdict == AiVerdict) mọi nhân sự làm được kể cả Recruiter; **Override** (đổi verdict) chỉ HR Admin/Super Admin **và bắt buộc `OverrideReason`** — thiếu lý do hoặc Recruiter override → Failure, không persist gì. Cập nhật status hồ sơ pass/not_pass; **auto-progression (ADR-017)**: pass + real + có `InterviewRoundConfig` vòng kế → tạo `InterviewInvite` vòng N+1 + status→interview, còn practice/không có config/not_pass → không progress. Thông báo ứng viên realtime (`ReceiveApplicationStatusUpdate` + `ReceiveUserNotification`) + bản ghi `Notification` chống trùng theo `DedupKey` (`hr_review:{evalId}`), hồ sơ không có tài khoản → bỏ qua realtime nhưng luồng chính vẫn hoàn tất; luôn ghi `AuditLog` `hr_confirm`/`hr_override`. Evaluation/HR user không tồn tại → Failure.
+  - File: `tests/ARI.Application.UnitTests/HrReview/{HrReviewData,SubmitHrReviewTests}.cs` + `TestSupport/InterviewServiceFactory.cs`. `dotnet test`: **109/109 pass**.
+
+- [x] 2026-08-05: **Unit test CV-JD Match Analysis (Gemini, ADR-030) — 13 test mới, tổng 93/93 pass.**
+  - **`CvJdAnalysisService`** với `FakeGeminiProvider` (đếm số lần gọi AI + nạp sẵn kết quả) + `FakeDocumentParser`: chốt reuse theo `(JobPostingId, CvHash MD5)` — bản "completed" cùng hash trả thẳng KHÔNG gọi Gemini (`AnalyzeCallCount==0`), gọi lần 2 cùng CV → cache hit (AI chỉ chạy 1 lần); CV không hợp lệ (`IsValidCv=false`) lưu bản `failed` (MatchScore 0 + ErrorMessage) rồi trả Failure; lỗi AI → Failure "Lỗi AI" không persist; bản `failed` KHÔNG chặn cache → chạy lại; cache hit enrich `analysis_reasoning`/`seniority_alignment`/`tech_depth_analysis` từ envelope `RawResponse`; `GetById`/`GetByApplication` (link `cv_jd_analysis_id`), `CheckCandidateOwnership` (đúng cả analysis + account), `ClearAllCache`.
+  - File: `tests/ARI.Application.UnitTests/CvAnalysis/{CvAnalysisFakes,CvJdAnalysisServiceTests}.cs`. `dotnet test`: **93/93 pass**.
+
+- [x] 2026-08-05: **Unit test luồng chính Scheduling (ADR-048) — 36 test mới, tổng 80/80 pass.**
+  - **Mở rộng hạ tầng test dùng chung:** `InMemoryUnitOfWork` thêm hook `OnExecuteSqlRaw` (giả lập SQL thô) + `ThrowOnSaveChanges` (test đường bù trừ). `Scheduling/SchedulingData.cs` factory + `SlotSqlEmulator` — giả lập 2 lệnh SQL nguyên tử chốt/nhả chỗ, giữ `booked_count` ở "DB ảo" tách khỏi entity EF nên guard chống overbooking + DTO trả về khớp production.
+  - **`AssignSlotCommandHandler` (19 test)** — chốt chỗ nguyên tử (`booked_count < capacity`) chống overbooking, screening→interview (vòng 2+ giữ interview), tạo booking scheduled/pending, đánh dấu invite ScheduledAt, thông báo ứng viên (bell `Notification` + realtime `ReceiveUserNotification`), liên kết `RescheduledFromId` khi xếp lại sau decline, **bù trừ nhả chỗ khi SaveChanges lỗi**; chặn: CV chưa duyệt (theory 5 status), đã có lịch vòng, sai job/vòng, slot quá khứ, không phải chủ tin→Forbidden (admin OK), app/slot không tồn tại→NotFound.
+  - **`ConfirmScheduleCommandHandler` (5) + `DeclineScheduleCommandHandler` (7)** — confirm đặt `confirmed` + báo staff, idempotent khi đã confirmed; decline validate lý do (≥3 ký tự, cắt 500), đặt `declined` + **trả chỗ slot** (booked−1) cho HR xếp lại + báo staff; cả hai chặn booking không còn `scheduled`, không phải chủ hồ sơ→Forbidden, not-found.
+  - **`GetCandidateScheduleQueryHandler` (5)** — phân loại Upcoming/Past theo giờ slot, AwaitingReschedule cho booking declined CHƯA xếp lại (vòng đã có lịch mới thì loại khỏi awaiting), không hồ sơ→list rỗng.
+  - File: `tests/ARI.Application.UnitTests/Scheduling/{SchedulingData,AssignSlotCommandHandlerTests,CandidateScheduleResponseTests,GetCandidateScheduleQueryHandlerTests}.cs` + sửa `TestSupport/InMemoryUnitOfWork.cs`. `dotnet test`: **80/80 pass**.
 
 - [x] 2026-08-05: **Unit test luồng chính Online Test (Phase 2c) — 33 test mới, tổng 44/44 pass.**
   - **Hạ tầng test tái dùng** (không thêm mocking lib): `tests/ARI.Application.UnitTests/TestSupport/` — `InMemoryUnitOfWork`/`InMemoryRepository<T>` (LINQ-to-objects thay EF, `Seed()` chainable, đếm `SaveChangesCount`) + `RecordingNotificationService` (ghi event realtime, công tắc `ThrowOnPublish` để test best-effort). Dùng chung cho mọi flow test sau này.

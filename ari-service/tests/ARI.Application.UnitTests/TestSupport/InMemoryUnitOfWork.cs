@@ -21,6 +21,15 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
     /// <summary>Số lần <see cref="SaveChangesAsync"/> được gọi — để assert handler có persist hay không.</summary>
     public int SaveChangesCount { get; private set; }
 
+    /// <summary>
+    /// Hook cho <see cref="ExecuteSqlRawAsync"/> (mặc định trả 0). Test nào dùng SQL thô
+    /// (vd chốt/nhả chỗ nguyên tử của Scheduling) tự cắm delegate giả lập hành vi + số dòng ảnh hưởng.
+    /// </summary>
+    public Func<string, object[], CancellationToken, Task<int>>? OnExecuteSqlRaw { get; set; }
+
+    /// <summary>Khi true: <see cref="SaveChangesAsync"/> ném lỗi để test đường bù trừ (compensating) của handler.</summary>
+    public bool ThrowOnSaveChanges { get; set; }
+
     /// <summary>Nạp sẵn dữ liệu cho một loại entity (chainable).</summary>
     public InMemoryUnitOfWork Seed<T>(params T[] entities) where T : class
     {
@@ -43,12 +52,13 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
+        if (ThrowOnSaveChanges) throw new InvalidOperationException("save failed");
         SaveChangesCount++;
         return Task.FromResult(1);
     }
 
     public Task<int> ExecuteSqlRawAsync(string sql, object[] parameters, CancellationToken ct = default)
-        => Task.FromResult(0);
+        => OnExecuteSqlRaw?.Invoke(sql, parameters, ct) ?? Task.FromResult(0);
 
     public void Dispose() { }
 }
