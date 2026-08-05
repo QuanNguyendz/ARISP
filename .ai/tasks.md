@@ -142,6 +142,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Candidate: Thực hiện làm bài trắc nghiệm trên Candidate Portal (Giao diện web trắc nghiệm) — `OnlineTestPage` + `CandidateOnlineTestController` ✅ 2026-07-24
 - [x] Backend: Tự động chấm điểm (Auto-scoring) sau khi nộp bài và so khớp đạt/không đạt dựa trên điểm sàn (`OnlineTestPassScore` trên JobPosting) ✅ 2026-07-24
 - [x] Auto-progression (mềm): nộp bài → lưu `IsPassed` + realtime `OnlineTestGraded` + notification; kết quả hiện cho HR (`GET /online-test/applications/{id}/result`) để HR cấp Interview Code vòng tiếp — không tự đổi status (ADR-049) ✅ 2026-07-24
+- [x] Unit test luồng Online Test — chấm điểm (khớp hoàn toàn, làm tròn 2 số, điểm sàn inclusive, chỉ chấm bộ đề đã bốc), gating (1 lượt/vòng, CV chưa duyệt, đã rút, ngân hàng rỗng, phân quyền), ẩn đáp án + bốc đề deterministic, validate câu hỏi — **33 test mới, 44/44 pass** ✅ 2026-08-05
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
 - [x] Database schema: `availability_slots`, `interview_codes` (entities đã có)
@@ -304,6 +305,13 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test luồng chính Online Test (Phase 2c) — 33 test mới, tổng 44/44 pass.**
+  - **Hạ tầng test tái dùng** (không thêm mocking lib): `tests/ARI.Application.UnitTests/TestSupport/` — `InMemoryUnitOfWork`/`InMemoryRepository<T>` (LINQ-to-objects thay EF, `Seed()` chainable, đếm `SaveChangesCount`) + `RecordingNotificationService` (ghi event realtime, công tắc `ThrowOnPublish` để test best-effort). Dùng chung cho mọi flow test sau này.
+  - **`SubmitOnlineTestCommandHandler` (18 test)** — công thức chấm: all-correct=100/pass, 2/3→66.67 làm tròn + trượt, điểm sàn inclusive (=50 → đạt), multiple khớp HOÀN TOÀN (theory: thiếu/dư/rỗng đều sai), câu bỏ trống tính sai, **chỉ chấm bộ đề đã bốc** (perTest=2 trên bank 5 → total=2); cổng chặn: 2 lượt/vòng→Conflict, CV chưa duyệt (cv_submitted/cv_rejected)→chặn, đã rút→chặn, ngân hàng rỗng→fail, không thấy hồ sơ→NotFound, không sở hữu hồ sơ→Forbidden; side-effect: báo ứng viên+recruiter+nhóm hr_admin, lỗi SignalR không hỏng nộp bài.
+  - **`CreateOnlineTestQuestionCommandHandler` (10 test)** — validate (theory 6 ca: text rỗng, <2 hoặc >6 phương án, thiếu đáp án đúng, đáp án ngoài danh sách, single mà chọn 2 đúng) chặn trước khi chạm repo; chuẩn hoá đáp án distinct+sort + đồng bộ `CorrectOption` legacy; phân quyền: admin thêm mọi job, recruiter không phải chủ tin→Forbidden, job không tồn tại→NotFound.
+  - **`GetCandidateOnlineTestQueryHandler` (5 test)** — CV passed trả câu hỏi (DTO ứng viên không có trường đáp án — ẩn ở compile-time), CV chưa duyệt trả metadata nhưng ẩn câu hỏi, phản ánh trạng thái đã nộp (score/isPassed), **bốc đề deterministic** (2 lần đọc ra cùng bộ + thứ tự), hồ sơ lạ→NotFound.
+  - File: `tests/ARI.Application.UnitTests/TestSupport/{InMemoryUnitOfWork,RecordingNotificationService}.cs` + `tests/ARI.Application.UnitTests/OnlineTest/{OnlineTestData,SubmitOnlineTestCommandHandlerTests,CreateOnlineTestQuestionCommandHandlerTests,GetCandidateOnlineTestQueryHandlerTests}.cs`. `dotnet test`: **44/44 pass**, không warning từ file test.
 
 - [x] 2026-07-26: **Dev-only seed endpoint test Phỏng vấn thử + dọn trùng số ADR (practice 048→050).**
   - **Seed:** `POST /api/dev/seed-practice` (`DevController`, gated `IWebHostEnvironment.IsDevelopment()` → prod 404; `AllowAnonymous`) → `SeedPracticeCommand`/handler (MediatR auto-discovered) tạo idempotent `CandidateAccount` (`EmailVerified=true`) + `JobPosting` (`active`, JD vi, **`SalaryCurrency="VND"`**) + `Application` (`Status="interview"` → `PracticeEligible`) + `AvailabilitySlot`/`InterviewBooking` (mirror `StaffScheduling.AssignSlotCommand`); trả `practiceUrl` + tài khoản. `?fresh=true` tạo app mới. Kết hợp `Interview:PracticeAttemptsPerRound=0` để test lặp vô hạn. Không migration.
