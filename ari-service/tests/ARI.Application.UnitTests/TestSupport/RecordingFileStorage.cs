@@ -13,6 +13,7 @@ namespace ARI.Application.UnitTests.TestSupport;
 public sealed class RecordingFileStorage : IFileStorageService
 {
     public List<(string FileName, string ContentType)> Saved { get; } = new();
+    public List<string> Deleted { get; } = new();
     public bool ThrowOnSave { get; set; }
 
     /// <summary>Bytes trả về khi <see cref="ReadAllBytesAsync"/> được gọi (null = không tìm thấy file).</summary>
@@ -27,7 +28,11 @@ public sealed class RecordingFileStorage : IFileStorageService
 
     public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
     public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
-    public Task DeleteAsync(string storageKey, CancellationToken ct = default) => Task.CompletedTask;
+    public Task DeleteAsync(string storageKey, CancellationToken ct = default)
+    {
+        Deleted.Add(storageKey);
+        return Task.CompletedTask;
+    }
     public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default) => Task.FromResult(FileBytes);
 }
 

@@ -124,6 +124,7 @@ _Chưa có task nào đang thực hiện._
   - [ ] Thêm khu vực upload file JD gốc (PDF/DOCX) bên cạnh textarea JD text
 
 ### Phase 2b – Job Board & Practice Interview
+- [x] Unit test Luồng 3 Submit Application (UC-16/17/18/27/28) — `GetJobsQuery` (chỉ tin active+public chưa hết hạn; lọc search/category/experience/location/language; phân trang+tổng; sắp lương/urgent-first/độ-phù-hợp-CV), `GetJobByIdQuery` (khách chỉ xem active+public, staff xem draft, Recruiter chỉ tin mình, resolve URL file JD), `GetJobFacetsQuery` (đếm facet trên tin active+public, gộp nhãn intern/fresher), `SubmitApplicationCommand` (hash MD5+parse+lưu file+ủy quyền service, lỗi parse/lưu→Failure, lỗi DB dọn file), `GetCvMatchQuery` (nhánh xác định: unauthorized/none/failed/cache completed+failed) — **36 test mới, 247/247 pass** ✅ 2026-08-05
 - [ ] Database schema: `candidate_accounts` (self-registered), extend `job_postings` với flag `is_public_listing`
 - [ ] EF Core migrations
 - [x] Candidate self-registration: email + password (role `Candidate`) – endpoint đã có
@@ -311,6 +312,12 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test Luồng 3 — Submit Application (UC-16/17/18/27/28) — 36 test mới, tổng 247/247 pass.**
+  - **`GetJobsQueryHandler` (13)** — chỉ trả tin active+public chưa hết hạn; lọc search (tiêu đề/kỹ năng), category, experience, location (case-insensitive), language; phân trang giới hạn item + báo tổng, trang kế khác trang trước; sắp `salary_desc` (lương cao trước), urgent-first mặc định, `relevance` theo số kỹ năng trùng CV (rơi về mới nhất khi không có kỹ năng).
+  - **`GetJobByIdQueryHandler` (8)** — NotFound; khách chỉ xem active+public (draft/non-public bị ẩn); staff xem draft; **Recruiter chỉ xem tin của chính mình** (tin người khác → coi như khách); staff được resolve URL file JD; kèm tên người tạo + vòng (sắp theo RoundNumber). **`GetJobFacetsQueryHandler` (5)** — chỉ đếm tin active+public, facet category/skill đếm đúng, gộp nhãn `intern`+`fresher`→"Intern / Fresher", board rỗng → total 0.
+  - **`SubmitApplicationCommandHandler` (5, wrapper CQRS)** — hash MD5 CV + parse text + lưu file rồi ủy quyền `IApplicationService` (source `job_board`); lỗi parse → Failure (không lưu/không ủy quyền); lỗi lưu → ServerError; **lỗi ghi DB → dọn file đã lưu** (`DeleteAsync`); null byte trong text được loại. **`GetCvMatchQueryHandler` (5, UC-27)** — nhánh xác định không chạy nền: tài khoản không tồn tại→Unauthorized, chưa có CV→none, file không đọc được→failed, cache `completed`→trả phân tích, cache `failed`→failed.
+  - Hạ tầng test bổ sung: `JobBoard/{JobBoardData,JobBoardFakes}.cs` (`FakeApplicationService` ghi request+source, `ThrowingScopeFactory`), `RecordingFileStorage` thêm `Deleted` (dọn file). File: `tests/ARI.Application.UnitTests/JobBoard/{GetJobsQueryHandlerTests,GetJobByIdQueryHandlerTests,GetJobFacetsQueryHandlerTests,SubmitApplicationCommandHandlerTests,GetCvMatchQueryHandlerTests}.cs`. `dotnet test`: **247/247 pass**.
 
 - [x] 2026-08-05: **Unit test Luồng 2 — Approve Job Posting (UC-48/77/78/79/80) — 35 test mới, tổng 211/211 pass.**
   - **`UpdateJobStatusCommandHandler` (28)** — cổng chặn (status rỗng/không hợp lệ, cấm về `draft`, NotFound, trùng trạng thái, `archived` bất biến, không chủ tin/không admin → Forbidden); **UC-48** Owner gửi `draft/rejected`→`pending` (báo nhóm hr_admin + `Notification` cho từng hr_admin, xoá lý do từ chối cũ), không phải Owner → Forbidden, `active`→pending bị chặn; **UC-78** HrAdmin/SuperAdmin `pending`→`active` (set `ApprovedByUserId`/`PublishedAt`, báo + `Notification` "approved" cho người tạo, broadcast công khai), Owner tự duyệt → Forbidden, sai trạng thái nguồn/hạn nộp quá khứ bị chặn, `closed`→`active` KHÔNG phê duyệt lại; **UC-79** từ chối bắt buộc lý do + chỉ từ `pending` + chỉ admin (`Notification` "rejected" cho người tạo); **UC-80** đóng dấu duyệt: PDF gọi `StampApprovalAsync`, DOCX gọi `StampApprovalFromTextAsync` (đặt `SignedJdFileUrl`), lỗi đóng dấu KHÔNG chặn duyệt, không có file JD → bỏ qua; đóng tin active→closed, chặn archive khi còn hồ sơ active + soft-delete khi sạch.
