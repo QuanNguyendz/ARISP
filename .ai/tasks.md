@@ -209,6 +209,7 @@ _Chưa có task nào đang thực hiện._
   - [x] Danh sách Application per Job Posting (filter, sort) – `EvaluationsController`
   - [x] Xem Evaluation Report + recording per Application per Round
   - [ ] Confirm / Override verdict (HrReview entity có, endpoint `/evaluations/{id}/review` cần kiểm tra)
+  - [x] Unit test `SubmitHrReviewAsync` — Confirm (mọi nhân sự) vs Override (chỉ HR Admin/Super Admin + bắt buộc lý do, Recruiter bị chặn), cập nhật status hồ sơ pass/not_pass, auto-progression sang vòng kế (chỉ real + có RoundConfig → tạo InterviewInvite, status→interview; practice/not_pass không progress), thông báo ứng viên realtime + Notification chống trùng (DedupKey), audit log hr_confirm/hr_override — **16 test mới, 109/109 pass** ✅ 2026-08-05
 - [x] `AuditLogService`: entity `AuditLog` đã có, ghi lại mọi action
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
 - [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
@@ -307,6 +308,10 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test luồng chính HR Review & Confirm/Override (Phase 6) — 16 test mới, tổng 109/109 pass.**
+  - **`InterviewService.SubmitHrReviewAsync`** với `InterviewServiceFactory` (dựng service 8 dependency, cắm stub ném lỗi cho 6 dependency media/AI không dùng trong luồng review) + `RecordingNotificationService`: **Confirm** (verdict == AiVerdict) mọi nhân sự làm được kể cả Recruiter; **Override** (đổi verdict) chỉ HR Admin/Super Admin **và bắt buộc `OverrideReason`** — thiếu lý do hoặc Recruiter override → Failure, không persist gì. Cập nhật status hồ sơ pass/not_pass; **auto-progression (ADR-017)**: pass + real + có `InterviewRoundConfig` vòng kế → tạo `InterviewInvite` vòng N+1 + status→interview, còn practice/không có config/not_pass → không progress. Thông báo ứng viên realtime (`ReceiveApplicationStatusUpdate` + `ReceiveUserNotification`) + bản ghi `Notification` chống trùng theo `DedupKey` (`hr_review:{evalId}`), hồ sơ không có tài khoản → bỏ qua realtime nhưng luồng chính vẫn hoàn tất; luôn ghi `AuditLog` `hr_confirm`/`hr_override`. Evaluation/HR user không tồn tại → Failure.
+  - File: `tests/ARI.Application.UnitTests/HrReview/{HrReviewData,SubmitHrReviewTests}.cs` + `TestSupport/InterviewServiceFactory.cs`. `dotnet test`: **109/109 pass**.
 
 - [x] 2026-08-05: **Unit test CV-JD Match Analysis (Gemini, ADR-030) — 13 test mới, tổng 93/93 pass.**
   - **`CvJdAnalysisService`** với `FakeGeminiProvider` (đếm số lần gọi AI + nạp sẵn kết quả) + `FakeDocumentParser`: chốt reuse theo `(JobPostingId, CvHash MD5)` — bản "completed" cùng hash trả thẳng KHÔNG gọi Gemini (`AnalyzeCallCount==0`), gọi lần 2 cùng CV → cache hit (AI chỉ chạy 1 lần); CV không hợp lệ (`IsValidCv=false`) lưu bản `failed` (MatchScore 0 + ErrorMessage) rồi trả Failure; lỗi AI → Failure "Lỗi AI" không persist; bản `failed` KHÔNG chặn cache → chạy lại; cache hit enrich `analysis_reasoning`/`seniority_alignment`/`tech_depth_analysis` từ envelope `RawResponse`; `GetById`/`GetByApplication` (link `cv_jd_analysis_id`), `CheckCandidateOwnership` (đúng cả analysis + account), `ClearAllCache`.
