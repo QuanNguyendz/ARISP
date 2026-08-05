@@ -149,6 +149,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] Database schema: `interview_bookings` (entity đã có nhưng chưa migration)
 - [ ] EF Core migrations
 - [ ] **Practice (Remote):** Candidate chọn slot → booking → nhận nhắc nhở 24h/1h
+- [x] Unit test luồng Scheduling (ADR-048) — HR gán slot (chốt chỗ nguyên tử/chống overbooking, screening→interview, bù trừ khi lưu lỗi, liên kết xếp-lại sau decline), ứng viên confirm/decline (trả chỗ slot, validate lý do), phân loại lịch Upcoming/Past/AwaitingReschedule — **36 test mới, 80/80 pass** ✅ 2026-08-05
 - [x] HR generate Interview Code (format `ARX7K2`, 6 ký tự alphanumeric) cho thi thật
   - [x] One-time-use: vô hiệu hóa sau khi dùng
   - [x] TTL: mặc định 2 giờ, cấu hình per Job Posting
@@ -305,6 +306,13 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test luồng chính Scheduling (ADR-048) — 36 test mới, tổng 80/80 pass.**
+  - **Mở rộng hạ tầng test dùng chung:** `InMemoryUnitOfWork` thêm hook `OnExecuteSqlRaw` (giả lập SQL thô) + `ThrowOnSaveChanges` (test đường bù trừ). `Scheduling/SchedulingData.cs` factory + `SlotSqlEmulator` — giả lập 2 lệnh SQL nguyên tử chốt/nhả chỗ, giữ `booked_count` ở "DB ảo" tách khỏi entity EF nên guard chống overbooking + DTO trả về khớp production.
+  - **`AssignSlotCommandHandler` (19 test)** — chốt chỗ nguyên tử (`booked_count < capacity`) chống overbooking, screening→interview (vòng 2+ giữ interview), tạo booking scheduled/pending, đánh dấu invite ScheduledAt, thông báo ứng viên (bell `Notification` + realtime `ReceiveUserNotification`), liên kết `RescheduledFromId` khi xếp lại sau decline, **bù trừ nhả chỗ khi SaveChanges lỗi**; chặn: CV chưa duyệt (theory 5 status), đã có lịch vòng, sai job/vòng, slot quá khứ, không phải chủ tin→Forbidden (admin OK), app/slot không tồn tại→NotFound.
+  - **`ConfirmScheduleCommandHandler` (5) + `DeclineScheduleCommandHandler` (7)** — confirm đặt `confirmed` + báo staff, idempotent khi đã confirmed; decline validate lý do (≥3 ký tự, cắt 500), đặt `declined` + **trả chỗ slot** (booked−1) cho HR xếp lại + báo staff; cả hai chặn booking không còn `scheduled`, không phải chủ hồ sơ→Forbidden, not-found.
+  - **`GetCandidateScheduleQueryHandler` (5)** — phân loại Upcoming/Past theo giờ slot, AwaitingReschedule cho booking declined CHƯA xếp lại (vòng đã có lịch mới thì loại khỏi awaiting), không hồ sơ→list rỗng.
+  - File: `tests/ARI.Application.UnitTests/Scheduling/{SchedulingData,AssignSlotCommandHandlerTests,CandidateScheduleResponseTests,GetCandidateScheduleQueryHandlerTests}.cs` + sửa `TestSupport/InMemoryUnitOfWork.cs`. `dotnet test`: **80/80 pass**.
 
 - [x] 2026-08-05: **Unit test luồng chính Online Test (Phase 2c) — 33 test mới, tổng 44/44 pass.**
   - **Hạ tầng test tái dùng** (không thêm mocking lib): `tests/ARI.Application.UnitTests/TestSupport/` — `InMemoryUnitOfWork`/`InMemoryRepository<T>` (LINQ-to-objects thay EF, `Seed()` chainable, đếm `SaveChangesCount`) + `RecordingNotificationService` (ghi event realtime, công tắc `ThrowOnPublish` để test best-effort). Dùng chung cho mọi flow test sau này.
