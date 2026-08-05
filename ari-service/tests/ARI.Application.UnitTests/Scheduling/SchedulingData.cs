@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.DTOs;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Entities;
 
@@ -39,6 +40,18 @@ internal static class SchedulingData
         EndTime = (start ?? Future).AddHours(1),
         Capacity = capacity,
         BookedCount = booked,
+    };
+
+    public static CreateSlotRequest SlotRequest(
+        Guid jobId, int round = 1, int capacity = 1,
+        DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh") => new()
+    {
+        JobPostingId = jobId,
+        RoundNumber = round,
+        Capacity = capacity,
+        StartTime = start ?? Future,
+        EndTime = end ?? (start ?? Future).AddHours(1),
+        Timezone = tz,
     };
 
     public static InterviewBooking Booking(
