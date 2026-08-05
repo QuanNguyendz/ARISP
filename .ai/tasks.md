@@ -156,6 +156,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] EF Core migrations
 - [ ] **Practice (Remote):** Candidate chọn slot → booking → nhận nhắc nhở 24h/1h
 - [x] Unit test luồng Scheduling (ADR-048) — HR gán slot (chốt chỗ nguyên tử/chống overbooking, screening→interview, bù trừ khi lưu lỗi, liên kết xếp-lại sau decline), ứng viên confirm/decline (trả chỗ slot, validate lý do), phân loại lịch Upcoming/Past/AwaitingReschedule — **36 test mới, 80/80 pass** ✅ 2026-08-05
+- [x] Unit test Luồng 5 Schedule Interview (UC-39/40/41/58/59/60/61/62/63) — quản lý kho khung giờ (StaffScheduling): `GetAvailabilitySlotsQuery` (guard jobId, NotFound/Forbidden theo chủ tin-admin, sắp theo StartTime, lọc theo vòng), `CreateSlotCommand` (validate tương lai/end>start/capacity≥1/round≥1, NotFound job, Forbidden, tạo slot booked=0, mặc định timezone), `DeleteSlotCommand` (NotFound, Forbidden, chặn khi đã có người đặt, xoá khi trống), `UpdateSlotCapacityCommand` (NotFound, Forbidden, ≥1, không nhỏ hơn số đã đặt, cập nhật thành công). Assign/confirm/decline/candidate-schedule đã phủ ở luồng Scheduling. — **24 test mới, 301/301 pass** ✅ 2026-08-05
 - [x] HR generate Interview Code (format `ARX7K2`, 6 ký tự alphanumeric) cho thi thật
   - [x] One-time-use: vô hiệu hóa sau khi dùng
   - [x] TTL: mặc định 2 giờ, cấu hình per Job Posting
@@ -313,6 +314,13 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test Luồng 5 — Schedule Interview (UC-39/40/41/58/59/60/61/62/63) — 24 test mới, tổng 301/301 pass.**
+  - Phủ nhánh còn thiếu: **quản lý kho khung giờ của nhân sự** (`StaffScheduling.cs`) — phần assign/confirm/decline/candidate-schedule đã phủ ở batch Scheduling trước.
+  - **`GetAvailabilitySlotsQueryHandler` (6)** — jobId rỗng→Failure; job không tồn tại→NotFound; Recruiter không phải chủ tin→Forbidden; chủ tin nhận slot **sắp theo StartTime**; lọc theo vòng; HrAdmin xem mọi tin.
+  - **`CreateSlotCommandHandler` (9)** — gauntlet validate trước phân quyền: jobId rỗng, end≤start, start ở quá khứ, capacity<1, round<1; job không tồn tại→NotFound; không phải chủ tin→Forbidden; chủ tin lưu slot **booked=0** (+SaveChanges); timezone trắng→mặc định `Asia/Ho_Chi_Minh`.
+  - **`DeleteSlotCommandHandler` (4)** — NotFound; Forbidden (slot vẫn còn); **chặn xoá khi `BookedCount>0`**; xoá slot trống thành công. **`UpdateSlotCapacityCommandHandler` (5)** — NotFound; Forbidden; capacity<1; **không nhỏ hơn số đã đặt**; cập nhật + persist thành công.
+  - Hạ tầng: thêm factory `SchedulingData.SlotRequest(...)`. File: `tests/ARI.Application.UnitTests/Scheduling/StaffSlotTests.cs` (+ sửa `SchedulingData.cs`). `dotnet test`: **301/301 pass**.
 
 - [x] 2026-08-05: **Unit test Luồng 4 — Screen Application (UC-53/54/55/56/57) — 30 test mới, tổng 277/277 pass.**
   - **`GetApplicationsListTests` (8)** — `GetApplicationsByJobAsync` (job không tồn tại→Failure; chỉ trả ứng viên của job đó, sắp mới nhất trước, JobTitle override từ job; danh sách bỏ CvText; kèm MatchScore+CvJdSummary), `GetAllApplicationsAsync` (sắp created desc, resolve tiêu đề theo từng job qua batch), `GetApplicationsForCreatorAsync` (rỗng khi không sở hữu job; chỉ gộp ứng viên của tin mình).
