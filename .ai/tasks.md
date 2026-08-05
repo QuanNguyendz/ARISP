@@ -87,6 +87,7 @@ _Chưa có task nào đang thực hiện._
   - [x] Scoring Rubric: trường `scoring_rubric` (JSONB) đã có
   - [x] Interview Persona: trường `persona_config` (JSONB) đã có
 - [x] Language detection khi tạo Job Posting: `JobDescriptionLanguageDetector` service đã có
+- [x] Unit test Luồng 1 Configure Job Posting (UC-45/46/47/50) — `CreateJobCommand` (validate, draft của người tạo, sinh RoundConfig + ngôn ngữ vòng kế thừa detect, ingest JD vào RAG, báo realtime), `UpdateJobCommand` (phân quyền chủ tin/admin, chặn archived, tái tạo round chỉ khi đổi, broadcast khi active), `AnalyzeJdCommand` (parse→lưu→Gemini; PDF inline vs DOCX fallback; lỗi parse/lưu→Failure; Gemini lỗi vẫn trả file), `CreateJobSlotsCommand` (slot booked=0, job không tồn tại→NotFound) — **31 test mới, 176/176 pass** ✅ 2026-08-05
 - [ ] HR confirm/chỉnh language requirement trước khi publish (UI chưa làm)
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
 - [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
@@ -309,6 +310,12 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test Luồng 1 — Configure Job Posting (UC-45/46/47/50) — 31 test mới, tổng 176/176 pass.**
+  - **`CreateJobCommandHandler` (10)** — request hợp lệ tạo job `draft` của người tạo + sinh `InterviewRoundConfig` từng vòng (ngôn ngữ vòng bỏ trống kế thừa `DetectedLanguage`, có set thì giữ), người tạo không tồn tại → Unauthorized, đẩy JD vào RAG, báo realtime; validate chặn trước (thiếu title, không có vòng, InterviewMode sai, onsite thiếu location).
+  - **`UpdateJobCommandHandler` (10)** — job không tồn tại → NotFound, không phải chủ tin/không admin → Forbidden (admin sửa job người khác OK), chặn khi `archived`, validate như create, **chỉ tái tạo round khi cấu hình đổi** (đổi số lượng → xoá+tạo mới; y hệt → giữ nguyên entity), broadcast `ReceivePublicJobUpdate` khi tin đang `active`, báo realtime người sửa.
+  - **`AnalyzeJdCommandHandler` (8, ADR-042)** — parse→lưu file→Gemini trích xuất auto-fill; **PDF gửi inline** (bytes + `application/pdf`) còn **DOCX dùng text fallback** (bytes null); lỗi parse → Failure (không lưu/không gọi AI); lỗi lưu → ServerError; Gemini lỗi vẫn trả file đã lưu (`IsValidJd=false`); JobDescription ưu tiên Gemini, rỗng thì fallback text parse. **`CreateJobSlotsCommandHandler` (3)** — tạo slot `booked_count=0`, job không tồn tại → NotFound, list rỗng vẫn success.
+  - Hạ tầng test bổ sung: `TestSupport/RecordingFileStorage.cs` (`RecordingFileStorage` + `StubDocumentParser`), `RecordingNotificationService` thêm `AllEvents` (broadcast toàn hệ thống). File: `tests/ARI.Application.UnitTests/JobPostings/{JobPostingData,JobsFakes,CreateJobCommandHandlerTests,UpdateJobCommandHandlerTests,AnalyzeJdCommandHandlerTests,CreateJobSlotsCommandHandlerTests}.cs`. `dotnet test`: **176/176 pass**.
 
 - [x] 2026-08-05: **Unit test luồng chính Application (Phase 2) — 36 test mới, tổng 145/145 pass.**
   - **`ApplicationService`** với `RecordingEmailService` + `RecordingRagIngestionService` + `ApplicationServiceFactory` (cắm `IServiceScopeFactory` stub — tác vụ phân tích CV nền fire-and-forget bị né bằng input CvFileUrl=null): **`SubmitApplicationAsync` (12)** chặn job không tồn tại/không active/quá hạn, tạo Application `cv_submitted` + Source, **auto-link `CvJdAnalysis` theo `(JobPostingId, CvHash)`** (không khớp → để trống), đẩy CV vào RAG (`IngestAsync("cv", …)`, bỏ qua khi không có CvText), báo nhóm `hr_admin` + recruiter, ứng viên tự ứng tuyển nhận `Notification` `applied:{id}` + realtime, hồ sơ ẩn danh không tạo notification.

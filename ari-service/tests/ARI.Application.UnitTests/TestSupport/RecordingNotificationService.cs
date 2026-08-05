@@ -14,6 +14,7 @@ public sealed class RecordingNotificationService : INotificationService
 {
     public List<(Guid UserId, string EventType)> UserEvents { get; } = new();
     public List<(string Group, string EventType)> GroupEvents { get; } = new();
+    public List<string> AllEvents { get; } = new();
 
     /// <summary>Nếu true: mọi Publish* ném lỗi (mô phỏng SignalR chết) để test đường best-effort.</summary>
     public bool ThrowOnPublish { get; set; }
@@ -37,5 +38,10 @@ public sealed class RecordingNotificationService : INotificationService
         return Task.CompletedTask;
     }
 
-    public Task PublishAllEventAsync(string eventType, object payload, CancellationToken ct = default) => Task.CompletedTask;
+    public Task PublishAllEventAsync(string eventType, object payload, CancellationToken ct = default)
+    {
+        if (ThrowOnPublish) throw new InvalidOperationException("SignalR down");
+        AllEvents.Add(eventType);
+        return Task.CompletedTask;
+    }
 }
