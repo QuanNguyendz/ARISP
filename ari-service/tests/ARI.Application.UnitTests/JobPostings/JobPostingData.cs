@@ -40,7 +40,9 @@ internal static class JobPostingData
         FullName = "Nguoi Tao Tin",
     };
 
-    public static JobPosting Job(Guid owner, string status = "draft") => new()
+    public static JobPosting Job(
+        Guid owner, string status = "draft",
+        string? jdFileUrl = null, string? jdFileFormat = null, DateTimeOffset? deadline = null) => new()
     {
         CreatedByUserId = owner,
         Title = "Backend Developer",
@@ -48,6 +50,17 @@ internal static class JobPostingData
         InterviewMode = "remote",
         Status = status,
         InviteTokenTtlHours = 48,
+        JdFileUrl = jdFileUrl,
+        JdFileName = jdFileUrl == null ? null : "jd." + (jdFileFormat ?? "pdf"),
+        JdFileFormat = jdFileFormat,
+        ApplicationDeadline = deadline,
+    };
+
+    /// <summary>Request đổi trạng thái (approval workflow) — kèm lý do khi từ chối.</summary>
+    public static UpdateJobStatusRequest StatusRequest(string status, string? reason = null) => new()
+    {
+        Status = status,
+        RejectionReason = reason,
     };
 
     public static InterviewRoundConfig RoundEntity(

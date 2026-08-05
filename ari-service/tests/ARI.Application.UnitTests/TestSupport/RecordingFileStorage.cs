@@ -15,6 +15,9 @@ public sealed class RecordingFileStorage : IFileStorageService
     public List<(string FileName, string ContentType)> Saved { get; } = new();
     public bool ThrowOnSave { get; set; }
 
+    /// <summary>Bytes trả về khi <see cref="ReadAllBytesAsync"/> được gọi (null = không tìm thấy file).</summary>
+    public byte[]? FileBytes { get; set; }
+
     public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default)
     {
         if (ThrowOnSave) throw new InvalidOperationException("storage down");
@@ -25,7 +28,7 @@ public sealed class RecordingFileStorage : IFileStorageService
     public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
     public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
     public Task DeleteAsync(string storageKey, CancellationToken ct = default) => Task.CompletedTask;
-    public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
+    public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default) => Task.FromResult(FileBytes);
 }
 
 /// <summary>Parser tài liệu giả (dùng chung) — trả text cố định; công tắc ném lỗi để test đường parse fail.</summary>

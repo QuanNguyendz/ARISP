@@ -88,6 +88,7 @@ _Chưa có task nào đang thực hiện._
   - [x] Interview Persona: trường `persona_config` (JSONB) đã có
 - [x] Language detection khi tạo Job Posting: `JobDescriptionLanguageDetector` service đã có
 - [x] Unit test Luồng 1 Configure Job Posting (UC-45/46/47/50) — `CreateJobCommand` (validate, draft của người tạo, sinh RoundConfig + ngôn ngữ vòng kế thừa detect, ingest JD vào RAG, báo realtime), `UpdateJobCommand` (phân quyền chủ tin/admin, chặn archived, tái tạo round chỉ khi đổi, broadcast khi active), `AnalyzeJdCommand` (parse→lưu→Gemini; PDF inline vs DOCX fallback; lỗi parse/lưu→Failure; Gemini lỗi vẫn trả file), `CreateJobSlotsCommand` (slot booked=0, job không tồn tại→NotFound) — **31 test mới, 176/176 pass** ✅ 2026-08-05
+- [x] Unit test Luồng 2 Approve Job Posting (UC-48/77/78/79/80) — `UpdateJobStatusCommand` (workflow draft→pending→active/rejected, phân quyền Owner gửi duyệt vs HrAdmin/SuperAdmin duyệt/từ chối, bắt buộc lý do từ chối, đóng dấu duyệt PDF/DOCX best-effort không chặn, thông báo người tạo + nhóm hr_admin, chặn archive khi còn hồ sơ active) + `GetAdminJobsQuery` (mọi trạng thái gồm draft/pending, lọc theo người tạo, đếm ứng viên, gắn tên+vai trò người tạo, sắp mới nhất) — **35 test mới, 211/211 pass** ✅ 2026-08-05
 - [ ] HR confirm/chỉnh language requirement trước khi publish (UI chưa làm)
 - [ ] Candidate invite flow: sinh invite link (signed JWT, 24–72h) → gửi email
 - [x] Candidate: nhận invite → submit CV + thông tin cá nhân (Application) (Backend)
@@ -310,6 +311,11 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Unit test Luồng 2 — Approve Job Posting (UC-48/77/78/79/80) — 35 test mới, tổng 211/211 pass.**
+  - **`UpdateJobStatusCommandHandler` (28)** — cổng chặn (status rỗng/không hợp lệ, cấm về `draft`, NotFound, trùng trạng thái, `archived` bất biến, không chủ tin/không admin → Forbidden); **UC-48** Owner gửi `draft/rejected`→`pending` (báo nhóm hr_admin + `Notification` cho từng hr_admin, xoá lý do từ chối cũ), không phải Owner → Forbidden, `active`→pending bị chặn; **UC-78** HrAdmin/SuperAdmin `pending`→`active` (set `ApprovedByUserId`/`PublishedAt`, báo + `Notification` "approved" cho người tạo, broadcast công khai), Owner tự duyệt → Forbidden, sai trạng thái nguồn/hạn nộp quá khứ bị chặn, `closed`→`active` KHÔNG phê duyệt lại; **UC-79** từ chối bắt buộc lý do + chỉ từ `pending` + chỉ admin (`Notification` "rejected" cho người tạo); **UC-80** đóng dấu duyệt: PDF gọi `StampApprovalAsync`, DOCX gọi `StampApprovalFromTextAsync` (đặt `SignedJdFileUrl`), lỗi đóng dấu KHÔNG chặn duyệt, không có file JD → bỏ qua; đóng tin active→closed, chặn archive khi còn hồ sơ active + soft-delete khi sạch.
+  - **`GetAdminJobsQueryHandler` (7)** — trả mọi trạng thái (gồm draft/pending) cho admin, lọc `MineUserId` chỉ tin của người tạo, đếm ứng viên theo tin, gắn tên+vai trò người tạo ("Anna (Recruiter)"), sắp mới nhất, rỗng → list rỗng.
+  - Hạ tầng test bổ sung: `JobsFakes.cs` thêm `RecordingJdStampService` (đếm đóng dấu PDF/text + công tắc lỗi), `RecordingFileStorage` thêm `FileBytes` cho `ReadAllBytesAsync`, `JobPostingData` thêm `StatusRequest` + JD-file fields. File: `tests/ARI.Application.UnitTests/JobPostings/{UpdateJobStatusCommandHandlerTests,GetAdminJobsQueryHandlerTests}.cs`. `dotnet test`: **211/211 pass**.
 
 - [x] 2026-08-05: **Unit test Luồng 1 — Configure Job Posting (UC-45/46/47/50) — 31 test mới, tổng 176/176 pass.**
   - **`CreateJobCommandHandler` (10)** — request hợp lệ tạo job `draft` của người tạo + sinh `InterviewRoundConfig` từng vòng (ngôn ngữ vòng bỏ trống kế thừa `DetectedLanguage`, có set thì giữ), người tạo không tồn tại → Unauthorized, đẩy JD vào RAG, báo realtime; validate chặn trước (thiếu title, không có vòng, InterviewMode sai, onsite thiếu location).
