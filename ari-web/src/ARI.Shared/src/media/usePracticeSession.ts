@@ -3,7 +3,9 @@ import * as signalR from '@microsoft/signalr'
 import { LiveAvatarSession, SessionEvent, AgentEventsEnum } from '@heygen/liveavatar-web-sdk'
 import { interviewService } from '@ari/shared/fservices/interview'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { getInterviewSessionToken } from '@ari/shared/api/apiClient'
 import { ASSET_BASE_URL } from '@ari/shared/config/constants'
+import { getStoredLanguage } from '@ari/shared/i18n'
 
 export interface TranscriptItem {
   role: 'ai' | 'candidate'
@@ -56,7 +58,33 @@ const QUESTION_AUDIO_TIMEOUT_MS = 6000
  * Practice AUDIO-ONLY (ADR-050): media-config trả heyGen=null → không avatar; audio ElevenLabs
  * phát qua WebAudio (playPcmViaWebAudio). Thiếu Deepgram → nhập tay + nút "Gửi trả lời".
  */
+export interface InterviewSessionOptions {
+  /** Bắt buộc khi tự tạo phiên (phỏng vấn thử). Kiosk truyền `existingSessionId` thay cho cặp này. */
+  applicationId?: string
+  roundNumber?: number
+  sessionType?: 'practice' | 'real'
+  /** Kiosk: phiên đã được tạo sẵn khi xác thực Interview Code — hook chỉ việc tham gia (ADR-052). */
+  existingSessionId?: string | null
+  /** Kiosk: quay video buổi thật (cam + mic) để tải lên storage sau khi kết thúc. */
+  recordVideo?: boolean
+}
+
+/**
+ * Phỏng vấn THỬ (audio-only, tự tạo phiên) — giữ nguyên chữ ký cũ cho các màn hiện có.
+ * Bản đầy đủ (dùng cho cả Kiosk phỏng vấn thật) là {@link useInterviewSession}.
+ */
 export function usePracticeSession(applicationId: string, roundNumber = 1) {
+  return useInterviewSession({ applicationId, roundNumber, sessionType: 'practice' })
+}
+
+export function useInterviewSession(options: InterviewSessionOptions) {
+  const {
+    applicationId = '',
+    roundNumber = 1,
+    sessionType = 'practice',
+    existingSessionId = null,
+    recordVideo = false,
+  } = options
   const [status, setStatus] = useState<PracticeStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [messages, setMessages] = useState<TranscriptItem[]>([])
@@ -71,6 +99,8 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const [micEnabled, setMicEnabled] = useState(true) // tắt mic = chuyển sang gõ phím tự do (ADR-050)
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null) // đếm ngược trần thời lượng
   const [timeUp, setTimeUp] = useState(false) // hết giờ — đang chờ AI nói câu kết thúc
+  // Id phiên đã tạo — page dùng để mở trang xem lại transcript sau khi kết thúc (ADR-051).
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const connRef = useRef<signalR.HubConnection | null>(null)
@@ -79,6 +109,10 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const dgSocketRef = useRef<WebSocket | null>(null)
   const dgRetryRef = useRef(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
+  // Ghi hình buổi THẬT (ADR-052) — recorder riêng trên stream cam+mic, tách khỏi recorder
+  // audio-only đang đẩy cho Deepgram.
+  const videoRecorderRef = useRef<MediaRecorder | null>(null)
+  const videoChunksRef = useRef<Blob[]>([])
   const micStreamRef = useRef<MediaStream | null>(null)
   const languageRef = useRef('vi')
   const sessionIdRef = useRef<string | null>(null)
@@ -491,7 +525,9 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   const connectHub = useCallback(async () => {
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(`${ASSET_BASE_URL}/hubs/session`, {
-        accessTokenFactory: () => useAuthStore.getState().tokens?.accessToken ?? '',
+        // Kiosk (ADR-052) dùng token phạm vi phiên; ứng viên đăng nhập dùng token tài khoản.
+        accessTokenFactory: () =>
+          getInterviewSessionToken() ?? useAuthStore.getState().tokens?.accessToken ?? '',
       })
       .withAutomaticReconnect()
       .build()
@@ -596,13 +632,41 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
         endedRef.current = false
         micStreamRef.current = micStream
 
-        const session = await interviewService.startSession({
-          applicationId,
-          roundNumber,
-          sessionType: 'practice',
-        })
-        const sessionId = session.sessionId
+        // Kiosk: phiên đã tạo lúc xác thực Interview Code → chỉ tham gia, KHÔNG tạo phiên mới
+        // (tránh đốt thêm 1 phiên thật). Phỏng vấn thử vẫn tự tạo phiên như cũ.
+        const sessionId =
+          existingSessionId ??
+          (
+            await interviewService.startSession({
+              applicationId,
+              roundNumber,
+              sessionType,
+              // Nhận xét AI viết theo ngôn ngữ ứng viên đang dùng → màn xem lại không trộn Việt–Anh.
+              uiLanguage: getStoredLanguage(),
+            })
+          ).sessionId
         sessionIdRef.current = sessionId
+        setSessionId(sessionId)
+
+        // Quay video buổi thật (ADR-052) — best-effort, lỗi codec không được chặn phỏng vấn.
+        if (recordVideo) {
+          try {
+            const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+              ? 'video/webm;codecs=vp9,opus'
+              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+                ? 'video/webm;codecs=vp8,opus'
+                : 'video/webm'
+            videoChunksRef.current = []
+            const vrec = new MediaRecorder(micStream, { mimeType: mime, videoBitsPerSecond: 900_000 })
+            vrec.ondataavailable = (ev: BlobEvent) => {
+              if (ev.data.size > 0) videoChunksRef.current.push(ev.data)
+            }
+            vrec.start(5000) // cắt chunk 5s để không giữ 1 buffer khổng lồ trong RAM
+            videoRecorderRef.current = vrec
+          } catch (e) {
+            console.error('[recording] không quay được video buổi phỏng vấn', e)
+          }
+        }
 
         const media = await interviewService.getMediaConfig(sessionId)
         languageRef.current = media.language || 'vi'
@@ -711,10 +775,58 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     } catch {
       /* noop */
     }
+    // Recorder video dừng ở đây để flush chunk cuối; chunks GIỮ LẠI cho finalizeRecording() upload.
+    try {
+      if (videoRecorderRef.current?.state === 'recording') videoRecorderRef.current.stop()
+    } catch {
+      /* noop */
+    }
+  }, [])
+
+  /**
+   * Chốt file ghi hình rồi tải lên storage (ADR-052). Gọi sau khi phiên đã kết thúc.
+   * Trả về trạng thái để màn Kiosk hiển thị: không quay → 'skipped'.
+   */
+  const finalizeRecording = useCallback(async (): Promise<'saved' | 'skipped' | 'error'> => {
+    const rec = videoRecorderRef.current
+    const sessionId = sessionIdRef.current
+    if (!rec || !sessionId) return 'skipped'
+    videoRecorderRef.current = null
+
+    // Chờ recorder flush nốt chunk cuối trước khi ghép Blob.
+    await new Promise<void>((resolve) => {
+      if (rec.state === 'inactive') return resolve()
+      rec.onstop = () => resolve()
+      try {
+        rec.stop()
+      } catch {
+        resolve()
+      }
+      window.setTimeout(resolve, 5000) // recorder treo → không chặn màn kết thúc
+    })
+
+    const chunks = videoChunksRef.current
+    videoChunksRef.current = []
+    if (chunks.length === 0) return 'skipped'
+
+    try {
+      const blob = new Blob(chunks, { type: rec.mimeType || 'video/webm' })
+      await interviewService.uploadRecording(sessionId, blob, `interview-${sessionId}.webm`)
+      return 'saved'
+    } catch (e) {
+      console.error('[recording] tải video lên thất bại', e)
+      return 'error'
+    }
   }, [])
 
   const end = useCallback(async () => {
     const sessionId = sessionIdRef.current
+    // Dừng recorder video TRƯỚC cleanup (cleanup đóng stream/track) nhưng giữ chunks để upload.
+    try {
+      if (videoRecorderRef.current?.state === 'recording') videoRecorderRef.current.requestData()
+    } catch {
+      /* noop */
+    }
     cleanup()
     if (sessionId) {
       try {
@@ -731,6 +843,7 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
   return {
     status,
     error,
+    sessionId, // dùng cho lối vào trang xem lại transcript sau khi kết thúc
     messages,
     interim,
     answerText,
@@ -747,5 +860,6 @@ export function usePracticeSession(applicationId: string, roundNumber = 1) {
     start,
     end,
     submitAnswer,
+    finalizeRecording, // Kiosk: chốt + tải video buổi thật lên storage sau khi kết thúc
   }
 }

@@ -15,5 +15,12 @@ namespace ARI.Domain.Constants
 
         // Người bên ngoài công ty (trong class Candidates)
         public const string Candidate = "Candidate";
+
+        /// <summary>
+        /// Không phải người dùng — là "danh tính của MỘT phiên phỏng vấn thật tại Kiosk" (ADR-052).
+        /// Token mang role này chỉ thao tác được đúng phiên ghi trong claim <c>session_id</c>,
+        /// hết hạn theo buổi phỏng vấn; máy Kiosk không cần ai đăng nhập.
+        /// </summary>
+        public const string KioskSession = "Kiosk_session";
     }
 }

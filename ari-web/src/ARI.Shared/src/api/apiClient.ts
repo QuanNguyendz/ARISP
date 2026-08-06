@@ -13,6 +13,21 @@ export function configureApiClient(options: { refreshPath?: string }): void {
   if (options.refreshPath) refreshPath = options.refreshPath;
 }
 
+/**
+ * Token phạm vi MỘT phiên phỏng vấn (Kiosk — ADR-052). Máy Kiosk dùng chung, không ai đăng nhập:
+ * mã phỏng vấn hợp lệ → BE trả token gắn đúng phiên, FE nạp vào đây cho mọi request/SignalR.
+ * Được ưu tiên hơn token người dùng; gọi `setInterviewSessionToken(null)` khi rời phòng.
+ */
+let interviewSessionToken: string | null = null;
+
+export function setInterviewSessionToken(token: string | null): void {
+  interviewSessionToken = token;
+}
+
+export function getInterviewSessionToken(): string | null {
+  return interviewSessionToken;
+}
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -27,11 +42,14 @@ apiClient.interceptors.request.use(
     const user = useAuthStore.getState().user;
     const headers = (config.headers ?? {}) as AxiosRequestHeaders;
 
-    if (tokens?.accessToken) {
+    // Kiosk: token phiên thắng token người dùng (máy dùng chung, không đăng nhập).
+    if (interviewSessionToken) {
+      headers.Authorization = `Bearer ${interviewSessionToken}`;
+    } else if (tokens?.accessToken) {
       headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
 
-    if (user?.id) {
+    if (!interviewSessionToken && user?.id) {
       headers['X-User-Id'] = user.id;
     }
 

@@ -23,5 +23,23 @@ namespace ARI.Application.Options
         /// bật lại avatar cho practice khi tài khoản LiveAvatar đủ quota. Real luôn có avatar.
         /// </summary>
         public bool PracticeUseAvatar { get; set; } = false;
+
+        /// <summary>
+        /// Trần thời lượng phỏng vấn THẬT (phút) — ADR-052. Hết giờ xử lý y hệt practice:
+        /// khoá mic → AI nói câu kết → đóng phiên. &lt;= 0 = không giới hạn.
+        /// </summary>
+        public int RealMaxDurationMinutes { get; set; } = 45;
+
+        /// <summary>
+        /// Hạn lưu video phỏng vấn thật (ngày) — ADR-052. Job dọn dẹp chạy hằng ngày xoá file
+        /// khỏi storage khi quá hạn. &lt;= 0 = giữ vĩnh viễn (tắt job).
+        /// </summary>
+        public int RecordingRetentionDays { get; set; } = 7;
+
+        /// <summary>Dung lượng tối đa 1 file ghi hình (MB) — chặn upload rác từ Kiosk.</summary>
+        public int MaxRecordingSizeMb { get; set; } = 300;
+
+        /// <summary>Hạn token phiên Kiosk (giờ) — phải phủ hết buổi phỏng vấn + thời gian upload video.</summary>
+        public int KioskSessionTokenHours { get; set; } = 3;
     }
 }

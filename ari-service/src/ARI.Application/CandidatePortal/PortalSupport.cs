@@ -68,6 +68,28 @@ namespace ARI.Application.CandidatePortal
                    && s != "pass" && s != "not_pass";
         }
 
+        /// <summary>
+        /// IDOR Protection + Auto-link: hồ sơ thuộc về ứng viên khi khớp <c>CandidateAccountId</c>, hoặc
+        /// hồ sơ cũ chưa gắn tài khoản nhưng trùng email trong token → gắn luôn rồi coi là chủ sở hữu.
+        /// </summary>
+        public static async Task<bool> TryEnsureOwnerAsync(
+            ARI.Domain.Entities.Application app, Guid candidateAccountId, string? emailClaim, IUnitOfWork unitOfWork)
+        {
+            if (app.CandidateAccountId == candidateAccountId)
+                return true;
+
+            if (!app.CandidateAccountId.HasValue && !string.IsNullOrEmpty(emailClaim) &&
+                string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase))
+            {
+                app.CandidateAccountId = candidateAccountId;
+                unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
+                await unitOfWork.SaveChangesAsync();
+                return true;
+            }
+
+            return false;
+        }
+
         public static T DeserializeOrEmpty<T>(string? json) where T : new()
         {
             if (string.IsNullOrWhiteSpace(json)) return new T();

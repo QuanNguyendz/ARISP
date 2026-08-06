@@ -245,6 +245,11 @@ namespace ARI.Infrastructure.Data
                 .HasIndex(s => s.CandidateAccountId).HasDatabaseName("ix_saved_jobs_candidate_account_id");
             modelBuilder.Entity<InterviewSession>()
                 .HasIndex(s => s.ApplicationId).HasDatabaseName("ix_interview_sessions_application_id");
+            // Đường đọc transcript (xem lại buổi thử — ADR-051) quét theo session_id.
+            modelBuilder.Entity<Question>()
+                .HasIndex(q => q.SessionId).HasDatabaseName("ix_questions_session_id");
+            modelBuilder.Entity<Answer>()
+                .HasIndex(a => a.SessionId).HasDatabaseName("ix_answers_session_id");
             modelBuilder.Entity<Evaluation>()
                 .HasIndex(e => e.SessionId).HasDatabaseName("ix_evaluations_session_id");
             modelBuilder.Entity<Evaluation>()

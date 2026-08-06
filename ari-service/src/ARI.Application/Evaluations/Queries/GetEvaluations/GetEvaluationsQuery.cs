@@ -59,8 +59,9 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluations
         {
             var (jobPostingId, status, page, pageSize) = (request.JobPostingId, request.Status, request.Page, request.PageSize);
 
+            // Đánh giá buổi thử là riêng tư của ứng viên — không vào danh sách của nhân sự nội bộ (ADR-051).
             List<EvalLite> evaluations = await _unitOfWork.Repository<Evaluation>()
-                .QueryAsync(q => q.Select(e => new EvalLite
+                .QueryAsync(q => q.Where(e => e.SessionType != "practice").Select(e => new EvalLite
                 {
                     Id = e.Id, SessionId = e.SessionId, ApplicationId = e.ApplicationId, RoundNumber = e.RoundNumber,
                     SessionType = e.SessionType, AiVerdict = e.AiVerdict, OverallScore = e.OverallScore,

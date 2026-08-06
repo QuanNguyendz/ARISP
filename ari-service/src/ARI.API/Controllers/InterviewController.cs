@@ -1,12 +1,15 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interviews;
+using ARI.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
@@ -84,16 +87,8 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = result.Error, valid = false });
             }
 
-            if (!result.Value.Valid)
-            {
-                return Ok(new { valid = false, message = "Mã phỏng vấn không hợp lệ, đã sử dụng hoặc hết hạn." });
-            }
-
-            return Ok(new
-            {
-                valid = true,
-                sessionId = result.Value.SessionId
-            });
+            // Mã sai/đã dùng/hết hạn → 200 kèm reason để Kiosk hiện đúng hướng dẫn (ADR-052).
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -140,11 +135,12 @@ namespace ARI.API.Controllers
         /// Token Deepgram (STT) + HeyGen (avatar) + ngôn ngữ/voice để FE vào phòng phỏng vấn.
         /// </summary>
         [HttpGet("session/{id}/media-config")]
-        [Authorize(Policy = "CandidateOnly")]
+        [Authorize(Policy = "InterviewParticipant")]
         public async Task<IActionResult> GetMediaConfig(Guid id, CancellationToken ct)
         {
+            if (!IsAuthorizedForSession(id)) return Forbid();
             var (accountId, email) = GetCandidateIdentity();
-            var result = await _sender.Send(new GetMediaConfigQuery(id, accountId, email), ct);
+            var result = await _sender.Send(new GetMediaConfigQuery(id, accountId, email, IsKioskSession(id)), ct);
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
@@ -154,31 +150,74 @@ namespace ARI.API.Controllers
         /// TTS câu hỏi → base64 PCM 24k cho FE đẩy vào LiveAvatar repeatAudio (ADR-044).
         /// </summary>
         [HttpPost("session/{id}/tts")]
-        [Authorize(Policy = "CandidateOnly")]
+        [Authorize(Policy = "InterviewParticipant")]
         public async Task<IActionResult> GetSpeechAudio(Guid id, [FromBody] TtsRequest request, CancellationToken ct)
         {
+            if (!IsAuthorizedForSession(id)) return Forbid();
             var (accountId, email) = GetCandidateIdentity();
-            var result = await _sender.Send(new SynthesizeSpeechCommand(id, request?.Text ?? string.Empty, accountId, email), ct);
+            var result = await _sender.Send(new SynthesizeSpeechCommand(id, request?.Text ?? string.Empty, accountId, email, IsKioskSession(id)), ct);
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { audio = result.Value });
         }
 
         [HttpPost("session/{id}/answer")]
-        [Authorize(Policy = "CandidateOnly")]
+        [Authorize(Policy = "InterviewParticipant")]
         public async Task<IActionResult> SubmitAnswer(Guid id, [FromBody] SubmitAnswerRequest request)
         {
+            if (!IsAuthorizedForSession(id)) return Forbid();
             var result = await _sender.Send(new SubmitAnswerCommand(id, request.QuestionId, request.Transcript, request.ResponseTimeMs));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(result.Value);
         }
 
         [HttpPost("session/{id}/end")]
-        [Authorize]
+        [Authorize(Policy = "InterviewParticipant")]
         public async Task<IActionResult> EndSession(Guid id, [FromQuery] string status = "completed")
         {
+            if (!IsAuthorizedForSession(id)) return Forbid();
             var result = await _sender.Send(new EndInterviewSessionCommand(id, status));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });
+        }
+
+        /// <summary>
+        /// POST /api/interview/session/{id}/signals — ghi nhận tín hiệu nghi vấn (thoát toàn màn hình,
+        /// chuyển tab, đóng trang giữa buổi…). Có bản REST bên cạnh SignalR vì lúc trang đang đóng
+        /// chỉ `sendBeacon`/`fetch keepalive` là chắc chắn gửi được (ADR-054).
+        /// </summary>
+        [HttpPost("session/{id}/signals")]
+        [Authorize(Policy = "InterviewParticipant")]
+        public async Task<IActionResult> ReportSignal(Guid id, [FromBody] ReportSignalRequest request, CancellationToken ct)
+        {
+            if (!IsAuthorizedForSession(id)) return Forbid();
+
+            var result = await _sender.Send(new ReportCheatSignalCommand(
+                id, request?.SignalType ?? string.Empty, request?.Payload), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(new { count = result.Value });
+        }
+
+        /// <summary>
+        /// POST /api/interview/session/{id}/recording — Kiosk tải video buổi phỏng vấn THẬT lên
+        /// storage sau khi kết thúc (ADR-052). File tự xoá sau <c>Interview:RecordingRetentionDays</c>.
+        /// </summary>
+        [HttpPost("session/{id}/recording")]
+        [Authorize(Policy = "InterviewParticipant")]
+        [RequestSizeLimit(400L * 1024 * 1024)]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadRecording(Guid id, IFormFile? file, CancellationToken ct)
+        {
+            if (!IsAuthorizedForSession(id)) return Forbid();
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Chưa có dữ liệu ghi hình." });
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, ct);
+
+            var result = await _sender.Send(new UploadRecordingCommand(
+                id, ms.ToArray(), file.FileName, file.ContentType ?? "video/webm"), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(result.Value);
         }
 
         [HttpPost("review/confirm")]
@@ -195,6 +234,24 @@ namespace ARI.API.Controllers
         }
 
         #endregion
+
+        /// <summary>Token Kiosk (role Kiosk_session) chỉ hợp lệ với ĐÚNG phiên ghi trong claim.</summary>
+        private bool IsKioskSession(Guid sessionId)
+        {
+            var role = User.FindFirst("role")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (!string.Equals(role, AppRoles.KioskSession, StringComparison.OrdinalIgnoreCase)) return false;
+            var claim = User.FindFirst("session_id")?.Value;
+            return Guid.TryParse(claim, out var sid) && sid == sessionId;
+        }
+
+        /// <summary>Ứng viên đăng nhập (kiểm quyền sở hữu ở service) HOẶC Kiosk đúng phiên.</summary>
+        private bool IsAuthorizedForSession(Guid sessionId)
+        {
+            var role = User.FindFirst("role")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (string.Equals(role, AppRoles.KioskSession, StringComparison.OrdinalIgnoreCase))
+                return IsKioskSession(sessionId);
+            return true;
+        }
 
         private (Guid? accountId, string? email) GetCandidateIdentity()
         {

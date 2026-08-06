@@ -93,7 +93,13 @@ export interface MyApplicationItem {
   practiceAvailable: boolean
   /** Vòng đang hoạt động (vòng được mời mới nhất) — dùng cho phỏng vấn thử theo vòng */
   activeRound?: number
+  /** Tổng số vòng theo cấu hình job — "Đạt" chỉ khi qua hết (ADR-053). */
+  totalRounds?: number
+  /** Số vòng THẬT đã được HR xác nhận Đạt — dựng nhãn "Qua vòng N/M". */
+  passedRounds?: number
   pendingHrReview: boolean
+  /** Lịch phỏng vấn thật đã qua giờ mà ứng viên chưa vào phòng — cần liên hệ nhân sự xếp lại. */
+  missedInterview?: MyApplicationUpcoming | null
   hrFeedback?: string | null
   source: string
   createdAt: string
@@ -159,6 +165,86 @@ export interface MyApplicationSession {
   evaluation?: MySharedEvaluation | null
 }
 
+/**
+ * Đánh giá năng lực ngôn ngữ của buổi thử — AI chấm dựa trên chính câu trả lời của ứng viên,
+ * kèm bậc CEFR và dẫn chứng (ADR-051).
+ */
+export interface MyPracticeLanguage extends MyEvalLanguage {
+  cefrLevel?: string | null
+  languageAdherence?: string | null
+  evidence?: string | null
+}
+
+/** Buổi phỏng vấn thử đã làm — lối vào trang xem lại (ADR-051). */
+export interface MyPracticeSessionItem {
+  id: string
+  applicationId: string
+  jobTitle?: string | null
+  roundNumber: number
+  roundType: string
+  status: string
+  startedAt?: string | null
+  endedAt?: string | null
+  durationSeconds?: number | null
+  hasEvaluation: boolean
+  overallScore?: number | null
+  turnCount: number
+}
+
+/**
+ * Một lượt hỏi–đáp trong transcript buổi thử. `score`/`analysis`/`feedback` là nhận xét AI
+ * của đúng lượt này (backend đã ghép theo `sequenceNumber` — ADR-051).
+ */
+export interface MyPracticeTurn {
+  sequenceNumber: number
+  question: string
+  questionType?: string | null
+  answer?: string | null
+  askedAt: string
+  answeredAt?: string | null
+  responseTimeMs?: number | null
+  score?: number | null
+  analysis?: string | null
+  feedback?: string | null
+}
+
+/**
+ * Nhận xét AI của buổi thử — CỐ Ý không có verdict Pass/Not Pass: buổi thử chỉ để luyện tập,
+ * không phải kết quả tuyển dụng (ADR-051).
+ */
+export interface MyPracticeEvaluation {
+  id: string
+  overallScore?: number | null
+  reasoning?: string | null
+  recommendedNextStep?: string | null
+  criterionScores: MyEvalCriterion[]
+  languageAssessment?: MyPracticeLanguage | null
+  /** Số lượt hỏi–đáp có nhận xét AI kèm theo (phân tích nằm trong `turns`). */
+  analyzedTurnCount: number
+  createdAt: string
+}
+
+/** Chi tiết một buổi thử để xem lại: transcript đầy đủ + nhận xét AI. */
+export interface MyPracticeReview {
+  id: string
+  applicationId: string
+  jobTitle?: string | null
+  roundNumber: number
+  roundType: string
+  status: string
+  interviewLanguage: string
+  /** Ngôn ngữ AI viết nhận xét (theo ngôn ngữ giao diện lúc bắt đầu phiên). */
+  reportLanguage?: string | null
+  startedAt?: string | null
+  endedAt?: string | null
+  durationSeconds?: number | null
+  closingText?: string | null
+  turns: MyPracticeTurn[]
+  evaluation?: MyPracticeEvaluation | null
+  /** Phiên đã đóng nhưng AI chưa chấm xong. */
+  evaluationPending: boolean
+}
+
 /** Chi tiết một hồ sơ ứng tuyển của chính ứng viên. */
 export interface MyApplicationDetail {
   id: string
@@ -176,9 +262,13 @@ export interface MyApplicationDetail {
   status: string
   createdAt: string
   updatedAt: string
+  totalRounds?: number
+  passedRounds?: number
   interviewCode?: MyApplicationCode | null
   upcomingInterview?: MyApplicationUpcoming | null
   sessions: MyApplicationSession[]
+  /** Các buổi thử của hồ sơ (tách khỏi tiến trình vòng thật) — ADR-051. */
+  practiceSessions: MyPracticeSessionItem[]
 }
 
 /**

@@ -24,70 +24,9 @@ import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 import OnlineTestEntry from '@components/OnlineTestEntry'
-import type {
-  MyApplicationDetail,
-  MyApplicationSession,
-  MyEvalCriterion,
-} from '@ari/shared/types/application'
-
-function scoreColor(score: number): string {
-  if (score >= 80) return 'bg-emerald-500'
-  if (score >= 60) return 'bg-amber-500'
-  return 'bg-red-500'
-}
-
-function formatDate(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString()
-}
-
-function formatDuration(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return ''
-  const m = Math.round(seconds / 60)
-  return `${m}m`
-}
-
-function langLevel(overall: number): string {
-  if (overall >= 9) return 'C1+'
-  if (overall >= 8) return 'B2+'
-  if (overall >= 6.5) return 'B2'
-  if (overall >= 5) return 'B1'
-  return 'A2'
-}
-
-function CriterionBar({ c, t }: { c: MyEvalCriterion; t: (key: string, opts?: any) => string }) {
-  const pct = Math.max(0, Math.min(100, Math.round(c.score)))
-  const criterionLabels: Record<string, string> = {
-    technical: t('criterionLabels.technical'),
-    technical_knowledge: t('criterionLabels.technical_knowledge'),
-    communication: t('criterionLabels.communication'),
-    problem_solving: t('criterionLabels.problem_solving'),
-    culture_fit: t('criterionLabels.culture_fit'),
-    experience: t('criterionLabels.experience'),
-    practical_experience: t('criterionLabels.practical_experience'),
-    language: t('criterionLabels.language'),
-    attitude: t('criterionLabels.attitude'),
-    teamwork: t('criterionLabels.teamwork'),
-  }
-  const key = c.name.trim().toLowerCase().replace(/\s+/g, '_')
-  const label =
-    criterionLabels[key] ||
-    c.name.replace(/_/g, ' ').replace(/^\w/, (ch: string) => ch.toUpperCase())
-
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-ink-700">{label}</span>
-        <span className="font-semibold text-ink-900">{pct}/100</span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
-        <div className={`h-full rounded-full ${scoreColor(pct)}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
+import CriterionBar from '@components/CriterionBar'
+import { formatDate, formatDuration, langLevel } from './_reportUi'
+import type { MyApplicationDetail, MyApplicationSession } from '@ari/shared/types/application'
 
 function ReportPanel({
   s,
@@ -136,9 +75,7 @@ function ReportPanel({
             </div>
             <h1 className="mt-2 font-display text-xl font-extrabold">{jobTitle}</h1>
             <p className="text-sm text-ink-500">
-              {s.sessionType === 'practice'
-                ? t('badge.practiceInterview')
-                : t('badge.realInterview')}
+              {t('badge.realInterview')}
               {s.endedAt ? ` · ${formatDate(s.endedAt)}` : ''}
               {formatDuration(s.durationSeconds) ? ` · ${formatDuration(s.durationSeconds)}` : ''}
             </p>
@@ -374,6 +311,28 @@ function RoundPlaceholder({
       </div>
     )
   }
+  if (s.status === 'missed') {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-10 text-center shadow-card">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-600">
+          <AlertTriangle className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-800">
+          {t('missed.title', { round: s.roundNumber })}
+        </p>
+        {s.scheduledAt && (
+          <p className="mt-2 text-base font-bold text-amber-700">
+            {formatDate(s.scheduledAt)}{' '}
+            {new Date(s.scheduledAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+        )}
+        <p className="mt-2 text-sm text-ink-500">{t('missed.description')}</p>
+      </div>
+    )
+  }
   if (s.status === 'invited') {
     return (
       <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-10 text-center shadow-card">
@@ -427,9 +386,6 @@ function RoundButton({
   const score = s.evaluation?.overallScore
 
   const getBadge = () => {
-    if (s.sessionType === 'practice') {
-      return { cls: 'bg-ai-50 text-ai-700', icon: Sparkles, label: t('badge.practice') }
-    }
     const verdict = s.hrFinalVerdict || s.evaluation?.aiVerdict
     if (s.evaluation && verdict) {
       return verdict === 'pass'
@@ -444,6 +400,9 @@ function RoundButton({
     }
     if (s.status === 'scheduled') {
       return { cls: 'bg-blue-50 text-blue-700', icon: CalendarClock, label: 'Đã xếp lịch' }
+    }
+    if (s.status === 'missed') {
+      return { cls: 'bg-amber-50 text-amber-700', icon: AlertTriangle, label: t('badge.missed') }
     }
     if (s.status === 'invited') {
       return { cls: 'bg-purple-50 text-purple-700', icon: CalendarPlus, label: 'Được mời' }
@@ -482,9 +441,7 @@ function RoundButton({
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-ink-500">
-        <span>
-          {s.sessionType === 'practice' ? t('badge.practiceInterview') : t('badge.realInterview')}
-        </span>
+        <span>{t('badge.realInterview')}</span>
         <span className="font-semibold text-ink-700">
           {typeof score === 'number' ? `${Math.round(score)}/100` : '—'}
         </span>
@@ -669,6 +626,51 @@ export default function ApplicationDetailPage() {
                 </>
               )}
             </div>
+
+            {/* Buổi phỏng vấn thử — riêng tư của ứng viên, xem lại không giới hạn (ADR-051) */}
+            {detail.practiceSessions?.length > 0 && (
+              <div>
+                <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                  {t('practiceList.title')}
+                </div>
+                <div className="space-y-2">
+                  {detail.practiceSessions.map((p) => (
+                    <Link
+                      key={p.id}
+                      to={`/candidate/practice/${p.id}`}
+                      className="block rounded-2xl border border-ai-200 bg-ai-50/40 p-4 shadow-card transition hover:border-ai-300"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-ink-900">
+                          {t('report.roundBadge', { number: p.roundNumber, type: '' })}
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-[11px] font-semibold text-ai-700">
+                          <Sparkles className="h-3 w-3" /> {t('badge.practice')}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-xs text-ink-500">
+                        <span>
+                          {p.hasEvaluation
+                            ? t('practiceList.hasReview')
+                            : t('practiceList.transcriptOnly')}
+                        </span>
+                        <span className="font-semibold text-ai-700">
+                          {t('practiceList.view')}
+                        </span>
+                      </div>
+                      {(p.endedAt || p.startedAt) && (
+                        <div className="mt-1 text-[11px] text-ink-400">
+                          {formatDate(p.endedAt || p.startedAt)}
+                          {formatDuration(p.durationSeconds)
+                            ? ` · ${formatDuration(p.durationSeconds)}`
+                            : ''}
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

@@ -58,7 +58,25 @@ namespace ARI.Infrastructure.Identity
             return CreateTokenString(claims);
         }
 
-        private string CreateTokenString(Claim[] claims)
+        /// <summary>
+        /// Token cho MỘT phiên phỏng vấn thật tại Kiosk (ADR-052) — không gắn với tài khoản nào.
+        /// Hạn ngắn theo buổi phỏng vấn (không dùng expiry 7 ngày như token người dùng) vì máy Kiosk
+        /// đặt nơi công cộng.
+        /// </summary>
+        public string CreateKioskSessionToken(Guid sessionId, Guid applicationId, int ttlHours)
+        {
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, sessionId.ToString()),
+                new Claim("role", AppRoles.KioskSession),
+                new Claim("session_id", sessionId.ToString()),
+                new Claim("application_id", applicationId.ToString()),
+            };
+
+            return CreateTokenString(claims, DateTime.Now.AddHours(ttlHours <= 0 ? 3 : ttlHours));
+        }
+
+        private string CreateTokenString(Claim[] claims, DateTime? expires = null)
         {
             var keyStr = _configuration["JWT:Secret"] is { Length: > 0 } s ? s
                 : Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
@@ -71,7 +89,7 @@ namespace ARI.Infrastructure.Identity
                 issuer: _configuration["JWT:Issuer"] ?? "ARISP",
                 audience: _configuration["JWT:Audience"] ?? "ARISP_Client",
                 claims: claims,
-                expires: DateTime.Now.AddDays(7),
+                expires: expires ?? DateTime.Now.AddDays(7),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

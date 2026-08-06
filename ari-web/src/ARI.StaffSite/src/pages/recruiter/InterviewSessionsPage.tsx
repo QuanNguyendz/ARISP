@@ -159,9 +159,9 @@ export default function RecruiterInterviewSessionsPage() {
                       >
                         {s.candidateName}
                       </Link>
+                      {/* Chỉ phiên THẬT — phiên thử là riêng tư của ứng viên (ADR-051) */}
                       <p className="truncate text-xs text-ink-500 dark:text-ink-400">
-                        {s.jobTitle || t('position')} · {t('round')} {s.roundNumber} ·{' '}
-                        {s.sessionType === 'practice' ? t('practice') : t('real')}
+                        {s.jobTitle || t('position')} · {t('round')} {s.roundNumber}
                       </p>
                     </div>
                     {s.hasRecording && (

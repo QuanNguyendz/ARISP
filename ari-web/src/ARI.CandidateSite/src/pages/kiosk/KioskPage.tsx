@@ -1,16 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot } from 'lucide-react'
+import { ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot, AlertTriangle, Loader2 } from 'lucide-react'
+import { interviewService } from '@ari/shared/fservices/interview'
+import { setInterviewSessionToken } from '@ari/shared/api/apiClient'
+import { useKioskLockdown } from '@ari/shared/media/useKioskLockdown'
+import { loadKioskSession, saveKioskSession, type KioskSession } from './kioskSession'
 
 export default function KioskPage() {
   const navigate = useNavigate()
   const [code, setCode] = useState(['', '', '', '', '', ''])
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resumable, setResumable] = useState<KioskSession | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  // Màn nhập mã chưa cần khoá (chưa có phiên) — chỉ mượn hàm bật toàn màn hình.
+  const { requestFullscreen } = useKioskLockdown(null, false)
 
   // Focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus()
+    // Buổi đang dở trên chính máy này (reload giữa chừng) — mã 6 ký tự one-time-use nên
+    // không nhập lại được; cho vào lại bằng token phiên còn hạn (ADR-052).
+    setResumable(loadKioskSession())
   }, [])
 
   const handleInput = (index: number, value: string) => {
@@ -67,9 +79,41 @@ export default function KioskPage() {
   const fullCode = code.join('')
   const isCodeComplete = fullCode.length === 6
 
-  const handleStartInterview = () => {
-    if (isCodeComplete) {
-      navigate(`/interview/room/${fullCode}`)
+  const resetCode = () => {
+    setCode(['', '', '', '', '', ''])
+    inputRefs.current[0]?.focus()
+  }
+
+  // Mã hợp lệ → BE đã tạo phiên phỏng vấn THẬT + cấp token phạm vi phiên (ADR-052).
+  const handleStartInterview = async () => {
+    if (!isCodeComplete || checking) return
+    setChecking(true)
+    setError(null)
+    try {
+      setInterviewSessionToken(null) // bỏ token phiên cũ còn sót trên máy dùng chung
+      const info = await interviewService.validateInterviewCode(fullCode)
+      if (!info.valid) {
+        const messages: Record<string, string> = {
+          not_found: 'Mã phỏng vấn không tồn tại. Vui lòng kiểm tra lại từng ký tự.',
+          used: 'Mã này đã được sử dụng. Liên hệ nhân viên tuyển dụng để được cấp mã mới.',
+          expired: 'Mã đã hết hạn (hiệu lực 2 giờ). Liên hệ nhân viên tuyển dụng để được cấp mã mới.',
+        }
+        setError(messages[info.reason ?? ''] ?? 'Mã phỏng vấn không hợp lệ, đã sử dụng hoặc hết hạn.')
+        resetCode()
+        return
+      }
+      saveKioskSession(info)
+      // Bật toàn màn hình NGAY trong cú click này — requestFullscreen chỉ được chấp nhận
+      // trong một thao tác người dùng, không gọi được sau khi đã điều hướng (ADR-054).
+      await requestFullscreen()
+      navigate('/kiosk/interview')
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Không kết nối được hệ thống. Vui lòng báo nhân viên lễ tân.'
+      setError(message)
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -191,16 +235,31 @@ export default function KioskPage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
+            {error && (
+              <div className="mt-6 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left text-sm text-amber-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <button
               onClick={handleStartInterview}
-              disabled={!isCodeComplete}
+              disabled={!isCodeComplete || checking}
               className={`mt-8 w-full rounded-2xl px-6 py-4 text-base font-bold flex items-center justify-center gap-2 transition-all ${
-                isCodeComplete
+                isCodeComplete && !checking
                   ? 'bg-gradient-to-r from-brand-600 to-ai-600 hover:opacity-95 text-white'
                   : 'bg-white/10 text-slate-500 cursor-not-allowed'
               }`}
             >
-              Bắt đầu phỏng vấn <ArrowRight className="w-5 h-5" />
+              {checking ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" /> Đang kiểm tra mã...
+                </>
+              ) : (
+                <>
+                  Bắt đầu phỏng vấn <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           </motion.div>
 
@@ -233,30 +292,23 @@ export default function KioskPage() {
         </div>
       </main>
 
-      {/* Footer - Demo section */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.7 }}
-        className="relative p-6 text-center"
-      >
-        <p className="text-xs text-slate-600 mb-3">Demo codes để test:</p>
-        <div className="flex items-center justify-center gap-4">
-          {['ABC123', 'XYZ789', 'INT001'].map((demoCode) => (
-            <button
-              key={demoCode}
-              onClick={() => {
-                const newCode = demoCode.split('').concat(Array(6 - demoCode.length).fill(''))
-                setCode(newCode)
-                inputRefs.current[Math.min(demoCode.length, 5)]?.focus()
-              }}
-              className="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors font-mono"
-            >
-              {demoCode}
-            </button>
-          ))}
-        </div>
-      </motion.div>
+      {/* Buổi đang dở trên chính máy này (reload/mất điện) — vào lại không cần mã mới */}
+      {resumable && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="relative p-6 text-center"
+        >
+          <button
+            onClick={() => navigate('/kiosk/interview')}
+            className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 hover:bg-white/10"
+          >
+            Tiếp tục buổi phỏng vấn đang dở
+            {resumable.candidateName ? ` — ${resumable.candidateName}` : ''}
+          </button>
+        </motion.div>
+      )}
     </div>
   )
 }

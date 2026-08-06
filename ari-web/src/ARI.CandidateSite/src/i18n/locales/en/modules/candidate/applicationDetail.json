@@ -14,13 +14,24 @@
     "title": "Interview Rounds",
     "empty": "No interview rounds for this application yet."
   },
+  "practiceList": {
+    "title": "Practice Sessions",
+    "hasReview": "AI notes available",
+    "transcriptOnly": "Transcript available",
+    "view": "Review →"
+  },
   "round": {
     "screening": "Screening",
     "technical": "Technical",
     "online_test": "Online Test",
     "final": "Final"
   },
+  "missed": {
+    "title": "Round {{round}}: interview slot missed",
+    "description": "The appointment has passed with no interview recorded. Please contact the recruitment team to be rescheduled."
+  },
   "badge": {
+    "missed": "Missed",
     "practice": "Practice",
     "pass": "Pass",
     "notPass": "Not Pass",

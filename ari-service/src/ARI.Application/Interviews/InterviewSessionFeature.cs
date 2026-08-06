@@ -54,7 +54,9 @@ namespace ARI.Application.Interviews
     // GET /api/interview/session/{id}/media-config
     // ============================================================
 
-    public record GetMediaConfigQuery(Guid SessionId, Guid? AccountId, string? Email) : IRequest<Result<PracticeMediaConfigResponse>>;
+    /// <param name="KioskAuthorized">Token Kiosk đã được xác thực đúng phiên (ADR-052) — bỏ qua kiểm tra chủ sở hữu.</param>
+    public record GetMediaConfigQuery(Guid SessionId, Guid? AccountId, string? Email, bool KioskAuthorized = false)
+        : IRequest<Result<PracticeMediaConfigResponse>>;
 
     public class GetMediaConfigQueryHandler : IRequestHandler<GetMediaConfigQuery, Result<PracticeMediaConfigResponse>>
     {
@@ -66,14 +68,15 @@ namespace ARI.Application.Interviews
         }
 
         public Task<Result<PracticeMediaConfigResponse>> Handle(GetMediaConfigQuery request, CancellationToken ct)
-            => _interviewService.GetMediaConfigAsync(request.SessionId, request.AccountId, request.Email, ct);
+            => _interviewService.GetMediaConfigAsync(request.SessionId, request.AccountId, request.Email, request.KioskAuthorized, ct);
     }
 
     // ============================================================
     // POST /api/interview/session/{id}/tts
     // ============================================================
 
-    public record SynthesizeSpeechCommand(Guid SessionId, string Text, Guid? AccountId, string? Email) : IRequest<Result<string>>;
+    public record SynthesizeSpeechCommand(Guid SessionId, string Text, Guid? AccountId, string? Email, bool KioskAuthorized = false)
+        : IRequest<Result<string>>;
 
     public class SynthesizeSpeechCommandHandler : IRequestHandler<SynthesizeSpeechCommand, Result<string>>
     {
@@ -85,7 +88,46 @@ namespace ARI.Application.Interviews
         }
 
         public Task<Result<string>> Handle(SynthesizeSpeechCommand request, CancellationToken ct)
-            => _interviewService.GetSpeechAudioAsync(request.SessionId, request.Text, request.AccountId, request.Email, ct);
+            => _interviewService.GetSpeechAudioAsync(request.SessionId, request.Text, request.AccountId, request.Email, request.KioskAuthorized, ct);
+    }
+
+    // ============================================================
+    // POST /api/interview/session/{id}/signals — tín hiệu nghi vấn (ADR-054)
+    // ============================================================
+
+    public record ReportCheatSignalCommand(Guid SessionId, string SignalType, string? Payload) : IRequest<Result<int>>;
+
+    public class ReportCheatSignalCommandHandler : IRequestHandler<ReportCheatSignalCommand, Result<int>>
+    {
+        private readonly IInterviewService _interviewService;
+
+        public ReportCheatSignalCommandHandler(IInterviewService interviewService)
+        {
+            _interviewService = interviewService;
+        }
+
+        public Task<Result<int>> Handle(ReportCheatSignalCommand request, CancellationToken ct)
+            => _interviewService.RecordCheatSignalAsync(request.SessionId, request.SignalType, request.Payload, ct);
+    }
+
+    // ============================================================
+    // POST /api/interview/session/{id}/recording — Kiosk tải video buổi thật (ADR-052)
+    // ============================================================
+
+    public record UploadRecordingCommand(Guid SessionId, byte[] Content, string FileName, string ContentType)
+        : IRequest<Result<RecordingUploadResponse>>;
+
+    public class UploadRecordingCommandHandler : IRequestHandler<UploadRecordingCommand, Result<RecordingUploadResponse>>
+    {
+        private readonly IInterviewService _interviewService;
+
+        public UploadRecordingCommandHandler(IInterviewService interviewService)
+        {
+            _interviewService = interviewService;
+        }
+
+        public Task<Result<RecordingUploadResponse>> Handle(UploadRecordingCommand request, CancellationToken ct)
+            => _interviewService.SaveRecordingAsync(request.SessionId, request.Content, request.FileName, request.ContentType, ct);
     }
 
     // ============================================================

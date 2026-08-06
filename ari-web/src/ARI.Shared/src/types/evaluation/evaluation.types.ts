@@ -21,6 +21,10 @@ export interface EvaluationReport {
   status?: 'pending' | 'completed';
   finalVerdict?: 'pass' | 'not_pass' | string;
   hrReview?: HRReview | null;
+  /** Video buổi phỏng vấn thật (ADR-052) — null nếu chưa quay hoặc đã quá hạn lưu. */
+  recordingUrl?: string | null;
+  recordingExpiresAt?: string | null;
+  recordingDeletedAt?: string | null;
 }
 
 export interface CriterionScore {

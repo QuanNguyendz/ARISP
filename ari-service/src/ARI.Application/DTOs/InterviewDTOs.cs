@@ -8,6 +8,11 @@ namespace ARI.Application.DTOs
         public Guid ApplicationId { get; set; }
         public int RoundNumber { get; set; } = 1;
         public string SessionType { get; set; } = "real"; // practice | real
+        /// <summary>
+        /// Ngôn ngữ giao diện ứng viên đang dùng (vi | en) — AI viết nhận xét bằng ngôn ngữ này
+        /// để màn xem lại không trộn hai thứ tiếng (ADR-051). Bỏ trống = theo ngôn ngữ phỏng vấn.
+        /// </summary>
+        public string? UiLanguage { get; set; }
     }
 
     public class StartSessionResponse
@@ -17,6 +22,34 @@ namespace ARI.Application.DTOs
         public string Language { get; set; } = "vi";
         public string? HeyGenSdpOffer { get; set; }
         public string? HeyGenSessionId { get; set; }
+    }
+
+    /// <summary>
+    /// Kết quả nhập Interview Code tại Kiosk (ADR-052). Mã hợp lệ → phiên phỏng vấn thật đã được
+    /// tạo, kèm token phạm vi đúng phiên đó để máy Kiosk gọi API/SignalR mà không cần đăng nhập.
+    /// </summary>
+    public class KioskSessionResponse
+    {
+        public bool Valid { get; set; }
+        /// <summary>Lý do khi mã không dùng được: not_found | used | expired.</summary>
+        public string? Reason { get; set; }
+        public Guid? SessionId { get; set; }
+        public string? Token { get; set; }
+        public DateTimeOffset? TokenExpiresAt { get; set; }
+        public string? CandidateName { get; set; }
+        public string? JobTitle { get; set; }
+        public int RoundNumber { get; set; }
+        public string? RoundType { get; set; }
+        public string Language { get; set; } = "vi";
+    }
+
+    /// <summary>Kết quả tải video buổi phỏng vấn thật lên storage (ADR-052).</summary>
+    public class RecordingUploadResponse
+    {
+        public bool Saved { get; set; }
+        public long SizeBytes { get; set; }
+        /// <summary>Hạn lưu — quá hạn thì job dọn dẹp xoá file.</summary>
+        public DateTimeOffset? ExpiresAt { get; set; }
     }
 
     /// <summary>Cấu hình media trả cho FE khi vào phòng phỏng vấn (token Deepgram + HeyGen).</summary>
@@ -54,6 +87,14 @@ namespace ARI.Application.DTOs
     public class TtsRequest
     {
         public string Text { get; set; } = string.Empty;
+    }
+
+    /// <summary>Tín hiệu nghi vấn client báo về (ADR-054): fullscreen_exit | tab_hidden | window_blur | ...</summary>
+    public class ReportSignalRequest
+    {
+        public string SignalType { get; set; } = string.Empty;
+        /// <summary>JSON tuỳ ý (vd {"at":"...","count":3}) — server chặn kích thước và ép JSON hợp lệ.</summary>
+        public string? Payload { get; set; }
     }
 
     public class SubmitAnswerRequest

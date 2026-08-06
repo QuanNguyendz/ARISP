@@ -92,18 +92,39 @@ def analyze_prompt(question_text: str, answer: str) -> tuple[str, str]:
     return system, user
 
 
+def report_language_name(ctx: SessionContext) -> str:
+    """Ngôn ngữ VIẾT báo cáo — mặc định theo ngôn ngữ phỏng vấn nếu .NET không truyền."""
+    return language_name(ctx.report_language or ctx.language)
+
+
 def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
     import json
 
     lang = language_name(ctx.language)
+    report_lang = report_language_name(ctx)
     system = (
         "You are an HR director evaluating a full interview session. "
         "Evaluate strictly against the scoring rubric. Return JSON only with keys: "
         '{"verdict": "pass"|"not_pass", "score": <0-100 number>, "reasoning": "<text>", '
-        '"recommended_next_step": "<text>", "criterion_scores": {<criterion>: <0-100>}, '
-        '"question_analyses": [<optional objects>]}. '
-        f"The interview was required to be conducted in {lang}; if the candidate repeatedly "
-        "answered in a different language, note this explicitly in the reasoning."
+        '"recommended_next_step": "<text>", "criterion_scores": {<criterion_key>: <0-100>}, '
+        # Khoá tiêu chí phải nằm trong bộ cố định: FE dịch khoá sang VI/EN, model tự đặt tên
+        # ("Cultural Fit", "Technical Skills") sẽ lọt ra màn hình dưới dạng tiếng Anh thô.
+        "criterion_scores keys MUST be chosen ONLY from this fixed snake_case list: "
+        "technical, communication, problem_solving, culture_fit, experience, language, attitude, teamwork. "
+        "Use 3-6 of them, never invent other keys and never use display names. "
+        '"question_analyses": [{"sequence_number": <int, from QA History>, "score": <0-100>, '
+        '"analysis": "<what the answer covered and what was missing>", '
+        '"feedback": "<one concrete, actionable improvement tip>"}]}. '
+        # question_analyses trước đây để "<optional objects>" → model tự bịa khoá, FE parse ra rỗng.
+        "Emit EXACTLY ONE question_analyses entry per answered question, in order, reusing its "
+        "sequence_number from QA History. Do NOT repeat the question or answer text — the client "
+        "already has them. Skip questions with an empty answer. "
+        # Chống bịa: chỉ chấm những gì ứng viên thực sự nói.
+        "Base every statement strictly on what the candidate actually said; never invent facts. "
+        f"The interview was required to be conducted in {lang}; mention a language problem in the "
+        "reasoning ONLY if the answers really are in another language. "
+        f"Write EVERY human-readable string (reasoning, recommended_next_step, analysis, feedback) "
+        f"in {report_lang}, and never mix languages within the report."
     )
     history = json.dumps([qa.model_dump(by_alias=True) for qa in ctx.chat_history], ensure_ascii=False)
     user = (
@@ -119,16 +140,33 @@ def assess_language_prompt(ctx: SessionContext) -> tuple[str, str]:
     import json
 
     lang = language_name(ctx.language)
+    report_lang = report_language_name(ctx)
     system = (
-        f"Assess the candidate's proficiency in {lang} from the conversation. "
+        f"You assess a candidate's proficiency in {lang}. "
+        # Chỉ lời ứng viên mới là bằng chứng — câu hỏi do AI viết, không phản ánh năng lực ứng viên.
+        "Use ONLY the candidate's own answers as evidence; the interviewer's questions prove nothing "
+        "about the candidate. "
+        "Score each dimension 0-10 with these anchors: 0-2 unusable/no output, 3-4 basic (A1-A2), "
+        "5-6 intermediate (B1), 7-8 upper-intermediate (B2), 9-10 advanced (C1-C2). "
+        "overall_score MUST be consistent with the four dimensions (roughly their average) and "
+        "cefr_level MUST match overall_score using the same anchors. "
         "Return JSON only: "
-        '{"fluency": <0-10>, "grammar": <0-10>, "vocabulary": <0-10>, '
-        '"comprehension": <0-10>, "overall_score": <0-10>, '
+        '{"fluency": <0-10>, "grammar": <0-10>, "vocabulary": <0-10>, "comprehension": <0-10>, '
+        '"overall_score": <0-10>, "cefr_level": "<A1|A2|B1|B2|C1|C2>", '
         f'"language_adherence": "<one short sentence: did the candidate consistently answer in {lang}? '
-        'If not, which language did they use and how often>"}.'
+        'If not, which language did they use and how often>", '
+        '"evidence": "<1-2 short fragments quoted verbatim from the answers that justify the scores>"}. '
+        f"Write language_adherence and evidence in {report_lang}, but keep quoted fragments verbatim."
     )
-    history = json.dumps([qa.model_dump(by_alias=True) for qa in ctx.chat_history], ensure_ascii=False)
-    user = f"Required interview language: {lang}\n\nConversation history:\n{history}"
+    answers = json.dumps(
+        [
+            {"sequenceNumber": qa.sequence_number, "answerText": qa.answer_text}
+            for qa in ctx.chat_history
+            if (qa.answer_text or "").strip()
+        ],
+        ensure_ascii=False,
+    )
+    user = f"Required interview language: {lang}\n\nCandidate answers only:\n{answers}"
     return system, user
 
 

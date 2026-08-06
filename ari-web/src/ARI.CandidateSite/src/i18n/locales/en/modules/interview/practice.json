@@ -55,8 +55,8 @@
     },
     "ended": {
       "title": "Practice Session Complete!",
-      "message": "This is a practice session, so it does not affect your recruitment results. The reference notes will be shown in the Results section.",
-      "viewResult": "View Results",
+      "message": "This is a practice session, so it does not affect your recruitment results. The full conversation and the AI notes are saved so you can review them anytime.",
+      "viewTranscript": "Review & AI notes",
       "backToApplication": "Back to Application"
     },
     "invalidApplication": "Invalid application."

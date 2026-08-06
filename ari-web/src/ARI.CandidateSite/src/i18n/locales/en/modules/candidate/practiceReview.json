@@ -1,0 +1,82 @@
+{
+  "position": "Applied position",
+  "loadError": "Could not load this practice session.",
+  "roundBadge": "Round {{number}}{{type}}",
+  "backToApplication": "Back to application",
+  "footer": "This practice session is kept private to you — the recruitment team cannot see it.",
+  "notice": "This is a practice run: the score and notes are for reference only and do not affect your recruitment result.",
+  "breadcrumb": {
+    "applications": "My applications",
+    "current": "Practice review"
+  },
+  "badge": {
+    "practice": "Practice"
+  },
+  "round": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "online_test": "Online Test",
+    "final": "Final"
+  },
+  "meta": {
+    "turns": "{{answered}}/{{total}} questions answered",
+    "referenceScore": "Reference score"
+  },
+  "language": {
+    "vi": "Vietnamese",
+    "en": "English"
+  },
+  "evaluation": {
+    "title": "AI notes",
+    "writtenIn": "These notes were written by the AI in {{lang}} — the language you were using when the session started.",
+    "scoresByCriteria": "Scores by criteria",
+    "pendingTitle": "AI is still grading this session",
+    "pendingDescription": "Your transcript is already saved. The notes will appear here in a few minutes — reload the page.",
+    "emptyTitle": "No AI notes yet",
+    "emptyDescription": "This session has not been graded — you can still read the full transcript below."
+  },
+  "criterionLabels": {
+    "technical": "Technical knowledge",
+    "technical_knowledge": "Technical knowledge",
+    "communication": "Communication",
+    "problem_solving": "Problem solving",
+    "culture_fit": "Culture fit",
+    "experience": "Practical experience",
+    "practical_experience": "Practical experience",
+    "language": "Language",
+    "attitude": "Attitude",
+    "teamwork": "Teamwork"
+  },
+  "questionAnalysis": {
+    "good": "Good",
+    "fair": "Fair",
+    "needsImprovement": "Needs improvement"
+  },
+  "turnNote": {
+    "title": "AI notes on this answer"
+  },
+  "languageAssessment": {
+    "title": "{{lang}} proficiency",
+    "fallbackCode": "language",
+    "fluency": "Fluency",
+    "grammar": "Grammar",
+    "vocabulary": "Vocabulary",
+    "comprehension": "Comprehension",
+    "basedOnAnswers": "Scored by AI from your own answers in this session."
+  },
+  "nextStep": {
+    "title": "What to practise next"
+  },
+  "transcript": {
+    "title": "Session transcript",
+    "subtitle": "AI notes appear right under the answer they refer to.",
+    "empty": "No questions were recorded for this session.",
+    "aiLabel": "AI",
+    "youLabel": "You",
+    "question": "Q",
+    "noAnswer": "You did not answer this question.",
+    "closing": "AI · Closing",
+    "copy": "Copy",
+    "copied": "Copied"
+  }
+}
