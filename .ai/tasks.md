@@ -329,6 +329,17 @@ _Chưa có task nào đang thực hiện._
   - **Sửa mislabel:** các nơi hiển thị round type vốn giả định nhị phân (`technical` ? technical : screening) khiến vòng `online_test` bị hiện nhầm "Screening" — nay 3 nhánh ở `JobDetailPage` (recruiter: tab + thẻ vòng) và `JobPostingDetailPage` (HR: tab + subtitle + badge màu emerald). i18n `roundOnlineTest` (recruiter/jobDetail) + `rounds.types.onlineTest` (hr/jobPostingDetail), VI/EN.
   - **Verify:** JSON 6 file hợp lệ; StaffSite `tsc --noEmit` xanh. Không đụng BE (đã sẵn sàng).
 
+- [x] 2026-08-06: **Tab mở từ trước deploy tự phục hồi thay vì chết cứng (stale chunk).**
+  - **Triệu chứng:** tab đang mở lúc deploy, bấm sang route lazy-load (vd Đăng nhập) thì đứng im; console đầy `Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html"` + `Failed to fetch dynamically imported module`. F5 thì hết.
+  - **Nguyên nhân:** Vite băm hash vào tên chunk, image mới không còn file cũ. `docker/frontend/Dockerfile` chỉ có `location / { try_files $uri $uri/ /index.html; }` nên request `/assets/<chunk-cũ>.js` **rơi vào fallback SPA** → nginx trả `index.html` kèm `Content-Type: text/html` cho một file `.js` → trình duyệt chặn vì strict MIME. Xác minh trực tiếp: `GET /assets/CandidateLoginPage-7eNG9b-W.js` trả **200 + text/html**.
+  - **Sửa (2 lớp):** (1) `ARI.Shared/src/utils/staleChunkReload.ts` — nghe `vite:preloadError` + `unhandledrejection`, tự `location.reload()` **đúng 1 lần** (cooldown 15s qua sessionStorage để asset mất thật không gây vòng lặp reload); gắn vào `main.tsx` cả 2 site. (2) Dockerfile: `location /assets/ { try_files $uri =404; }` — 404 thật thay vì HTML giả, kèm `Cache-Control: immutable` cho asset và `no-cache` cho `index.html` (index cache lại thì reload cũng vô nghĩa vì vẫn trỏ chunk đã xoá).
+  - **Giới hạn:** không cứu được tab đang mở tại thời điểm deploy bản vá này (tab đó vẫn chạy code cũ) — có tác dụng từ lần deploy kế tiếp.
+
+- [x] 2026-08-06: **Chẩn đoán lỗi xem CV DOCX trên production (thiếu CORS trên bucket R2).**
+  - Prod chạy `Storage:Provider=S3` (key dạng `cv/<guid>.ext` trong `applications.cv_file_url`), local chạy `Local` (key `/uploads/<guid>.ext`) → chỉ prod trả **presigned URL khác origin**.
+  - Bucket R2 mặc định không có CORS rule → `fetch()` bị chặn. **Chỉ DOCX hỏng** vì riêng nó cần blob cho `docx-preview`; PDF (`<iframe>`), ảnh (`<img>`), "Tải về" (`<a href>`) không dính CORS → dễ tưởng nhầm là ổn.
+  - Không sửa bằng code: viết [docs/r2-storage-cors-setup.md](../docs/r2-storage-cors-setup.md) (rule JSON `GET`/`HEAD` cho đủ 3 origin, không dùng `*` vì bucket chứa CV ứng viên, cách đặt qua dashboard/AWS CLI, lệnh `curl` kiểm chứng) + ghi bổ sung vào ADR-036.
+
 - [x] 2026-08-06: **Chống gian lận bài thi trắc nghiệm khi chuyển tab (mức "đủ" — FE bắt + BE lưu vết + HR thấy cờ).**
   - **Bối cảnh:** trước đây bài trắc nghiệm remote KHÔNG có bất kỳ chống gian lận nào (chỉ đếm giờ + tự nộp). Hạ tầng cheat-signal (`useKioskLockdown`/`RecordCheatSignalAsync`/`CheatDetectionSignal`, ADR-054) chỉ gắn cho phiên phỏng vấn Kiosk, không áp cho Online Test.
   - **FE (candidate):** `OnlineTestPage.tsx` thêm effect bắt `visibilitychange`(hidden) + `window.blur` **chỉ khi đang làm bài**, khử trùng 500ms để chuyển tab (thường bắn cả 2 sự kiện) không đếm gấp đôi. Đếm sống ở `useRef` (gửi kèm cả khi tự nộp lúc hết giờ), state để hiện UI: banner nhắc luôn hiển thị + cảnh báo amber leo thang theo số lần. i18n VI/EN (`antiCheatHint`, `tabSwitchWarning`).
