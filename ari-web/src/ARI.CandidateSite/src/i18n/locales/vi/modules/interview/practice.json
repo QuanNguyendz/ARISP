@@ -55,8 +55,8 @@
     },
     "ended": {
       "title": "Hoàn thành buổi thử!",
-      "message": "Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Bản nhận xét tham khảo sẽ hiển thị trong mục Kết quả.",
-      "viewResult": "Xem kết quả",
+      "message": "Đây là buổi luyện tập nên không ảnh hưởng kết quả tuyển dụng. Nội dung hội thoại và nhận xét của AI được lưu lại để bạn xem lại bất cứ lúc nào.",
+      "viewTranscript": "Xem lại & nhận xét AI",
       "backToApplication": "Về hồ sơ ứng tuyển"
     },
     "invalidApplication": "Hồ sơ ứng tuyển không hợp lệ."

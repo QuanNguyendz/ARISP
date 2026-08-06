@@ -94,6 +94,8 @@ export interface StartSessionRequest {
   applicationId: string;
   roundNumber?: number;
   sessionType?: 'real' | 'practice';
+  /** Ngôn ngữ giao diện (vi|en) — AI viết nhận xét bằng ngôn ngữ này (ADR-051). */
+  uiLanguage?: string;
 }
 
 export interface StartSessionResponse {

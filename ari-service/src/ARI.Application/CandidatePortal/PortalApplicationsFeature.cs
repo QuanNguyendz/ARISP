@@ -118,6 +118,13 @@ namespace ARI.Application.CandidatePortal
                     .GroupBy(s => s.Id)
                     .ToDictionary(g => g.Key, g => g.First());
 
+                // Tổng số vòng theo cấu hình job — mốc để biết khi nào mới là "Đạt" (ADR-053).
+                var roundConfigCounts = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                        .QueryAsync(q => q.Where(r => jobIds.Contains(r.JobPostingId))
+                            .Select(r => new { r.JobPostingId, r.RoundNumber })))
+                    .GroupBy(r => r.JobPostingId)
+                    .ToDictionary(g => g.Key, g => Math.Max(1, g.Max(x => x.RoundNumber)));
+
                 // Lời mời theo vòng — để xác định "vòng đang hoạt động" (vòng được mời mới nhất).
                 var invites = appIds.Count > 0
                     ? (await _unitOfWork.Repository<InterviewInvite>()
@@ -147,9 +154,21 @@ namespace ARI.Application.CandidatePortal
                             && allSessions.Count(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound) >= maxPractice;
                         bool realDoneForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real" && s.RoundNumber == activeRound);
 
+                        // Số vòng THẬT đã được HR xác nhận Đạt — dựng nhãn "Qua vòng N/M" (ADR-053).
+                        var totalRounds = roundConfigCounts.TryGetValue(a.JobPostingId, out var tr) ? tr : 1;
+                        var passedRounds = allSessions
+                            .Where(s => s.ApplicationId == a.Id && s.SessionType != "practice"
+                                && evalBySession.TryGetValue(s.Id, out var ev)
+                                && reviewByEval.TryGetValue(ev.Id, out var rv) && rv.FinalVerdict == "pass")
+                            .Select(s => s.RoundNumber)
+                            .Distinct()
+                            .Count();
+
                         bool pendingHrReview = false; // có vòng đã xong + AI đã chấm nhưng HR chưa xác nhận/chia sẻ
+                        // Tiến trình vòng CHỈ tính phiên THẬT — buổi thử không được làm ứng viên tưởng
+                        // đã qua vòng, cũng không sinh trạng thái "chờ HR xác nhận" (ADR-051).
                         var rounds = allSessions
-                            .Where(s => s.ApplicationId == a.Id)
+                            .Where(s => s.ApplicationId == a.Id && s.SessionType != "practice")
                             .OrderBy(s => s.RoundNumber)
                             .Select(s =>
                             {
@@ -200,6 +219,17 @@ namespace ARI.Application.CandidatePortal
                             .Select(b => slotById[b.AvailabilitySlotId])
                             .FirstOrDefault();
 
+                        // Lịch đã qua giờ mà vòng đó chưa hề có phiên phỏng vấn THẬT → quá hạn.
+                        // Ứng viên cần liên hệ nhân sự xếp lại thay vì thấy mãi "đã xếp lịch".
+                        var missed = bookings
+                            .Where(b => b.ApplicationId == a.Id && slotById.ContainsKey(b.AvailabilitySlotId)
+                                && slotById[b.AvailabilitySlotId].EndTime <= nowUtc
+                                && !allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real"
+                                    && s.RoundNumber == slotById[b.AvailabilitySlotId].RoundNumber))
+                            .OrderByDescending(b => slotById[b.AvailabilitySlotId].StartTime)
+                            .Select(b => slotById[b.AvailabilitySlotId])
+                            .FirstOrDefault();
+
                         return new
                         {
                             a.Id,
@@ -218,6 +248,8 @@ namespace ARI.Application.CandidatePortal
                             // (1 lượt/vòng) — vòng kế mở lại thử khi được mời lên vòng đó.
                             PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound,
                             ActiveRound = activeRound,
+                            TotalRounds = totalRounds,
+                            PassedRounds = passedRounds,
                             PendingHrReview = pendingHrReview,
                             HrFeedback = sharedFeedback?.CandidateFeedback,
                             a.Source,
@@ -230,6 +262,12 @@ namespace ARI.Application.CandidatePortal
                                 upcoming.StartTime,
                                 upcoming.Timezone,
                                 RoundNumber = upcoming.RoundNumber
+                            },
+                            MissedInterview = missed == null ? null : new
+                            {
+                                missed.StartTime,
+                                missed.Timezone,
+                                RoundNumber = missed.RoundNumber
                             }
                         };
                     })
@@ -270,17 +308,7 @@ namespace ARI.Application.CandidatePortal
                 return Result.Failure<object>("Không tìm thấy hồ sơ ứng tuyển.", CommonErrorCodes.NotFound);
 
             // IDOR Protection + Auto-link
-            bool isOwner = app.CandidateAccountId == candidateAccountId;
-            if (!isOwner && !app.CandidateAccountId.HasValue && !string.IsNullOrEmpty(emailClaim) &&
-                string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase))
-            {
-                app.CandidateAccountId = candidateAccountId;
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
-                await _unitOfWork.SaveChangesAsync();
-                isOwner = true;
-            }
-
-            if (!isOwner)
+            if (!await PortalSupport.TryEnsureOwnerAsync(app, candidateAccountId, emailClaim, _unitOfWork))
                 return Result.Failure<object>("Forbidden", CommonErrorCodes.Forbidden);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId);
@@ -292,13 +320,21 @@ namespace ARI.Application.CandidatePortal
                 .ToList();
 
             var sessionsResult = await _unitOfWork.Repository<InterviewSession>().FindAsync(s => s.ApplicationId == id);
-            var sessions = sessionsResult.OrderBy(s => s.RoundNumber).ToList();
+            var allSessions = sessionsResult.OrderBy(s => s.RoundNumber).ToList();
+
+            // Tiến trình các vòng chỉ tính phiên THẬT — phiên thử cùng vòng từng che trạng thái phiên thật.
+            // Phiên thử trả riêng ở PracticeSessions (lối vào trang xem lại — ADR-051).
+            var sessions = allSessions.Where(s => s.SessionType != "practice").ToList();
+            var practiceSessions = allSessions
+                .Where(s => s.SessionType == "practice")
+                .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
+                .ToList();
 
             var invites = (await _unitOfWork.Repository<InterviewInvite>()
                 .FindAsync(i => i.ApplicationId == id)).ToList();
 
             // Optimize query: Fetch all evaluations and HR reviews in batch
-            var sessionIds = sessions.Select(s => s.Id).ToList();
+            var sessionIds = allSessions.Select(s => s.Id).ToList();
             var evaluations = await _unitOfWork.Repository<Evaluation>().FindAsync(e => sessionIds.Contains(e.SessionId));
             var evalDict = evaluations.GroupBy(e => e.SessionId).ToDictionary(g => g.Key, g => g.First());
 
@@ -403,7 +439,9 @@ namespace ARI.Application.CandidatePortal
                 }
                 else if (slot != null && bk?.Status == "scheduled")
                 {
-                    status = "scheduled";
+                    // Hết giờ hẹn mà không có phiên phỏng vấn thật nào của vòng → quá hạn, không
+                    // để hiển thị mãi "đã xếp lịch" (ứng viên cần liên hệ nhân sự xếp lại).
+                    status = slot.EndTime <= nowUtc ? "missed" : "scheduled";
                 }
                 else if (inv != null)
                 {
@@ -451,9 +489,28 @@ namespace ARI.Application.CandidatePortal
                 app.Status,
                 app.CreatedAt,
                 app.UpdatedAt,
+                // Mốc "Đạt" = qua hết mọi vòng cấu hình của job (ADR-053).
+                TotalRounds = roundConfigs.Count == 0 ? 1 : Math.Max(1, roundConfigs.Max(r => r.RoundNumber)),
+                PassedRounds = sessions
+                    .Where(s => evalDict.TryGetValue(s.Id, out var ev)
+                        && reviewDict.TryGetValue(ev.Id, out var rv) && rv.FinalVerdict == "pass")
+                    .Select(s => s.RoundNumber)
+                    .Distinct()
+                    .Count(),
                 InterviewCode = activeCode == null ? null : new { activeCode.Code, activeCode.ExpiresAt, activeCode.RoundNumber },
                 UpcomingInterview = upcoming == null ? null : new { upcoming.StartTime, upcoming.Timezone, RoundNumber = upcoming.RoundNumber },
-                Sessions = sessionDetails
+                Sessions = sessionDetails,
+                PracticeSessions = practiceSessions.Select(p => new
+                {
+                    Id = p.Id.ToString(),
+                    p.RoundNumber,
+                    p.RoundType,
+                    p.Status,
+                    p.StartedAt,
+                    p.EndedAt,
+                    p.DurationSeconds,
+                    HasEvaluation = evalDict.ContainsKey(p.Id)
+                }).ToList()
             });
         }
     }
@@ -484,17 +541,7 @@ namespace ARI.Application.CandidatePortal
                 return Result.Failure<object>("Không tìm thấy hồ sơ ứng tuyển liên quan.", CommonErrorCodes.NotFound);
 
             // IDOR Protection + Auto-link
-            bool isOwner = app.CandidateAccountId == request.CandidateAccountId;
-            if (!isOwner && !app.CandidateAccountId.HasValue && !string.IsNullOrEmpty(request.Email) &&
-                string.Equals(app.CandidateEmail, request.Email, StringComparison.OrdinalIgnoreCase))
-            {
-                app.CandidateAccountId = request.CandidateAccountId;
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
-                await _unitOfWork.SaveChangesAsync();
-                isOwner = true;
-            }
-
-            if (!isOwner)
+            if (!await PortalSupport.TryEnsureOwnerAsync(app, request.CandidateAccountId, request.Email, _unitOfWork))
                 return Result.Failure<object>("Forbidden", CommonErrorCodes.Forbidden);
 
             var evaluations = await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.SessionId == request.SessionId);

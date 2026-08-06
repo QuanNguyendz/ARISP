@@ -38,6 +38,11 @@ namespace ARI.Application.Interfaces
         public string ScoringRubric { get; set; } = "{}";
         /// <summary>Ngôn ngữ phỏng vấn yêu cầu — đánh giá mức tuân thủ trong Language Assessment.</summary>
         public string? Language { get; set; }
+        /// <summary>
+        /// Ngôn ngữ VIẾT báo cáo (reasoning/analysis/feedback) — tách khỏi ngôn ngữ phỏng vấn để
+        /// màn hình không trộn Việt–Anh (ADR-051). Mặc định = ngôn ngữ ứng viên đang dùng trên web.
+        /// </summary>
+        public string? ReportLanguage { get; set; }
     }
 
     public class QuestionAnswerDto
@@ -70,8 +75,12 @@ namespace ARI.Application.Interfaces
         public decimal Vocabulary { get; set; }
         public decimal Comprehension { get; set; }
         public decimal OverallScore { get; set; }
+        /// <summary>Bậc CEFR do AI kết luận (A1..C2) — không suy ra ở FE để tránh lệch với điểm.</summary>
+        public string CefrLevel { get; set; } = string.Empty;
         /// <summary>Nhận xét ngắn về mức tuân thủ ngôn ngữ phỏng vấn (ứng viên có trả lời đúng ngôn ngữ yêu cầu không).</summary>
         public string LanguageAdherence { get; set; } = string.Empty;
+        /// <summary>Dẫn chứng trích từ chính câu trả lời của ứng viên — chống AI chấm cảm tính.</summary>
+        public string Evidence { get; set; } = string.Empty;
     }
 
     public interface IAIProvider

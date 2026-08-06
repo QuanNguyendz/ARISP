@@ -99,6 +99,8 @@ class SessionContext(CamelModel):
     chat_history: list[QuestionAnswer] = []
     scoring_rubric: str = "{}"
     language: str | None = None
+    # Ngôn ngữ VIẾT báo cáo (tách khỏi ngôn ngữ phỏng vấn) — màn xem lại không trộn Việt–Anh.
+    report_language: str | None = None
 
 
 class EvaluationReport(CamelModel):
@@ -116,8 +118,12 @@ class LanguageAssessment(CamelModel):
     vocabulary: float = 0.0
     comprehension: float = 0.0
     overall_score: float = 0.0
+    # Bậc CEFR do LLM kết luận (A1..C2) — FE hiển thị thẳng, không tự suy từ điểm.
+    cefr_level: str = ""
     # Nhận xét ngắn: ứng viên có trả lời đúng ngôn ngữ phỏng vấn yêu cầu không.
     language_adherence: str = ""
+    # Dẫn chứng trích nguyên văn từ câu trả lời của ứng viên.
+    evidence: str = ""
 
 
 class DetectLanguageRequest(CamelModel):

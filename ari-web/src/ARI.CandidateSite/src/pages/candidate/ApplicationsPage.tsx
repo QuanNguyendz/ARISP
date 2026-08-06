@@ -51,6 +51,7 @@ function metaOf(t: TFunction, status: string) {
   > = {
     invited: { label: t('applications.status.invited'), group: 'processing', icon: Eye },
     cv_submitted: { label: t('applications.status.cvSubmitted'), group: 'processing', icon: Eye },
+    cv_rejected: { label: t('applications.status.cvRejected'), group: 'done', icon: XCircle },
     screening: { label: t('applications.status.screening'), group: 'processing', icon: Clock },
     interview: { label: t('applications.status.interview'), group: 'action', icon: AlertCircle },
     pass: { label: t('applications.status.pass'), group: 'done', icon: Check },
@@ -67,6 +68,25 @@ function metaOf(t: TFunction, status: string) {
 }
 
 /**
+ * Nhãn trạng thái hiển thị trên thẻ hồ sơ. "Đạt" CHỈ xuất hiện khi backend đã đặt `pass` —
+ * tức đã qua vòng CUỐI (ADR-053). Đang giữa chừng mà đã qua ít nhất 1 vòng thì hiện
+ * "Qua vòng N/M" thay vì "Đang phỏng vấn" chung chung.
+ */
+function statusMetaOf(t: TFunction, app: MyApplicationItem) {
+  const base = metaOf(t, app.status)
+  const passed = app.passedRounds ?? 0
+  const total = app.totalRounds ?? 1
+  if (passed > 0 && (app.status === 'interview' || app.status === 'screening')) {
+    return {
+      ...base,
+      label: t('applications.status.roundPassed', { passed, total }),
+      icon: Check,
+    }
+  }
+  return base
+}
+
+/**
  * Nhóm hiển thị của một hồ sơ — phản ánh quy trình:
  * có việc cần ứng viên làm (mã phỏng vấn còn hiệu lực, hoặc đã qua CV và còn lượt phỏng vấn thử)
  * → "Cần hành động"; còn lại theo trạng thái gốc (HR xem hồ sơ → Đang xử lý; pass/not_pass → Đã hoàn tất).
@@ -74,7 +94,7 @@ function metaOf(t: TFunction, status: string) {
 function groupOf(t: TFunction, app: MyApplicationItem): Exclude<FilterKey, 'all'> {
   if (app.interviewCode) return 'action'
   if (app.practiceAvailable) return 'action'
-  return metaOf(t, app.status).group
+  return statusMetaOf(t, app).group
 }
 
 function formatDate(iso?: string | null): string {
@@ -82,6 +102,14 @@ function formatDate(iso?: string | null): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return ''
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/** Ngày + giờ hẹn (dùng cho lịch đã qua giờ). */
+function formatDateTime(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return `${formatDate(iso)} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
 
 function formatRelative(t: TFunction, iso?: string | null): string {
@@ -245,10 +273,13 @@ function CardFooter({
 }
 
 function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
-  const meta = metaOf(t, app.status)
+  const meta = statusMetaOf(t, app)
+  const passedMidway =
+    (app.passedRounds ?? 0) > 0 && (app.status === 'interview' || app.status === 'screening')
   const statusCls: Record<string, string> = {
     invited: 'bg-brand-50 text-brand-700 ring-brand-200',
     cv_submitted: 'bg-brand-50 text-brand-700 ring-brand-200',
+    cv_rejected: 'bg-red-50 text-red-700 ring-red-200',
     screening: 'bg-brand-50 text-brand-700 ring-brand-200',
     interview: 'bg-amber-50 text-amber-700 ring-amber-200',
     pass: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
@@ -259,7 +290,8 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
   const Icon = deptIcon(app.department)
   const [copied, setCopied] = useState(false)
   const hasCode = !!app.interviewCode
-  const isClosed = app.status === 'not_pass' || app.status === 'withdrawn'
+  const isClosed =
+    app.status === 'not_pass' || app.status === 'withdrawn' || app.status === 'cv_rejected'
   // Practice chỉ hiện khi backend xác nhận đủ điều kiện (ĐÃ QUA vòng CV — ADR-038) và chưa có mã On-site.
   const showPractice = app.practiceAvailable && !hasCode
 
@@ -314,7 +346,11 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
               </div>
               <div className="flex shrink-0 flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
                 <span
-                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${
+                    passedMidway
+                      ? 'bg-brand-50 text-brand-700 ring-brand-200'
+                      : statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'
+                  }`}
                 >
                   <StatusIcon className="h-3.5 w-3.5" /> {meta.label}
                 </span>
@@ -371,6 +407,21 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
                   <Clock className="h-4 w-4 text-amber-600" /> {t('applications.hrConfirming')}
                 </div>
                 <p className="mt-1 text-xs text-ink-400">{t('applications.hrConfirmingHint')}</p>
+              </div>
+            )}
+
+            {/* Lịch phỏng vấn thật đã qua giờ mà chưa vào phòng — hồ sơ đã đóng thì không nhắc nữa */}
+            {!hasCode && !isClosed && app.missedInterview && (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-sm">
+                <div className="flex items-center gap-2 font-semibold text-amber-700">
+                  <AlertCircle className="h-4 w-4" />{' '}
+                  {t('applications.missedInterview', { round: app.missedInterview.roundNumber })}
+                </div>
+                <p className="mt-1 text-xs text-ink-500">
+                  {t('applications.missedInterviewHint', {
+                    time: formatDateTime(app.missedInterview.startTime),
+                  })}
+                </p>
               </div>
             )}
 

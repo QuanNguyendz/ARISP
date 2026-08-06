@@ -127,6 +127,9 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_answers_session_id");
+
                     b.ToTable("answers", (string)null);
                 });
 
@@ -1019,6 +1022,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
 
+                    b.Property<string>("ClosingText")
+                        .HasColumnType("text")
+                        .HasColumnName("closing_text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1036,6 +1043,18 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("interview_language");
 
+                    b.Property<DateTimeOffset?>("RecordingDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recording_deleted_at");
+
+                    b.Property<DateTimeOffset?>("RecordingExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recording_expires_at");
+
+                    b.Property<long?>("RecordingSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recording_size_bytes");
+
                     b.Property<string>("RecordingUrl")
                         .HasColumnType("text")
                         .HasColumnName("recording_url");
@@ -1043,6 +1062,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<bool>("RecordingVisibleToCandidate")
                         .HasColumnType("boolean")
                         .HasColumnName("recording_visible_to_candidate");
+
+                    b.Property<string>("ReportLanguage")
+                        .HasColumnType("text")
+                        .HasColumnName("report_language");
 
                     b.Property<int>("RoundNumber")
                         .HasColumnType("integer")
@@ -1630,6 +1653,9 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnName("source");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_questions_session_id");
 
                     b.ToTable("questions", (string)null);
                 });

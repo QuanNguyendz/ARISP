@@ -32,7 +32,9 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationsByApplication
             if (job == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Job posting associated with this application was not found.");
 
-            var evaluations = (await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.ApplicationId == request.ApplicationId, ct)).ToList();
+            // Bỏ đánh giá buổi thử — chỉ ứng viên xem qua Portal (ADR-051).
+            var evaluations = (await _unitOfWork.Repository<Evaluation>()
+                .FindAsync(e => e.ApplicationId == request.ApplicationId && e.SessionType != "practice", ct)).ToList();
             var evalIds = evaluations.Select(e => e.Id).ToList();
             // Chỉ lấy HrReview của các đánh giá thuộc hồ sơ này (không quét toàn bảng).
             var hrDict = (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId), ct))

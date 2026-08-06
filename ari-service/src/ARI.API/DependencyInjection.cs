@@ -199,6 +199,12 @@ namespace ARI.API
                 // 4. Chính sách biệt lập dành riêng cho Ứng viên
                 options.AddPolicy("CandidateOnly", policy =>
                     policy.RequireRole(AppRoles.Candidate));
+
+                // 5. Người đang NGỒI TRONG phòng phỏng vấn: ứng viên đăng nhập (phỏng vấn thử) hoặc
+                //    máy Kiosk mang token phạm vi 1 phiên (phỏng vấn thật — ADR-052). Phạm vi phiên
+                //    được kiểm tra thêm ở controller/hub qua claim session_id.
+                options.AddPolicy("InterviewParticipant", policy =>
+                    policy.RequireRole(AppRoles.Candidate, AppRoles.KioskSession));
             });
 
             // Hai origin FE tách biệt (ADR-046): StaffSite = AdminFrontendUrl, CandidateSite = Frontend:CandidateBaseUrl.

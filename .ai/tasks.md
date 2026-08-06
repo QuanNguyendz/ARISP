@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-07-18
+**Last updated:** 2026-08-05
 
 ---
 
@@ -138,7 +138,8 @@ _Chưa có task nào đang thực hiện._
 - [ ] **Practice Interview:**
   - [ ] `ApplicationService`: check eligibility (`practice_session_used` flag per application)
   - [ ] Practice Session: `session_type = practice`, interview flow dùng JD + CV only (không load Playbook)
-  - [ ] Practice Session: Evaluation Report riêng, HR xem được, không ảnh hưởng verdict
+  - [x] Practice Session: Evaluation Report riêng, **chỉ ứng viên xem — HR/Recruiter bị ẩn hoàn toàn** (đảo chiều "HR xem được" theo ADR-051), không ảnh hưởng verdict ✅ 2026-08-05
+  - [x] Practice Session: xem lại transcript + nhận xét AI vĩnh viễn — `GET /api/portal/practice/sessions[/{id}]` + trang `/candidate/practice/:sessionId` (ADR-051) ✅ 2026-08-05
   - [ ] Disable nút "Phỏng vấn thử" sau khi đã dùng 1 lần
 
 ### Phase 2c – Online Test (Multiple Choice Quiz)
@@ -151,6 +152,8 @@ _Chưa có task nào đang thực hiện._
 - [x] Unit test luồng Online Test — chấm điểm (khớp hoàn toàn, làm tròn 2 số, điểm sàn inclusive, chỉ chấm bộ đề đã bốc), gating (1 lượt/vòng, CV chưa duyệt, đã rút, ngân hàng rỗng, phân quyền), ẩn đáp án + bốc đề deterministic, validate câu hỏi — **33 test mới, 44/44 pass** ✅ 2026-08-05
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
+- [x] Kiosk mode frontend: nhập Interview Code → phiên phỏng vấn thật (token phạm vi phiên), device check, phòng phỏng vấn có avatar, màn kết thúc tự reset (ADR-052) ✅ 2026-08-05
+- [x] Ghi hình buổi phỏng vấn thật lên storage + tự xoá sau 7 ngày (`RecordingRetentionHostedService`), HR xem lại trong màn đánh giá (ADR-052) ✅ 2026-08-05
 - [x] Database schema: `availability_slots`, `interview_codes` (entities đã có)
 - [ ] Database schema: `interview_bookings` (entity đã có nhưng chưa migration)
 - [ ] EF Core migrations
@@ -314,6 +317,45 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-05: **Khoá màn hình Kiosk + ghi nhận mọi lần rời buổi phỏng vấn (ADR-054).**
+  - **Khoá màn hình:** `KioskPage` gọi `requestFullscreen()` ngay trong cú click "Bắt đầu phỏng vấn" (bắt buộc phải là thao tác người dùng); `KioskInterviewPage` phủ **lớp chặn toàn bộ giao diện** khi rời toàn màn hình, chỉ tiếp tục khi bấm "Quay lại toàn màn hình"; chặn context menu, phím tắt `F11/F5/Ctrl+P,S,U,F,T,N,W,R`, cảnh báo `beforeunload`; thoát fullscreen khi kết thúc.
+  - **Ghi log:** hook mới `ARI.Shared/src/media/useKioskLockdown.ts` đếm + gửi 5 loại tín hiệu (`fullscreen_exit`, `tab_hidden`, `window_blur`, `shortcut_blocked`, `page_unload`) qua `POST /api/interview/session/{id}/signals`; lúc đóng trang dùng `fetch keepalive` (sendBeacon không đặt được Authorization).
+  - **Nối hạ tầng chống gian lận đã có nhưng chưa chạy:** `IInterviewService.RecordCheatSignalAsync` lưu `CheatDetectionSignal` thật (chặn payload >2000 ký tự, ép JSON hợp lệ); `SessionHub.ReportCheatSignal` gọi service trước khi broadcast (trước đây chỉ broadcast); `GenerateEvaluationReportAsync` tính `CheatScore` theo trọng số từng loại (trần 100) và ghi `CheatSignals` gộp theo loại — trước đây ghi cứng `"[]"` nên HR không bao giờ thấy chi tiết.
+  - **Minh bạch:** màn kết thúc Kiosk hiện "Ghi nhận N lần rời khỏi màn hình phỏng vấn".
+  - **Giới hạn đã ghi rõ trong docs:** web không chặn được Alt+Tab/phím Windows → cần `chrome --kiosk` + Windows Assigned Access cho máy thật.
+  - **Verify:** `ARI.Application`/`ARI.Infrastructure` build 0 error, `ARI.API` compile 0 error (build đầy đủ vướng khoá file do API đang chạy trong VS); CandidateSite build xanh.
+
+- [x] 2026-08-05: **"Đạt" chỉ khi qua hết vòng + AI không tự đổi trạng thái + chất lượng báo cáo buổi thử (ADR-053).**
+  - **Ràng buộc từng bước:** bỏ hẳn ghi `Application.Status` trong `GenerateEvaluationReportAsync` (AI chấm trượt không còn tự đánh rớt hồ sơ trước khi HR xem); `SubmitHrReviewAsync` tính trạng thái một lần theo tổng số vòng (`ResolveTotalRoundsAsync`): `not_pass` / `interview` (còn vòng) / `pass` (vòng cuối). `TriggerAutoProgressionAsync` không còn sửa trạng thái.
+  - **Hiển thị tiến độ:** portal (danh sách + chi tiết) trả `TotalRounds`/`PassedRounds`; `ApplicationsPage` hiện badge **"Qua vòng N/M"**, ẩn banner quá hạn khi hồ sơ đã đóng, thêm nhãn `cv_rejected` (trước lọt chuỗi thô).
+  - **Điểm từng câu:** `Score` chỉ gán khi `> 0` (còn lại null) + FE ẩn chip điểm/khung trung tính → hết cảnh nhận xét khen mà gắn "0/100 · Cần cải thiện"; rag-service nhận thêm biến thể khoá điểm và kẹp 0–100.
+  - **Một màn một ngôn ngữ:** ghim bộ khoá `criterion_scores` trong prompt (rag-service + OpenAIProvider) + alias trong `CriterionBar` → tên tiêu chí dịch được VI/EN; ghi chú khi `reportLanguage` lệch ngôn ngữ UI; transcript giữ nguyên ngôn ngữ buổi phỏng vấn. Đồng bộ cỡ chữ `LanguageMetric` với `CriterionBar`.
+  - **Công cụ test:** `POST /api/dev/seed-interview-job` (job `[DEV] Kiosk Sandbox` 3 vòng screening→online_test→technical, 10 câu trắc nghiệm mẫu, lịch vòng 1+3, mã Kiosk vòng 1, tài khoản HR `hr.dev@arisp.local` đăng nhập được); `POST /api/dev/regrade-session/{id}?lang=vi` chấm lại phiên cũ. Hướng dẫn: `docs/kiosk-interview-setup.md`.
+  - **Xác nhận vòng trắc nghiệm:** slice Online Test (ADR-049) đã có đủ trên nhánh (commit `b56abf1a`, `86c32804`); còn thiếu duy nhất tuỳ chọn `online_test` trong dropdown tạo job.
+  - **Verify:** `dotnet build` 0 error; FE 2 site build xanh. Không có migration mới. Sau khi merge `develop` (bộ test 301 case mới): cập nhật `InterviewServiceFactory` (thêm stub `IFileStorageService`) và chạy lại **304/304 pass**.
+  - **Lỗ hổng lộ ra khi merge develop:** test `Pass_practice_does_not_progress_even_with_config` kỳ vọng review một đánh giá **buổi thử** vẫn đẩy hồ sơ sang `pass` — trái ADR-051. Sửa `SubmitHrReviewAsync` chỉ ghi trạng thái khi `SessionType == "real"`, cập nhật test theo hành vi đúng.
+  - **Sửa sau khi chạy thật trên Kiosk (cùng ngày):** (1) upload video 500 — `MediaRecorder` gửi `video/webm;codecs=vp9,opus`, dấu phẩy trong tham số MIME làm `MediaTypeHeaderValue.Parse` của AWS SDK ném `FormatException`; nay `S3FileStorageService` + `SaveRecordingAsync` cắt bỏ tham số, và lỗi storage trả `Result.Failure` (400 kèm thông báo) thay vì văng 500. (2) Màn Kiosk co về góc trái — route `/kiosk` bị bọc trong `InterviewLayout` (flex container + thanh tiêu đề thừa); nay tách thành route toàn màn hình độc lập như `PracticeSessionPage`.
+
+- [x] 2026-08-05: **Kiosk phỏng vấn THẬT + ghi hình tự xoá sau 7 ngày (ADR-052) + sửa trạng thái hồ sơ/lịch quá hạn.**
+  - **Trạng thái "Đạt" sai:** danh sách hồ sơ (`GetMyApplicationsQueryHandler`) vẫn gom phiên **thử** vào `rounds` + `pendingHrReview` → thẻ hồ sơ hiện "V1 ✓" và "chờ HR xác nhận" chỉ vì một buổi luyện tập. Nay tiến trình vòng chỉ tính phiên **thật** (khớp ADR-051 đã làm cho trang chi tiết).
+  - **Lịch quá hạn:** thêm `MissedInterview` (booking `scheduled` đã qua `EndTime` mà vòng đó chưa có phiên thật) ở danh sách + trạng thái vòng `missed` ở chi tiết; FE hiện banner "Đã quá hạn buổi phỏng vấn vòng N" + hướng dẫn liên hệ nhân sự, thay vì kẹt mãi ở "Đã xếp lịch".
+  - **Kiosk auth:** `AppRoles.Kiosk_session` + `ITokenService.CreateKioskSessionToken` (claim `session_id`, TTL `Interview:KioskSessionTokenHours`=3h) + policy `InterviewParticipant`; `validate-code` trả `KioskSessionResponse` (sessionId, token, tên ứng viên, vị trí, vòng, ngôn ngữ, `reason` khi mã hỏng). Controller + `SessionHub` kiểm `session_id` khớp phiên. FE: `setInterviewSessionToken` ở `apiClient` (ưu tiên hơn token người dùng) + `accessTokenFactory` SignalR.
+  - **Ghi hình:** `POST /interview/session/{id}/recording` (multipart, ≤`MaxRecordingSizeMb`=300) → `IFileStorageService`; entity thêm `recording_size_bytes`/`recording_expires_at`/`recording_deleted_at` (migration `AddKioskInterviewRecording`). `RecordingRetentionHostedService` quét 12h/lần xoá file quá hạn (`RecordingRetentionDays`=7), giữ transcript + đánh giá. Practice bị từ chối ghi hình.
+  - **HR xem video:** `GetEvaluationDetailQuery` trả `recordingUrl`/`recordingExpiresAt`/`recordingDeletedAt`; `EvaluationReviewPage` thay placeholder chết (nút Play không onClick) bằng `<video>` thật + dòng nhắc hạn xoá; i18n VI/EN.
+  - **FE Kiosk:** `KioskPage` gọi API thật (3 thông báo lỗi theo `reason`, bỏ demo codes, nút "tiếp tục buổi đang dở"), `kioskSession.ts` (sessionStorage + token), `KioskInterviewPage` mới (device check → phòng có avatar/đếm ngược/chỉ báo ghi hình/transcript/nhập kép → màn kết thúc lưu video + tự về màn nhập mã sau 30s). Hook tách thành `useInterviewSession({existingSessionId, sessionType, recordVideo})`, `usePracticeSession` giữ chữ ký cũ. Trần buổi thật `RealMaxDurationMinutes`=45' dùng chung cơ chế hết giờ.
+  - **Verify:** `dotnet build` 0 error; `dotnet ef migrations add AddKioskInterviewRecording`; FE 2 site `tsc && vite build` xanh.
+
+- [x] 2026-08-05: **Buổi thử — transcript + nhận xét AI riêng tư cho ứng viên, lưu vĩnh viễn (ADR-051).** Branch `feature/be/practice-transcript-review`.
+  - **Ứng viên xem lại:** feature mới `ARI.Application/CandidatePortal/PortalPracticeFeature.cs` — `GetMyPracticeSessionsQuery` (`GET /api/portal/practice/sessions[?applicationId=]`) + `GetMyPracticeReviewQuery` (`GET /api/portal/practice/sessions/{sessionId}`), policy `CandidateOnly` + IDOR. Detail trả meta + `turns[]` (Question order `SequenceNumber` ghép Answer nạp 1 lần, không N+1) + `closingText` + evaluation + `evaluationPending`. Từ chối `NotFound` nếu phiên không phải `practice` (transcript buổi thật vẫn theo cổng `HrReview.ShareTranscript`). **DTO cố ý bỏ `AiVerdict`** — không hiện Pass/Not Pass cho buổi luyện tập.
+  - **Ẩn khỏi nhân sự nội bộ:** lọc `SessionType != "practice"` ở `GetSessionsForHrAsync` (cả evaluation join), `GetEvaluationsQuery`, `GetEvaluationsByApplicationQuery`, `GetEvaluationDetailQuery` (cả nhánh fallback theo SessionId → NotFound). Giữ cờ `PracticeSessionUsed`.
+  - **Bug sửa kèm:** (1) `GenerateEvaluationReportAsync` trước đó ghi đè `application.Status = "screening"|"not_pass"` + báo `hr_admin` **kể cả phiên thử** → buổi thử điểm thấp đánh rớt hồ sơ thật; nay chỉ chạy khi `SessionType=="real"`. (2) `GetMyApplicationDetailQueryHandler` map vòng bằng `FirstOrDefault(RoundNumber)` → phiên thử che trạng thái phiên thật; nay tách `realSessions`/`practiceSessions`, trả thêm `PracticeSessions[]`. (3) `PracticeSessionPage` hardcode round 1 → đọc `?round=`.
+  - **DB:** `InterviewSession.ClosingText` (lưu câu chào kết thúc AI, trước chỉ bắn SignalR rồi mất) + index `ix_questions_session_id`, `ix_answers_session_id`; migration `20260805022000_AddPracticeTranscriptReview`. Không có job xoá — transcript giữ vĩnh viễn (ADR-038 điểm 6 chỉ nói về recording).
+  - **Refactor nhỏ:** khối "IDOR Protection + Auto-link" copy 2 chỗ → `PortalSupport.TryEnsureOwnerAsync`, dùng lại ở cả 3 handler.
+  - **FE:** trang mới `pages/candidate/PracticeReviewPage.tsx` (route `/candidate/practice/:sessionId`) — banner "chỉ tham khảo", panel nhận xét AI (có trạng thái "AI đang chấm"), transcript hội thoại + nút sao chép. `usePracticeSession` expose `sessionId`; màn kết thúc buổi thử đổi nút chính → "Xem lại & nhận xét AI"; card "Phỏng vấn thử" trong trang chi tiết hồ sơ. Tách `pages/candidate/_reportUi.ts` + `components/CriterionBar.tsx` dùng chung với `ApplicationDetailPage`; StaffSite gỡ nhãn practice/real đã chết (2 `InterviewSessionsPage` + 2 `CandidateDetailPage`). i18n namespace mới `modules/candidate/practiceReview` (VI/EN) + key `practice.ended.viewTranscript`, `applicationDetail.practiceList.*`.
+  - **Vòng 2 (cùng ngày, sau khi soi màn thật):** 4 vấn đề user chỉ ra — (1) **trộn Việt–Anh**: thêm `InterviewSession.ReportLanguage` (FE gửi `uiLanguage` lúc start) + `SessionContext.ReportLanguage`, prompt buộc viết toàn bộ text theo 1 ngôn ngữ; (2) **phân tích từng câu trống rỗng**: prompt cũ để `question_analyses: [<optional objects>]` nên model bịa khoá → chốt schema `{sequence_number, score, analysis, feedback}`, thêm `normalize_question_analyses()` ở rag-service + `QuestionAnalysisDto.SequenceNumber`, BE ghép nhận xét vào đúng lượt hỏi–đáp (câu hỏi/trả lời luôn từ DB); (3) **đánh giá ngôn ngữ sai**: prompt chỉ đưa câu trả lời của ứng viên, neo thang 0–10 ↔ CEFR, thêm `cefr_level`/`evidence`/`language_adherence` chạy suốt Python → .NET → FE, `cefr_from_score` bù khi model bỏ trống, và **bỏ hẳn bước chấm khi phiên không có câu trả lời**; (4) **bố cục**: màn xem lại chuyển 2 cột (tổng quan sticky trái, hội thoại + `TurnNote` phải), bỏ mục "phân tích từng câu" tách rời. Migration gộp lại còn 1 file (`AddPracticeTranscriptReview`: `closing_text` + `report_language` + 2 index) — viết bằng SQL `IF NOT EXISTS` + xoá bản ghi lịch sử mồ côi `20260805022000_AddPracticeTranscriptReview`, vì bản trước khi gộp đã kịp chạy trên DB dev nên `ALTER TABLE ... ADD closing_text` báo 42701 (column already exists).
+  - **Verify:** `dotnet build ARI.sln` 0 error, 14/14 test xanh; FE 2 site `tsc && vite build` xanh; eslint candidate 0 error, 0 warning mới (20 warning `any` là code cũ); rag-service `py_compile` sạch.
+  - **Docs:** ADR-051 + mục "Cập nhật 2026-08-05 — chất lượng báo cáo AI" (`.ai/architecture.md`) + bảng ADR & Glossary trong `CLAUDE.md` + entry này.
 
 - [x] 2026-08-05: **Unit test Luồng 5 — Schedule Interview (UC-39/40/41/58/59/60/61/62/63) — 24 test mới, tổng 301/301 pass.**
   - Phủ nhánh còn thiếu: **quản lý kho khung giờ của nhân sự** (`StaffScheduling.cs`) — phần assign/confirm/decline/candidate-schedule đã phủ ở batch Scheduling trước.

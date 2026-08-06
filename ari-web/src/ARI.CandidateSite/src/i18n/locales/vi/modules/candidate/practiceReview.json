@@ -1,0 +1,82 @@
+{
+  "position": "Vị trí ứng tuyển",
+  "loadError": "Không tải được buổi phỏng vấn thử.",
+  "roundBadge": "Vòng {{number}}{{type}}",
+  "backToApplication": "Về hồ sơ ứng tuyển",
+  "footer": "Nội dung buổi thử được lưu riêng cho bạn — bộ phận tuyển dụng không xem được.",
+  "notice": "Đây là buổi luyện tập: điểm và nhận xét chỉ mang tính tham khảo, không ảnh hưởng tới kết quả tuyển dụng của bạn.",
+  "breadcrumb": {
+    "applications": "Hồ sơ ứng tuyển",
+    "current": "Xem lại buổi thử"
+  },
+  "badge": {
+    "practice": "Phỏng vấn thử"
+  },
+  "round": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "online_test": "Online Test",
+    "final": "Final"
+  },
+  "meta": {
+    "turns": "{{answered}}/{{total}} câu đã trả lời",
+    "referenceScore": "Điểm tham khảo"
+  },
+  "language": {
+    "vi": "Tiếng Việt",
+    "en": "Tiếng Anh"
+  },
+  "evaluation": {
+    "title": "Nhận xét của AI",
+    "writtenIn": "Bản nhận xét này được AI viết bằng {{lang}} — theo ngôn ngữ bạn đang dùng lúc bắt đầu buổi thử.",
+    "scoresByCriteria": "Điểm theo tiêu chí",
+    "pendingTitle": "AI đang chấm buổi thử",
+    "pendingDescription": "Nội dung hội thoại đã được lưu. Bản nhận xét sẽ xuất hiện ở đây sau ít phút, hãy tải lại trang.",
+    "emptyTitle": "Chưa có nhận xét AI",
+    "emptyDescription": "Buổi thử này chưa được chấm — bạn vẫn xem lại được toàn bộ nội dung hội thoại bên dưới."
+  },
+  "criterionLabels": {
+    "technical": "Kiến thức kỹ thuật",
+    "technical_knowledge": "Kiến thức kỹ thuật",
+    "communication": "Giao tiếp",
+    "problem_solving": "Giải quyết vấn đề",
+    "culture_fit": "Văn hoá phù hợp",
+    "experience": "Kinh nghiệm thực tế",
+    "practical_experience": "Kinh nghiệm thực tế",
+    "language": "Ngôn ngữ",
+    "attitude": "Thái độ",
+    "teamwork": "Làm việc nhóm"
+  },
+  "questionAnalysis": {
+    "good": "Tốt",
+    "fair": "Khá",
+    "needsImprovement": "Cần cải thiện"
+  },
+  "turnNote": {
+    "title": "AI nhận xét câu này"
+  },
+  "languageAssessment": {
+    "title": "Năng lực {{lang}}",
+    "fallbackCode": "ngôn ngữ",
+    "fluency": "Độ trôi chảy",
+    "grammar": "Ngữ pháp",
+    "vocabulary": "Từ vựng",
+    "comprehension": "Khả năng hiểu",
+    "basedOnAnswers": "AI chấm dựa trên chính các câu trả lời của bạn trong buổi này."
+  },
+  "nextStep": {
+    "title": "Gợi ý luyện tập tiếp theo"
+  },
+  "transcript": {
+    "title": "Nội dung buổi phỏng vấn",
+    "subtitle": "Nhận xét của AI nằm ngay dưới câu trả lời tương ứng.",
+    "empty": "Buổi thử này chưa ghi nhận câu hỏi nào.",
+    "aiLabel": "AI",
+    "youLabel": "Bạn",
+    "question": "Câu",
+    "noAnswer": "Bạn chưa trả lời câu này.",
+    "closing": "AI · Kết thúc",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép"
+  }
+}

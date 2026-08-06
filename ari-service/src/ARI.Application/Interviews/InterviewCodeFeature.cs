@@ -54,9 +54,9 @@ namespace ARI.Application.Interviews
     // POST /api/interview/validate-code (Kiosk, anonymous)
     // ============================================================
 
-    public record ValidateInterviewCodeCommand(string Code) : IRequest<Result<(bool Valid, Guid? SessionId)>>;
+    public record ValidateInterviewCodeCommand(string Code) : IRequest<Result<KioskSessionResponse>>;
 
-    public class ValidateInterviewCodeCommandHandler : IRequestHandler<ValidateInterviewCodeCommand, Result<(bool Valid, Guid? SessionId)>>
+    public class ValidateInterviewCodeCommandHandler : IRequestHandler<ValidateInterviewCodeCommand, Result<KioskSessionResponse>>
     {
         private readonly IInterviewCodeService _interviewCodeService;
 
@@ -65,7 +65,7 @@ namespace ARI.Application.Interviews
             _interviewCodeService = interviewCodeService;
         }
 
-        public Task<Result<(bool Valid, Guid? SessionId)>> Handle(ValidateInterviewCodeCommand request, CancellationToken ct)
+        public Task<Result<KioskSessionResponse>> Handle(ValidateInterviewCodeCommand request, CancellationToken ct)
             => _interviewCodeService.ValidateCodeAsync(request.Code, ct);
     }
 

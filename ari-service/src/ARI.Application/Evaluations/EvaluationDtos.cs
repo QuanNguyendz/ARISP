@@ -28,6 +28,10 @@ namespace ARI.Application.Evaluations
 
     public class QuestionAnalysisDto
     {
+        /// <summary>Số thứ tự câu hỏi trong phiên — dùng để ghép phân tích vào đúng lượt hỏi–đáp thật.</summary>
+        [JsonPropertyName("SequenceNumber")]
+        public int SequenceNumber { get; set; }
+
         [JsonPropertyName("Question")]
         public string Question { get; set; } = string.Empty;
 
@@ -71,6 +75,18 @@ namespace ARI.Application.Evaluations
 
         [JsonPropertyName("overall_score")]
         public decimal OverallScore { get; set; }
+
+        /// <summary>Bậc CEFR do AI kết luận (A1..C2) — hiển thị trực tiếp, không suy từ điểm ở FE.</summary>
+        [JsonPropertyName("cefr_level")]
+        public string? CefrLevel { get; set; }
+
+        /// <summary>Ứng viên có trả lời đúng ngôn ngữ phỏng vấn yêu cầu không.</summary>
+        [JsonPropertyName("language_adherence")]
+        public string? LanguageAdherence { get; set; }
+
+        /// <summary>Dẫn chứng trích từ câu trả lời của ứng viên.</summary>
+        [JsonPropertyName("evidence")]
+        public string? Evidence { get; set; }
     }
 
     public class HrReviewDto
@@ -134,6 +150,13 @@ namespace ARI.Application.Evaluations
 
         // HR Review if exists
         public HrReviewDto? HrReview { get; set; }
+
+        /// <summary>Video buổi phỏng vấn thật (ADR-052) — null nếu chưa quay hoặc đã quá hạn lưu.</summary>
+        public string? RecordingUrl { get; set; }
+        /// <summary>Hạn lưu video — HR biết còn bao lâu để xem/tải trước khi bị xoá tự động.</summary>
+        public DateTimeOffset? RecordingExpiresAt { get; set; }
+        /// <summary>Thời điểm video đã bị xoá theo hạn lưu (để HR không tưởng là mất dữ liệu).</summary>
+        public DateTimeOffset? RecordingDeletedAt { get; set; }
 
         public static EvaluationDetailResponse FromEntity(
             Evaluation eval, 

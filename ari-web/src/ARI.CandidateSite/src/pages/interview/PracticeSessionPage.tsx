@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import {
@@ -58,6 +58,7 @@ function Logo() {
 
 export default function PracticeSessionPage() {
   const { applicationId } = useParams<{ applicationId: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { t } = useTranslation('modules/interview/practice')
 
@@ -66,7 +67,10 @@ export default function PracticeSessionPage() {
   const selfVideoRef = useRef<HTMLVideoElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
 
-  const practice = usePracticeSession(applicationId ?? '', 1)
+  // Phỏng vấn thử theo VÒNG (ADR-038) — ApplicationsPage truyền ?round=N.
+  const roundNumber = Number.parseInt(searchParams.get('round') ?? '', 10) || 1
+
+  const practice = usePracticeSession(applicationId ?? '', roundNumber)
 
   // Tin nhắn/diễn giải mới → tự cuộn transcript xuống cuối (chỉ cuộn panel, không cuộn page).
   useEffect(() => {
@@ -192,15 +196,22 @@ export default function PracticeSessionPage() {
             {t('practice.ended.title')}
           </h1>
           <p className="mb-8 text-slate-400">{t('practice.ended.message')}</p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {/* Transcript + nhận xét AI được lưu lại, xem lại bất cứ lúc nào (ADR-051) */}
             <button
-              onClick={() => navigate(`/candidate/applications/${applicationId}`)}
+              onClick={() =>
+                navigate(
+                  practice.sessionId
+                    ? `/candidate/practice/${practice.sessionId}`
+                    : `/candidate/applications/${applicationId}`
+                )
+              }
               className="rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-3 font-semibold text-white hover:opacity-90"
             >
-              {t('practice.ended.viewResult')}
+              {t('practice.ended.viewTranscript')}
             </button>
             <button
-              onClick={() => navigate('/candidate/applications')}
+              onClick={() => navigate(`/candidate/applications/${applicationId}`)}
               className="rounded-xl bg-white/10 px-6 py-3 font-semibold text-white hover:bg-white/20"
             >
               {t('practice.ended.backToApplication')}

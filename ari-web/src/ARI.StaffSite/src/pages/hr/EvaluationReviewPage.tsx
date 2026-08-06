@@ -11,12 +11,11 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Play,
-  FileText,
   Languages,
   ArrowLeft,
   Bell,
 } from 'lucide-react'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton } from './_skeletons'
@@ -468,17 +467,33 @@ export default function EvaluationReviewPage() {
               </div>
             )}
 
-          {/* Recording / transcript */}
+          {/* Bản ghi hình buổi phỏng vấn thật (ADR-052) — tự xoá khi hết hạn lưu */}
           <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
             <h2 className="font-display text-lg font-bold mb-4">{t('recordingTranscript')}</h2>
-            <div className="aspect-video rounded-xl bg-ink-900 grid place-items-center text-ink-400">
-              <button className="grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
-                <Play className="w-6 h-6" />
-              </button>
-            </div>
-            <button className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:underline">
-              <FileText className="w-4 h-4" /> {t('viewFullTranscript')}
-            </button>
+            {selectedEvaluation.recordingUrl ? (
+              <>
+                <video
+                  src={resolveAssetUrl(selectedEvaluation.recordingUrl)}
+                  controls
+                  className="aspect-video w-full rounded-xl bg-ink-900"
+                />
+                {selectedEvaluation.recordingExpiresAt && (
+                  <p className="mt-2 text-xs text-ink-500">
+                    {t('recordingExpiresAt', {
+                      date: new Date(selectedEvaluation.recordingExpiresAt).toLocaleString(),
+                    })}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="aspect-video rounded-xl bg-ink-100 dark:bg-white/5 grid place-items-center px-6 text-center text-sm text-ink-500">
+                {selectedEvaluation.recordingDeletedAt
+                  ? t('recordingDeleted', {
+                      date: new Date(selectedEvaluation.recordingDeletedAt).toLocaleDateString(),
+                    })
+                  : t('recordingNone')}
+              </div>
+            )}
           </div>
         </div>
 

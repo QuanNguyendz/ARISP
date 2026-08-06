@@ -15,8 +15,8 @@ namespace ARI.Application.Interfaces
     /// </summary>
     public interface IInterviewService
     {
-        Task<Result<string>> GetSpeechAudioAsync(Guid sessionId, string text, Guid? accountId, string? email, CancellationToken ct = default);
-        Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(Guid sessionId, Guid? accountId, string? email, CancellationToken ct = default);
+        Task<Result<string>> GetSpeechAudioAsync(Guid sessionId, string text, Guid? accountId, string? email, bool kioskAuthorized = false, CancellationToken ct = default);
+        Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(Guid sessionId, Guid? accountId, string? email, bool kioskAuthorized = false, CancellationToken ct = default);
         Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(CancellationToken ct = default);
         Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default);
         Task<Result<string>> GenerateAndSendNextQuestionAsync(Guid sessionId, CancellationToken ct = default);
@@ -25,6 +25,15 @@ namespace ARI.Application.Interfaces
         Task AnalyzeAnswerAndAdaptAsync(Guid sessionId, Guid questionId, string transcript, CancellationToken ct = default);
         Task<Result<bool>> EndSessionAsync(Guid sessionId, string status = "completed", CancellationToken ct = default);
         Task<Result<bool>> PracticeTimeoutCloseAsync(Guid sessionId, CancellationToken ct = default);
+        /// <summary>
+        /// Ghi nhận tín hiệu nghi vấn của phiên (thoát toàn màn hình, chuyển tab…) và trả về
+        /// số lần đã ghi của chính loại đó (ADR-054).
+        /// </summary>
+        Task<Result<int>> RecordCheatSignalAsync(Guid sessionId, string signalType, string? payloadJson, CancellationToken ct = default);
+        /// <summary>Chấm lại phiên đã kết thúc bằng prompt hiện tại (dev/ops) — chặn nếu HR đã xác nhận.</summary>
+        Task<Result<bool>> RegenerateEvaluationAsync(Guid sessionId, string? reportLanguage = null, CancellationToken ct = default);
+        /// <summary>Lưu video buổi phỏng vấn THẬT vào storage kèm hạn xoá tự động (ADR-052).</summary>
+        Task<Result<RecordingUploadResponse>> SaveRecordingAsync(Guid sessionId, byte[] content, string fileName, string contentType, CancellationToken ct = default);
         Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default);
     }
 }

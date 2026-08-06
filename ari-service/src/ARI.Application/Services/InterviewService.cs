@@ -24,6 +24,7 @@ namespace ARI.Application.Services
         private readonly IDeepgramTokenService _deepgramTokenService;
         private readonly IRagIngestionService _ragIngestion;
         private readonly ITTSService _ttsService;
+        private readonly IFileStorageService _fileStorage;
         private readonly InterviewOptions _interviewOptions;
 
         public InterviewService(
@@ -35,8 +36,10 @@ namespace ARI.Application.Services
             IDeepgramTokenService deepgramTokenService,
             IRagIngestionService ragIngestion,
             ITTSService ttsService,
+            IFileStorageService fileStorage,
             InterviewOptions? interviewOptions = null)
         {
+            _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
             _embeddingProvider = embeddingProvider;
@@ -53,7 +56,7 @@ namespace ARI.Application.Services
         /// Xác thực ứng viên sở hữu phiên. Rỗng nếu chưa cấu hình ElevenLabs → FE fallback browser TTS.
         /// </summary>
         public async Task<Result<string>> GetSpeechAudioAsync(
-            Guid sessionId, string text, Guid? candidateAccountId, string? candidateEmail, CancellationToken ct = default)
+            Guid sessionId, string text, Guid? candidateAccountId, string? candidateEmail, bool kioskAuthorized = false, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(text))
                 return Result.Success(string.Empty);
@@ -64,7 +67,8 @@ namespace ARI.Application.Services
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<string>("Không tìm thấy hồ sơ ứng tuyển.");
-            var owns = (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
+            var owns = kioskAuthorized
+                       || (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
                        || (!string.IsNullOrEmpty(candidateEmail)
                            && string.Equals(application.CandidateEmail, candidateEmail, StringComparison.OrdinalIgnoreCase));
             if (!owns)
@@ -115,7 +119,7 @@ namespace ARI.Application.Services
         /// (FE tự fallback).
         /// </summary>
         public async Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(
-            Guid sessionId, Guid? candidateAccountId, string? candidateEmail, CancellationToken ct = default)
+            Guid sessionId, Guid? candidateAccountId, string? candidateEmail, bool kioskAuthorized = false, CancellationToken ct = default)
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
@@ -125,7 +129,9 @@ namespace ARI.Application.Services
             if (application == null)
                 return Result.Failure<PracticeMediaConfigResponse>("Không tìm thấy hồ sơ ứng tuyển.");
 
-            var owns = (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
+            // Kiosk: token đã gắn đúng session_id (kiểm ở controller) — máy Kiosk không đăng nhập ứng viên.
+            var owns = kioskAuthorized
+                       || (candidateAccountId.HasValue && application.CandidateAccountId == candidateAccountId.Value)
                        || (!string.IsNullOrEmpty(candidateEmail)
                            && string.Equals(application.CandidateEmail, candidateEmail, StringComparison.OrdinalIgnoreCase));
             if (!owns)
@@ -150,11 +156,12 @@ namespace ARI.Application.Services
                 catch { /* avatar tuỳ chọn — FE fallback WebAudio (ElevenLabs) + bot tĩnh */ }
             }
 
-            // Trần thời lượng để FE vẽ đếm ngược khớp giờ server (ADR-050). Practice = config;
-            // real = 0 (không chặn — tới Phase 7). StartedAtUtc để FE tính remaining chính xác.
-            var maxDurationSeconds = session.SessionType == "practice" && _interviewOptions.PracticeMaxDurationMinutes > 0
-                ? _interviewOptions.PracticeMaxDurationMinutes * 60
-                : 0;
+            // Trần thời lượng để FE vẽ đếm ngược khớp giờ server: practice 20' (ADR-050),
+            // real 45' (ADR-052) — cùng cơ chế hết giờ AI nói câu kết rồi đóng phiên.
+            var maxMinutes = session.SessionType == "practice"
+                ? _interviewOptions.PracticeMaxDurationMinutes
+                : _interviewOptions.RealMaxDurationMinutes;
+            var maxDurationSeconds = maxMinutes > 0 ? maxMinutes * 60 : 0;
 
             return Result.Success(new PracticeMediaConfigResponse
             {
@@ -184,7 +191,10 @@ namespace ARI.Application.Services
         /// </summary>
         public async Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(CancellationToken ct = default)
         {
-            var sessions = (await _unitOfWork.Repository<InterviewSession>().GetAllAsync(ct)).ToList();
+            // Phỏng vấn thử là không gian riêng của ứng viên — không lộ cho nhân sự nội bộ (ADR-051).
+            var sessions = (await _unitOfWork.Repository<InterviewSession>().GetAllAsync(ct))
+                .Where(s => s.SessionType != "practice")
+                .ToList();
             if (sessions.Count == 0) return new List<HrInterviewSessionItem>();
 
             var appIds = sessions.Select(s => s.ApplicationId).Distinct().ToList();
@@ -200,7 +210,7 @@ namespace ARI.Application.Services
             // Đánh giá mới nhất theo từng phiên — chỉ lấy cột nhẹ (bỏ JSON criterion/question/...).
             var evaluations = await _unitOfWork.Repository<Evaluation>()
                 .QueryAsync(q => q
-                    .Where(e => appIds.Contains(e.ApplicationId))
+                    .Where(e => appIds.Contains(e.ApplicationId) && e.SessionType != "practice")
                     .Select(e => new { e.Id, e.ApplicationId, e.RoundNumber, e.AiVerdict, e.CreatedAt }), ct);
             var evalByAppRound = evaluations
                 .GroupBy(e => (e.ApplicationId, e.RoundNumber))
@@ -274,6 +284,10 @@ namespace ARI.Application.Services
                 MaxDurationMinutes = 45
             };
 
+            // Ngôn ngữ viết báo cáo = ngôn ngữ FE đang dùng (chỉ nhận vi|en), fallback ngôn ngữ phỏng vấn.
+            var uiLanguage = (request.UiLanguage ?? string.Empty).Trim().ToLowerInvariant();
+            if (uiLanguage != "vi" && uiLanguage != "en") uiLanguage = string.Empty;
+
             var session = new InterviewSession
             {
                 ApplicationId = application.Id,
@@ -281,6 +295,7 @@ namespace ARI.Application.Services
                 RoundType = roundConfig.RoundType,
                 SessionType = request.SessionType,
                 InterviewLanguage = jobPosting.DetectedLanguage ?? "vi",
+                ReportLanguage = string.IsNullOrEmpty(uiLanguage) ? null : uiLanguage,
                 Status = "active",
                 StartedAt = DateTimeOffset.UtcNow
             };
@@ -633,6 +648,11 @@ namespace ARI.Application.Services
                     : "Thank you for taking the time to join this interview. Your results will be shared with you soon. Have a great day!";
             }
 
+            // Lưu câu chào trước khi phát — transcript xem lại phải khớp đúng những gì ứng viên nghe (ADR-051).
+            session.ClosingText = farewell;
+            _unitOfWork.Repository<InterviewSession>().Update(session);
+            await _unitOfWork.SaveChangesAsync(ct);
+
             await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveClosing", new { text = farewell }, ct);
 
             try
@@ -665,19 +685,167 @@ namespace ARI.Application.Services
             if (session.Status == "completed")
                 return Result.Success(true); // đã đóng — idempotent
 
-            if (session.SessionType != "practice")
-                return Result.Failure<bool>("Timeout close chỉ áp dụng cho phỏng vấn thử.");
-
-            var maxMinutes = _interviewOptions.PracticeMaxDurationMinutes;
+            // Áp dụng cho CẢ buổi thật (ADR-052) với trần riêng của từng loại phiên.
+            var maxMinutes = session.SessionType == "practice"
+                ? _interviewOptions.PracticeMaxDurationMinutes
+                : _interviewOptions.RealMaxDurationMinutes;
             if (maxMinutes > 0 && session.StartedAt.HasValue)
             {
                 var elapsedMinutes = (DateTimeOffset.UtcNow - session.StartedAt.Value).TotalMinutes;
                 if (elapsedMinutes < maxMinutes * 0.95)
-                    return Result.Failure<bool>("Chưa hết thời gian phỏng vấn thử.");
+                    return Result.Failure<bool>("Chưa hết thời gian phỏng vấn.");
             }
 
             await CloseWithFarewellAsync(sessionId, session.InterviewLanguage, null, ct);
             return Result.Success(true);
+        }
+
+        /// <summary>
+        /// Lưu video buổi phỏng vấn THẬT (Kiosk quay tại chỗ) vào storage + đặt hạn xoá tự động
+        /// theo <c>Interview:RecordingRetentionDays</c> (ADR-052). Buổi THỬ không quay video
+        /// (ADR-038 điểm 6) nên bị từ chối ở đây.
+        /// </summary>
+        public async Task<Result<RecordingUploadResponse>> SaveRecordingAsync(
+            Guid sessionId, byte[] content, string fileName, string contentType, CancellationToken ct = default)
+        {
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<RecordingUploadResponse>("Không tìm thấy phiên phỏng vấn.");
+            if (session.SessionType == "practice")
+                return Result.Failure<RecordingUploadResponse>("Phỏng vấn thử không quay video.");
+            if (content == null || content.Length == 0)
+                return Result.Failure<RecordingUploadResponse>("Dữ liệu ghi hình rỗng.");
+
+            var maxBytes = (long)Math.Max(1, _interviewOptions.MaxRecordingSizeMb) * 1024 * 1024;
+            if (content.LongLength > maxBytes)
+                return Result.Failure<RecordingUploadResponse>($"File ghi hình vượt quá {_interviewOptions.MaxRecordingSizeMb}MB.");
+
+            // Ghi đè bản cũ (nếu upload lại) — không để file mồ côi trong storage.
+            if (!string.IsNullOrEmpty(session.RecordingUrl))
+            {
+                try { await _fileStorage.DeleteAsync(session.RecordingUrl, ct); } catch { /* best-effort */ }
+            }
+
+            var safeName = string.IsNullOrWhiteSpace(fileName) ? $"interview-{sessionId}.webm" : fileName;
+            // MediaRecorder gửi "video/webm;codecs=vp9,opus" — bỏ tham số, chỉ giữ MIME type gốc.
+            var baseContentType = (contentType ?? string.Empty).Split(';')[0].Trim();
+            if (string.IsNullOrEmpty(baseContentType)) baseContentType = "video/webm";
+
+            string storageKey;
+            try
+            {
+                storageKey = await _fileStorage.SaveAsync(content, safeName, baseContentType, ct);
+            }
+            catch (Exception ex)
+            {
+                // Storage lỗi là lỗi nghiệp vụ với Kiosk (hiện cảnh báo "không lưu được bản ghi"),
+                // không để văng 500 giữa màn kết thúc phỏng vấn.
+                return Result.Failure<RecordingUploadResponse>($"Không lưu được bản ghi hình: {ex.Message}");
+            }
+
+            var retentionDays = _interviewOptions.RecordingRetentionDays;
+            session.RecordingUrl = storageKey;
+            session.RecordingSizeBytes = content.LongLength;
+            session.RecordingExpiresAt = retentionDays > 0 ? DateTimeOffset.UtcNow.AddDays(retentionDays) : null;
+            session.RecordingDeletedAt = null;
+            _unitOfWork.Repository<InterviewSession>().Update(session);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Result.Success(new RecordingUploadResponse
+            {
+                Saved = true,
+                SizeBytes = content.LongLength,
+                ExpiresAt = session.RecordingExpiresAt
+            });
+        }
+
+        /// <summary>Trọng số điểm nghi vấn theo loại tín hiệu — dùng chung khi chấm và khi tổng hợp.</summary>
+        private static readonly Dictionary<string, (decimal Weight, string Severity)> CheatSignalWeights = new()
+        {
+            ["fullscreen_exit"] = (8m, "medium"),   // thoát toàn màn hình
+            ["tab_hidden"] = (12m, "high"),         // chuyển tab / thu nhỏ cửa sổ
+            ["window_blur"] = (5m, "low"),          // click ra ngoài cửa sổ
+            ["shortcut_blocked"] = (3m, "low"),     // bấm phím tắt bị chặn
+            ["page_unload"] = (15m, "high"),        // đóng/tải lại trang giữa buổi
+        };
+
+        /// <summary>
+        /// Ghi nhận tín hiệu nghi vấn của một phiên (Kiosk thoát toàn màn hình, chuyển tab…).
+        /// Trước đây `SessionHub.ReportCheatSignal` chỉ phát cảnh báo realtime rồi bỏ — không có gì
+        /// xuống DB nên báo cáo luôn trống. Nay lưu thật để tổng hợp vào kết quả đánh giá (ADR-054).
+        /// </summary>
+        public async Task<Result<int>> RecordCheatSignalAsync(
+            Guid sessionId, string signalType, string? payloadJson, CancellationToken ct = default)
+        {
+            var type = (signalType ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(type))
+                return Result.Failure<int>("Thiếu loại tín hiệu.");
+
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<int>("Không tìm thấy phiên phỏng vấn.");
+
+            // Payload là dữ liệu do client gửi — chặn phình to, luôn giữ JSON hợp lệ cho cột jsonb.
+            var payload = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson!.Trim();
+            if (payload.Length > 2000 || (!payload.StartsWith("{") && !payload.StartsWith("[")))
+                payload = "{}";
+
+            await _unitOfWork.Repository<CheatDetectionSignal>().AddAsync(new CheatDetectionSignal
+            {
+                SessionId = sessionId,
+                SignalType = type,
+                Payload = payload
+            }, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Result.Success(await _unitOfWork.Repository<CheatDetectionSignal>()
+                .CountAsync(s => s.SessionId == sessionId && s.SignalType == type, ct));
+        }
+
+        /// <summary>
+        /// Chấm LẠI một phiên đã kết thúc (dev/ops): xoá bản đánh giá cũ rồi chạy lại pipeline chấm
+        /// với prompt hiện tại. Dùng khi báo cáo cũ sinh từ prompt lỗi thời (sai ngôn ngữ, thiếu
+        /// điểm từng câu). Từ chối nếu HR đã review — không đụng vào kết quả đã chốt.
+        /// </summary>
+        public async Task<Result<bool>> RegenerateEvaluationAsync(
+            Guid sessionId, string? reportLanguage = null, CancellationToken ct = default)
+        {
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+            if (session == null)
+                return Result.Failure<bool>("Không tìm thấy phiên phỏng vấn.");
+
+            var existing = (await _unitOfWork.Repository<Evaluation>()
+                .FindAsync(e => e.SessionId == sessionId, ct)).ToList();
+            var evalIds = existing.Select(e => e.Id).ToList();
+            var reviewed = evalIds.Count > 0
+                && (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId), ct)).Any();
+            if (reviewed)
+                return Result.Failure<bool>("Đánh giá đã được HR xác nhận — không chấm lại.");
+
+            var lang = (reportLanguage ?? string.Empty).Trim().ToLowerInvariant();
+            if (lang == "vi" || lang == "en")
+            {
+                session.ReportLanguage = lang;
+                _unitOfWork.Repository<InterviewSession>().Update(session);
+            }
+
+            foreach (var e in existing) _unitOfWork.Repository<Evaluation>().Delete(e);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            await GenerateEvaluationReportAsync(sessionId, ct);
+            return Result.Success(true);
+        }
+
+        /// <summary>
+        /// Tổng số vòng của job = <c>max(InterviewRoundConfig.RoundNumber)</c>. Job chưa khai báo
+        /// vòng nào thì coi như 1 vòng (khớp fallback ở <see cref="StartSessionAsync"/>).
+        /// Dùng để xác định "vòng cuối" — điều kiện duy nhất để hồ sơ được đặt "pass" (ADR-053).
+        /// </summary>
+        private async Task<int> ResolveTotalRoundsAsync(Guid jobPostingId, CancellationToken ct = default)
+        {
+            var rounds = await _unitOfWork.Repository<InterviewRoundConfig>()
+                .QueryAsync(q => q.Where(r => r.JobPostingId == jobPostingId).Select(r => r.RoundNumber), ct);
+            return rounds.Count == 0 ? 1 : Math.Max(1, rounds.Max());
         }
 
         private async Task GenerateEvaluationReportAsync(Guid sessionId, CancellationToken ct = default)
@@ -707,20 +875,40 @@ namespace ARI.Application.Services
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
                 ScoringRubric = jobPosting.ScoringRubric ?? "{}",
-                Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage
+                Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage,
+                // Báo cáo viết bằng ngôn ngữ ứng viên đang dùng trên web (ADR-051).
+                ReportLanguage = session.ReportLanguage ?? session.InterviewLanguage ?? "vi"
             };
 
             // Call AI provider to generate Verdict, Score, Reasoning, etc.
             var evalReport = await _aiProvider.GenerateEvaluationAsync(evalCtx, ct);
             
-            // Collect cheat detection signals
-            var signals = await _unitOfWork.Repository<CheatDetectionSignal>()
-                .FindAsync(s => s.SessionId == sessionId, ct);
-            decimal cheatScore = signals.Any() ? 10 : 0; // simple heuristic calculation for prototype
+            // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
+            // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
+            var signals = (await _unitOfWork.Repository<CheatDetectionSignal>()
+                .FindAsync(s => s.SessionId == sessionId, ct)).ToList();
+            decimal cheatScore = 0;
+            foreach (var s in signals)
+            {
+                cheatScore += CheatSignalWeights.TryGetValue(s.SignalType, out var w) ? w.Weight : 5m;
+            }
+            cheatScore = Math.Min(100m, cheatScore);
 
-            // Language Assessment (English/other languages check)
+            // Gộp theo loại để HR đọc nhanh: "Thoát toàn màn hình × 3".
+            var cheatSignalsJson = System.Text.Json.JsonSerializer.Serialize(
+                signals.GroupBy(s => s.SignalType).Select(g => new
+                {
+                    type = g.Key,
+                    severity = CheatSignalWeights.TryGetValue(g.Key, out var w) ? w.Severity : "low",
+                    description = $"{g.Count()} lần",
+                    timestamp = g.Max(x => x.RecordedAt)
+                }));
+
+            // Language Assessment — CHỈ chấm khi thực sự có câu trả lời để chấm; không có dữ liệu
+            // thì bỏ trống thay vì để AI đoán bừa một bậc năng lực (ADR-051).
             LanguageAssessment? langAssess = null;
-            if (!string.IsNullOrEmpty(jobPosting.DetectedLanguage))
+            var hasAnswers = chatHistory.Any(qa => !string.IsNullOrWhiteSpace(qa.AnswerText));
+            if (!string.IsNullOrEmpty(jobPosting.DetectedLanguage) && hasAnswers)
             {
                 langAssess = await _aiProvider.AssessLanguageProficiencyAsync(evalCtx, ct);
             }
@@ -738,7 +926,7 @@ namespace ARI.Application.Services
                 RecommendedNextStep = evalReport.RecommendedNextStep,
                 QuestionAnalyses = evalReport.QuestionAnalysesJson,
                 CheatScore = cheatScore,
-                CheatSignals = "[]",
+                CheatSignals = cheatSignalsJson,
                 LanguageAssessment = langAssess != null
                     ? System.Text.Json.JsonSerializer.Serialize(new
                     {
@@ -748,25 +936,32 @@ namespace ARI.Application.Services
                         vocabulary = langAssess.Vocabulary,
                         comprehension = langAssess.Comprehension,
                         overall_score = langAssess.OverallScore,
-                        language_adherence = langAssess.LanguageAdherence
+                        cefr_level = langAssess.CefrLevel,
+                        language_adherence = langAssess.LanguageAdherence,
+                        evidence = langAssess.Evidence
                     })
                     : null
             };
 
             await _unitOfWork.Repository<Evaluation>().AddAsync(evaluation, ct);
-            
-            // Set candidate status to screening / interview finished
-            application.Status = evalReport.Verdict == "pass" ? "screening" : "not_pass";
-            _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+
+            // AI KHÔNG tự đổi trạng thái hồ sơ (ADR-053). Trước đây AI chấm "not_pass" là hồ sơ bị
+            // đánh rớt ngay trước khi HR kịp xem — trái Phase 6 "HR Review & Confirm". Nay hồ sơ giữ
+            // nguyên "interview" cho tới khi HR xác nhận; FE hiện "chờ HR xác nhận" qua pendingHrReview.
+            // Buổi thử thì còn không báo HR (ADR-051).
+            var isRealSession = session.SessionType == "real";
 
             await _unitOfWork.SaveChangesAsync(ct);
-            
-            // Notify HR Admin that there is a new evaluation to review
-            await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveSystemEvent", new { 
-                Type = "AiEvaluationComplete", 
-                EvaluationId = evaluation.Id,
-                ApplicationId = application.Id
-            }, ct);
+
+            if (isRealSession)
+            {
+                // Notify HR Admin that there is a new evaluation to review
+                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveSystemEvent", new {
+                    Type = "AiEvaluationComplete",
+                    EvaluationId = evaluation.Id,
+                    ApplicationId = application.Id
+                }, ct);
+            }
         }
 
         public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)
@@ -815,8 +1010,20 @@ namespace ARI.Application.Services
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
             {
-                application.Status = request.FinalVerdict == "pass" ? "pass" : "not_pass";
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+                // Buổi THỬ không chạm pipeline tuyển dụng, kể cả khi có ai đó review nó (ADR-051).
+                // "Đạt" CHỈ khi đã qua vòng CUỐI của job (ADR-053): trước đây HR xác nhận pass ở
+                // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị TriggerAutoProgressionAsync ghi
+                // đè về "interview" — job không khai báo round config thì không có gì ghi đè nên
+                // ứng viên mới xong vòng 1 đã hiện "Đạt".
+                if (evaluation.SessionType == "real")
+                {
+                    var totalRounds = await ResolveTotalRoundsAsync(application.JobPostingId, ct);
+                    var isFinalRound = evaluation.RoundNumber >= totalRounds;
+                    application.Status = request.FinalVerdict != "pass"
+                        ? "not_pass"
+                        : (isFinalRound ? "pass" : "interview");
+                    _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+                }
 
                 var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var jobTitle = jobPosting?.Title ?? "vị trí ứng tuyển";

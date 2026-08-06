@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using ARI.Application.Hubs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 
 namespace ARI.API.Hubs
 {
@@ -18,9 +19,21 @@ namespace ARI.API.Hubs
             _interviewService = interviewService;
         }
 
+        /// <summary>
+        /// Token Kiosk (ADR-052) chỉ được thao tác ĐÚNG phiên ghi trong claim <c>session_id</c>;
+        /// token ứng viên/nhân sự giữ nguyên hành vi cũ.
+        /// </summary>
+        private bool IsAllowedSession(Guid sessionId)
+        {
+            var role = Context.User?.FindFirst("role")?.Value;
+            if (!string.Equals(role, AppRoles.KioskSession, StringComparison.OrdinalIgnoreCase)) return true;
+            var claim = Context.User?.FindFirst("session_id")?.Value;
+            return Guid.TryParse(claim, out var sid) && sid == sessionId;
+        }
+
         public async Task JoinSession(string sessionIdStr)
         {
-            if (Guid.TryParse(sessionIdStr, out var sessionId))
+            if (Guid.TryParse(sessionIdStr, out var sessionId) && IsAllowedSession(sessionId))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, sessionId.ToString());
                 await Clients.Caller.ReceiveSessionStatus("joined");
@@ -29,7 +42,7 @@ namespace ARI.API.Hubs
 
         public async Task StartInterview(string sessionIdStr)
         {
-            if (Guid.TryParse(sessionIdStr, out var sessionId))
+            if (Guid.TryParse(sessionIdStr, out var sessionId) && IsAllowedSession(sessionId))
             {
                 // Trigger the first question generation
                 await _interviewService.GenerateAndSendNextQuestionAsync(sessionId);
@@ -38,7 +51,8 @@ namespace ARI.API.Hubs
 
         public async Task SubmitAnswerText(string sessionIdStr, string questionIdStr, string transcript, int responseTimeMs)
         {
-            if (Guid.TryParse(sessionIdStr, out var sessionId) && Guid.TryParse(questionIdStr, out var questionId))
+            if (Guid.TryParse(sessionIdStr, out var sessionId) && IsAllowedSession(sessionId)
+                && Guid.TryParse(questionIdStr, out var questionId))
             {
                 // Lưu answer nhanh (không LLM) → sinh & gửi câu hỏi kế NGAY (critical path latency),
                 // phân tích adaptive difficulty chạy sau khi ứng viên đã nhận câu hỏi mới.
@@ -57,7 +71,7 @@ namespace ARI.API.Hubs
         /// </summary>
         public async Task NotifyTimeout(string sessionIdStr)
         {
-            if (Guid.TryParse(sessionIdStr, out var sessionId))
+            if (Guid.TryParse(sessionIdStr, out var sessionId) && IsAllowedSession(sessionId))
             {
                 await _interviewService.PracticeTimeoutCloseAsync(sessionId);
             }
@@ -65,9 +79,11 @@ namespace ARI.API.Hubs
 
         public async Task ReportCheatSignal(string sessionIdStr, string signalType, string payloadJson)
         {
-            if (Guid.TryParse(sessionIdStr, out var sessionId))
+            if (Guid.TryParse(sessionIdStr, out var sessionId) && IsAllowedSession(sessionId))
             {
-                // Log cheat signal or alert HR via clients
+                // LƯU xuống DB rồi mới cảnh báo — trước đây chỉ broadcast nên không còn dấu vết nào
+                // để tổng hợp vào kết quả đánh giá (ADR-054).
+                await _interviewService.RecordCheatSignalAsync(sessionId, signalType, payloadJson);
                 await Clients.Group(sessionId.ToString()).ReceiveCheatAlert($"Suspicious action detected: {signalType}");
             }
         }

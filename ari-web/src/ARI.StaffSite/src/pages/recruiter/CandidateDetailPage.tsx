@@ -137,7 +137,7 @@ export default function RecruiterCandidateDetailPage() {
   const roundLabel = (num: number, type?: string) =>
     `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
 
-  const sessionTypeLabel = (type?: string) => (type === 'practice' ? t('practice') : t('real'))
+  // Chỉ hiển thị phiên/đánh giá THẬT — backend đã lọc bỏ phiên thử (riêng tư của ứng viên, ADR-051).
 
   if (loading) return <JobDetailSkeleton />
   if (!app) {
@@ -241,7 +241,7 @@ export default function RecruiterCandidateDetailPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(ev.roundNumber)} · {sessionTypeLabel(ev.sessionType)}
+                        {roundLabel(ev.roundNumber)}
                       </p>
                       <p className="text-xs text-ink-400">
                         {timeAgo(ev.createdAt)}
@@ -285,7 +285,7 @@ export default function RecruiterCandidateDetailPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(s.roundNumber, s.roundType)} · {sessionTypeLabel(s.sessionType)}
+                        {roundLabel(s.roundNumber, s.roundType)}
                       </p>
                       <p className="flex items-center gap-1 text-xs text-ink-400">
                         <Clock className="h-3 w-3" />

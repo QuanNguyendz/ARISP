@@ -26,6 +26,17 @@ namespace ARI.Infrastructure.Storage
             _logger = logger;
         }
 
+        /// <summary>
+        /// Bỏ tham số của MIME type trước khi đưa cho AWS SDK. MediaRecorder trả
+        /// <c>video/webm;codecs=vp9,opus</c> — dấu phẩy trong tham số không đặt trong ngoặc kép làm
+        /// <c>MediaTypeHeaderValue.Parse</c> của .NET ném FormatException giữa lúc PUT.
+        /// </summary>
+        private static string NormalizeContentType(string? contentType)
+        {
+            var value = (contentType ?? string.Empty).Split(';')[0].Trim();
+            return string.IsNullOrEmpty(value) ? "application/octet-stream" : value;
+        }
+
         public async Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default)
         {
             var ext = Path.GetExtension(originalFileName);
@@ -38,7 +49,7 @@ namespace ARI.Infrastructure.Storage
                 BucketName = _options.Bucket,
                 Key = key,
                 InputStream = ms,
-                ContentType = contentType,
+                ContentType = NormalizeContentType(contentType),
                 DisablePayloadSigning = true // R2 yêu cầu để tránh lỗi chữ ký streaming
             };
             await _s3.PutObjectAsync(request, ct);
