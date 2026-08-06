@@ -2,10 +2,15 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { installStaleChunkReload } from '@ari/shared/utils/staleChunkReload'
 import App from './app/App'
 
 // i18n configuration
 import './i18n'
+
+// Tab mở từ trước lúc deploy trỏ tới chunk hash cũ đã bị xoá → route lazy-load
+// không mở được. Tự reload 1 lần để lấy index mới thay vì bắt người dùng F5 tay.
+installStaleChunkReload()
 
 // Self-hosted fonts (bao gồm subset vietnamese) — đảm bảo render nhất quán trên mọi OS
 import '@fontsource/inter/400.css'

@@ -51,7 +51,33 @@ ARG SITE=ARI.CandidateSite
 ARG PORT=3000
 RUN rm /etc/nginx/conf.d/default.conf
 COPY --from=build /app/src/${SITE}/dist /usr/share/nginx/html
-# SPA routing config (giữ $uri literal — dùng nháy đơn cho printf)
-RUN printf 'server { listen %s; root /usr/share/nginx/html; index index.html; location / { try_files $uri $uri/ /index.html; } }' "$PORT" > /etc/nginx/conf.d/default.conf
+# SPA routing config. Nháy KÉP cho dòng cần nội suy $PORT, nháy ĐƠN cho dòng phải
+# giữ nguyên biến của nginx ($uri) — shell sẽ nuốt mất nếu để trong nháy kép.
+RUN printf '%s\n' \
+      "server {" \
+      "    listen ${PORT};" \
+      "    root /usr/share/nginx/html;" \
+      "    index index.html;" \
+      "" \
+      "    # Tên chunk có hash nội dung nên bất biến -> cache 1 nam." \
+      "    # Quan trong hon: KHONG fallback ve index.html. Tab mo tu truoc deploy" \
+      "    # se xin chunk da bi xoa; fallback khien nginx tra index.html kem" \
+      "    # Content-Type text/html cho mot file .js -> trinh duyet chan vi strict" \
+      "    # MIME va bao loi rat kho lan ra nguyen nhan. 404 that thi dung hon, va" \
+      "    # la tin hieu de installStaleChunkReload() o FE tu reload lay index moi." \
+      '    location /assets/ {' \
+      '        try_files $uri =404;' \
+      '        add_header Cache-Control "public, max-age=31536000, immutable";' \
+      '    }' \
+      "" \
+      "    # index.html phai luon revalidate: no chua bang ten chunk moi. Neu de" \
+      "    # trinh duyet cache lai, reload cung van nap ban cu tro toi chunk da xoa." \
+      "    location = /index.html {" \
+      '        add_header Cache-Control "no-cache";' \
+      "    }" \
+      "" \
+      '    location / { try_files $uri $uri/ /index.html; }' \
+      "}" \
+      > /etc/nginx/conf.d/default.conf
 EXPOSE $PORT
 CMD ["nginx", "-g", "daemon off;"]
