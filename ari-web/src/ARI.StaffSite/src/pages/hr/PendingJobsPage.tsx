@@ -206,7 +206,7 @@ export default function PendingJobsPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.05, 0.3) }}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card"
               >
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   <div className="flex items-start gap-4 min-w-0">

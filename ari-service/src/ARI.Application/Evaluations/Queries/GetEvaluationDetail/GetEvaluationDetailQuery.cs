@@ -16,10 +16,12 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
         : IRequestHandler<GetEvaluationDetailQuery, Result<EvaluationDetailResponse>>
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IFileStorageService _fileStorage;
 
-        public GetEvaluationDetailQueryHandler(IUnitOfWork unitOfWork)
+        public GetEvaluationDetailQueryHandler(IUnitOfWork unitOfWork, IFileStorageService fileStorage)
         {
             _unitOfWork = unitOfWork;
+            _fileStorage = fileStorage;
         }
 
         public async Task<Result<EvaluationDetailResponse>> Handle(GetEvaluationDetailQuery request, CancellationToken ct)
@@ -37,6 +39,10 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             if (evaluation == null)
                 return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
 
+            // Buổi thử chỉ thuộc về ứng viên — với nhân sự nội bộ thì coi như không tồn tại (ADR-051).
+            if (evaluation.SessionType == "practice")
+                return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
+
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application == null)
                 return Result.Failure<EvaluationDetailResponse>("Application associated with this evaluation was not found.");
@@ -49,6 +55,17 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             var hrReview = hrReviews.FirstOrDefault();
 
             var response = EvaluationDetailResponse.FromEntity(evaluation, application, job, hrReview);
+
+            // Video buổi phỏng vấn thật (ADR-052) — resolve storageKey thành URL xem được, kèm hạn lưu.
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(evaluation.SessionId, ct);
+            if (session != null)
+            {
+                response.RecordingExpiresAt = session.RecordingExpiresAt;
+                response.RecordingDeletedAt = session.RecordingDeletedAt;
+                if (!string.IsNullOrEmpty(session.RecordingUrl))
+                    response.RecordingUrl = await _fileStorage.GetUrlAsync(session.RecordingUrl, ct);
+            }
+
             return Result.Success(response);
         }
     }

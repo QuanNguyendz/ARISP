@@ -127,6 +127,9 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_answers_session_id");
+
                     b.ToTable("answers", (string)null);
                 });
 
@@ -822,9 +825,18 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("availability_slot_id");
 
+                    b.Property<string>("ConfirmationStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("confirmation_status");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("DeclineReason")
+                        .HasColumnType("text")
+                        .HasColumnName("decline_reason");
 
                     b.Property<string>("InterviewLink")
                         .HasColumnType("text")
@@ -841,6 +853,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<Guid?>("RescheduledFromId")
                         .HasColumnType("uuid")
                         .HasColumnName("rescheduled_from_id");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
 
                     b.Property<int>("RoundNumber")
                         .HasColumnType("integer")
@@ -1006,6 +1022,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
 
+                    b.Property<string>("ClosingText")
+                        .HasColumnType("text")
+                        .HasColumnName("closing_text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1023,6 +1043,18 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("interview_language");
 
+                    b.Property<DateTimeOffset?>("RecordingDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recording_deleted_at");
+
+                    b.Property<DateTimeOffset?>("RecordingExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recording_expires_at");
+
+                    b.Property<long?>("RecordingSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recording_size_bytes");
+
                     b.Property<string>("RecordingUrl")
                         .HasColumnType("text")
                         .HasColumnName("recording_url");
@@ -1030,6 +1062,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<bool>("RecordingVisibleToCandidate")
                         .HasColumnType("boolean")
                         .HasColumnName("recording_visible_to_candidate");
+
+                    b.Property<string>("ReportLanguage")
+                        .HasColumnType("text")
+                        .HasColumnName("report_language");
 
                     b.Property<int>("RoundNumber")
                         .HasColumnType("integer")
@@ -1166,6 +1202,18 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<string>("Location")
                         .HasColumnType("text")
                         .HasColumnName("location");
+
+                    b.Property<int>("OnlineTestDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("online_test_duration_minutes");
+
+                    b.Property<int>("OnlineTestPassScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("online_test_pass_score");
+
+                    b.Property<int>("OnlineTestQuestionsPerTest")
+                        .HasColumnType("integer")
+                        .HasColumnName("online_test_questions_per_test");
 
                     b.Property<string>("PersonaName")
                         .HasColumnType("text")
@@ -1404,6 +1452,11 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("correct_option");
 
+                    b.Property<string>("CorrectOptions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("correct_options");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1422,6 +1475,15 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("question_text");
 
+                    b.Property<string>("QuestionType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("question_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
                     b.HasKey("Id");
 
                     b.ToTable("online_test_questions", (string)null);
@@ -1437,6 +1499,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
+
+                    b.Property<int>("CorrectCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("correct_count");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1459,7 +1525,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("selected_answers");
 
+                    b.Property<int>("TotalQuestions")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_questions");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "RoundNumber")
+                        .IsUnique();
 
                     b.ToTable("online_test_submissions", (string)null);
                 });
@@ -1580,6 +1653,9 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnName("source");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_questions_session_id");
 
                     b.ToTable("questions", (string)null);
                 });
@@ -1734,6 +1810,10 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("role");
+
+                    b.Property<string>("SettingsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("settings_json");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")

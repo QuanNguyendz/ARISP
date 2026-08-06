@@ -1,15 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Users, MapPin, Briefcase, Building2, Calendar, Languages, Zap } from 'lucide-react'
+import {
+  Users,
+  MapPin,
+  Briefcase,
+  Building2,
+  Calendar,
+  Languages,
+  Zap,
+  User,
+  Search,
+  Filter,
+  X,
+} from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@ari/shared/fservices/job'
-
-type StatusKey = 'draft' | 'active' | 'paused' | 'closed'
-type FilterKey = 'all' | StatusKey
+import { useAuthStore } from '@ari/shared/store/auth'
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -42,6 +52,7 @@ function getDeadlineText(
 
 export default function HrJobsPage() {
   const { t } = useTranslation('modules/hr/jobs')
+  const user = useAuthStore((s) => s.user)
   const {
     data: jobsData,
     isLoading: loading,
@@ -55,13 +66,24 @@ export default function HrJobsPage() {
   const jobs = jobsData || []
   const error =
     (fetchError as any)?.response?.data?.message || (fetchError ? t('loadingError') : '')
-  const [filter, setFilter] = useState<FilterKey>('all')
+
+  // Filter States
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
+  const [selectedUrgent, setSelectedUrgent] = useState<string>('all')
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
   const [page, setPage] = useState(1)
 
-  const statusMeta: Record<StatusKey, { label: string; badge: string }> = {
+  const statusMeta: Record<string, { label: string; badge: string }> = {
     active: {
       label: t('status.active'),
       badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+    },
+    pending: {
+      label: t('status.pending'),
+      badge: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400',
     },
     draft: {
       label: t('status.draft'),
@@ -75,29 +97,50 @@ export default function HrJobsPage() {
       label: t('status.closed'),
       badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400',
     },
+    rejected: {
+      label: t('status.rejected'),
+      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    },
   }
 
-  const filters: { key: FilterKey; label: string }[] = [
-    { key: 'all', label: t('filters.all') },
-    { key: 'active', label: t('status.active') },
-    { key: 'draft', label: t('status.draft') },
-    { key: 'paused', label: t('status.paused') },
-    { key: 'closed', label: t('status.closed') },
-  ]
+  // Extract unique creator/recruiter names for filter dropdown
+  const uniqueEmployees = useMemo(() => {
+    const set = new Set<string>()
+    jobs.forEach((j) => {
+      if (j.createdByName) set.add(j.createdByName)
+    })
+    return Array.from(set)
+  }, [jobs])
+
+  const getEffectiveStatus = useCallback((j: any) => {
+    if (j.status === 'active' && j.applicationDeadline && new Date(j.applicationDeadline).getTime() < Date.now()) {
+      return 'closed'
+    }
+    return j.status
+  }, [])
 
   const stats = useMemo(() => {
-    const count = (s: StatusKey) => jobs.filter((j) => j.status === s).length
+    // Bao gồm các tin không phải nháp VÀ các tin nháp của chính HR Admin này
+    const validJobs = jobs.filter(
+      (j) => getEffectiveStatus(j) !== 'draft' || j.createdByUserId === user?.id
+    )
+    const count = (s: string) => validJobs.filter((j) => getEffectiveStatus(j) === s).length
     return [
-      { label: t('stats.total'), value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
+      { label: t('stats.total'), value: validJobs.length, color: 'text-blue-600 dark:text-blue-400' },
       {
         label: t('status.active'),
         value: count('active'),
         color: 'text-emerald-600 dark:text-emerald-400',
       },
       {
+        label: t('status.pending'),
+        value: count('pending'),
+        color: 'text-indigo-600 dark:text-indigo-400',
+      },
+      {
         label: t('status.draft'),
         value: count('draft'),
-        color: 'text-amber-600 dark:text-amber-400',
+        color: 'text-ink-500 dark:text-ink-400',
       },
       {
         label: t('status.closed'),
@@ -105,12 +148,52 @@ export default function HrJobsPage() {
         color: 'text-ink-600 dark:text-ink-400',
       },
     ]
-  }, [jobs, t])
+  }, [jobs, t, getEffectiveStatus, user?.id])
 
-  const filtered = useMemo(
-    () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
-    [jobs, filter]
-  )
+  const filtered = useMemo(() => {
+    return jobs.filter((j) => {
+      const effectiveStatus = getEffectiveStatus(j)
+
+      // Chỉ hiển thị tin nháp của chính mình
+      if (effectiveStatus === 'draft' && j.createdByUserId !== user?.id) return false
+
+      // 1. Search term
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim()
+        const titleMatch = j.title?.toLowerCase().includes(q)
+        const deptMatch = j.department?.toLowerCase().includes(q)
+        const locMatch = j.location?.toLowerCase().includes(q)
+        const creatorMatch = j.createdByName?.toLowerCase().includes(q)
+        if (!titleMatch && !deptMatch && !locMatch && !creatorMatch) return false
+      }
+
+      // 2. Status filter
+      if (selectedStatus !== 'all' && effectiveStatus !== selectedStatus) return false
+
+      // 3. Employee filter
+      if (selectedEmployee !== 'all' && j.createdByName !== selectedEmployee) return false
+
+      // 4. Urgent filter
+      if (selectedUrgent === 'urgent' && !j.isUrgent) return false
+      if (selectedUrgent === 'normal' && j.isUrgent) return false
+
+      // 5. Date range filter
+      if (fromDate) {
+        const createdDate = new Date(j.createdAt)
+        const start = new Date(fromDate)
+        start.setHours(0, 0, 0, 0)
+        if (createdDate < start) return false
+      }
+      if (toDate) {
+        const createdDate = new Date(j.createdAt)
+        const end = new Date(toDate)
+        end.setHours(23, 59, 59, 999)
+        if (createdDate > end) return false
+      }
+
+      return true
+    })
+  }, [jobs, searchTerm, selectedStatus, selectedEmployee, selectedUrgent, fromDate, toDate])
 
   const PAGE_SIZE = 10
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -121,38 +204,121 @@ export default function HrJobsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter])
+  }, [searchTerm, selectedStatus, selectedEmployee, selectedUrgent, fromDate, toDate])
+
+  const hasActiveFilters =
+    searchTerm ||
+    selectedStatus !== 'all' ||
+    selectedEmployee !== 'all' ||
+    selectedUrgent !== 'all' ||
+    fromDate ||
+    toDate
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setSelectedStatus('all')
+    setSelectedEmployee('all')
+    setSelectedUrgent('all')
+    setFromDate('')
+    setToDate('')
+  }
 
   return (
-    <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {loading && <HrStatsSkeleton />}
       {!loading && !error && <StatsGrid stats={stats} />}
 
+      {/* Unified Filter Bar */}
       {!loading && !error && jobs.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          {filters.map((f) => {
-            const cnt =
-              f.key === 'all' ? jobs.length : jobs.filter((j) => j.status === f.key).length
-            const activeTab = filter === f.key
-            return (
+        <div className="mb-6 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+              <Filter className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+              <span>Bộ lọc tin tuyển dụng</span>
+            </div>
+            {hasActiveFilters && (
               <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  activeTab
-                    ? 'bg-gradient-to-r from-brand-600 to-ai-600 text-white'
-                    : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10'
-                }`}
+                type="button"
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
               >
-                {f.label}
-                <span className={`ml-2 text-xs ${activeTab ? 'text-white/80' : 'text-ink-400'}`}>
-                  {cnt}
-                </span>
+                <X className="w-3.5 h-3.5" /> Xóa bộ lọc
               </button>
-            )
-          })}
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Search Input */}
+            <div className="relative xl:col-span-2">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-ink-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={t('filters.search')}
+                className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">{t('status.active')}</option>
+                <option value="pending">{t('status.pending')}</option>
+                <option value="draft">{t('status.draft')}</option>
+                <option value="paused">{t('status.paused')}</option>
+                <option value="closed">{t('status.closed')}</option>
+                <option value="rejected">{t('status.rejected')}</option>
+              </select>
+            </div>
+
+            {/* Employee Filter */}
+            <div>
+              <select
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              >
+                <option value="all">Lọc theo người phụ trách</option>
+                {uniqueEmployees.map((emp) => (
+                  <option key={emp} value={emp}>
+                    {emp}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Urgent Filter */}
+            <div>
+              <select
+                value={selectedUrgent}
+                onChange={(e) => setSelectedUrgent(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              >
+                <option value="all">Tất cả mức độ</option>
+                <option value="urgent">Tin tuyển gấp</option>
+                <option value="normal">Bình thường</option>
+              </select>
+            </div>
+
+            {/* Date Range: From Date */}
+            <div>
+              <input
+                type="date"
+                value={fromDate}
+                title="Từ ngày tạo"
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -170,7 +336,7 @@ export default function HrJobsPage() {
       {!loading && !error && filtered.length > 0 && (
         <div className="space-y-4">
           {paged.map((job, index) => {
-            const meta = statusMeta[job.status as StatusKey] ?? statusMeta.draft
+            const meta = statusMeta[job.status] ?? statusMeta.draft
             return (
               <motion.div
                 key={job.id}
@@ -179,28 +345,40 @@ export default function HrJobsPage() {
                 transition={{ delay: Math.min(index * 0.04, 0.3) }}
                 className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card hover:shadow-card-hover transition-all"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex items-center gap-3 min-w-0 sm:gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-ai-600 flex items-center justify-center text-white font-semibold shrink-0 sm:w-12 sm:h-12">
                       {job.title.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <h3 className="text-lg font-semibold text-ink-900 dark:text-white truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap sm:gap-3">
+                        <h3 className="text-base font-semibold text-ink-900 dark:text-white truncate sm:text-lg">
                           {job.title}
                         </h3>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            job.status === 'active' && job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now()
+                              ? 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-400'
+                              : meta.badge
+                          }`}
                         >
-                          {meta.label}
+                          {job.status === 'active' && job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now()
+                            ? 'Hết hạn (Đã đóng)'
+                            : meta.label}
                         </span>
                         {job.isUrgent && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-1">
                             <Zap className="w-3 h-3" /> {t('urgent')}
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600 dark:text-ink-400">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-600 dark:text-ink-400">
+                        {/* Employee Column / Badge */}
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 font-medium text-xs">
+                          <User className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+                          <span>Thực hiện: {job.createdByName || '—'}</span>
+                        </span>
+
                         {job.department && (
                           <span className="flex items-center gap-1">
                             <Building2 className="w-4 h-4" />

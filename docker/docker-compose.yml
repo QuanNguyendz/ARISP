@@ -29,6 +29,11 @@ services:
       - RAG_SERVICE_URL=http://rag-service:8000
     volumes:
       - ../ari-service:/app/src
+      - /app/src/src/ARI.API/obj
+      - /app/src/src/ARI.API/bin
+      - /app/src/src/ARI.Application/obj
+      - /app/src/src/ARI.Domain/obj
+      - /app/src/src/ARI.Infrastructure/obj
     depends_on:
       redis:
         condition: service_healthy
@@ -142,9 +147,31 @@ services:
       - arisp-network
     restart: unless-stopped
 
+  # --- Local PostgreSQL (Test Environment) ---
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: arisp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: arisp_db
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d arisp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - arisp-network
+    restart: unless-stopped
+
 networks:
   arisp-network:
     driver: bridge
 
 volumes:
   redis-data:
+  postgres-data:

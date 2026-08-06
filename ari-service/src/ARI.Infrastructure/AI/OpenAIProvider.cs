@@ -257,9 +257,22 @@ namespace ARI.Infrastructure.AI
                 };
             }
 
+            // QuestionAnalyses phải có schema RÕ: trước đây để "[]" nên model tự bịa khoá →
+            // FE parse ra rỗng, mục "phân tích từng câu" trống trơn (ADR-051).
+            var reportLang = LanguageName(ctx.ReportLanguage ?? ctx.Language);
             var prompt = $"You are an HR director. Evaluate the candidate's interview session based on Job Description, CV, and QA History.\nJob: {ctx.JobDescription}\nCV: {ctx.CandidateCv}\n\n" +
                          $"QA History: {JsonSerializer.Serialize(ctx.ChatHistory)}\n\n" +
-                         $"Evaluate according to scoring rubrics. Return JSON format only: {{\"Verdict\": \"pass\"|\"not_pass\", \"Score\": 85.0, \"Reasoning\": \"overall text\", \"RecommendedNextStep\": \"text\", \"CriterionScores\": {{\"technical\": 80}}, \"QuestionAnalyses\": []}}";
+                         $"Scoring Rubric: {ctx.ScoringRubric}\n\n" +
+                         $"Write EVERY human-readable string (Reasoning, RecommendedNextStep, Analysis, Feedback) in {reportLang}. Do not mix languages.\n" +
+                         "Judge ONLY what the candidate actually said; never invent facts or claim a language issue without evidence in their answers.\n" +
+                         // Khoá tiêu chí cố định để FE dịch được sang VI/EN (model tự đặt tên hiển thị
+                         // sẽ lọt ra màn hình dưới dạng tiếng Anh thô).
+                         "CriterionScores keys MUST come ONLY from this fixed snake_case list: technical, communication, " +
+                         "problem_solving, culture_fit, experience, language, attitude, teamwork. Use 3-6 of them.\n" +
+                         "Return JSON format only: {\"Verdict\": \"pass\"|\"not_pass\", \"Score\": 85.0, \"Reasoning\": \"overall text\", " +
+                         "\"RecommendedNextStep\": \"text\", \"CriterionScores\": {\"technical\": 80}, " +
+                         "\"QuestionAnalyses\": [{\"SequenceNumber\": 1, \"Score\": 80, \"Analysis\": \"what the answer covered and what was missing\", \"Feedback\": \"one concrete improvement tip\"}]}. " +
+                         "Include exactly one QuestionAnalyses entry per answered question, using its SequenceNumber from QA History.";
 
             var jsonResponse = await CallOpenAIChatAsync(prompt, ct, jsonMode: true);
             using var doc = JsonDocument.Parse(jsonResponse);
@@ -289,9 +302,23 @@ namespace ARI.Infrastructure.AI
                 };
             }
 
-            var requiredLang = string.IsNullOrEmpty(ctx.Language) ? "vi" : ctx.Language;
-            var prompt = $"Assess candidate proficiency in language '{requiredLang}' based on the conversation history:\n{JsonSerializer.Serialize(ctx.ChatHistory)}\n\n" +
-                         $"Return JSON format only: {{\"Fluency\": 8.0, \"Grammar\": 7.5, \"Vocabulary\": 8.0, \"Comprehension\": 8.5, \"OverallScore\": 8.0, \"LanguageAdherence\": \"one short sentence: did the candidate consistently answer in '{requiredLang}'?\"}}";
+            // Chấm CHỈ dựa trên phần ứng viên nói (bỏ câu hỏi của AI), có neo thang điểm + CEFR +
+            // dẫn chứng — trước đây thang điểm thả nổi nên overall lệch hẳn với fluency/grammar.
+            var requiredLang = LanguageName(ctx.Language);
+            var reportLang = LanguageName(ctx.ReportLanguage ?? ctx.Language);
+            var answersOnly = JsonSerializer.Serialize(
+                ctx.ChatHistory.Select(qa => new { qa.SequenceNumber, qa.AnswerText }));
+            var prompt = $"Assess the candidate's {requiredLang} proficiency using ONLY the candidate's own answers below " +
+                         $"(the interviewer's questions are not evidence):\n{answersOnly}\n\n" +
+                         "Scale 0-10 for each dimension: 0-2 unusable, 3-4 basic (A1-A2), 5-6 intermediate (B1), " +
+                         "7-8 upper-intermediate (B2), 9-10 advanced (C1-C2). " +
+                         "OverallScore must be consistent with the four dimensions (roughly their average) and CefrLevel must match OverallScore. " +
+                         $"Write LanguageAdherence and Evidence in {reportLang}. " +
+                         "Evidence must quote 1-2 short fragments taken verbatim from the answers. " +
+                         "Return JSON format only: {\"Fluency\": 8.0, \"Grammar\": 7.5, \"Vocabulary\": 8.0, \"Comprehension\": 8.5, " +
+                         "\"OverallScore\": 8.0, \"CefrLevel\": \"B2\", " +
+                         $"\"LanguageAdherence\": \"one short sentence: did the candidate consistently answer in {requiredLang}?\", " +
+                         "\"Evidence\": \"short quotes from the answers\"}";
 
             var jsonResponse = await CallOpenAIChatAsync(prompt, ct, jsonMode: true);
             using var doc = JsonDocument.Parse(jsonResponse);
@@ -303,9 +330,23 @@ namespace ARI.Infrastructure.AI
                 Vocabulary = doc.RootElement.GetProperty("Vocabulary").GetDecimal(),
                 Comprehension = doc.RootElement.GetProperty("Comprehension").GetDecimal(),
                 OverallScore = doc.RootElement.GetProperty("OverallScore").GetDecimal(),
-                LanguageAdherence = doc.RootElement.TryGetProperty("LanguageAdherence", out var la) ? la.GetString() ?? "" : ""
+                CefrLevel = doc.RootElement.TryGetProperty("CefrLevel", out var cefr) ? cefr.GetString() ?? "" : "",
+                LanguageAdherence = doc.RootElement.TryGetProperty("LanguageAdherence", out var la) ? la.GetString() ?? "" : "",
+                Evidence = doc.RootElement.TryGetProperty("Evidence", out var ev) ? ev.GetString() ?? "" : ""
             };
         }
+
+        /// <summary>ISO code → tên ngôn ngữ cho prompt (model bám tên rõ hơn mã).</summary>
+        private static string LanguageName(string? code) => (code ?? "vi").ToLowerInvariant() switch
+        {
+            "en" => "English",
+            "ja" => "Japanese",
+            "ko" => "Korean",
+            "zh" => "Chinese",
+            "fr" => "French",
+            "de" => "German",
+            _ => "Vietnamese",
+        };
 
         // Fallback structured-JSON completion (dùng khi Gemini lỗi). GPT-4o-mini rẻ + nhanh,
         // response_format json_object đảm bảo trả JSON hợp lệ đúng schema trong systemInstruction.

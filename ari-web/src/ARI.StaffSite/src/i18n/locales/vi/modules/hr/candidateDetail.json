@@ -15,7 +15,7 @@
   "sessionTitle": "Phiên phỏng vấn",
   "noSession": "Chưa có phiên phỏng vấn nào.",
   "sessionCount": "({count})",
-  "round": "Vòng {number}",
+  "round": "Vòng {{number}}",
   "practice": "Thử",
   "real": "Thật",
   "screening": "Sơ loại",

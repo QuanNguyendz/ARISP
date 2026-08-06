@@ -160,6 +160,9 @@ namespace ARI.Infrastructure
             services.AddSingleton<IEmailQueue, EmailBackgroundQueue>();
             services.AddHostedService<EmailQueueHostedService>();
 
+            // Dọn video phỏng vấn thật quá hạn lưu (ADR-052) — quét 12h/lần.
+            services.AddHostedService<RecordingRetentionHostedService>();
+
             return services;
         }
     }

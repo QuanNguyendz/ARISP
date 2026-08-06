@@ -381,6 +381,41 @@ namespace ARI.API.Controllers
         }
 
         // ============================================================
+        // PRACTICE (Phỏng vấn thử — transcript + nhận xét AI, riêng tư của ứng viên, ADR-051)
+        // ============================================================
+
+        /// <summary>GET /api/portal/practice/sessions — các buổi thử đã làm (lọc theo hồ sơ nếu truyền applicationId).</summary>
+        [HttpGet("practice/sessions")]
+        public async Task<IActionResult> GetPracticeSessions([FromQuery] Guid? applicationId)
+        {
+            if (!TryGetCandidateId(out var candidateAccountId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var result = await _sender.Send(new GetMyPracticeSessionsQuery(applicationId, candidateAccountId, GetEmailClaim()));
+            return Ok(result.Value);
+        }
+
+        /// <summary>GET /api/portal/practice/sessions/{sessionId} — transcript đầy đủ + nhận xét AI của buổi thử.</summary>
+        [HttpGet("practice/sessions/{sessionId:guid}")]
+        public async Task<IActionResult> GetPracticeReview(Guid sessionId)
+        {
+            if (!TryGetCandidateId(out var candidateAccountId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var result = await _sender.Send(new GetMyPracticeReviewQuery(sessionId, candidateAccountId, GetEmailClaim()));
+            if (result.IsFailure)
+            {
+                return result.ErrorCode switch
+                {
+                    CommonErrorCodes.Forbidden => Forbid(),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error }),
+                };
+            }
+            return Ok(result.Value);
+        }
+
+        // ============================================================
         // CANDIDATE PROFILE
         // ============================================================
 

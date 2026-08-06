@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -49,8 +49,15 @@ export default function RecruiterMyJobsPage() {
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
 
+  const getEffectiveStatus = useCallback((j: any) => {
+    if (j.status === 'active' && j.applicationDeadline && new Date(j.applicationDeadline).getTime() < Date.now()) {
+      return 'closed'
+    }
+    return j.status
+  }, [])
+
   const counts = useMemo(() => {
-    const by = (s: string) => jobs.filter((j) => j.status === s).length
+    const by = (s: string) => jobs.filter((j) => getEffectiveStatus(j) === s).length
     return {
       all: jobs.length,
       active: by('active'),
@@ -59,11 +66,11 @@ export default function RecruiterMyJobsPage() {
       draft: by('draft'),
       closed: by('closed'),
     }
-  }, [jobs])
+  }, [jobs, getEffectiveStatus])
 
   const filtered = useMemo(
-    () => (filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)),
-    [jobs, filter]
+    () => (filter === 'all' ? jobs : jobs.filter((j) => getEffectiveStatus(j) === filter)),
+    [jobs, filter, getEffectiveStatus]
   )
 
   const PAGE_SIZE = 10
@@ -94,7 +101,7 @@ export default function RecruiterMyJobsPage() {
   ]
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={t('title')}
         description={t('description')}
@@ -161,9 +168,9 @@ export default function RecruiterMyJobsPage() {
                         <Briefcase className="h-5 w-5" />
                       </span>
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status)}`}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${jobStatusBadge(j.status, j.applicationDeadline)}`}
                       >
-                        {jobStatusLabel(j.status)}
+                        {jobStatusLabel(j.status, j.applicationDeadline)}
                       </span>
                     </div>
                     <h3 className="truncate font-semibold text-ink-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
@@ -196,15 +203,21 @@ export default function RecruiterMyJobsPage() {
                       </p>
                     )}
 
-                    <div className="mt-4 flex items-center justify-between border-t border-ink-100 dark:border-white/10 pt-3 text-xs">
-                      <span className="flex items-center gap-1.5 font-medium text-ink-600 dark:text-ink-300">
-                        <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1 text-ink-400">
-                        <Clock className="h-3 w-3" /> {timeAgo(j.createdAt)}
-                      </span>
-                      <span className="text-ink-400">{formatSalary(j)}</span>
-                      <ChevronRight className="h-4 w-4 text-ink-300 transition-transform group-hover:translate-x-0.5" />
+                    <div className="mt-4 flex flex-col gap-1.5 border-t border-ink-100 dark:border-white/10 pt-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-2">
+                      <div className="flex items-center justify-between gap-2 sm:flex-1 sm:justify-start">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap font-medium text-ink-600 dark:text-ink-300">
+                          <Users className="h-3.5 w-3.5" /> {j.applicantCount ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1 whitespace-nowrap text-ink-400">
+                          <Clock className="h-3 w-3" /> {timeAgo(j.createdAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 sm:flex-1 sm:justify-end">
+                        <span className="min-w-0 truncate whitespace-nowrap text-ink-400 sm:text-right">
+                          {formatSalary(j)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5" />
+                      </div>
                     </div>
                   </Link>
                 </motion.div>

@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.DTOs;
 using ARI.Application.Scheduling;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -12,19 +13,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
-    public class BookSlotRequest
-    {
-        public Guid SlotId { get; set; }
-        public int Round { get; set; } = 1;
-        public string? Token { get; set; }
-    }
-
     /// <summary>
-    /// Ứng viên chọn lịch phỏng vấn trên thiết bị cá nhân. Truy cập bằng token lời mời
-    /// (InterviewInvite, từ email) HOẶC đã đăng nhập Candidate Portal (JWT) và sở hữu hồ sơ.
+    /// Ứng viên xem lịch phỏng vấn đã được nhân sự xếp; xác nhận lịch hoặc từ chối kèm lý do.
+    /// Từ ADR-048, ứng viên KHÔNG tự chọn lịch — HR gán qua /api/schedules/assign; ứng viên chỉ
+    /// phản hồi (confirm/decline) để nhân sự sắp lịch khác khi bận.
     /// </summary>
     [ApiController]
     [Route("api")]
+    [Authorize(Policy = "CandidateOnly")]
     public class CandidateScheduleController : ControllerBase
     {
         private readonly ISender _sender;
@@ -34,72 +30,55 @@ namespace ARI.API.Controllers
             _sender = sender;
         }
 
-        /// <summary>Danh tính candidate từ claims (nếu đã đăng nhập) — dùng cho xác thực quyền truy cập hồ sơ.</summary>
-        private (Guid? accountId, string? email) GetCandidateIdentity()
-        {
-            if (User?.Identity?.IsAuthenticated != true) return (null, null);
-            var subClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
-                           ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
-            return (Guid.TryParse(subClaim, out var accId) ? accId : null, emailClaim);
-        }
-
-        private IActionResult MapFailure(Result result)
-        {
-            return result.ErrorCode switch
-            {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
-            };
-        }
-
-        /// <summary>Khung giờ còn trống của hồ sơ cho một vòng (để ứng viên chọn).</summary>
-        [HttpGet("schedule/{applicationId:guid}/slots")]
-        [AllowAnonymous]
-        public async Task<IActionResult> GetOpenSlots(Guid applicationId, [FromQuery] int round, [FromQuery] string? token, CancellationToken ct)
-        {
-            var roundNumber = round > 0 ? round : 1;
-            var (accountId, email) = GetCandidateIdentity();
-
-            var result = await _sender.Send(new GetOpenSlotsQuery(applicationId, roundNumber, token, accountId, email), ct);
-            if (result.IsFailure) return MapFailure(result);
-            return Ok(result.Value);
-        }
-
-        /// <summary>Đặt một khung giờ phỏng vấn cho hồ sơ + vòng.</summary>
-        [HttpPost("schedule/{applicationId:guid}/book")]
-        [AllowAnonymous]
-        public async Task<IActionResult> Book(Guid applicationId, [FromBody] BookSlotRequest request, CancellationToken ct)
-        {
-            var roundNumber = request.Round > 0 ? request.Round : 1;
-            var (accountId, email) = GetCandidateIdentity();
-
-            var result = await _sender.Send(new BookSlotCommand(applicationId, request.SlotId, roundNumber, request.Token, accountId, email), ct);
-            if (result.IsFailure) return MapFailure(result);
-
-            var value = result.Value;
-            return Ok(new
-            {
-                message = "Đặt lịch thành công. Bạn có thể luyện tập với phỏng vấn thử trước ngày hẹn.",
-                bookingId = value.BookingId,
-                slot = value.Slot,
-            });
-        }
-
-        /// <summary>Lịch phỏng vấn của ứng viên đang đăng nhập (sắp tới / đã qua).</summary>
-        [HttpGet("candidate/schedule")]
-        [Authorize(Policy = "CandidateOnly")]
-        public async Task<IActionResult> GetMySchedule(CancellationToken ct)
+        private (Guid accId, string? email) Identity()
         {
             var subClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
                            ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             var emailClaim = User.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email)?.Value;
             Guid.TryParse(subClaim, out var accId);
+            return (accId, emailClaim);
+        }
 
-            var result = await _sender.Send(new GetCandidateScheduleQuery(accId, emailClaim), ct);
+        private IActionResult MapFailure(Result result) => result.ErrorCode switch
+        {
+            CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+            CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
+            _ => BadRequest(new { message = result.Error }),
+        };
+
+        /// <summary>Lịch phỏng vấn của ứng viên đang đăng nhập (sắp tới / đã qua / chờ xếp lại).</summary>
+        [HttpGet("candidate/schedule")]
+        public async Task<IActionResult> GetMySchedule(CancellationToken ct)
+        {
+            var (accId, email) = Identity();
+            var result = await _sender.Send(new GetCandidateScheduleQuery(accId, email), ct);
             var value = result.Value;
-            return Ok(new { upcomingSlots = value.UpcomingSlots, pastSlots = value.PastSlots });
+            return Ok(new
+            {
+                upcoming = value.Upcoming,
+                past = value.Past,
+                awaitingReschedule = value.AwaitingReschedule,
+            });
+        }
+
+        /// <summary>Ứng viên xác nhận sẽ tham dự khung giờ đã được xếp.</summary>
+        [HttpPost("candidate/schedule/{bookingId:guid}/confirm")]
+        public async Task<IActionResult> Confirm(Guid bookingId, CancellationToken ct)
+        {
+            var (accId, email) = Identity();
+            var result = await _sender.Send(new ConfirmScheduleCommand(bookingId, accId, email), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(new { message = "Đã xác nhận lịch phỏng vấn." });
+        }
+
+        /// <summary>Ứng viên bận, từ chối lịch kèm lý do để nhân sự xếp lịch khác.</summary>
+        [HttpPost("candidate/schedule/{bookingId:guid}/decline")]
+        public async Task<IActionResult> Decline(Guid bookingId, [FromBody] DeclineScheduleRequest request, CancellationToken ct)
+        {
+            var (accId, email) = Identity();
+            var result = await _sender.Send(new DeclineScheduleCommand(bookingId, request?.Reason ?? string.Empty, accId, email), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(new { message = "Đã gửi lý do từ chối. Nhân sự sẽ xếp lịch khác cho bạn." });
         }
     }
 }

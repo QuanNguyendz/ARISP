@@ -18,12 +18,21 @@ namespace ARI.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly InterviewService _interviewService;
         private readonly INotificationService _notificationService;
+        private readonly ITokenService _tokenService;
+        private readonly Options.InterviewOptions _interviewOptions;
 
-        public InterviewCodeService(IUnitOfWork unitOfWork, InterviewService interviewService, INotificationService notificationService)
+        public InterviewCodeService(
+            IUnitOfWork unitOfWork,
+            InterviewService interviewService,
+            INotificationService notificationService,
+            ITokenService tokenService,
+            Options.InterviewOptions interviewOptions)
         {
             _unitOfWork = unitOfWork;
             _interviewService = interviewService;
             _notificationService = notificationService;
+            _tokenService = tokenService;
+            _interviewOptions = interviewOptions;
         }
 
         public async Task<Result<InterviewCode>> GenerateCodeAsync(Guid applicationId, int? roundNumber, Guid createdByUserId, CancellationToken ct = default)
@@ -170,21 +179,24 @@ namespace ARI.Application.Services
             return Result.Success(generatedCodes);
         }
 
-        public async Task<Result<(bool Valid, Guid? SessionId)>> ValidateCodeAsync(string code, CancellationToken ct = default)
+        public async Task<Result<KioskSessionResponse>> ValidateCodeAsync(string code, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(code))
             {
-                return Result.Failure<(bool Valid, Guid? SessionId)>("Mã phỏng vấn không được để trống.");
+                return Result.Failure<KioskSessionResponse>("Mã phỏng vấn không được để trống.");
             }
 
             var upperCode = code.Trim().ToUpper();
             var interviewCodes = await _unitOfWork.Repository<InterviewCode>().FindAsync(c => c.Code == upperCode, ct);
             var interviewCode = interviewCodes.FirstOrDefault();
 
-            if (interviewCode == null || interviewCode.UsedAt.HasValue || interviewCode.ExpiresAt <= DateTimeOffset.UtcNow)
-            {
-                return Result.Success<(bool Valid, Guid? SessionId)>((false, null));
-            }
+            // Phân biệt lý do để Kiosk báo đúng việc cần làm (nhập lại / xin mã mới / gọi lễ tân).
+            if (interviewCode == null)
+                return Result.Success(new KioskSessionResponse { Valid = false, Reason = "not_found" });
+            if (interviewCode.UsedAt.HasValue)
+                return Result.Success(new KioskSessionResponse { Valid = false, Reason = "used" });
+            if (interviewCode.ExpiresAt <= DateTimeOffset.UtcNow)
+                return Result.Success(new KioskSessionResponse { Valid = false, Reason = "expired" });
 
             interviewCode.UsedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<InterviewCode>().Update(interviewCode);
@@ -204,7 +216,7 @@ namespace ARI.Application.Services
                 _unitOfWork.Repository<InterviewCode>().Update(interviewCode);
                 await _unitOfWork.SaveChangesAsync(ct);
 
-                return Result.Failure<(bool Valid, Guid? SessionId)>(sessionResult.Error);
+                return Result.Failure<KioskSessionResponse>(sessionResult.Error);
             }
 
             var sessionId = sessionResult.Value.SessionId;
@@ -223,7 +235,29 @@ namespace ARI.Application.Services
             await _unitOfWork.Repository<AuditLog>().AddAsync(auditLog, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            return Result.Success<(bool Valid, Guid? SessionId)>((true, sessionId));
+            // Token phạm vi ĐÚNG phiên này (ADR-052) — máy Kiosk dùng chung, không đăng nhập ứng viên.
+            var ttlHours = _interviewOptions.KioskSessionTokenHours;
+            var token = _tokenService.CreateKioskSessionToken(sessionId, interviewCode.ApplicationId, ttlHours);
+
+            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                .GetByIdAsync(interviewCode.ApplicationId, ct);
+            var job = application == null
+                ? null
+                : await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
+
+            return Result.Success(new KioskSessionResponse
+            {
+                Valid = true,
+                SessionId = sessionId,
+                Token = token,
+                TokenExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours <= 0 ? 3 : ttlHours),
+                CandidateName = application?.CandidateName,
+                JobTitle = job?.Title,
+                RoundNumber = interviewCode.RoundNumber,
+                RoundType = session?.RoundType,
+                Language = sessionResult.Value.Language
+            });
         }
 
         /// <summary>

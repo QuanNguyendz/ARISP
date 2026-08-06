@@ -150,9 +150,8 @@ export default function InterviewSessionsPage() {
     return s === 0 ? `${m}m` : `${m}m ${s}s`
   }
 
+  // Danh sách chỉ còn phiên THẬT — backend đã lọc bỏ phiên thử (riêng tư của ứng viên, ADR-051).
   const roundLabel = (num: number) => t('table.round', { number: num })
-  const sessionTypeLabel = (type?: string) =>
-    type === 'practice' ? t('table.practice') : t('table.real')
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
@@ -226,9 +225,6 @@ export default function InterviewSessionsPage() {
                           </h3>
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300">
                             {roundLabel(session.roundNumber)}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300 uppercase">
-                            {sessionTypeLabel(session.sessionType)}
                           </span>
                         </div>
                         <p className="text-sm text-ink-500 dark:text-ink-400 truncate">

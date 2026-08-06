@@ -32,187 +32,253 @@ namespace ARI.Application.CandidatePortal
 
         public async Task<Result<object>> Handle(GetMyApplicationsQuery request, CancellationToken ct)
         {
-            var candidateAccountId = request.CandidateAccountId;
-            var emailClaim = request.Email;
-
-            // Liên kết các hồ sơ khớp email nhưng chưa gắn CandidateAccountId — làm thẳng bằng
-            // SQL UPDATE (không nạp entity). Sau đó mọi hồ sơ của ứng viên đều có CandidateAccountId.
-            if (!string.IsNullOrEmpty(emailClaim))
+            try
             {
-                await _unitOfWork.ExecuteSqlRawAsync(
-                    "UPDATE applications SET candidate_account_id = {0}, updated_at = {1} " +
-                    "WHERE candidate_account_id IS NULL AND candidate_email = {2} AND deleted_at IS NULL",
-                    new object[] { candidateAccountId, DateTimeOffset.UtcNow, emailClaim });
-            }
+                var candidateAccountId = request.CandidateAccountId;
+                var emailClaim = request.Email;
 
-            // Hồ sơ của ứng viên — projection nhẹ (KHÔNG kéo CvText/CoverLetter/DemographicData lớn).
-            var appsList = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
-                .QueryAsync(q => q
-                    .Where(a => a.CandidateAccountId == candidateAccountId)
-                    .Select(a => new
-                    {
-                        a.Id, a.JobPostingId, a.CandidateEmail, a.CandidateName, a.Status,
-                        a.CvJdAnalysisId, a.CvFileUrl, a.PracticeSessionUsed, a.Source, a.CreatedAt, a.UpdatedAt,
-                    }));
-
-            // Batch fetch jobs — chỉ cột cần (bỏ JobDescription/ScoringRubric...)
-            var jobIds = appsList.Select(a => a.JobPostingId).Distinct().ToList();
-            var jobsDict = (await _unitOfWork.Repository<JobPosting>()
-                    .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id))
-                        .Select(j => new { j.Id, j.Title, j.Location, j.Department, j.InterviewMode })))
-                .ToDictionary(j => j.Id, j => j);
-
-            // Batch fetch CV–JD analyses (chỉ match score)
-            var analysisIds = appsList.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
-            var analysisDict = (await _unitOfWork.Repository<CvJdAnalysis>()
-                    .QueryAsync(q => q.Where(x => analysisIds.Contains(x.Id)).Select(x => new { x.Id, x.MatchScore })))
-                .ToDictionary(x => x.Id, x => x);
-
-            // Sessions + evaluations (bỏ cột JSON lớn) + HR reviews để dựng tiến trình vòng phỏng vấn
-            var appIds = appsList.Select(a => a.Id).ToList();
-            var allSessions = await _unitOfWork.Repository<InterviewSession>()
-                .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId))
-                    .Select(s => new { s.Id, s.ApplicationId, s.RoundNumber, s.RoundType, s.SessionType, s.Status }));
-            var sessionIds = allSessions.Select(s => s.Id).ToList();
-            var allEvals = await _unitOfWork.Repository<Evaluation>()
-                .QueryAsync(q => q.Where(e => sessionIds.Contains(e.SessionId))
-                    .Select(e => new { e.Id, e.SessionId, e.ApplicationId, e.AiVerdict, e.OverallScore }));
-            var evalBySession = allEvals.ToDictionary(e => e.SessionId, e => e);
-            var evalIds = allEvals.Select(e => e.Id).ToList();
-            var allReviews = (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId))).ToList();
-            var reviewByEval = allReviews.ToDictionary(r => r.EvaluationId, r => r);
-
-            var nowUtc = DateTimeOffset.UtcNow;
-
-            // Mã phỏng vấn On-site còn hiệu lực (chưa dùng, chưa hết hạn) — để hiển thị thẻ "Cần hành động".
-            var activeCodes = (await _unitOfWork.Repository<InterviewCode>()
-                .FindAsync(c => appIds.Contains(c.ApplicationId) && c.UsedAt == null && c.ExpiresAt > nowUtc)).ToList();
-
-            // Lịch phỏng vấn sắp tới (booking đã đặt + slot tương ứng).
-            var bookings = (await _unitOfWork.Repository<InterviewBooking>()
-                .FindAsync(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled")).ToList();
-            var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
-            var slots = slotIds.Any()
-                ? (await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id))).ToList()
-                : new List<AvailabilitySlot>();
-            var slotById = slots.ToDictionary(s => s.Id, s => s);
-
-            // Lời mời theo vòng — để xác định "vòng đang hoạt động" (vòng được mời mới nhất).
-            var invites = (await _unitOfWork.Repository<InterviewInvite>()
-                .FindAsync(i => appIds.Contains(i.ApplicationId))).ToList();
-
-            // Resolve CV storageKey -> URL hiển thị (presigned nếu dùng S3) trước khi project (LINQ sync).
-            var cvUrlMap = new Dictionary<Guid, string?>();
-            foreach (var a in appsList)
-                cvUrlMap[a.Id] = string.IsNullOrEmpty(a.CvFileUrl) ? a.CvFileUrl : await _fileStorage.GetUrlAsync(a.CvFileUrl);
-
-            var response = appsList
-                .OrderByDescending(a => a.UpdatedAt)
-                .Select(a =>
+                // Liên kết các hồ sơ khớp email nhưng chưa gắn CandidateAccountId — làm thẳng bằng
+                // SQL UPDATE (không nạp entity). Sau đó mọi hồ sơ của ứng viên đều có CandidateAccountId.
+                if (!string.IsNullOrEmpty(emailClaim))
                 {
-                    jobsDict.TryGetValue(a.JobPostingId, out var job);
-                    int? matchScore = (a.CvJdAnalysisId.HasValue && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)) ? an.MatchScore : (int?)null;
-
-                    // Vòng đang hoạt động = vòng được mời mới nhất (mỗi vòng có 1 invite). Mặc định 1.
-                    var inviteRounds = invites.Where(i => i.ApplicationId == a.Id).Select(i => i.RoundNumber).ToList();
-                    int activeRound = inviteRounds.Count > 0 ? inviteRounds.Max() : 1;
-                    // Phỏng vấn thử theo VÒNG: còn lượt nếu số phiên practice của vòng này chưa chạm
-                    // giới hạn (Interview:PracticeAttemptsPerRound, <= 0 = không giới hạn — dev/test)
-                    // và chưa làm phỏng vấn thật của vòng này.
-                    var maxPractice = _interviewOptions.PracticeAttemptsPerRound;
-                    bool practiceUsedForRound = maxPractice > 0
-                        && allSessions.Count(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound) >= maxPractice;
-                    bool realDoneForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real" && s.RoundNumber == activeRound);
-
-                    bool pendingHrReview = false; // có vòng đã xong + AI đã chấm nhưng HR chưa xác nhận/chia sẻ
-                    var rounds = allSessions
-                        .Where(s => s.ApplicationId == a.Id)
-                        .OrderBy(s => s.RoundNumber)
-                        .Select(s =>
-                        {
-                            string? verdict = null;
-                            decimal? overall = null;
-                            bool hasEval = evalBySession.TryGetValue(s.Id, out var ev);
-                            bool shared = hasEval && reviewByEval.TryGetValue(ev!.Id, out var rv) && rv.ShareEvaluation;
-                            // Chỉ lộ verdict/điểm khi HR đã chia sẻ kết quả vòng đó (giữ nguyên mô hình bảo mật)
-                            if (shared)
-                            {
-                                verdict = ev!.AiVerdict;
-                                overall = ev.OverallScore;
-                            }
-                            // Vòng đã hoàn tất + AI đã có đánh giá nhưng HR chưa chia sẻ → đang chờ HR xác nhận
-                            if (s.Status == "completed" && hasEval && !shared)
-                                pendingHrReview = true;
-                            return new
-                            {
-                                s.RoundNumber,
-                                s.RoundType,
-                                s.SessionType,
-                                s.Status,
-                                Verdict = verdict,
-                                OverallScore = overall
-                            };
-                        })
-                        .ToList();
-
-                    // Mã phỏng vấn còn hiệu lực mới nhất (theo vòng).
-                    var code = activeCodes
-                        .Where(c => c.ApplicationId == a.Id)
-                        .OrderByDescending(c => c.RoundNumber)
-                        .ThenByDescending(c => c.CreatedAt)
-                        .FirstOrDefault();
-
-                    // Phản hồi của HR được chia sẻ cho ứng viên (nếu có).
-                    var sharedFeedback = allReviews
-                        .Where(r => r.ShareFeedback && !string.IsNullOrWhiteSpace(r.CandidateFeedback)
-                            && allEvals.Any(e => e.Id == r.EvaluationId && e.ApplicationId == a.Id))
-                        .OrderByDescending(r => r.UpdatedAt)
-                        .FirstOrDefault();
-
-                    // Lịch phỏng vấn sắp tới gần nhất.
-                    var upcoming = bookings
-                        .Where(b => b.ApplicationId == a.Id && slotById.ContainsKey(b.AvailabilitySlotId)
-                            && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
-                        .OrderBy(b => slotById[b.AvailabilitySlotId].StartTime)
-                        .Select(b => slotById[b.AvailabilitySlotId])
-                        .FirstOrDefault();
-
-                    return new
+                    try
                     {
-                        a.Id,
-                        a.JobPostingId,
-                        JobTitle = job?.Title,
-                        Location = job?.Location,
-                        Department = job?.Department,
-                        InterviewMode = job?.InterviewMode,
-                        a.CandidateEmail,
-                        a.CandidateName,
-                        a.Status,
-                        MatchScore = matchScore,
-                        CvFileUrl = cvUrlMap[a.Id],
-                        a.PracticeSessionUsed,
-                        // ADR-038: phỏng vấn thử mở cho ứng viên ĐÃ QUA vòng CV, tính theo TỪNG VÒNG
-                        // (1 lượt/vòng) — vòng kế mở lại thử khi được mời lên vòng đó.
-                        PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound,
-                        ActiveRound = activeRound,
-                        PendingHrReview = pendingHrReview,
-                        HrFeedback = sharedFeedback?.CandidateFeedback,
-                        a.Source,
-                        a.CreatedAt,
-                        a.UpdatedAt,
-                        Rounds = rounds,
-                        InterviewCode = code == null ? null : new { code.Code, code.ExpiresAt, code.RoundNumber },
-                        UpcomingInterview = upcoming == null ? null : new
-                        {
-                            upcoming.StartTime,
-                            upcoming.Timezone,
-                            RoundNumber = upcoming.RoundNumber
-                        }
-                    };
-                })
-                .ToList();
+                        await _unitOfWork.ExecuteSqlRawAsync(
+                            "UPDATE applications SET candidate_account_id = {0}, updated_at = {1} " +
+                            "WHERE candidate_account_id IS NULL AND candidate_email = {2} AND deleted_at IS NULL",
+                            new object[] { candidateAccountId, DateTimeOffset.UtcNow, emailClaim });
+                    }
+                    catch
+                    {
+                        // Fail-safe: không để lỗi auto-link làm sập toàn bộ request lấy danh sách hồ sơ
+                    }
+                }
 
-            return Result.Success<object>(response);
+                // Hồ sơ của ứng viên — projection nhẹ (KHÔNG kéo CvText/CoverLetter/DemographicData lớn).
+                var appsList = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                    .QueryAsync(q => q
+                        .Where(a => a.CandidateAccountId == candidateAccountId)
+                        .Select(a => new
+                        {
+                            a.Id, a.JobPostingId, a.CandidateEmail, a.CandidateName, a.Status,
+                            a.CvJdAnalysisId, a.CvFileUrl, a.PracticeSessionUsed, a.Source, a.CreatedAt, a.UpdatedAt,
+                        }));
+
+                // Batch fetch jobs — chỉ cột cần (bỏ JobDescription/ScoringRubric...)
+                var jobIds = appsList.Select(a => a.JobPostingId).Distinct().ToList();
+                var jobsDict = (await _unitOfWork.Repository<JobPosting>()
+                        .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id))
+                            .Select(j => new { j.Id, j.Title, j.Location, j.Department, j.InterviewMode })))
+                    .GroupBy(j => j.Id)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                // Batch fetch CV–JD analyses (chỉ match score)
+                var analysisIds = appsList.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
+                var analysisDict = (await _unitOfWork.Repository<CvJdAnalysis>()
+                        .QueryAsync(q => q.Where(x => analysisIds.Contains(x.Id)).Select(x => new { x.Id, x.MatchScore })))
+                    .GroupBy(x => x.Id)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                // Sessions + evaluations (bỏ cột JSON lớn) + HR reviews để dựng tiến trình vòng phỏng vấn
+                var appIds = appsList.Select(a => a.Id).ToList();
+                var allSessions = await _unitOfWork.Repository<InterviewSession>()
+                    .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId))
+                        .Select(s => new { s.Id, s.ApplicationId, s.RoundNumber, s.RoundType, s.SessionType, s.Status }));
+                var sessionIds = allSessions.Select(s => s.Id).ToList();
+                var allEvals = await _unitOfWork.Repository<Evaluation>()
+                    .QueryAsync(q => q.Where(e => sessionIds.Contains(e.SessionId))
+                        .Select(e => new { e.Id, e.SessionId, e.ApplicationId, e.AiVerdict, e.OverallScore }));
+                var evalBySession = allEvals
+                    .GroupBy(e => e.SessionId)
+                    .ToDictionary(g => g.Key, g => g.First());
+                var evalIds = allEvals.Select(e => e.Id).ToList();
+                var allReviews = (await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId))).ToList();
+                var reviewByEval = allReviews
+                    .GroupBy(r => r.EvaluationId)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                // Mã phỏng vấn On-site còn hiệu lực (chưa dùng, chưa hết hạn) — để hiển thị thẻ "Cần hành động".
+                var activeCodes = appIds.Count > 0
+                    ? (await _unitOfWork.Repository<InterviewCode>()
+                        .FindAsync(c => appIds.Contains(c.ApplicationId) && c.UsedAt == null && c.ExpiresAt > nowUtc)).ToList()
+                    : new List<InterviewCode>();
+
+                // Lịch phỏng vấn sắp tới (booking đã đặt + slot tương ứng).
+                var bookings = appIds.Count > 0
+                    ? (await _unitOfWork.Repository<InterviewBooking>()
+                        .FindAsync(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled")).ToList()
+                    : new List<InterviewBooking>();
+                var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
+                var slots = slotIds.Any()
+                    ? (await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id))).ToList()
+                    : new List<AvailabilitySlot>();
+                var slotById = slots
+                    .GroupBy(s => s.Id)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                // Tổng số vòng theo cấu hình job — mốc để biết khi nào mới là "Đạt" (ADR-053).
+                var roundConfigCounts = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                        .QueryAsync(q => q.Where(r => jobIds.Contains(r.JobPostingId))
+                            .Select(r => new { r.JobPostingId, r.RoundNumber })))
+                    .GroupBy(r => r.JobPostingId)
+                    .ToDictionary(g => g.Key, g => Math.Max(1, g.Max(x => x.RoundNumber)));
+
+                // Lời mời theo vòng — để xác định "vòng đang hoạt động" (vòng được mời mới nhất).
+                var invites = appIds.Count > 0
+                    ? (await _unitOfWork.Repository<InterviewInvite>()
+                        .FindAsync(i => appIds.Contains(i.ApplicationId))).ToList()
+                    : new List<InterviewInvite>();
+
+                // Resolve CV storageKey -> URL hiển thị (presigned nếu dùng S3) trước khi project (LINQ sync).
+                var cvUrlMap = new Dictionary<Guid, string?>();
+                foreach (var a in appsList)
+                    cvUrlMap[a.Id] = string.IsNullOrEmpty(a.CvFileUrl) ? a.CvFileUrl : await _fileStorage.GetUrlAsync(a.CvFileUrl);
+
+                var response = appsList
+                    .OrderByDescending(a => a.UpdatedAt)
+                    .Select(a =>
+                    {
+                        jobsDict.TryGetValue(a.JobPostingId, out var job);
+                        int? matchScore = (a.CvJdAnalysisId.HasValue && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)) ? an.MatchScore : (int?)null;
+
+                        // Vòng đang hoạt động = vòng được mời mới nhất (mỗi vòng có 1 invite). Mặc định 1.
+                        var inviteRounds = invites.Where(i => i.ApplicationId == a.Id).Select(i => i.RoundNumber).ToList();
+                        int activeRound = inviteRounds.Count > 0 ? inviteRounds.Max() : 1;
+                        // Phỏng vấn thử theo VÒNG: còn lượt nếu số phiên practice của vòng này chưa chạm
+                        // giới hạn (Interview:PracticeAttemptsPerRound, <= 0 = không giới hạn — dev/test)
+                        // và chưa làm phỏng vấn thật của vòng này.
+                        var maxPractice = _interviewOptions.PracticeAttemptsPerRound;
+                        bool practiceUsedForRound = maxPractice > 0
+                            && allSessions.Count(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound) >= maxPractice;
+                        bool realDoneForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real" && s.RoundNumber == activeRound);
+
+                        // Số vòng THẬT đã được HR xác nhận Đạt — dựng nhãn "Qua vòng N/M" (ADR-053).
+                        var totalRounds = roundConfigCounts.TryGetValue(a.JobPostingId, out var tr) ? tr : 1;
+                        var passedRounds = allSessions
+                            .Where(s => s.ApplicationId == a.Id && s.SessionType != "practice"
+                                && evalBySession.TryGetValue(s.Id, out var ev)
+                                && reviewByEval.TryGetValue(ev.Id, out var rv) && rv.FinalVerdict == "pass")
+                            .Select(s => s.RoundNumber)
+                            .Distinct()
+                            .Count();
+
+                        bool pendingHrReview = false; // có vòng đã xong + AI đã chấm nhưng HR chưa xác nhận/chia sẻ
+                        // Tiến trình vòng CHỈ tính phiên THẬT — buổi thử không được làm ứng viên tưởng
+                        // đã qua vòng, cũng không sinh trạng thái "chờ HR xác nhận" (ADR-051).
+                        var rounds = allSessions
+                            .Where(s => s.ApplicationId == a.Id && s.SessionType != "practice")
+                            .OrderBy(s => s.RoundNumber)
+                            .Select(s =>
+                            {
+                                string? verdict = null;
+                                decimal? overall = null;
+                                bool hasEval = evalBySession.TryGetValue(s.Id, out var ev);
+                                bool shared = hasEval && reviewByEval.TryGetValue(ev!.Id, out var rv) && rv.ShareEvaluation;
+                                // Chỉ lộ verdict/điểm khi HR đã chia sẻ kết quả vòng đó (giữ nguyên mô hình bảo mật)
+                                if (shared)
+                                {
+                                    verdict = ev!.AiVerdict;
+                                    overall = ev.OverallScore;
+                                }
+                                // Vòng đã hoàn tất + AI đã có đánh giá nhưng HR chưa chia sẻ → đang chờ HR xác nhận
+                                if (s.Status == "completed" && hasEval && !shared)
+                                    pendingHrReview = true;
+                                return new
+                                {
+                                    s.RoundNumber,
+                                    s.RoundType,
+                                    s.SessionType,
+                                    s.Status,
+                                    Verdict = verdict,
+                                    OverallScore = overall
+                                };
+                            })
+                            .ToList();
+
+                        // Mã phỏng vấn còn hiệu lực mới nhất (theo vòng).
+                        var code = activeCodes
+                            .Where(c => c.ApplicationId == a.Id)
+                            .OrderByDescending(c => c.RoundNumber)
+                            .ThenByDescending(c => c.CreatedAt)
+                            .FirstOrDefault();
+
+                        // Phản hồi của HR được chia sẻ cho ứng viên (nếu có).
+                        var sharedFeedback = allReviews
+                            .Where(r => r.ShareFeedback && !string.IsNullOrWhiteSpace(r.CandidateFeedback)
+                                && allEvals.Any(e => e.Id == r.EvaluationId && e.ApplicationId == a.Id))
+                            .OrderByDescending(r => r.UpdatedAt)
+                            .FirstOrDefault();
+
+                        // Lịch phỏng vấn sắp tới gần nhất.
+                        var upcoming = bookings
+                            .Where(b => b.ApplicationId == a.Id && slotById.ContainsKey(b.AvailabilitySlotId)
+                                && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
+                            .OrderBy(b => slotById[b.AvailabilitySlotId].StartTime)
+                            .Select(b => slotById[b.AvailabilitySlotId])
+                            .FirstOrDefault();
+
+                        // Lịch đã qua giờ mà vòng đó chưa hề có phiên phỏng vấn THẬT → quá hạn.
+                        // Ứng viên cần liên hệ nhân sự xếp lại thay vì thấy mãi "đã xếp lịch".
+                        var missed = bookings
+                            .Where(b => b.ApplicationId == a.Id && slotById.ContainsKey(b.AvailabilitySlotId)
+                                && slotById[b.AvailabilitySlotId].EndTime <= nowUtc
+                                && !allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real"
+                                    && s.RoundNumber == slotById[b.AvailabilitySlotId].RoundNumber))
+                            .OrderByDescending(b => slotById[b.AvailabilitySlotId].StartTime)
+                            .Select(b => slotById[b.AvailabilitySlotId])
+                            .FirstOrDefault();
+
+                        return new
+                        {
+                            a.Id,
+                            a.JobPostingId,
+                            JobTitle = job?.Title,
+                            Location = job?.Location,
+                            Department = job?.Department,
+                            InterviewMode = job?.InterviewMode,
+                            a.CandidateEmail,
+                            a.CandidateName,
+                            a.Status,
+                            MatchScore = matchScore,
+                            CvFileUrl = cvUrlMap[a.Id],
+                            a.PracticeSessionUsed,
+                            // ADR-038: phỏng vấn thử mở cho ứng viên ĐÃ QUA vòng CV, tính theo TỪNG VÒNG
+                            // (1 lượt/vòng) — vòng kế mở lại thử khi được mời lên vòng đó.
+                            PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound,
+                            ActiveRound = activeRound,
+                            TotalRounds = totalRounds,
+                            PassedRounds = passedRounds,
+                            PendingHrReview = pendingHrReview,
+                            HrFeedback = sharedFeedback?.CandidateFeedback,
+                            a.Source,
+                            a.CreatedAt,
+                            a.UpdatedAt,
+                            Rounds = rounds,
+                            InterviewCode = code == null ? null : new { code.Code, code.ExpiresAt, code.RoundNumber },
+                            UpcomingInterview = upcoming == null ? null : new
+                            {
+                                upcoming.StartTime,
+                                upcoming.Timezone,
+                                RoundNumber = upcoming.RoundNumber
+                            },
+                            MissedInterview = missed == null ? null : new
+                            {
+                                missed.StartTime,
+                                missed.Timezone,
+                                RoundNumber = missed.RoundNumber
+                            }
+                        };
+                    })
+                    .ToList();
+
+                return Result.Success<object>(response);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure<object>($"Lỗi tải hồ sơ: {ex.Message}");
+            }
         }
     }
 
@@ -242,57 +308,86 @@ namespace ARI.Application.CandidatePortal
                 return Result.Failure<object>("Không tìm thấy hồ sơ ứng tuyển.", CommonErrorCodes.NotFound);
 
             // IDOR Protection + Auto-link
-            bool isOwner = app.CandidateAccountId == candidateAccountId;
-            if (!isOwner && !app.CandidateAccountId.HasValue && !string.IsNullOrEmpty(emailClaim) &&
-                string.Equals(app.CandidateEmail, emailClaim, StringComparison.OrdinalIgnoreCase))
-            {
-                app.CandidateAccountId = candidateAccountId;
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
-                await _unitOfWork.SaveChangesAsync();
-                isOwner = true;
-            }
-
-            if (!isOwner)
+            if (!await PortalSupport.TryEnsureOwnerAsync(app, candidateAccountId, emailClaim, _unitOfWork))
                 return Result.Failure<object>("Forbidden", CommonErrorCodes.Forbidden);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId);
 
+            // Round configs của job (nếu có)
+            var roundConfigs = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == app.JobPostingId))
+                .OrderBy(r => r.RoundNumber)
+                .ToList();
+
             var sessionsResult = await _unitOfWork.Repository<InterviewSession>().FindAsync(s => s.ApplicationId == id);
-            var sessions = sessionsResult.OrderBy(s => s.RoundNumber).ToList();
+            var allSessions = sessionsResult.OrderBy(s => s.RoundNumber).ToList();
+
+            // Tiến trình các vòng chỉ tính phiên THẬT — phiên thử cùng vòng từng che trạng thái phiên thật.
+            // Phiên thử trả riêng ở PracticeSessions (lối vào trang xem lại — ADR-051).
+            var sessions = allSessions.Where(s => s.SessionType != "practice").ToList();
+            var practiceSessions = allSessions
+                .Where(s => s.SessionType == "practice")
+                .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
+                .ToList();
+
+            var invites = (await _unitOfWork.Repository<InterviewInvite>()
+                .FindAsync(i => i.ApplicationId == id)).ToList();
 
             // Optimize query: Fetch all evaluations and HR reviews in batch
-            var sessionIds = sessions.Select(s => s.Id).ToList();
+            var sessionIds = allSessions.Select(s => s.Id).ToList();
             var evaluations = await _unitOfWork.Repository<Evaluation>().FindAsync(e => sessionIds.Contains(e.SessionId));
-            var evalDict = evaluations.ToDictionary(e => e.SessionId, e => e);
+            var evalDict = evaluations.GroupBy(e => e.SessionId).ToDictionary(g => g.Key, g => g.First());
 
             var evalIds = evaluations.Select(e => e.Id).ToList();
             var reviews = await _unitOfWork.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId));
-            var reviewDict = reviews.ToDictionary(r => r.EvaluationId, r => r);
+            var reviewDict = reviews.GroupBy(r => r.EvaluationId).ToDictionary(g => g.Key, g => g.First());
 
-            // Lịch phỏng vấn sắp tới (booking đã đặt) cho hồ sơ này — để hiển thị "Lịch sắp tới".
+            // Lịch phỏng vấn sắp tới (booking đã đặt) cho hồ sơ này
             var nowUtc = DateTimeOffset.UtcNow;
             var bookings = (await _unitOfWork.Repository<InterviewBooking>()
-                .FindAsync(b => b.ApplicationId == id && b.Status == "scheduled")).ToList();
+                .FindAsync(b => b.ApplicationId == id)).ToList();
             var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
             var slots = slotIds.Any()
                 ? (await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id))).ToList()
                 : new List<AvailabilitySlot>();
-            var slotById = slots.ToDictionary(s => s.Id, s => s);
+            var slotById = slots.GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First());
+
             var upcoming = bookings
-                .Where(b => slotById.ContainsKey(b.AvailabilitySlotId) && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
+                .Where(b => b.Status == "scheduled" && slotById.ContainsKey(b.AvailabilitySlotId) && slotById[b.AvailabilitySlotId].StartTime > nowUtc)
                 .OrderBy(b => slotById[b.AvailabilitySlotId].StartTime)
                 .Select(b => slotById[b.AvailabilitySlotId])
                 .FirstOrDefault();
 
-            // Mã phỏng vấn On-site còn hiệu lực (để liên kết qua trang Hồ sơ ứng tuyển).
+            // Mã phỏng vấn On-site còn hiệu lực
             var activeCode = (await _unitOfWork.Repository<InterviewCode>()
                 .FindAsync(c => c.ApplicationId == id && c.UsedAt == null && c.ExpiresAt > nowUtc))
                 .OrderByDescending(c => c.RoundNumber).ThenByDescending(c => c.CreatedAt)
                 .FirstOrDefault();
 
-            var sessionDetails = new List<object>();
-            foreach (var s in sessions)
+            // Tổng hợp các roundNumber của job
+            var roundNumbers = new SortedSet<int>();
+            if (roundConfigs.Any())
             {
+                foreach (var rc in roundConfigs) roundNumbers.Add(rc.RoundNumber);
+            }
+            foreach (var s in sessions) roundNumbers.Add(s.RoundNumber);
+            foreach (var i in invites) roundNumbers.Add(i.RoundNumber);
+            foreach (var b in bookings)
+            {
+                if (slotById.TryGetValue(b.AvailabilitySlotId, out var sl))
+                    roundNumbers.Add(sl.RoundNumber);
+            }
+            if (!roundNumbers.Any()) roundNumbers.Add(1);
+
+            var sessionDetails = new List<object>();
+            foreach (var rNum in roundNumbers)
+            {
+                var s = sessions.FirstOrDefault(x => x.RoundNumber == rNum);
+                var rc = roundConfigs.FirstOrDefault(x => x.RoundNumber == rNum);
+                var inv = invites.FirstOrDefault(x => x.RoundNumber == rNum);
+                var bk = bookings.FirstOrDefault(x => slotById.TryGetValue(x.AvailabilitySlotId, out var sl) && sl.RoundNumber == rNum);
+                var slot = bk != null && slotById.TryGetValue(bk.AvailabilitySlotId, out var sl2) ? sl2 : null;
+
                 object? evalData = null;
                 string? recordingUrl = null;
                 bool transcriptShared = false;
@@ -300,52 +395,74 @@ namespace ARI.Application.CandidatePortal
                 string? hrFinalVerdict = null;
                 bool pendingHrReview = false;
 
-                if (evalDict.TryGetValue(s.Id, out var evaluation))
+                string status;
+                DateTimeOffset? scheduledAt = slot?.StartTime;
+
+                if (s != null)
                 {
-                    reviewDict.TryGetValue(evaluation.Id, out var review);
-                    bool sharedEval = review != null && review.ShareEvaluation;
-
-                    // Vòng đã hoàn tất + AI đã chấm nhưng HR chưa chia sẻ → đang chờ HR xác nhận.
-                    if (s.Status == "completed" && !sharedEval)
-                        pendingHrReview = true;
-
-                    if (review != null)
+                    status = s.Status;
+                    if (evalDict.TryGetValue(s.Id, out var evaluation))
                     {
-                        hrFinalVerdict = sharedEval ? review.FinalVerdict : null;
-                        transcriptShared = review.ShareTranscript;
-                        if (review.ShareRecording && !string.IsNullOrEmpty(s.RecordingUrl))
-                            recordingUrl = await _fileStorage.GetUrlAsync(s.RecordingUrl);
-                        if (review.ShareFeedback && !string.IsNullOrWhiteSpace(review.CandidateFeedback))
-                            hrFeedback = review.CandidateFeedback;
-                    }
+                        reviewDict.TryGetValue(evaluation.Id, out var review);
+                        bool sharedEval = review != null && review.ShareEvaluation;
 
-                    if (sharedEval)
-                    {
-                        evalData = new
+                        // Vòng đã hoàn tất + AI đã chấm nhưng HR chưa chia sẻ → đang chờ HR xác nhận.
+                        if (s.Status == "completed" && !sharedEval)
+                            pendingHrReview = true;
+
+                        if (review != null)
                         {
-                            evaluation.Id,
-                            evaluation.RoundNumber,
-                            evaluation.AiVerdict,
-                            evaluation.OverallScore,
-                            evaluation.Reasoning,
-                            evaluation.RecommendedNextStep,
-                            CriterionScores = PortalSupport.ParseCriterionScores(evaluation.CriterionScores),
-                            QuestionAnalyses = PortalSupport.ParseQuestionAnalyses(evaluation.QuestionAnalyses),
-                            LanguageAssessment = PortalSupport.ParseLanguageAssessment(evaluation.LanguageAssessment)
-                        };
+                            hrFinalVerdict = sharedEval ? review.FinalVerdict : null;
+                            transcriptShared = review.ShareTranscript;
+                            if (review.ShareRecording && !string.IsNullOrEmpty(s.RecordingUrl))
+                                recordingUrl = await _fileStorage.GetUrlAsync(s.RecordingUrl);
+                            if (review.ShareFeedback && !string.IsNullOrWhiteSpace(review.CandidateFeedback))
+                                hrFeedback = review.CandidateFeedback;
+                        }
+
+                        if (sharedEval)
+                        {
+                            evalData = new
+                            {
+                                evaluation.Id,
+                                evaluation.RoundNumber,
+                                evaluation.AiVerdict,
+                                evaluation.OverallScore,
+                                evaluation.Reasoning,
+                                evaluation.RecommendedNextStep,
+                                CriterionScores = PortalSupport.ParseCriterionScores(evaluation.CriterionScores),
+                                QuestionAnalyses = PortalSupport.ParseQuestionAnalyses(evaluation.QuestionAnalyses),
+                                LanguageAssessment = PortalSupport.ParseLanguageAssessment(evaluation.LanguageAssessment)
+                            };
+                        }
                     }
+                }
+                else if (slot != null && bk?.Status == "scheduled")
+                {
+                    // Hết giờ hẹn mà không có phiên phỏng vấn thật nào của vòng → quá hạn, không
+                    // để hiển thị mãi "đã xếp lịch" (ứng viên cần liên hệ nhân sự xếp lại).
+                    status = slot.EndTime <= nowUtc ? "missed" : "scheduled";
+                }
+                else if (inv != null)
+                {
+                    status = "invited";
+                }
+                else
+                {
+                    status = "not_started";
                 }
 
                 sessionDetails.Add(new
                 {
-                    s.Id,
-                    s.RoundNumber,
-                    s.RoundType,
-                    s.SessionType,
-                    s.Status,
-                    s.StartedAt,
-                    s.EndedAt,
-                    s.DurationSeconds,
+                    Id = s?.Id.ToString() ?? $"virtual_round_{app.Id}_{rNum}",
+                    RoundNumber = rNum,
+                    RoundType = s?.RoundType ?? rc?.RoundType ?? "screening",
+                    SessionType = s?.SessionType ?? "real",
+                    Status = status,
+                    ScheduledAt = scheduledAt,
+                    StartedAt = s?.StartedAt,
+                    EndedAt = s?.EndedAt,
+                    DurationSeconds = s?.DurationSeconds,
                     RecordingUrl = recordingUrl,
                     TranscriptShared = transcriptShared,
                     PendingHrReview = pendingHrReview,
@@ -372,9 +489,28 @@ namespace ARI.Application.CandidatePortal
                 app.Status,
                 app.CreatedAt,
                 app.UpdatedAt,
+                // Mốc "Đạt" = qua hết mọi vòng cấu hình của job (ADR-053).
+                TotalRounds = roundConfigs.Count == 0 ? 1 : Math.Max(1, roundConfigs.Max(r => r.RoundNumber)),
+                PassedRounds = sessions
+                    .Where(s => evalDict.TryGetValue(s.Id, out var ev)
+                        && reviewDict.TryGetValue(ev.Id, out var rv) && rv.FinalVerdict == "pass")
+                    .Select(s => s.RoundNumber)
+                    .Distinct()
+                    .Count(),
                 InterviewCode = activeCode == null ? null : new { activeCode.Code, activeCode.ExpiresAt, activeCode.RoundNumber },
                 UpcomingInterview = upcoming == null ? null : new { upcoming.StartTime, upcoming.Timezone, RoundNumber = upcoming.RoundNumber },
-                Sessions = sessionDetails
+                Sessions = sessionDetails,
+                PracticeSessions = practiceSessions.Select(p => new
+                {
+                    Id = p.Id.ToString(),
+                    p.RoundNumber,
+                    p.RoundType,
+                    p.Status,
+                    p.StartedAt,
+                    p.EndedAt,
+                    p.DurationSeconds,
+                    HasEvaluation = evalDict.ContainsKey(p.Id)
+                }).ToList()
             });
         }
     }
@@ -405,17 +541,7 @@ namespace ARI.Application.CandidatePortal
                 return Result.Failure<object>("Không tìm thấy hồ sơ ứng tuyển liên quan.", CommonErrorCodes.NotFound);
 
             // IDOR Protection + Auto-link
-            bool isOwner = app.CandidateAccountId == request.CandidateAccountId;
-            if (!isOwner && !app.CandidateAccountId.HasValue && !string.IsNullOrEmpty(request.Email) &&
-                string.Equals(app.CandidateEmail, request.Email, StringComparison.OrdinalIgnoreCase))
-            {
-                app.CandidateAccountId = request.CandidateAccountId;
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
-                await _unitOfWork.SaveChangesAsync();
-                isOwner = true;
-            }
-
-            if (!isOwner)
+            if (!await PortalSupport.TryEnsureOwnerAsync(app, request.CandidateAccountId, request.Email, _unitOfWork))
                 return Result.Failure<object>("Forbidden", CommonErrorCodes.Forbidden);
 
             var evaluations = await _unitOfWork.Repository<Evaluation>().FindAsync(e => e.SessionId == request.SessionId);

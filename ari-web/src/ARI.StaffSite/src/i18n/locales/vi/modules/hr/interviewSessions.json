@@ -33,7 +33,7 @@
     "noResultsHint": "Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái."
   },
   "table": {
-    "round": "Vòng {number}",
+    "round": "Vòng {{number}}",
     "practice": "Thử",
     "real": "Thật",
     "recording": "Ghi hình",

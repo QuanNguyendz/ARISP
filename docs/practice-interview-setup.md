@@ -1,6 +1,9 @@
 # Phỏng vấn thử (Practice) — Hướng dẫn cắm API key để test
 
-Luồng phỏng vấn thử đã được nối **end-to-end**. Code không chứa secret — bạn chỉ cần điền **4 API key** rồi chạy là test được.
+Luồng phỏng vấn thử đã được nối **end-to-end**. Code không chứa secret — bạn chỉ cần điền các API key rồi chạy là test được.
+
+> **⚠️ ADR-050 — Practice nay AUDIO-ONLY (không avatar).** `media-config` trả `heyGen=null` cho phiên `practice` **theo thiết kế** (không phải do thiếu key) → FE phát giọng ElevenLabs qua WebAudio + bot tĩnh, KHÔNG dựng LiveAvatar. Lý do: tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán. Để test practice **không cần** HeyGen/LiveAvatar key (mục 4 bên dưới chỉ cần cho phỏng vấn **thật**). Bật lại avatar cho practice: `Interview:PracticeUseAvatar=true`.
+> Thêm: practice có **trần 20 phút** (`Interview:PracticeMaxDurationMinutes`) — hết giờ AI nói câu kết rồi dừng; và **nhập kép** — thu âm điền vào ô trả lời, sửa/gõ tay được (nút Mic on/off).
 
 ## Pipeline thực tế (ADR-043/044)
 
@@ -92,16 +95,40 @@ Practice mở **1 lượt / vòng** sau khi ứng viên **đã pass CV + đặt 
 /interview/practice/:applicationId    (đăng nhập Candidate)
 ```
 
+### Dev quick-start (test nhanh, lặp lại) — ADR-050
+
+Không cần dựng lại cả phễu (apply → duyệt CV → xếp lịch). Backend chạy ở **Development** có sẵn endpoint seed idempotent:
+
+```bash
+# Tạo/tái dùng 1 hồ sơ đủ điều kiện phỏng vấn thử. Thêm ?fresh=true để tạo application mới.
+curl -X POST http://localhost:5000/api/dev/seed-practice
+```
+
+Trả về `credentials {email, login}` + `applicationId` + `practiceUrl`:
+
+```json
+{
+  "credentials": { "email": "practice.dev@arisp.local", "login": "Practice123!" },
+  "applicationId": "…",
+  "practiceUrl": "/interview/practice/…"
+}
+```
+
+Đăng nhập **CandidateSite** (`http://localhost:3000`) bằng `credentials` → mở `practiceUrl`.
+
+- Endpoint **chỉ hoạt động khi `ASPNETCORE_ENVIRONMENT=Development`** — production trả **404** (an toàn). Có thể gọi qua **Swagger** (`/swagger`) thay cho `curl`.
+- Để **chạy lại nhiều lần** trên cùng hồ sơ: đặt `Interview:PracticeAttemptsPerRound=0` trong `appsettings.Development.json` (đã có sẵn trong `.example`, mục "CẤU HÌNH DEV TIỆN TEST"). Giá trị 0 tắt giới hạn 1-lượt/vòng (cả cờ Portal lẫn server) — đúng cho dev, **đừng đặt 0 ở prod** (tốn phí media stack).
+
 ## Chạy
 
 ```bash
-# Backend
+# Backend (Development)
 cd ari-service/src/ARI.API && dotnet run
-# Frontend
-cd frontend && npm install && npm run dev
+# Frontend (monorepo ari-web — ADR-046)
+cd ari-web && npm install && npm run dev:candidate   # CandidateSite :3000
 ```
 
-Vào phòng → qua cổng kiểm tra mic/cam (ADR-040) → AI hỏi (avatar nói) → bạn trả lời bằng giọng (Deepgram nhận) → dừng ~1s để AI nhận, hoặc bấm **"Gửi trả lời"** → AI hỏi tiếp → bấm **Kết thúc** sinh Evaluation Report.
+Vào phòng → qua cổng kiểm tra mic/cam (ADR-040) → **đồng hồ 20 phút bắt đầu đếm ngược** → AI hỏi (audio-only, không avatar — ADR-050) → bạn trả lời bằng giọng (Deepgram điền vào ô, **sửa/gõ tay được**) → bấm **"Gửi trả lời"** → AI hỏi tiếp → **hết 20 phút** thì mic khoá, AI nói câu kết rồi dừng (hoặc bấm **Kết thúc**) → sinh Evaluation Report.
 
 ## Endpoint/Hub liên quan
 - `POST /api/interview/session/start` (CandidateOnly) — tạo phiên practice.

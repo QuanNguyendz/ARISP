@@ -35,6 +35,8 @@ const CandidateNotificationsPage = lazy(() => import('@pages/candidate/Notificat
 const CandidateSettingsPage = lazy(() => import('@pages/candidate/SettingsPage'))
 const InterviewSchedulePage = lazy(() => import('@pages/candidate/InterviewSchedulePage'))
 const CandidateSchedulePage = lazy(() => import('@pages/candidate/SchedulePage'))
+const CandidateOnlineTestPage = lazy(() => import('@pages/candidate/OnlineTestPage'))
+const PracticeReviewPage = lazy(() => import('@pages/candidate/PracticeReviewPage'))
 
 // Interview
 const InterviewRoomPage = lazy(() => import('@pages/interview/InterviewRoomPage'))
@@ -46,6 +48,7 @@ const FindJobPage = lazy(() => import('@pages/landing/FindJobPage'))
 const JobDetailPage = lazy(() => import('@pages/job-board/JobDetailPage'))
 const JobApplyPage = lazy(() => import('@pages/job-board/ApplyPage'))
 const KioskPage = lazy(() => import('@pages/kiosk/KioskPage'))
+const KioskInterviewPage = lazy(() => import('@pages/kiosk/KioskInterviewPage'))
 const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
 
 /** Fallback nhẹ khi đang tải chunk của page. */
@@ -127,6 +130,12 @@ function App() {
             <Route path="/candidate/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/candidate/notifications" element={<CandidateNotificationsPage />} />
             <Route path="/candidate/settings" element={<CandidateSettingsPage />} />
+            <Route
+              path="/candidate/online-test/:applicationId"
+              element={<CandidateOnlineTestPage />}
+            />
+            {/* Xem lại buổi phỏng vấn thử: transcript + nhận xét AI (ADR-051) */}
+            <Route path="/candidate/practice/:sessionId" element={<PracticeReviewPage />} />
           </Route>
 
           {/* Redirect các route ứng viên cũ (đã bị thay bằng job board / hồ sơ ứng tuyển mới) */}
@@ -181,9 +190,12 @@ function App() {
           />
 
           {/* ==================== KIOSK ROUTE ==================== */}
-          <Route path="/kiosk" element={<InterviewLayout />}>
-            <Route index element={<KioskPage />} />
-          </Route>
+          {/* Kiosk chạy TOÀN MÀN HÌNH: 2 trang tự dựng shell min-h-screen riêng nên KHÔNG bọc
+              InterviewLayout — layout đó là flex container khiến trang co lại vào góc trái,
+              lại thêm thanh tiêu đề không thuộc chế độ Kiosk. */}
+          <Route path="/kiosk" element={<KioskPage />} />
+          {/* Phòng phỏng vấn THẬT tại Kiosk — vào bằng token phiên sau khi nhập mã (ADR-052) */}
+          <Route path="/kiosk/interview" element={<KioskInterviewPage />} />
 
           <Route path="*" element={<Navigate to="/404" replace />} />
           <Route path="/404" element={<NotFoundPage />} />

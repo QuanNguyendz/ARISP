@@ -1,4 +1,6 @@
-import { apiClient } from '@ari/shared/api/apiClient';
+import { apiClient, getInterviewSessionToken } from '@ari/shared/api/apiClient';
+import { API_BASE_URL } from '@ari/shared/config/constants';
+import { useAuthStore } from '@ari/shared/store/auth';
 import type {
   InterviewSession,
   ScheduleInterviewRequest,
@@ -6,6 +8,7 @@ import type {
   StartSessionRequest,
   StartSessionResponse,
 } from '@ari/shared/types/interview';
+import type { MyPracticeReview, MyPracticeSessionItem } from '@ari/shared/types/application';
 
 interface SessionFilters {
   applicationId?: string;
@@ -51,10 +54,29 @@ export interface InterviewCodeSummary {
   candidateName: string;
 }
 
+/** Kết quả nhập Interview Code tại Kiosk (ADR-052). */
+export interface KioskSessionInfo {
+  valid: boolean;
+  /** Lý do khi mã không dùng được: not_found | used | expired. */
+  reason?: string | null;
+  sessionId?: string | null;
+  token?: string | null;
+  tokenExpiresAt?: string | null;
+  candidateName?: string | null;
+  jobTitle?: string | null;
+  roundNumber: number;
+  roundType?: string | null;
+  language: string;
+}
+
 export interface PracticeMediaConfig {
   sessionId: string;
   language: string;
   sessionType: string;
+  /** Trần thời lượng phiên (giây) để vẽ đếm ngược; 0 = không giới hạn (ADR-050). */
+  maxDurationSeconds?: number;
+  /** Mốc bắt đầu phiên (ISO UTC) để tính thời gian còn lại khớp giờ server. */
+  startedAtUtc?: string | null;
   deepgram?: { token: string; expiresInSeconds: number; model: string } | null;
   heyGen?: { token: string; serverUrl: string; avatarId?: string | null; voiceId?: string | null } | null;
 }
@@ -131,19 +153,77 @@ export const interviewService = {
     return data;
   },
 
-  async validateInterviewCode(code: string): Promise<{ valid: boolean; sessionId?: string }> {
-    const { data } = await apiClient.post<{ valid: boolean; sessionId?: string }>('/interview/validate-code', {
-      code,
+  // Kiosk: nhập mã 6 ký tự → BE tạo phiên phỏng vấn THẬT + trả token phạm vi phiên (ADR-052).
+  async validateInterviewCode(code: string): Promise<KioskSessionInfo> {
+    const { data } = await apiClient.post<KioskSessionInfo>('/interview/validate-code', { code });
+    return data;
+  },
+
+  // Kiosk: tải video buổi phỏng vấn thật lên storage (tự xoá theo hạn lưu phía BE).
+  async uploadRecording(
+    sessionId: string,
+    blob: Blob,
+    fileName = 'interview.webm'
+  ): Promise<{ saved: boolean; sizeBytes: number; expiresAt?: string | null }> {
+    const form = new FormData();
+    form.append('file', blob, fileName);
+    const { data } = await apiClient.post(`/interview/session/${sessionId}/recording`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // video vài chục MB — vượt timeout mặc định 30s
     });
     return data;
   },
 
-  async submitSignals(sessionId: string, signals: unknown): Promise<void> {
-    await apiClient.post(`/interview/${sessionId}/signals`, signals);
+  // Tín hiệu nghi vấn trong phòng phỏng vấn (Kiosk thoát toàn màn hình, chuyển tab… — ADR-054).
+  async reportSessionSignal(
+    sessionId: string,
+    signalType: string,
+    payload?: Record<string, unknown>
+  ): Promise<{ count: number }> {
+    const { data } = await apiClient.post<{ count: number }>(
+      `/interview/session/${sessionId}/signals`,
+      { signalType, payload: payload ? JSON.stringify(payload) : undefined }
+    );
+    return data;
+  },
+
+  /**
+   * Bản "gửi lúc trang đang đóng": request thường bị huỷ khi unload nên dùng fetch keepalive
+   * (sendBeacon không đặt được header Authorization).
+   */
+  reportSignalBeacon(sessionId: string, signalType: string): void {
+    const token = getInterviewSessionToken() ?? useAuthStore.getState().tokens?.accessToken;
+    if (!token) return;
+    try {
+      void fetch(`${API_BASE_URL}/interview/session/${sessionId}/signals`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ signalType, payload: JSON.stringify({ at: new Date().toISOString() }) }),
+      });
+    } catch {
+      /* trang đang đóng — không còn gì để xử lý */
+    }
   },
 
   async getUpcomingSessions(): Promise<InterviewSession[]> {
     const { data } = await apiClient.get<InterviewSession[]>('/candidate/upcoming-sessions');
+    return data;
+  },
+
+  // ===== Xem lại buổi phỏng vấn THỬ (riêng tư của ứng viên — ADR-051) =====
+
+  // Candidate: các buổi thử đã làm; truyền applicationId để lọc theo 1 hồ sơ.
+  async getMyPracticeSessions(applicationId?: string): Promise<MyPracticeSessionItem[]> {
+    const { data } = await apiClient.get<MyPracticeSessionItem[]>('/portal/practice/sessions', {
+      params: applicationId ? { applicationId } : undefined,
+    });
+    return data;
+  },
+
+  // Candidate: transcript đầy đủ + nhận xét AI của một buổi thử (không có verdict Pass/Not Pass).
+  async getMyPracticeReview(sessionId: string): Promise<MyPracticeReview> {
+    const { data } = await apiClient.get<MyPracticeReview>(`/portal/practice/sessions/${sessionId}`);
     return data;
   },
 };

@@ -379,7 +379,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-10">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4" /> {error || t('profile.saveFailed')}
         </div>
@@ -392,7 +392,7 @@ export default function ProfilePage() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Link to="/" className="hover:text-brand-600">
             {t('profile.home')}
@@ -402,17 +402,20 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[240px_1fr]">
-        {/* Section nav */}
-        <aside className="self-start lg:sticky lg:top-24">
-          <nav className="rounded-2xl border border-ink-200 bg-white p-2 text-sm shadow-card">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
+        {/* Section nav — horizontal scroll trên mobile, sticky aside từ lg */}
+        <aside className="lg:self-start lg:sticky lg:top-24">
+          <nav
+            aria-label="Profile sections"
+            className="-mx-4 -mr-2 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mr-0 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:text-sm lg:shadow-card"
+          >
             {SECTIONS.map((s) => {
               const Icon = s.icon
               return (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 hover:bg-ink-100"
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-50 sm:gap-2 sm:px-3.5 lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5 lg:text-sm lg:hover:bg-ink-100"
                 >
                   <Icon className="h-4 w-4 text-ink-400" /> {s.label}
                 </a>
@@ -450,14 +453,14 @@ export default function ProfilePage() {
             className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card scroll-mt-24"
           >
             <div className="h-24 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
-            <div className="px-6 pb-2">
+            <div className="px-4 sm:px-6 pb-2">
               <div className="-mt-10">
-                <span className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900">
+                <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
                   {initials}
                 </span>
               </div>
               <div className="mt-3">
-                <h1 className="font-display text-2xl font-extrabold leading-tight">
+                <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-tight">
                   {profile.fullName || t('profile.candidate')}
                 </h1>
                 <p className="text-sm text-ink-500">
@@ -683,7 +686,7 @@ export default function ProfilePage() {
               ))}
               <div className="inline-flex items-center gap-1 rounded-lg border border-dashed border-ink-300 px-2 py-1">
                 <input
-                  className="w-28 bg-transparent px-1 text-sm outline-none placeholder:text-ink-400"
+                  className="w-20 sm:w-28 bg-transparent px-1 text-sm outline-none placeholder:text-ink-400"
                   placeholder={t('profile.skillPlaceholder')}
                   value={skillInput}
                   onChange={(e) => setSkillInput(e.target.value)}
@@ -752,7 +755,7 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 {profile.experience.map((exp, i) => (
                   <div key={i} className="rounded-xl border border-ink-200 p-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <input
                         className={`${inputWrap} text-sm`}
                         placeholder={t('profile.jobTitle')}
@@ -811,7 +814,7 @@ export default function ProfilePage() {
                 {profile.education.map((edu, i) => (
                   <div
                     key={i}
-                    className="grid gap-3 rounded-xl border border-ink-200 p-4 sm:grid-cols-2"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-ink-200 p-4 sm:grid-cols-2"
                   >
                     <input
                       className={`${inputWrap} text-sm`}
@@ -831,9 +834,9 @@ export default function ProfilePage() {
                       value={edu.period}
                       onChange={(e) => updateEdu(i, 'period', e.target.value)}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex min-w-0 gap-2">
                       <input
-                        className={`${inputWrap} flex-1 text-sm`}
+                        className={`${inputWrap} min-w-0 flex-1 text-sm`}
                         placeholder={t('profile.notes')}
                         value={edu.note || ''}
                         onChange={(e) => updateEdu(i, 'note', e.target.value)}
@@ -982,18 +985,21 @@ function ProfileSkeleton() {
   return (
     <>
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6">
         <Skeleton className="h-4 w-48" />
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[240px_1fr] lg:gap-8">
         {/* Section nav + completeness */}
         <aside className="space-y-4 self-start">
-          <div className="rounded-2xl border border-ink-200 bg-white p-2 shadow-card">
+          <div className="-mx-4 -mr-2 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mr-0 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-2 lg:shadow-card">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+              <div
+                key={i}
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-ink-200 bg-white px-3.5 py-1.5 lg:w-full lg:whitespace-normal lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5"
+              >
                 <Skeleton className="h-4 w-4 rounded" />
-                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
               </div>
             ))}
           </div>
@@ -1012,8 +1018,8 @@ function ProfileSkeleton() {
           {/* Personal card with banner */}
           <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
             <Skeleton className="h-24 rounded-none" />
-            <div className="px-6 pb-2">
-              <Skeleton className="-mt-10 h-20 w-20 rounded-2xl ring-4 ring-white dark:ring-ink-900" />
+            <div className="px-4 sm:px-6 pb-2">
+              <Skeleton className="-mt-10 h-16 w-16 rounded-2xl ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20" />
               <div className="mt-3 space-y-2">
                 <Skeleton className="h-6 w-48" />
                 <Skeleton className="h-4 w-36" />
@@ -1038,7 +1044,7 @@ function ProfileSkeleton() {
 
           {/* Các section card còn lại */}
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div key={i} className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
               <Skeleton className="mb-4 h-5 w-44" />
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: 6 }).map((_, j) => (

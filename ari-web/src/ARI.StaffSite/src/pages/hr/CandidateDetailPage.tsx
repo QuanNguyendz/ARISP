@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
+import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
@@ -40,6 +41,10 @@ import {
 import { JobDetailSkeleton } from '../recruiter/_skeletons'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 
+function apiErr(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
+}
+
 export default function HrCandidateDetailPage() {
   const { t } = useTranslation('modules/hr/candidateDetail')
   const { id } = useParams<{ id: string }>()
@@ -57,24 +62,24 @@ export default function HrCandidateDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const [a, ev, ss] = await Promise.all([
-          applicationService.getHrApplicationById(id),
-          evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
-          interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
-        ])
-        setApp(a)
-        setEvals(ev)
-        setSessions(ss)
-      } catch (e: any) {
-        setError(e?.response?.data?.message || t('loadingError'))
-      } finally {
-        setLoading(false)
-      }
-    })()
+      ; (async () => {
+        setLoading(true)
+        setError('')
+        try {
+          const [a, ev, ss] = await Promise.all([
+            applicationService.getHrApplicationById(id),
+            evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
+            interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
+          ])
+          setApp(a)
+          setEvals(ev)
+          setSessions(ss)
+        } catch (e) {
+          setError(apiErr(e, t('loadingError')))
+        } finally {
+          setLoading(false)
+        }
+      })()
   }, [id, t])
 
   const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])
@@ -87,8 +92,8 @@ export default function HrCandidateDetailPage() {
     try {
       await applicationService.sendInvite(id)
       setNotice(t('sent'))
-    } catch (e: any) {
-      setError(e?.response?.data?.message || t('sendError'))
+    } catch (e) {
+      setError(apiErr(e, t('sendError')))
     } finally {
       setInviting(false)
     }
@@ -102,8 +107,8 @@ export default function HrCandidateDetailPage() {
     try {
       const r = await interviewService.generateCode(id)
       setCode({ code: r.code, expiresAt: r.expiresAt })
-    } catch (e: any) {
-      setError(e?.response?.data?.message || t('codeError'))
+    } catch (e) {
+      setError(apiErr(e, t('codeError')))
     } finally {
       setCoding(false)
     }
@@ -120,10 +125,19 @@ export default function HrCandidateDetailPage() {
     }
   }
 
+  const refreshApp = async () => {
+    if (!id) return
+    try {
+      setApp(await applicationService.getHrApplicationById(id))
+    } catch {
+      /* giữ nguyên hồ sơ hiện tại nếu refetch lỗi */
+    }
+  }
+
   const roundLabel = (num: number, type?: string) =>
     `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
 
-  const sessionTypeLabel = (type?: string) => (type === 'practice' ? t('practice') : t('real'))
+  // Chỉ hiển thị phiên/đánh giá THẬT — backend đã lọc bỏ phiên thử (riêng tư của ứng viên, ADR-051).
 
   if (loading) return <JobDetailSkeleton />
   if (!app) {
@@ -141,7 +155,7 @@ export default function HrCandidateDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 p-6 dark:bg-ink-950 lg:p-8">
+    <div className="min-h-screen bg-ink-50 p-4 sm:p-6 dark:bg-ink-950 lg:p-8">
       <Link
         to="/hr/candidates"
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
@@ -156,9 +170,9 @@ export default function HrCandidateDetailPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-lg font-bold text-white">
+      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-base sm:text-lg font-bold text-white sm:h-16 sm:w-16">
             {initials(app.candidateName || app.candidateEmail)}
           </span>
           <div className="min-w-0">
@@ -205,7 +219,7 @@ export default function HrCandidateDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
               <ClipboardList className="h-5 w-5 text-brand-600 dark:text-brand-400" />{' '}
               {t('reportTitle')} {t('reportCount', { count: evals.length })}
@@ -224,7 +238,7 @@ export default function HrCandidateDetailPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(ev.roundNumber)} · {sessionTypeLabel(ev.sessionType)}
+                        {roundLabel(ev.roundNumber)}
                       </p>
                       <p className="text-xs text-ink-400">
                         {timeAgo(ev.createdAt)}
@@ -249,7 +263,7 @@ export default function HrCandidateDetailPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
               <Video className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('sessionTitle')}{' '}
               {t('sessionCount', { count: mySessions.length })}
@@ -267,7 +281,7 @@ export default function HrCandidateDetailPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(s.roundNumber, s.roundType)} · {sessionTypeLabel(s.sessionType)}
+                        {roundLabel(s.roundNumber, s.roundType)}
                       </p>
                       <p className="flex items-center gap-1 text-xs text-ink-400">
                         <Clock className="h-3 w-3" />
@@ -356,7 +370,7 @@ export default function HrCandidateDetailPage() {
                   </p>
                   <button
                     onClick={copyCode}
-                    className="flex w-full items-center justify-between font-mono text-lg font-bold tracking-widest text-emerald-700 dark:text-emerald-300"
+                    className="flex w-full items-center justify-between font-mono text-base sm:text-lg font-bold tracking-widest text-emerald-700 dark:text-emerald-300"
                   >
                     {code.code}
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -365,6 +379,19 @@ export default function HrCandidateDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Xếp lịch phỏng vấn (HR gán cứng 1 giờ cho ứng viên — ADR-048) */}
+          <AssignSchedulePanel
+            applicationId={app.id}
+            jobPostingId={app.jobPostingId}
+            round={app.currentRound || 1}
+            hasScheduled={!!app.hasScheduledInterview}
+            scheduledAt={app.interviewDate}
+            confirmationStatus={app.scheduleConfirmationStatus}
+            declineReason={app.scheduleDeclineReason}
+            status={app.status}
+            onAssigned={refreshApp}
+          />
 
           <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
             <h2 className="mb-4 text-sm font-semibold text-ink-900 dark:text-white">{t('info')}</h2>

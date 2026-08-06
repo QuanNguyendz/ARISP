@@ -122,13 +122,13 @@ export default function RecruiterInterviewCodePage() {
         <span dangerouslySetInnerHTML={{ __html: t('infoText') }} />
       </div>
 
-      <div className="mb-5 flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 max-w-md">
-        <Search className="h-4 w-4 text-ink-400" />
+      <div className="mb-5 flex min-w-0 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 w-full max-w-md">
+        <Search className="h-4 w-4 shrink-0 text-ink-400" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t('searchPlaceholder')}
-          className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
+          className="min-w-0 w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
         />
       </div>
 

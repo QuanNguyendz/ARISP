@@ -371,7 +371,7 @@ export default function CandidateLoginPage() {
             </Link>
           </p>
 
-          <p className="mt-3 text-center text-xs text-ink-400">
+          <p className="mt-3 text-center text-xs text-ink-400 hidden">
             {t('candidateLogin.isRecruiter')}
             <Link
               to="/auth/login"

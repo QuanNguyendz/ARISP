@@ -13,7 +13,7 @@ namespace ARI.Application.Interfaces
     {
         Task<Result<InterviewCode>> GenerateCodeAsync(Guid applicationId, int? roundNumber, Guid createdByUserId, CancellationToken ct = default);
         Task<Result<List<InterviewCode>>> GenerateBatchAsync(List<Guid> applicationIds, int? roundNumber, Guid createdByUserId, CancellationToken ct = default);
-        Task<Result<(bool Valid, Guid? SessionId)>> ValidateCodeAsync(string code, CancellationToken ct = default);
+        Task<Result<KioskSessionResponse>> ValidateCodeAsync(string code, CancellationToken ct = default);
         Task<List<InterviewCodeSummaryDto>> GetCodesByJobAsync(Guid jobPostingId, CancellationToken ct = default);
     }
 }

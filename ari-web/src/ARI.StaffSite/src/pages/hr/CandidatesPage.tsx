@@ -240,7 +240,7 @@ export default function CandidatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 dark:bg-ink-950 p-6 lg:p-8">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {notice && <NoticeAlert message={notice} onDismiss={() => setNotice('')} />}
@@ -293,6 +293,7 @@ export default function CandidatesPage() {
       {!loading && !error && filtered.length > 0 && (
         <div className="p-2 sm:p-4 rounded-2xl bg-white dark:bg-white/5 border border-ink-200 dark:border-white/10">
           <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-ink-200 dark:border-white/10">
@@ -396,6 +397,7 @@ export default function CandidatesPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

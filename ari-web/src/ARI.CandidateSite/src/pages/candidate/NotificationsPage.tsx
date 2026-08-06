@@ -191,7 +191,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-6">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       {/* Breadcrumb */}
       <div className="mb-4 flex items-center gap-2 text-sm text-ink-400">
         <Link to="/jobs" className="hover:text-brand-600">
@@ -264,7 +264,7 @@ export default function NotificationsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-12 text-center shadow-card">
+        <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center shadow-card sm:p-12">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
             <Bell className="h-6 w-6" />
           </div>

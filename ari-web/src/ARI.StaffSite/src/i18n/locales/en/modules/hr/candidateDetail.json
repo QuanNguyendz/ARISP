@@ -15,7 +15,7 @@
   "sessionTitle": "Interview Sessions",
   "noSession": "No interview sessions yet.",
   "sessionCount": "({count})",
-  "round": "Round {number}",
+  "round": "Round {{number}}",
   "practice": "Practice",
   "real": "Real",
   "screening": "Screening",

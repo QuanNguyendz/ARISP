@@ -552,7 +552,7 @@ function FilterSidebar({
                 title={t('jobs.filters.workLocation')}
                 selectedCount={filters.workModes.length}
               >
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {facets.workModes.map((mode) => (
                     <button
                       key={mode.value}
@@ -852,6 +852,7 @@ export default function FindJob() {
   const [maxSalary, setMaxSalary] = useState<number>(220)
   const [salaryIsNegotiable, setSalaryIsNegotiable] = useState<boolean>(false)
   const [page, setPage] = useState(1)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const listTopRef = useRef<HTMLDivElement>(null)
 
   // Load facets từ API chỉ 1 lần khi mount
@@ -1017,7 +1018,7 @@ export default function FindJob() {
       {/* Hero + search */}
       <section className="relative border-b border-ink-200 bg-white">
         <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-ai-50" />
-        <div className="relative mx-auto max-w-6xl px-6 py-14">
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-14">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-ai-50 px-3 py-1 text-xs font-semibold text-ai-700 ring-1 ring-ai-200">
             <Sparkles className="w-3.5 h-3.5" />
             {t('jobs.aiInterviewing')}
@@ -1081,9 +1082,10 @@ export default function FindJob() {
       </section>
 
       {/* Body: filters + list */}
-      <main className="mx-auto max-w-6xl px-6 py-10 grid gap-8 lg:grid-cols-[260px_1fr]">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 grid gap-8 lg:grid-cols-[260px_1fr]">
         {/* Filters */}
-        <FilterSidebar
+        <div className="hidden lg:block">
+          <FilterSidebar
           filters={filters}
           setFilters={setFilters}
           onClearAll={clearFilters}
@@ -1096,6 +1098,62 @@ export default function FindJob() {
           salaryIsNegotiable={salaryIsNegotiable}
           setSalaryIsNegotiable={setSalaryIsNegotiable}
         />
+        </div>
+
+        {/* Mobile filter toggle */}
+        <button
+          type="button"
+          onClick={() => setShowMobileFilters(true)}
+          className="lg:hidden fixed bottom-6 right-6 z-30 flex items-center gap-2 rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-brand-700"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {t('jobs.filters.title')}
+        </button>
+
+        {/* Mobile filter overlay */}
+        {showMobileFilters && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowMobileFilters(false)}
+            />
+            <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white dark:bg-ink-900 shadow-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-ink-900">
+                <span className="flex items-center gap-2 font-semibold text-ink-900 dark:text-white">
+                  <SlidersHorizontal className="h-4 w-4 text-brand-600" />
+                  {t('jobs.filters.title')}
+                </span>
+                <button
+                  onClick={() => setShowMobileFilters(false)}
+                  className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <FilterSidebar
+                  filters={filters}
+                  setFilters={setFilters}
+                  onClearAll={() => {
+                    clearFilters()
+                    setShowMobileFilters(false)
+                  }}
+                  facets={facets}
+                  locationFacets={locationFacets}
+                  minSalary={minSalary}
+                  setMinSalary={setMinSalary}
+                  maxSalary={maxSalary}
+                  setMaxSalary={setMaxSalary}
+                  salaryIsNegotiable={salaryIsNegotiable}
+                  setSalaryIsNegotiable={(v) => {
+                    setSalaryIsNegotiable(v)
+                    setShowMobileFilters(false)
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Job List */}
         <section>
@@ -1110,10 +1168,12 @@ export default function FindJob() {
           )}
 
           {/* Section Header */}
-          <div ref={listTopRef} className="flex items-center justify-between scroll-mt-24">
-            <h2 className="font-display text-lg font-bold text-ink-900">
-              {loading ? t('jobs.loading') : t('jobs.jobCount', { count: totalCount })}
-            </h2>
+          <div ref={listTopRef} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between scroll-mt-24">
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-lg font-bold text-ink-900">
+                {loading ? t('jobs.loading') : t('jobs.jobCount', { count: totalCount })}
+              </h2>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-ink-600 font-medium">{t('jobs.sortBy')}:</span>
               <select
@@ -1149,7 +1209,7 @@ export default function FindJob() {
                 <p className="text-sm text-ink-500">{t('jobs.loadingJobs')}</p>
               </div>
             ) : totalCount === 0 ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-12 text-center">
+              <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center sm:p-12">
                 <p className="text-ink-500">{t('jobs.noJobs')}</p>
                 <button
                   onClick={clearFilters}
@@ -1184,7 +1244,7 @@ export default function FindJob() {
 
       {/* Footer */}
       <footer className="border-t border-ink-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-ink-400 flex items-center justify-between">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-8 text-sm text-ink-400 sm:px-6">
           <span>{t('footer.copyright', { year: new Date().getFullYear() })}</span>
           <span className="flex items-center gap-1.5">
             <Check className="w-4 h-4" />

@@ -157,9 +157,18 @@ namespace ARI.Infrastructure.Data
                 .Property(q => q.Options)
                 .HasColumnType("jsonb");
 
+            modelBuilder.Entity<OnlineTestQuestion>()
+                .Property(q => q.CorrectOptions)
+                .HasColumnType("jsonb");
+
             modelBuilder.Entity<OnlineTestSubmission>()
                 .Property(s => s.SelectedAnswers)
                 .HasColumnType("jsonb");
+
+            // Mỗi hồ sơ chỉ nộp bài trắc nghiệm 1 lần / vòng (single-attempt).
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .HasIndex(s => new { s.ApplicationId, s.RoundNumber })
+                .IsUnique();
 
             modelBuilder.Entity<InterviewRoundConfig>()
                 .HasIndex(r => new { r.JobPostingId, r.RoundNumber })
@@ -236,6 +245,11 @@ namespace ARI.Infrastructure.Data
                 .HasIndex(s => s.CandidateAccountId).HasDatabaseName("ix_saved_jobs_candidate_account_id");
             modelBuilder.Entity<InterviewSession>()
                 .HasIndex(s => s.ApplicationId).HasDatabaseName("ix_interview_sessions_application_id");
+            // Đường đọc transcript (xem lại buổi thử — ADR-051) quét theo session_id.
+            modelBuilder.Entity<Question>()
+                .HasIndex(q => q.SessionId).HasDatabaseName("ix_questions_session_id");
+            modelBuilder.Entity<Answer>()
+                .HasIndex(a => a.SessionId).HasDatabaseName("ix_answers_session_id");
             modelBuilder.Entity<Evaluation>()
                 .HasIndex(e => e.SessionId).HasDatabaseName("ix_evaluations_session_id");
             modelBuilder.Entity<Evaluation>()

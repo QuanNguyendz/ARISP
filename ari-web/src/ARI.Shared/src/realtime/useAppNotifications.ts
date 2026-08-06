@@ -5,6 +5,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import {
   STAFF_NOTIF_REFRESH_EVENT,
   CANDIDATE_DATA_REFRESH_EVENT,
+  STAFF_ONLINE_TEST_REFRESH_EVENT,
 } from '@ari/shared/fservices/notification/notificationService'
 
 import { API_BASE_URL } from '@ari/shared/config/constants'
@@ -14,6 +15,10 @@ const refreshStaffBell = () => window.dispatchEvent(new Event(STAFF_NOTIF_REFRES
 
 /** Yêu cầu các trang candidate dùng state cục bộ (ApplicationsPage...) refetch nền. */
 const refreshCandidateData = () => window.dispatchEvent(new Event(CANDIDATE_DATA_REFRESH_EVENT))
+
+/** Yêu cầu trang bảng điểm trắc nghiệm (state cục bộ) tải lại khi có ứng viên nộp bài. */
+const refreshOnlineTestResults = () =>
+  window.dispatchEvent(new Event(STAFF_ONLINE_TEST_REFRESH_EVENT))
 
 // Remove trailing "/api" if present and append hub path
 const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications'
@@ -78,6 +83,29 @@ export const useAppNotifications = () => {
           refreshStaffBell() // Chuông nhân sự: ứng viên mới ứng tuyển
           break
 
+        case 'ReceiveScheduleResponse':
+          // Ứng viên xác nhận/báo bận lịch phỏng vấn → cập nhật hồ sơ + chuông nhân sự.
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({ queryKey: ['application', payload?.applicationId] })
+          queryClient.invalidateQueries({
+            queryKey: ['job', payload?.jobPostingId, 'applications'],
+          })
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          refreshStaffBell() // Chuông nhân sự: ứng viên phản hồi lịch phỏng vấn
+          break
+
+        case 'ReceiveOnlineTestSubmitted':
+          // Ứng viên hoàn thành bài thi trắc nghiệm → cập nhật bảng điểm + danh sách + chuông nhân sự.
+          queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({
+            queryKey: ['job', payload?.jobPostingId, 'applications'],
+          })
+          queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          refreshOnlineTestResults() // Bảng điểm trắc nghiệm tải lại tức thời
+          refreshStaffBell() // Chuông nhân sự: ứng viên nộp bài thi trắc nghiệm
+          break
+
         case 'ReceivePublicJobUpdate':
           // A job was approved/closed/archived, refresh public job board
           queryClient.invalidateQueries({ queryKey: ['public-jobs'] })
@@ -115,6 +143,7 @@ export const useAppNotifications = () => {
           // Đồng thời cập nhật dữ liệu hồ sơ ứng tuyển (mã phỏng vấn mới, đổi trạng thái...):
           // react-query cho trang dùng cache + DOM event cho trang dùng state cục bộ.
           queryClient.invalidateQueries({ queryKey: ['applications'] })
+          queryClient.invalidateQueries({ queryKey: ['my-schedule'] }) // Trang lịch phỏng vấn (xếp/xếp lại)
           refreshCandidateData()
           break
 

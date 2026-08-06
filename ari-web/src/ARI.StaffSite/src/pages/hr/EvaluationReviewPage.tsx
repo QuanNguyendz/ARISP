@@ -11,12 +11,11 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Play,
-  FileText,
   Languages,
   ArrowLeft,
   Bell,
 } from 'lucide-react'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton } from './_skeletons'
@@ -199,7 +198,7 @@ export default function EvaluationReviewPage() {
               key={stat.label}
               className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
             >
-              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
+              <div className="font-display text-xl font-extrabold text-ink-900 dark:text-white sm:text-2xl">
                 {stat.value}
               </div>
               <div className="text-sm text-ink-500 dark:text-ink-400 mt-1">{stat.label}</div>
@@ -222,7 +221,7 @@ export default function EvaluationReviewPage() {
             {evaluations.map((evaluation) => (
               <div
                 key={evaluation.id}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card hover:shadow-card-hover transition cursor-pointer"
+                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card hover:shadow-card-hover transition cursor-pointer"
                 onClick={() => handleOpenDetail(evaluation.id)}
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -300,33 +299,33 @@ export default function EvaluationReviewPage() {
   // Detail view
   return (
     <>
-      <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-6 h-16">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-4 sm:px-6 h-14 sm:h-16">
         <button
           onClick={closeDetail}
-          className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2 text-sm text-ink-400">
-          <Link to="#" onClick={closeDetail} className="hover:text-brand-600 dark:text-brand-400">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-400">
+          <Link to="#" onClick={closeDetail} className="shrink-0 hover:text-brand-600 dark:text-brand-400">
             {t('evaluations')}
           </Link>
-          <ChevronRight className="w-4 h-4" />
-          <span className="text-ink-600 dark:text-ink-300 font-medium">
+          <ChevronRight className="h-4 w-4 shrink-0" />
+          <span className="truncate text-ink-600 dark:text-ink-300 font-medium">
             {selectedEvaluation.candidateName} · {selectedEvaluation.jobTitle}
           </span>
         </div>
-        <button className="ml-auto relative grid h-10 w-10 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
+        <button className="ml-auto relative grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
           <Bell className="w-5 h-5 text-ink-600 dark:text-ink-400" />
           <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
         </button>
       </header>
 
-      <main className="p-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+      <main className="p-4 sm:p-6 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT: report */}
         <div className="space-y-6">
           {/* Candidate header */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 font-display text-lg font-extrabold">
@@ -374,7 +373,7 @@ export default function EvaluationReviewPage() {
           </div>
 
           {/* Scores */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card">
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
             <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
               {t('criterionScores')}
             </h2>
@@ -405,21 +404,21 @@ export default function EvaluationReviewPage() {
                   <Languages className="w-4 h-4" />
                   {t('languageAssessment')} ({selectedEvaluation.languageAssessment.language})
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-3 text-center text-sm">
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs sm:gap-3 sm:text-sm">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.cefrLevel ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('cefr')}</div>
                   </div>
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.fluency ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('fluency')}</div>
                   </div>
-                  <div className="rounded-lg bg-white p-2">
-                    <div className="font-display text-lg font-extrabold text-ink-900">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
                       {selectedEvaluation.languageAssessment.vocabulary ?? '—'}
                     </div>
                     <div className="text-xs text-ink-400">{t('vocabulary')}</div>
@@ -432,7 +431,7 @@ export default function EvaluationReviewPage() {
           {/* Per-question */}
           {selectedEvaluation.questionAnalyses &&
             selectedEvaluation.questionAnalyses.length > 0 && (
-              <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+              <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
                 <h2 className="font-display text-lg font-bold mb-4">{t('questionAnalysis')}</h2>
                 <div className="space-y-3">
                   {selectedEvaluation.questionAnalyses.map((item, index) => (
@@ -468,24 +467,40 @@ export default function EvaluationReviewPage() {
               </div>
             )}
 
-          {/* Recording / transcript */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+          {/* Bản ghi hình buổi phỏng vấn thật (ADR-052) — tự xoá khi hết hạn lưu */}
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
             <h2 className="font-display text-lg font-bold mb-4">{t('recordingTranscript')}</h2>
-            <div className="aspect-video rounded-xl bg-ink-900 grid place-items-center text-ink-400">
-              <button className="grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
-                <Play className="w-6 h-6" />
-              </button>
-            </div>
-            <button className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:underline">
-              <FileText className="w-4 h-4" /> {t('viewFullTranscript')}
-            </button>
+            {selectedEvaluation.recordingUrl ? (
+              <>
+                <video
+                  src={resolveAssetUrl(selectedEvaluation.recordingUrl)}
+                  controls
+                  className="aspect-video w-full rounded-xl bg-ink-900"
+                />
+                {selectedEvaluation.recordingExpiresAt && (
+                  <p className="mt-2 text-xs text-ink-500">
+                    {t('recordingExpiresAt', {
+                      date: new Date(selectedEvaluation.recordingExpiresAt).toLocaleString(),
+                    })}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="aspect-video rounded-xl bg-ink-100 dark:bg-white/5 grid place-items-center px-6 text-center text-sm text-ink-500">
+                {selectedEvaluation.recordingDeletedAt
+                  ? t('recordingDeleted', {
+                      date: new Date(selectedEvaluation.recordingDeletedAt).toLocaleDateString(),
+                    })
+                  : t('recordingNone')}
+              </div>
+            )}
           </div>
         </div>
 
         {/* RIGHT: verdict & decision */}
         <aside className="space-y-5 xl:sticky xl:top-24 self-start">
           {/* AI verdict */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card text-center">
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card text-center">
             <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700">
               <Sparkles className="w-4 h-4" /> {t('aiVerdict')}
             </div>
@@ -497,7 +512,7 @@ export default function EvaluationReviewPage() {
                 t('verdict.notPass')
               )}
             </div>
-            <div className="mt-4 font-display text-5xl font-extrabold leading-none">
+            <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none">
               {selectedEvaluation.overallScore ?? 0}
               <span className="text-lg text-ink-400">/100</span>
             </div>
@@ -511,7 +526,7 @@ export default function EvaluationReviewPage() {
 
           {/* HR decision */}
           {!selectedEvaluation.hrReview ? (
-            <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
               <h3 className="font-display font-bold">{t('hrDecision')}</h3>
               <p className="mt-1 text-sm text-ink-500">{t('hrDecisionHint')}</p>
 
@@ -589,7 +604,7 @@ export default function EvaluationReviewPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-card">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6 shadow-card">
               <h3 className="font-display font-bold text-emerald-800">{t('confirmed')}</h3>
               <p className="mt-1 text-sm text-emerald-700">
                 {t('verdict')}:{' '}

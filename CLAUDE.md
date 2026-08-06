@@ -45,8 +45,10 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 - **Mở tự động cho từng vòng** sau khi ứng viên **đã pass CV + đặt lịch buổi phỏng vấn thật của vòng đó** (qua Portal). Vào thẳng route Portal (`/practice/:applicationId`) — **KHÔNG cần Interview Code, không cần magic link riêng**. Giới hạn **1 lượt / VÒNG**; cửa sổ dùng = từ lúc đặt lịch đến giờ phỏng vấn thật của vòng — xem ADR-020/027
 - **Practice giống hệt buổi thật sắp tới của vòng:** cùng `round_type` (technical → technical, sơ loại/ngôn ngữ → sơ loại/ngôn ngữ) + cùng ngôn ngữ (chung `InterviewRoundConfig` theo `RoundNumber`)
 - RAG chỉ dùng JD + CV (không load Playbook nội bộ)
-- **Đầy đủ pipeline công nghệ như Real** (STT/RAG/GPT-4o/TTS/Avatar + Hybrid Idle). **Không quay video — chỉ lưu transcript** + Evaluation Report
-- Chi phí practice **do doanh nghiệp trả** (mỗi vòng = 1 lượt thử + 1 lượt thật). Tối ưu bằng gating theo phễu, không cắt tech — xem ADR-038
+- **Audio-only (ADR-050): KHÔNG avatar** — giữ đủ STT/RAG/GPT-4o + **giọng ElevenLabs** (phát qua WebAudio), bot tĩnh. Bỏ avatar để tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit. **Không quay video — chỉ lưu transcript** + Evaluation Report
+- **Trần 20 phút (ADR-050):** đồng hồ đếm ngược; hết giờ → khoá mic → AI nói 1 câu kết thúc → đóng phiên (`Interview:PracticeMaxDurationMinutes`)
+- **Nhập kép (ADR-050):** thu âm điền vào ô trả lời, ứng viên **sửa/gõ tay** được (mic on/off) trước khi Gửi — sửa đoạn thu âm nghe sai
+- Chi phí practice **do doanh nghiệp trả** (mỗi vòng = 1 lượt thử + 1 lượt thật). Tối ưu bằng gating theo phễu + bỏ avatar practice — xem ADR-038/048
 
 ### Real (Phỏng vấn thật – On-site)
 - Bắt buộc tại văn phòng công ty, đến đúng khung giờ đã đặt lịch (Availability Slot của vòng)
@@ -128,51 +130,8 @@ Candidate đăng nhập bằng magic link → xem recording, transcript, Evaluat
 
 ## Coding Rules
 
-### Backend (C# / ASP.NET Core .NET 8)
-
-**Naming:**
-- Namespace: `ARI.<Layer>.<Module>` (ví dụ: `ARI.Application.Interview`) — PascalCase
-- Class: PascalCase | Interface: prefix `I` | Method: PascalCase + suffix `Async` cho async
-- Private field: `_camelCase` | Constant: `UPPER_SNAKE_CASE`
-
-**Project Structure (Clean Architecture):**
-```
-ari-service/
-├── ARI.sln
-├── src/
-│   ├── ARI.API/            # Controllers, Middleware, Program.cs
-│   ├── ARI.Application/    # Use Cases (CQRS), DTOs, Interfaces, Validators
-│   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
-│   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
-└── tests/                # Unit / functional tests
-```
-
-**Patterns bắt buộc:** Repository Pattern, CQRS (MediatR nếu phức tạp), Result Pattern (không throw exception cho business errors), Dependency Injection, Async/Await cho mọi I/O.
-
-**Security:** Không hardcode secrets – luôn dùng `appsettings.json` + env vars. JWT bắt buộc mọi protected endpoint. CORS chặt – chỉ allow frontend domain.
-
-### Frontend (React + TypeScript)
-
-**Naming:** Component: PascalCase | Hook: prefix `use` | Util: camelCase | Type/Interface: PascalCase
-
-**File Structure (`ari-web/` — npm workspaces, 3 package — ADR-046):**
-```
-ari-web/                         # workspaces root (1 package-lock.json), tsconfig.base.json
-├── src/ARI.Shared/              # @ari/shared — dùng chung, import source-level qua @ari/shared/*
-│   ├── tailwind-preset.cjs      # theme (ink/brand/ai) dùng chung
-│   └── src/{api, fservices, ui, guards, document, media, realtime,
-│            store, types, config, utils, authflows, i18n, styles}
-├── src/ARI.CandidateSite/       # @ari/candidate-site (port 3000, public deploy)
-│   └── src/{app(main+App+layouts), pages(theo domain), components, fservices, i18n}
-└── src/ARI.StaffSite/           # @ari/staff-site (port 3001, nội bộ)
-    └── src/{app(main+App+layouts), pages(hr/recruiter/super-admin), components, fservices, utils, i18n}
-```
-- **`services/` → `fservices/`** (quy tắc "f" prefix). `fservices` mirror tên feature slice backend (tầng API).
-- **Mỗi folder một nhiệm vụ:** `app/` = routing+layouts, `pages/` = màn theo domain, `fservices/` = gọi API, `components/` = UI tái dùng.
-- Code dùng chung ở `ARI.Shared`; hướng phụ thuộc 1 chiều: site → Shared (Shared không import site).
-- Dev: `npm run dev:candidate` (3000) / `npm run dev:staff` (3001).
-
-**Patterns:** Không fetch API trong component – qua `fservices/`. Dùng custom hook cho logic tái sử dụng. Không dùng `any`.
+> **Backend** (C# / ASP.NET Core .NET 8): quy ước chi tiết ở [ari-service/CLAUDE.md](ari-service/CLAUDE.md) — tự nạp khi làm trong `ari-service/`.
+> **Frontend** (React + TypeScript, npm workspaces): quy ước chi tiết ở [ari-web/CLAUDE.md](ari-web/CLAUDE.md) — tự nạp khi làm trong `ari-web/`.
 
 ### Database (PostgreSQL + EF Core)
 
@@ -235,7 +194,7 @@ Type: `feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `setup`
 ## Trạng thái Tasks
 
 **Phase hiện tại:** Phase 1–2 (foundation và auth đã xong, đang tiến vào Phase 2a–3)  
-**Cập nhật lần cuối:** 2026-06-14
+**Cập nhật lần cuối:** 2026-08-05
 
 ### Completed (tóm tắt)
 - Phase 0: GitHub repo, branch strategy, .gitignore, project structure, backend/frontend boilerplate, Docker, Nginx
@@ -305,6 +264,13 @@ _Chưa có task nào đang thực hiện._
 | ADR-045 | Refactor Clean Architecture chuẩn JT template: `ari-service/` (src/+tests/), namespace `ARI.*`, CQRS + MediatR **pin [12.5.0]** (v13 commercial), FluentValidation, thin controllers, DI per-project, schema 100% migrations. SessionHub gọi thẳng `IInterviewService` (không qua MediatR — latency ADR-006) |
 | ADR-046 | Refactor FE mirror ADR-045: `frontend/` → `ari-web/` (npm workspaces), tách **ARI.CandidateSite** (public, 3000) + **ARI.StaffSite** (nội bộ, 3001) + **ARI.Shared**. `services/`→`fservices/` (quy tắc "f"). Tách concern app/pages/fservices/components; import Shared qua `@ari/shared/*`. URL/API/DTO/localStorage/hub freeze. Nginx host-based 2 origin (localhost / staff.localhost); CORS thêm `Frontend:CandidateBaseUrl`. `configureApiClient` refresh riêng mỗi site (candidate = `/auth/candidate/refresh`) |
 | ADR-047 | CI/CD GitHub Actions: build 4 image ở runner → GHCR → VPS chỉ `pull && up -d` (không build trên VPS 3.8GB RAM). **`main` = production** (deploy tự động), `develop` = integration. `ci.yml` chặn PR không build được. Config prod hết drift nhờ tách `nginx/conf.d.prod/`; `ports: !reset []` (không phải `ports: []`) mới thực sự đóng cổng. `VITE_API_BASE_URL=/api` tương đối → 1 image dùng mọi domain. 2 origin: `arisp.io.vn` + `staff.arisp.io.vn` |
+| ADR-048 | **HR gán cứng lịch phỏng vấn cho ứng viên** (đảo phần đặt lịch của ADR-015): staff chọn 1 slot trong kho ấn định cho ứng viên qua `POST /api/schedules/assign`; **bỏ hẳn** ứng viên tự chọn (gỡ `GET /schedule/{id}/slots` + `POST /schedule/{id}/book` + `AuthorizeCandidateAsync`). Giữ nguyên side-effects booking (chốt chỗ nguyên tử, `screening→interview`, gating Interview Code). Ứng viên nhận realtime `InterviewScheduled` + bell + email giờ hẹn. **Xác nhận/báo bận (2026-07-25):** `InterviewBooking` thêm `confirmation_status`/`decline_reason`/`responded_at` (migration `AddBookingConfirmation`); ứng viên `POST /api/candidate/schedule/{bookingId}/confirm|decline` — decline (có lý do) set `Status="declined"` + trả chỗ slot để staff gán lại qua chính `AssignSlotCommand` (không cần luồng huỷ riêng). Nhân sự nhận realtime `ReceiveScheduleResponse` + bell; `AssignSchedulePanel` hiện trạng thái xác nhận + banner lý do báo bận. `SchedulePage` candidate có nút Xác nhận / "Tôi bận, đổi lịch". UI gán: `@ari/shared/ui/AssignSchedulePanel` trên trang chi tiết ứng viên HR/Recruiter |
+| ADR-049 | **Online Test (thi trắc nghiệm) — Phase 2c**. Ngân hàng câu hỏi **theo JOB** (`OnlineTestQuestion.JobPostingId`); điểm sàn `OnlineTestPassScore` trên `JobPosting` (mặc định 70). Tự chấm `score = correct/total*100`, `isPassed = score >= passScore`; `CorrectOption` không rời BE (DTO ứng viên ẩn). 1 lượt/vòng qua unique `(application_id, round_number)`. CQRS `ARI.Application/OnlineTest/`: HR `OnlineTestController` (InternalStaff, chủ tin/admin), ứng viên `CandidateOnlineTestController` (CandidateOnly). Auto-progression **mềm**: realtime `OnlineTestGraded` + notification idempotent (`SyncNotificationsAsync`), không tự đổi status; kết quả hiện cho HR qua `GET /online-test/applications/{id}/result` + bảng tổng hợp theo job `GET /online-test/jobs/{id}/results`. FE: `JobOnlineTestPage` + `JobOnlineTestResultsPage` (staff) + `OnlineTestPage`/`OnlineTestEntry` (candidate); i18n VI/EN. **Screening Test (cập nhật):** bốc N câu ngẫu nhiên/lượt (mặc định 20, deterministic theo hồ sơ+vòng), câu 1/nhiều đáp án (`QuestionType`+`CorrectOptions`, chấm khớp hoàn toàn), hẹn giờ (mặc định 30', FE tự nộp khi hết giờ), export `.xlsx` (OpenXML) qua `GET .../results/export`; cấu hình per-job qua `PUT .../settings` (passScore+questionsPerTest+durationMinutes). **Import ngân hàng từ Excel:** upload `.xlsx` `POST .../jobs/{id}/questions/import` (OpenXML đọc, layout A=câu hỏi/B=loại/C–H=phương án/I=đáp án đúng, remap chỉ số + dùng lại `ValidateQuestion`, trả `imported/failed/errors[]`) + tải file mẫu `GET .../questions/template`; FE card "Nhập từ file Excel" trong `JobOnlineTestPage` |
+| ADR-054 | **Khoá màn hình Kiosk + ghi log rời phòng**: nhập đúng mã → `requestFullscreen()` ngay trong cú click; rời toàn màn hình → **lớp phủ chặn** cả phòng phỏng vấn cho tới khi bấm quay lại; chặn context menu + phím tắt bắt được + cảnh báo `beforeunload`. Hook chung `useKioskLockdown` ghi nhận `fullscreen_exit`/`tab_hidden`/`window_blur`/`shortcut_blocked`/`page_unload` → `POST /interview/session/{id}/signals` (lúc đóng trang dùng `fetch keepalive`). Nối hạ tầng cũ: `RecordCheatSignalAsync` lưu `CheatDetectionSignal` thật (trước `SessionHub` chỉ broadcast), `CheatScore` tính theo trọng số từng loại + `CheatSignals` gộp theo loại (trước ghi cứng `"[]"`). **Web không chặn được Alt+Tab/phím Windows** — khoá cứng cần `chrome --kiosk` + Windows Assigned Access |
+| ADR-053 | **"Đạt" chỉ khi qua HẾT vòng**: AI **không bao giờ** ghi `Application.Status` (bỏ hẳn ở `GenerateEvaluationReportAsync` — trước đây AI chấm trượt là đánh rớt hồ sơ trước khi HR xem); `SubmitHrReviewAsync` tính trạng thái 1 lần theo `ResolveTotalRoundsAsync` = `max(InterviewRoundConfig.RoundNumber)`: không đạt→`not_pass`, đạt & còn vòng→`interview`, **đạt & vòng cuối→`pass`**. Portal trả `TotalRounds`/`PassedRounds` → thẻ hồ sơ hiện **"Qua vòng N/M"**. Sửa kèm: điểm từng câu `null` thay vì 0 (hết "0/100 · Cần cải thiện" sai), **ghim bộ khoá tiêu chí** trong prompt + alias `CriterionBar` (hết tên tiêu chí tiếng Anh giữa màn tiếng Việt), đồng bộ cỡ chữ, ẩn banner quá hạn ở hồ sơ đã đóng. Dev: `POST /api/dev/seed-interview-job` (job 3 vòng + trắc nghiệm + mã Kiosk + tài khoản HR), `POST /api/dev/regrade-session/{id}?lang=` |
+| ADR-052 | **Kiosk phỏng vấn THẬT**: `validate-code` trả `sessionId` + **JWT role `Kiosk_session`** (claim `session_id`, TTL 3h) thay cho đăng nhập; policy `InterviewParticipant` (Candidate ∪ Kiosk_session) + kiểm khớp `session_id` ở controller & `SessionHub`. Kiosk **quay video** cam+mic → `POST /interview/session/{id}/recording` → storage, `recording_expires_at = now + Interview:RecordingRetentionDays` (**7 ngày**); `RecordingRetentionHostedService` quét 12h/lần xoá file quá hạn (giữ transcript + đánh giá), ghi `recording_deleted_at`. HR xem video trong `EvaluationReviewPage` (trước là placeholder chết). Trần buổi thật `RealMaxDurationMinutes` (45'). Hook chung `useInterviewSession({existingSessionId, sessionType, recordVideo})`. Kiosk UX: device check → chỉ báo đang ghi hình + đếm ngược → màn kết thúc tự reset 30s, khôi phục phiên khi reload |
+| ADR-051 | **Buổi thử = không gian riêng của ứng viên**: transcript + nhận xét AI **lưu vĩnh viễn**, chỉ ứng viên sở hữu xem lại (không giới hạn số lần) qua `GET /api/portal/practice/sessions[/{sessionId}]` (`PortalPracticeFeature`, `CandidateOnly` + IDOR); endpoint từ chối phiên `real` (transcript thật vẫn theo cổng `HrReview.ShareTranscript`). **Ẩn hoàn toàn khỏi HR Lead/Recruiter** (lọc `SessionType != "practice"` ở `GetSessionsForHrAsync` + 3 query Evaluations), chỉ giữ cờ `PracticeSessionUsed`. **Không hiện verdict Pass/Not Pass** (DTO bỏ hẳn `AiVerdict`) — chỉ điểm/tiêu chí/phân tích câu/ngôn ngữ/gợi ý, kèm nhãn tham khảo. Buổi thử **không chạm pipeline thật**: `GenerateEvaluationReportAsync` chỉ đổi `application.Status` + báo `hr_admin` khi `SessionType=="real"` (sửa bug practice đánh rớt hồ sơ); portal detail tách `practiceSessions` khỏi tiến trình vòng. Thêm `InterviewSession.ClosingText` + index `ix_questions_session_id`/`ix_answers_session_id` (migration `AddPracticeTranscriptReview`). FE: `PracticeReviewPage` (`/candidate/practice/:sessionId`, bố cục 2 cột — tổng quan sticky bên trái, hội thoại + nhận xét AI theo từng câu bên phải) + lối vào từ màn kết thúc buổi thử và trang chi tiết hồ sơ. **Báo cáo AI 1 ngôn ngữ** (`InterviewSession.ReportLanguage` lấy từ i18n FE lúc bắt đầu phiên, prompt cấm trộn ngôn ngữ); **phân tích từng câu có schema cứng** `{sequence_number,score,analysis,feedback}` + ghép vào đúng lượt hỏi–đáp từ DB; **đánh giá ngôn ngữ chấm trên chính câu trả lời** (kèm CEFR + dẫn chứng, bỏ qua khi không có câu trả lời) |
+| ADR-050 | Practice **audio-only** (bỏ avatar — tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit; giữ đủ STT/RAG/GPT-4o/ElevenLabs qua WebAudio). **Trần 20 phút** (`Interview:PracticeMaxDurationMinutes`) → hết giờ khoá mic + AI câu kết + đóng phiên (2 lớp enforce: FE `NotifyTimeout` + server `forceClosing` theo elapsed; `CloseWithFarewellAsync`/`EndSessionAsync` idempotent). **Nhập kép** voice+keyboard: transcript vào 1 `answerText` sửa/gõ tay được. Real vẫn có avatar. Huỷ ghi âm+xoá 7 ngày (giữ ADR-038 đ.6). SỬA ADR-038 đ.3-4, HIỆN THỰC đ.5. **Dev test:** `POST /api/dev/seed-practice` (chỉ Development) tạo sẵn hồ sơ đủ điều kiện + `Interview:PracticeAttemptsPerRound=0` để lặp lại. *(Ban đầu ADR-048; đổi 050 do trùng số khi merge — 048=lịch, 049=online-test.)* |
 
 > Chi tiết đầy đủ từng ADR: xem [.ai/architecture.md](.ai/architecture.md)
 
@@ -322,7 +288,7 @@ _Chưa có task nào đang thực hiện._
 | Magic Link | Link xác thực email không cần mật khẩu, TTL 15 phút, one-time-use |
 | Playbook | Tài liệu phỏng vấn nội bộ doanh nghiệp (style, question bank, rubric...) đưa vào RAG |
 | RAG | Retrieval-Augmented Generation – retrieve chunks từ JD/CV/Playbook trước khi generate câu hỏi |
-| Practice Session | Phỏng vấn thử 1 lượt / vòng (mở sau khi đặt lịch buổi thật của vòng, vào qua Portal không cần code), JD+CV only, không ảnh hưởng verdict |
+| Practice Session | Phỏng vấn thử 1 lượt / vòng (mở sau khi đặt lịch buổi thật của vòng, vào qua Portal không cần code), JD+CV only, không ảnh hưởng verdict. **Audio-only (không avatar), trần 20 phút, nhập kép voice/keyboard** — ADR-050. **Transcript + nhận xét AI lưu vĩnh viễn, chỉ ứng viên xem lại (`/candidate/practice/:sessionId`), ẩn hoàn toàn khỏi HR/Recruiter, không hiện verdict** — ADR-051 |
 | Real Session | Phỏng vấn thật On-site, full RAG, kết quả ảnh hưởng tuyển dụng |
 | Match Score | Điểm phù hợp CV-JD (0–100) do Gemini chấm – chỉ tham khảo |
 | Must-ask | Câu hỏi bắt buộc phải hỏi trước khi kết thúc session (định nghĩa trong Playbook) |

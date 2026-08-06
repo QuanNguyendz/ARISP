@@ -86,18 +86,18 @@ export default function InterviewSchedulePage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary py-8">
-      <div className="max-w-3xl mx-auto px-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+    <div className="min-h-screen bg-ink-50 py-6 sm:py-8">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 sm:mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-text-secondary hover:text-white transition-colors mb-4"
+            className="mb-4 flex items-center gap-2 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             {t('back')}
           </button>
-          <h1 className="text-3xl font-bold text-white mb-2">{t('title')}</h1>
-          <p className="text-text-secondary">{t('subtitle')}</p>
+          <h1 className="mb-2 text-2xl font-bold text-ink-900 sm:text-3xl">{t('title')}</h1>
+          <p className="text-sm text-ink-600 sm:text-base">{t('subtitle')}</p>
         </motion.div>
 
         {!interviewData ? (
@@ -105,14 +105,14 @@ export default function InterviewSchedulePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-bg-secondary border border-white/10 rounded-2xl p-8"
+            className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card sm:p-8"
           >
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center">
-                <KeyRound className="w-10 h-10 text-white" />
+            <div className="mb-6 text-center sm:mb-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-primary to-violet sm:mb-6 sm:h-20 sm:w-20">
+                <KeyRound className="h-8 w-8 text-white sm:h-10 sm:w-10" />
               </div>
-              <h2 className="text-2xl font-semibold text-white mb-2">{t('enterCode.title')}</h2>
-              <p className="text-text-secondary">{t('enterCode.description')}</p>
+              <h2 className="mb-2 text-xl font-semibold text-ink-900 sm:text-2xl">{t('enterCode.title')}</h2>
+              <p className="text-sm text-ink-600 sm:text-base">{t('enterCode.description')}</p>
             </div>
 
             <div className="space-y-4">
@@ -123,7 +123,7 @@ export default function InterviewSchedulePage() {
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
                   onKeyPress={handleKeyPress}
                   placeholder={t('enterCode.placeholder')}
-                  className="w-full px-6 py-4 rounded-xl bg-white/5 border border-white/10 text-white text-center text-2xl font-mono placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                  className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-center font-mono text-lg text-ink-900 placeholder:text-ink-400 transition-colors focus:border-accent-primary focus:outline-none sm:px-6 sm:py-4 sm:text-2xl"
                   maxLength={10}
                 />
               </div>
@@ -132,7 +132,7 @@ export default function InterviewSchedulePage() {
                 <motion.p
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-red-400 text-sm text-center"
+                  className="text-center text-sm text-red-600"
                 >
                   {error}
                 </motion.p>
@@ -148,8 +148,8 @@ export default function InterviewSchedulePage() {
               </LoadingButton>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-white/10 text-center">
-              <p className="text-sm text-text-tertiary">
+            <div className="mt-6 border-t border-ink-200 pt-6 text-center">
+              <p className="text-sm text-ink-500">
                 {t('enterCode.noCode')}{' '}
                 <a href="/jobs" className="text-accent-primary hover:underline">
                   {t('enterCode.findJob')}
@@ -159,68 +159,68 @@ export default function InterviewSchedulePage() {
           </motion.div>
         ) : !isConfirmed ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="bg-bg-secondary border border-white/10 rounded-2xl p-6 mb-4">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center text-white font-bold text-lg">
+            <div className="mb-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
+              <div className="mb-4 flex items-start gap-3 sm:items-center sm:gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent-primary to-violet text-base font-bold text-white sm:h-14 sm:w-14 sm:text-lg">
                   {interviewData.job.logo}
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-white">{interviewData.job.title}</h2>
-                  <p className="text-text-secondary">{interviewData.job.company}</p>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold text-ink-900 sm:text-xl">{interviewData.job.title}</h2>
+                  <p className="truncate text-sm text-ink-600">{interviewData.job.company}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
+              <div className="flex flex-wrap gap-3 text-xs text-ink-600 sm:gap-4 sm:text-sm">
                 <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
+                  <MapPin className="h-4 w-4" />
                   {interviewData.job.location}
                 </span>
                 <span className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
+                  <DollarSign className="h-4 w-4" />
                   {interviewData.job.salary}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Building2 className="w-4 h-4" />
+                  <Building2 className="h-4 w-4" />
                   {interviewData.job.type}
                 </span>
               </div>
             </div>
 
-            <div className="bg-bg-secondary border border-white/10 rounded-2xl p-6 mb-4">
-              <div className="flex items-center gap-2 mb-4">
-                <User className="w-5 h-5 text-accent-primary" />
-                <h3 className="text-lg font-semibold text-white">{t('candidateInfo.title')}</h3>
+            <div className="mb-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <User className="h-5 w-5 text-accent-primary" />
+                <h3 className="text-base font-semibold text-ink-900 sm:text-lg">{t('candidateInfo.title')}</h3>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-text-tertiary mb-1">{t('candidateInfo.fullName')}</p>
-                  <p className="text-white">{interviewData.candidate.name}</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <p className="mb-1 text-xs text-ink-500 sm:text-sm">{t('candidateInfo.fullName')}</p>
+                  <p className="truncate text-sm text-ink-900 sm:text-base">{interviewData.candidate.name}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-text-tertiary mb-1">{t('candidateInfo.email')}</p>
-                  <p className="text-white">{interviewData.candidate.email}</p>
+                <div className="min-w-0">
+                  <p className="mb-1 text-xs text-ink-500 sm:text-sm">{t('candidateInfo.email')}</p>
+                  <p className="truncate text-sm text-ink-900 sm:text-base">{interviewData.candidate.email}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-text-tertiary mb-1">{t('candidateInfo.phone')}</p>
-                  <p className="text-white">{interviewData.candidate.phone}</p>
+                <div className="min-w-0">
+                  <p className="mb-1 text-xs text-ink-500 sm:text-sm">{t('candidateInfo.phone')}</p>
+                  <p className="truncate text-sm text-ink-900 sm:text-base">{interviewData.candidate.phone}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-text-tertiary mb-1">{t('candidateInfo.location')}</p>
-                  <p className="text-white">{interviewData.candidate.location}</p>
+                <div className="min-w-0">
+                  <p className="mb-1 text-xs text-ink-500 sm:text-sm">{t('candidateInfo.location')}</p>
+                  <p className="truncate text-sm text-ink-900 sm:text-base">{interviewData.candidate.location}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-bg-secondary border border-white/10 rounded-2xl p-6 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-accent-primary" />
-                <h3 className="text-lg font-semibold text-white">{t('cvInfo.title')}</h3>
+            <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent-primary" />
+                <h3 className="text-base font-semibold text-ink-900 sm:text-lg">{t('cvInfo.title')}</h3>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-8 h-8 text-text-tertiary" />
-                  <div>
-                    <p className="text-white font-medium">{interviewData.cv.fileName}</p>
-                    <p className="text-sm text-text-tertiary">
+              <div className="flex items-center justify-between rounded-xl bg-ink-50 p-3 sm:p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <FileText className="h-7 w-7 shrink-0 text-ink-500 sm:h-8 sm:w-8" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink-900 sm:text-base">{interviewData.cv.fileName}</p>
+                    <p className="truncate text-xs text-ink-500 sm:text-sm">
                       {t('cvInfo.uploadedAt')} {interviewData.cv.uploadedAt}
                     </p>
                   </div>
@@ -228,20 +228,20 @@ export default function InterviewSchedulePage() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-accent-primary/10 to-violet/10 border border-accent-primary/30 rounded-2xl p-6">
-              <div className="flex items-start gap-3 mb-6">
-                <CheckCircle className="w-6 h-6 text-accent-primary flex-shrink-0 mt-0.5" />
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 sm:p-6">
+              <div className="mb-4 flex items-start gap-3 sm:mb-6">
+                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 sm:h-6 sm:w-6" />
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">
+                  <h3 className="mb-1 text-base font-semibold text-ink-900 sm:text-lg">
                     {t('confirmInfo.title')}
                   </h3>
-                  <p className="text-text-secondary text-sm">{t('confirmInfo.description')}</p>
+                  <p className="text-xs text-ink-600 sm:text-sm">{t('confirmInfo.description')}</p>
                 </div>
               </div>
 
               <button
                 onClick={handleConfirm}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-accent-primary to-violet text-white font-semibold hover:opacity-90 transition-opacity"
+                className="w-full rounded-xl bg-gradient-to-r from-accent-primary to-violet py-3.5 font-semibold text-white transition-opacity hover:opacity-90 sm:py-4"
               >
                 {t('confirmInfo.button')}
               </button>
@@ -253,62 +253,62 @@ export default function InterviewSchedulePage() {
             animate={{ opacity: 1, scale: 1 }}
             className="text-center"
           >
-            <div className="mb-8">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <CheckCircle className="w-10 h-10 text-emerald-400" />
+            <div className="mb-6 sm:mb-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 sm:mb-6 sm:h-20 sm:w-20">
+                <CheckCircle className="h-8 w-8 text-emerald-600 sm:h-10 sm:w-10" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">{t('success.title')}</h2>
-              <p className="text-text-secondary">{t('success.description')}</p>
+              <h2 className="mb-2 text-xl font-bold text-ink-900 sm:text-2xl">{t('success.title')}</h2>
+              <p className="text-sm text-ink-600 sm:text-base">{t('success.description')}</p>
             </div>
 
-            <div className="bg-bg-secondary border border-white/10 rounded-2xl p-6 mb-8 text-left">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent-primary to-violet flex items-center justify-center text-white font-bold">
+            <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-4 text-left shadow-card sm:mb-8 sm:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent-primary to-violet font-bold text-white">
                   {interviewData.job.logo}
                 </div>
-                <div>
-                  <p className="font-semibold text-white">{interviewData.job.title}</p>
-                  <p className="text-sm text-text-secondary">{interviewData.job.company}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink-900">{interviewData.job.title}</p>
+                  <p className="truncate text-xs text-ink-600 sm:text-sm">{interviewData.job.company}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-emerald-400">
-                <CheckCircle className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-xs text-emerald-700 sm:text-sm">
+                <CheckCircle className="h-4 w-4" />
                 <span>{t('success.infoConfirmed')}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <button
                 onClick={handleStartInterview}
-                className="p-6 rounded-2xl bg-gradient-to-br from-accent-primary to-violet hover:opacity-90 transition-opacity text-left group"
+                className="group rounded-2xl bg-gradient-to-br from-accent-primary to-violet p-5 text-left transition-opacity hover:opacity-90 sm:p-6"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Play className="w-6 h-6 text-white" />
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 transition-transform group-hover:scale-110 sm:mb-4 sm:h-12 sm:w-12">
+                  <Play className="h-5 w-5 text-white sm:h-6 sm:w-6" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1">
+                <h3 className="mb-1 text-base font-semibold text-white sm:text-lg">
                   {t('interviewType.startInterview')}
                 </h3>
-                <p className="text-sm text-white/70">{t('interviewType.startInterviewDesc')}</p>
+                <p className="text-xs text-white/80 sm:text-sm">{t('interviewType.startInterviewDesc')}</p>
               </button>
 
               <button
                 onClick={handlePracticeInterview}
-                className="p-6 rounded-2xl bg-bg-secondary border border-white/10 hover:border-white/20 transition-colors text-left group"
+                className="group rounded-2xl border border-ink-200 bg-white p-5 text-left transition-colors hover:border-ink-300 sm:p-6"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4 group-hover:bg-white/20 transition-colors">
-                  <Briefcase className="w-6 h-6 text-white" />
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 transition-colors group-hover:bg-ink-200 sm:mb-4 sm:h-12 sm:w-12">
+                  <Briefcase className="h-5 w-5 text-ink-700 sm:h-6 sm:w-6" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1">
+                <h3 className="mb-1 text-base font-semibold text-ink-900 sm:text-lg">
                   {t('interviewType.practiceInterview')}
                 </h3>
-                <p className="text-sm text-text-secondary">
+                <p className="text-xs text-ink-600 sm:text-sm">
                   {t('interviewType.practiceInterviewDesc')}
                 </p>
               </button>
             </div>
 
-            <div className="mt-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <p className="text-sm text-amber-400 text-center">
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:mt-8 sm:p-4">
+              <p className="text-center text-xs text-amber-800 sm:text-sm">
                 <strong>{t('note.title')}</strong> {t('note.description')}
               </p>
             </div>

@@ -390,16 +390,24 @@ export default function WorkspaceLayout({
       {/* Main */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 backdrop-blur px-6 h-16">
+        <header className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 border-b border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 backdrop-blur px-3 sm:px-6 h-16">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 lg:hidden"
             aria-label={t('shared.openMenu')}
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400">
+          {/* Search icon button (mobile only) */}
+          <button
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 sm:hidden"
+            aria-label={searchPlaceholder}
+          >
+            <Search className="w-5 h-5" />
+          </button>
+
+          <div className="hidden flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400 sm:flex">
             <Search className="w-4 h-4 text-ink-400" />
             <input
               className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
@@ -431,7 +439,7 @@ export default function WorkspaceLayout({
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl z-40"
+                    className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[calc(100vh-6rem)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 dark:border-white/10">
@@ -536,7 +544,7 @@ export default function WorkspaceLayout({
 
             {primaryAction && (
               <>
-                <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10" />
+                <span className="mx-1 hidden h-6 w-px bg-ink-200 dark:bg-white/10 sm:inline-block" />
                 <Link
                   to={primaryAction.to}
                   className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 flex items-center gap-2"
@@ -551,7 +559,7 @@ export default function WorkspaceLayout({
               </>
             )}
 
-            <span className="mx-1 h-6 w-px bg-ink-200 dark:bg-white/10" />
+            <span className="mx-1 hidden h-6 w-px bg-ink-200 dark:bg-white/10 sm:inline-block" />
 
             {/* User menu */}
             <div className="relative" ref={userRef}>
@@ -576,7 +584,7 @@ export default function WorkspaceLayout({
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-60 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl z-40"
+                    className="fixed left-3 right-3 top-[calc(4rem+0.5rem)] z-50 max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-60 sm:max-h-[calc(100vh-6rem)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 dark:border-white/10">

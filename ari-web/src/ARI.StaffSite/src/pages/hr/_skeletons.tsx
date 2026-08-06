@@ -8,10 +8,10 @@ import { Skeleton } from '@ari/shared/ui/Skeleton'
 const card =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card'
 
-/** 4 ô chỉ số — khớp `StatsGrid` (grid-cols-2 lg:grid-cols-4 gap-4 mb-8). */
+/** 4 ô chỉ số — khớp `HrDashboardPage` (grid gap-4 sm:grid-cols-2 xl:grid-cols-4). */
 export function HrStatsSkeleton() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className={`${card} p-5`}>
           <Skeleton className="mb-3 h-4 w-24" />

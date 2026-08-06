@@ -14,13 +14,24 @@
     "title": "Các vòng phỏng vấn",
     "empty": "Chưa có vòng phỏng vấn nào cho hồ sơ này."
   },
+  "practiceList": {
+    "title": "Phỏng vấn thử",
+    "hasReview": "Có nhận xét AI",
+    "transcriptOnly": "Có nội dung hội thoại",
+    "view": "Xem lại →"
+  },
   "round": {
     "screening": "Screening",
     "technical": "Technical",
     "online_test": "Online Test",
     "final": "Final"
   },
+  "missed": {
+    "title": "Vòng {{round}}: Đã quá hạn buổi phỏng vấn",
+    "description": "Lịch hẹn đã qua nhưng chưa ghi nhận buổi phỏng vấn nào. Vui lòng liên hệ bộ phận tuyển dụng để được xếp lịch lại."
+  },
   "badge": {
+    "missed": "Quá hạn",
     "practice": "Thử",
     "pass": "Pass",
     "notPass": "Not Pass",
@@ -63,6 +74,7 @@
   },
   "report": {
     "title": "Nhận định tổng quan",
+    "roundBadge": "Vòng {{number}}{{type}}",
     "scoresByCriteria": "Điểm theo tiêu chí",
     "downloadRecording": "Tải bản ghi",
     "footer": "Báo cáo do AI tạo · HR đã xác nhận · Một số phần có thể được HR điều chỉnh hiển thị"

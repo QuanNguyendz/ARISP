@@ -45,4 +45,28 @@ namespace ARI.Application.DTOs
     {
         public int Capacity { get; set; }
     }
+
+    /// <summary>
+    /// Một mục lịch phỏng vấn của ứng viên (kèm thông tin booking để xác nhận/từ chối) — ADR-048.
+    /// </summary>
+    public class CandidateScheduleItemDto
+    {
+        public Guid BookingId { get; set; }
+        public Guid ApplicationId { get; set; }
+        public string? JobTitle { get; set; }
+        public int RoundNumber { get; set; }
+        public DateTimeOffset StartTime { get; set; }
+        public DateTimeOffset EndTime { get; set; }
+        public string Timezone { get; set; } = "Asia/Ho_Chi_Minh";
+        /// <summary>pending | confirmed | declined — phản hồi của ứng viên với lịch được gán.</summary>
+        public string ConfirmationStatus { get; set; } = "pending";
+        /// <summary>Lý do đã từ chối (khi ConfirmationStatus = declined).</summary>
+        public string? DeclineReason { get; set; }
+    }
+
+    /// <summary>Body ứng viên từ chối lịch (bận) kèm lý do để nhân sự xếp lại.</summary>
+    public class DeclineScheduleRequest
+    {
+        public string Reason { get; set; } = string.Empty;
+    }
 }

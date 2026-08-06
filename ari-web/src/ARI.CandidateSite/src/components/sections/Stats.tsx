@@ -64,7 +64,7 @@ export default function Stats() {
   ];
 
   return (
-    <Container className="py-40 relative">
+    <Container className="relative py-20 sm:py-32 lg:py-40">
       <ContainerItem className="text-center mb-20">
         <motion.span
           initial={{ opacity: 0 }}
