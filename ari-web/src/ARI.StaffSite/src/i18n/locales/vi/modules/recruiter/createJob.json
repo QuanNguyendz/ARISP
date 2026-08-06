@@ -32,6 +32,7 @@
     "employmentType": "Hình thức",
     "workLocation": "Nơi làm việc",
     "interviewMode": "Chế độ phỏng vấn *",
+    "workAddress": "Địa chỉ cụ thể",
     "workLocationPlaceholder": "VD: Tòa nhà FPT, Quận 9, TP.HCM",
     "vacancies": "Số lượng cần tuyển",
     "vacanciesPlaceholder": "Để trống = không giới hạn",

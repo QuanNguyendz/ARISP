@@ -431,7 +431,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
             {interviewMode !== 'remote' && (
               <div>
-                <label className={label}>{t('form.workLocationPlaceholder')} *</label>
+                <label className={label}>{t('form.workAddress')} *</label>
                 <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t('form.workLocationPlaceholder')} className={input} required />
               </div>
             )}

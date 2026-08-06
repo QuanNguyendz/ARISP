@@ -318,6 +318,8 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-06: **Sửa nhãn trường địa chỉ ở form tạo tin tuyển dụng.** `CreateJobPostingPage` đang lấy chính key placeholder (`form.workLocationPlaceholder`) làm `<label>` nên màn hình hiện "VD: Tòa nhà FPT, Quận 9, TP.HCM *". Thêm key `form.workAddress` ("Địa chỉ cụ thể" / "Specific address") cho nhãn, giữ nguyên câu ví dụ ở placeholder trong ô nhập.
+
 - [x] 2026-08-05: **Khoá màn hình Kiosk + ghi nhận mọi lần rời buổi phỏng vấn (ADR-054).**
   - **Khoá màn hình:** `KioskPage` gọi `requestFullscreen()` ngay trong cú click "Bắt đầu phỏng vấn" (bắt buộc phải là thao tác người dùng); `KioskInterviewPage` phủ **lớp chặn toàn bộ giao diện** khi rời toàn màn hình, chỉ tiếp tục khi bấm "Quay lại toàn màn hình"; chặn context menu, phím tắt `F11/F5/Ctrl+P,S,U,F,T,N,W,R`, cảnh báo `beforeunload`; thoát fullscreen khi kết thúc.
   - **Ghi log:** hook mới `ARI.Shared/src/media/useKioskLockdown.ts` đếm + gửi 5 loại tín hiệu (`fullscreen_exit`, `tab_hidden`, `window_blur`, `shortcut_blocked`, `page_unload`) qua `POST /api/interview/session/{id}/signals`; lúc đóng trang dùng `fetch keepalive` (sendBeacon không đặt được Authorization).
