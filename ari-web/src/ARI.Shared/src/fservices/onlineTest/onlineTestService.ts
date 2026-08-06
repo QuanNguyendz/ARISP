@@ -95,11 +95,12 @@ export const onlineTestService = {
 
   async submit(
     applicationId: string,
-    answers: Record<string, number[]>
+    answers: Record<string, number[]>,
+    tabSwitchCount = 0
   ): Promise<OnlineTestResult> {
     const { data } = await apiClient.post<OnlineTestResult>(
       `/portal/online-test/${applicationId}/submit`,
-      { answers }
+      { answers, tabSwitchCount }
     )
     return data
   },

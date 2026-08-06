@@ -1,0 +1,125 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using ARI.Application.Common;
+using ARI.Application.Evaluations;
+using ARI.Application.Evaluations.Queries.GetEvaluationDetail;
+using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Entities;
+using Xunit;
+
+namespace ARI.Application.UnitTests.EvaluationReview;
+
+/// <summary>
+/// Chi tiết đánh giá cho HR (UC-64/86/95, <see cref="GetEvaluationDetailQueryHandler"/>): tra theo EvaluationId
+/// hoặc fallback SessionId; ẩn buổi thử; kèm HR review + resolve URL video buổi thật (ADR-052).
+/// </summary>
+public class GetEvaluationDetailQueryHandlerTests
+{
+    private static Task<Result<EvaluationDetailResponse>> Run(InMemoryUnitOfWork uow, Guid id, RecordingFileStorage? storage = null)
+        => new GetEvaluationDetailQueryHandler(uow, storage ?? new RecordingFileStorage())
+            .Handle(new GetEvaluationDetailQuery(id), CancellationToken.None);
+
+    [Fact]
+    public async Task Not_found_fails()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Guid.NewGuid());
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("Evaluation not found", res.Error);
+    }
+
+    [Fact]
+    public async Task Found_by_evaluation_id()
+    {
+        var job = EvaluationData.Job("Data Engineer");
+        var app = EvaluationData.App(job.Id, name: "Lê C");
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(eval.Id, res.Value!.Id);
+        Assert.Equal("Lê C", res.Value.CandidateName);
+        Assert.Equal("Data Engineer", res.Value.JobTitle);
+    }
+
+    [Fact]
+    public async Task Falls_back_to_session_id_lookup()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var sessionId = Guid.NewGuid();
+        var eval = EvaluationData.Eval(app.Id, sessionId: sessionId);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, sessionId); // truyền SessionId, không phải EvaluationId
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(eval.Id, res.Value!.Id);
+    }
+
+    [Fact]
+    public async Task Rejects_practice_evaluation()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id, type: "practice");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("Evaluation not found", res.Error); // ẩn buổi thử khỏi HR
+    }
+
+    [Fact]
+    public async Task Application_not_found_fails()
+    {
+        var eval = EvaluationData.Eval(Guid.NewGuid()); // app không seed
+        var uow = new InMemoryUnitOfWork().Seed(eval);
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("Application associated", res.Error);
+    }
+
+    [Fact]
+    public async Task Includes_hr_review_when_present()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id, verdict: "not_pass");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval)
+            .Seed(EvaluationData.Review(eval.Id, finalVerdict: "pass", isOverride: true));
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.NotNull(res.Value!.HrReview);
+        Assert.Equal("pass", res.Value.HrReview!.FinalVerdict);
+        Assert.True(res.Value.HrReview.IsOverride);
+    }
+
+    [Fact]
+    public async Task Resolves_recording_url_from_session()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var sessionId = Guid.NewGuid();
+        var eval = EvaluationData.Eval(app.Id, sessionId: sessionId);
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(5);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval)
+            .Seed(new InterviewSession
+            {
+                Id = sessionId, ApplicationId = app.Id, RoundNumber = 1, SessionType = "real",
+                RecordingUrl = "rec/interview.webm", RecordingExpiresAt = expiresAt,
+            });
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.Equal("/files/rec/interview.webm", res.Value!.RecordingUrl); // resolve qua storage
+        Assert.Equal(expiresAt, res.Value.RecordingExpiresAt);
+    }
+}

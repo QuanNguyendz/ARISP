@@ -77,6 +77,19 @@ services:
           memory: 256M
           cpus: "0.25"
 
+  # --- Postgres local: CHỈ dùng cho dev/test, prod chạy DB trên Supabase ---
+  # Base compose bind 5433 ra 0.0.0.0 kèm mật khẩu dev mặc định (chấp nhận được ở
+  # máy dev). Trên VPS, Docker tự chèn rule iptables nên binding này vượt mặt ufw
+  # → cổng 5433 mở thẳng ra Internet. Không dịch vụ prod nào dùng container này,
+  # nên đóng cổng cho khớp nguyên tắc "prod chỉ hở nginx 80/443" ở đầu file.
+  postgres:
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
   # --- Nginx: SSL + config prod ---
   nginx:
     ports:

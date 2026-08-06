@@ -67,7 +67,8 @@ namespace ARI.Application.OnlineTest
                 // Header cột.
                 sheetData.Append(RowOf(
                     Text("STT"), Text("Họ tên"), Text("Email"), Text("Vòng"),
-                    Text("Số câu đúng"), Text("Tổng câu"), Text("Điểm"), Text("Kết quả"), Text("Nộp lúc")));
+                    Text("Số câu đúng"), Text("Tổng câu"), Text("Điểm"), Text("Kết quả"),
+                    Text("Rời màn hình"), Text("Nộp lúc")));
 
                 int i = 1;
                 foreach (var r in dto.Rows)
@@ -82,6 +83,8 @@ namespace ARI.Application.OnlineTest
                         Number(r.TotalQuestions),
                         Number((double)r.Score),
                         Text(r.IsPassed ? "Đạt" : "Chưa đạt"),
+                        // Cột chống gian lận: số lần rời tab/mất focus. 0 → "-" cho gọn.
+                        r.TabSwitchCount > 0 ? Number(r.TabSwitchCount) : Text("-"),
                         Text(local.ToString("dd/MM/yyyy HH:mm"))));
                     i++;
                 }

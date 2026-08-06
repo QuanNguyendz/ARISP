@@ -89,10 +89,13 @@
       "correct": "Đúng",
       "score": "Điểm",
       "result": "Kết quả",
+      "tabSwitches": "Rời màn hình",
       "submittedAt": "Nộp lúc"
     },
     "passed": "Đạt",
     "notPassed": "Chưa đạt",
+    "tabSwitchNone": "Không rời màn hình trong lúc thi",
+    "tabSwitchFlag": "Rời tab/cửa sổ {{count}} lần khi làm bài — nghi vấn gian lận",
     "empty": "Chưa có ứng viên nào nộp bài thi."
   }
 }

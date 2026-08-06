@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Application.Options;
 using ARI.Application.Services;
 using ARI.Domain.Entities;
 
@@ -26,6 +27,24 @@ internal static class InterviewServiceFactory
         new ThrowingRagIngestionService(),
         new ThrowingTTSService(),
         new ThrowingFileStorageService());
+
+    /// <summary>
+    /// Overload cho luồng phỏng vấn thử (Luồng 6): cắm AI provider + TTS điều khiển được để test sinh
+    /// câu hỏi / chấm điểm / đóng phiên. Embedding/avatar/deepgram/rag-ingestion/storage vẫn dùng stub
+    /// ném lỗi — các nhánh gọi chúng (avatar chỉ khi có persona; rag-ingestion) đều bọc try/catch nuốt lỗi.
+    /// </summary>
+    public static InterviewService Create(
+        IUnitOfWork uow, INotificationService notif, IAIProvider ai, ITTSService tts, InterviewOptions? options = null) => new(
+        uow,
+        ai,
+        new ThrowingEmbeddingProvider(),
+        new ThrowingAvatarService(),
+        notif,
+        new ThrowingDeepgramTokenService(),
+        new ThrowingRagIngestionService(),
+        tts,
+        new ThrowingFileStorageService(),
+        options);
 
     private sealed class ThrowingAIProvider : IAIProvider
     {

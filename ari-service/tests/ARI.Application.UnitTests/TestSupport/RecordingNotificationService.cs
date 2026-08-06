@@ -15,6 +15,7 @@ public sealed class RecordingNotificationService : INotificationService
     public List<(Guid UserId, string EventType)> UserEvents { get; } = new();
     public List<(string Group, string EventType)> GroupEvents { get; } = new();
     public List<string> AllEvents { get; } = new();
+    public List<(Guid SessionId, string EventType)> SessionEvents { get; } = new();
 
     /// <summary>Nếu true: mọi Publish* ném lỗi (mô phỏng SignalR chết) để test đường best-effort.</summary>
     public bool ThrowOnPublish { get; set; }
@@ -22,7 +23,12 @@ public sealed class RecordingNotificationService : INotificationService
     public Task SendEmailAsync(string toEmail, string subject, string content, CancellationToken ct = default) => Task.CompletedTask;
     public Task SendSlackNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
     public Task SendTeamsNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
-    public Task PublishInterviewSessionEventAsync(Guid sessionId, string eventType, object payload, CancellationToken ct = default) => Task.CompletedTask;
+    public Task PublishInterviewSessionEventAsync(Guid sessionId, string eventType, object payload, CancellationToken ct = default)
+    {
+        // Best-effort như production (không throw kể cả khi ThrowOnPublish) — chỉ ghi lại để assert.
+        SessionEvents.Add((sessionId, eventType));
+        return Task.CompletedTask;
+    }
 
     public Task PublishUserEventAsync(Guid userId, string eventType, object payload, CancellationToken ct = default)
     {

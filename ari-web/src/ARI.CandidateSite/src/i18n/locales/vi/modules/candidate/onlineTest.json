@@ -19,7 +19,9 @@
     "submitError": "Không nộp được bài thi.",
     "unauthorized": "Vui lòng đăng nhập Portal ứng viên để làm bài thi.",
     "lockedTitle": "Chờ duyệt CV",
-    "lockedDetail": "Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm."
+    "lockedDetail": "Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm.",
+    "antiCheatHint": "Vui lòng không rời khỏi trang trong lúc làm bài. Mọi lần chuyển tab hoặc thoát cửa sổ đều được ghi lại và gửi cho nhà tuyển dụng.",
+    "tabSwitchWarning": "Bạn đã rời khỏi bài thi {{count}} lần. Hành vi này đã được ghi nhận và sẽ hiển thị cho nhà tuyển dụng."
   },
   "entry": {
     "resultTitle": "Bài thi trắc nghiệm: {{result}}",

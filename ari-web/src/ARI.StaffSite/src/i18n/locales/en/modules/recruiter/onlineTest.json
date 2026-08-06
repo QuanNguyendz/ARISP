@@ -89,10 +89,13 @@
       "correct": "Correct",
       "score": "Score",
       "result": "Result",
+      "tabSwitches": "Left screen",
       "submittedAt": "Submitted"
     },
     "passed": "Passed",
     "notPassed": "Not passed",
+    "tabSwitchNone": "Never left the screen during the test",
+    "tabSwitchFlag": "Left the tab/window {{count}} time(s) during the test — possible cheating",
     "empty": "No candidate has submitted the test yet."
   }
 }

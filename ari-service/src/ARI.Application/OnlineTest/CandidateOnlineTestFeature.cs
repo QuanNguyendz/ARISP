@@ -82,7 +82,7 @@ namespace ARI.Application.OnlineTest
     // POST /api/portal/online-test/{applicationId}/submit — nộp bài + tự chấm
     // ============================================================
 
-    public record SubmitOnlineTestCommand(Guid ApplicationId, Guid CandidateAccountId, string? Email, Dictionary<Guid, List<int>> Answers)
+    public record SubmitOnlineTestCommand(Guid ApplicationId, Guid CandidateAccountId, string? Email, Dictionary<Guid, List<int>> Answers, int TabSwitchCount = 0)
         : IRequest<Result<OnlineTestResultDto>>;
 
     public class SubmitOnlineTestCommandHandler : IRequestHandler<SubmitOnlineTestCommand, Result<OnlineTestResultDto>>
@@ -152,6 +152,8 @@ namespace ARI.Application.OnlineTest
                 IsPassed = isPassed,
                 CorrectCount = correct,
                 TotalQuestions = total,
+                // Chống gian lận nhẹ: số lần rời bài thi do FE đếm (âm → kẹp về 0).
+                TabSwitchCount = Math.Max(0, command.TabSwitchCount),
             };
             await _unitOfWork.Repository<OnlineTestSubmission>().AddAsync(submission, ct);
             await _unitOfWork.SaveChangesAsync(ct);

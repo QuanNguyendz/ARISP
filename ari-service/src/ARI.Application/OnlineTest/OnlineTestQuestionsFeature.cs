@@ -320,7 +320,8 @@ namespace ARI.Application.OnlineTest
                         s.IsPassed,
                         s.CorrectCount,
                         s.TotalQuestions,
-                        s.CreatedAt);
+                        s.CreatedAt,
+                        s.TabSwitchCount);
                 })
                 .ToList();
 
