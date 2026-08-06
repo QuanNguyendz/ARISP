@@ -330,6 +330,15 @@ _Chưa có task nào đang thực hiện._
   - **Giới hạn (đã ghi chú):** đếm ở client → có thể bị spoof; đóng hẳn trình duyệt không nộp thì không có bản ghi (nhưng cũng không có kết quả). Bản chất là **răn đe + lưu vết**, không phải khoá cứng (khoá cứng = Kiosk `chrome --kiosk`, ADR-054).
   - **Verify:** `dotnet build` 0 error; `dotnet ef migrations add AddOnlineTestTabSwitchCount`; unit test **375/375 pass**; FE 2 site `tsc --noEmit` xanh.
 
+- [x] 2026-08-06: **Release `develop` → `main` + deploy production (PR #272, tag `696b8a56`).**
+  - Kiểm tra trước khi merge: `dotnet build -c Release` 0 error, **304/304 unit test pass**, `npm run build --workspaces` xanh cả CandidateSite lẫn StaffSite; CI trên PR xanh cả 3 job (backend / frontend / rag import).
+  - Deploy workflow chạy hết: 4 image build & push GHCR → VPS `pull && up -d` → restart nginx → health check `candidate-api=200 staff=200`.
+  - **Xác minh sau deploy (không chỉ dựa vào health check):** cả 6 migration mới (`AddOnlineTestFlow`, `AddOnlineTestScreening`, `AddUserSettings`, `AddBookingConfirmation`, `AddPracticeTranscriptReview`, `AddKioskInterviewRecording`) đã có trong `ef_migrations_history` trên DB production — quan trọng vì `AriDbContextInitialiser` **nuốt lỗi migration** (app vẫn boot khi migrate fail). Route mới trả 401/405 thay vì 404 → đúng là build mới đang chạy.
+
+- [x] 2026-08-06: **Đóng cổng Postgres dev đang hở ra Internet trên VPS production.**
+  - `docker-compose.prod.yml` reset `ports` cho **redis / rag / backend / frontend** nhưng **bỏ sót `postgres`** → base compose bind `0.0.0.0:5433` kèm mật khẩu dev mặc định. Docker tự chèn rule iptables nên binding này vượt mặt ufw: quét từ ngoài xác nhận `5433 open=True` (các cổng 5000/3000/3001/8000/6379 đều đóng đúng).
+  - Prod dùng DB trên Supabase, **không dịch vụ nào đụng container này** → thêm `postgres: ports: !reset []` + giới hạn RAM 256M, khớp lại nguyên tắc "prod chỉ hở nginx 80/443" ghi ở đầu file.
+
 - [x] 2026-08-06: **Sửa nhãn trường địa chỉ ở form tạo tin tuyển dụng.** `CreateJobPostingPage` đang lấy chính key placeholder (`form.workLocationPlaceholder`) làm `<label>` nên màn hình hiện "VD: Tòa nhà FPT, Quận 9, TP.HCM *". Thêm key `form.workAddress` ("Địa chỉ cụ thể" / "Specific address") cho nhãn, giữ nguyên câu ví dụ ở placeholder trong ô nhập.
 
 - [x] 2026-08-05: **Unit test Luồng 8 — Review Interview Result (UC-64/84–90/95) — 24 test mới, tổng 375/375 pass.**
