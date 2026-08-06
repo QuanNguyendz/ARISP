@@ -330,6 +330,8 @@ _Chưa có task nào đang thực hiện._
   - **Giới hạn (đã ghi chú):** đếm ở client → có thể bị spoof; đóng hẳn trình duyệt không nộp thì không có bản ghi (nhưng cũng không có kết quả). Bản chất là **răn đe + lưu vết**, không phải khoá cứng (khoá cứng = Kiosk `chrome --kiosk`, ADR-054).
   - **Verify:** `dotnet build` 0 error; `dotnet ef migrations add AddOnlineTestTabSwitchCount`; unit test **375/375 pass**; FE 2 site `tsc --noEmit` xanh.
 
+- [x] 2026-08-06: **Sửa nhãn trường địa chỉ ở form tạo tin tuyển dụng.** `CreateJobPostingPage` đang lấy chính key placeholder (`form.workLocationPlaceholder`) làm `<label>` nên màn hình hiện "VD: Tòa nhà FPT, Quận 9, TP.HCM *". Thêm key `form.workAddress` ("Địa chỉ cụ thể" / "Specific address") cho nhãn, giữ nguyên câu ví dụ ở placeholder trong ô nhập.
+
 - [x] 2026-08-05: **Unit test Luồng 8 — Review Interview Result (UC-64/84–90/95) — 24 test mới, tổng 375/375 pass.**
   - Phủ nốt các query HR đọc/giám sát kết quả phỏng vấn (Confirm/Override đã phủ ở `SubmitHrReviewAsync`). Bất biến chung: **đánh giá/phiên `practice` luôn bị ẩn khỏi nhân sự nội bộ** (ADR-051).
   - **`GetEvaluationsQueryHandlerTests` (8)** — danh sách phân trang: loại `practice`; lọc theo `JobPostingId`; trạng thái `pending`(chưa review)/`completed`(đã review)/`pass`/`not_pass` **tôn trọng HR override** (FinalVerdict thắng AiVerdict); phân trang + `Total`/`TotalPages` + sắp mới nhất trước; join tên ứng viên/vị trí/trạng thái review; rỗng→Total 0.
