@@ -47,6 +47,8 @@
     "roundType": "Loại vòng",
     "screening": "Screening / Sơ loại",
     "technical": "Technical / Chuyên môn",
+    "onlineTest": "Online Test / Trắc nghiệm",
+    "onlineTestHint": "Vòng trắc nghiệm dùng ngân hàng câu hỏi của tin này. Sau khi tạo tin, mở mục \"Bài thi trắc nghiệm\" để thêm câu hỏi và cấu hình điểm sàn / thời gian.",
     "language": "Ngôn ngữ",
     "vietnamese": "Tiếng Việt",
     "english": "Tiếng Anh",

@@ -47,6 +47,8 @@
     "roundType": "Round Type",
     "screening": "Screening",
     "technical": "Technical",
+    "onlineTest": "Online Test",
+    "onlineTestHint": "This round uses the job's question bank. After creating the job, open \"Online Test\" to add questions and set the pass score / duration.",
     "language": "Language",
     "vietnamese": "Vietnamese",
     "english": "English",

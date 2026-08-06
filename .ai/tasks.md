@@ -152,6 +152,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Auto-progression (mềm): nộp bài → lưu `IsPassed` + realtime `OnlineTestGraded` + notification; kết quả hiện cho HR (`GET /online-test/applications/{id}/result`) để HR cấp Interview Code vòng tiếp — không tự đổi status (ADR-049) ✅ 2026-07-24
 - [x] Unit test luồng Online Test — chấm điểm (khớp hoàn toàn, làm tròn 2 số, điểm sàn inclusive, chỉ chấm bộ đề đã bốc), gating (1 lượt/vòng, CV chưa duyệt, đã rút, ngân hàng rỗng, phân quyền), ẩn đáp án + bốc đề deterministic, validate câu hỏi — **33 test mới, 44/44 pass** ✅ 2026-08-05
 - [x] Chống gian lận (mức đủ) bài trắc nghiệm: FE bắt `visibilitychange`/`blur` khi làm bài (khử trùng 500ms) → đếm số lần rời tab, banner nhắc + cảnh báo leo thang, gửi kèm khi nộp; BE lưu `OnlineTestSubmission.TabSwitchCount` (migration `AddOnlineTestTabSwitchCount`); HR thấy cột "Rời màn hình" (badge nghi vấn) ở bảng điểm + export `.xlsx` ✅ 2026-08-06
+- [x] Loại vòng `online_test` trong form tạo tin: thêm option "Online Test / Trắc nghiệm" vào dropdown Loại vòng (`CreateJobPostingPage`) + hint; sửa nhãn hiển thị 3 nhánh ở `JobDetailPage`/`JobPostingDetailPage` (trước hiện nhầm "Screening") — hoàn tất phần UI còn thiếu của ADR-049 ✅ 2026-08-06
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
 - [x] Kiosk mode frontend: nhập Interview Code → phiên phỏng vấn thật (token phạm vi phiên), device check, phòng phỏng vấn có avatar, màn kết thúc tự reset (ADR-052) ✅ 2026-08-05
@@ -321,6 +322,12 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-06: **Thêm loại vòng `online_test` (trắc nghiệm) vào form tạo tin — hoàn tất phần UI còn thiếu của ADR-049.**
+  - **Bối cảnh:** BE đã hỗ trợ đầy đủ round type `online_test` (`OnlineTestSupport.ResolveRoundAsync` map vòng trắc nghiệm theo `InterviewRoundConfig.RoundType=="online_test"`; dev seed đã dùng), `RoundType` là chuỗi tự do không ràng buộc enum — nhưng dropdown "Loại vòng" ở `CreateJobPostingPage` chỉ có Screening/Technical (đúng như ghi chú ADR-053).
+  - **FE:** thêm `<option value="online_test">` vào dropdown + hint chỉ dẫn cấu hình ngân hàng câu hỏi/điểm sàn ở mục "Bài thi trắc nghiệm" sau khi tạo tin. i18n VI/EN (`form.onlineTest`, `form.onlineTestHint`).
+  - **Sửa mislabel:** các nơi hiển thị round type vốn giả định nhị phân (`technical` ? technical : screening) khiến vòng `online_test` bị hiện nhầm "Screening" — nay 3 nhánh ở `JobDetailPage` (recruiter: tab + thẻ vòng) và `JobPostingDetailPage` (HR: tab + subtitle + badge màu emerald). i18n `roundOnlineTest` (recruiter/jobDetail) + `rounds.types.onlineTest` (hr/jobPostingDetail), VI/EN.
+  - **Verify:** JSON 6 file hợp lệ; StaffSite `tsc --noEmit` xanh. Không đụng BE (đã sẵn sàng).
 
 - [x] 2026-08-06: **Tab mở từ trước deploy tự phục hồi thay vì chết cứng (stale chunk).**
   - **Triệu chứng:** tab đang mở lúc deploy, bấm sang route lazy-load (vd Đăng nhập) thì đứng im; console đầy `Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html"` + `Failed to fetch dynamically imported module`. F5 thì hết.

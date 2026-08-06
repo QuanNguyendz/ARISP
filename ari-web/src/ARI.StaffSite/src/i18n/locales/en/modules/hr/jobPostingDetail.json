@@ -57,7 +57,8 @@
     "round": "Round {{number}}",
     "types": {
       "technical": "Technical",
-      "screening": "Screening"
+      "screening": "Screening",
+      "onlineTest": "Online Test"
     },
     "language": "Language:",
     "languages": {
