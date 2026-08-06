@@ -58,7 +58,8 @@ namespace ARI.Application.DTOs
         bool IsPassed,
         int CorrectCount,
         int TotalQuestions,
-        DateTimeOffset SubmittedAt);
+        DateTimeOffset SubmittedAt,
+        int TabSwitchCount);
 
     /// <summary>Bảng tổng hợp điểm bài trắc nghiệm của toàn bộ ứng viên đã thi trong một job.</summary>
     public record OnlineTestJobResultsDto(
@@ -97,5 +98,11 @@ namespace ARI.Application.DTOs
     {
         /// <summary>Map questionId → danh sách chỉ số đáp án ứng viên chọn (0-based, có thể nhiều).</summary>
         public Dictionary<Guid, List<int>> Answers { get; set; } = new();
+
+        /// <summary>
+        /// Số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus cửa sổ) trong lúc làm bài —
+        /// FE đếm và gửi kèm. Chống gian lận nhẹ (client-side, có thể spoof) — dùng để răn đe + lưu vết.
+        /// </summary>
+        public int TabSwitchCount { get; set; }
     }
 }

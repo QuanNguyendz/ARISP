@@ -14,6 +14,11 @@ namespace ARI.Domain.Entities
         public int CorrectCount { get; set; }
         /// <summary>Tổng số câu của lượt thi (số câu đã bốc ngẫu nhiên).</summary>
         public int TotalQuestions { get; set; }
+        /// <summary>
+        /// Số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus cửa sổ) trong lúc làm bài —
+        /// tín hiệu chống gian lận nhẹ do FE đếm và gửi kèm khi nộp. &gt; 0 → HR thấy cờ nghi vấn.
+        /// </summary>
+        public int TabSwitchCount { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 }

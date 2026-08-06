@@ -151,6 +151,7 @@ _Chưa có task nào đang thực hiện._
 - [x] Backend: Tự động chấm điểm (Auto-scoring) sau khi nộp bài và so khớp đạt/không đạt dựa trên điểm sàn (`OnlineTestPassScore` trên JobPosting) ✅ 2026-07-24
 - [x] Auto-progression (mềm): nộp bài → lưu `IsPassed` + realtime `OnlineTestGraded` + notification; kết quả hiện cho HR (`GET /online-test/applications/{id}/result`) để HR cấp Interview Code vòng tiếp — không tự đổi status (ADR-049) ✅ 2026-07-24
 - [x] Unit test luồng Online Test — chấm điểm (khớp hoàn toàn, làm tròn 2 số, điểm sàn inclusive, chỉ chấm bộ đề đã bốc), gating (1 lượt/vòng, CV chưa duyệt, đã rút, ngân hàng rỗng, phân quyền), ẩn đáp án + bốc đề deterministic, validate câu hỏi — **33 test mới, 44/44 pass** ✅ 2026-08-05
+- [x] Chống gian lận (mức đủ) bài trắc nghiệm: FE bắt `visibilitychange`/`blur` khi làm bài (khử trùng 500ms) → đếm số lần rời tab, banner nhắc + cảnh báo leo thang, gửi kèm khi nộp; BE lưu `OnlineTestSubmission.TabSwitchCount` (migration `AddOnlineTestTabSwitchCount`); HR thấy cột "Rời màn hình" (badge nghi vấn) ở bảng điểm + export `.xlsx` ✅ 2026-08-06
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
 - [x] Kiosk mode frontend: nhập Interview Code → phiên phỏng vấn thật (token phạm vi phiên), device check, phòng phỏng vấn có avatar, màn kết thúc tự reset (ADR-052) ✅ 2026-08-05
@@ -320,6 +321,14 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-06: **Chống gian lận bài thi trắc nghiệm khi chuyển tab (mức "đủ" — FE bắt + BE lưu vết + HR thấy cờ).**
+  - **Bối cảnh:** trước đây bài trắc nghiệm remote KHÔNG có bất kỳ chống gian lận nào (chỉ đếm giờ + tự nộp). Hạ tầng cheat-signal (`useKioskLockdown`/`RecordCheatSignalAsync`/`CheatDetectionSignal`, ADR-054) chỉ gắn cho phiên phỏng vấn Kiosk, không áp cho Online Test.
+  - **FE (candidate):** `OnlineTestPage.tsx` thêm effect bắt `visibilitychange`(hidden) + `window.blur` **chỉ khi đang làm bài**, khử trùng 500ms để chuyển tab (thường bắn cả 2 sự kiện) không đếm gấp đôi. Đếm sống ở `useRef` (gửi kèm cả khi tự nộp lúc hết giờ), state để hiện UI: banner nhắc luôn hiển thị + cảnh báo amber leo thang theo số lần. i18n VI/EN (`antiCheatHint`, `tabSwitchWarning`).
+  - **BE:** `OnlineTestSubmission.TabSwitchCount` (int, default 0) + migration `AddOnlineTestTabSwitchCount` (`tab_switch_count`, `nullable:false default 0` — an toàn với hàng cũ). `SubmitOnlineTestRequest`/`SubmitOnlineTestCommand` nhận `TabSwitchCount`; handler kẹp `Math.Max(0, …)` khi lưu. `OnlineTestScoreRowDto` + `OnlineTestResultsBuilder` trả `TabSwitchCount`; export `.xlsx` thêm cột "Rời màn hình" (0→"-").
+  - **HR:** `JobOnlineTestResultsPage.tsx` thêm cột "Rời màn hình" — badge amber `AlertTriangle` + số lần khi `>0` (tooltip nghi vấn gian lận), gạch mờ khi 0. i18n VI/EN (`table.tabSwitches`, `tabSwitchFlag`, `tabSwitchNone`).
+  - **Giới hạn (đã ghi chú):** đếm ở client → có thể bị spoof; đóng hẳn trình duyệt không nộp thì không có bản ghi (nhưng cũng không có kết quả). Bản chất là **răn đe + lưu vết**, không phải khoá cứng (khoá cứng = Kiosk `chrome --kiosk`, ADR-054).
+  - **Verify:** `dotnet build` 0 error; `dotnet ef migrations add AddOnlineTestTabSwitchCount`; unit test **375/375 pass**; FE 2 site `tsc --noEmit` xanh.
 
 - [x] 2026-08-05: **Unit test Luồng 8 — Review Interview Result (UC-64/84–90/95) — 24 test mới, tổng 375/375 pass.**
   - Phủ nốt các query HR đọc/giám sát kết quả phỏng vấn (Confirm/Override đã phủ ở `SubmitHrReviewAsync`). Bất biến chung: **đánh giá/phiên `practice` luôn bị ẩn khỏi nhân sự nội bộ** (ADR-051).

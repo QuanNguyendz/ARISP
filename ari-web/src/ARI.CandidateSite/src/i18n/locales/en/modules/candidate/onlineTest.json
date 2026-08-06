@@ -19,7 +19,9 @@
     "submitError": "Failed to submit the test.",
     "unauthorized": "Please sign in to the Candidate Portal to take the test.",
     "lockedTitle": "Awaiting CV approval",
-    "lockedDetail": "Your application must pass the CV screening round before you can take the online test."
+    "lockedDetail": "Your application must pass the CV screening round before you can take the online test.",
+    "antiCheatHint": "Please do not leave this page while taking the test. Every tab switch or window blur is recorded and shared with the recruiter.",
+    "tabSwitchWarning": "You have left the test {{count}} time(s). This has been recorded and will be visible to the recruiter."
   },
   "entry": {
     "resultTitle": "Online test: {{result}}",

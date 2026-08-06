@@ -71,7 +71,7 @@ namespace ARI.API.Controllers
                 return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
 
             var result = await _sender.Send(
-                new SubmitOnlineTestCommand(applicationId, candidateId, GetEmailClaim(), request.Answers), ct);
+                new SubmitOnlineTestCommand(applicationId, candidateId, GetEmailClaim(), request.Answers, request.TabSwitchCount), ct);
             if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }
