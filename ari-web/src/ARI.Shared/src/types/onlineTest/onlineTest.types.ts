@@ -68,6 +68,8 @@ export interface OnlineTestScoreRow {
   correctCount: number
   totalQuestions: number
   submittedAt: string
+  /** Số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus) — chống gian lận nhẹ. > 0 → cờ nghi vấn. */
+  tabSwitchCount: number
 }
 
 /** Bảng tổng hợp điểm bài trắc nghiệm của toàn bộ ứng viên trong một job. */

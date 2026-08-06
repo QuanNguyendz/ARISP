@@ -6,12 +6,14 @@ import {
   ClipboardList,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   XCircle,
   ArrowLeft,
   Send,
   Clock,
   Lock,
+  ShieldAlert,
 } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 import type { OnlineTestResult } from '@ari/shared/types/onlineTest'
@@ -77,6 +79,11 @@ export default function CandidateOnlineTestPage() {
   const [submitError, setSubmitError] = useState('')
   const [result, setResult] = useState<OnlineTestResult | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  // Chống gian lận nhẹ: đếm số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus cửa sổ).
+  // Giá trị "sống" giữ ở ref (gửi khi nộp, kể cả tự nộp lúc hết giờ); state chỉ để hiện cảnh báo.
+  const [tabSwitches, setTabSwitches] = useState(0)
+  const tabSwitchRef = useRef(0)
+  const lastLeaveRef = useRef(0)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['online-test', applicationId],
@@ -108,7 +115,7 @@ export default function CandidateOnlineTestPage() {
       setSubmitting(true)
       setSubmitError('')
       try {
-        const res = await onlineTestService.submit(applicationId, answers)
+        const res = await onlineTestService.submit(applicationId, answers, tabSwitchRef.current)
         setResult(res)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       } catch (e) {
@@ -142,6 +149,29 @@ export default function CandidateOnlineTestPage() {
       void submit(true)
     }
   }, [taking, timeLeft, submit])
+
+  // Chống gian lận: bắt sự kiện rời khỏi bài thi (ẩn tab hoặc mất focus cửa sổ). Chỉ theo dõi
+  // khi đang làm bài. Gộp blur + visibilitychange xảy ra sát nhau (chuyển tab thường bắn cả hai)
+  // bằng cửa sổ khử trùng 500ms để không đếm gấp đôi 1 hành động.
+  useEffect(() => {
+    if (!taking) return
+    const registerLeave = () => {
+      const now = Date.now()
+      if (now - lastLeaveRef.current < 500) return
+      lastLeaveRef.current = now
+      tabSwitchRef.current += 1
+      setTabSwitches(tabSwitchRef.current)
+    }
+    const onVisibility = () => {
+      if (document.hidden) registerLeave()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', registerLeave)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', registerLeave)
+    }
+  }, [taking])
 
   return (
     <div className="min-h-screen bg-ink-50 px-4 py-10">
@@ -224,6 +254,20 @@ export default function CandidateOnlineTestPage() {
                 </span>
               )}
             </div>
+
+            {/* Nhắc nhở chống gian lận — luôn hiển thị trong lúc làm bài. */}
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-500">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t('page.antiCheatHint')}
+            </div>
+
+            {/* Cảnh báo leo thang khi ứng viên đã rời khỏi bài thi. */}
+            {tabSwitches > 0 && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {t('page.tabSwitchWarning', { count: tabSwitches })}
+              </div>
+            )}
 
             {submitError && (
               <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">

@@ -7,6 +7,7 @@ import {
   BarChart3,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   XCircle,
   Users,
@@ -234,6 +235,7 @@ export default function JobOnlineTestResultsPage() {
                       <th className="px-5 py-3 font-semibold">{t('results.table.correct')}</th>
                       <th className="px-5 py-3 font-semibold">{t('results.table.score')}</th>
                       <th className="px-5 py-3 font-semibold">{t('results.table.result')}</th>
+                      <th className="px-5 py-3 font-semibold">{t('results.table.tabSwitches')}</th>
                       <th className="px-5 py-3 font-semibold">{t('results.table.submittedAt')}</th>
                     </tr>
                   </thead>
@@ -269,6 +271,20 @@ export default function JobOnlineTestResultsPage() {
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-500/15 dark:text-red-400">
                               <XCircle className="h-3 w-3" /> {t('results.notPassed')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {r.tabSwitchCount > 0 ? (
+                            <span
+                              title={t('results.tabSwitchFlag', { count: r.tabSwitchCount })}
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+                            >
+                              <AlertTriangle className="h-3 w-3" /> {r.tabSwitchCount}
+                            </span>
+                          ) : (
+                            <span title={t('results.tabSwitchNone')} className="text-xs text-ink-300 dark:text-ink-500">
+                              –
                             </span>
                           )}
                         </td>
