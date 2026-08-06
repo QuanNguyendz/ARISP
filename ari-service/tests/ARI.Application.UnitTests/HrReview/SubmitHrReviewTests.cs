@@ -180,7 +180,9 @@ public class SubmitHrReviewTests
         var invite = Assert.Single(uow.Repo<InterviewInvite>().Items);
         Assert.Equal(2, invite.RoundNumber);
         Assert.Equal(app.Id, invite.ApplicationId);
-        Assert.Equal("interview", app.Status); // progression ghi đè "pass" → tiếp tục phỏng vấn
+        // ADR-053: còn vòng sau → trạng thái là "interview" ngay từ đầu (trước đây đặt "pass"
+        // rồi mới bị auto-progression ghi đè).
+        Assert.Equal("interview", app.Status);
     }
 
     [Fact]
@@ -206,7 +208,9 @@ public class SubmitHrReviewTests
 
         Assert.True(res.IsSuccess);
         Assert.Empty(uow.Repo<InterviewInvite>().Items); // practice không kích hoạt vòng kế
-        Assert.Equal("pass", app.Status);
+        // ADR-051: buổi thử KHÔNG chạm pipeline tuyển dụng — trạng thái hồ sơ giữ nguyên như trước
+        // khi review (trước đây review một buổi thử vẫn đẩy hồ sơ sang "pass").
+        Assert.Equal("interview", app.Status);
     }
 
     [Fact]

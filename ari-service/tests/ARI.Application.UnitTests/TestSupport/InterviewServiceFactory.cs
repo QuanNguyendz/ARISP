@@ -10,9 +10,9 @@ using ARI.Domain.Entities;
 namespace ARI.Application.UnitTests.TestSupport;
 
 /// <summary>
-/// Dựng <see cref="InterviewService"/> cho unit test luồng HR Review. Service có 8 dependency nhưng
+/// Dựng <see cref="InterviewService"/> cho unit test luồng HR Review. Service có 9 dependency nhưng
 /// <c>SubmitHrReviewAsync</c> chỉ chạm <see cref="IUnitOfWork"/> + <see cref="INotificationService"/>;
-/// 6 dependency media/AI còn lại được cắm stub ném lỗi (không được gọi trong luồng này).
+/// 7 dependency media/AI/storage còn lại được cắm stub ném lỗi (không được gọi trong luồng này).
 /// </summary>
 internal static class InterviewServiceFactory
 {
@@ -24,7 +24,8 @@ internal static class InterviewServiceFactory
         notif,
         new ThrowingDeepgramTokenService(),
         new ThrowingRagIngestionService(),
-        new ThrowingTTSService());
+        new ThrowingTTSService(),
+        new ThrowingFileStorageService());
 
     private sealed class ThrowingAIProvider : IAIProvider
     {
@@ -67,5 +68,15 @@ internal static class InterviewServiceFactory
     {
         public Task<Stream> TextToSpeechAsync(string text, string voiceId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<string> TextToSpeechBase64PcmAsync(string text, string voiceId, CancellationToken ct = default) => throw new NotImplementedException();
+    }
+
+    /// <summary>Storage chỉ dùng ở luồng lưu video Kiosk (ADR-052) — không chạm trong các test này.</summary>
+    private sealed class ThrowingFileStorageService : IFileStorageService
+    {
+        public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task DeleteAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();
     }
 }

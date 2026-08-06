@@ -1010,16 +1010,20 @@ namespace ARI.Application.Services
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
             {
-                // "Đạt" CHỈ khi đã qua vòng CUỐI của job (ADR-053). Trước đây HR xác nhận pass ở
+                // Buổi THỬ không chạm pipeline tuyển dụng, kể cả khi có ai đó review nó (ADR-051).
+                // "Đạt" CHỈ khi đã qua vòng CUỐI của job (ADR-053): trước đây HR xác nhận pass ở
                 // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị TriggerAutoProgressionAsync ghi
                 // đè về "interview" — job không khai báo round config thì không có gì ghi đè nên
                 // ứng viên mới xong vòng 1 đã hiện "Đạt".
-                var totalRounds = await ResolveTotalRoundsAsync(application.JobPostingId, ct);
-                var isFinalRound = evaluation.RoundNumber >= totalRounds;
-                application.Status = request.FinalVerdict != "pass"
-                    ? "not_pass"
-                    : (isFinalRound ? "pass" : "interview");
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+                if (evaluation.SessionType == "real")
+                {
+                    var totalRounds = await ResolveTotalRoundsAsync(application.JobPostingId, ct);
+                    var isFinalRound = evaluation.RoundNumber >= totalRounds;
+                    application.Status = request.FinalVerdict != "pass"
+                        ? "not_pass"
+                        : (isFinalRound ? "pass" : "interview");
+                    _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+                }
 
                 var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var jobTitle = jobPosting?.Title ?? "vị trí ứng tuyển";
