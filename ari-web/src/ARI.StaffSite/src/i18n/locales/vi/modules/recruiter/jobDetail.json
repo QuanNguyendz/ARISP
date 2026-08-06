@@ -40,6 +40,7 @@
   "interviewRoundsCount": "({{count}})",
   "roundTechnical": "Chuyên môn",
   "roundScreening": "Sơ loại",
+  "roundOnlineTest": "Trắc nghiệm",
   "noCandidatesForJob": "Chưa có ứng viên nào cho tin này.",
   "filters": {
     "filterByDate": "Lọc theo ngày",

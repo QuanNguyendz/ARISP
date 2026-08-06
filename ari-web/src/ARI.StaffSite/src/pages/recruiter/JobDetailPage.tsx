@@ -181,7 +181,9 @@ export default function RecruiterJobDetailPage() {
             ? t('roundScreening')
             : rc.roundType.toLowerCase() === 'technical'
               ? t('roundTechnical')
-              : rc.roundType
+              : rc.roundType.toLowerCase() === 'online_test'
+                ? t('roundOnlineTest')
+                : rc.roundType
           : ''
         const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
@@ -681,8 +683,12 @@ export default function RecruiterJobDetailPage() {
                 className="rounded-lg border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-1.5 text-xs text-ink-700 dark:text-ink-200"
               >
                 {t('tabs.round')} {r.roundNumber}:{' '}
-                {r.roundType === 'technical' ? t('roundTechnical') : t('roundScreening')} ·{' '}
-                {r.maxDurationMinutes}′
+                {r.roundType === 'technical'
+                  ? t('roundTechnical')
+                  : r.roundType === 'online_test'
+                    ? t('roundOnlineTest')
+                    : t('roundScreening')}{' '}
+                · {r.maxDurationMinutes}′
               </span>
             ))}
           </div>

@@ -501,7 +501,11 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                       <select value={round.roundType} onChange={(e) => changeRound(idx, 'roundType', e.target.value)} className={`${input} py-2`}>
                         <option value="screening">{t('form.screening')}</option>
                         <option value="technical">{t('form.technical')}</option>
+                        <option value="online_test">{t('form.onlineTest')}</option>
                       </select>
+                      {round.roundType === 'online_test' && (
+                        <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{t('form.onlineTestHint')}</p>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div>

@@ -40,6 +40,7 @@
   "interviewRoundsCount": "({{count}})",
   "roundTechnical": "Technical",
   "roundScreening": "Screening",
+  "roundOnlineTest": "Online Test",
   "noCandidatesForJob": "No candidates for this job yet.",
   "filters": {
     "filterByDate": "Filter by date",

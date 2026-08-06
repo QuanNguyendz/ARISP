@@ -288,7 +288,9 @@ export default function JobPostingDetailPage() {
             ? t('rounds.types.screening')
             : rc.roundType.toLowerCase() === 'technical'
               ? t('rounds.types.technical')
-              : rc.roundType
+              : rc.roundType.toLowerCase() === 'online_test'
+                ? t('rounds.types.onlineTest')
+                : rc.roundType
           : ''
         const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
         return {
@@ -297,7 +299,9 @@ export default function JobPostingDetailPage() {
           subtitle:
             rc.roundType === 'technical'
               ? t('rounds.types.technical')
-              : t('rounds.types.screening'),
+              : rc.roundType === 'online_test'
+                ? t('rounds.types.onlineTest')
+                : t('rounds.types.screening'),
           candidates,
         }
       })
@@ -930,11 +934,19 @@ export default function JobPostingDetailPage() {
                           {t('rounds.round', { number: round.roundNumber })}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${round.roundType === 'technical' ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400' : 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            round.roundType === 'technical'
+                              ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400'
+                              : round.roundType === 'online_test'
+                                ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                          }`}
                         >
                           {round.roundType === 'technical'
                             ? t('rounds.types.technical')
-                            : t('rounds.types.screening')}
+                            : round.roundType === 'online_test'
+                              ? t('rounds.types.onlineTest')
+                              : t('rounds.types.screening')}
                         </span>
                       </div>
                       <div className="space-y-1.5 text-xs text-ink-600 dark:text-ink-400">
