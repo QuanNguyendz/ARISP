@@ -64,6 +64,19 @@ namespace ARI.Application.DTOs
         /// khi đang chờ xếp lại (chỉ set khi hiện KHÔNG còn lịch "scheduled").
         /// </summary>
         public string? ScheduleDeclineReason { get; set; }
+
+        // Candidate Profile fields (Online Profile)
+        public string? CandidateHeadline { get; set; }
+        public string? CandidateAbout { get; set; }
+        public string? CandidateLocation { get; set; }
+        public string? CandidateDateOfBirth { get; set; }
+        public string? CandidateLinkedinUrl { get; set; }
+        public string? CandidateGithubUrl { get; set; }
+        public string? CandidatePortfolioUrl { get; set; }
+        public bool AllowHrViewProfile { get; set; } = true;
+        public System.Collections.Generic.List<string> CandidateSkills { get; set; } = new();
+        public System.Collections.Generic.List<CandidateExperienceItem> CandidateExperience { get; set; } = new();
+        public System.Collections.Generic.List<CandidateEducationItem> CandidateEducation { get; set; } = new();
     }
 
     public class UpdateApplicationStatusRequest

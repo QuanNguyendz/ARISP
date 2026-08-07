@@ -17,7 +17,14 @@ namespace ARI.Application.Interfaces
     {
         Task<Result<string>> GetSpeechAudioAsync(Guid sessionId, string text, Guid? accountId, string? email, bool kioskAuthorized = false, CancellationToken ct = default);
         Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(Guid sessionId, Guid? accountId, string? email, bool kioskAuthorized = false, CancellationToken ct = default);
-        Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(CancellationToken ct = default);
+        Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(Guid? applicationId = null, CancellationToken ct = default);
+        // ─── Interview Management: Job → Slot → Candidate ───
+        Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(CancellationToken ct = default);
+        Task<List<InterviewSlotDetailDto>> GetSlotsForJobAsync(Guid jobPostingId, CancellationToken ct = default);
+        Task<List<SlotCandidateDto>> GetCandidatesInSlotAsync(Guid slotId, CancellationToken ct = default);
+        Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, CancellationToken ct = default);
+        Task<Result<bool>> RescheduleBookingAsync(Guid bookingId, Guid targetSlotId, CancellationToken ct = default);
+        // ─────────────────────────────────────────────────────
         Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default);
         Task<Result<string>> GenerateAndSendNextQuestionAsync(Guid sessionId, CancellationToken ct = default);
         Task<Result<Answer>> SubmitAnswerAsync(Guid sessionId, Guid questionId, string transcript, int? responseTimeMs, CancellationToken ct = default);
