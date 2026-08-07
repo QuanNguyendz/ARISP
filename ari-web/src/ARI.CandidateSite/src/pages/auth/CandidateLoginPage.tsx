@@ -66,6 +66,9 @@ export default function CandidateLoginPage() {
   const [searchParams] = useSearchParams()
   const verificationSent =
     searchParams.get('verify') === 'sent' || searchParams.get('registered') === 'true'
+  // Đích quay lại sau đăng nhập (vd deep-link xác nhận lịch từ email). Chỉ nhận path nội bộ để tránh open-redirect.
+  const rawReturn = searchParams.get('returnUrl')
+  const returnUrl = rawReturn && rawReturn.startsWith('/') && !rawReturn.startsWith('//') ? rawReturn : '/'
   const { setAuthFromResponse } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState(searchParams.get('email') ?? '')
@@ -93,7 +96,7 @@ export default function CandidateLoginPage() {
         return
       }
 
-      navigate('/')
+      navigate(returnUrl)
     } catch (err: any) {
       if (err.code === 'email_not_verified') {
         setNeedsVerification(true)

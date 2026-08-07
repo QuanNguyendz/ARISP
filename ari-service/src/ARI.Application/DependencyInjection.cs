@@ -18,6 +18,11 @@ namespace ARI.Application
             configuration.GetSection("Interview").Bind(interviewOptions);
             services.AddSingleton(interviewOptions);
 
+            // Cấu hình xếp lịch (hạn xác nhận lịch trước khi hệ thống tự Reject) — bind section "Scheduling".
+            var schedulingOptions = new SchedulingOptions();
+            configuration.GetSection("Scheduling").Bind(schedulingOptions);
+            services.AddSingleton(schedulingOptions);
+
             // CQRS: MediatR pipeline (thứ tự đăng ký = thứ tự chạy) + FluentValidation validators.
             services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
             services.AddMediatR(cfg =>

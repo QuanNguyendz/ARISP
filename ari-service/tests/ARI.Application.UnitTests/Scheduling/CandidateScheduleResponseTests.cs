@@ -162,6 +162,21 @@ public class CandidateScheduleResponseTests
     }
 
     [Fact]
+    public async Task Decline_is_locked_after_confirm()
+    {
+        // Quyết định khoá: đã xác nhận tham dự thì không được đổi sang từ chối (một lần / lịch).
+        var (uow, _, _, booking, _) = Scheduled(confirmation: "confirmed");
+
+        var res = await new DeclineScheduleCommandHandler(uow, new RecordingNotificationService())
+            .Handle(new DeclineScheduleCommand(booking.Id, "Đổi ý muốn báo bận", _accountId, Email), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("đã xác nhận", res.Error);
+        Assert.Equal("confirmed", booking.ConfirmationStatus); // không đổi
+        Assert.Equal("scheduled", booking.Status);
+    }
+
+    [Fact]
     public async Task Decline_by_non_owner_is_forbidden()
     {
         var (uow, _, app, booking, _) = Scheduled();

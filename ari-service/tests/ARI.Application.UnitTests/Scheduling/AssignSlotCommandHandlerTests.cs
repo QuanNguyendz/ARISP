@@ -7,6 +7,7 @@ using ARI.Application.Scheduling;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace ARI.Application.UnitTests.Scheduling;
@@ -22,9 +23,11 @@ public class AssignSlotCommandHandlerTests
     private readonly Guid _staffId = Guid.NewGuid();
     private readonly Guid _accountId = Guid.NewGuid();
 
+    private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
+
     private Task<Result<AssignSlotResultDto>> Run(
         InMemoryUnitOfWork uow, RecordingNotificationService notif, AssignSlotCommand cmd)
-        => new AssignSlotCommandHandler(uow, notif).Handle(cmd, CancellationToken.None);
+        => new AssignSlotCommandHandler(uow, notif, EmptyConfig).Handle(cmd, CancellationToken.None);
 
     private AssignSlotCommand Cmd(Guid appId, Guid slotId, int round = 1, Guid? user = null, string? role = null)
         => new(appId, slotId, round, user ?? _staffId, role ?? AppRoles.Recruiter);
