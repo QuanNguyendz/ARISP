@@ -8,6 +8,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 
 namespace ARI.Application.Scheduling
 {
@@ -179,11 +180,14 @@ namespace ARI.Application.Scheduling
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notificationService;
+        private readonly IConfiguration _configuration;
 
-        public AssignSlotCommandHandler(IUnitOfWork unitOfWork, INotificationService notificationService)
+        public AssignSlotCommandHandler(
+            IUnitOfWork unitOfWork, INotificationService notificationService, IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _notificationService = notificationService;
+            _configuration = configuration;
         }
 
         public async Task<Result<AssignSlotResultDto>> Handle(AssignSlotCommand request, CancellationToken ct)
@@ -304,19 +308,78 @@ namespace ARI.Application.Scheduling
             }
 
             // Email thông báo lịch (best-effort — không chặn kết quả nếu gửi lỗi).
+            // Email này gộp: (1) báo qua vòng CV, (2) lịch phỏng vấn được xếp, (3) toàn bộ quy trình theo vòng,
+            // (4) 2 nút Xác nhận / Từ chối deep-link về Portal (ADR-048).
             try
             {
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
                 var jobTitle = job?.Title ?? "vị trí ứng tuyển";
-                var subject = "[ARISP] - Lịch phỏng vấn của bạn đã được xếp";
+
+                // Danh sách vòng phỏng vấn của tin → mô tả quy trình trong email.
+                var roundConfigs = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                        .FindAsync(r => r.JobPostingId == app.JobPostingId, ct))
+                    .OrderBy(r => r.RoundNumber).ToList();
+
+                static string RoundLabel(string? t) => (t ?? string.Empty).ToLowerInvariant() switch
+                {
+                    "screening" => "Sơ loại (Screening)",
+                    "technical" => "Chuyên môn (Technical)",
+                    "online_test" => "Trắc nghiệm (Online Test)",
+                    "hr" => "Phỏng vấn với HR",
+                    "culture_fit" => "Đánh giá mức độ phù hợp văn hoá",
+                    _ => string.IsNullOrWhiteSpace(t) ? "Phỏng vấn" : t!,
+                };
+
+                var processHtml = roundConfigs.Count == 0
+                    ? string.Empty
+                    : "<ol style='padding-left: 20px; color: #333; font-size: 14px; line-height: 1.6;'>"
+                      + string.Join(string.Empty, roundConfigs.Select(r =>
+                          $"<li style='margin: 4px 0;'>Vòng {r.RoundNumber}: <strong>{RoundLabel(r.RoundType)}</strong>"
+                          + (r.RoundNumber == round ? " — <span style='color:#007bff; font-weight:bold;'>bạn được mời ở vòng này</span>" : string.Empty)
+                          + "</li>"))
+                      + "</ol>";
+
+                var baseUrl = ARI.Application.Applications.Commands.ApplicationsSupport
+                    .CandidateBaseUrl(_configuration).TrimEnd('/');
+                var confirmLink = $"{baseUrl}/portal/schedule/{applicationId}?booking={booking.Id}&action=confirm";
+                var declineLink = $"{baseUrl}/portal/schedule/{applicationId}?booking={booking.Id}&action=decline";
+                var deadlineHours = int.TryParse(_configuration["Scheduling:ConfirmDeadlineHours"], out var dh) && dh > 0 ? dh : 48;
+
+                var cvPassLine = round == 1
+                    ? "<p><strong>Chúc mừng!</strong> Hồ sơ của bạn đã <strong>qua vòng duyệt CV</strong>. Bộ phận nhân sự trân trọng mời bạn tham dự phỏng vấn.</p>"
+                    : string.Empty;
+
+                var subject = "[ARISP] - Mời phỏng vấn & xác nhận lịch hẹn";
                 var html = $@"
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
             <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
+            {cvPassLine}
             <p>Bộ phận nhân sự đã xếp lịch phỏng vấn <strong>vòng {round}</strong> cho vị trí <strong>{jobTitle}</strong> của bạn:</p>
-            <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
-            <p>Vui lòng đăng nhập Candidate Portal để <strong>xác nhận lịch</strong>. Nếu bạn bận vào khung giờ này, hãy <strong>báo bận kèm lý do</strong> để nhân sự xếp lịch khác phù hợp hơn.</p>
-            <p>Vui lòng đến văn phòng đúng khung giờ trên. Nhân sự sẽ cấp <strong>Mã phỏng vấn (Interview Code)</strong> tại chỗ để bạn vào phòng phỏng vấn.</p>
-            <p>Bạn cũng có thể luyện tập với chế độ <em>phỏng vấn thử</em> trên Portal trước ngày hẹn.</p>
+            <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 20px 0;'>{whenText}</p>
+
+            <p style='margin-bottom: 4px;'><strong>Quy trình phỏng vấn của vị trí này:</strong></p>
+            {processHtml}
+
+            <p style='margin-top: 20px;'>Vui lòng phản hồi lịch hẹn bằng một trong hai lựa chọn dưới đây:</p>
+            <table role='presentation' cellpadding='0' cellspacing='0' style='margin: 16px auto;'>
+                <tr>
+                    <td style='padding: 0 8px;'>
+                        <a href='{confirmLink}' style='display: inline-block; padding: 12px 26px; background-color: #16a34a; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;'>✓ Xác nhận lịch</a>
+                    </td>
+                    <td style='padding: 0 8px;'>
+                        <a href='{declineLink}' style='display: inline-block; padding: 12px 26px; background-color: #dc2626; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;'>✕ Từ chối / đổi lịch</a>
+                    </td>
+                </tr>
+            </table>
+
+            <div style='background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px 14px; margin: 16px 0;'>
+                <p style='margin: 0; color: #9a3412; font-size: 13px;'>
+                    <strong>Lưu ý quan trọng:</strong> Mỗi lịch chỉ phản hồi <strong>một lần</strong> — sau khi bấm Xác nhận hoặc Từ chối, bạn sẽ <strong>không thể thay đổi</strong> lựa chọn.
+                    Nếu bạn <strong>không xác nhận trong vòng {deadlineHours} giờ</strong>, lịch sẽ tự động bị huỷ (chuyển sang Từ chối) và nhân sự sẽ sắp xếp lại.
+                </p>
+            </div>
+
+            <p style='color: #555; font-size: 13px;'>Bạn cần đăng nhập Candidate Portal để hoàn tất xác nhận. Buổi phỏng vấn thật diễn ra tại văn phòng — nhân sự sẽ cấp <strong>Mã phỏng vấn (Interview Code)</strong> tại chỗ. Bạn cũng có thể luyện tập với chế độ <em>phỏng vấn thử</em> trên Portal trước ngày hẹn.</p>
             <br/>
             <p>Trân trọng,</p>
             <p><strong>Đội ngũ nhân sự ARISP</strong></p>

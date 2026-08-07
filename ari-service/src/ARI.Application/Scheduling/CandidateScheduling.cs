@@ -242,6 +242,11 @@ namespace ARI.Application.Scheduling
             if (booking.Status != "scheduled")
                 return Result.Failure("Lịch này không còn hiệu lực để từ chối.");
 
+            // Khoá quyết định: đã xác nhận tham dự thì không được đổi sang từ chối (và ngược lại — confirm
+            // sau khi từ chối bị chặn bởi guard Status ở trên). Mỗi lịch chỉ phản hồi 1 lần.
+            if (string.Equals(booking.ConfirmationStatus, "confirmed", StringComparison.OrdinalIgnoreCase))
+                return Result.Failure("Bạn đã xác nhận tham dự lịch này nên không thể đổi sang từ chối. Quyết định đã được ghi nhận và không thể thay đổi.");
+
             booking.ConfirmationStatus = "declined";
             booking.DeclineReason = reason;
             booking.RespondedAt = DateTimeOffset.UtcNow;
