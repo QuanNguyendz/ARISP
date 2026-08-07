@@ -342,16 +342,6 @@ export default function CandidateRegisterPage() {
               {t('candidateRegister.signIn')}
             </Link>
           </p>
-
-          <p className="mt-3 text-center text-xs text-ink-400">
-            {t('candidateRegister.isRecruiter')}
-            <Link
-              to="/auth/login"
-              className="font-medium text-ink-600 hover:text-brand-600 hover:underline"
-            >
-              {t('candidateRegister.staffLoginLink')}
-            </Link>
-          </p>
         </div>
       </div>
     </div>
