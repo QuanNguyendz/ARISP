@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Clock,
   CalendarClock,
+  UserCheck,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
@@ -27,6 +28,7 @@ import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import { interviewService, type HrInterviewSessionItem } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
+import { CandidateOnlineProfileModal } from './CandidatesPage'
 import {
   appStatusBadge,
   appStatusLabel,
@@ -59,6 +61,7 @@ export default function HrCandidateDetailPage() {
   const [coding, setCoding] = useState(false)
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -69,7 +72,7 @@ export default function HrCandidateDetailPage() {
           const [a, ev, ss] = await Promise.all([
             applicationService.getHrApplicationById(id),
             evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
-            interviewService.getHrSessions().catch(() => [] as HrInterviewSessionItem[]),
+            interviewService.getHrSessions(id).catch(() => [] as HrInterviewSessionItem[]),
           ])
           setApp(a)
           setEvals(ev)
@@ -233,7 +236,7 @@ export default function HrCandidateDetailPage() {
                 {evals.map((ev) => (
                   <Link
                     key={ev.id}
-                    to="/hr/evaluations"
+                    to={`/hr/evaluations?id=${ev.id}`}
                     className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:border-brand-300 dark:hover:border-brand-500/40"
                   >
                     <div className="min-w-0">
@@ -318,6 +321,13 @@ export default function HrCandidateDetailPage() {
               {t('actions')}
             </h2>
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="flex w-full items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50/50 dark:bg-purple-500/10 px-3 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors cursor-pointer"
+              >
+                <UserCheck className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Xem Profile Online
+              </button>
               {app.cvFileUrl && (
                 <button
                   type="button"
@@ -418,6 +428,13 @@ export default function HrCandidateDetailPage() {
           </div>
         </div>
       </div>
+
+      {showProfileModal && (
+        <CandidateOnlineProfileModal
+          app={app}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </div>
   )
 }

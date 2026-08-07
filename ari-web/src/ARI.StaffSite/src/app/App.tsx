@@ -53,7 +53,6 @@ const RecruiterCreateJobPage = lazy(() => import('@/pages/recruiter/CreateJobPos
 const RecruiterJobSchedulePage = lazy(() => import('@/pages/recruiter/JobScheduleConfigPage'))
 const JobOnlineTestPage = lazy(() => import('@/pages/recruiter/JobOnlineTestPage'))
 const JobOnlineTestResultsPage = lazy(() => import('@/pages/recruiter/JobOnlineTestResultsPage'))
-const RecruiterInterviewCodePage = lazy(() => import('@/pages/recruiter/InterviewCodePage'))
 const RecruiterCandidatesPage = lazy(() => import('@/pages/recruiter/CandidatesPage'))
 const RecruiterCandidateDetailPage = lazy(() => import('@/pages/recruiter/CandidateDetailPage'))
 const RecruiterEvaluationsPage = lazy(() => import('@/pages/recruiter/EvaluationReviewPage'))
@@ -145,6 +144,7 @@ function App() {
             <Route path="/hr/jobs" element={<HrJobsPage />} />
             <Route path="/hr/jobs/create" element={<RecruiterCreateJobPage mode="create" />} />
             <Route path="/hr/jobs/:id/edit" element={<RecruiterCreateJobPage mode="edit" />} />
+            <Route path="/hr/jobs/:id/schedule" element={<RecruiterJobSchedulePage />} />
             <Route path="/hr/jobs/:id" element={<HrJobDetailPage />} />
             <Route path="/hr/jobs/:id/online-test" element={<JobOnlineTestPage />} />
             <Route path="/hr/jobs/:id/online-test/results" element={<JobOnlineTestResultsPage />} />
@@ -180,7 +180,7 @@ function App() {
             />
             <Route path="/recruiter/candidates" element={<RecruiterCandidatesPage />} />
             <Route path="/recruiter/candidates/:id" element={<RecruiterCandidateDetailPage />} />
-            <Route path="/recruiter/code" element={<RecruiterInterviewCodePage />} />
+            <Route path="/recruiter/code" element={<Navigate to="/recruiter/interviews" replace />} />
             <Route path="/recruiter/evaluations" element={<RecruiterEvaluationsPage />} />
             <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
             <Route path="/recruiter/notifications" element={<RecruiterNotificationsPage />} />

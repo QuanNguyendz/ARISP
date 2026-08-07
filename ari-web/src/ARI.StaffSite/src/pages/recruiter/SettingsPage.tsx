@@ -30,17 +30,17 @@ export default function RecruiterSettingsPage() {
   }
 
   const tabs = [
-    { id: 'profile', label: t('tabs.profile'), icon: User },
-    { id: 'notifications', label: t('tabs.notifications'), icon: Bell },
-    { id: 'security', label: t('tabs.security'), icon: Lock },
+    { id: 'profile', label: t('tabs.profile', 'Hồ sơ'), icon: User },
+    { id: 'notifications', label: t('tabs.notifications', 'Thông báo'), icon: Bell },
+    { id: 'security', label: t('tabs.security', 'Bảo mật'), icon: Lock },
   ]
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
-      <PageHeader title={t('title')} description={t('description')} />
+      <PageHeader title={t('title', 'Cài đặt')} description={t('description', 'Quản lý hồ sơ và cài đặt cá nhân')} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
-        {/* Tabs — horizontal scroll trên mobile, sidebar dọc từ lg */}
+        {/* Tabs */}
         <div className="-mx-4 sm:mx-0 lg:w-64 lg:shrink-0">
           <nav
             aria-label="Settings tabs"
@@ -76,12 +76,12 @@ export default function RecruiterSettingsPage() {
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                  {t('profile.title')}
+                  {t('profile.title', 'Hồ sơ')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      {t('profile.fullName')}
+                      {t('profile.fullName', 'Họ tên')}
                     </label>
                     <input
                       type="text"
@@ -91,7 +91,7 @@ export default function RecruiterSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      {t('profile.email')}
+                      {t('profile.email', 'Email')}
                     </label>
                     <input
                       type="email"
@@ -101,7 +101,7 @@ export default function RecruiterSettingsPage() {
                   </div>
                 </div>
                 <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity">
-                  {t('profile.saveChanges')}
+                  {t('profile.saveChanges', 'Lưu thay đổi')}
                 </button>
               </div>
             )}
@@ -109,7 +109,7 @@ export default function RecruiterSettingsPage() {
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                  {t('notifications.title')}
+                  {t('notifications.title', 'Cài đặt thông báo')}
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
@@ -154,12 +154,12 @@ export default function RecruiterSettingsPage() {
             {activeTab === 'security' && (
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                  {t('security.title')}
+                  {t('security.title', 'Đổi mật khẩu')}
                 </h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      {t('security.currentPassword')}
+                      {t('security.currentPassword', 'Mật khẩu hiện tại')}
                     </label>
                     <input
                       type="password"
@@ -169,7 +169,7 @@ export default function RecruiterSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
-                      {t('security.newPassword')}
+                      {t('security.newPassword', 'Mật khẩu mới')}
                     </label>
                     <input
                       type="password"
@@ -179,7 +179,7 @@ export default function RecruiterSettingsPage() {
                   </div>
                 </div>
                 <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 text-white font-medium hover:opacity-90 transition-opacity">
-                  {t('security.changePassword')}
+                  {t('security.changePassword', 'Đổi mật khẩu')}
                 </button>
               </div>
             )}

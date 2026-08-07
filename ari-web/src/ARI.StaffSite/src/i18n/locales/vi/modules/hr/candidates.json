@@ -1,10 +1,10 @@
 {
   "title": "Ứng viên",
-  "subtitle": "Quản lý và theo dõi tất cả hồ sơ ứng tuyển",
+  "subtitle": "Quản lý và theo dõi tất cả ứng viên của công ty",
   "allCandidates": "Tất cả ứng viên",
-  "noCandidates": "Chưa có ứng viên",
+  "noCandidates": "Chưa có ứng viên nào",
   "noCandidatesHint": "Khi ứng viên nộp hồ sơ qua Job Board, họ sẽ xuất hiện tại đây.",
-  "searchPlaceholder": "Tìm theo tên, email, vị trí...",
+  "searchPlaceholder": "Tìm theo tên, email...",
   "noResults": "Không tìm thấy ứng viên",
   "noResultsHint": "Thử từ khoá khác hoặc bỏ bớt bộ lọc.",
   "paginationLabel": "ứng viên",

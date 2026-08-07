@@ -574,7 +574,7 @@ namespace ARI.Application.CandidatePortal
     }
 
     // ============================================================
-    // POST /api/portal/applications/verify-cv-info — AI so khớp thông tin liên hệ với CV
+    // POST /api/portal/applications/verify-cv-info — So khớp thông tin liên hệ với CV bằng Code (0 AI token)
     // ============================================================
 
     public record VerifyCvInfoCommand(
@@ -586,18 +586,15 @@ namespace ARI.Application.CandidatePortal
         private readonly IUnitOfWork _unitOfWork;
         private readonly IFileStorageService _fileStorage;
         private readonly IDocumentParserService _documentParserService;
-        private readonly IGeminiProvider _geminiProvider;
 
         public VerifyCvInfoCommandHandler(
             IUnitOfWork unitOfWork,
             IFileStorageService fileStorage,
-            IDocumentParserService documentParserService,
-            IGeminiProvider geminiProvider)
+            IDocumentParserService documentParserService)
         {
             _unitOfWork = unitOfWork;
             _fileStorage = fileStorage;
             _documentParserService = documentParserService;
-            _geminiProvider = geminiProvider;
         }
 
         public async Task<Result<CvContactVerificationResultDto>> Handle(VerifyCvInfoCommand command, CancellationToken ct)
@@ -624,13 +621,6 @@ namespace ARI.Application.CandidatePortal
                 ext = System.IO.Path.GetExtension(acc.ProfileCvFileName ?? acc.ProfileCvUrl).ToLowerInvariant();
             }
 
-            var mime = ext switch
-            {
-                ".pdf" => "application/pdf",
-                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                _ => "application/octet-stream"
-            };
-
             string cvText = string.Empty;
             try
             {
@@ -639,9 +629,87 @@ namespace ARI.Application.CandidatePortal
             }
             catch { /* best-effort */ }
 
-            return await _geminiProvider.VerifyCvContactInfoAsync(
-                bytes, mime, cvText,
-                command.CandidateName, command.CandidatePhone, acc.Email, ct);
+            // SO SÁNH BẰNG CODE BÌNH THƯỜNG TRÊN FILE CV (0 AI TOKEN, FAST & FREE)
+            return Result.Success(PerformCodeVerification(cvText, command.CandidateName, command.CandidatePhone));
+        }
+
+        private static CvContactVerificationResultDto PerformCodeVerification(string cvText, string formName, string formPhone)
+        {
+            var mismatches = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(cvText))
+            {
+                // File CV dạng ảnh (scan) hoặc không đọc được văn bản -> Không thể so sánh bằng text, coi như hợp lệ
+                return new CvContactVerificationResultDto
+                {
+                    IsMatch = true,
+                    MismatchDetails = null
+                };
+            }
+
+            var normCvText = RemoveDiacritics(cvText).ToLowerInvariant();
+            var normFormName = RemoveDiacritics(formName).ToLowerInvariant().Trim();
+            var formPhoneDigits = System.Text.RegularExpressions.Regex.Replace(formPhone ?? string.Empty, @"\D", "");
+
+            // 1. Kiểm tra Họ và tên xuất hiện trong nội dung file CV
+            if (!string.IsNullOrWhiteSpace(normFormName))
+            {
+                var nameParts = normFormName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                bool nameMatches = nameParts.Length > 0 && nameParts.All(p => p.Length <= 1 || normCvText.Contains(p));
+                if (!nameMatches)
+                {
+                    mismatches.Add($"• Họ và tên: \"{formName.Trim()}\" không tìm thấy hoặc khác với nội dung trong file CV.");
+                }
+            }
+
+            // 2. Kiểm tra Số điện thoại xuất hiện trong nội dung file CV
+            if (!string.IsNullOrWhiteSpace(formPhoneDigits) && formPhoneDigits.Length >= 8)
+            {
+                var phoneCore = formPhoneDigits.Length > 9 ? formPhoneDigits.Substring(formPhoneDigits.Length - 9) : formPhoneDigits;
+                var digitsCvText = System.Text.RegularExpressions.Regex.Replace(cvText, @"\D", "");
+
+                bool phoneMatches = digitsCvText.Contains(phoneCore);
+                if (!phoneMatches)
+                {
+                    mismatches.Add($"• Số điện thoại: \"{formPhone.Trim()}\" không tìm thấy trong nội dung file CV.");
+                }
+            }
+
+            if (mismatches.Count > 0)
+            {
+                return new CvContactVerificationResultDto
+                {
+                    IsMatch = false,
+                    MismatchDetails = string.Join("\n", mismatches)
+                };
+            }
+
+            return new CvContactVerificationResultDto
+            {
+                IsMatch = true,
+                MismatchDetails = null
+            };
+        }
+
+        private static string RemoveDiacritics(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            var normalizedString = text.Normalize(System.Text.NormalizationForm.FormD);
+            var stringBuilder = new System.Text.StringBuilder(capacity: normalizedString.Length);
+
+            foreach (var c in normalizedString)
+            {
+                var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+
+            return stringBuilder
+                .ToString()
+                .Normalize(System.Text.NormalizationForm.FormC)
+                .Replace('đ', 'd').Replace('Đ', 'D');
         }
     }
 

@@ -8,14 +8,38 @@ import type {
   MyApplicationDetail,
 } from '@ari/shared/types/application'
 
+let pendingGetApplicationsPromise: Promise<HrApplicationItem[]> | null = null
+
 export const applicationService = {
   // HR/Recruiter: lấy hồ sơ ứng tuyển (GET /applications trả về mảng phẳng).
   // mine=true: chỉ ứng viên thuộc các tin do người đang đăng nhập tạo (Recruiter).
   async getApplications(mine = false): Promise<HrApplicationItem[]> {
-    const { data } = await apiClient.get<HrApplicationItem[]>('/applications', {
-      params: mine ? { mine: true } : undefined,
-    })
-    return data
+    if (!mine && pendingGetApplicationsPromise) {
+      return pendingGetApplicationsPromise
+    }
+
+    const promise = (async () => {
+      try {
+        const { data } = await apiClient.get<HrApplicationItem[]>('/applications', {
+          params: mine ? { mine: true } : undefined,
+        })
+        return data
+      } finally {
+        if (!mine) {
+          setTimeout(() => {
+            if (pendingGetApplicationsPromise === promise) {
+              pendingGetApplicationsPromise = null
+            }
+          }, 300)
+        }
+      }
+    })()
+
+    if (!mine) {
+      pendingGetApplicationsPromise = promise
+    }
+
+    return promise
   },
 
   async getApplicationById(id: string): Promise<ApplicationDetail> {

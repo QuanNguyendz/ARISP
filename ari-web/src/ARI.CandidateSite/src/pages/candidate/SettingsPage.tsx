@@ -296,9 +296,9 @@ export default function SettingsPage() {
             <div className="divide-y divide-ink-100">
               <div className="flex items-center justify-between py-3">
                 <div className="pr-4">
-                  <div className="text-sm font-semibold text-ink-800">Cho phép HR xem hồ sơ của tôi</div>
+                  <div className="text-sm font-semibold text-ink-800">Cho phép HR xem Profile Online mở rộng</div>
                   <div className="text-xs text-ink-400">
-                    Chỉ HR của vị trí bạn ứng tuyển mới xem được thông tin & CV
+                    Bật để HR xem các phần Kỹ năng, Kinh nghiệm, Học vấn trên Profile Online. Khi tắt, HR chỉ xem được thông tin cá nhân cơ bản và file CV đính kèm.
                   </div>
                 </div>
                 <Toggle

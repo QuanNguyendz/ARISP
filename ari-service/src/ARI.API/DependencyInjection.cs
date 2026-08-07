@@ -64,6 +64,7 @@ namespace ARI.API
             });
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddHttpClient();
+            builder.Services.AddMemoryCache(); // cache danh sách applications để tránh truy vấn DB mỗi request
             builder.Services.AddSignalR();
 
             // Notification: SignalR thật (đẩy ReceiveQuestion/... tới SessionHub) + email qua IEmailService.

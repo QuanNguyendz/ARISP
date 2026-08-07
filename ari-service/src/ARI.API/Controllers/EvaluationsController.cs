@@ -36,9 +36,9 @@ namespace ARI.API.Controllers
                 return BadRequest("Số trang (page) không hợp lệ. Số trang bắt buộc phải lớn hơn hoặc bằng 1.");
             }
 
-            if (pageSize < 1 || pageSize > 10)
+            if (pageSize < 1 || pageSize > 1000)
             {
-                return BadRequest("Kích thước trang (pageSize) không hợp lệ. Kích thước trang phải nằm trong khoảng từ 1 đến 10 phần tử.");
+                return BadRequest("Kích thước trang (pageSize) không hợp lệ. Kích thước trang phải nằm trong khoảng từ 1 đến 1000 phần tử.");
             }
 
             if (jobPostingId.HasValue && jobPostingId.Value == Guid.Empty)

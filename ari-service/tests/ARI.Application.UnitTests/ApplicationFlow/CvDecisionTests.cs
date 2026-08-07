@@ -153,13 +153,13 @@ public class CvDecisionTests
     [Fact]
     public async Task Reject_wrong_status_fails()
     {
-        var (uow, notif, email, app, _) = Seed(status: "screening");
+        var (uow, notif, email, app, _) = Seed(status: "cv_rejected");
 
         var res = await Svc(uow, notif, email).RejectApplicationAsync(app.Id, CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Chỉ có thể từ chối", res.Error);
-        Assert.Equal("screening", app.Status);
+        Assert.Contains("Hồ sơ này đã ở trạng thái kết thúc", res.Error);
+        Assert.Equal("cv_rejected", app.Status);
     }
 
     [Fact]

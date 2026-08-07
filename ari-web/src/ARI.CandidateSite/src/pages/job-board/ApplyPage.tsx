@@ -52,13 +52,11 @@ export default function ApplyPage() {
   const [cvSource, setCvSource] = useState<'profile' | 'upload'>('profile')
   const [cvFile, setCvFile] = useState<File | null>(null)
 
-  // AI Verification state
-  const [verifyingInfo, setVerifyingInfo] = useState(false)
+  // Contact Verification state
   const [verificationResult, setVerificationResult] = useState<{
     isMatch: boolean
     mismatchDetails: string | null
   } | null>(null)
-  const [verificationError, setVerificationError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [submitting, setSubmitting] = useState(false)
@@ -68,7 +66,6 @@ export default function ApplyPage() {
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set())
   const [showCancel, setShowCancel] = useState(false)
   const [showVerificationModal, setShowVerificationModal] = useState(false)
-  const [showPendingVerificationModal, setShowPendingVerificationModal] = useState(false)
 
   const markTouched = (key: string) =>
     setTouchedFields((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
@@ -110,35 +107,7 @@ export default function ApplyPage() {
 
   const hasProfileCv = !!profile?.profileCvUrl
 
-  // AI CV-Form Contact Verification
-  useEffect(() => {
-    const hasCv = (cvSource === 'upload' && !!cvFile) || (cvSource === 'profile' && hasProfileCv)
-    if (!fullName.trim() || !phone.trim() || !hasCv) {
-      setVerificationResult(null)
-      return
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      setVerifyingInfo(true)
-      setVerificationResult(null)
-      setVerificationError('')
-      try {
-        const res = await applicationService.verifyCvContactInfo({
-          candidateName: fullName.trim(),
-          candidatePhone: phone.trim(),
-          cvFile: cvSource === 'upload' ? cvFile : null,
-        })
-        setVerificationResult(res)
-      } catch (err: any) {
-        console.error('Lỗi khi đối chiếu CV:', err)
-        setVerificationError(t('aiVerification.error'))
-      } finally {
-        setVerifyingInfo(false)
-      }
-    }, 1000)
-
-    return () => clearTimeout(delayDebounceFn)
-  }, [fullName, phone, cvSource, cvFile, hasProfileCv, t])
+  const [verifyingInfo, setVerifyingInfo] = useState(false)
 
   const onPickFile = (f: File | null) => {
     setSubmitError('')
@@ -205,19 +174,28 @@ export default function ApplyPage() {
     if (Object.keys(errors).length > 0) return
     if (!id) return
 
-    // 1. Nếu AI đang trong quá trình phân tích
-    if (verifyingInfo) {
-      setShowPendingVerificationModal(true)
-      return
+    setVerifyingInfo(true)
+    try {
+      // Đối chiếu thông tin form với nội dung file CV bằng Code C# (0 token AI)
+      const res = await applicationService.verifyCvContactInfo({
+        candidateName: fullName.trim(),
+        candidatePhone: phone.trim(),
+        cvFile: cvSource === 'upload' ? cvFile : null,
+      })
+
+      if (res && !res.isMatch) {
+        setVerificationResult(res)
+        setShowVerificationModal(true)
+        return
+      }
+    } catch (err) {
+      console.error('Lỗi đối chiếu CV:', err)
+      // Nếu có lỗi mạng hoặc file không đọc được, vẫn cho phép nộp tiếp
+    } finally {
+      setVerifyingInfo(false)
     }
 
-    // 2. Nếu AI đã phân tích và phát hiện lệch thông tin liên hệ
-    if (verificationResult && !verificationResult.isMatch) {
-      setShowVerificationModal(true)
-      return
-    }
-
-    // 3. Nếu thông tin khớp hoặc không có cảnh báo
+    // Nếu thông tin khớp hoặc không có sai lệch -> Nộp hồ sơ luôn
     await executeSubmit()
   }
 
@@ -481,78 +459,6 @@ export default function ApplyPage() {
                 />
               </div>
             </div>
-
-            {/* AI Contact Verification Warning/Status */}
-            {(verifyingInfo || verificationResult || verificationError) && (
-              <div className="mt-4 rounded-xl border p-4 transition-all duration-300 bg-blue-50/10 border-blue-200">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-                      verifyingInfo
-                        ? 'bg-blue-50 text-blue-600'
-                        : verificationError
-                          ? 'bg-red-50 text-red-600'
-                          : verificationResult?.isMatch
-                            ? 'bg-green-50 text-green-600'
-                            : 'bg-amber-50 text-amber-600'
-                    }`}
-                  >
-                    {verifyingInfo ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                  </span>
-                  <div className="flex-1">
-                    <h4 className="font-display text-sm font-bold text-ink-900 flex items-center gap-1.5">
-                      {t('aiVerification.title')}
-                      {!verifyingInfo && verificationResult?.isMatch && (
-                        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                          {t('aiVerification.matchBadge')}
-                        </span>
-                      )}
-                      {!verifyingInfo && verificationResult && !verificationResult.isMatch && (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                          {t('aiVerification.mismatchBadge')}
-                        </span>
-                      )}
-                    </h4>
-
-                    {verifyingInfo && (
-                      <p className="mt-1 text-xs text-ink-500 animate-pulse">
-                        {t('aiVerification.verifying')}
-                      </p>
-                    )}
-
-                    {verificationError && (
-                      <p className="mt-1 text-xs text-red-600">{verificationError}</p>
-                    )}
-
-                    {!verifyingInfo && verificationResult && (
-                      <div className="mt-1.5">
-                        {verificationResult.isMatch ? (
-                          <p className="text-xs text-green-600 font-medium">
-                            {t('aiVerification.matchSuccess')}
-                          </p>
-                        ) : (
-                          <div className="space-y-1">
-                            <p className="text-xs text-amber-600 font-medium">
-                              {t('aiVerification.mismatchTitle')}
-                            </p>
-                            <p className="text-xs text-ink-600 bg-amber-50/50 p-2 rounded-lg border border-amber-100 italic font-mono">
-                              {verificationResult.mismatchDetails}
-                            </p>
-                            <p className="text-[11px] text-ink-400 mt-1">
-                              {t('aiVerification.mismatchNote')}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </section>
 
           {/* Thư giới thiệu / câu trả lời */}
@@ -610,10 +516,10 @@ export default function ApplyPage() {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || verifyingInfo}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
             >
-              {submitting ? (
+              {submitting || verifyingInfo ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> {t('submit.submitting')}
                 </>
@@ -664,46 +570,7 @@ export default function ApplyPage() {
         </div>
       )}
 
-      {/* Popup xác nhận khi AI đang phân tích */}
-      {showPendingVerificationModal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-6 shadow-xl">
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </span>
-              <div>
-                <h3 className="font-display text-base font-bold text-ink-900 flex items-center gap-1.5">
-                  {t('aiVerification.pendingModal.title')}
-                </h3>
-                <p className="mt-2 text-sm text-ink-600 leading-relaxed">
-                  {t('aiVerification.pendingModal.description')}
-                </p>
-                <p className="mt-1.5 text-xs text-ink-400 italic">
-                  {t('aiVerification.pendingModal.hint')}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => setShowPendingVerificationModal(false)}
-                className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
-              >
-                {t('aiVerification.pendingModal.continueWaiting')}
-              </button>
-              <button
-                onClick={async () => {
-                  setShowPendingVerificationModal(false)
-                  await executeSubmit()
-                }}
-                className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-              >
-                {t('aiVerification.pendingModal.skipAndSubmit')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Popup cảnh báo sai lệch thông tin */}
       {showVerificationModal && (

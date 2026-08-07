@@ -301,4 +301,17 @@ export interface HrApplicationItem {
   scheduleConfirmationStatus?: string | null
   /** Lý do ứng viên báo bận lần xếp lịch gần nhất (khi đang chờ nhân sự xếp lại). */
   scheduleDeclineReason?: string | null
+
+  // Candidate Profile fields (Online Profile)
+  candidateHeadline?: string | null
+  candidateAbout?: string | null
+  candidateLocation?: string | null
+  candidateDateOfBirth?: string | null
+  candidateLinkedinUrl?: string | null
+  candidateGithubUrl?: string | null
+  candidatePortfolioUrl?: string | null
+  allowHrViewProfile?: boolean
+  candidateSkills?: string[]
+  candidateExperience?: Array<{ title: string; organization: string; period: string; description?: string }>
+  candidateEducation?: Array<{ school: string; degree: string; period: string; note?: string }>
 }

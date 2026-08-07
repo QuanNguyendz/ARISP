@@ -1,10 +1,10 @@
 {
   "title": "Candidates",
-  "subtitle": "Manage and track all applications",
+  "subtitle": "Manage and track all candidates",
   "allCandidates": "All Candidates",
   "noCandidates": "No candidates yet",
   "noCandidatesHint": "When candidates apply through the Job Board, they will appear here.",
-  "searchPlaceholder": "Search by name, email, position...",
+  "searchPlaceholder": "Search by name, email...",
   "noResults": "No candidates found",
   "noResultsHint": "Try different keywords or remove filters.",
   "paginationLabel": "candidates",

@@ -16,7 +16,7 @@ namespace ARI.Application.Interviews
     // GET /api/interview/sessions (HR)
     // ============================================================
 
-    public record GetHrInterviewSessionsQuery : IRequest<Result<List<HrInterviewSessionItem>>>;
+    public record GetHrInterviewSessionsQuery(Guid? ApplicationId = null) : IRequest<Result<List<HrInterviewSessionItem>>>;
 
     public class GetHrInterviewSessionsQueryHandler : IRequestHandler<GetHrInterviewSessionsQuery, Result<List<HrInterviewSessionItem>>>
     {
@@ -28,7 +28,77 @@ namespace ARI.Application.Interviews
         }
 
         public async Task<Result<List<HrInterviewSessionItem>>> Handle(GetHrInterviewSessionsQuery request, CancellationToken ct)
-            => Result.Success(await _interviewService.GetSessionsForHrAsync(ct));
+            => Result.Success(await _interviewService.GetSessionsForHrAsync(request.ApplicationId, ct));
+    }
+
+    // ============================================================
+    // GET /api/interview/management/jobs
+    // ============================================================
+
+    public record GetInterviewJobsQuery() : IRequest<Result<List<InterviewJobSummaryDto>>>;
+
+    public class GetInterviewJobsQueryHandler : IRequestHandler<GetInterviewJobsQuery, Result<List<InterviewJobSummaryDto>>>
+    {
+        private readonly IInterviewService _interviewService;
+        public GetInterviewJobsQueryHandler(IInterviewService interviewService) { _interviewService = interviewService; }
+        public async Task<Result<List<InterviewJobSummaryDto>>> Handle(GetInterviewJobsQuery request, CancellationToken ct)
+            => Result.Success(await _interviewService.GetInterviewJobsAsync(ct));
+    }
+
+    // ============================================================
+    // GET /api/interview/management/jobs/{jobId}/slots
+    // ============================================================
+
+    public record GetSlotsForJobQuery(Guid JobPostingId) : IRequest<Result<List<InterviewSlotDetailDto>>>;
+
+    public class GetSlotsForJobQueryHandler : IRequestHandler<GetSlotsForJobQuery, Result<List<InterviewSlotDetailDto>>>
+    {
+        private readonly IInterviewService _interviewService;
+        public GetSlotsForJobQueryHandler(IInterviewService interviewService) { _interviewService = interviewService; }
+        public async Task<Result<List<InterviewSlotDetailDto>>> Handle(GetSlotsForJobQuery request, CancellationToken ct)
+            => Result.Success(await _interviewService.GetSlotsForJobAsync(request.JobPostingId, ct));
+    }
+
+    // ============================================================
+    // GET /api/interview/management/slots/{slotId}/candidates
+    // ============================================================
+
+    public record GetCandidatesInSlotQuery(Guid SlotId) : IRequest<Result<List<SlotCandidateDto>>>;
+
+    public class GetCandidatesInSlotQueryHandler : IRequestHandler<GetCandidatesInSlotQuery, Result<List<SlotCandidateDto>>>
+    {
+        private readonly IInterviewService _interviewService;
+        public GetCandidatesInSlotQueryHandler(IInterviewService interviewService) { _interviewService = interviewService; }
+        public async Task<Result<List<SlotCandidateDto>>> Handle(GetCandidatesInSlotQuery request, CancellationToken ct)
+            => Result.Success(await _interviewService.GetCandidatesInSlotAsync(request.SlotId, ct));
+    }
+
+    // ============================================================
+    // POST /api/interview/management/booking/{bookingId}/remind
+    // ============================================================
+
+    public record SendBookingReminderCommand(Guid BookingId) : IRequest<Result<bool>>;
+
+    public class SendBookingReminderCommandHandler : IRequestHandler<SendBookingReminderCommand, Result<bool>>
+    {
+        private readonly IInterviewService _interviewService;
+        public SendBookingReminderCommandHandler(IInterviewService interviewService) { _interviewService = interviewService; }
+        public async Task<Result<bool>> Handle(SendBookingReminderCommand request, CancellationToken ct)
+            => await _interviewService.SendBookingReminderAsync(request.BookingId, ct);
+    }
+
+    // ============================================================
+    // POST /api/interview/management/booking/{bookingId}/reschedule
+    // ============================================================
+
+    public record RescheduleBookingCommand(Guid BookingId, Guid TargetSlotId) : IRequest<Result<bool>>;
+
+    public class RescheduleBookingCommandHandler : IRequestHandler<RescheduleBookingCommand, Result<bool>>
+    {
+        private readonly IInterviewService _interviewService;
+        public RescheduleBookingCommandHandler(IInterviewService interviewService) { _interviewService = interviewService; }
+        public async Task<Result<bool>> Handle(RescheduleBookingCommand request, CancellationToken ct)
+            => await _interviewService.RescheduleBookingAsync(request.BookingId, request.TargetSlotId, ct);
     }
 
     // ============================================================
