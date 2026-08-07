@@ -164,7 +164,7 @@
     "matchScore": "Độ phù hợp: {{score}}%"
   },
   "notices": {
-    "acceptSuccess": "Đã duyệt hồ sơ ứng viên và gửi lời mời phỏng vấn Vòng 1 thành công.",
+    "acceptSuccess": "Đã duyệt CV ứng viên (Vòng 1). Hãy xếp lịch để hệ thống gửi email mời phỏng vấn kèm lịch hẹn.",
     "rejectSuccess": "Đã từ chối hồ sơ và gửi email cảm ơn ứng viên thành công.",
     "inviteSuccess": "Đã gửi lời mời (magic link) cho ứng viên.",
     "jobApproveSuccess": "Đã duyệt tin tuyển dụng. File JD đã được đóng dấu xác nhận.",
