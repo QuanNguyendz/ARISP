@@ -91,8 +91,17 @@ namespace ARI.Infrastructure
             services.AddScoped<IGeminiProvider, GeminiProvider>();
 
             // File storage — Local (dev) hoặc S3-compatible object storage như Cloudflare R2 (prod).
-            // Chọn qua "Storage:Provider" = "Local" | "S3". Mặc định Local.
-            var storageProvider = configuration["Storage:Provider"] ?? "Local";
+            // Chọn qua "Storage:Provider" = "Local" | "S3".
+            //
+            // KHÔNG được âm thầm rơi về Local: prod không mount volume cho backend
+            // (docker-compose.prod.yml đặt `volumes: !reset []`) nên ./uploads nằm trong lớp
+            // container và bị xoá sạch mỗi lần deploy. Mà upload vẫn trả 200 và vẫn ghi row DB
+            // thành công → hỏng hoàn toàn im lặng, chỉ lộ ra khi ứng viên/HR mở CV thấy 404.
+            // Thà chết ngay lúc boot còn hơn nuốt mất file người dùng.
+            var storageProvider = (configuration["Storage:Provider"] ?? string.Empty).Trim();
+            var isProduction = string.Equals(
+                configuration["ASPNETCORE_ENVIRONMENT"], "Production", StringComparison.OrdinalIgnoreCase);
+
             if (string.Equals(storageProvider, "S3", StringComparison.OrdinalIgnoreCase))
             {
                 var s3Options = new Storage.S3StorageOptions();
@@ -122,9 +131,23 @@ namespace ARI.Infrastructure
                 });
                 services.AddScoped<IFileStorageService, Storage.S3FileStorageService>();
             }
+            else if (string.Equals(storageProvider, "Local", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isProduction)
+                {
+                    throw new InvalidOperationException(
+                        "Storage:Provider=Local không dùng được ở Production: ./uploads nằm trong lớp container " +
+                        "(backend không mount volume) nên mọi file upload sẽ mất khi deploy lần sau. " +
+                        "Đặt Storage__Provider=S3 kèm Storage__S3__{Endpoint,AccessKeyId,SecretAccessKey,Bucket}.");
+                }
+
+                services.AddScoped<IFileStorageService, Storage.LocalFileStorageService>();
+            }
             else
             {
-                services.AddScoped<IFileStorageService, Storage.LocalFileStorageService>();
+                throw new InvalidOperationException(
+                    $"Storage:Provider không hợp lệ: \"{storageProvider}\". Chỉ nhận \"S3\" hoặc \"Local\". " +
+                    "Cấu hình qua biến môi trường Storage__Provider hoặc user-secrets.");
             }
 
             // === Media stack phỏng vấn realtime (ADR-043/044): real provider nếu có API key, else Mock ===

@@ -66,4 +66,12 @@ export function installStaleChunkReload(): void {
   window.addEventListener('unhandledrejection', (event) => {
     if (looksLikeStaleChunk(event.reason) && reloadOnce()) event.preventDefault();
   });
+
+  // Lưới thứ ba: quan sát thực tế trên production cho thấy lỗi nổi lên dưới dạng
+  // "Uncaught TypeError: Failed to fetch dynamically imported module" — tức đi qua
+  // window.onerror chứ không phải unhandledrejection. Thiếu nhánh này thì đúng ca
+  // hay gặp nhất lại lọt lưới.
+  window.addEventListener('error', (event) => {
+    if (looksLikeStaleChunk(event.error ?? event.message)) reloadOnce();
+  });
 }
