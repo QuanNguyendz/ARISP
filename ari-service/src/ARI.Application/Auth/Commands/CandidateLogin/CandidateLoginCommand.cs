@@ -33,14 +33,14 @@ namespace ARI.Application.Auth.Commands.CandidateLogin
             var candidate = candidates.FirstOrDefault();
 
             if (candidate == null)
-                return Result.Failure<AuthResponse>("Invalid email or password.", AuthErrorCodes.InvalidCredentials);
+                return Result.Failure<AuthResponse>("Sai email hoặc mật khẩu.", AuthErrorCodes.InvalidCredentials);
 
             // Tài khoản tạo qua Google Sign-In không có mật khẩu → hướng dẫn đăng nhập bằng Google
             if (string.IsNullOrEmpty(candidate.PasswordHash))
                 return Result.Failure<AuthResponse>("Tài khoản này đăng ký qua Google. Vui lòng đăng nhập bằng Google.", AuthErrorCodes.PasswordlessGoogle);
 
             if (!_passwordHasher.Verify(request.Password, candidate.PasswordHash))
-                return Result.Failure<AuthResponse>("Invalid email or password.", AuthErrorCodes.InvalidCredentials);
+                return Result.Failure<AuthResponse>("Sai email hoặc mật khẩu.", AuthErrorCodes.InvalidCredentials);
 
             // Chặn đăng nhập đến khi ứng viên xác minh email (code để FE hiển thị nút gửi lại)
             if (!candidate.EmailVerified)
