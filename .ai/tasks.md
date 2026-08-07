@@ -323,6 +323,10 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-07: **Đồng bộ màu trang Cài đặt của Recruiter theo HR Leader.** `recruiter/SettingsPage.tsx` trước dùng theme kính tối cứng (`bg-white/[0.03]`, `text-white`, nhấn amber) không có class light-mode → chữ trắng trên nền sáng bị "trôi" mờ. Nay dùng đúng bộ token của `hr/SettingsPage.tsx`: nền `bg-ink-50 dark:bg-ink-950`, thẻ `bg-white dark:bg-white/5` + `shadow-card`, tab active `brand-100/brand-700`, input `border-ink-200 focus:border-brand-400`, nút lưu gradient `from-brand-600 to-ai-600`, toggle `bg-brand-600`. Giữ nguyên namespace i18n `modules/recruiter/settings`, default values Recruiter, và mọi `t()` cũ. StaffSite `tsc --noEmit` xanh. Thuần FE, không đụng BE.
+
+- [x] 2026-08-07: **Thông báo lỗi đăng nhập ứng viên chuyển sang tiếng Việt.** `CandidateLoginCommand` đổi cả 2 chỗ `"Invalid email or password."` → `"Sai email hoặc mật khẩu."` (khớp `StaffLoginCommand`); FE hiển thị thẳng message backend. Chỉ đổi chuỗi literal, không đụng logic/test.
+
 - [x] 2026-08-07: **Email mời phỏng vấn gộp (qua CV + lịch + quy trình vòng) với 2 nút Xác nhận/Từ chối, trạng thái 3 mức, khoá quyết định + auto-reject quá hạn (bổ sung ADR-048).**
   - **Bối cảnh:** ADR-048 đã có HR gán lịch + ứng viên confirm/decline, nhưng nghiệp vụ mới muốn: (1) một email gộp báo qua vòng CV + lịch hẹn + **mô tả quy trình theo từng vòng**, kèm **2 nút Xác nhận / Từ chối**; (2) hiện rõ **3 trạng thái** (đã confirm / chưa confirm / đã từ chối); (3) chưa xác nhận trong hạn → **tự động Reject**; (4) bấm nút trong email **nhảy vào hệ thống** rồi hỏi "bạn chắc chưa?" + cảnh báo **không sửa lại được**. Chốt với user: auto-reject theo **TTL giờ kể từ lúc gửi mail**; Reject = xin đổi lịch (**giữ mô hình reschedule** của ADR-048); nút email = **deep-link cần đăng nhập**.
   - **BE — không cần migration** (tái dùng `confirmation_status`/`decline_reason`/`responded_at`):
