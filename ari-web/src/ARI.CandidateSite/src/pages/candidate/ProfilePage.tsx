@@ -30,8 +30,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Download,
+  Lock,
 } from 'lucide-react'
 import { profileService } from '@ari/shared/fservices/profile/profileService'
+import { settingsService } from '@/fservices/settings/settingsService'
 import { provinceService } from '@/fservices/location/provinceService'
 import type { Province } from '@/fservices/location/provinceService'
 import ChangePasswordModal from '@components/profile/ChangePasswordModal'
@@ -139,6 +141,8 @@ export default function ProfilePage() {
   const [cvNotice, setCvNotice] = useState('')
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [provinces, setProvinces] = useState<Province[]>([])
+  const [allowHrViewProfile, setAllowHrViewProfile] = useState<boolean>(true)
+  const [privacySaving, setPrivacySaving] = useState(false)
 
   // Chỉ dẫn tới khu vực tải CV khi vào từ banner "Tải CV lên" (?focus=cv).
   const [searchParams, setSearchParams] = useSearchParams()
@@ -155,7 +159,33 @@ export default function ProfilePage() {
       .then(setProfile)
       .catch((e: any) => setError(e?.message || t('profile.saveFailed')))
       .finally(() => setLoading(false))
+
+    settingsService
+      .get()
+      .then((s) => {
+        if (s && typeof s.allowHrViewProfile === 'boolean') {
+          setAllowHrViewProfile(s.allowHrViewProfile)
+        }
+      })
+      .catch(() => {})
   }, [t])
+
+  async function handleToggleHrPrivacy() {
+    const nextVal = !allowHrViewProfile
+    setAllowHrViewProfile(nextVal)
+    setPrivacySaving(true)
+    try {
+      const currentSettings = await settingsService.get()
+      await settingsService.update({
+        ...currentSettings,
+        allowHrViewProfile: nextVal,
+      })
+    } catch {
+      setAllowHrViewProfile(!nextVal) // rollback nếu lỗi
+    } finally {
+      setPrivacySaving(false)
+    }
+  }
 
   // Sau khi hồ sơ đã render, nếu được dẫn từ banner (?focus=cv) → cuộn tới khối CV,
   // bật hiệu ứng chỉ dẫn (glow + nhãn) rồi gỡ tham số khỏi URL để không lặp lại khi refresh.
@@ -553,6 +583,50 @@ export default function ProfilePage() {
                       onChange={(e) => patch({ about: e.target.value })}
                     />
                   </Field>
+                </div>
+              </div>
+
+              {/* Thẻ Cài đặt Quyền riêng tư chia sẻ với HR */}
+              <div className="mt-6 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-brand-100 text-brand-700 shrink-0 mt-0.5">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-ink-900 flex items-center gap-2">
+                        <span>Quyền riêng tư Profile Online với Nhà tuyển dụng (HR)</span>
+                        {allowHrViewProfile ? (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                            Đang Bật chia sẻ
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                            🔒 Chế độ Riêng tư
+                          </span>
+                        )}
+                      </h4>
+                      <p className="mt-1 text-xs text-ink-600 leading-relaxed">
+                        {allowHrViewProfile
+                          ? 'HR các công ty bạn ứng tuyển được quyền xem các phần Kỹ năng, Kinh nghiệm làm việc, Học vấn trên Profile Online này.'
+                          : 'Đã tắt: HR chỉ xem được Thông tin cá nhân cơ bản & file CV đính kèm của bạn. Toàn bộ phần Kỹ năng, Kinh nghiệm sẽ được ẩn an toàn.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleHrPrivacy}
+                    disabled={privacySaving}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      allowHrViewProfile ? 'bg-brand-600' : 'bg-ink-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        allowHrViewProfile ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>
