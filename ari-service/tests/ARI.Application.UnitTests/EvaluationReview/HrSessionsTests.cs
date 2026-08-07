@@ -14,7 +14,7 @@ namespace ARI.Application.UnitTests.EvaluationReview;
 public class HrSessionsTests
 {
     private static Task<System.Collections.Generic.List<ARI.Application.DTOs.HrInterviewSessionItem>> Run(InMemoryUnitOfWork uow)
-        => InterviewServiceFactory.Create(uow, new RecordingNotificationService()).GetSessionsForHrAsync(CancellationToken.None);
+        => InterviewServiceFactory.Create(uow, new RecordingNotificationService()).GetSessionsForHrAsync(ct: CancellationToken.None);
 
     [Fact]
     public async Task Excludes_practice_sessions()

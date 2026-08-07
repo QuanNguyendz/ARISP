@@ -7,13 +7,15 @@ using ARI.Application.Interfaces;
 using ARI.Application.Options;
 using ARI.Application.Services;
 using ARI.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ARI.Application.UnitTests.TestSupport;
 
 /// <summary>
-/// Dựng <see cref="InterviewService"/> cho unit test luồng HR Review. Service có 9 dependency nhưng
+/// Dựng <see cref="InterviewService"/> cho unit test luồng HR Review. Service có các dependency nhưng
 /// <c>SubmitHrReviewAsync</c> chỉ chạm <see cref="IUnitOfWork"/> + <see cref="INotificationService"/>;
-/// 7 dependency media/AI/storage còn lại được cắm stub ném lỗi (không được gọi trong luồng này).
+/// các dependency còn lại được cắm stub.
 /// </summary>
 internal static class InterviewServiceFactory
 {
@@ -26,12 +28,13 @@ internal static class InterviewServiceFactory
         new ThrowingDeepgramTokenService(),
         new ThrowingRagIngestionService(),
         new ThrowingTTSService(),
-        new ThrowingFileStorageService());
+        new ThrowingFileStorageService(),
+        new TestScopeFactory(uow),
+        new MemoryCache(new MemoryCacheOptions()));
 
     /// <summary>
     /// Overload cho luồng phỏng vấn thử (Luồng 6): cắm AI provider + TTS điều khiển được để test sinh
-    /// câu hỏi / chấm điểm / đóng phiên. Embedding/avatar/deepgram/rag-ingestion/storage vẫn dùng stub
-    /// ném lỗi — các nhánh gọi chúng (avatar chỉ khi có persona; rag-ingestion) đều bọc try/catch nuốt lỗi.
+    /// câu hỏi / chấm điểm / đóng phiên.
     /// </summary>
     public static InterviewService Create(
         IUnitOfWork uow, INotificationService notif, IAIProvider ai, ITTSService tts, InterviewOptions? options = null) => new(
@@ -44,7 +47,23 @@ internal static class InterviewServiceFactory
         new ThrowingRagIngestionService(),
         tts,
         new ThrowingFileStorageService(),
+        new TestScopeFactory(uow),
+        new MemoryCache(new MemoryCacheOptions()),
         options);
+
+    private sealed class TestScopeFactory : IServiceScopeFactory, IServiceScope
+    {
+        private readonly IServiceProvider _provider;
+        public TestScopeFactory(IUnitOfWork uow)
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(uow);
+            _provider = services.BuildServiceProvider();
+        }
+        public IServiceScope CreateScope() => this;
+        public IServiceProvider ServiceProvider => _provider;
+        public void Dispose() { }
+    }
 
     private sealed class ThrowingAIProvider : IAIProvider
     {
