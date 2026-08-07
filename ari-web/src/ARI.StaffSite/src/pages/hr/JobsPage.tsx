@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -67,14 +67,37 @@ export default function HrJobsPage() {
   const error =
     (fetchError as any)?.response?.data?.message || (fetchError ? t('loadingError') : '')
 
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
-  const [selectedUrgent, setSelectedUrgent] = useState<string>('all')
-  const [fromDate, setFromDate] = useState<string>('')
-  const [toDate, setToDate] = useState<string>('')
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = Number(searchParams.get('page')) || 1
+  const searchTerm = searchParams.get('search') || ''
+  const selectedStatus = searchParams.get('status') || 'all'
+  const selectedEmployee = searchParams.get('employee') || 'all'
+  const selectedUrgent = searchParams.get('urgent') || 'all'
+  const fromDate = searchParams.get('fromDate') || ''
+  const toDate = searchParams.get('toDate') || ''
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (!value || value === 'all') {
+        p.delete(key)
+      } else {
+        p.set(key, value)
+      }
+      p.delete('page')
+      return p
+    }, { replace: true })
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (newPage > 1) p.set('page', String(newPage))
+      else p.delete('page')
+      return p
+    }, { replace: true })
+  }
 
   const statusMeta: Record<string, { label: string; badge: string }> = {
     active: {
@@ -202,10 +225,6 @@ export default function HrJobsPage() {
     [filtered, page]
   )
 
-  useEffect(() => {
-    setPage(1)
-  }, [searchTerm, selectedStatus, selectedEmployee, selectedUrgent, fromDate, toDate])
-
   const hasActiveFilters =
     searchTerm ||
     selectedStatus !== 'all' ||
@@ -215,12 +234,17 @@ export default function HrJobsPage() {
     toDate
 
   const clearFilters = () => {
-    setSearchTerm('')
-    setSelectedStatus('all')
-    setSelectedEmployee('all')
-    setSelectedUrgent('all')
-    setFromDate('')
-    setToDate('')
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.delete('search')
+      p.delete('status')
+      p.delete('employee')
+      p.delete('urgent')
+      p.delete('fromDate')
+      p.delete('toDate')
+      p.delete('page')
+      return p
+    }, { replace: true })
   }
 
   return (
@@ -256,7 +280,7 @@ export default function HrJobsPage() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => updateParam('search', e.target.value)}
                 placeholder={t('filters.search')}
                 className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
@@ -266,7 +290,7 @@ export default function HrJobsPage() {
             <div>
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => updateParam('status', e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               >
                 <option value="all">Tất cả trạng thái</option>
@@ -283,7 +307,7 @@ export default function HrJobsPage() {
             <div>
               <select
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
+                onChange={(e) => updateParam('employee', e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               >
                 <option value="all">Lọc theo người phụ trách</option>
@@ -299,7 +323,7 @@ export default function HrJobsPage() {
             <div>
               <select
                 value={selectedUrgent}
-                onChange={(e) => setSelectedUrgent(e.target.value)}
+                onChange={(e) => updateParam('urgent', e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               >
                 <option value="all">Tất cả mức độ</option>
@@ -314,7 +338,7 @@ export default function HrJobsPage() {
                 type="date"
                 value={fromDate}
                 title="Từ ngày tạo"
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => updateParam('fromDate', e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             </div>
@@ -435,7 +459,7 @@ export default function HrJobsPage() {
           totalPages={totalPages}
           total={filtered.length}
           label={t('paginationLabel')}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
         />
       )}
     </div>

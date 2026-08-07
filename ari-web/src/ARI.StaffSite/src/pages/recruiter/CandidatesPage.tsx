@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState, Fragment } from 'react'
+import React, { useMemo, useState, Fragment } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Mail, Eye, Loader2, ChevronRight, ChevronDown, Calendar, Briefcase, X, Phone, FileText, User, UserCheck, Lock, GraduationCap, Award, Globe, Link2 } from 'lucide-react'
 import {
@@ -148,13 +148,37 @@ export default function RecruiterCandidatesPage() {
   const { openDocument } = useDocumentViewer()
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | Group>('all')
-  const [dateStart, setDateStart] = useState('')
-  const [dateEnd, setDateEnd] = useState('')
   const [invitingId, setInvitingId] = useState<string | null>(null)
   const [selectedProfileApp, setSelectedProfileApp] = useState<HrApplicationItem | null>(null)
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = Number(searchParams.get('page')) || 1
+  const search = searchParams.get('search') || ''
+  const filter = (searchParams.get('filter') as Group | 'all') || 'all'
+  const dateStart = searchParams.get('dateStart') || ''
+  const dateEnd = searchParams.get('dateEnd') || ''
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (!value || value === 'all') {
+        p.delete(key)
+      } else {
+        p.set(key, value)
+      }
+      p.delete('page')
+      return p
+    }, { replace: true })
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (newPage > 1) p.set('page', String(newPage))
+      else p.delete('page')
+      return p
+    }, { replace: true })
+  }
 
   const filters: { key: 'all' | Group; label: string }[] = [
     { key: 'all', label: t('filters.all') },
@@ -272,10 +296,6 @@ export default function RecruiterCandidatesPage() {
     [groupedCandidates, page]
   )
 
-  useEffect(() => {
-    setPage(1)
-  }, [search, filter, dateStart, dateEnd])
-
   const handleInvite = async (e: React.MouseEvent, app: HrApplicationItem) => {
     e.stopPropagation()
     setNotice('')
@@ -309,7 +329,7 @@ export default function RecruiterCandidatesPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => updateParam('search', e.target.value)}
                 placeholder={t('searchPlaceholder')}
                 className="w-full pl-12 pr-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:border-brand-400 transition-colors text-sm"
               />
@@ -322,19 +342,19 @@ export default function RecruiterCandidatesPage() {
               <input
                 type="date"
                 value={dateStart}
-                onChange={(e) => setDateStart(e.target.value)}
+                onChange={(e) => updateParam('dateStart', e.target.value)}
                 className="bg-transparent text-ink-900 dark:text-white focus:outline-none text-xs"
               />
               <span className="text-xs font-medium text-ink-400 shrink-0">Đến:</span>
               <input
                 type="date"
                 value={dateEnd}
-                onChange={(e) => setDateEnd(e.target.value)}
+                onChange={(e) => updateParam('dateEnd', e.target.value)}
                 className="bg-transparent text-ink-900 dark:text-white focus:outline-none text-xs"
               />
               {(dateStart || dateEnd) && (
                 <button
-                  onClick={() => { setDateStart(''); setDateEnd(''); }}
+                  onClick={() => { updateParam('dateStart', ''); updateParam('dateEnd', ''); }}
                   className="p-1 hover:bg-ink-200 dark:hover:bg-white/10 rounded-md transition-colors"
                   title="Xóa lọc ngày"
                 >
@@ -349,7 +369,7 @@ export default function RecruiterCandidatesPage() {
                 return (
                   <button
                     key={f.key}
-                    onClick={() => setFilter(f.key)}
+                    onClick={() => updateParam('filter', f.key)}
                     className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${activeTab ? 'bg-gradient-to-r from-brand-600 to-ai-600 text-white' : 'border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10'}`}
                   >
                     {f.label}
@@ -659,7 +679,7 @@ export default function RecruiterCandidatesPage() {
           totalPages={totalPages}
           total={groupedCandidates.length}
           label={t('paginationLabel')}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
         />
       )}
 

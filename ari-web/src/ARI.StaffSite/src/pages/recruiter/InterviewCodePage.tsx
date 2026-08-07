@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import {
   KeyRound,
   Search,
@@ -468,13 +469,35 @@ function JobSessionsGroup({
 // ── Main RecruiterInterviewCodePage Component ─────────────────────────────────
 export default function RecruiterInterviewCodePage() {
   const { t } = useTranslation('modules/recruiter/interviewCode')
-  const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
   const [issuedCodes, setIssuedCodes] = useState<Record<string, IssuedCode>>({})
   const [actionError, setActionError] = useState('')
 
-  // Pagination for Jobs
-  const [currentPage, setCurrentPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentPage = Number(searchParams.get('page')) || 1
+  const search = searchParams.get('search') || ''
+  const dateFilter = searchParams.get('date') || ''
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (!value) {
+        p.delete(key)
+      } else {
+        p.set(key, value)
+      }
+      p.delete('page')
+      return p
+    }, { replace: true })
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (newPage > 1) p.set('page', String(newPage))
+      else p.delete('page')
+      return p
+    }, { replace: true })
+  }
   const pageSize = 5
 
   const {
@@ -527,10 +550,6 @@ export default function RecruiterInterviewCodePage() {
     return filteredJobs.slice(start, start + pageSize)
   }, [filteredJobs, currentPage, pageSize])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [search, dateFilter])
-
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
       <PageHeader
@@ -559,7 +578,7 @@ export default function RecruiterInterviewCodePage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => updateParam('search', e.target.value)}
             placeholder="Tìm ứng viên, email, vị trí tuyển dụng..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/40"
           />
@@ -571,12 +590,12 @@ export default function RecruiterInterviewCodePage() {
           <input
             type="date"
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => updateParam('date', e.target.value)}
             className="pl-9 pr-8 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-800 dark:text-ink-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500/40"
           />
           {dateFilter && (
             <button
-              onClick={() => setDateFilter('')}
+              onClick={() => updateParam('date', '')}
               title="Xóa lọc ngày"
               className="absolute right-2 p-1 text-ink-400 hover:text-ink-600 dark:hover:text-white"
             >
@@ -595,7 +614,7 @@ export default function RecruiterInterviewCodePage() {
               Đang lọc các ca thi diễn ra vào ngày <strong className="underline">{fmtDate(dateFilter)}</strong>
             </span>
           </div>
-          <button onClick={() => setDateFilter('')} className="font-semibold text-violet-800 dark:text-violet-200 hover:underline">
+          <button onClick={() => updateParam('date', '')} className="font-semibold text-violet-800 dark:text-violet-200 hover:underline">
             Xóa lọc
           </button>
         </div>
@@ -646,7 +665,7 @@ export default function RecruiterInterviewCodePage() {
               <div className="flex items-center gap-1.5">
                 <button
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   className="p-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 transition-colors"
                   title="Trang trước"
                 >
@@ -656,7 +675,7 @@ export default function RecruiterInterviewCodePage() {
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
-                    onClick={() => setCurrentPage(page)}
+                    onClick={() => handlePageChange(page)}
                     className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${currentPage === page
                         ? 'bg-violet-600 text-white shadow-sm'
                         : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10'
@@ -668,7 +687,7 @@ export default function RecruiterInterviewCodePage() {
 
                 <button
                   disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   className="p-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 transition-colors"
                   title="Trang sau"
                 >

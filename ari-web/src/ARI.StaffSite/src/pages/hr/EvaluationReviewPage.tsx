@@ -86,19 +86,40 @@ export default function EvaluationReviewPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const targetId = searchParams.get('id')
 
+  const page = Number(searchParams.get('page')) || 1
+  const searchQuery = searchParams.get('search') || ''
+  const statusFilter = (searchParams.get('status') as 'all' | 'pending' | 'pass' | 'not_pass') || 'all'
+  const dateFilter = searchParams.get('date') || ''
+
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
   const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-
-  // Search & Filter state for list view
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'pass' | 'not_pass'>('all')
-  const [dateFilter, setDateFilter] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (!value || value === 'all') {
+        p.delete(key)
+      } else {
+        p.set(key, value)
+      }
+      p.delete('page')
+      return p
+    }, { replace: true })
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (newPage > 1) p.set('page', String(newPage))
+      else p.delete('page')
+      return p
+    }, { replace: true })
+  }
 
   const {
     data: evaluationsResponse,
@@ -187,9 +208,6 @@ export default function EvaluationReviewPage() {
     return Array.from(groupsMap.values())
   }, [filteredEvaluations])
 
-  useEffect(() => {
-    setPage(1)
-  }, [searchQuery, statusFilter, dateFilter])
 
   const totalGroupPages = Math.max(1, Math.ceil(groupedSessions.length / GROUPS_PER_PAGE))
 
@@ -362,7 +380,7 @@ export default function EvaluationReviewPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => updateParam('search', e.target.value)}
                 placeholder="Tìm theo tên ứng viên hoặc vị trí..."
                 className="w-full pl-9 pr-4 py-2 text-sm bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
               />
@@ -374,12 +392,12 @@ export default function EvaluationReviewPage() {
               <input
                 type="date"
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                onChange={(e) => updateParam('date', e.target.value)}
                 className="w-full sm:w-auto pl-9 pr-8 py-2 text-xs bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
               />
               {dateFilter && (
                 <button
-                  onClick={() => setDateFilter('')}
+                  onClick={() => updateParam('date', '')}
                   className="absolute right-2 text-ink-400 hover:text-ink-600 p-0.5 rounded-full"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -390,7 +408,7 @@ export default function EvaluationReviewPage() {
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => updateParam('status', 'all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 ${
                 statusFilter === 'all'
                   ? 'bg-brand-600 text-white font-semibold shadow-sm'
@@ -400,7 +418,7 @@ export default function EvaluationReviewPage() {
               Tất cả ({counts.total})
             </button>
             <button
-              onClick={() => setStatusFilter('pending')}
+              onClick={() => updateParam('status', 'pending')}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
                 statusFilter === 'pending'
                   ? 'bg-amber-500 text-white font-semibold shadow-sm'
@@ -411,7 +429,7 @@ export default function EvaluationReviewPage() {
               Chờ duyệt ({counts.pending})
             </button>
             <button
-              onClick={() => setStatusFilter('pass')}
+              onClick={() => updateParam('status', 'pass')}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
                 statusFilter === 'pass'
                   ? 'bg-emerald-600 text-white font-semibold shadow-sm'
@@ -422,7 +440,7 @@ export default function EvaluationReviewPage() {
               Đạt ({counts.pass})
             </button>
             <button
-              onClick={() => setStatusFilter('not_pass')}
+              onClick={() => updateParam('status', 'not_pass')}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
                 statusFilter === 'not_pass'
                   ? 'bg-red-600 text-white font-semibold shadow-sm'
@@ -584,7 +602,7 @@ export default function EvaluationReviewPage() {
             totalPages={totalGroupPages}
             total={groupedSessions.length}
             label="ca thi"
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
           />
         )}
       </main>
