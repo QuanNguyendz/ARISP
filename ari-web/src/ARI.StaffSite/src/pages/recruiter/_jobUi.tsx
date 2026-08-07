@@ -92,9 +92,13 @@ export function formatSalary(job: Pick<JobPosting, 'salaryIsNegotiable' | 'salar
   return 'Thỏa thuận'
 }
 
-// ===== Verdict đánh giá (pass | not_pass) =====
-export const verdictLabel = (v?: string | null): string =>
-  v === 'pass' ? 'Đạt' : v === 'not_pass' ? 'Không đạt' : 'Chưa rõ'
+export const verdictLabel = (v?: string | null): string => {
+  if (!v) return 'Chưa rõ'
+  const norm = v.toLowerCase().trim()
+  if (norm === 'pass' || norm === 'verdict.pass' || norm.includes('pass')) return 'Đạt'
+  if (norm === 'not_pass' || norm === 'verdict.notpass' || norm.includes('not')) return 'Không đạt'
+  return v
+}
 
 export const verdictBadge = (v?: string | null): string =>
   v === 'pass'

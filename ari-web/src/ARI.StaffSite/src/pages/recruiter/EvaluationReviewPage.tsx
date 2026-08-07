@@ -1,332 +1,927 @@
-import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useMemo, useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList, Search, X, Loader2, Lock } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import {
+  Code2,
+  Layers,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Play,
+  FileText,
+  Languages,
+  ArrowLeft,
+  Bell,
+  Search,
+  Eye,
+  Award,
+  XCircle,
+  X,
+} from 'lucide-react'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import { applicationService } from '@ari/shared/fservices/application'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
-import { verdictBadge, verdictLabel, scoreColor, initials, timeAgo } from './_jobUi'
-import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
+import { EvaluationListSkeleton } from './_skeletons'
+import { Pagination } from '@ari/shared/ui'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
-const INTERVIEWED = new Set(['screening', 'interview', 'pass', 'not_pass'])
+function formatVerdictLabel(verdict?: string) {
+  if (!verdict) return '—'
+  const v = verdict.toLowerCase().trim()
+  if (v === 'pass' || v === 'verdict.pass' || v.includes('pass')) return 'Đạt'
+  if (v === 'not_pass' || v === 'verdict.notpass' || v.includes('not')) return 'Không đạt'
+  return verdict
+}
+
+function formatDate(dateString?: string) {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleDateString('vi-VN')
+  } catch {
+    return dateString
+  }
+}
+
+function formatTime(dateString?: string) {
+  if (!dateString) return ''
+  try {
+    const d = new Date(dateString)
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
+}
+
+function getInitials(name?: string) {
+  if (!name) return 'NA'
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function getScoreColor(score: number) {
+  if (score >= 80) return 'bg-emerald-500'
+  if (score >= 60) return 'bg-brand-500'
+  return 'bg-amber-500'
+}
+
+function getScoreTextColor(score: number) {
+  if (score >= 80) return 'text-emerald-700 dark:text-emerald-400'
+  if (score >= 60) return 'text-brand-700 dark:text-brand-400'
+  return 'text-amber-700 dark:text-amber-400'
+}
+
+function getScoreBgColor(score: number) {
+  if (score >= 80) return 'bg-emerald-50 dark:bg-emerald-500/20'
+  if (score >= 60) return 'bg-brand-50 dark:bg-brand-500/20'
+  return 'bg-amber-50 dark:bg-amber-500/20'
+}
 
 export default function RecruiterEvaluationReviewPage() {
-  const { t } = useTranslation('modules/recruiter/evaluations')
+  const { t } = useTranslation('modules/hr/evaluations')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const targetId = searchParams.get('id')
 
-  const [evals, setEvals] = useState<EvaluationReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [q, setQ] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [detail, setDetail] = useState<EvaluationReport | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
+  const [isOverrideMode, setIsOverrideMode] = useState(false)
+  const [overrideReason, setOverrideReason] = useState('')
+  const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const myApps = await applicationService.getApplications(true)
-        const targets = myApps.filter((a) => INTERVIEWED.has(a.status))
-        const lists = await Promise.all(
-          targets.map((a) =>
-            evaluationService
-              .getEvaluationsByApplicationId(a.id)
-              .catch(() => [] as EvaluationReport[])
-          )
-        )
-        const flat = lists
-          .flat()
-          .sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())
-        setEvals(flat)
-      } catch (e: any) {
-        setError(e?.response?.data?.message || t('loadingError'))
-      } finally {
-        setLoading(false)
+  // Search & Filter state for list view
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'pass' | 'not_pass'>('all')
+  const [dateFilter, setDateFilter] = useState('')
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  // Fetch recruiter's applications to filter evaluations to only recruiter's jobs
+  const { data: myApps = [] } = useQuery({
+    queryKey: ['recruiter-my-applications'],
+    queryFn: () => applicationService.getApplications(true),
+    refetchOnWindowFocus: false,
+  })
+
+  const myAppIds = useMemo(() => new Set(myApps.map((a) => a.id)), [myApps])
+
+  const {
+    data: evaluationsResponse,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['evaluations-all'],
+    queryFn: () => evaluationService.getEvaluations({ page: 1, pageSize: 100 }),
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  })
+
+  const evaluations = useMemo(() => {
+    const raw = evaluationsResponse?.items || []
+    if (myApps.length === 0) return []
+    return raw.filter((e) => myAppIds.has(e.applicationId))
+  }, [evaluationsResponse, myApps, myAppIds])
+
+  const displayError = error ? t('loadingError') : null
+
+  const filteredEvaluations = useMemo(() => {
+    return evaluations.filter((e) => {
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch = !q || (e.candidateName || '').toLowerCase().includes(q) || (e.jobTitle || '').toLowerCase().includes(q)
+      if (!matchesSearch) return false
+
+      if (dateFilter) {
+        const eDate = e.createdAt ? new Date(e.createdAt).toISOString().split('T')[0] : ''
+        if (eDate !== dateFilter) return false
       }
-    })()
-  }, [t])
 
-  const counts = useMemo(() => {
-    const pass = evals.filter((e) => (e.finalVerdict ?? e.aiVerdict) === 'pass').length
-    const high = evals.filter((e) => (e.overallScore ?? 0) >= 80).length
-    const reviewed = evals.filter((e) => !!e.hrReview).length
-    return { total: evals.length, pass, high, reviewed }
-  }, [evals])
+      if (statusFilter === 'pending') return e.status === 'pending'
+      const verdict = e.finalVerdict ?? e.aiVerdict
+      const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+      if (statusFilter === 'pass') return isPass && e.status !== 'pending'
+      if (statusFilter === 'not_pass') return !isPass && e.status !== 'pending'
+      return true
+    })
+  }, [evaluations, searchQuery, statusFilter, dateFilter])
 
-  const filtered = useMemo(() => {
-    const searchTerm = q.trim().toLowerCase()
-    return evals
-      .filter((e) => (filter === 'all' ? true : (e.finalVerdict ?? e.aiVerdict) === filter))
-      .filter((e) =>
-        searchTerm
-          ? ((e.candidateName || '') + (e.jobTitle || '')).toLowerCase().includes(searchTerm)
-          : true
-      )
-  }, [evals, q, filter])
+  interface EvaluationSessionGroup {
+    groupId: string
+    jobTitle: string
+    roundNumber: number
+    sessionDate: string
+    sessionTime: string
+    items: EvaluationReport[]
+    passCount: number
+    notPassCount: number
+    pendingCount: number
+  }
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page]
-  )
+  const GROUPS_PER_PAGE = 5
+
+  const groupedSessions = useMemo(() => {
+    const groupsMap = new Map<string, EvaluationSessionGroup>()
+
+    filteredEvaluations.forEach((evalItem) => {
+      const dateStr = formatDate(evalItem.createdAt)
+      const timeStr = formatTime(evalItem.createdAt)
+      const key = evalItem.sessionId || `${dateStr}_${evalItem.jobTitle}_${evalItem.roundNumber}`
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          groupId: key,
+          jobTitle: evalItem.jobTitle || 'Phiên phỏng vấn',
+          roundNumber: evalItem.roundNumber,
+          sessionDate: dateStr,
+          sessionTime: timeStr,
+          items: [],
+          passCount: 0,
+          notPassCount: 0,
+          pendingCount: 0,
+        })
+      }
+
+      const grp = groupsMap.get(key)!
+      grp.items.push(evalItem)
+
+      if (evalItem.status === 'pending') {
+        grp.pendingCount += 1
+      } else {
+        const verdict = evalItem.finalVerdict ?? evalItem.aiVerdict
+        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+        if (isPass) grp.passCount += 1
+        else grp.notPassCount += 1
+      }
+    })
+
+    return Array.from(groupsMap.values())
+  }, [filteredEvaluations])
 
   useEffect(() => {
     setPage(1)
-  }, [q, filter])
+  }, [searchQuery, statusFilter, dateFilter])
 
-  const openDetail = async (id: string) => {
-    setDetailLoading(true)
-    setDetail(null)
+  const totalGroupPages = Math.max(1, Math.ceil(groupedSessions.length / GROUPS_PER_PAGE))
+
+  const paginatedGroupedSessions = useMemo(() => {
+    const start = (page - 1) * GROUPS_PER_PAGE
+    return groupedSessions.slice(start, start + GROUPS_PER_PAGE)
+  }, [groupedSessions, page])
+
+  function toggleGroup(groupId: string) {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }
+
+  useEffect(() => {
+    if (targetId) {
+      handleOpenDetail(targetId)
+    } else {
+      setSelectedEvaluation(null)
+      setLoadingDetail(false)
+    }
+  }, [targetId])
+
+  async function handleOpenDetail(evaluationId: string) {
     try {
-      setDetail(await evaluationService.getEvaluationById(id))
-    } catch {
-      setError(t('loadDetailError'))
+      setLoadingDetail(true)
+      setActionError(null)
+      setIsOverrideMode(false)
+      setOverrideReason('')
+      const detail = await evaluationService.getEvaluationById(evaluationId)
+      setSelectedEvaluation(detail)
+    } catch (fetchError) {
+      console.error(fetchError)
+      setSelectedEvaluation(null)
     } finally {
-      setDetailLoading(false)
+      setLoadingDetail(false)
     }
   }
 
-  const statCards = [
-    { label: t('stats.totalEvaluations'), value: counts.total, color: 'text-brand-600' },
-    { label: t('stats.passVerdict'), value: counts.pass, color: 'text-emerald-600' },
-    { label: t('stats.score80'), value: counts.high, color: 'text-ai-600' },
-    { label: t('stats.hrReviewed'), value: counts.reviewed, color: 'text-amber-600' },
-  ]
+  function closeDetail() {
+    setSelectedEvaluation(null)
+    setLoadingDetail(false)
+    setActionError(null)
+    setIsOverrideMode(false)
+    setOverrideReason('')
+    setSubmittingAction(null)
+    if (targetId) {
+      setSearchParams({})
+    }
+  }
 
-  const FILTERS = [
-    { value: 'all', label: t('filters.all') },
-    { value: 'pass', label: t('filters.pass') },
-    { value: 'not_pass', label: t('filters.notPass') },
-  ]
+  async function refreshListAndSelection(evaluationId: string) {
+    await refetch()
+    const detailResponse = await evaluationService.getEvaluationById(evaluationId)
+    setSelectedEvaluation(detailResponse)
+  }
 
-  return (
-    <div className="p-6 lg:p-8">
-      <PageHeader title={t('title')} description={t('description')} />
+  async function handleConfirm() {
+    if (!selectedEvaluation) return
+    try {
+      setSubmittingAction('confirm')
+      setActionError(null)
+      await evaluationService.confirmEvaluation(selectedEvaluation)
+      await refreshListAndSelection(selectedEvaluation.id)
+    } catch (submitError) {
+      console.error(submitError)
+      setActionError(t('confirmError'))
+    } finally {
+      setSubmittingAction(null)
+    }
+  }
 
-      {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
+  async function handleOverride() {
+    if (!selectedEvaluation) return
+    const trimmedReason = overrideReason.trim()
+    if (!trimmedReason) {
+      setActionError(t('overrideReasonRequired'))
+      return
+    }
+    try {
+      setSubmittingAction('override')
+      setActionError(null)
+      await evaluationService.overrideEvaluation(selectedEvaluation, trimmedReason)
+      await refreshListAndSelection(selectedEvaluation.id)
+    } catch (submitError) {
+      console.error(submitError)
+      setActionError(t('overrideError'))
+    } finally {
+      setSubmittingAction(null)
+    }
+  }
 
-      {loading ? (
-        <>
-          <StatsGridSkeleton />
-          <ApplicantsSkeleton rows={6} />
-        </>
-      ) : (
-        <>
-          <StatsGrid stats={statCards} />
+  const counts = useMemo(() => {
+    const total = evaluations.length
+    const completed = evaluations.filter((item) => item.status === 'completed').length
+    const pending = evaluations.filter((item) => item.status === 'pending').length
+    const highScore = evaluations.filter((item) => (item.overallScore ?? 0) >= 80).length
+    const pass = evaluations.filter((item) => {
+      const v = item.finalVerdict ?? item.aiVerdict
+      return item.status !== 'pending' && (v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+    }).length
+    const notPass = evaluations.filter((item) => {
+      const v = item.finalVerdict ?? item.aiVerdict
+      return item.status !== 'pending' && !(v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+    }).length
 
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 sm:max-w-sm sm:flex-1">
-              <Search className="h-4 w-4 text-ink-400" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t('searchPlaceholder')}
-                className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => setFilter(f.value)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    filter === f.value
-                      ? 'bg-brand-600 text-white'
-                      : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
+    return { total, completed, pending, highScore, pass, notPass }
+  }, [evaluations])
 
-          {filtered.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardList className="h-8 w-8 text-ink-400" />}
-              title={t('noEvaluations')}
-              description={t('noEvaluationsHint')}
-            />
-          ) : (
-            <div className="space-y-3">
-              {paged.map((ev, i) => (
-                <motion.button
-                  key={ev.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i, 12) * 0.02 }}
-                  onClick={() => openDetail(ev.id)}
-                  className="flex w-full items-center gap-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 text-left shadow-card hover:border-brand-300 dark:hover:border-brand-500/40"
-                >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
-                    {initials(ev.candidateName)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink-900 dark:text-white">
-                      {ev.candidateName || t('candidate')}
-                    </p>
-                    <p className="truncate text-xs text-ink-500 dark:text-ink-400">
-                      {ev.jobTitle || t('position')} · {t('round')} {ev.roundNumber} ·{' '}
-                      {timeAgo(ev.createdAt)}
-                    </p>
-                  </div>
-                  {ev.overallScore != null && (
-                    <span className={`text-xl font-bold ${scoreColor(ev.overallScore)}`}>
-                      {ev.overallScore}
-                    </span>
-                  )}
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(ev.finalVerdict ?? ev.aiVerdict)}`}
-                  >
-                    {verdictLabel(ev.finalVerdict ?? ev.aiVerdict)}
-                  </span>
-                  {ev.hrReview && (
-                    <span className="hidden rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400 sm:inline">
-                      {t('hrReviewed')}
-                    </span>
-                  )}
-                </motion.button>
-              ))}
-            </div>
-          )}
+  const stats = useMemo(
+    () => [
+      { label: t('stats.total'), value: counts.total.toString() },
+      { label: t('stats.completed'), value: counts.completed.toString() },
+      { label: t('stats.pending'), value: counts.pending.toString() },
+      { label: t('stats.highScore'), value: counts.highScore.toString() },
+    ],
+    [counts, t]
+  )
 
-          {filtered.length > 0 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              total={filtered.length}
-              label={t('paginationLabel')}
-              onPageChange={setPage}
-            />
-          )}
-        </>
-      )}
+  const criterionEntries = useMemo(
+    () => Object.entries(selectedEvaluation?.criterionScores ?? {}),
+    [selectedEvaluation]
+  )
 
-      {/* Detail modal (read-only) */}
-      {(detail || detailLoading) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setDetail(null)}
-          />
-          <div className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-xl">
-            <button
-              onClick={() => setDetail(null)}
-              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
-            >
-              <X className="h-4 w-4" />
-            </button>
+  if (loadingDetail) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center bg-ink-50 dark:bg-ink-950">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600 dark:border-brand-500/30 dark:border-t-brand-400" />
+          <p className="text-sm font-medium text-ink-500 dark:text-ink-400">Đang tải báo cáo đánh giá chi tiết...</p>
+        </div>
+      </div>
+    )
+  }
 
-            {detailLoading ? (
-              <div className="flex flex-col items-center gap-3 py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" />
-                <p className="text-sm text-ink-500 dark:text-ink-400">{t('loadingDetail')}</p>
-              </div>
-            ) : detail ? (
-              <div>
-                <div className="mb-5 pr-10">
-                  <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                    {t('evaluationDetail')}
-                  </h2>
-                  <p className="text-sm text-ink-500 dark:text-ink-400">
-                    {detail.candidateName} · {detail.jobTitle} · {t('round')} {detail.roundNumber}
-                  </p>
-                </div>
-
-                <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">{t('aiVerdict')}</p>
-                    <p className="text-sm font-semibold text-ink-900 dark:text-white truncate">
-                      {verdictLabel(detail.aiVerdict)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">{t('totalScore')}</p>
-                    <p className={`text-sm font-semibold ${scoreColor(detail.overallScore)}`}>
-                      {detail.overallScore ?? '—'}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-ink-100 dark:border-white/10 p-3">
-                    <p className="mb-1 text-xs text-ink-400">{t('hrReview')}</p>
-                    <p className="text-sm font-semibold text-ink-900 dark:text-white truncate">
-                      {detail.hrReview ? t('reviewed') : t('pending')}
-                    </p>
-                  </div>
-                </div>
-
-                {detail.criterionScores && Object.keys(detail.criterionScores).length > 0 && (
-                  <section className="mb-5">
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      {t('criterionScores')}
-                    </h3>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {Object.entries(detail.criterionScores).map(([k, v]) => (
-                        <div
-                          key={k}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-ink-100 dark:border-white/10 px-3 py-2"
-                        >
-                          <span
-                            className="min-w-0 truncate text-sm text-ink-600 dark:text-ink-300"
-                            title={k}
-                          >
-                            {k}
-                          </span>
-                          <span className={`shrink-0 text-sm font-bold ${scoreColor(v)}`}>{v}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {detail.reasoning && (
-                  <section className="mb-5">
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      {t('reasoning')}
-                    </h3>
-                    <p className="whitespace-pre-wrap rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm leading-6 text-ink-700 dark:text-ink-200">
-                      {detail.reasoning}
-                    </p>
-                  </section>
-                )}
-
-                {detail.questionAnalyses && detail.questionAnalyses.length > 0 && (
-                  <section className="mb-5">
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      {t('questionAnalysis')}
-                    </h3>
-                    <div className="space-y-2">
-                      {detail.questionAnalyses.map((qa, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-xl border border-ink-100 dark:border-white/10 p-3"
-                        >
-                          <p className="mb-1 text-sm font-medium text-ink-900 dark:text-white">
-                            {idx + 1}. {qa.question}
-                          </p>
-                          <p className="mb-1 text-sm text-ink-600 dark:text-ink-300">
-                            {qa.analysis}
-                          </p>
-                          <p className="text-xs text-ink-400">
-                            {t('score')}: {qa.score}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                <div className="flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 p-3 text-xs text-ink-500 dark:text-ink-400">
-                  <Lock className="h-3.5 w-3.5" /> {t('readOnlyNote')}
-                </div>
-              </div>
-            ) : null}
+  // List view
+  if (!selectedEvaluation) {
+    return (
+      <main className="p-6 space-y-6 bg-ink-50 dark:bg-ink-950">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
+              {t('title')}
+            </h1>
+            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('subtitle')}</p>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
+            >
+              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
+                {stat.value}
+              </div>
+              <div className="text-xs font-medium text-ink-500 dark:text-ink-400 mt-0.5">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
+            <div className="relative w-full sm:flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm theo tên ứng viên hoặc vị trí..."
+                className="w-full pl-9 pr-4 py-2 text-sm bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
+              />
+            </div>
+
+            {/* Date filter */}
+            <div className="relative flex items-center w-full sm:w-auto">
+              <Calendar className="w-4 h-4 absolute left-3 text-ink-400 pointer-events-none" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full sm:w-auto pl-9 pr-8 py-2 text-xs bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
+              />
+              {dateFilter && (
+                <button
+                  onClick={() => setDateFilter('')}
+                  className="absolute right-2 text-ink-400 hover:text-ink-600 p-0.5 rounded-full"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 ${
+                statusFilter === 'all'
+                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              Tất cả ({counts.total})
+            </button>
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'pending'
+                  ? 'bg-amber-500 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Chờ duyệt ({counts.pending})
+            </button>
+            <button
+              onClick={() => setStatusFilter('pass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'pass'
+                  ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Đạt ({counts.pass})
+            </button>
+            <button
+              onClick={() => setStatusFilter('not_pass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'not_pass'
+                  ? 'bg-red-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Không đạt ({counts.notPass})
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <EvaluationListSkeleton rows={4} />
+        ) : displayError ? (
+          <div className="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
+            {displayError}
+          </div>
+        ) : groupedSessions.length === 0 ? (
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-12 text-center text-ink-500 dark:text-ink-400 space-y-2">
+            <Award className="w-10 h-10 mx-auto text-ink-300" />
+            <p className="font-semibold text-ink-700 dark:text-ink-300">Không tìm thấy ca thi hoặc báo cáo đánh giá phù hợp</p>
+            <p className="text-xs text-ink-400">Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc ngày / trạng thái</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {paginatedGroupedSessions.map((group) => {
+              const isExpanded = Boolean(expandedGroups[group.groupId])
+              return (
+                <div
+                  key={group.groupId}
+                  className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card"
+                >
+                  {/* Session Group Header */}
+                  <div
+                    onClick={() => toggleGroup(group.groupId)}
+                    className="flex flex-wrap items-center justify-between p-4 bg-ink-50/70 dark:bg-white/5 border-b border-ink-200/60 dark:border-white/10 cursor-pointer hover:bg-ink-100/50 dark:hover:bg-white/10 transition-colors gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-display text-base font-bold text-ink-900 dark:text-white truncate">
+                            Ca thi: {group.sessionTime ? `${group.sessionTime} (${group.sessionDate})` : group.sessionDate}
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white">
+                            {group.jobTitle} · Vòng {group.roundNumber}
+                          </span>
+                        </div>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
+                          Tổng số thí sinh: <b className="text-ink-700 dark:text-ink-300">{group.items.length}</b>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 ml-auto">
+                      <div className="hidden sm:flex items-center gap-2 text-xs">
+                        {group.passCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-500/30">
+                            {group.passCount} Đạt
+                          </span>
+                        )}
+                        {group.notPassCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 font-semibold border border-red-200 dark:border-red-500/30">
+                            {group.notPassCount} Không đạt
+                          </span>
+                        )}
+                        {group.pendingCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-500/30">
+                            {group.pendingCount} Chờ duyệt
+                          </span>
+                        )}
+                      </div>
+
+                      <button className="flex items-center gap-1 text-xs font-medium text-ink-600 dark:text-ink-400 p-1.5 rounded-lg hover:bg-ink-200/60 dark:hover:bg-white/10 transition-colors">
+                        <span className="hidden sm:inline">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Session Group Candidates List */}
+                  {isExpanded && (
+                    <div className="p-3 space-y-2.5 divide-y divide-ink-100 dark:divide-white/5">
+                      {group.items.map((evaluation) => {
+                        const overallScore = evaluation.overallScore ?? 0
+                        const isPending = evaluation.status === 'pending'
+                        const verdict = evaluation.finalVerdict ?? evaluation.aiVerdict
+                        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+
+                        return (
+                          <div
+                            key={evaluation.id}
+                            className="pt-2.5 first:pt-0 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl hover:bg-ink-50 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                            onClick={() => handleOpenDetail(evaluation.id)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-ai-600 text-white font-display text-xs font-extrabold shadow-sm">
+                                {getInitials(evaluation.candidateName)}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-display text-sm font-bold text-ink-900 dark:text-white group-hover:text-brand-600 transition-colors truncate">
+                                  {evaluation.candidateName ?? t('candidate')}
+                                </h4>
+                                <p className="text-xs text-ink-500 dark:text-ink-400 truncate">
+                                  {evaluation.candidateEmail || evaluation.jobTitle}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 ml-auto sm:ml-0">
+                              {isPending ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                                  <Clock className="w-3 h-3" /> Chờ HR duyệt
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-2.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
+                                      isPass
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                                        : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30'
+                                    }`}
+                                  >
+                                    {isPass ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                    {isPass ? 'Đạt' : 'Không đạt'}
+                                  </span>
+
+                                  <div className={`px-2.5 py-0.5 rounded-lg font-display text-xs font-extrabold flex items-center gap-0.5 ${getScoreBgColor(overallScore)} ${getScoreTextColor(overallScore)}`}>
+                                    <span>{overallScore}</span>
+                                    <span className="text-[9px] opacity-70">/100</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(evaluation.id) }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-medium text-ink-700 dark:text-ink-200 group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-all"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> Xem chi tiết
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {!loading && !displayError && groupedSessions.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalGroupPages}
+            total={groupedSessions.length}
+            label="ca thi"
+            onPageChange={setPage}
+          />
+        )}
+      </main>
+    )
+  }
+
+  // Detail view
+  return (
+    <>
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-4 sm:px-6 h-14 sm:h-16">
+        <button
+          onClick={closeDetail}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-400">
+          <Link to="#" onClick={closeDetail} className="shrink-0 hover:text-brand-600 dark:text-brand-400">
+            {t('evaluations')}
+          </Link>
+          <ChevronRight className="h-4 w-4 shrink-0" />
+          <span className="truncate text-ink-600 dark:text-ink-300 font-medium">
+            {selectedEvaluation.candidateName} · {selectedEvaluation.jobTitle}
+          </span>
+        </div>
+        <button className="ml-auto relative grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
+          <Bell className="w-5 h-5 text-ink-600 dark:text-ink-400" />
+          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
+        </button>
+      </header>
+
+      <main className="p-4 sm:p-6 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
+        {/* LEFT: report */}
+        <div className="space-y-6">
+          {/* Candidate header */}
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 font-display text-lg font-extrabold">
+                  {getInitials(selectedEvaluation.candidateName)}
+                </div>
+                <div>
+                  <h1 className="font-display text-xl font-extrabold leading-snug text-ink-900 dark:text-white">
+                    {selectedEvaluation.candidateName}
+                  </h1>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Code2 className="w-4 h-4" /> {selectedEvaluation.jobTitle}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Layers className="w-4 h-4" /> {t('round')} {selectedEvaluation.roundNumber}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4" /> {formatDate(selectedEvaluation.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {selectedEvaluation.status === 'pending' ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 dark:bg-amber-500/20 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">
+                  <Clock className="w-4 h-4" /> {t('status.pendingHrReview')}
+                </span>
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
+                    (selectedEvaluation.overallScore ?? 0) >= 80
+                      ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                      : (selectedEvaluation.overallScore ?? 0) >= 60
+                        ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
+                        : 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                  }`}
+                >
+                  {formatVerdictLabel(selectedEvaluation.finalVerdict ?? selectedEvaluation.aiVerdict)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Scores */}
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+            <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
+              {t('criterionScores')}
+            </h2>
+            <div className="space-y-4">
+              {criterionEntries.length > 0 ? (
+                criterionEntries.map(([criterion, score]) => (
+                  <div key={criterion}>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span className="text-ink-600 dark:text-ink-400">{criterion}</span>
+                      <span className="font-semibold text-ink-900 dark:text-white">{score}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-ink-100 dark:bg-white/10">
+                      <div
+                        className={`h-full rounded-full ${getScoreColor(score)}`}
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('noCriterionData')}</p>
+              )}
+            </div>
+
+            {selectedEvaluation.languageAssessment && (
+              <div className="mt-6 rounded-xl border border-ai-200 bg-ai-50/50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
+                  <Languages className="w-4 h-4" />
+                  {t('languageAssessment')} ({selectedEvaluation.languageAssessment.language})
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs sm:gap-3 sm:text-sm">
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
+                      {selectedEvaluation.languageAssessment.cefrLevel ?? '—'}
+                    </div>
+                    <div className="text-xs text-ink-400">{t('cefr')}</div>
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
+                      {selectedEvaluation.languageAssessment.fluency ?? '—'}
+                    </div>
+                    <div className="text-xs text-ink-400">{t('fluency')}</div>
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-white p-2">
+                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
+                      {selectedEvaluation.languageAssessment.vocabulary ?? '—'}
+                    </div>
+                    <div className="text-xs text-ink-400">{t('vocabulary')}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Per-question */}
+          {selectedEvaluation.questionAnalyses &&
+            selectedEvaluation.questionAnalyses.length > 0 && (
+              <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
+                <h2 className="font-display text-lg font-bold mb-4">{t('questionAnalysis')}</h2>
+                <div className="space-y-3">
+                  {selectedEvaluation.questionAnalyses.map((item, index) => (
+                    <details
+                      key={`${item.question}-${index}`}
+                      className="group rounded-xl border border-ink-200"
+                      open={index === 0}
+                    >
+                      <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm font-medium">
+                          <span className="grid h-6 w-6 place-items-center rounded-full bg-ink-100 text-xs">
+                            {index + 1}
+                          </span>
+                          {item.question}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getScoreBgColor(item.score)} ${getScoreTextColor(item.score)}`}
+                          >
+                            {item.score}/10
+                          </span>
+                          <ChevronDown className="w-4 h-4 text-ink-400 group-open:rotate-180 transition" />
+                        </span>
+                      </summary>
+                      <div className="border-t border-ink-100 px-4 py-3 text-sm text-ink-600">
+                        <p>
+                          <b className="text-ink-800">{t('aiComment')}:</b> {item.analysis}
+                        </p>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Recording / transcript */}
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
+            <h2 className="font-display text-lg font-bold mb-4">{t('recordingTranscript')}</h2>
+            <div className="aspect-video rounded-xl bg-ink-900 grid place-items-center text-ink-400">
+              <button className="grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
+                <Play className="w-6 h-6" />
+              </button>
+            </div>
+            <button className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:underline">
+              <FileText className="w-4 h-4" /> {t('viewFullTranscript')}
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT: verdict & decision */}
+        <aside className="space-y-5 xl:sticky xl:top-24 self-start">
+          {/* AI verdict */}
+          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card text-center">
+            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700">
+              Verdict của AI
+            </div>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-base font-bold text-emerald-700 ring-1 ring-emerald-200">
+              <CheckCircle2 className="w-5 h-5" />
+              {formatVerdictLabel(selectedEvaluation.aiVerdict)}
+            </div>
+            <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none">
+              {selectedEvaluation.overallScore ?? 0}
+              <span className="text-lg text-ink-400">/100</span>
+            </div>
+            <p className="mt-3 text-sm text-ink-500">
+              {t('recommendation')}:{' '}
+              <b className="text-ink-700">
+                {t('inviteNextRound', { round: selectedEvaluation.roundNumber + 1 })}
+              </b>
+            </p>
+          </div>
+
+          {/* HR decision */}
+          {!selectedEvaluation.hrReview ? (
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
+              <h3 className="font-display font-bold">{t('hrDecision')}</h3>
+              <p className="mt-1 text-sm text-ink-500">{t('hrDecisionHint')}</p>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleConfirm}
+                  disabled={submittingAction !== null}
+                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${submittingAction === 'confirm' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'} disabled:opacity-50`}
+                >
+                  {submittingAction === 'confirm' ? t('confirming') : t('confirmAi')}
+                </button>
+                <button
+                  onClick={() => setIsOverrideMode(!isOverrideMode)}
+                  disabled={submittingAction !== null}
+                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${isOverrideMode ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-ink-200 text-ink-600 hover:border-ink-300'} disabled:opacity-50`}
+                >
+                  {t('override')}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {isOverrideMode && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 space-y-3 overflow-hidden"
+                  >
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                        {t('overrideVerdict')}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                          Đạt
+                        </button>
+                        <button className="rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-600 hover:border-red-300">
+                          Không đạt
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                        {t('overrideReason')} <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={overrideReason}
+                        onChange={(e) => setOverrideReason(e.target.value)}
+                        placeholder={t('overrideReasonPlaceholder')}
+                        className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {actionError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {actionError}
+                </div>
+              )}
+
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={handleOverride}
+                  disabled={submittingAction !== null || !isOverrideMode || !overrideReason.trim()}
+                  className="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {t('saveAndSendResult')}
+                </button>
+                <button className="w-full rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
+                  {t('saveAndInviteNext')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6 shadow-card">
+              <h3 className="font-display font-bold text-emerald-800">{t('confirmed')}</h3>
+              <p className="mt-1 text-sm text-emerald-700">
+                {t('verdict')}:{' '}
+                <b>
+                  {formatVerdictLabel(selectedEvaluation.hrReview.finalVerdict)}
+                </b>
+              </p>
+              {selectedEvaluation.hrReview.isOverride &&
+                selectedEvaluation.hrReview.overrideReason && (
+                  <div className="mt-3 p-3 rounded-lg bg-white text-sm text-ink-600">
+                    <b>{t('overrideReason')}:</b> {selectedEvaluation.hrReview.overrideReason}
+                  </div>
+                )}
+            </div>
+          )}
+
+          {/* CV-JD match */}
+          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1.5 font-semibold text-ai-700">
+                Match CV-JD
+              </span>
+              <span className="font-display text-xl font-extrabold text-ai-700">87</span>
+            </div>
+            <div className="mt-2 h-2 rounded-full bg-ai-100">
+              <div className="h-full w-[87%] rounded-full bg-gradient-to-r from-brand-600 to-ai-600" />
+            </div>
+          </div>
+        </aside>
+      </main>
+    </>
   )
 }
