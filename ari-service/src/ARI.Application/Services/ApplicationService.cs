@@ -696,7 +696,12 @@ namespace ARI.Application.Services
         /// </summary>
         /// <param name="frontendBaseUrl">Base URL portal ứng viên (controller truyền từ config).</param>
         /// <param name="roundNumber">Vòng cần mời (mặc định 1).</param>
-        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default)
+        /// <param name="sendEmail">
+        /// Có gửi email báo "qua vòng CV" hay không. Luồng duyệt CV → gán lịch chỉ gửi MỘT email duy nhất
+        /// (email gộp ở bước gán slot đã kèm chúc mừng qua CV + lịch + 2 nút), nên <c>AcceptApplicationAsync</c>
+        /// gọi với <c>sendEmail: false</c> (chỉ đổi trạng thái + tạo token + chuông). Standalone "Mời" vẫn gửi.
+        /// </param>
+        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default, bool sendEmail = true)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
@@ -751,7 +756,7 @@ namespace ARI.Application.Services
 
             try
             {
-                if (settings.InterviewInvite.Email)
+                if (sendEmail && settings.InterviewInvite.Email)
                 {
                     await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
                 }
@@ -773,7 +778,9 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// Chấp nhận hồ sơ ứng tuyển: chuyển trạng thái sang screening và gửi email chúc mừng và đặt lịch vòng 1 luôn.
+        /// Chấp nhận hồ sơ ứng tuyển: chuyển trạng thái sang screening + mở phỏng vấn thử. KHÔNG gửi email ở
+        /// bước này — ứng viên chỉ nhận chuông báo qua CV; email mời phỏng vấn (gộp chúc mừng qua CV + lịch hẹn
+        /// + 2 nút xác nhận/từ chối) được gửi MỘT LẦN DUY NHẤT khi HR gán khung giờ (AssignSlotCommand).
         /// </summary>
         public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default)
         {
@@ -787,8 +794,9 @@ namespace ARI.Application.Services
                 return Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
             }
 
-            // Gọi SendInterviewInviteAsync để vừa nâng trạng thái, vừa tạo token chọn lịch, vừa gửi email mời phỏng vấn
-            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct);
+            // Nâng trạng thái + tạo token đánh dấu vòng, NHƯNG không gửi email ở đây (sendEmail: false) —
+            // chỉ gửi 1 email duy nhất khi gán lịch (email đó đã gộp chúc mừng qua CV + lịch + 2 nút).
+            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct, sendEmail: false);
             if (inviteResult.IsFailure)
             {
                 return Result<bool>.Failure(inviteResult.Error);
@@ -819,7 +827,7 @@ namespace ARI.Application.Services
                         DedupKey = dedupKey,
                         Type = "result",
                         Title = "Hồ sơ ứng tuyển được chấp nhận",
-                        Body = $"Chúc mừng hồ sơ ứng tuyển vị trí {jobTitle} đã được chấp nhận. Vui lòng kiểm tra email để đặt lịch phỏng vấn.",
+                        Body = $"Chúc mừng! Hồ sơ vị trí {jobTitle} đã qua vòng duyệt CV. Nhân sự sẽ xếp lịch và gửi email mời phỏng vấn kèm lịch hẹn cho bạn.",
                         Link = $"/candidate/applications/{application.Id}",
                         IsRead = false
                     };

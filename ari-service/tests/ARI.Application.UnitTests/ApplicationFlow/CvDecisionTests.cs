@@ -12,8 +12,9 @@ namespace ARI.Application.UnitTests.ApplicationFlow;
 
 /// <summary>
 /// Quyết định vòng duyệt CV (ADR-048): mời phỏng vấn (<see cref="ApplicationService.SendInterviewInviteAsync"/>),
-/// duyệt (<see cref="ApplicationService.AcceptApplicationAsync"/> → screening + tạo InterviewInvite + email)
-/// và từ chối (<see cref="ApplicationService.RejectApplicationAsync"/> → cv_rejected + thư cảm ơn).
+/// duyệt (<see cref="ApplicationService.AcceptApplicationAsync"/> → screening + tạo InterviewInvite + chuông,
+/// KHÔNG gửi email — email gộp gửi 1 lần khi gán lịch) và từ chối
+/// (<see cref="ApplicationService.RejectApplicationAsync"/> → cv_rejected + thư cảm ơn).
 /// </summary>
 public class CvDecisionTests
 {
@@ -120,7 +121,7 @@ public class CvDecisionTests
         Assert.True(res.IsSuccess);
         Assert.Equal("screening", app.Status);
         Assert.Single(uow.Repo<InterviewInvite>().Items);
-        Assert.Single(email.Sent);
+        Assert.Empty(email.Sent); // duyệt CV KHÔNG gửi email — email mời gộp gửi 1 lần khi gán lịch
         var record = Assert.Single(uow.Repo<Domain.Entities.Notification>().Items);
         Assert.Equal($"cv_accepted:{app.Id}", record.DedupKey);
         Assert.Contains(notif.UserEvents, e => e.UserId == _accountId && e.EventType == "ReceiveUserNotification");

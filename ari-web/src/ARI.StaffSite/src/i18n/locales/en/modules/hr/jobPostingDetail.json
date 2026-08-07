@@ -164,7 +164,7 @@
     "matchScore": "Match Score: {{score}}%"
   },
   "notices": {
-    "acceptSuccess": "Candidate application approved and Round 1 interview invitation sent successfully.",
+    "acceptSuccess": "CV approved (Round 1). Assign a schedule to send the interview invitation email with the appointment.",
     "rejectSuccess": "Application rejected and thank you email sent to candidate successfully.",
     "inviteSuccess": "Magic link invitation sent to candidate.",
     "jobApproveSuccess": "Job posting approved. JD file has been stamped.",
