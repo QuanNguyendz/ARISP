@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -7,13 +7,17 @@ import {
   Layers,
   Calendar,
   Clock,
-  Sparkles,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Languages,
   ArrowLeft,
   Bell,
+  Search,
+  Eye,
+  Award,
+  XCircle,
+  X,
 } from 'lucide-react'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
@@ -22,10 +26,12 @@ import { EvaluationListSkeleton } from './_skeletons'
 import { Pagination } from '@ari/shared/ui'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
-function formatVerdictLabel(verdict?: string, tPass?: string, tNotPass?: string) {
-  if (verdict === 'pass') return tPass || 'Pass'
-  if (verdict === 'not_pass') return tNotPass || 'Not Pass'
-  return '—'
+function formatVerdictLabel(verdict?: string) {
+  if (!verdict) return '—'
+  const v = verdict.toLowerCase().trim()
+  if (v === 'pass' || v === 'verdict.pass' || v.includes('pass')) return 'Đạt'
+  if (v === 'not_pass' || v === 'verdict.notpass' || v.includes('not')) return 'Không đạt'
+  return verdict
 }
 
 function formatDate(dateString?: string) {
@@ -34,6 +40,16 @@ function formatDate(dateString?: string) {
     return new Date(dateString).toLocaleDateString('vi-VN')
   } catch {
     return dateString
+  }
+}
+
+function formatTime(dateString?: string) {
+  if (!dateString) return ''
+  try {
+    const d = new Date(dateString)
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
   }
 }
 
@@ -54,47 +70,153 @@ function getScoreColor(score: number) {
 }
 
 function getScoreTextColor(score: number) {
-  if (score >= 80) return 'text-emerald-700'
-  if (score >= 60) return 'text-brand-700'
-  return 'text-amber-700'
+  if (score >= 80) return 'text-emerald-700 dark:text-emerald-400'
+  if (score >= 60) return 'text-brand-700 dark:text-brand-400'
+  return 'text-amber-700 dark:text-amber-400'
 }
 
 function getScoreBgColor(score: number) {
-  if (score >= 80) return 'bg-emerald-50'
-  if (score >= 60) return 'bg-brand-50'
-  return 'bg-amber-50'
+  if (score >= 80) return 'bg-emerald-50 dark:bg-emerald-500/20'
+  if (score >= 60) return 'bg-brand-50 dark:bg-brand-500/20'
+  return 'bg-amber-50 dark:bg-amber-500/20'
 }
 
 export default function EvaluationReviewPage() {
   const { t } = useTranslation('modules/hr/evaluations')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const targetId = searchParams.get('id')
 
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
-  const PAGE_SIZE = 10
+  // Search & Filter state for list view
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'pass' | 'not_pass'>('all')
+  const [dateFilter, setDateFilter] = useState('')
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
   const {
     data: evaluationsResponse,
     isLoading: loading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['evaluations', page, PAGE_SIZE],
-    queryFn: () => evaluationService.getEvaluations({ page, pageSize: PAGE_SIZE }),
+    queryKey: ['evaluations-all'],
+    queryFn: () => evaluationService.getEvaluations({ page: 1, pageSize: 100 }),
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   })
 
   const evaluations = evaluationsResponse?.items || []
-  const totalPages = Math.max(1, evaluationsResponse?.totalPages ?? 1)
-  const totalCount = evaluationsResponse?.total ?? evaluations.length
   const displayError = error ? t('loadingError') : null
+
+  const filteredEvaluations = useMemo(() => {
+    return evaluations.filter((e) => {
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch = !q || (e.candidateName || '').toLowerCase().includes(q) || (e.jobTitle || '').toLowerCase().includes(q)
+      if (!matchesSearch) return false
+
+      if (dateFilter) {
+        const eDate = e.createdAt ? new Date(e.createdAt).toISOString().split('T')[0] : ''
+        if (eDate !== dateFilter) return false
+      }
+
+      if (statusFilter === 'pending') return e.status === 'pending'
+      const verdict = e.finalVerdict ?? e.aiVerdict
+      const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+      if (statusFilter === 'pass') return isPass && e.status !== 'pending'
+      if (statusFilter === 'not_pass') return !isPass && e.status !== 'pending'
+      return true
+    })
+  }, [evaluations, searchQuery, statusFilter, dateFilter])
+
+  interface EvaluationSessionGroup {
+    groupId: string
+    jobTitle: string
+    roundNumber: number
+    sessionDate: string
+    sessionTime: string
+    items: EvaluationReport[]
+    passCount: number
+    notPassCount: number
+    pendingCount: number
+  }
+
+  const GROUPS_PER_PAGE = 5
+
+  const groupedSessions = useMemo(() => {
+    const groupsMap = new Map<string, EvaluationSessionGroup>()
+
+    filteredEvaluations.forEach((evalItem) => {
+      const dateStr = formatDate(evalItem.createdAt)
+      const timeStr = formatTime(evalItem.createdAt)
+      const key = evalItem.sessionId || `${dateStr}_${evalItem.jobTitle}_${evalItem.roundNumber}`
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          groupId: key,
+          jobTitle: evalItem.jobTitle || 'Phiên phỏng vấn',
+          roundNumber: evalItem.roundNumber,
+          sessionDate: dateStr,
+          sessionTime: timeStr,
+          items: [],
+          passCount: 0,
+          notPassCount: 0,
+          pendingCount: 0,
+        })
+      }
+
+      const grp = groupsMap.get(key)!
+      grp.items.push(evalItem)
+
+      if (evalItem.status === 'pending') {
+        grp.pendingCount += 1
+      } else {
+        const verdict = evalItem.finalVerdict ?? evalItem.aiVerdict
+        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+        if (isPass) grp.passCount += 1
+        else grp.notPassCount += 1
+      }
+    })
+
+    return Array.from(groupsMap.values())
+  }, [filteredEvaluations])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, statusFilter, dateFilter])
+
+  const totalGroupPages = Math.max(1, Math.ceil(groupedSessions.length / GROUPS_PER_PAGE))
+
+  const paginatedGroupedSessions = useMemo(() => {
+    const start = (page - 1) * GROUPS_PER_PAGE
+    return groupedSessions.slice(start, start + GROUPS_PER_PAGE)
+  }, [groupedSessions, page])
+
+  function toggleGroup(groupId: string) {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }
+
+  useEffect(() => {
+    if (targetId) {
+      handleOpenDetail(targetId)
+    } else {
+      setSelectedEvaluation(null)
+      setLoadingDetail(false)
+    }
+  }, [targetId])
 
   async function handleOpenDetail(evaluationId: string) {
     try {
+      setLoadingDetail(true)
       setActionError(null)
       setIsOverrideMode(false)
       setOverrideReason('')
@@ -103,15 +225,21 @@ export default function EvaluationReviewPage() {
     } catch (fetchError) {
       console.error(fetchError)
       setSelectedEvaluation(null)
+    } finally {
+      setLoadingDetail(false)
     }
   }
 
   function closeDetail() {
     setSelectedEvaluation(null)
+    setLoadingDetail(false)
     setActionError(null)
     setIsOverrideMode(false)
     setOverrideReason('')
     setSubmittingAction(null)
+    if (targetId) {
+      setSearchParams({})
+    }
   }
 
   async function refreshListAndSelection(evaluationId: string) {
@@ -155,23 +283,31 @@ export default function EvaluationReviewPage() {
     }
   }
 
+  const counts = useMemo(() => {
+    const total = evaluations.length
+    const completed = evaluations.filter((item) => item.status === 'completed').length
+    const pending = evaluations.filter((item) => item.status === 'pending').length
+    const highScore = evaluations.filter((item) => (item.overallScore ?? 0) >= 80).length
+    const pass = evaluations.filter((item) => {
+      const v = item.finalVerdict ?? item.aiVerdict
+      return item.status !== 'pending' && (v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+    }).length
+    const notPass = evaluations.filter((item) => {
+      const v = item.finalVerdict ?? item.aiVerdict
+      return item.status !== 'pending' && !(v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+    }).length
+
+    return { total, completed, pending, highScore, pass, notPass }
+  }, [evaluations])
+
   const stats = useMemo(
     () => [
-      { label: t('stats.total'), value: evaluations.length.toString() },
-      {
-        label: t('stats.completed'),
-        value: evaluations.filter((item) => item.status === 'completed').length.toString(),
-      },
-      {
-        label: t('stats.pending'),
-        value: evaluations.filter((item) => item.status === 'pending').length.toString(),
-      },
-      {
-        label: t('stats.highScore'),
-        value: evaluations.filter((item) => (item.overallScore ?? 0) >= 80).length.toString(),
-      },
+      { label: t('stats.total'), value: counts.total.toString() },
+      { label: t('stats.completed'), value: counts.completed.toString() },
+      { label: t('stats.pending'), value: counts.pending.toString() },
+      { label: t('stats.highScore'), value: counts.highScore.toString() },
     ],
-    [evaluations, t]
+    [counts, t]
   )
 
   const criterionEntries = useMemo(
@@ -179,11 +315,22 @@ export default function EvaluationReviewPage() {
     [selectedEvaluation]
   )
 
+  if (loadingDetail) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center bg-ink-50 dark:bg-ink-950">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600 dark:border-brand-500/30 dark:border-t-brand-400" />
+          <p className="text-sm font-medium text-ink-500 dark:text-ink-400">Đang tải báo cáo đánh giá chi tiết...</p>
+        </div>
+      </div>
+    )
+  }
+
   // List view
   if (!selectedEvaluation) {
     return (
       <main className="p-6 space-y-6 bg-ink-50 dark:bg-ink-950">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
               {t('title')}
@@ -192,18 +339,100 @@ export default function EvaluationReviewPage() {
           </div>
         </div>
 
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}
               className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
             >
-              <div className="font-display text-xl font-extrabold text-ink-900 dark:text-white sm:text-2xl">
+              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
                 {stat.value}
               </div>
-              <div className="text-sm text-ink-500 dark:text-ink-400 mt-1">{stat.label}</div>
+              <div className="text-xs font-medium text-ink-500 dark:text-ink-400 mt-0.5">{stat.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
+            <div className="relative w-full sm:flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm theo tên ứng viên hoặc vị trí..."
+                className="w-full pl-9 pr-4 py-2 text-sm bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
+              />
+            </div>
+
+            {/* Date filter */}
+            <div className="relative flex items-center w-full sm:w-auto">
+              <Calendar className="w-4 h-4 absolute left-3 text-ink-400 pointer-events-none" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full sm:w-auto pl-9 pr-8 py-2 text-xs bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-ink-900 dark:text-white"
+              />
+              {dateFilter && (
+                <button
+                  onClick={() => setDateFilter('')}
+                  className="absolute right-2 text-ink-400 hover:text-ink-600 p-0.5 rounded-full"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 ${
+                statusFilter === 'all'
+                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              Tất cả ({counts.total})
+            </button>
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'pending'
+                  ? 'bg-amber-500 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Chờ duyệt ({counts.pending})
+            </button>
+            <button
+              onClick={() => setStatusFilter('pass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'pass'
+                  ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Đạt ({counts.pass})
+            </button>
+            <button
+              onClick={() => setStatusFilter('not_pass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                statusFilter === 'not_pass'
+                  ? 'bg-red-600 text-white font-semibold shadow-sm'
+                  : 'bg-ink-50 dark:bg-white/5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Không đạt ({counts.notPass})
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -212,83 +441,149 @@ export default function EvaluationReviewPage() {
           <div className="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
             {displayError}
           </div>
-        ) : evaluations.length === 0 ? (
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-10 text-center text-ink-500 dark:text-ink-400">
-            {t('noEvaluations')}
+        ) : groupedSessions.length === 0 ? (
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-12 text-center text-ink-500 dark:text-ink-400 space-y-2">
+            <Award className="w-10 h-10 mx-auto text-ink-300" />
+            <p className="font-semibold text-ink-700 dark:text-ink-300">Không tìm thấy ca thi hoặc báo cáo đánh giá phù hợp</p>
+            <p className="text-xs text-ink-400">Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc ngày / trạng thái</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {evaluations.map((evaluation) => (
-              <div
-                key={evaluation.id}
-                className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card hover:shadow-card-hover transition cursor-pointer"
-                onClick={() => handleOpenDetail(evaluation.id)}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 font-display text-lg font-extrabold">
-                      {getInitials(evaluation.candidateName)}
-                    </div>
-                    <div>
-                      <h3 className="font-display text-lg font-bold text-ink-900 dark:text-white">
-                        {evaluation.candidateName ?? t('candidate')}
-                      </h3>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Code2 className="w-4 h-4" />
-                          {evaluation.jobTitle ?? '—'}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Layers className="w-4 h-4" />
-                          {t('round')} {evaluation.roundNumber}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="w-4 h-4" />
-                          {formatDate(evaluation.createdAt)}
-                        </span>
+            {paginatedGroupedSessions.map((group) => {
+              const isExpanded = Boolean(expandedGroups[group.groupId])
+              return (
+                <div
+                  key={group.groupId}
+                  className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card"
+                >
+                  {/* Session Group Header */}
+                  <div
+                    onClick={() => toggleGroup(group.groupId)}
+                    className="flex flex-wrap items-center justify-between p-4 bg-ink-50/70 dark:bg-white/5 border-b border-ink-200/60 dark:border-white/10 cursor-pointer hover:bg-ink-100/50 dark:hover:bg-white/10 transition-colors gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-display text-base font-bold text-ink-900 dark:text-white truncate">
+                            Ca thi: {group.sessionTime ? `${group.sessionTime} (${group.sessionDate})` : group.sessionDate}
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white">
+                            {group.jobTitle} · Vòng {group.roundNumber}
+                          </span>
+                        </div>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
+                          Tổng số thí sinh: <b className="text-ink-700 dark:text-ink-300">{group.items.length}</b>
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {evaluation.status === 'pending' ? (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 dark:bg-amber-500/20 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">
-                        <Clock className="w-4 h-4" /> {t('status.pendingHrReview')}
-                      </span>
-                    ) : (
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
-                          (evaluation.overallScore ?? 0) >= 80
-                            ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                            : (evaluation.overallScore ?? 0) >= 60
-                              ? 'bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400'
-                              : 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
-                        }`}
-                      >
-                        {formatVerdictLabel(
-                          evaluation.finalVerdict ?? evaluation.aiVerdict,
-                          t('verdict.pass'),
-                          t('verdict.notPass')
+
+                    <div className="flex items-center gap-3 ml-auto">
+                      <div className="hidden sm:flex items-center gap-2 text-xs">
+                        {group.passCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-500/30">
+                            {group.passCount} Đạt
+                          </span>
                         )}
-                      </span>
-                    )}
-                    {evaluation.status !== 'pending' && (
-                      <span className="font-display text-3xl font-extrabold text-ink-900 dark:text-white">
-                        {evaluation.overallScore ?? 0}
-                      </span>
-                    )}
+                        {group.notPassCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 font-semibold border border-red-200 dark:border-red-500/30">
+                            {group.notPassCount} Không đạt
+                          </span>
+                        )}
+                        {group.pendingCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-500/30">
+                            {group.pendingCount} Chờ duyệt
+                          </span>
+                        )}
+                      </div>
+
+                      <button className="flex items-center gap-1 text-xs font-medium text-ink-600 dark:text-ink-400 p-1.5 rounded-lg hover:bg-ink-200/60 dark:hover:bg-white/10 transition-colors">
+                        <span className="hidden sm:inline">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Session Group Candidates List */}
+                  {isExpanded && (
+                    <div className="p-3 space-y-2.5 divide-y divide-ink-100 dark:divide-white/5">
+                      {group.items.map((evaluation) => {
+                        const overallScore = evaluation.overallScore ?? 0
+                        const isPending = evaluation.status === 'pending'
+                        const verdict = evaluation.finalVerdict ?? evaluation.aiVerdict
+                        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+
+                        return (
+                          <div
+                            key={evaluation.id}
+                            className="pt-2.5 first:pt-0 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl hover:bg-ink-50 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                            onClick={() => handleOpenDetail(evaluation.id)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-ai-600 text-white font-display text-xs font-extrabold shadow-sm">
+                                {getInitials(evaluation.candidateName)}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-display text-sm font-bold text-ink-900 dark:text-white group-hover:text-brand-600 transition-colors truncate">
+                                  {evaluation.candidateName ?? t('candidate')}
+                                </h4>
+                                <p className="text-xs text-ink-500 dark:text-ink-400 truncate">
+                                  {evaluation.candidateEmail || evaluation.jobTitle}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 ml-auto sm:ml-0">
+                              {isPending ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                                  <Clock className="w-3 h-3" /> Chờ HR duyệt
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-2.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
+                                      isPass
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                                        : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30'
+                                    }`}
+                                  >
+                                    {isPass ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                    {isPass ? 'Đạt' : 'Không đạt'}
+                                  </span>
+
+                                  <div className={`px-2.5 py-0.5 rounded-lg font-display text-xs font-extrabold flex items-center gap-0.5 ${getScoreBgColor(overallScore)} ${getScoreTextColor(overallScore)}`}>
+                                    <span>{overallScore}</span>
+                                    <span className="text-[9px] opacity-70">/100</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(evaluation.id) }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-medium text-ink-700 dark:text-ink-200 group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-all"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> Xem chi tiết
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
-        {!loading && !displayError && evaluations.length > 0 && (
+        {!loading && !displayError && groupedSessions.length > 0 && (
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={totalCount}
-            label={t('paginationLabel')}
+            totalPages={totalGroupPages}
+            total={groupedSessions.length}
+            label="ca thi"
             onPageChange={setPage}
           />
         )}
@@ -362,11 +657,7 @@ export default function EvaluationReviewPage() {
                         : 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
                   }`}
                 >
-                  {formatVerdictLabel(
-                    selectedEvaluation.finalVerdict ?? selectedEvaluation.aiVerdict,
-                    t('verdict.pass'),
-                    t('verdict.notPass')
-                  )}
+                  {formatVerdictLabel(selectedEvaluation.finalVerdict ?? selectedEvaluation.aiVerdict)}
                 </span>
               )}
             </div>
@@ -502,15 +793,11 @@ export default function EvaluationReviewPage() {
           {/* AI verdict */}
           <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card text-center">
             <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700">
-              <Sparkles className="w-4 h-4" /> {t('aiVerdict')}
+              Verdict của AI
             </div>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-base font-bold text-emerald-700 ring-1 ring-emerald-200">
               <CheckCircle2 className="w-5 h-5" />
-              {formatVerdictLabel(
-                selectedEvaluation.aiVerdict,
-                t('verdict.pass'),
-                t('verdict.notPass')
-              )}
+              {formatVerdictLabel(selectedEvaluation.aiVerdict)}
             </div>
             <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none">
               {selectedEvaluation.overallScore ?? 0}
@@ -561,10 +848,10 @@ export default function EvaluationReviewPage() {
                       </label>
                       <div className="grid grid-cols-2 gap-2">
                         <button className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-                          {t('verdict.pass')}
+                          Đạt
                         </button>
                         <button className="rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-600 hover:border-red-300">
-                          {t('verdict.notPass')}
+                          Không đạt
                         </button>
                       </div>
                     </div>
@@ -609,11 +896,7 @@ export default function EvaluationReviewPage() {
               <p className="mt-1 text-sm text-emerald-700">
                 {t('verdict')}:{' '}
                 <b>
-                  {formatVerdictLabel(
-                    selectedEvaluation.hrReview.finalVerdict,
-                    t('verdict.pass'),
-                    t('verdict.notPass')
-                  )}
+                  {formatVerdictLabel(selectedEvaluation.hrReview.finalVerdict)}
                 </b>
               </p>
               {selectedEvaluation.hrReview.isOverride &&
@@ -629,7 +912,7 @@ export default function EvaluationReviewPage() {
           <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5 font-semibold text-ai-700">
-                <Sparkles className="w-4 h-4" /> {t('cvJdMatch')}
+                Match CV-JD
               </span>
               <span className="font-display text-xl font-extrabold text-ai-700">87</span>
             </div>
