@@ -57,7 +57,8 @@
     "round": "Vòng {{number}}",
     "types": {
       "technical": "Technical",
-      "screening": "Screening"
+      "screening": "Screening",
+      "onlineTest": "Trắc nghiệm"
     },
     "language": "Ngôn ngữ:",
     "languages": {
