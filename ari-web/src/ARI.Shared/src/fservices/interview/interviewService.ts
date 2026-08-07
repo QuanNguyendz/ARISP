@@ -95,14 +95,22 @@ export const interviewService = {
     return data?.audio ?? '';
   },
 
-  async getHrSessions(): Promise<HrInterviewSessionItem[]> {
-    const { data } = await apiClient.get<HrInterviewSessionItem[]>('/interview/sessions');
+  async getHrSessions(applicationId?: string): Promise<HrInterviewSessionItem[]> {
+    const { data } = await apiClient.get<HrInterviewSessionItem[]>('/interview/sessions', {
+      params: applicationId ? { applicationId } : undefined,
+    });
     return data;
   },
 
   // Staff: sinh Interview Code cho 1 hồ sơ (round tự suy ra nếu không truyền)
   async generateCode(applicationId: string, roundNumber?: number): Promise<{ code: string; expiresAt: string; applicationId: string }> {
     const { data } = await apiClient.post('/interview/generate-code', { applicationId, roundNumber });
+    return data;
+  },
+
+  // Staff: sinh Interview Code hàng loạt cho danh sách hồ sơ
+  async generateCodeBatch(applicationIds: string[], roundNumber?: number): Promise<Array<{ code: string; applicationId: string }>> {
+    const { data } = await apiClient.post('/interview/generate-code-batch', { applicationIds, roundNumber });
     return data;
   },
 
@@ -226,4 +234,79 @@ export const interviewService = {
     const { data } = await apiClient.get<MyPracticeReview>(`/portal/practice/sessions/${sessionId}`);
     return data;
   },
+
+  // ─── Interview Management: Job → Slot → Candidate ───
+
+  async getInterviewJobs(): Promise<InterviewJobSummary[]> {
+    const { data } = await apiClient.get<InterviewJobSummary[]>('/interview/management/jobs');
+    return data;
+  },
+
+  async getSlotsForJob(jobId: string): Promise<InterviewSlotDetail[]> {
+    const { data } = await apiClient.get<InterviewSlotDetail[]>(`/interview/management/jobs/${jobId}/slots`);
+    return data;
+  },
+
+  async getCandidatesInSlot(slotId: string): Promise<SlotCandidate[]> {
+    const { data } = await apiClient.get<SlotCandidate[]>(`/interview/management/slots/${slotId}/candidates`);
+    return data;
+  },
+
+  async sendBookingReminder(bookingId: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(`/interview/management/booking/${bookingId}/remind`);
+    return data;
+  },
+
+  async rescheduleBooking(bookingId: string, targetSlotId: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(`/interview/management/booking/${bookingId}/reschedule`, { targetSlotId });
+    return data;
+  },
 };
+
+// ─── Interview Management DTOs ───────────────────────────────────────────────
+
+export interface InterviewJobSummary {
+  jobId: string;
+  jobTitle: string;
+  jobStatus: string;
+  totalSlots: number;
+  totalBooked: number;
+  totalConfirmed: number;
+  maxRound: number;
+  totalSessions: number;
+  completedSessions: number;
+  nextSlotTime?: string | null;
+}
+
+export interface InterviewSlotDetail {
+  slotId: string;
+  jobPostingId: string;
+  roundNumber: number;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  capacity: number;
+  bookedCount: number;
+  confirmedCount: number;
+  declinedCount: number;
+  pendingCount: number;
+  isPast: boolean;
+}
+
+export interface SlotCandidate {
+  applicationId: string;
+  bookingId: string;
+  candidateName: string;
+  candidateEmail: string;
+  confirmationStatus: string; // pending | confirmed | declined
+  declineReason?: string | null;
+  bookingStatus: string;       // scheduled | completed | cancelled
+  sessionId?: string | null;
+  sessionStatus?: string | null;
+  durationSeconds?: number | null;
+  evaluationId?: string | null;
+  verdict?: string | null;
+  overallScore?: number | null;
+  interviewCode?: string | null;
+  codeExpiresAt?: string | null;
+}
