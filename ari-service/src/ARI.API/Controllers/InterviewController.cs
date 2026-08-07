@@ -113,11 +113,77 @@ namespace ARI.API.Controllers
         /// </summary>
         [HttpGet("sessions")]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> GetSessions(CancellationToken ct)
+        public async Task<IActionResult> GetSessions([FromQuery] Guid? applicationId, CancellationToken ct)
         {
-            var result = await _sender.Send(new GetHrInterviewSessionsQuery(), ct);
+            var result = await _sender.Send(new GetHrInterviewSessionsQuery(applicationId), ct);
             return Ok(result.Value);
         }
+
+        // ─────────── Interview Management: Job → Slot → Candidate ───────────
+
+        /// <summary>
+        /// GET /api/interview/management/jobs
+        /// Danh sách vị trí tuyển dụng có ca phỏng vấn, kèm thống kê tổng quan.
+        /// </summary>
+        [HttpGet("management/jobs")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetInterviewJobs(CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetInterviewJobsQuery(), ct);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// GET /api/interview/management/jobs/{jobId}/slots
+        /// Danh sách ca phỏng vấn (AvailabilitySlot) của một vị trí, kèm thống kê đặt lịch.
+        /// </summary>
+        [HttpGet("management/jobs/{jobId:guid}/slots")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetSlotsForJob(Guid jobId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetSlotsForJobQuery(jobId), ct);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// GET /api/interview/management/slots/{slotId}/candidates
+        /// Danh sách ứng viên trong một ca, kèm trạng thái xác nhận, phiên AI, điểm đánh giá.
+        /// </summary>
+        [HttpGet("management/slots/{slotId:guid}/candidates")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetCandidatesInSlot(Guid slotId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetCandidatesInSlotQuery(slotId), ct);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// POST /api/interview/management/booking/{bookingId}/remind
+        /// Gửi email + notification nhắc lịch phỏng vấn cho ứng viên.
+        /// </summary>
+        [HttpPost("management/booking/{bookingId:guid}/remind")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> SendBookingReminder(Guid bookingId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new SendBookingReminderCommand(bookingId), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(new { success = true, message = "Đã gửi nhắc nhở tới ứng viên." });
+        }
+
+        /// <summary>
+        /// POST /api/interview/management/booking/{bookingId}/reschedule
+        /// Dời ứng viên sang ca phỏng vấn mới.
+        /// </summary>
+        [HttpPost("management/booking/{bookingId:guid}/reschedule")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> RescheduleBooking(Guid bookingId, [FromBody] RescheduleRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new RescheduleBookingCommand(bookingId, request.TargetSlotId), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            return Ok(new { success = true, message = "Đã dời lịch thành công." });
+        }
+
+        // ────────────────────────────────────────────────────────────────────
 
         #region ================= EXISTED INTERVIEW SESSION ENDPOINTS =================
 
