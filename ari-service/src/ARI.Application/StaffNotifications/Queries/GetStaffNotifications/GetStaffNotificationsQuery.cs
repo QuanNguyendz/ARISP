@@ -37,7 +37,11 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
 
             if (settings.ReceivePush)
             {
-                await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+                try
+                {
+                    await SyncNotificationsAsync(request.UserId, request.IsRecruiter, request.IsHrAdmin, ct);
+                }
+                catch { /* sync idempotent — lỗi thoáng qua không được crash toàn endpoint */ }
             }
 
             var items = (await _unitOfWork.Repository<Notification>()
@@ -110,18 +114,17 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                 Add($"applied:{a.Id}", "applied", "Ứng viên mới ứng tuyển",
                     $"{a.CandidateName} · {Title(a.JobPostingId)}", $"{linkBase}/candidates/{a.Id}", a.CreatedAt);
 
-            // 2. Đánh giá AI chờ HR xác nhận (chưa có HrReview) cho tin trong phạm vi.
-            var appIds = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
-                .QueryAsync(q => q.Where(a => jobIds.Contains(a.JobPostingId)).Select(a => a.Id), ct);
+            // 2. Đánh giá AI chờ HR xác nhận (chưa có HrReview) cho tin trong phạm vi (30 ngày gần nhất).
+            var appIds = apps.Select(a => a.Id).ToList();
             if (appIds.Count > 0)
             {
                 var evals = await _unitOfWork.Repository<Evaluation>()
-                    .QueryAsync(q => q.Where(e => appIds.Contains(e.ApplicationId))
+                    .QueryAsync(q => q.Where(e => appIds.Contains(e.ApplicationId) && e.CreatedAt >= since)
                         .Select(e => new { e.Id, e.ApplicationId, e.RoundNumber, e.CreatedAt }), ct);
                 var evalIds = evals.Select(e => e.Id).ToList();
                 var reviewed = evalIds.Count > 0
                     ? (await _unitOfWork.Repository<HrReview>()
-                        .FindAsync(r => evalIds.Contains(r.EvaluationId), ct)).Select(r => r.EvaluationId).ToHashSet()
+                        .QueryAsync(q => q.Where(r => evalIds.Contains(r.EvaluationId)).Select(r => r.EvaluationId), ct)).ToHashSet()
                     : new HashSet<Guid>();
                 var appToJob = apps.ToDictionary(a => a.Id, a => a.JobPostingId);
                 foreach (var ev in evals.Where(e => !reviewed.Contains(e.Id)))
