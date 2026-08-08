@@ -115,7 +115,15 @@ export default function CandidateHeader() {
   const { user, isAuthenticated, logout } = useAuthStore()
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+  const [headerSearch, setHeaderSearch] = useState('')
   const rootRef = useRef<HTMLElement>(null)
+
+  // Tìm việc ở header → mở trang việc làm kèm ?search=<từ khoá> (FindJobPage tự đọc param).
+  const submitHeaderSearch = () => {
+    const q = headerSearch.trim()
+    navigate(q ? `/jobs?search=${encodeURIComponent(q)}` : '/jobs')
+    setOpen(null)
+  }
 
   const langMap: Record<string, string> = { vi: 'VI', en: 'EN' }
 
@@ -261,16 +269,23 @@ export default function CandidateHeader() {
           })}
         </nav>
 
-        {/* Global search (trang trí) */}
+        {/* Global search — Enter để tìm việc làm */}
         <div className="hidden max-w-sm flex-1 items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm focus-within:border-brand-400 focus-within:bg-white md:flex">
           <Search className="h-4 w-4 text-ink-400" />
           <input
             className="w-full bg-transparent outline-none placeholder:text-ink-400"
             placeholder={t('jobs.searchPlaceholder')}
-            onFocus={() => navigate('/jobs')}
+            value={headerSearch}
+            onChange={(e) => setHeaderSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                submitHeaderSearch()
+              }
+            }}
           />
           <kbd className="hidden rounded border border-ink-200 bg-white px-1.5 text-[10px] font-semibold text-ink-400 lg:inline">
-            ⌘K
+            ⏎
           </kbd>
         </div>
 
@@ -534,7 +549,14 @@ export default function CandidateHeader() {
             <input
               className="w-full bg-transparent outline-none placeholder:text-ink-400"
               placeholder={t('jobs.searchPlaceholder')}
-              onFocus={() => navigate('/jobs')}
+              value={headerSearch}
+              onChange={(e) => setHeaderSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submitHeaderSearch()
+                }
+              }}
             />
           </div>
           {NAV.map((item) => {

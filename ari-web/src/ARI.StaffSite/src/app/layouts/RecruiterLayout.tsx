@@ -14,6 +14,8 @@ export default function RecruiterLayout() {
       roleLabel={t('recruiter.roleLabel')}
       homePath="/recruiter/dashboard"
       searchPlaceholder={t('recruiter.searchPlaceholder')}
+      searchPath="/recruiter/candidates"
+      globalSearchScope="recruiter"
       settingsPath="/recruiter/settings"
       notificationsPath="/recruiter/notifications"
       primaryAction={{ label: t('recruiter.createJob'), to: '/recruiter/jobs/create', icon: Plus }}

@@ -23,6 +23,7 @@ import {
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useThemeStore } from '@ari/shared/store/theme'
 import { LanguageSwitcher } from '@ari/shared/ui/LanguageSwitcher'
+import GlobalSearch from '@/components/GlobalSearch'
 import {
   staffNotificationService,
   STAFF_NOTIF_REFRESH_EVENT,
@@ -77,6 +78,10 @@ interface WorkspaceLayoutProps {
   /** Đường dẫn về trang chủ của khu vực (logo click) */
   homePath: string
   searchPlaceholder?: string
+  /** Trang đích khi submit ô tìm kiếm ở header — điều hướng kèm ?search=<từ khoá> */
+  searchPath?: string
+  /** Nếu có: dùng dropdown tìm kiếm tổng hợp (tin tuyển dụng + ứng viên) thay ô tìm đơn giản. */
+  globalSearchScope?: 'hr' | 'recruiter'
   /** Nút hành động chính ở topbar (tùy chọn) */
   primaryAction?: WorkspacePrimaryAction
   /** Đường dẫn trang cài đặt (hiện ở cuối sidebar + menu user) */
@@ -132,6 +137,8 @@ export default function WorkspaceLayout({
   roleLabel,
   homePath,
   searchPlaceholder = 'Tìm kiếm...',
+  searchPath,
+  globalSearchScope,
   primaryAction,
   settingsPath,
   notificationsPath,
@@ -139,6 +146,14 @@ export default function WorkspaceLayout({
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [headerSearch, setHeaderSearch] = useState('')
+
+  // Tìm kiếm ở header → điều hướng tới trang đích kèm ?search=<từ khoá> (trang đích tự đọc param).
+  const submitHeaderSearch = () => {
+    const dest = searchPath || homePath
+    const q = headerSearch.trim()
+    navigate(q ? `${dest}?search=${encodeURIComponent(q)}` : dest)
+  }
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotificationItem[]>([])
@@ -401,22 +416,35 @@ export default function WorkspaceLayout({
 
           {/* Search icon button (mobile only) */}
           <button
+            onClick={submitHeaderSearch}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 sm:hidden"
             aria-label={searchPlaceholder}
           >
             <Search className="w-5 h-5" />
           </button>
 
-          <div className="hidden flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400 sm:flex">
-            <Search className="w-4 h-4 text-ink-400" />
-            <input
-              className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
-              placeholder={searchPlaceholder}
-            />
-            <kbd className="hidden sm:inline rounded border border-ink-200 dark:border-white/10 bg-white dark:bg-white/10 px-1.5 text-[10px] font-semibold text-ink-400">
-              ⌘K
-            </kbd>
-          </div>
+          {globalSearchScope ? (
+            <GlobalSearch scope={globalSearchScope} placeholder={searchPlaceholder} />
+          ) : (
+            <div className="hidden flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400 sm:flex">
+              <Search className="w-4 h-4 text-ink-400" />
+              <input
+                className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
+                placeholder={searchPlaceholder}
+                value={headerSearch}
+                onChange={(e) => setHeaderSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    submitHeaderSearch()
+                  }
+                }}
+              />
+              <kbd className="hidden sm:inline rounded border border-ink-200 dark:border-white/10 bg-white dark:bg-white/10 px-1.5 text-[10px] font-semibold text-ink-400">
+                ⏎
+              </kbd>
+            </div>
+          )}
 
           <div className="ml-auto flex items-center gap-1">
             {/* Notifications */}

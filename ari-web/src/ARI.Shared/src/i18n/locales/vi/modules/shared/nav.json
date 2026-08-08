@@ -39,6 +39,12 @@
     "addStaff": "Thêm staff",
     "roleLabel": "Super Admin"
   },
+  "search": {
+    "jobs": "Tin tuyển dụng",
+    "candidates": "Ứng viên",
+    "noResults": "Không tìm thấy kết quả",
+    "loading": "Đang tìm..."
+  },
   "shared": {
     "help": "Trợ giúp & tài liệu",
     "logout": "Đăng xuất",
