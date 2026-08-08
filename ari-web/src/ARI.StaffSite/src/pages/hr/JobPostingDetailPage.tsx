@@ -640,13 +640,15 @@ export default function JobPostingDetailPage() {
             >
               <Calendar className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Lịch phỏng vấn
             </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
-              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
-            >
-              <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
-            </button>
+            {job.roundConfigs?.some((r) => (r.roundType || '').toLowerCase() === 'online_test') && (
+              <button
+                type="button"
+                onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+              >
+                <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
