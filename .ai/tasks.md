@@ -323,6 +323,15 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-08: **Đổi nhãn "HR Leader" → "HR Admin" trên workspace HR (StaffSite).** Sửa 2 key i18n `hr.workspace` ("HR Leader Workspace" → "HR Admin Workspace") và `hr.roleLabel` ("HR Leader" → "HR Admin") trong `ARI.Shared/i18n/locales/{vi,en}/modules/shared/nav.json`. Chỉ khối `hr` (dùng bởi `HrLayout`) — Recruiter/Super Admin giữ nguyên. JSON hợp lệ. Thuần label, không đụng logic/role/quyền.
+
+- [x] 2026-08-08: **Nút "Xoá khỏi danh sách" cho lịch đã bị huỷ/từ chối (Candidate) — bổ sung ADR-048.**
+  - **Yêu cầu:** thẻ lịch "Đã từ chối" (mục chờ xếp lại) trên trang lịch ứng viên cần nút xoá để dọn danh sách.
+  - **Mô hình:** ẩn phía ứng viên (soft-dismiss), KHÔNG xoá dữ liệu — nhân sự vẫn thấy booking `Status="declined"` để xếp lại (AssignSlot đọc `priorDeclined` theo Status).
+  - **BE (vertical slice + migration):** `InterviewBooking.CandidateDismissedAt` (nullable) + migration `AddBookingCandidateDismissedAt` (cột `candidate_dismissed_at`, tự áp khi app khởi động qua `MigrateAsync`). `GetCandidateScheduleQuery` lọc thêm `CandidateDismissedAt == null` ở nhánh declined. CQRS `DismissDeclinedScheduleCommand` (+handler dùng `CandidateBookingSupport.LoadOwnedAsync` để guard sở hữu; chỉ cho ẩn khi Status `declined`/`cancelled`; idempotent). Endpoint `DELETE /api/candidate/schedule/{bookingId}` (`CandidateOnly`).
+  - **FE:** `scheduleService.dismissSchedule()` (DELETE); `SchedulePage` thêm `dismissMut` (invalidate `['my-schedule']`) + nút "Xoá khỏi danh sách" (icon `Trash2`, spinner khi đang gọi) ở mỗi thẻ trong `awaitingReschedule`.
+  - **Verify:** Release build 0 error (Debug bị app đang chạy khoá — không phải lỗi biên dịch); unit test **380 pass** (+4 test dismiss: ẩn/ chặn lịch còn hiệu lực/ idempotent/ chặn không phải chủ sở hữu); CandidateSite `tsc --noEmit` xanh. **Cần restart API** để áp migration + code mới.
+
 - [x] 2026-08-08: **Nút "Xem thêm" ở thẻ "Lịch phỏng vấn sắp tới" (Candidate) → trang lịch đầy đủ.** Trước ứng viên chỉ xem lịch đã xếp qua chuông thông báo; nay thẻ `upcomingSchedule` ở sidebar `ApplicationsPage` có link "Xem thêm" góc trên phải trỏ `/portal/schedule/{applicationId}` (`CandidateSchedulePage` gọi `getMySchedule()` → liệt kê TẤT CẢ lịch sắp tới + lịch chờ xếp lại, kèm xác nhận/từ chối — trang này bỏ qua param, hiển thị toàn bộ). i18n VI "Xem thêm" / EN "View all" (`applications.viewAllSchedule`). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE. *(Lưu ý: `/candidate/interviews` là màn mock nhập-mã cũ, KHÔNG dùng.)*
 
 - [x] 2026-08-08: **Phân trang danh sách hồ sơ ứng tuyển của Candidate (`ApplicationsPage`).** Trước render toàn bộ `filtered.map`; nay phân trang phía client 5 hồ sơ/trang (`APPLICATIONS_PER_PAGE`): `pageItems = filtered.slice(...)`, thanh phân trang (Trang x/y · N hồ sơ + nút trước/sau) chỉ hiện khi >1 trang, đổi bộ lọc → về trang 1, đổi trang cuộn lên đầu danh sách (`listTopRef`). i18n VI/EN thêm `applications.pagination.{pageInfo,count,prev,next}` (giữ song ngữ — không dùng `@ari/shared/ui` Pagination vì hardcode "Trang"). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE.

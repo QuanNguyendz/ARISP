@@ -188,4 +188,60 @@ public class CandidateScheduleResponseTests
         Assert.True(res.IsFailure);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
+
+    // ---------- Dismiss (ứng viên ẩn lịch đã bị huỷ/từ chối khỏi danh sách) ----------
+
+    [Fact]
+    public async Task Dismiss_marks_declined_booking_hidden()
+    {
+        var (uow, _, _, booking, _) = Scheduled();
+        booking.Status = "declined";
+
+        var res = await new DismissDeclinedScheduleCommandHandler(uow)
+            .Handle(new DismissDeclinedScheduleCommand(booking.Id, _accountId, Email), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.NotNull(booking.CandidateDismissedAt); // đã ẩn khỏi danh sách ứng viên
+    }
+
+    [Fact]
+    public async Task Dismiss_rejects_active_scheduled_booking()
+    {
+        var (uow, _, _, booking, _) = Scheduled(); // Status = "scheduled" (còn hiệu lực)
+
+        var res = await new DismissDeclinedScheduleCommandHandler(uow)
+            .Handle(new DismissDeclinedScheduleCommand(booking.Id, _accountId, Email), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Null(booking.CandidateDismissedAt); // không ẩn lịch còn hiệu lực
+    }
+
+    [Fact]
+    public async Task Dismiss_is_idempotent_when_already_hidden()
+    {
+        var (uow, _, _, booking, _) = Scheduled();
+        booking.Status = "declined";
+        var firstAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        booking.CandidateDismissedAt = firstAt;
+
+        var res = await new DismissDeclinedScheduleCommandHandler(uow)
+            .Handle(new DismissDeclinedScheduleCommand(booking.Id, _accountId, Email), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(firstAt, booking.CandidateDismissedAt); // không ghi đè thời điểm ẩn lần đầu
+    }
+
+    [Fact]
+    public async Task Dismiss_by_non_owner_is_forbidden()
+    {
+        var (uow, _, app, booking, _) = Scheduled();
+        booking.Status = "declined";
+        app.CandidateAccountId = Guid.NewGuid();
+
+        var res = await new DismissDeclinedScheduleCommandHandler(uow)
+            .Handle(new DismissDeclinedScheduleCommand(booking.Id, Guid.NewGuid(), "intruder@example.io"), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
 }

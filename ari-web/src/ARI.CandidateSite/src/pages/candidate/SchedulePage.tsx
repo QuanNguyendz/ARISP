@@ -13,6 +13,7 @@ import {
   Lock,
   ShieldAlert,
   LogIn,
+  Trash2,
 } from 'lucide-react'
 import { scheduleService } from '@ari/shared/fservices/schedule'
 import type { CandidateScheduleItem } from '@ari/shared/fservices/schedule'
@@ -98,6 +99,13 @@ export default function CandidateSchedulePage() {
       queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
     },
     onError: (e) => setActionError(errMsg(e, 'Gửi lý do thất bại.')),
+  })
+
+  // Ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối — chỉ dọn hiển thị phía ứng viên.
+  const dismissMut = useMutation({
+    mutationFn: (bookingId: string) => scheduleService.dismissSchedule(bookingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-schedule'] }),
+    onError: (e) => setActionError(errMsg(e, 'Xoá lịch thất bại.')),
   })
 
   const openModal = (bookingId: string, action: 'confirm' | 'decline') => {
@@ -233,6 +241,21 @@ export default function CandidateSchedulePage() {
                   Bạn đã từ chối lịch{s.declineReason ? `: “${s.declineReason}”` : ''}. Nhân sự sẽ
                   xếp một khung giờ khác và thông báo lại cho bạn.
                 </p>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => dismissMut.mutate(s.bookingId)}
+                    disabled={dismissMut.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-100 hover:text-red-600 disabled:opacity-50"
+                  >
+                    {dismissMut.isPending && dismissMut.variables === s.bookingId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    Xoá khỏi danh sách
+                  </button>
+                </div>
               </div>
             ))}
 

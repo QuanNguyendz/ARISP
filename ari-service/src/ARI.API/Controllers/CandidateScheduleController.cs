@@ -80,5 +80,15 @@ namespace ARI.API.Controllers
             if (result.IsFailure) return MapFailure(result);
             return Ok(new { message = "Đã gửi lý do từ chối. Nhân sự sẽ xếp lịch khác cho bạn." });
         }
+
+        /// <summary>Ứng viên ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối. Không đụng luồng xếp lại của nhân sự.</summary>
+        [HttpDelete("candidate/schedule/{bookingId:guid}")]
+        public async Task<IActionResult> Dismiss(Guid bookingId, CancellationToken ct)
+        {
+            var (accId, email) = Identity();
+            var result = await _sender.Send(new DismissDeclinedScheduleCommand(bookingId, accId, email), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(new { message = "Đã xoá lịch khỏi danh sách." });
+        }
     }
 }
