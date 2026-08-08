@@ -100,6 +100,18 @@ export default function UsersPage() {
     }
   }, [searchParams, setSearchParams])
 
+  // Nhận từ khoá tìm kiếm từ ô search ở header (?search=) → áp vào ô tìm + query, rồi dọn URL.
+  useEffect(() => {
+    const q = searchParams.get('search')
+    if (q !== null) {
+      setSearch(q)
+      setSearchInput(q)
+      setPage(1)
+      searchParams.delete('search')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setPage(1)

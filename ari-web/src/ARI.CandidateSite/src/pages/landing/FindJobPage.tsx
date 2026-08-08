@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -848,8 +848,9 @@ function Pagination({
 export default function FindJob() {
   const { t } = useTranslation('landing')
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated } = useAuthStore()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '')
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
   const [facets, setFacets] = useState<JobFacets>(EMPTY_FACETS)
   const [cities, setCities] = useState<City[]>([])
@@ -884,6 +885,17 @@ export default function FindJob() {
     }
     loadFacets()
   }, [])
+
+  // Nhận từ khoá từ ô tìm ở header (?search=) khi đang ở trang việc làm → áp vào ô tìm rồi dọn URL.
+  useEffect(() => {
+    const q = searchParams.get('search')
+    if (q !== null) {
+      setSearchQuery(q)
+      setPage(1)
+      searchParams.delete('search')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
   const queryParams = {

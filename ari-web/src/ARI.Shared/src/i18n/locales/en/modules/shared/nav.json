@@ -39,6 +39,12 @@
     "addStaff": "Add Staff",
     "roleLabel": "Super Admin"
   },
+  "search": {
+    "jobs": "Job Postings",
+    "candidates": "Candidates",
+    "noResults": "No results found",
+    "loading": "Searching..."
+  },
   "shared": {
     "help": "Help & Documentation",
     "logout": "Sign out",

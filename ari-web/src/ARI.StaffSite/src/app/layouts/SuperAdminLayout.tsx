@@ -14,6 +14,7 @@ export default function SuperAdminLayout() {
       roleLabel={t('superAdmin.roleLabel')}
       homePath="/super-admin/dashboard"
       searchPlaceholder={t('superAdmin.searchPlaceholder')}
+      searchPath="/super-admin/users"
       settingsPath="/super-admin/settings"
       primaryAction={{
         label: t('superAdmin.addStaff'),
