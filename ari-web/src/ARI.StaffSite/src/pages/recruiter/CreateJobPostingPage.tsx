@@ -24,6 +24,9 @@ const input =
 const label = 'block text-sm font-medium text-ink-700 dark:text-ink-200 mb-1.5'
 const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card'
 
+// Dấu * bắt buộc — luôn hiển thị màu đỏ.
+const RequiredStar = () => <span className="text-red-500 ml-0.5">*</span>
+
 export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps) {
   const { t } = useTranslation('modules/recruiter/createJob')
   const { id: jobId } = useParams<{ id: string }>()
@@ -329,7 +332,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             <h2 className="border-b border-ink-100 dark:border-white/10 pb-2 text-base font-semibold text-ink-900 dark:text-white">{t('form.generalInfo')}</h2>
 
             <div>
-              <label className={label}>{t('form.jobTitle')}</label>
+              <label className={label}>{t('form.jobTitle')}<RequiredStar /></label>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('form.jobTitlePlaceholder')} className={input} required />
             </div>
 
@@ -369,7 +372,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             </div>
 
             <div>
-              <label className={label}>{t('form.jobDescription')}</label>
+              <label className={label}>{t('form.jobDescription')}<RequiredStar /></label>
               <div className="quill-editor-wrapper">
                 <ReactQuill
                   theme="snow"
@@ -427,7 +430,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 </select>
               </div>
               <div>
-                <label className={label}>{t('form.interviewMode')}</label>
+                <label className={label}>{t('form.interviewMode')}<RequiredStar /></label>
                 <select value={interviewMode} onChange={(e) => setInterviewMode(e.target.value as any)} className={input}>
                   <option value="remote">{t('options.remote')}</option>
                   <option value="onsite">{t('options.onsiteInterview')}</option>
@@ -438,7 +441,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
             {interviewMode !== 'remote' && (
               <div>
-                <label className={label}>{t('form.workAddress')} *</label>
+                <label className={label}>{t('form.workAddress')}<RequiredStar /></label>
                 <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t('form.workLocationPlaceholder')} className={input} required />
               </div>
             )}
