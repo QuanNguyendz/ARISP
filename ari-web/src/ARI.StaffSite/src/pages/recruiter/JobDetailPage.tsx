@@ -557,7 +557,12 @@ export default function RecruiterJobDetailPage() {
             {job.jdFileUrl && (
               <button
                 type="button"
-                onClick={() => openDocument(job.jdFileUrl!, job.jdFileName || `${job.title} - JD`)}
+                onClick={() =>
+                  openDocument(
+                    job.signedJdFileUrl || job.jdFileUrl!,
+                    job.jdFileName || `${job.title} - JD`,
+                  )
+                }
                 className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
               >
                 <FileText className="h-4 w-4" /> {t('jdFile')}
