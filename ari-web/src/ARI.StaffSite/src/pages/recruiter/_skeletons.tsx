@@ -101,3 +101,31 @@ export function JobDetailSkeleton() {
     </div>
   )
 }
+
+export function EvaluationListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className={`${card} p-6`}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
+              <div>
+                <Skeleton className="mb-2 h-5 w-40" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-3.5 w-20" />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+

@@ -1,6 +1,6 @@
 {
   "hr": {
-    "workspace": "HR Leader Workspace",
+    "workspace": "HR Admin Workspace",
     "dashboard": "Tổng quan",
     "jobs": "Tin tuyển dụng",
     "candidates": "Ứng viên",
@@ -12,7 +12,7 @@
     "help": "Trợ giúp & tài liệu",
     "searchPlaceholder": "Tìm ứng viên, tin tuyển dụng...",
     "createJob": "Tạo tin",
-    "roleLabel": "HR Leader"
+    "roleLabel": "HR Admin"
   },
   "recruiter": {
     "workspace": "Recruiter Workspace",

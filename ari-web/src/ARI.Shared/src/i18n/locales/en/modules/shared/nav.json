@@ -1,6 +1,6 @@
 {
   "hr": {
-    "workspace": "HR Leader Workspace",
+    "workspace": "HR Admin Workspace",
     "dashboard": "Overview",
     "jobs": "Job Postings",
     "candidates": "Candidates",
@@ -12,7 +12,7 @@
     "help": "Help & Documentation",
     "searchPlaceholder": "Search candidates, job postings...",
     "createJob": "Create Job",
-    "roleLabel": "HR Leader"
+    "roleLabel": "HR Admin"
   },
   "recruiter": {
     "workspace": "Recruiter Workspace",

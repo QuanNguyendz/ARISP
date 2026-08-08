@@ -17,22 +17,11 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
 
     public class GetHrDashboardQueryHandler : IRequestHandler<GetHrDashboardQuery, Result<HrDashboardResponse>>
     {
-        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public GetHrDashboardQueryHandler(IServiceScopeFactory scopeFactory)
+        public GetHrDashboardQueryHandler(IUnitOfWork unitOfWork)
         {
-            _scopeFactory = scopeFactory;
-        }
-
-        /// <summary>
-        /// Chạy 1 truy vấn trong DI scope riêng (DbContext + connection riêng) để có thể
-        /// đọc song song nhiều bảng — biến tổng thời gian round-trip thành max thay vì sum.
-        /// </summary>
-        private async Task<T> RunScopedAsync<T>(Func<IUnitOfWork, Task<T>> work)
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-            return await work(uow);
+            _unitOfWork = unitOfWork;
         }
 
         // ===== Projection nhẹ: chỉ cột cần cho dashboard (tránh nạp text/JSON lớn) =====
@@ -74,37 +63,32 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
 
         public async Task<Result<HrDashboardResponse>> Handle(GetHrDashboardQuery request, CancellationToken ct)
         {
-            // Projection ở tầng SQL — chỉ kéo đúng cột cần. Tránh nạp cột text/JSON lớn
-            // (Application.CvText, Evaluation.criterion_scores/question_analyses/…) gây timeout đọc stream.
-            // 5 bảng độc lập đọc SONG SONG (mỗi cái 1 scope/connection riêng) → latency = max thay vì sum.
-            var jobsTask = RunScopedAsync(uow => uow.Repository<JobPosting>()
+            // Projection ở tầng SQL — chỉ kéo đúng cột cần.
+            var jobs = await _unitOfWork.Repository<JobPosting>()
                 .QueryAsync(q => q.Select(j => new JobLite
                 {
                     Id = j.Id, Title = j.Title, Department = j.Department, Status = j.Status,
                     CreatedByUserId = j.CreatedByUserId, Vacancies = j.Vacancies, CreatedAt = j.CreatedAt, ApplicationDeadline = j.ApplicationDeadline,
-                }), ct));
-            var appsTask = RunScopedAsync(uow => uow.Repository<ARI.Domain.Entities.Application>()
+                }), ct);
+
+            var apps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Select(a => new AppLite
                 {
                     Id = a.Id, JobPostingId = a.JobPostingId, Status = a.Status,
                     CvJdAnalysisId = a.CvJdAnalysisId, CandidateName = a.CandidateName, CreatedAt = a.CreatedAt,
-                }), ct));
-            var sessionTask = RunScopedAsync(uow => uow.Repository<InterviewSession>()
-                .QueryAsync(q => q.Select(s => s.ApplicationId), ct));
-            var evalTask = RunScopedAsync(uow => uow.Repository<Evaluation>()
+                }), ct);
+
+            var sessionAppIds = await _unitOfWork.Repository<InterviewSession>()
+                .QueryAsync(q => q.Select(s => s.ApplicationId), ct);
+
+            var evaluations = await _unitOfWork.Repository<Evaluation>()
                 .QueryAsync(q => q.Select(e => new EvalLite
                 {
                     Id = e.Id, ApplicationId = e.ApplicationId, RoundNumber = e.RoundNumber, AiVerdict = e.AiVerdict,
-                }), ct));
-            var reviewTask = RunScopedAsync(uow => uow.Repository<HrReview>()
-                .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct));
+                }), ct);
 
-            await Task.WhenAll(jobsTask, appsTask, sessionTask, evalTask, reviewTask);
-            var jobs = jobsTask.Result;
-            var apps = appsTask.Result;
-            var sessionAppIds = sessionTask.Result;
-            var evaluations = evalTask.Result;
-            var reviews = reviewTask.Result;
+            var reviews = await _unitOfWork.Repository<HrReview>()
+                .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct);
 
             var reviewedEvalIds = reviews.Select(r => r.EvaluationId).ToHashSet();
             var pendingReviews = evaluations.Count(e => !reviewedEvalIds.Contains(e.Id));
@@ -132,22 +116,21 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
                 },
             };
 
-            // Điểm match CV–JD + tên người tạo tin: 2 truy vấn phụ thuộc, chạy SONG SONG với nhau.
+            // Điểm match CV–JD + tên người tạo tin
             var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
             var creatorIds = jobs.Select(j => j.CreatedByUserId).Distinct().ToList();
 
-            var scoreTask = analysisIds.Count == 0
-                ? Task.FromResult(new Dictionary<Guid, int>())
-                : RunScopedAsync(async uow => (await uow.Repository<CvJdAnalysis>()
+            var scoreByAnalysisId = analysisIds.Count == 0
+                ? new Dictionary<Guid, int>()
+                : (await _unitOfWork.Repository<CvJdAnalysis>()
                         .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
-                    .ToDictionary(c => c.Id, c => c.MatchScore));
-            var creatorTask = RunScopedAsync(async uow => (await uow.Repository<User>()
-                    .QueryAsync(q => q.Where(u => creatorIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email }), ct))
-                .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName));
+                    .ToDictionary(c => c.Id, c => c.MatchScore);
 
-            await Task.WhenAll(scoreTask, creatorTask);
-            var scoreByAnalysisId = scoreTask.Result;
-            var creatorNameById = creatorTask.Result;
+            var creatorNameById = creatorIds.Count == 0
+                ? new Dictionary<Guid, string>()
+                : (await _unitOfWork.Repository<User>()
+                        .QueryAsync(q => q.Where(u => creatorIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email }), ct))
+                    .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
 
             var jobTitleById = jobs.ToDictionary(j => j.Id, j => j.Title);
 

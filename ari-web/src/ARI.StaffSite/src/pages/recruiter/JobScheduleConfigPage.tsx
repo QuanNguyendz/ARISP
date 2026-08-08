@@ -141,10 +141,19 @@ export default function JobScheduleConfigPage() {
   const roundLabel = (num: number, type?: string) =>
     t('roundLabel', { number: num, type: type === 'technical' ? t('technical') : t('screening') })
 
+  const isHr = typeof window !== 'undefined' && window.location.pathname.startsWith('/hr')
+  const backUrl = jobId
+    ? isHr
+      ? `/hr/jobs/${jobId}`
+      : `/recruiter/my-jobs/${jobId}`
+    : isHr
+    ? '/hr/jobs'
+    : '/recruiter/my-jobs'
+
   return (
     <div className="p-6 lg:p-8">
       <Link
-        to={jobId ? `/recruiter/my-jobs/${jobId}` : '/recruiter/my-jobs'}
+        to={backUrl}
         className="mb-4 inline-flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> {t('back')}
@@ -184,8 +193,11 @@ export default function JobScheduleConfigPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Slot form */}
         <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
-          <h2 className="mb-4 text-base font-semibold text-ink-900 dark:text-white">
-            {t('addSlot')}
+          <h2 className="mb-4 text-base font-semibold text-ink-900 dark:text-white flex items-center justify-between">
+            <span>{t('addSlot')}</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400">
+              Vòng {round}
+            </span>
           </h2>
           <div className="space-y-3">
             <div>

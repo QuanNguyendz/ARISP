@@ -53,11 +53,13 @@ namespace ARI.Application.Scheduling
             var appById = myApps.ToDictionary(a => a.Id);
             var myAppIds = appById.Keys.ToHashSet();
 
-            // Booking còn hiệu lực (scheduled) + booking bị từ chối gần đây (chờ xếp lại).
+            // Booking còn hiệu lực (scheduled) + booking bị từ chối gần đây (chờ xếp lại) mà ứng viên
+            // CHƯA tự ẩn khỏi danh sách (CandidateDismissedAt == null).
             var since = DateTimeOffset.UtcNow.AddDays(-30);
             var bookings = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
                     b => myAppIds.Contains(b.ApplicationId)
-                         && (b.Status == "scheduled" || (b.Status == "declined" && b.RespondedAt >= since)), ct))
+                         && (b.Status == "scheduled"
+                             || (b.Status == "declined" && b.RespondedAt >= since && b.CandidateDismissedAt == null)), ct))
                 .ToList();
             if (bookings.Count == 0)
                 return Result.Success(new CandidateScheduleDto(upcoming, past, awaiting));
@@ -242,6 +244,11 @@ namespace ARI.Application.Scheduling
             if (booking.Status != "scheduled")
                 return Result.Failure("Lịch này không còn hiệu lực để từ chối.");
 
+            // Khoá quyết định: đã xác nhận tham dự thì không được đổi sang từ chối (và ngược lại — confirm
+            // sau khi từ chối bị chặn bởi guard Status ở trên). Mỗi lịch chỉ phản hồi 1 lần.
+            if (string.Equals(booking.ConfirmationStatus, "confirmed", StringComparison.OrdinalIgnoreCase))
+                return Result.Failure("Bạn đã xác nhận tham dự lịch này nên không thể đổi sang từ chối. Quyết định đã được ghi nhận và không thể thay đổi.");
+
             booking.ConfirmationStatus = "declined";
             booking.DeclineReason = reason;
             booking.RespondedAt = DateTimeOffset.UtcNow;
@@ -261,6 +268,46 @@ namespace ARI.Application.Scheduling
             catch { /* best-effort */ }
 
             await CandidateBookingSupport.NotifyStaffAsync(_unitOfWork, _notificationService, app, booking, "declined", ct);
+
+            return Result.Success();
+        }
+    }
+
+    // ============================================================
+    // DELETE /api/candidate/schedule/{bookingId} — ứng viên ẩn lịch đã bị huỷ/từ chối
+    // (chỉ dọn danh sách phía ứng viên; KHÔNG đụng luồng xếp lại của nhân sự)
+    // ============================================================
+
+    public record DismissDeclinedScheduleCommand(Guid BookingId, Guid AccountId, string? Email) : IRequest<Result>;
+
+    public class DismissDeclinedScheduleCommandHandler : IRequestHandler<DismissDeclinedScheduleCommand, Result>
+    {
+        private readonly IUnitOfWork _unitOfWork;
+
+        public DismissDeclinedScheduleCommandHandler(IUnitOfWork unitOfWork)
+        {
+            _unitOfWork = unitOfWork;
+        }
+
+        public async Task<Result> Handle(DismissDeclinedScheduleCommand request, CancellationToken ct)
+        {
+            var (booking, app, error, errorCode) = await CandidateBookingSupport.LoadOwnedAsync(
+                _unitOfWork, request.BookingId, request.AccountId, request.Email, ct);
+            if (booking == null || app == null) return Result.Failure(error!, errorCode!);
+
+            // Chỉ cho ẩn lịch đã đóng (bị huỷ / bị từ chối) — không đụng lịch còn hiệu lực.
+            if (!string.Equals(booking.Status, "declined", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(booking.Status, "cancelled", StringComparison.OrdinalIgnoreCase))
+                return Result.Failure("Chỉ có thể xoá lịch đã bị huỷ hoặc đã từ chối.");
+
+            // Idempotent: đã ẩn rồi thì thôi.
+            if (booking.CandidateDismissedAt == null)
+            {
+                booking.CandidateDismissedAt = DateTimeOffset.UtcNow;
+                booking.UpdatedAt = DateTimeOffset.UtcNow;
+                _unitOfWork.Repository<InterviewBooking>().Update(booking);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
 
             return Result.Success();
         }

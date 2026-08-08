@@ -29,6 +29,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
+import InviteAndScheduleModal from '../../components/InviteAndScheduleModal'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
@@ -119,7 +120,6 @@ export default function RecruiterJobDetailPage() {
   const [mutationError, setMutationError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-  const [invitingId, setInvitingId] = useState<string | null>(null)
   const [processingAppId, setProcessingAppId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
@@ -162,6 +162,7 @@ export default function RecruiterJobDetailPage() {
   const [interviewSortOrder, setInterviewSortOrder] = useState<string>('desc')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchProcessing, setBatchProcessing] = useState<boolean>(false)
+  const [inviteModalTarget, setInviteModalTarget] = useState<{ id: string; name: string; targetRound: number } | null>(null)
 
   const activeRoundNumber = useMemo(
     () => (activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0),
@@ -405,20 +406,6 @@ export default function RecruiterJobDetailPage() {
       setMutationError(e?.response?.data?.message || t('statusError'))
     } finally {
       setBusy(false)
-    }
-  }
-
-  const sendInvite = async (appId: string) => {
-    setInvitingId(appId)
-    setMutationError('')
-    setNotice('')
-    try {
-      await applicationService.sendInvite(appId)
-      setNotice(t('messages.singleInviteSent'))
-    } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('messages.inviteError'))
-    } finally {
-      setInvitingId(null)
     }
   }
 
@@ -1016,30 +1003,50 @@ export default function RecruiterJobDetailPage() {
                                 {t('actions.reject')}
                               </button>
                             </>
+                          ) : a.status === 'not_pass' || a.status === 'cv_rejected' || a.status === 'failed' || a.status === 'rejected' ? (
+                            <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 font-medium text-xs rounded-lg whitespace-nowrap">
+                              Đã loại (Không đạt)
+                            </span>
+                          ) : a.status === 'pass' ? (
+                            <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium text-xs rounded-lg whitespace-nowrap">
+                              Trúng tuyển
+                            </span>
                           ) : (
-                            <button
-                              onClick={() => sendInvite(a.id)}
-                              disabled={
-                                invitingId === a.id ||
-                                a.status === 'rejected' ||
-                                a.status === 'failed' ||
-                                a.status === 'not_pass' ||
-                                a.status === 'cv_rejected' ||
-                                a.status === 'pass' ||
-                                (a.currentRound != null &&
-                                  activeRoundNumber > 0 &&
-                                  a.currentRound > activeRoundNumber) ||
-                                batchProcessing
-                              }
-                              className="flex w-full items-center justify-center gap-1 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors whitespace-nowrap"
-                            >
-                              {invitingId === a.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Send className="w-3 h-3" />
-                              )}
-                              {t('actions.invite')}
-                            </button>
+                            <div className="flex gap-2 w-full">
+                              <button
+                                onClick={() => {
+                                  const targetRound = activeRoundNumber > 0 ? activeRoundNumber : (a.currentRound && a.currentRound > 0 ? a.currentRound : 1)
+                                  setInviteModalTarget({ id: a.id, name: a.candidateName || t('candidate'), targetRound })
+                                }}
+                                disabled={
+                                  inviteModalTarget?.id === a.id ||
+                                  (a.currentRound != null &&
+                                    activeRoundNumber > 0 &&
+                                    a.currentRound > activeRoundNumber) ||
+                                  batchProcessing
+                                }
+                                className="flex flex-1 items-center justify-center gap-1 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors whitespace-nowrap"
+                              >
+                                {inviteModalTarget?.id === a.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Send className="w-3 h-3" />
+                                )}
+                                {t('actions.invite')}
+                              </button>
+                              <button
+                                disabled={
+                                  processingAppId != null ||
+                                  batchProcessing
+                                }
+                                onClick={() => handleReject(a.id)}
+                                className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                title="Loại ứng viên khỏi quy trình tuyển dụng"
+                              >
+                                <X className="w-3 h-3" />
+                                {t('actions.reject')}
+                              </button>
+                            </div>
                           )}
                         </div>
                         {a.cvFileUrl ? (
@@ -1199,6 +1206,20 @@ export default function RecruiterJobDetailPage() {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {inviteModalTarget && id && (
+        <InviteAndScheduleModal
+          applicationId={inviteModalTarget.id}
+          candidateName={inviteModalTarget.name}
+          jobPostingId={id}
+          targetRoundNumber={inviteModalTarget.targetRound}
+          onClose={() => setInviteModalTarget(null)}
+          onSuccess={(msg) => {
+            setNotice(msg)
+            void load()
+          }}
+        />
       )}
     </div>
   )

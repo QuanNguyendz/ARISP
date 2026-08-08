@@ -9,6 +9,7 @@ using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using ARI.Domain.Entities;
 
@@ -21,7 +22,11 @@ namespace ARI.Application.Services
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
-        
+        private readonly IMemoryCache _cache;
+
+        // Cache key cho danh sách toàn bộ ứng tuyển (HR view).
+        private const string AllApplicationsCacheKey = "applications:all";
+
         // Define valid status transitions in a static dictionary
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -39,13 +44,15 @@ namespace ARI.Application.Services
             IRagIngestionService ragIngestion,
             IEmailService emailService,
             INotificationService notificationService,
-            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
+            IMemoryCache cache)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
             _emailService = emailService;
             _notificationService = notificationService;
             _scopeFactory = scopeFactory;
+            _cache = cache;
         }
 
         /// <summary>
@@ -119,6 +126,7 @@ namespace ARI.Application.Services
 
             await _unitOfWork.Repository<ARI.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            _cache.Remove(AllApplicationsCacheKey); // xóa cache để lần load tiếp theo lấy dữ liệu mới nhất
 
             // Auto-trigger background CV-JD analysis if it does not already exist
             if (application.CvJdAnalysisId == null && !string.IsNullOrEmpty(application.CvFileUrl))
@@ -296,6 +304,11 @@ namespace ARI.Application.Services
 
         public async Task<Result<List<ApplicationResponse>>> GetAllApplicationsAsync(CancellationToken ct = default)
         {
+            // Cache 60 giây để tránh truy vấn 7-8 lần liên tiếp tới Supabase (mỗi RTT ~100-150ms).
+            // Cache bị xóa tự động khi có submit/update/reject/accept ứng tuyển.
+            if (_cache.TryGetValue(AllApplicationsCacheKey, out List<ApplicationResponse>? cached) && cached != null)
+                return Result.Success(cached);
+
             // Projection ở tầng SQL — KHÔNG kéo cột text lớn (CvText/CoverLetter/DemographicData)
             // vốn khiến danh sách rất nặng và timeout khi đọc stream từ Postgres.
             var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
@@ -318,7 +331,15 @@ namespace ARI.Application.Services
                         NoticePeriod = a.NoticePeriod
                     }), ct);
 
-            return Result.Success(await MapApplicationsAsync(applications, null, ct));
+            var result = await MapApplicationsAsync(applications, null, ct);
+
+            _cache.Set(AllApplicationsCacheKey, result, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60),
+                SlidingExpiration = null
+            });
+
+            return Result.Success(result);
         }
 
         /// <summary>Cột nhẹ cho danh sách ứng viên (không gồm text lớn).</summary>
@@ -339,6 +360,13 @@ namespace ARI.Application.Services
             public string? NoticePeriod { get; set; }
         }
 
+        private sealed class BookingProjection
+        {
+            public Guid ApplicationId { get; set; }
+            public int RoundNumber { get; set; }
+            public Guid AvailabilitySlotId { get; set; }
+        }
+
         /// <summary>
         /// Map danh sách projection → ApplicationResponse (CvText = null cho list).
         /// JobTitle lấy từ <paramref name="jobTitleOverride"/> nếu cùng 1 job, ngược lại batch query tiêu đề.
@@ -346,78 +374,190 @@ namespace ARI.Application.Services
         private async Task<List<ApplicationResponse>> MapApplicationsAsync(
             List<AppListProjection> apps, string? jobTitleOverride, CancellationToken ct)
         {
-            Dictionary<Guid, string> jobDict;
-            if (jobTitleOverride != null)
-            {
-                jobDict = new Dictionary<Guid, string>();
-            }
-            else
-            {
-                var jobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
-                jobDict = (await _unitOfWork.Repository<JobPosting>()
-                        .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct))
-                    .ToDictionary(j => j.Id, j => j.Title);
-            }
+            if (apps == null || apps.Count == 0) return new List<ApplicationResponse>();
 
-            var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
-            var analysisDataById = analysisIds.Count == 0
-                ? new Dictionary<Guid, (int MatchScore, string Summary)>()
-                : (await _unitOfWork.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Summary }), ct))
-                    .ToDictionary(c => c.Id, c => (c.MatchScore, c.Summary));
-
-            // Ứng viên đã đặt lịch phỏng vấn thật (booking "scheduled") → đủ điều kiện cấp Interview Code.
             var appIds = apps.Select(a => a.Id).ToList();
-            var bookedAppIds = appIds.Count == 0
-                ? new HashSet<Guid>()
-                : (await _unitOfWork.Repository<InterviewBooking>()
+            var jobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
+            var analysisIds = apps.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
+            var candidateEmails = apps
+                .Where(a => !string.IsNullOrWhiteSpace(a.CandidateEmail))
+                .Select(a => a.CandidateEmail.Trim())
+                .Distinct()
+                .ToList();
+            var candidateEmailsLower = candidateEmails.Select(e => e.ToLower()).Distinct().ToList();
+
+            var candidatesTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<string, CandidateAccount>();
+                try
+                {
+                    if (candidateEmails.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var allVariations = candidateEmails.Concat(candidateEmailsLower).Distinct().ToList();
+
+                    var rawCandidates = await uow.Repository<CandidateAccount>()
+                        .QueryAsync(q => q.Where(c => allVariations.Contains(c.Email)).Select(c => new
+                        {
+                            c.Id, c.Email, c.FullName, c.Headline, c.About,
+                            c.Location, c.DateOfBirth, c.SettingsJson,
+                            c.LinkedinUrl, c.GithubUrl, c.PortfolioUrl,
+                            c.SkillsJson, c.ExperienceJson, c.EducationJson
+                        }), ct);
+
+                    foreach (var group in rawCandidates.Where(c => !string.IsNullOrEmpty(c.Email)).GroupBy(c => c.Email.Trim().ToLower()))
+                    {
+                        var first = group.First();
+                        dict[group.Key] = new CandidateAccount
+                        {
+                            Id = first.Id, Email = first.Email, FullName = first.FullName, Headline = first.Headline, About = first.About,
+                            Location = first.Location, DateOfBirth = first.DateOfBirth, SettingsJson = first.SettingsJson,
+                            LinkedinUrl = first.LinkedinUrl, GithubUrl = first.GithubUrl, PortfolioUrl = first.PortfolioUrl,
+                            SkillsJson = first.SkillsJson, ExperienceJson = first.ExperienceJson, EducationJson = first.EducationJson
+                        };
+                    }
+                }
+                catch { }
+                return dict;
+            });
+
+            var jobTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<Guid, string>();
+                try
+                {
+                    if (jobTitleOverride != null || jobIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var jobs = await uow.Repository<JobPosting>()
+                        .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct);
+                    foreach (var j in jobs) dict[j.Id] = j.Title;
+                }
+                catch { }
+                return dict;
+            });
+
+            var analysisTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<Guid, (int MatchScore, string Summary)>();
+                try
+                {
+                    if (analysisIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var list = await uow.Repository<CvJdAnalysis>()
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Summary }), ct);
+                    foreach (var a in list) dict[a.Id] = (a.MatchScore, a.Summary);
+                }
+                catch { }
+                return dict;
+            });
+
+            var bookingsTask = Task.Run(async () =>
+            {
+                var list = new List<BookingProjection>();
+                try
+                {
+                    if (appIds.Count == 0) return list;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    return await uow.Repository<InterviewBooking>()
                         .QueryAsync(q => q
                             .Where(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled")
-                            .Select(b => b.ApplicationId), ct))
-                    .ToHashSet();
+                            .Select(b => new BookingProjection { ApplicationId = b.ApplicationId, RoundNumber = b.RoundNumber, AvailabilitySlotId = b.AvailabilitySlotId }), ct);
+                }
+                catch { return list; }
+            });
 
-            var highestRoundInvites = appIds.Count == 0
-                ? new Dictionary<Guid, int>()
-                : (await _unitOfWork.Repository<InterviewInvite>()
-                    .QueryAsync(q => q.Where(i => appIds.Contains(i.ApplicationId)), ct))
-                    .GroupBy(i => i.ApplicationId)
-                    .ToDictionary(g => g.Key, g => g.Max(i => i.RoundNumber));
+            var invitesTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<Guid, int>();
+                try
+                {
+                    if (appIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var invites = await uow.Repository<InterviewInvite>()
+                        .QueryAsync(q => q.Where(i => appIds.Contains(i.ApplicationId)).Select(i => new { i.ApplicationId, i.RoundNumber }), ct);
+                    foreach (var g in invites.GroupBy(i => i.ApplicationId))
+                    {
+                        dict[g.Key] = g.Max(i => i.RoundNumber);
+                    }
+                }
+                catch { }
+                return dict;
+            });
 
-            var highestRoundSessions = appIds.Count == 0
-                ? new Dictionary<Guid, int>()
-                : (await _unitOfWork.Repository<InterviewSession>()
-                    .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId)), ct))
-                    .GroupBy(s => s.ApplicationId)
-                    .ToDictionary(g => g.Key, g => g.Max(s => s.RoundNumber));
+            var sessionsTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<Guid, int>();
+                try
+                {
+                    if (appIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var sessions = await uow.Repository<InterviewSession>()
+                        .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId)).Select(s => new { s.ApplicationId, s.RoundNumber }), ct);
+                    foreach (var g in sessions.GroupBy(s => s.ApplicationId))
+                    {
+                        dict[g.Key] = g.Max(s => s.RoundNumber);
+                    }
+                }
+                catch { }
+                return dict;
+            });
 
-            var appEvaluations = appIds.Count == 0
-                ? new List<Evaluation>()
-                : await _unitOfWork.Repository<Evaluation>()
-                    .FindAsync(e => appIds.Contains(e.ApplicationId) && e.SessionType == "real", ct);
+            var evalsTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<(Guid ApplicationId, int RoundNumber), int?>();
+                try
+                {
+                    if (appIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var evals = await uow.Repository<Evaluation>()
+                        .QueryAsync(q => q
+                            .Where(e => appIds.Contains(e.ApplicationId) && e.SessionType == "real")
+                            .Select(e => new { e.ApplicationId, e.RoundNumber, e.OverallScore }), ct);
+                    foreach (var g in evals.GroupBy(e => (e.ApplicationId, e.RoundNumber)))
+                    {
+                        var firstScore = g.First().OverallScore;
+                        dict[g.Key] = firstScore.HasValue ? Convert.ToInt32(firstScore.Value) : null;
+                    }
+                }
+                catch { }
+                return dict;
+            });
 
-            var evalDict = appEvaluations
-                .GroupBy(e => new { e.ApplicationId, e.RoundNumber })
-                .ToDictionary(g => g.Key, g => g.First().OverallScore);
+            await Task.WhenAll(jobTask, analysisTask, bookingsTask, invitesTask, sessionsTask, evalsTask, candidatesTask);
 
-            // Lịch thi thực tế: lấy từ InterviewBooking → AvailabilitySlot.StartTime.
-            // (InterviewInvite.ScheduledAt chỉ là dấu thời gian invite, KHÔNG phải giờ thi thực tế)
-            var appBookings = appIds.Count == 0
-                ? new List<InterviewBooking>()
-                : await _unitOfWork.Repository<InterviewBooking>()
-                    .FindAsync(b => appIds.Contains(b.ApplicationId) && b.Status == "scheduled", ct);
+            var jobDict = await jobTask;
+            var analysisDataById = await analysisTask;
+            var scheduledBookings = await bookingsTask;
+            var highestRoundInvites = await invitesTask;
+            var highestRoundSessions = await sessionsTask;
+            var evalDict = await evalsTask;
+            var candidateDictByEmail = await candidatesTask;
 
-            // Map (ApplicationId, RoundNumber) -> SlotId
-            var bookingSlotLookup = appBookings
-                .GroupBy(b => new { b.ApplicationId, b.RoundNumber })
-                .ToDictionary(g => g.Key, g => g.First().AvailabilitySlotId);
+            var bookedAppIds = scheduledBookings.Select(b => b.ApplicationId).ToHashSet();
+            var bookingSlotLookup = new Dictionary<(Guid ApplicationId, int RoundNumber), Guid>();
+            foreach (var g in scheduledBookings.GroupBy(b => (b.ApplicationId, b.RoundNumber)))
+            {
+                bookingSlotLookup[g.Key] = g.First().AvailabilitySlotId;
+            }
 
-            // Batch load distinct slots
             var slotIds2 = bookingSlotLookup.Values.Distinct().ToList();
-            var slotStartDict = slotIds2.Count == 0
-                ? new Dictionary<Guid, DateTimeOffset>()
-                : (await _unitOfWork.Repository<AvailabilitySlot>()
-                    .FindAsync(s => slotIds2.Contains(s.Id), ct))
-                    .ToDictionary(s => s.Id, s => s.StartTime);
+            var slotStartDict = new Dictionary<Guid, DateTimeOffset>();
+            if (slotIds2.Count > 0)
+            {
+                try
+                {
+                    var slots = await _unitOfWork.Repository<AvailabilitySlot>()
+                        .QueryAsync(q => q.Where(s => slotIds2.Contains(s.Id)).Select(s => new { s.Id, s.StartTime }), ct);
+                    foreach (var s in slots) slotStartDict[s.Id] = s.StartTime;
+                }
+                catch { }
+            }
 
             return apps.Select(app =>
             {
@@ -440,15 +580,14 @@ namespace ARI.Application.Services
                 DateTimeOffset? interviewDate = null;
                 if (currentRound.HasValue)
                 {
-                    var bookingKey = new { ApplicationId = app.Id, RoundNumber = currentRound.Value };
-                    if (bookingSlotLookup.TryGetValue(bookingKey, out var slotId2)
+                    if (bookingSlotLookup.TryGetValue((app.Id, currentRound.Value), out var slotId2)
                         && slotStartDict.TryGetValue(slotId2, out var startTime))
                     {
                         interviewDate = startTime;
                     }
                 }
 
-                return new ApplicationResponse
+                var resp = new ApplicationResponse
                 {
                     Id = app.Id,
                     JobPostingId = app.JobPostingId,
@@ -473,10 +612,60 @@ namespace ARI.Application.Services
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
                     NoticePeriod = app.NoticePeriod,
-                    InterviewScore = currentRound.HasValue && evalDict.TryGetValue(new { ApplicationId = app.Id, RoundNumber = currentRound.Value }, out var iscr) ? iscr : null,
+                    InterviewScore = currentRound.HasValue && evalDict.TryGetValue((app.Id, currentRound.Value), out var iscr) ? iscr : null,
                     InterviewDate = interviewDate
                 };
+
+                var emailKey = (app.CandidateEmail ?? "").Trim().ToLower();
+                if (!string.IsNullOrEmpty(emailKey) && candidateDictByEmail.TryGetValue(emailKey, out var cAcc))
+                {
+                    PopulateCandidateProfileFields(resp, cAcc);
+                }
+
+                return resp;
             }).ToList();
+        }
+
+        private static void PopulateCandidateProfileFields(ApplicationResponse response, CandidateAccount c)
+        {
+            response.CandidateHeadline = c.Headline;
+            response.CandidateAbout = c.About;
+            response.CandidateLocation = c.Location;
+            response.CandidateDateOfBirth = c.DateOfBirth;
+
+            bool allowHr = true;
+            if (!string.IsNullOrEmpty(c.SettingsJson))
+            {
+                try
+                {
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<CandidateSettingsDto>(c.SettingsJson, CandidatePortal.PortalSupport.JsonOpts);
+                    if (settings != null)
+                    {
+                        allowHr = settings.AllowHrViewProfile;
+                    }
+                }
+                catch { }
+            }
+
+            response.AllowHrViewProfile = allowHr;
+
+            if (allowHr)
+            {
+                response.CandidateLinkedinUrl = c.LinkedinUrl;
+                response.CandidateGithubUrl = c.GithubUrl;
+                response.CandidatePortfolioUrl = c.PortfolioUrl;
+
+                try
+                {
+                    if (!string.IsNullOrEmpty(c.SkillsJson))
+                        response.CandidateSkills = System.Text.Json.JsonSerializer.Deserialize<List<string>>(c.SkillsJson) ?? new();
+                    if (!string.IsNullOrEmpty(c.ExperienceJson))
+                        response.CandidateExperience = System.Text.Json.JsonSerializer.Deserialize<List<CandidateExperienceItem>>(c.ExperienceJson) ?? new();
+                    if (!string.IsNullOrEmpty(c.EducationJson))
+                        response.CandidateEducation = System.Text.Json.JsonSerializer.Deserialize<List<CandidateEducationItem>>(c.EducationJson) ?? new();
+                }
+                catch { }
+            }
         }
 
         /// <summary>
@@ -623,10 +812,19 @@ namespace ARI.Application.Services
             var response = MapToResponse(application, jobPosting, currentRound, score, interviewDate);
             // Cờ đủ điều kiện cấp Interview Code: đã đặt lịch phỏng vấn thật (booking "scheduled").
             var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
-                b => b.ApplicationId == id && b.Status != null && b.Status.ToLower() == "scheduled", ct);
+                b => b.ApplicationId == id && b.Status == "scheduled", ct);
             response.HasScheduledInterview = scheduled.Any();
             response.ScheduleConfirmationStatus = scheduleConfirmationStatus;
             response.ScheduleDeclineReason = scheduleDeclineReason;
+
+            var emailClean = application.CandidateEmail.Trim();
+            var cAccs = await _unitOfWork.Repository<CandidateAccount>()
+                .QueryAsync(q => q.Where(c => c.Email == emailClean), ct);
+            if (cAccs.FirstOrDefault() is { } cAcc)
+            {
+                PopulateCandidateProfileFields(response, cAcc);
+            }
+
             return Result.Success(response);
         }
 
@@ -677,6 +875,7 @@ namespace ARI.Application.Services
 
             repository.Update(application);
             await _unitOfWork.SaveChangesAsync(ct);
+            _cache.Remove(AllApplicationsCacheKey);
 
             // Get job info for the response
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
@@ -696,7 +895,12 @@ namespace ARI.Application.Services
         /// </summary>
         /// <param name="frontendBaseUrl">Base URL portal ứng viên (controller truyền từ config).</param>
         /// <param name="roundNumber">Vòng cần mời (mặc định 1).</param>
-        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default)
+        /// <param name="sendEmail">
+        /// Có gửi email báo "qua vòng CV" hay không. Luồng duyệt CV → gán lịch chỉ gửi MỘT email duy nhất
+        /// (email gộp ở bước gán slot đã kèm chúc mừng qua CV + lịch + 2 nút), nên <c>AcceptApplicationAsync</c>
+        /// gọi với <c>sendEmail: false</c> (chỉ đổi trạng thái + tạo token + chuông). Standalone "Mời" vẫn gửi.
+        /// </param>
+        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default, bool sendEmail = true)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
@@ -751,7 +955,7 @@ namespace ARI.Application.Services
 
             try
             {
-                if (settings.InterviewInvite.Email)
+                if (sendEmail && settings.InterviewInvite.Email)
                 {
                     await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
                 }
@@ -773,7 +977,9 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// Chấp nhận hồ sơ ứng tuyển: chuyển trạng thái sang screening và gửi email chúc mừng và đặt lịch vòng 1 luôn.
+        /// Chấp nhận hồ sơ ứng tuyển: chuyển trạng thái sang screening + mở phỏng vấn thử. KHÔNG gửi email ở
+        /// bước này — ứng viên chỉ nhận chuông báo qua CV; email mời phỏng vấn (gộp chúc mừng qua CV + lịch hẹn
+        /// + 2 nút xác nhận/từ chối) được gửi MỘT LẦN DUY NHẤT khi HR gán khung giờ (AssignSlotCommand).
         /// </summary>
         public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default)
         {
@@ -787,8 +993,9 @@ namespace ARI.Application.Services
                 return Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
             }
 
-            // Gọi SendInterviewInviteAsync để vừa nâng trạng thái, vừa tạo token chọn lịch, vừa gửi email mời phỏng vấn
-            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct);
+            // Nâng trạng thái + tạo token đánh dấu vòng, NHƯNG không gửi email ở đây (sendEmail: false) —
+            // chỉ gửi 1 email duy nhất khi gán lịch (email đó đã gộp chúc mừng qua CV + lịch + 2 nút).
+            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct, sendEmail: false);
             if (inviteResult.IsFailure)
             {
                 return Result<bool>.Failure(inviteResult.Error);
@@ -819,7 +1026,7 @@ namespace ARI.Application.Services
                         DedupKey = dedupKey,
                         Type = "result",
                         Title = "Hồ sơ ứng tuyển được chấp nhận",
-                        Body = $"Chúc mừng hồ sơ ứng tuyển vị trí {jobTitle} đã được chấp nhận. Vui lòng kiểm tra email để đặt lịch phỏng vấn.",
+                        Body = $"Chúc mừng! Hồ sơ vị trí {jobTitle} đã qua vòng duyệt CV. Nhân sự sẽ xếp lịch và gửi email mời phỏng vấn kèm lịch hẹn cho bạn.",
                         Link = $"/candidate/applications/{application.Id}",
                         IsRead = false
                     };
@@ -843,17 +1050,46 @@ namespace ARI.Application.Services
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
-            if (!string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(application.Status, "cv_rejected", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(application.Status, "not_pass", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(application.Status, "failed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(application.Status, "withdrawn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(application.Status, "pass", StringComparison.OrdinalIgnoreCase))
             {
-                return Result<bool>.Failure("Chỉ có thể từ chối hồ sơ ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
+                return Result<bool>.Failure("Hồ sơ này đã ở trạng thái kết thúc (đã từ chối / loại / hoàn thành).");
             }
 
-            application.Status = "cv_rejected";
+            bool isCvPhase = string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase);
+
+            application.Status = isCvPhase ? "cv_rejected" : "not_pass";
             application.UpdatedAt = DateTimeOffset.UtcNow;
 
             _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
+
+            // Hủy các lịch phỏng vấn đang chờ/đã đặt của ứng viên (nếu có)
+            var activeBookings = await _unitOfWork.Repository<InterviewBooking>()
+                .FindAsync(b => b.ApplicationId == applicationId && b.Status != "cancelled", ct);
+
+            foreach (var booking in activeBookings)
+            {
+                booking.Status = "cancelled";
+                booking.ConfirmationStatus = "declined";
+                booking.DeclineReason = "Ứng viên đã bị loại khỏi quy trình tuyển dụng.";
+                booking.UpdatedAt = DateTimeOffset.UtcNow;
+                _unitOfWork.Repository<InterviewBooking>().Update(booking);
+
+                var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
+                if (slot != null)
+                {
+                    slot.BookedCount = Math.Max(slot.BookedCount - 1, 0);
+                    slot.UpdatedAt = DateTimeOffset.UtcNow;
+                    _unitOfWork.Repository<AvailabilitySlot>().Update(slot);
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
+            _cache.Remove(AllApplicationsCacheKey);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             var jobTitle = job?.Title ?? "Vị trí tuyển dụng";

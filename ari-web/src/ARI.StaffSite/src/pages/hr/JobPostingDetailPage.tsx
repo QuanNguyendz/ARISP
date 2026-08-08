@@ -28,6 +28,7 @@ import {
 import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import InviteAndScheduleModal from '../../components/InviteAndScheduleModal'
 import { Pagination } from '@ari/shared/ui'
 import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { JobPosting } from '@ari/shared/types/job'
@@ -56,7 +57,6 @@ export default function JobPostingDetailPage() {
   const [apps, setApps] = useState<HrApplicationItem[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
   const [processingAppId, setProcessingAppId] = useState<string | null>(null)
-  const [invitingId, setInvitingId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<string>('cv_review')
   const [page, setPage] = useState<number>(1)
   const [selectedCoverLetter, setSelectedCoverLetter] = useState<{
@@ -80,6 +80,7 @@ export default function JobPostingDetailPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchProcessing, setBatchProcessing] = useState<boolean>(false)
+  const [inviteModalTarget, setInviteModalTarget] = useState<{ id: string; name: string; targetRound: number } | null>(null)
 
   const activeRoundNumber = useMemo(() => {
     return activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0
@@ -233,20 +234,6 @@ export default function JobPostingDetailPage() {
       setActionError(t('errors.acceptApplication'))
     } finally {
       setProcessingAppId(null)
-    }
-  }
-
-  const sendInvite = async (appId: string) => {
-    setInvitingId(appId)
-    setActionError(null)
-    setNotice(null)
-    try {
-      await applicationService.sendInvite(appId)
-      setNotice(t('notices.inviteSuccess'))
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message || t('errors.sendInvite'))
-    } finally {
-      setInvitingId(null)
     }
   }
 
@@ -646,6 +633,13 @@ export default function JobPostingDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/jobs/${job.id}/schedule`)}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+            >
+              <Calendar className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Lịch phỏng vấn
+            </button>
             <button
               type="button"
               onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
@@ -1295,30 +1289,49 @@ export default function JobPostingDetailPage() {
                                   <X className="w-3 h-3" /> {t('actions.reject')}
                                 </button>
                               </>
+                            ) : a.status === 'not_pass' || a.status === 'cv_rejected' || a.status === 'failed' || a.status === 'rejected' ? (
+                              <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 font-medium text-xs rounded-lg whitespace-nowrap">
+                                Đã loại (Không đạt)
+                              </span>
+                            ) : a.status === 'pass' ? (
+                              <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium text-xs rounded-lg whitespace-nowrap">
+                                Trúng tuyển
+                              </span>
                             ) : (
-                              <button
-                                onClick={() => sendInvite(a.id)}
-                                disabled={
-                                  invitingId === a.id ||
-                                  a.status === 'rejected' ||
-                                  a.status === 'failed' ||
-                                  a.status === 'not_pass' ||
-                                  a.status === 'cv_rejected' ||
-                                  a.status === 'pass' ||
-                                  (a.currentRound != null &&
-                                    activeRoundNumber > 0 &&
-                                    a.currentRound > activeRoundNumber) ||
-                                  batchProcessing
-                                }
-                                className="flex w-full items-center justify-center gap-1 py-1.5 text-xs bg-brand-600 text-white hover:bg-brand-700 rounded-lg transition-colors font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                              >
-                                {invitingId === a.id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Send className="w-3 h-3" />
-                                )}{' '}
-                                {t('actions.invite')}
-                              </button>
+                              <div className="flex gap-2 w-full">
+                                <button
+                                  onClick={() => {
+                                    const targetRound = activeRoundNumber > 0 ? activeRoundNumber : (a.currentRound && a.currentRound > 0 ? a.currentRound : 1)
+                                    setInviteModalTarget({ id: a.id, name: a.candidateName || t('candidate'), targetRound })
+                                  }}
+                                  disabled={
+                                    inviteModalTarget?.id === a.id ||
+                                    (a.currentRound != null &&
+                                      activeRoundNumber > 0 &&
+                                      a.currentRound > activeRoundNumber) ||
+                                    batchProcessing
+                                  }
+                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 text-xs bg-brand-600 text-white hover:bg-brand-700 rounded-lg transition-colors font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                  {inviteModalTarget?.id === a.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Send className="w-3 h-3" />
+                                  )}{' '}
+                                  {t('actions.invite')}
+                                </button>
+                                <button
+                                  disabled={
+                                    processingAppId != null ||
+                                    batchProcessing
+                                  }
+                                  onClick={() => handleReject(a.id)}
+                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                  title="Loại ứng viên khỏi quy trình tuyển dụng"
+                                >
+                                  <X className="w-3 h-3" /> {t('actions.reject')}
+                                </button>
+                              </div>
                             )}
                           </div>
                           {a.cvFileUrl ? (
@@ -1533,6 +1546,20 @@ export default function JobPostingDetailPage() {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {inviteModalTarget && id && (
+        <InviteAndScheduleModal
+          applicationId={inviteModalTarget.id}
+          candidateName={inviteModalTarget.name}
+          jobPostingId={id}
+          targetRoundNumber={inviteModalTarget.targetRound}
+          onClose={() => setInviteModalTarget(null)}
+          onSuccess={(msg) => {
+            setNotice(msg)
+            void loadApps()
+          }}
+        />
       )}
     </div>
   )

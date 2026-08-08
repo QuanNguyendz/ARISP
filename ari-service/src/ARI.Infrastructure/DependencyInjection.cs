@@ -186,6 +186,9 @@ namespace ARI.Infrastructure
             // Dọn video phỏng vấn thật quá hạn lưu (ADR-052) — quét 12h/lần.
             services.AddHostedService<RecordingRetentionHostedService>();
 
+            // Auto-reject lịch ứng viên không xác nhận trong thời hạn (ADR-048) — quét 30'/lần.
+            services.AddHostedService<ScheduleConfirmationHostedService>();
+
             return services;
         }
     }

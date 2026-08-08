@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Briefcase, Users, MapPin, Clock, ChevronRight } from 'lucide-react'
@@ -46,8 +46,31 @@ export default function RecruiterMyJobsPage() {
   const jobs = jobsData || []
   const error =
     (fetchError as any)?.response?.data?.message || (fetchError ? t('loadingError') : '')
-  const [filter, setFilter] = useState('all')
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = searchParams.get('status') || 'all'
+  const page = Number(searchParams.get('page')) || 1
+
+  const handleFilterChange = (newStatus: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (!newStatus || newStatus === 'all') {
+        p.delete('status')
+      } else {
+        p.set('status', newStatus)
+      }
+      p.delete('page')
+      return p
+    }, { replace: true })
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (newPage > 1) p.set('page', String(newPage))
+      else p.delete('page')
+      return p
+    }, { replace: true })
+  }
 
   const getEffectiveStatus = useCallback((j: any) => {
     if (j.status === 'active' && j.applicationDeadline && new Date(j.applicationDeadline).getTime() < Date.now()) {
@@ -79,10 +102,6 @@ export default function RecruiterMyJobsPage() {
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [filtered, page]
   )
-
-  useEffect(() => {
-    setPage(1)
-  }, [filter])
 
   const statCards = [
     { label: t('stats.total'), value: counts.all, color: 'text-brand-600' },
@@ -123,7 +142,7 @@ export default function RecruiterMyJobsPage() {
             {filters.map((f) => (
               <button
                 key={f.value}
-                onClick={() => setFilter(f.value)}
+                onClick={() => handleFilterChange(f.value)}
                 className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                   filter === f.value
                     ? 'bg-brand-600 text-white'
@@ -231,7 +250,7 @@ export default function RecruiterMyJobsPage() {
               totalPages={totalPages}
               total={filtered.length}
               label={t('paginationLabel')}
-              onPageChange={setPage}
+              onPageChange={handlePageChange}
             />
           )}
         </>

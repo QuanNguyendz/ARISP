@@ -153,4 +153,69 @@ namespace ARI.Application.DTOs
         public Guid? EvaluationId { get; set; }
         public string? Verdict { get; set; }
     }
+
+    // ─────────── Interview Management: Job → Slot → Candidate ───────────
+
+    /// <summary>
+    /// Một vị trí tuyển dụng có phỏng vấn, kèm thống kê nhanh cho trang quản lý phiên.
+    /// </summary>
+    public class InterviewJobSummaryDto
+    {
+        public Guid JobId { get; set; }
+        public string JobTitle { get; set; } = string.Empty;
+        public string JobStatus { get; set; } = string.Empty; // active | closed | ...
+        public int TotalSlots { get; set; }          // Tổng số ca đã tạo
+        public int TotalBooked { get; set; }         // Tổng ứng viên đã đặt lịch
+        public int TotalConfirmed { get; set; }      // Ứng viên xác nhận
+        public int MaxRound { get; set; }            // Vòng cao nhất đang active
+        public int TotalSessions { get; set; }       // Tổng phiên AI đã tạo
+        public int CompletedSessions { get; set; }   // Phiên đã hoàn thành
+        public DateTimeOffset? NextSlotTime { get; set; } // Ca gần nhất sắp diễn ra
+    }
+
+    /// <summary>
+    /// Chi tiết một ca phỏng vấn (AvailabilitySlot), kèm thống kê đặt lịch.
+    /// </summary>
+    public class InterviewSlotDetailDto
+    {
+        public Guid SlotId { get; set; }
+        public Guid JobPostingId { get; set; }
+        public int RoundNumber { get; set; }
+        public DateTimeOffset StartTime { get; set; }
+        public DateTimeOffset EndTime { get; set; }
+        public string Timezone { get; set; } = "Asia/Ho_Chi_Minh";
+        public int Capacity { get; set; }
+        public int BookedCount { get; set; }
+        public int ConfirmedCount { get; set; }   // ConfirmationStatus = confirmed
+        public int DeclinedCount { get; set; }    // ConfirmationStatus = declined
+        public int PendingCount { get; set; }     // ConfirmationStatus = pending
+        public bool IsPast { get; set; }          // StartTime < now
+    }
+
+    /// <summary>
+    /// Một ứng viên trong một ca phỏng vấn cụ thể.
+    /// </summary>
+    public class SlotCandidateDto
+    {
+        public Guid ApplicationId { get; set; }
+        public Guid BookingId { get; set; }
+        public string CandidateName { get; set; } = string.Empty;
+        public string CandidateEmail { get; set; } = string.Empty;
+        public string ConfirmationStatus { get; set; } = "pending"; // pending | confirmed | declined
+        public string? DeclineReason { get; set; }
+        public string BookingStatus { get; set; } = "scheduled";    // scheduled | completed | cancelled
+        public Guid? SessionId { get; set; }
+        public string? SessionStatus { get; set; }   // active | completed | aborted
+        public int? DurationSeconds { get; set; }
+        public Guid? EvaluationId { get; set; }
+        public string? Verdict { get; set; }          // Pass | Not Pass
+        public int? OverallScore { get; set; }
+        public string? InterviewCode { get; set; }
+        public DateTimeOffset? CodeExpiresAt { get; set; }
+    }
+
+    public class RescheduleRequest
+    {
+        public Guid TargetSlotId { get; set; }
+    }
 }

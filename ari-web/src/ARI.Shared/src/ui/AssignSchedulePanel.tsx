@@ -137,7 +137,7 @@ export default function AssignSchedulePanel({
       {!hasScheduled && canAssign && declineReason && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            <AlertCircle className="h-3.5 w-3.5" /> Ứng viên đã báo bận lịch trước
+            <AlertCircle className="h-3.5 w-3.5" /> Ứng viên đã từ chối lịch trước (xin đổi lịch)
           </p>
           <p className="mt-1 text-sm italic text-amber-800 dark:text-amber-300">“{declineReason}”</p>
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
@@ -155,13 +155,13 @@ export default function AssignSchedulePanel({
             {scheduledAt ? fullDateTime(scheduledAt) : 'Đã có lịch phỏng vấn thật'}
           </p>
           {confirmationStatus === 'confirmed' ? (
-            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Ứng viên đã xác nhận tham dự
-            </p>
+            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác nhận
+            </span>
           ) : (
-            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-              <AlertCircle className="h-3.5 w-3.5" /> Đang chờ ứng viên xác nhận
-            </p>
+            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              <AlertCircle className="h-3.5 w-3.5" /> Chưa xác nhận
+            </span>
           )}
         </div>
       ) : !canAssign ? (
