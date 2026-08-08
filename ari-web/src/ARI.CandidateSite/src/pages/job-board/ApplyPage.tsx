@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
@@ -36,6 +37,7 @@ export default function ApplyPage() {
   const { t } = useTranslation('modules/job-board/apply')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { isAuthenticated } = useAuthStore()
 
   const [job, setJob] = useState<JobPosting | null>(null)
@@ -150,10 +152,14 @@ export default function ApplyPage() {
         noticePeriod: noticePeriod.trim(),
         cvFile: cvSource === 'upload' ? cvFile : null,
       })
+      // Làm mới cache hồ sơ ứng tuyển để nút "Ứng tuyển" ở danh sách/chi tiết đổi ngay
+      // sang "Đã ứng tuyển" khi ứng viên quay lại (dùng chung query key ['my-applications']).
+      queryClient.invalidateQueries({ queryKey: ['my-applications'] })
       navigate('/candidate/applications')
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string } } }
       if (e?.response?.status === 409) {
+        queryClient.invalidateQueries({ queryKey: ['my-applications'] })
         navigate('/candidate/applications')
         return
       }

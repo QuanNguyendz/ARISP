@@ -18,6 +18,11 @@ namespace ARI.Domain.Entities
         /// <summary>Thời điểm ứng viên xác nhận/từ chối lịch (null nếu chưa phản hồi).</summary>
         public DateTimeOffset? RespondedAt { get; set; }
 
+        /// <summary>Thời điểm ứng viên tự ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối.
+        /// CHỈ ảnh hưởng hiển thị phía ứng viên — nhân sự vẫn thấy booking để xếp lại
+        /// (Status giữ nguyên "declined"/"cancelled"). Null = chưa ẩn.</summary>
+        public DateTimeOffset? CandidateDismissedAt { get; set; }
+
         public bool Reminder24hSent { get; set; } = false;
         public bool Reminder1hSent { get; set; } = false;
         public Guid? RescheduledFromId { get; set; }

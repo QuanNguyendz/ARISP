@@ -323,6 +323,28 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-08: **Đổi nhãn "HR Leader" → "HR Admin" trên workspace HR (StaffSite).** Sửa 2 key i18n `hr.workspace` ("HR Leader Workspace" → "HR Admin Workspace") và `hr.roleLabel` ("HR Leader" → "HR Admin") trong `ARI.Shared/i18n/locales/{vi,en}/modules/shared/nav.json`. Chỉ khối `hr` (dùng bởi `HrLayout`) — Recruiter/Super Admin giữ nguyên. JSON hợp lệ. Thuần label, không đụng logic/role/quyền.
+
+- [x] 2026-08-08: **Nút "Xoá khỏi danh sách" cho lịch đã bị huỷ/từ chối (Candidate) — bổ sung ADR-048.**
+  - **Yêu cầu:** thẻ lịch "Đã từ chối" (mục chờ xếp lại) trên trang lịch ứng viên cần nút xoá để dọn danh sách.
+  - **Mô hình:** ẩn phía ứng viên (soft-dismiss), KHÔNG xoá dữ liệu — nhân sự vẫn thấy booking `Status="declined"` để xếp lại (AssignSlot đọc `priorDeclined` theo Status).
+  - **BE (vertical slice + migration):** `InterviewBooking.CandidateDismissedAt` (nullable) + migration `AddBookingCandidateDismissedAt` (cột `candidate_dismissed_at`, tự áp khi app khởi động qua `MigrateAsync`). `GetCandidateScheduleQuery` lọc thêm `CandidateDismissedAt == null` ở nhánh declined. CQRS `DismissDeclinedScheduleCommand` (+handler dùng `CandidateBookingSupport.LoadOwnedAsync` để guard sở hữu; chỉ cho ẩn khi Status `declined`/`cancelled`; idempotent). Endpoint `DELETE /api/candidate/schedule/{bookingId}` (`CandidateOnly`).
+  - **FE:** `scheduleService.dismissSchedule()` (DELETE); `SchedulePage` thêm `dismissMut` (invalidate `['my-schedule']`) + nút "Xoá khỏi danh sách" (icon `Trash2`, spinner khi đang gọi) ở mỗi thẻ trong `awaitingReschedule`.
+  - **Verify:** Release build 0 error (Debug bị app đang chạy khoá — không phải lỗi biên dịch); unit test **380 pass** (+4 test dismiss: ẩn/ chặn lịch còn hiệu lực/ idempotent/ chặn không phải chủ sở hữu); CandidateSite `tsc --noEmit` xanh. **Cần restart API** để áp migration + code mới.
+
+- [x] 2026-08-08: **Nút "Xem thêm" ở thẻ "Lịch phỏng vấn sắp tới" (Candidate) → trang lịch đầy đủ.** Trước ứng viên chỉ xem lịch đã xếp qua chuông thông báo; nay thẻ `upcomingSchedule` ở sidebar `ApplicationsPage` có link "Xem thêm" góc trên phải trỏ `/portal/schedule/{applicationId}` (`CandidateSchedulePage` gọi `getMySchedule()` → liệt kê TẤT CẢ lịch sắp tới + lịch chờ xếp lại, kèm xác nhận/từ chối — trang này bỏ qua param, hiển thị toàn bộ). i18n VI "Xem thêm" / EN "View all" (`applications.viewAllSchedule`). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE. *(Lưu ý: `/candidate/interviews` là màn mock nhập-mã cũ, KHÔNG dùng.)*
+
+- [x] 2026-08-08: **Phân trang danh sách hồ sơ ứng tuyển của Candidate (`ApplicationsPage`).** Trước render toàn bộ `filtered.map`; nay phân trang phía client 5 hồ sơ/trang (`APPLICATIONS_PER_PAGE`): `pageItems = filtered.slice(...)`, thanh phân trang (Trang x/y · N hồ sơ + nút trước/sau) chỉ hiện khi >1 trang, đổi bộ lọc → về trang 1, đổi trang cuộn lên đầu danh sách (`listTopRef`). i18n VI/EN thêm `applications.pagination.{pageInfo,count,prev,next}` (giữ song ngữ — không dùng `@ari/shared/ui` Pagination vì hardcode "Trang"). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE.
+
+- [x] 2026-08-08: **Nút "Ứng tuyển" bên Candidate phản ánh đúng trạng thái đã ứng tuyển, hết nháy trạng thái.**
+  - **Yêu cầu:** ở màn Việc làm (`FindJobPage`), tin nào đã ứng tuyển thì nút đổi thành "Đã ứng tuyển"; ở màn chi tiết tin (`JobDetailPage`), tin đã ứng tuyển phải hiện "Đã ứng tuyển" NGAY (trước bị delay/nháy từ "Ứng tuyển ngay" sang "Đã ứng tuyển").
+  - **Nguyên nhân delay:** `JobDetailPage` khởi tạo `appliedId=null` rồi mới `getMyApplications()` trong `useEffect` → render "Ứng tuyển ngay" trước, sau mới lật. `FindJobPage` không hề kiểm tra đã-ứng-tuyển, luôn hiện "Ứng tuyển".
+  - **Sửa (thuần FE, dùng chung React Query key `['my-applications']`):**
+    - `FindJobPage`: thêm `useQuery(['my-applications'])` (enabled khi đăng nhập) → `Set` các `jobPostingId` (bỏ `withdrawn`); `JobCard` nhận prop `applied` → nút xanh emerald "Đã ứng tuyển" (key i18n có sẵn `jobs.applied`) trỏ `/candidate/applications`.
+    - `JobDetailPage`: thay `useEffect` bằng cùng `useQuery(['my-applications'])`; `appliedId` suy ra bằng `useMemo`. Điều hướng từ danh sang chi tiết đọc thẳng cache → hiện đúng ngay. Thêm cờ `appliedResolved = !isAuthenticated || data!==undefined`: khi CHƯA biết trạng thái (lần tải trực tiếp) hiện nút loading (spinner) thay vì "Ứng tuyển ngay" → hết nháy. Áp cho cả nút desktop (aside) lẫn thanh mobile dưới cùng.
+    - `ApplyPage`: sau khi nộp thành công (và ca 409 "đã ứng tuyển") gọi `queryClient.invalidateQueries(['my-applications'])` → quay lại danh sách/chi tiết thấy "Đã ứng tuyển" tức thì.
+  - **Verify:** CandidateSite `tsc --noEmit` xanh. Không đụng BE, không thêm i18n key mới.
+
 - [x] 2026-08-07: **Đồng bộ màu trang Cài đặt của Recruiter theo HR Leader.** `recruiter/SettingsPage.tsx` trước dùng theme kính tối cứng (`bg-white/[0.03]`, `text-white`, nhấn amber) không có class light-mode → chữ trắng trên nền sáng bị "trôi" mờ. Nay dùng đúng bộ token của `hr/SettingsPage.tsx`: nền `bg-ink-50 dark:bg-ink-950`, thẻ `bg-white dark:bg-white/5` + `shadow-card`, tab active `brand-100/brand-700`, input `border-ink-200 focus:border-brand-400`, nút lưu gradient `from-brand-600 to-ai-600`, toggle `bg-brand-600`. Giữ nguyên namespace i18n `modules/recruiter/settings`, default values Recruiter, và mọi `t()` cũ. StaffSite `tsc --noEmit` xanh. Thuần FE, không đụng BE.
 
 - [x] 2026-08-07: **Thông báo lỗi đăng nhập ứng viên chuyển sang tiếng Việt.** `CandidateLoginCommand` đổi cả 2 chỗ `"Invalid email or password."` → `"Sai email hoặc mật khẩu."` (khớp `StaffLoginCommand`); FE hiển thị thẳng message backend. Chỉ đổi chuỗi literal, không đụng logic/test.

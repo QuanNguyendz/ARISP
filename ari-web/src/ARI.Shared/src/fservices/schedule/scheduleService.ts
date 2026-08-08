@@ -82,6 +82,11 @@ export const scheduleService = {
   async declineSchedule(bookingId: string, reason: string): Promise<void> {
     await apiClient.post(`/candidate/schedule/${bookingId}/decline`, { reason })
   },
+
+  /** Ứng viên ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối. */
+  async dismissSchedule(bookingId: string): Promise<void> {
+    await apiClient.delete(`/candidate/schedule/${bookingId}`)
+  },
 }
 
 export default scheduleService

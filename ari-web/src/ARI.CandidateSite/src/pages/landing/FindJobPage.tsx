@@ -19,11 +19,13 @@ import {
   Code2,
   Server,
   BrainCircuit,
+  CheckCircle2,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import CandidateHeader from '@/app/layouts/CandidateHeader'
 import jobService from '@ari/shared/fservices/job'
 import type { JobFacets } from '@ari/shared/fservices/job'
+import { applicationService } from '@ari/shared/fservices/application'
 import { savedJobService } from '@/fservices/job/savedJobService'
 import { provinceService } from '@/fservices/location/provinceService'
 import type { City } from '@/fservices/location/provinceService'
@@ -660,9 +662,11 @@ interface JobCardProps {
   onToggleSave?: (jobId: string) => void
   /** Kỹ năng khớp với hồ sơ ứng viên — có giá trị thì hiển thị badge "gợi ý theo CV". */
   matchedSkills?: string[]
+  /** Ứng viên đã nộp hồ sơ cho tin này → nút đổi sang "Đã ứng tuyển". */
+  applied?: boolean
 }
 
-function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardProps) {
+function JobCard({ job, isSaved = false, onToggleSave, matchedSkills, applied = false }: JobCardProps) {
   const { t } = useTranslation('landing')
   const navigate = useNavigate()
   const hasMatch = !!matchedSkills && matchedSkills.length > 0
@@ -736,15 +740,28 @@ function JobCard({ job, isSaved = false, onToggleSave, matchedSkills }: JobCardP
                 </span>
               )}
             </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(`/jobs/${job.id}`)
-              }}
-              className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
-            >
-              {t('jobs.apply')}
-            </button>
+            {applied ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate('/candidate/applications')
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {t('jobs.applied')}
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate(`/jobs/${job.id}`)
+                }}
+                className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+              >
+                {t('jobs.apply')}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -901,6 +918,25 @@ export default function FindJob() {
 
   const jobs = jobsData?.items || []
   const totalCount = jobsData?.totalCount || 0
+
+  // Hồ sơ ứng tuyển của chính ứng viên — dùng chung query key với trang chi tiết tin
+  // (['my-applications']) để cache được tái sử dụng, tránh nút "Ứng tuyển" nháy trạng thái.
+  const { data: myApplications } = useQuery({
+    queryKey: ['my-applications'],
+    queryFn: () => applicationService.getMyApplications(),
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  })
+  const appliedJobIds = useMemo(
+    () =>
+      new Set(
+        (myApplications ?? [])
+          .filter((a) => a.status !== 'withdrawn')
+          .map((a) => a.jobPostingId)
+      ),
+    [myApplications]
+  )
 
   // Khi lọc theo lương thỏa thuận thì khóa/reset sắp xếp lương
   useEffect(() => {
@@ -1225,6 +1261,7 @@ export default function FindJob() {
                   job={job}
                   isSaved={savedIds.has(job.id)}
                   onToggleSave={handleToggleSave}
+                  applied={appliedJobIds.has(job.id)}
                   matchedSkills={
                     sortBy === 'relevance'
                       ? (job.skills ?? []).filter((s) => profileSkillsLower.has(s.toLowerCase()))

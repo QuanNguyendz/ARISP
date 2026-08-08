@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   MapPin,
@@ -189,7 +190,25 @@ export default function JobDetailPage() {
   const [savePending, setSavePending] = useState(false)
 
   // Ứng tuyển — đã nộp hồ sơ cho tin này chưa (để đổi nút sang "Xem hồ sơ").
-  const [appliedId, setAppliedId] = useState<string | null>(null)
+  // Dùng chung query key với trang danh sách (['my-applications']) → điều hướng từ danh
+  // sang chi tiết đọc thẳng cache, nút hiện đúng "Đã ứng tuyển" ngay, không nháy trạng thái.
+  const { data: myApplications } = useQuery({
+    queryKey: ['my-applications'],
+    queryFn: () => applicationService.getMyApplications(),
+    enabled: isAuthenticated && !!id,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  })
+  const appliedId = useMemo(() => {
+    if (!id) return null
+    const found = (myApplications ?? []).find(
+      (a) => a.jobPostingId === id && a.status !== 'withdrawn'
+    )
+    return found?.id ?? null
+  }, [myApplications, id])
+  // Đã biết chắc trạng thái ứng tuyển chưa? (chưa đăng nhập = không cần chờ; đã đăng nhập
+  // thì đợi query trả về lần đầu). Trước khi biết, KHÔNG render nút "Ứng tuyển ngay" để khỏi nháy.
+  const appliedResolved = !isAuthenticated || myApplications !== undefined
 
   useEffect(() => {
     async function loadJobDetail() {
@@ -264,26 +283,6 @@ export default function JobDetailPage() {
       .getSavedJobIds()
       .then((ids) => {
         if (!cancelled) setIsSaved(ids.includes(id))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [id, isAuthenticated])
-
-  // Đã ứng tuyển tin này chưa? (để nút đổi sang "Xem hồ sơ ứng tuyển")
-  useEffect(() => {
-    if (!id || !isAuthenticated) {
-      setAppliedId(null)
-      return
-    }
-    let cancelled = false
-    applicationService
-      .getMyApplications()
-      .then((apps) => {
-        if (cancelled) return
-        const found = apps.find((a) => a.jobPostingId === id && a.status !== 'withdrawn')
-        if (found) setAppliedId(found.id)
       })
       .catch(() => {})
     return () => {
@@ -600,7 +599,11 @@ export default function JobDetailPage() {
         <aside className="hidden space-y-5 lg:sticky lg:top-24 lg:block self-start">
           {/* Apply card */}
           <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
-            {appliedId ? (
+            {!appliedResolved ? (
+              <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-4 py-3 text-sm font-bold text-ink-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : appliedId ? (
               <button
                 onClick={() => navigate('/candidate/applications')}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
@@ -819,7 +822,11 @@ export default function JobDetailPage() {
           >
             <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
           </button>
-          {appliedId ? (
+          {!appliedResolved ? (
+            <div className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-4 text-sm font-bold text-ink-400 sm:h-12">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : appliedId ? (
             <button
               onClick={() => navigate('/candidate/applications')}
               className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 sm:h-12"
