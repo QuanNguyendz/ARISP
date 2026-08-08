@@ -80,6 +80,11 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             setLoadError('Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.')
             return
           }
+          // Recruiter chỉ được sửa tin ở trạng thái nháp hoặc bị từ chối — đã gửi duyệt/đã duyệt thì khoá.
+          if (user?.role === 'recruiter' && job.status !== 'draft' && job.status !== 'rejected') {
+            setLoadError('Tin đã gửi HR duyệt hoặc đã được duyệt nên không thể chỉnh sửa. Bạn chỉ sửa được tin ở trạng thái nháp hoặc khi bị từ chối.')
+            return
+          }
           setTitle(job.title || '')
           setDepartment(job.department || '')
           setJobDescription(job.jobDescription || '')

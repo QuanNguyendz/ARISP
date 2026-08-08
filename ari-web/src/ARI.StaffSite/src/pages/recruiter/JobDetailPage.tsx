@@ -472,7 +472,8 @@ export default function RecruiterJobDetailPage() {
 
   const canSubmit = job.status === 'draft' || job.status === 'rejected'
   const canClose = job.status === 'active'
-  const canEdit = job.status !== 'archived'
+  // Chỉ cho Recruiter sửa tin khi còn nháp hoặc bị HR từ chối — đã gửi duyệt (pending) / đã duyệt (active...) thì khoá.
+  const canEdit = job.status === 'draft' || job.status === 'rejected'
 
   return (
     <div className="p-6 lg:p-8">
