@@ -53,6 +53,7 @@
     "vietnamese": "Tiếng Việt",
     "english": "Tiếng Anh",
     "minutes": "Phút",
+    "minutesMax": "Tối đa 20 phút",
     "visibility": "Hiển thị",
     "languageRequirement": "Yêu cầu ngôn ngữ",
     "languageRequirementPlaceholder": "VD: Tiếng Anh (IELTS 6.5)",

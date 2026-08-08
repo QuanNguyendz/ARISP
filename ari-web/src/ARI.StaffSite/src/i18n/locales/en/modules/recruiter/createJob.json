@@ -53,6 +53,7 @@
     "vietnamese": "Vietnamese",
     "english": "English",
     "minutes": "Minutes",
+    "minutesMax": "Max 20 minutes",
     "visibility": "Visibility",
     "languageRequirement": "Language Requirement",
     "languageRequirementPlaceholder": "e.g. English (IELTS 6.5)",

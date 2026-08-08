@@ -16,6 +16,9 @@ interface CreateJobPostingPageProps {
   mode: 'create' | 'edit'
 }
 
+// Trần thời lượng mỗi vòng phỏng vấn (sơ loại / chuyên môn) — tối đa 20 phút.
+const MAX_ROUND_MINUTES = 20
+
 const input =
   'w-full px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-ink-200 dark:border-white/10 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:border-brand-400 dark:focus:border-brand-500/50 text-sm'
 const label = 'block text-sm font-medium text-ink-700 dark:text-ink-200 mb-1.5'
@@ -55,7 +58,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const [skills, setSkills] = useState<string[]>([])
   const [applicationDeadline, setApplicationDeadline] = useState('')
   const [rounds, setRounds] = useState<RoundConfig[]>([
-    { roundNumber: 1, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 30 },
+    { roundNumber: 1, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
   ])
 
   const [jdFileUrl, setJdFileUrl] = useState<string | undefined>()
@@ -156,7 +159,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   }
 
   const addRound = () =>
-    setRounds([...rounds, { roundNumber: rounds.length + 1, roundType: 'technical', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 45 }])
+    setRounds([...rounds, { roundNumber: rounds.length + 1, roundType: 'technical', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES }])
   const removeRound = (n: number) => {
     if (rounds.length <= 1) return
     setRounds(rounds.filter((r) => r.roundNumber !== n).map((r, i) => ({ ...r, roundNumber: i + 1 })))
@@ -207,7 +210,11 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         isPublicListing,
         vacancies: vacancies === '' ? undefined : Number(vacancies),
         skills,
-        roundConfigs: rounds,
+        roundConfigs: rounds.map((r) =>
+          r.roundType === 'online_test'
+            ? { ...r, maxDurationMinutes: Math.max(r.maxDurationMinutes || 30, 1) }
+            : { ...r, maxDurationMinutes: Math.min(Math.max(r.maxDurationMinutes || MAX_ROUND_MINUTES, 1), MAX_ROUND_MINUTES) },
+        ),
         languageRequirement: languageRequirement.trim() || undefined,
         applicationDeadline: applicationDeadline ? new Date(applicationDeadline).toISOString() : undefined,
       }
@@ -482,7 +489,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             </div>
             <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
               <AnimatePresence initial={false}>
-                {rounds.map((round, idx) => (
+                {rounds.map((round, idx) => {
+                  // Vòng trắc nghiệm cấu hình thời gian riêng ở mục "Bài thi trắc nghiệm" → không áp trần 20 phút.
+                  const capped = round.roundType !== 'online_test'
+                  return (
                   <motion.div
                     key={round.roundNumber}
                     initial={{ opacity: 0, scale: 0.96 }}
@@ -520,18 +530,33 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                         <input
                           type="number"
                           min={1}
+                          max={capped ? MAX_ROUND_MINUTES : undefined}
                           inputMode="numeric"
                           value={round.maxDurationMinutes === 0 ? '' : round.maxDurationMinutes}
-                          onChange={(e) => changeRound(idx, 'maxDurationMinutes', e.target.value === '' ? 0 : Number(e.target.value))}
+                          onChange={(e) =>
+                            changeRound(
+                              idx,
+                              'maxDurationMinutes',
+                              e.target.value === ''
+                                ? 0
+                                : capped
+                                  ? Math.min(Number(e.target.value), MAX_ROUND_MINUTES)
+                                  : Number(e.target.value),
+                            )
+                          }
                           onBlur={(e) => {
-                            if (e.target.value === '' || Number(e.target.value) < 1) changeRound(idx, 'maxDurationMinutes', 30)
+                            const v = Number(e.target.value)
+                            if (e.target.value === '' || v < 1) changeRound(idx, 'maxDurationMinutes', capped ? MAX_ROUND_MINUTES : 30)
+                            else if (capped && v > MAX_ROUND_MINUTES) changeRound(idx, 'maxDurationMinutes', MAX_ROUND_MINUTES)
                           }}
                           className={`${input} py-2`}
                         />
+                        {capped && <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">{t('form.minutesMax')}</p>}
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                  )
+                })}
               </AnimatePresence>
             </div>
           </div>
