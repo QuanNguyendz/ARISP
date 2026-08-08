@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -14,6 +14,7 @@ import {
   File as FileIcon,
   Briefcase,
   AlertCircle,
+  ChevronLeft,
   ChevronRight,
   Code2,
   Server,
@@ -43,6 +44,9 @@ import type { MyApplicationItem, MyApplicationRound } from '@ari/shared/types/ap
 
 type FilterKey = 'all' | 'action' | 'processing' | 'done'
 type TFunction = (key: string, options?: Record<string, unknown>) => string
+
+// Số hồ sơ hiển thị mỗi trang trong danh sách ứng tuyển của ứng viên.
+const APPLICATIONS_PER_PAGE = 5
 
 function metaOf(t: TFunction, status: string) {
   const labels: Record<
@@ -569,6 +573,8 @@ export default function ApplicationsPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
   const [now, setNow] = useState(() => Date.now())
+  const [page, setPage] = useState(1)
+  const listTopRef = useRef<HTMLDivElement>(null)
 
   const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'all', label: t('applications.all') },
@@ -621,6 +627,29 @@ export default function ApplicationsPage() {
     () => (filter === 'all' ? apps : apps.filter((a) => groupOf(t, a) === filter)),
     [apps, filter, t]
   )
+
+  // Phân trang phía client trên danh sách đã lọc.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / APPLICATIONS_PER_PAGE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = useMemo(
+    () =>
+      filtered.slice(
+        (currentPage - 1) * APPLICATIONS_PER_PAGE,
+        currentPage * APPLICATIONS_PER_PAGE
+      ),
+    [filtered, currentPage]
+  )
+
+  // Đổi bộ lọc → quay về trang 1.
+  useEffect(() => {
+    setPage(1)
+  }, [filter])
+
+  const goToPage = (next: number) => {
+    const clamped = Math.min(Math.max(1, next), totalPages)
+    setPage(clamped)
+    listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const passedRounds = useMemo(
     () => apps.reduce((n, a) => n + a.rounds.filter((r) => r.verdict === 'pass').length, 0),
@@ -758,7 +787,10 @@ export default function ApplicationsPage() {
             </div>
 
             {/* Filter tabs */}
-            <div className="flex flex-wrap items-center gap-2 pb-1 text-sm">
+            <div
+              ref={listTopRef}
+              className="flex flex-wrap items-center gap-2 pb-1 text-sm scroll-mt-24"
+            >
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
@@ -803,9 +835,42 @@ export default function ApplicationsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filtered.map((app) => (
+                {pageItems.map((app) => (
                   <ApplicationCard key={app.id} t={t} app={app} />
                 ))}
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm shadow-card sm:px-5">
+                    <span className="text-ink-500">
+                      {t('applications.pagination.pageInfo', {
+                        page: currentPage,
+                        total: totalPages,
+                      })}
+                      {' · '}
+                      {t('applications.pagination.count', { count: filtered.length })}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={currentPage <= 1}
+                        onClick={() => goToPage(currentPage - 1)}
+                        aria-label={t('applications.pagination.prev')}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 text-ink-600 hover:bg-ink-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => goToPage(currentPage + 1)}
+                        aria-label={t('applications.pagination.next')}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 text-ink-600 hover:bg-ink-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -886,9 +951,17 @@ export default function ApplicationsPage() {
             {/* Upcoming schedule */}
             {nextSchedule && (
               <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <CalendarClock className="h-4 w-4 text-brand-600" />{' '}
-                  {t('applications.upcomingSchedule')}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <CalendarClock className="h-4 w-4 text-brand-600" />{' '}
+                    {t('applications.upcomingSchedule')}
+                  </span>
+                  <Link
+                    to={`/portal/schedule/${nextSchedule.app.id}`}
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline"
+                  >
+                    {t('applications.viewAllSchedule')} <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
                 {(() => {
                   const info = scheduleInfo(t, nextSchedule.slot.startTime, now)

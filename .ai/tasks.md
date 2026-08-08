@@ -323,6 +323,10 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-08: **Nút "Xem thêm" ở thẻ "Lịch phỏng vấn sắp tới" (Candidate) → trang lịch đầy đủ.** Trước ứng viên chỉ xem lịch đã xếp qua chuông thông báo; nay thẻ `upcomingSchedule` ở sidebar `ApplicationsPage` có link "Xem thêm" góc trên phải trỏ `/portal/schedule/{applicationId}` (`CandidateSchedulePage` gọi `getMySchedule()` → liệt kê TẤT CẢ lịch sắp tới + lịch chờ xếp lại, kèm xác nhận/từ chối — trang này bỏ qua param, hiển thị toàn bộ). i18n VI "Xem thêm" / EN "View all" (`applications.viewAllSchedule`). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE. *(Lưu ý: `/candidate/interviews` là màn mock nhập-mã cũ, KHÔNG dùng.)*
+
+- [x] 2026-08-08: **Phân trang danh sách hồ sơ ứng tuyển của Candidate (`ApplicationsPage`).** Trước render toàn bộ `filtered.map`; nay phân trang phía client 5 hồ sơ/trang (`APPLICATIONS_PER_PAGE`): `pageItems = filtered.slice(...)`, thanh phân trang (Trang x/y · N hồ sơ + nút trước/sau) chỉ hiện khi >1 trang, đổi bộ lọc → về trang 1, đổi trang cuộn lên đầu danh sách (`listTopRef`). i18n VI/EN thêm `applications.pagination.{pageInfo,count,prev,next}` (giữ song ngữ — không dùng `@ari/shared/ui` Pagination vì hardcode "Trang"). CandidateSite `tsc --noEmit` xanh, JSON hợp lệ. Thuần FE.
+
 - [x] 2026-08-08: **Nút "Ứng tuyển" bên Candidate phản ánh đúng trạng thái đã ứng tuyển, hết nháy trạng thái.**
   - **Yêu cầu:** ở màn Việc làm (`FindJobPage`), tin nào đã ứng tuyển thì nút đổi thành "Đã ứng tuyển"; ở màn chi tiết tin (`JobDetailPage`), tin đã ứng tuyển phải hiện "Đã ứng tuyển" NGAY (trước bị delay/nháy từ "Ứng tuyển ngay" sang "Đã ứng tuyển").
   - **Nguyên nhân delay:** `JobDetailPage` khởi tạo `appliedId=null` rồi mới `getMyApplications()` trong `useEffect` → render "Ứng tuyển ngay" trước, sau mới lật. `FindJobPage` không hề kiểm tra đã-ứng-tuyển, luôn hiện "Ứng tuyển".
