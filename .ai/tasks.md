@@ -323,6 +323,15 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-08: **Nút "Ứng tuyển" bên Candidate phản ánh đúng trạng thái đã ứng tuyển, hết nháy trạng thái.**
+  - **Yêu cầu:** ở màn Việc làm (`FindJobPage`), tin nào đã ứng tuyển thì nút đổi thành "Đã ứng tuyển"; ở màn chi tiết tin (`JobDetailPage`), tin đã ứng tuyển phải hiện "Đã ứng tuyển" NGAY (trước bị delay/nháy từ "Ứng tuyển ngay" sang "Đã ứng tuyển").
+  - **Nguyên nhân delay:** `JobDetailPage` khởi tạo `appliedId=null` rồi mới `getMyApplications()` trong `useEffect` → render "Ứng tuyển ngay" trước, sau mới lật. `FindJobPage` không hề kiểm tra đã-ứng-tuyển, luôn hiện "Ứng tuyển".
+  - **Sửa (thuần FE, dùng chung React Query key `['my-applications']`):**
+    - `FindJobPage`: thêm `useQuery(['my-applications'])` (enabled khi đăng nhập) → `Set` các `jobPostingId` (bỏ `withdrawn`); `JobCard` nhận prop `applied` → nút xanh emerald "Đã ứng tuyển" (key i18n có sẵn `jobs.applied`) trỏ `/candidate/applications`.
+    - `JobDetailPage`: thay `useEffect` bằng cùng `useQuery(['my-applications'])`; `appliedId` suy ra bằng `useMemo`. Điều hướng từ danh sang chi tiết đọc thẳng cache → hiện đúng ngay. Thêm cờ `appliedResolved = !isAuthenticated || data!==undefined`: khi CHƯA biết trạng thái (lần tải trực tiếp) hiện nút loading (spinner) thay vì "Ứng tuyển ngay" → hết nháy. Áp cho cả nút desktop (aside) lẫn thanh mobile dưới cùng.
+    - `ApplyPage`: sau khi nộp thành công (và ca 409 "đã ứng tuyển") gọi `queryClient.invalidateQueries(['my-applications'])` → quay lại danh sách/chi tiết thấy "Đã ứng tuyển" tức thì.
+  - **Verify:** CandidateSite `tsc --noEmit` xanh. Không đụng BE, không thêm i18n key mới.
+
 - [x] 2026-08-07: **Đồng bộ màu trang Cài đặt của Recruiter theo HR Leader.** `recruiter/SettingsPage.tsx` trước dùng theme kính tối cứng (`bg-white/[0.03]`, `text-white`, nhấn amber) không có class light-mode → chữ trắng trên nền sáng bị "trôi" mờ. Nay dùng đúng bộ token của `hr/SettingsPage.tsx`: nền `bg-ink-50 dark:bg-ink-950`, thẻ `bg-white dark:bg-white/5` + `shadow-card`, tab active `brand-100/brand-700`, input `border-ink-200 focus:border-brand-400`, nút lưu gradient `from-brand-600 to-ai-600`, toggle `bg-brand-600`. Giữ nguyên namespace i18n `modules/recruiter/settings`, default values Recruiter, và mọi `t()` cũ. StaffSite `tsc --noEmit` xanh. Thuần FE, không đụng BE.
 
 - [x] 2026-08-07: **Thông báo lỗi đăng nhập ứng viên chuyển sang tiếng Việt.** `CandidateLoginCommand` đổi cả 2 chỗ `"Invalid email or password."` → `"Sai email hoặc mật khẩu."` (khớp `StaffLoginCommand`); FE hiển thị thẳng message backend. Chỉ đổi chuỗi literal, không đụng logic/test.
