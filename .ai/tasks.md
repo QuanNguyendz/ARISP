@@ -323,6 +323,8 @@ _Chưa có task nào đang thực hiện._
 
 ## Completed
 
+- [x] 2026-08-08: **Sửa lỗi ô "Phút" cấu hình vòng phỏng vấn tự hiện số 0 ở đầu khi xoá trắng.** `CreateJobPostingPage.tsx` — ô `maxDurationMinutes` trước dùng `value={round.maxDurationMinutes}` + `Number(e.target.value)`: xoá trắng → `Number('')=0` → input hiển thị "0" → gõ tiếp thành "015". Sửa: hiển thị rỗng khi giá trị = 0 (`value === 0 ? '' : value`), `onChange` map rỗng→0, thêm `min={1}`/`inputMode="numeric"` và `onBlur` khôi phục mặc định 30 nếu để trống/<1 (không bao giờ submit 0 phút). Typecheck StaffSite pass.
+
 - [x] 2026-08-08: **Đổi nhãn "HR Leader" → "HR Admin" trên workspace HR (StaffSite).** Sửa 2 key i18n `hr.workspace` ("HR Leader Workspace" → "HR Admin Workspace") và `hr.roleLabel` ("HR Leader" → "HR Admin") trong `ARI.Shared/i18n/locales/{vi,en}/modules/shared/nav.json`. Chỉ khối `hr` (dùng bởi `HrLayout`) — Recruiter/Super Admin giữ nguyên. JSON hợp lệ. Thuần label, không đụng logic/role/quyền.
 
 - [x] 2026-08-08: **Nút "Xoá khỏi danh sách" cho lịch đã bị huỷ/từ chối (Candidate) — bổ sung ADR-048.**

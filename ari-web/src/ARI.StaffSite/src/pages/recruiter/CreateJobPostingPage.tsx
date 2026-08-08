@@ -517,7 +517,17 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                       </div>
                       <div>
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.minutes')}</label>
-                        <input type="number" value={round.maxDurationMinutes} onChange={(e) => changeRound(idx, 'maxDurationMinutes', Number(e.target.value))} className={`${input} py-2`} />
+                        <input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={round.maxDurationMinutes === 0 ? '' : round.maxDurationMinutes}
+                          onChange={(e) => changeRound(idx, 'maxDurationMinutes', e.target.value === '' ? 0 : Number(e.target.value))}
+                          onBlur={(e) => {
+                            if (e.target.value === '' || Number(e.target.value) < 1) changeRound(idx, 'maxDurationMinutes', 30)
+                          }}
+                          className={`${input} py-2`}
+                        />
                       </div>
                     </div>
                   </motion.div>
