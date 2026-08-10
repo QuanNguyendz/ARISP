@@ -51,6 +51,26 @@ internal static class InterviewServiceFactory
         new MemoryCache(new MemoryCacheOptions()),
         options);
 
+    /// <summary>
+    /// Overload cho luồng lưu video Kiosk (ADR-052): cắm <see cref="IFileStorageService"/> thật
+    /// (thường là <see cref="RecordingFileStorage"/>) + <see cref="InterviewOptions"/> để test
+    /// giới hạn dung lượng / hạn lưu / ghi đè file cũ.
+    /// </summary>
+    public static InterviewService Create(
+        IUnitOfWork uow, INotificationService notif, IFileStorageService storage, InterviewOptions? options = null) => new(
+        uow,
+        new ThrowingAIProvider(),
+        new ThrowingEmbeddingProvider(),
+        new ThrowingAvatarService(),
+        notif,
+        new ThrowingDeepgramTokenService(),
+        new ThrowingRagIngestionService(),
+        new ThrowingTTSService(),
+        storage,
+        new TestScopeFactory(uow),
+        new MemoryCache(new MemoryCacheOptions()),
+        options);
+
     private sealed class TestScopeFactory : IServiceScopeFactory, IServiceScope
     {
         private readonly IServiceProvider _provider;
