@@ -174,6 +174,38 @@ public class GenerateInterviewCodeTests
         var code = Assert.Single(res.Value);
         Assert.Equal(eligible.Id, code.ApplicationId); // hồ sơ chưa đủ điều kiện bị bỏ qua
     }
+
+    [Fact]
+    public async Task Batch_null_list_fails()
+    {
+        var (_, svc) = Build();
+
+        var res = await svc.GenerateBatchAsync(null!, 1, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("không được để trống", res.Error);
+    }
+
+    [Fact]
+    public async Task Batch_two_eligible_round2_apps_get_distinct_codes_and_two_audits()
+    {
+        var (ctx, svc) = Build();
+        var hrId = Guid.NewGuid();
+        var job = InterviewCodeData.Job();
+        var app1 = InterviewCodeData.App(job.Id, name: "Ứng viên 1");
+        var app2 = InterviewCodeData.App(job.Id, name: "Ứng viên 2");
+        ctx.Uow.Seed(job).Seed(app1, app2)
+            .Seed(InterviewCodeData.Booking(app1.Id, round: 2))   // cả 2 đã đặt lịch vòng 2
+            .Seed(InterviewCodeData.Booking(app2.Id, round: 2));
+
+        var res = await svc.GenerateBatchAsync(new() { app1.Id, app2.Id }, roundNumber: 2, hrId, CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(2, res.Value.Count);
+        Assert.All(res.Value, c => Assert.Equal(2, c.RoundNumber));            // đúng vòng 2
+        Assert.NotEqual(res.Value[0].Code, res.Value[1].Code);                 // mã khác nhau
+        Assert.Equal(2, ctx.Uow.Repo<AuditLog>().Items.Count(a => a.Action == "interview_code_generated"));
+    }
 }
 
 /// <summary>Gói 3 fake dùng chung cho các test cấp/validate mã (giữ chữ ký test gọn).</summary>
