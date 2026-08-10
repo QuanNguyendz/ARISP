@@ -24,12 +24,16 @@ public sealed class RecordingEmailService : IEmailService
 /// <summary>RAG ingestion giả — ghi lại tài liệu đã đẩy (sourceType/sourceId) để assert, không gọi service Python.</summary>
 public sealed class RecordingRagIngestionService : IRagIngestionService
 {
-    public List<(string SourceType, Guid SourceId, string Text)> Ingested { get; } = new();
+    public List<(string SourceType, Guid SourceId, string Text, string? Scope, string? DocumentType)> Ingested { get; } = new();
+
+    /// <summary>Nếu true: <see cref="IngestAsync"/> ném lỗi (mô phỏng RAG service chết) để test đường bù trừ.</summary>
+    public bool ThrowOnIngest { get; set; }
 
     public Task<int> IngestAsync(string sourceType, Guid sourceId, string text, string? scope = null,
         string? documentType = null, bool replaceExisting = true, System.Threading.CancellationToken ct = default)
     {
-        Ingested.Add((sourceType, sourceId, text));
+        if (ThrowOnIngest) throw new InvalidOperationException("rag down");
+        Ingested.Add((sourceType, sourceId, text, scope, documentType));
         return Task.FromResult(1);
     }
 }
