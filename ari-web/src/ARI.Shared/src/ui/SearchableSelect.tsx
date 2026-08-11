@@ -38,8 +38,8 @@ export default function SearchableSelect({
   onClear?: () => void
 }) {
   const { t } = useTranslation('modules/shared/designSystem')
-  const resolvedPlaceholder = placeholder ?? '— Chọn —'
-  const resolvedEmptyText = emptyText ?? 'Không có kết quả'
+  const resolvedPlaceholder = placeholder ?? t('searchableSelect.selectPlaceholder')
+  const resolvedEmptyText = emptyText ?? t('searchableSelect.noResults')
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -124,7 +124,7 @@ export default function SearchableSelect({
           </div>
           <ul className="max-h-60 overflow-auto py-1">
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-ink-400">{emptyText}</li>
+              <li className="px-3 py-2 text-sm text-ink-400">{resolvedEmptyText}</li>
             ) : (
               filtered.map((o) => (
                 <li key={o.value}>

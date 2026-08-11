@@ -3,7 +3,9 @@
   "close": "Đóng",
   "searchableSelect": {
     "clearSelection": "Xoá lựa chọn",
-    "typeToSearch": "Gõ để tìm..."
+    "typeToSearch": "Gõ để tìm...",
+    "selectPlaceholder": "— Chọn —",
+    "noResults": "Không có kết quả"
   },
   "pagination": {
     "pageLabel": "Trang {{page}}/{{total}}",

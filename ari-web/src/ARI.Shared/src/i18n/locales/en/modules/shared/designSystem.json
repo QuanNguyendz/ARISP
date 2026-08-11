@@ -3,7 +3,9 @@
   "close": "Close",
   "searchableSelect": {
     "clearSelection": "Clear selection",
-    "typeToSearch": "Type to search..."
+    "typeToSearch": "Type to search...",
+    "selectPlaceholder": "— Select —",
+    "noResults": "No results"
   },
   "pagination": {
     "pageLabel": "Page {{page}}/{{total}}",
