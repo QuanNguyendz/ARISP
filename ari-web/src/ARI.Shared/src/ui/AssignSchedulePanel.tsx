@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CalendarClock,
   CalendarCheck,
@@ -75,6 +76,7 @@ export default function AssignSchedulePanel({
   status,
   onAssigned,
 }: AssignSchedulePanelProps) {
+  const { t } = useTranslation('modules/shared/assignSchedulePanel')
   const canAssign = !PRE_SCREENING.includes(status.toLowerCase())
 
   const [slots, setSlots] = useState<AvailabilitySlot[]>([])
@@ -95,7 +97,7 @@ export default function AssignSchedulePanel({
         if (alive) setSlots(data)
       })
       .catch((e) => {
-        if (alive) setError(errMsg(e, 'Không tải được khung giờ.'))
+        if (alive) setError(errMsg(e, t('loadError')))
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -103,7 +105,7 @@ export default function AssignSchedulePanel({
     return () => {
       alive = false
     }
-  }, [jobPostingId, round, hasScheduled, canAssign])
+  }, [jobPostingId, round, hasScheduled, canAssign, t])
 
   // Chỉ khung giờ tương lai còn chỗ trống.
   const openSlots = useMemo(() => {
@@ -121,7 +123,7 @@ export default function AssignSchedulePanel({
       await scheduleService.assign({ applicationId, slotId: selected, round })
       onAssigned()
     } catch (e) {
-      setError(errMsg(e, 'Gán lịch thất bại.'))
+      setError(errMsg(e, t('assignError')))
     } finally {
       setAssigning(false)
     }
@@ -131,17 +133,17 @@ export default function AssignSchedulePanel({
     <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card dark:border-white/10 dark:bg-white/5">
       <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
         <CalendarClock className="h-4 w-4 text-brand-600 dark:text-brand-400" />
-        Xếp lịch phỏng vấn · Vòng {round}
+        {t('title', { round })}
       </h2>
 
       {!hasScheduled && canAssign && declineReason && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            <AlertCircle className="h-3.5 w-3.5" /> Ứng viên đã từ chối lịch trước (xin đổi lịch)
+            <AlertCircle className="h-3.5 w-3.5" /> {t('declineWarning.title')}
           </p>
-          <p className="mt-1 text-sm italic text-amber-800 dark:text-amber-300">“{declineReason}”</p>
+          <p className="mt-1 text-sm italic text-amber-800 dark:text-amber-300">"{declineReason}"</p>
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-            Hãy chọn một khung giờ khác phù hợp hơn cho ứng viên.
+            {t('declineWarning.hint')}
           </p>
         </div>
       )}
@@ -149,25 +151,25 @@ export default function AssignSchedulePanel({
       {hasScheduled ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
           <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-            <CalendarCheck className="h-3.5 w-3.5" /> Đã xếp lịch cho ứng viên
+            <CalendarCheck className="h-3.5 w-3.5" /> {t('scheduled.title')}
           </p>
           <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-            {scheduledAt ? fullDateTime(scheduledAt) : 'Đã có lịch phỏng vấn thật'}
+            {scheduledAt ? fullDateTime(scheduledAt) : t('scheduled.alreadyScheduled')}
           </p>
           {confirmationStatus === 'confirmed' ? (
             <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác nhận
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t('scheduled.confirmed')}
             </span>
           ) : (
             <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
-              <AlertCircle className="h-3.5 w-3.5" /> Chưa xác nhận
+              <AlertCircle className="h-3.5 w-3.5" /> {t('scheduled.pendingConfirmation')}
             </span>
           )}
         </div>
       ) : !canAssign ? (
         <p className="flex items-start gap-1.5 text-xs text-ink-400">
           <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Hãy gửi lời mời phỏng vấn (duyệt CV) trước khi xếp lịch cho ứng viên.
+          {t('cannotAssign')}
         </p>
       ) : loading ? (
         <div className="flex items-center justify-center py-6">
@@ -176,8 +178,7 @@ export default function AssignSchedulePanel({
       ) : openSlots.length === 0 ? (
         <p className="flex items-start gap-1.5 text-xs text-ink-400">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Chưa có khung giờ trống cho vòng {round}. Hãy tạo khung giờ ở trang cấu hình lịch của tin
-          tuyển dụng trước.
+          {t('noSlots', { round })}
         </p>
       ) : (
         <div className="space-y-3">
@@ -187,17 +188,17 @@ export default function AssignSchedulePanel({
             </div>
           )}
           <label className="block text-xs font-medium text-ink-600 dark:text-ink-300">
-            Chọn khung giờ ấn định
+            {t('selectSlot')}
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
               className="mt-1 w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-white/10 dark:bg-ink-900 dark:text-white dark:focus:ring-brand-500/20"
             >
-              <option value="">— Chọn khung giờ —</option>
+              <option value="">{t('selectPlaceholder')}</option>
               {openSlots.map((s) => (
                 <option key={s.id} value={s.id}>
                   {slotLabel(s)}
-                  {s.capacity > 1 ? ` (còn ${s.capacity - s.bookedCount}/${s.capacity})` : ''}
+                  {s.capacity > 1 ? ` (${t('capacityHint', { available: s.capacity - s.bookedCount, total: s.capacity })})` : ''}
                 </option>
               ))}
             </select>
@@ -213,11 +214,11 @@ export default function AssignSchedulePanel({
             ) : (
               <CalendarPlus className="h-4 w-4" />
             )}
-            Gán lịch cho ứng viên
+            {t('assignButton')}
           </button>
           <p className="flex items-start gap-1.5 text-xs text-ink-400">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Sau khi gán, ứng viên nhận thông báo giờ hẹn và có thể luyện tập phỏng vấn thử.
+            {t('assignHint')}
           </p>
         </div>
       )}

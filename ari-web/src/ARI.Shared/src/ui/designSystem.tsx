@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -176,11 +177,12 @@ interface LoadingSpinnerProps {
   message?: string
 }
 
-export function LoadingSpinner({ message = 'Đang tải dữ liệu...' }: LoadingSpinnerProps) {
+export function LoadingSpinner({ message }: LoadingSpinnerProps) {
+  const { t } = useTranslation('modules/shared/designSystem')
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
       <div className="w-10 h-10 rounded-full border-2 border-brand-300 dark:border-brand-500/30 border-t-brand-600 dark:border-t-brand-400 animate-spin" />
-      <p className="text-sm text-ink-500 dark:text-ink-400">{message}</p>
+      <p className="text-sm text-ink-500 dark:text-ink-400">{message ?? t('loading')}</p>
     </div>
   )
 }
@@ -191,6 +193,7 @@ interface ErrorAlertProps {
 }
 
 export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
+  const { t } = useTranslation('modules/shared/designSystem')
   return (
     <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-sm mb-6 flex items-start justify-between gap-3">
       <span>{message}</span>
@@ -200,7 +203,7 @@ export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
           onClick={onDismiss}
           className="text-red-400 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200 transition-colors"
         >
-          Đóng
+          {t('close')}
         </button>
       )}
     </div>
@@ -213,6 +216,7 @@ interface NoticeAlertProps {
 }
 
 export function NoticeAlert({ message, onDismiss }: NoticeAlertProps) {
+  const { t } = useTranslation('modules/shared/designSystem')
   return (
     <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-sm mb-6 flex items-start justify-between gap-3">
       <span>{message}</span>
@@ -222,7 +226,7 @@ export function NoticeAlert({ message, onDismiss }: NoticeAlertProps) {
           onClick={onDismiss}
           className="text-amber-500 dark:text-amber-300 hover:text-amber-700 dark:hover:text-amber-200 transition-colors"
         >
-          Đóng
+          {t('close')}
         </button>
       )}
     </div>
@@ -244,18 +248,19 @@ export function Pagination({
   page,
   totalPages,
   total,
-  label = 'mục',
+  label = 'items',
   onPageChange,
   className = '',
 }: PaginationProps) {
+  const { t } = useTranslation('modules/shared/designSystem')
   if (totalPages <= 1) return null
   return (
     <div
       className={`mt-6 flex items-center justify-between rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3 text-sm shadow-card ${className}`}
     >
       <span className="text-ink-500 dark:text-ink-400">
-        Trang {page}/{totalPages}
-        {typeof total === 'number' ? ` · ${total} ${label}` : ''}
+        {t('pagination.pageLabel', { page, total: totalPages })}
+        {typeof total === 'number' ? ` ${t('pagination.totalItems', { total, label })}` : ''}
       </span>
       <div className="flex items-center gap-1">
         <button
@@ -263,7 +268,7 @@ export function Pagination({
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
           className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          aria-label="Trang trước"
+          aria-label={t('pagination.previousPage')}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -272,7 +277,7 @@ export function Pagination({
           disabled={page >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           className="grid h-8 w-8 place-items-center rounded-lg border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          aria-label="Trang sau"
+          aria-label={t('pagination.nextPage')}
         >
           <ChevronRight className="h-4 w-4" />
         </button>

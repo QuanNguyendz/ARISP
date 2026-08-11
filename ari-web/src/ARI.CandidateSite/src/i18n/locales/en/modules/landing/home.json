@@ -5,5 +5,8 @@
     "placeholder": "Enter code",
     "button": "Start",
     "noCodeHint": "Contact HR if you don't have a code"
+  },
+  "jobDetail": {
+    "skillMatchTooltip": "Skill match: {{skills}}"
   }
 }

@@ -1,0 +1,71 @@
+{
+  "kiosk": {
+    "title": "Enter Interview Code",
+    "subtitle": "Enter the 6-character code provided by the recruiter to start the interview.",
+    "startButton": "Start Interview",
+    "checkingCode": "Checking code...",
+    "mode": "Locked Mode · Office",
+    "validity": {
+      "hours": "Code valid for 2 hours",
+      "oneTime": "One-time use",
+      "autoRecover": "Auto-recovers on disconnect"
+    },
+    "noCode": "Don't have a code? Please contact the recruiter at the reception desk.",
+    "continue": "Continue Incomplete Interview",
+    "errors": {
+      "notFound": "Interview code does not exist. Please check each character.",
+      "used": "This code has been used. Contact the recruiter for a new code.",
+      "expired": "Code has expired (valid for 2 hours). Contact the recruiter for a new code.",
+      "invalid": "Invalid, used, or expired interview code.",
+      "connectionFailed": "Cannot connect to the system. Please notify the reception staff."
+    }
+  },
+  "kioskInterview": {
+    "greeting": "Hello {{name}}!",
+    "interviewInfo": "Official interview round {{round}}{{jobTitle}}",
+    "intro": {
+      "recordingNotice": "The interview is being recorded for HR evaluation.",
+      "recordingPrivacy": "Video is automatically deleted after the retention period.",
+      "voiceAnswer": "Answer by voice; you can edit the content before submitting.",
+      "timeLimit": "When time runs out, AI will close the interview."
+    },
+    "status": {
+      "recording": "Recording",
+      "aiInterviewer": "AI Interviewer",
+      "connecting": "Connecting to interview room...",
+      "aiInterviewerIdle": "AI Interviewer"
+    },
+    "micStatus": {
+      "listening": "Listening...",
+      "micOn": "Mic is on",
+      "typing": "Typing answer"
+    },
+    "answerPlaceholder": "Your answer (you can edit the recorded content before submitting)",
+    "submitAnswer": "Submit Answer",
+    "endInterview": "End Interview",
+    "toggleMic": "Toggle Mic",
+    "charCount": "{{count}} characters",
+    "timeUp": "Time is up — AI is closing the interview",
+    "emptyTranscript": "Conversation content will appear here when the interview starts.",
+    "roleAi": "AI Interviewer",
+    "roleUser": "You",
+    "thanks": "Thank you {{name}}!",
+    "completion": "The interview is complete. HR will review and respond to results via email.",
+    "recordingSaving": "Saving recording...",
+    "recordingSaved": "Recording saved",
+    "recordingFailed": "Recording failed — please notify reception staff.",
+    "exitWarning": {
+      "title": "You have left the interview screen",
+      "message": "The interview must run in fullscreen mode. Please return to continue — this exit has been recorded.",
+      "exitCount": "Number of screen exits: {{count}}"
+    },
+    "fullscreenReturn": "Return to Fullscreen",
+    "exitRecorded": "Recorded {{count}} exit(s) from interview screen — this information is sent with the results to HR.",
+    "autoReset": "Screen will return to code entry in {{seconds}}s",
+    "returnToCode": "Return to Code Entry",
+    "deviceCheck": {
+      "title": "Check Devices Before Entering Room",
+      "startLabel": "Enter Interview Room"
+    }
+  }
+}

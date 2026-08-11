@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, Search, Check, X } from 'lucide-react'
 
 export interface SelectOption {
@@ -20,9 +21,9 @@ export default function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder = '— Chọn —',
+  placeholder,
   disabled = false,
-  emptyText = 'Không có kết quả',
+  emptyText,
   icon,
   onClear,
 }: {
@@ -36,6 +37,10 @@ export default function SearchableSelect({
   /** Khi truyền vào và đang có lựa chọn → hiện nút xoá (X) để bỏ chọn. */
   onClear?: () => void
 }) {
+  const { t } = useTranslation('modules/shared/designSystem')
+  const resolvedPlaceholder = placeholder ?? '— Chọn —'
+  const resolvedEmptyText = emptyText ?? 'Không có kết quả'
+
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
@@ -76,13 +81,13 @@ export default function SearchableSelect({
       >
         {icon}
         <span className={`flex-1 truncate ${selected ? '' : 'text-ink-400'}`}>
-          {selected ? selected.label : placeholder}
+          {selected ? selected.label : resolvedPlaceholder}
         </span>
         {onClear && selected ? (
           <span
             role="button"
             tabIndex={0}
-            aria-label="Xoá lựa chọn"
+            aria-label={t('searchableSelect.clearSelection')}
             onClick={(e) => {
               e.stopPropagation()
               onClear()
@@ -113,7 +118,7 @@ export default function SearchableSelect({
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Gõ để tìm..."
+              placeholder={t('searchableSelect.typeToSearch')}
               className="w-full bg-transparent text-sm text-ink-800 outline-none placeholder:text-ink-400"
             />
           </div>

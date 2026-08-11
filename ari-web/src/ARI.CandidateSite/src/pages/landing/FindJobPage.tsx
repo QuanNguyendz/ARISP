@@ -692,7 +692,7 @@ function JobCard({ job, isSaved = false, onToggleSave, matchedSkills, applied = 
                 {hasMatch && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
-                    title={`Khớp kỹ năng: ${matchedSkills!.join(', ')}`}
+                    title={t('jobDetail.skillMatchTooltip', { skills: matchedSkills!.join(', ') })}
                   >
                     <Sparkles className="w-3 h-3" />
                     {t('jobs.skillMatch', { count: matchedSkills!.length })}

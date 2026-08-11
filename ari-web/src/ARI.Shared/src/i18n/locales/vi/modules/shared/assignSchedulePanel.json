@@ -1,0 +1,22 @@
+{
+  "title": "Xếp lịch phỏng vấn · Vòng {{round}}",
+  "declineWarning": {
+    "title": "Ứng viên đã từ chối lịch trước (xin đổi lịch)",
+    "hint": "Hãy chọn một khung giờ khác phù hợp hơn cho ứng viên."
+  },
+  "scheduled": {
+    "title": "Đã xếp lịch cho ứng viên",
+    "alreadyScheduled": "Đã có lịch phỏng vấn thật",
+    "confirmed": "Đã xác nhận",
+    "pendingConfirmation": "Chưa xác nhận"
+  },
+  "cannotAssign": "Hãy gửi lời mời phỏng vấn (duyệt CV) trước khi xếp lịch cho ứng viên.",
+  "noSlots": "Chưa có khung giờ trống cho vòng {{round}}. Hãy tạo khung giờ ở trang cấu hình lịch của tin tuyển dụng trước.",
+  "loadError": "Không tải được khung giờ.",
+  "assignError": "Gán lịch thất bại.",
+  "selectSlot": "Chọn khung giờ ấn định",
+  "selectPlaceholder": "— Chọn khung giờ —",
+  "capacityHint": " (còn {{available}}/${total})",
+  "assignButton": "Gán lịch cho ứng viên",
+  "assignHint": "Sau khi gán, ứng viên nhận thông báo giờ hẹn và có thể luyện tập phỏng vấn thử."
+}

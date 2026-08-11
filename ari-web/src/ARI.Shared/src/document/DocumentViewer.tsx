@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { renderAsync } from 'docx-preview'
 import { Download, FileText, Loader2, X, AlertCircle } from 'lucide-react'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
@@ -36,11 +37,7 @@ function detectKind(nameOrUrl: string): DocKind {
   return 'other'
 }
 
-function fileLabel(fileName: string): string {
-  return fileName || 'Tài liệu'
-}
-
-function DocxRender({ url }: { url: string }) {
+function DocxRender({ url, t }: { url: string; t: ReturnType<typeof useTranslation<'modules/shared/documentViewer'>['t']> }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,11 +62,9 @@ function DocxRender({ url }: { url: string }) {
           breakPages: true,
         })
         if (!cancelled) setLoading(false)
-      } catch (e) {
+      } catch {
         if (!cancelled) {
-          setError(
-            'Không thể hiển thị file DOCX trực tiếp (có thể do CORS hoặc file lỗi). Hãy tải về để xem.'
-          )
+          setError(t('documentViewer.docxError'))
           setLoading(false)
         }
       }
@@ -77,14 +72,14 @@ function DocxRender({ url }: { url: string }) {
     return () => {
       cancelled = true
     }
-  }, [url])
+  }, [url, t])
 
   return (
     <div className="relative h-full w-full overflow-auto bg-ink-100 dark:bg-ink-800">
       {loading && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-ink-100/80 dark:bg-ink-800/80">
           <Loader2 className="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" />
-          <p className="text-sm text-ink-500 dark:text-ink-300">Đang dựng nội dung tài liệu...</p>
+          <p className="text-sm text-ink-500 dark:text-ink-300">{t('documentViewer.loading')}</p>
         </div>
       )}
       {error && (
@@ -100,13 +95,12 @@ function DocxRender({ url }: { url: string }) {
 }
 
 function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) {
-  // Ưu tiên đuôi từ fileName; nếu fileName không có đuôi nhận biết được thì suy từ URL.
+  const { t } = useTranslation('modules/shared/documentViewer')
   const kind = useMemo(() => {
     const byName = detectKind(doc.fileName)
     return byName !== 'other' ? byName : detectKind(doc.url)
   }, [doc])
 
-  // ESC để đóng
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -127,7 +121,7 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
           <div className="flex min-w-0 items-center gap-2">
             <FileText className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
             <span className="truncate text-sm font-medium text-ink-900 dark:text-white">
-              {fileLabel(doc.fileName)}
+              {doc.fileName || t('documentViewer.defaultFileName')}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -137,13 +131,13 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
             >
-              <Download className="h-3.5 w-3.5" /> Tải về
+              <Download className="h-3.5 w-3.5" /> {t('documentViewer.download')}
             </a>
             <button
               type="button"
               onClick={onClose}
               className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-white/10 dark:hover:text-white"
-              aria-label="Đóng"
+              aria-label={t('documentViewer.close')}
             >
               <X className="h-5 w-5" />
             </button>
@@ -155,7 +149,7 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
           {kind === 'pdf' && (
             <iframe src={doc.url} title={doc.fileName} className="h-full w-full border-0" />
           )}
-          {kind === 'docx' && <DocxRender url={doc.url} />}
+          {kind === 'docx' && <DocxRender url={doc.url} t={t} />}
           {kind === 'image' && (
             <div className="flex h-full w-full items-center justify-center overflow-auto bg-ink-100 dark:bg-ink-800 p-4">
               <img src={doc.url} alt={doc.fileName} className="max-h-full max-w-full object-contain" />
@@ -165,7 +159,7 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
             <div className="flex h-full flex-col items-center justify-center gap-3 p-10 text-center">
               <FileText className="h-10 w-10 text-ink-400" />
               <p className="max-w-sm text-sm text-ink-600 dark:text-ink-300">
-                Không hỗ trợ xem trực tiếp định dạng này. Hãy tải về để mở.
+                {t('documentViewer.unsupportedFormat')}
               </p>
               <a
                 href={doc.url}
@@ -173,7 +167,7 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
               >
-                <Download className="h-4 w-4" /> Tải về
+                <Download className="h-4 w-4" /> {t('documentViewer.download')}
               </a>
             </div>
           )}

@@ -1,0 +1,44 @@
+{
+  "pageTitle": "Lịch phỏng vấn của bạn",
+  "pageDescription": "Lịch do bộ phận nhân sự xếp. Vui lòng xác nhận, hoặc từ chối kèm lý do để được xếp lịch khác.",
+  "errors": {
+    "loadFailed": "Không tải được lịch phỏng vấn.",
+    "confirmFailed": "Xác nhận lịch thất bại.",
+    "declineFailed": "Gửi lý do thất bại.",
+    "dismissFailed": "Xoá lịch thất bại.",
+    "reasonTooShort": "Vui lòng nhập lý do (ít nhất 3 ký tự).",
+    "alreadyResponded": "Lịch này đã được phản hồi trước đó và không thể thay đổi."
+  },
+  "loginRequired": {
+    "message": "Vui lòng đăng nhập Portal ứng viên để xem và xác nhận lịch phỏng vấn của bạn.",
+    "button": "Đăng nhập để tiếp tục"
+  },
+  "noSchedule": "Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo khi có lịch.",
+  "awaitingSection": {
+    "badge": "Đã từ chối",
+    "title": "Phỏng vấn · Vòng {{round}}",
+    "message": "Bạn đã từ chối lịch{{declineReason}}. Nhân sự sẽ xếp một khung giờ khác và thông báo lại cho bạn.",
+    "dismissButton": "Xoá khỏi danh sách"
+  },
+  "scheduleItem": {
+    "interviewRound": "{{jobTitle || 'Phỏng vấn'}} · Vòng {{round}}",
+    "confirmed": "Đã xác nhận",
+    "pendingConfirmation": "Chưa xác nhận",
+    "confirmedLocked": "Bạn đã xác nhận tham dự. Quyết định đã được khoá và không thể thay đổi.",
+    "confirmButton": "Xác nhận tham dự",
+    "declineButton": "Từ chối / đổi lịch"
+  },
+  "practiceLink": "Vào hồ sơ ứng tuyển để luyện tập phỏng vấn thử",
+  "modal": {
+    "confirmTitle": "Xác nhận tham dự?",
+    "declineTitle": "Từ chối / xin đổi lịch?",
+    "confirmSummary": "{{jobTitle || 'Phỏng vấn'}} · Vòng {{round}} — {{day}}, {{time}}",
+    "declineReasonLabel": "Lý do bạn không thể tham dự (nhân sự sẽ xếp lịch khác):",
+    "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường, bận công việc...",
+    "warning": "Bạn đã chắc chắn với quyết định của mình chưa? Sau khi bấm, bạn sẽ không thể sửa lại lựa chọn này nữa.",
+    "warningDecline": " Nhân sự sẽ sắp xếp một khung giờ khác dựa trên lý do của bạn.",
+    "laterButton": "Để sau",
+    "confirmButton": "Tôi chắc chắn — Xác nhận",
+    "declineButton": "Tôi chắc chắn — Từ chối"
+  }
+}

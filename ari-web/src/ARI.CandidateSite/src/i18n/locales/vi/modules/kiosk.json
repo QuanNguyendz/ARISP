@@ -1,0 +1,71 @@
+{
+  "kiosk": {
+    "title": "Nhập mã phỏng vấn",
+    "subtitle": "Nhập mã 6 ký tự do nhân viên tuyển dụng cung cấp để bắt đầu phỏng vấn.",
+    "startButton": "Bắt đầu phỏng vấn",
+    "checkingCode": "Đang kiểm tra mã...",
+    "mode": "Chế độ khoá · Văn phòng",
+    "validity": {
+      "hours": "Mã hiệu lực 2 giờ",
+      "oneTime": "Dùng một lần",
+      "autoRecover": "Tự khôi phục khi mất kết nối"
+    },
+    "noCode": "Chưa có mã? Vui lòng liên hệ nhân viên tuyển dụng tại quầy lễ tân.",
+    "continue": "Tiếp tục buổi phỏng vấn đang dở",
+    "errors": {
+      "notFound": "Mã phỏng vấn không tồn tại. Vui lòng kiểm tra lại từng ký tự.",
+      "used": "Mã này đã được sử dụng. Liên hệ nhân viên tuyển dụng để được cấp mã mới.",
+      "expired": "Mã đã hết hạn (hiệu lực 2 giờ). Liên hệ nhân viên tuyển dụng để được cấp mã mới.",
+      "invalid": "Mã phỏng vấn không hợp lệ, đã sử dụng hoặc hết hạn.",
+      "connectionFailed": "Không kết nối được hệ thống. Vui lòng báo nhân viên lễ tân."
+    }
+  },
+  "kioskInterview": {
+    "greeting": "Xin chào {{name}}!",
+    "interviewInfo": "Buổi phỏng vấn chính thức vòng {{round}}{{jobTitle}}",
+    "intro": {
+      "recordingNotice": "Buổi phỏng vấn được ghi hình để bộ phận tuyển dụng đánh giá.",
+      "recordingPrivacy": "Video tự động xoá sau thời gian lưu trữ quy định.",
+      "voiceAnswer": "Trả lời bằng giọng nói; có thể sửa lại nội dung trước khi gửi.",
+      "timeLimit": "Hết thời lượng, AI sẽ khép lại buổi phỏng vấn."
+    },
+    "status": {
+      "recording": "Đang ghi hình",
+      "aiInterviewer": "Người phỏng vấn AI",
+      "connecting": "Đang kết nối phòng phỏng vấn...",
+      "aiInterviewerIdle": "Người phỏng vấn AI"
+    },
+    "micStatus": {
+      "listening": "Đang nghe...",
+      "micOn": "Mic đang bật",
+      "typing": "Đang nhập bằng bàn phím"
+    },
+    "answerPlaceholder": "Câu trả lời của bạn (có thể sửa lại nội dung thu âm trước khi gửi)",
+    "submitAnswer": "Gửi trả lời",
+    "endInterview": "Kết thúc phỏng vấn",
+    "toggleMic": "Bật/tắt mic",
+    "charCount": "{{count}} ký tự",
+    "timeUp": "Đã hết thời lượng — AI đang khép lại buổi phỏng vấn",
+    "emptyTranscript": "Nội dung hội thoại sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.",
+    "roleAi": "Người phỏng vấn AI",
+    "roleUser": "Bạn",
+    "thanks": "Cảm ơn {{name}}!",
+    "completion": "Buổi phỏng vấn đã hoàn tất. Bộ phận tuyển dụng sẽ xem xét và phản hồi kết quả qua email.",
+    "recordingSaving": "Đang lưu bản ghi hình...",
+    "recordingSaved": "Đã lưu bản ghi hình",
+    "recordingFailed": "Không lưu được bản ghi hình — vui lòng báo nhân viên lễ tân.",
+    "exitWarning": {
+      "title": "Bạn đã rời khỏi màn hình phỏng vấn",
+      "message": "Buổi phỏng vấn phải chạy ở chế độ toàn màn hình. Vui lòng quay lại để tiếp tục — hệ thống đã ghi nhận lần rời đi này.",
+      "exitCount": "Số lần rời khỏi màn hình: {{count}}"
+    },
+    "fullscreenReturn": "Quay lại toàn màn hình",
+    "exitRecorded": "Ghi nhận {{count}} lần rời khỏi màn hình phỏng vấn — thông tin này được gửi kèm kết quả cho bộ phận tuyển dụng.",
+    "autoReset": "Màn hình tự trở về trang nhập mã sau {{seconds}}s",
+    "returnToCode": "Về màn hình nhập mã",
+    "deviceCheck": {
+      "title": "Kiểm tra thiết bị trước khi vào phòng",
+      "startLabel": "Vào phòng phỏng vấn"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "title": "Device Check",
+  "subtitle": "Please enable camera and microphone to join the interview. Access permissions are only used during this session.",
+  "startLabel": "Start",
+  "camera": "Camera",
+  "microphone": "Microphone",
+  "microphoneLevel": "Microphone level",
+  "cameraStatus": {
+    "notSeeing": "Cannot see image",
+    "blockedOrDark": "Camera is blocked or room is too dark. Remove the lens cover or turn on more lights.",
+    "blocked": "Camera is blocked or too dark",
+    "blockedExplanation": "For transparency during the interview, you need to have your face clearly visible to the camera. Remove the lens cover or turn on more lights — the join button will unlock as soon as the camera detects a clear image."
+  },
+  "microphoneStatus": {
+    "speakNow": "Try speaking — the bar will move according to your voice.",
+    "noSignal": "Microphone signal not detected."
+  },
+  "noDeviceWarning": "Without an active camera/microphone, you cannot join the interview.",
+  "ready": "Ready",
+  "notReady": "Not ready",
+  "back": "Back",
+  "retry": "Retry",
+  "allowCameraMic": "Allow camera & microphone",
+  "checking": "Checking...",
+  "blockedByUser": "You have blocked camera/microphone permissions",
+  "deviceNotFound": "Camera or microphone not found",
+  "accessLost": "Camera/microphone access lost",
+  "cannotAccessDevice": "Cannot access device",
+  "errorHelp": {
+    "denied": "Open the permission icon in your browser address bar → allow Camera & Microphone → press Retry.",
+    "notfound": "Connect a camera/microphone and make sure no other application is using them, then Retry.",
+    "lost": "Camera/microphone permissions were just disabled or the device was disconnected. Enable permissions again and press Retry to join the interview.",
+    "other": "Please check your device and try again."
+  }
+}

@@ -98,5 +98,31 @@
   "noSession": {
     "title": "Chưa có vòng nào để hiển thị",
     "description": "Khi bạn hoàn thành phỏng vấn, kết quả sẽ xuất hiện tại đây."
+  },
+  "scheduled": {
+    "title": "Vòng {{round}}: Lịch phỏng vấn đã được xếp",
+    "preparationHint": "Vui lòng chuẩn bị thiết bị, microphone/camera và mã phỏng vấn trước thời gian bắt đầu."
+  },
+  "invited": {
+    "title": "Vòng {{round}}: Lời mời phỏng vấn",
+    "description": "Bạn đã nhận được lời mời cho vòng phỏng vấn này. Vui lòng kiểm tra email hoặc đăng ký lịch phỏng vấn."
+  },
+  "notStarted": {
+    "title": "Vòng {{round}}: Chưa diễn ra",
+    "description": "Vòng phỏng vấn này chưa bắt đầu. Bạn sẽ nhận được thông báo khi kết quả vòng trước được phê duyệt."
+  },
+  "badge": {
+    "scheduled": "Đã xếp lịch",
+    "invited": "Được mời",
+    "notStarted": "Chưa phỏng vấn",
+    "missed": "Quá hạn",
+    "practice": "Thử",
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "pendingHr": "Chờ HR",
+    "inProgress": "Đang diễn ra",
+    "noResult": "Chưa có kết quả",
+    "practiceInterview": "Phỏng vấn thử",
+    "realInterview": "Phỏng vấn thật"
   }
 }
