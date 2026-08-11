@@ -32,6 +32,12 @@ import candidateOnlineTestVi from './locales/vi/modules/candidate/onlineTest.jso
 import candidateOnlineTestEn from './locales/en/modules/candidate/onlineTest.json'
 import candidatePracticeReviewVi from './locales/vi/modules/candidate/practiceReview.json'
 import candidatePracticeReviewEn from './locales/en/modules/candidate/practiceReview.json'
+import candidateScheduleVi from './locales/vi/modules/candidate/schedule.json'
+import candidateScheduleEn from './locales/en/modules/candidate/schedule.json'
+import candidateSettingsVi from './locales/vi/modules/candidate/settings.json'
+import candidateSettingsEn from './locales/en/modules/candidate/settings.json'
+import kioskVi from './locales/vi/modules/kiosk.json'
+import kioskEn from './locales/en/modules/kiosk.json'
 
 // ===== MODULES: LEGAL =====
 import legalPrivacyPolicyVi from './locales/vi/modules/legal/privacyPolicy.json'
@@ -57,6 +63,9 @@ export const resources = {
     'modules/candidate/notifications': candidateNotificationsVi,
     'modules/candidate/onlineTest': candidateOnlineTestVi,
     'modules/candidate/practiceReview': candidatePracticeReviewVi,
+    'modules/candidate/schedule': candidateScheduleVi,
+    'modules/candidate/settings': candidateSettingsVi,
+    'modules/kiosk': kioskVi,
     // Legal module
     'modules/legal/privacyPolicy': legalPrivacyPolicyVi,
     'modules/legal/terms': legalTermsVi,
@@ -76,6 +85,9 @@ export const resources = {
     'modules/candidate/notifications': candidateNotificationsEn,
     'modules/candidate/onlineTest': candidateOnlineTestEn,
     'modules/candidate/practiceReview': candidatePracticeReviewEn,
+    'modules/candidate/schedule': candidateScheduleEn,
+    'modules/candidate/settings': candidateSettingsEn,
+    'modules/kiosk': kioskEn,
     // Legal module
     'modules/legal/privacyPolicy': legalPrivacyPolicyEn,
     'modules/legal/terms': legalTermsEn,
@@ -95,6 +107,9 @@ const siteNamespaces = [
   'modules/candidate/notifications',
   'modules/candidate/onlineTest',
   'modules/candidate/practiceReview',
+  'modules/candidate/schedule',
+  'modules/candidate/settings',
+  'modules/kiosk',
   'modules/legal/privacyPolicy',
   'modules/legal/terms',
   'modules/job-board/apply',

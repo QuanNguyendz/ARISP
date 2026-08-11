@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot, AlertTriangle, Loader2 } from 'lucide-react'
 import { interviewService } from '@ari/shared/fservices/interview'
@@ -8,20 +9,17 @@ import { useKioskLockdown } from '@ari/shared/media/useKioskLockdown'
 import { loadKioskSession, saveKioskSession, type KioskSession } from './kioskSession'
 
 export default function KioskPage() {
+  const { t } = useTranslation('modules/kiosk')
   const navigate = useNavigate()
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resumable, setResumable] = useState<KioskSession | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
-  // Màn nhập mã chưa cần khoá (chưa có phiên) — chỉ mượn hàm bật toàn màn hình.
   const { requestFullscreen } = useKioskLockdown(null, false)
 
-  // Focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus()
-    // Buổi đang dở trên chính máy này (reload giữa chừng) — mã 6 ký tự one-time-use nên
-    // không nhập lại được; cho vào lại bằng token phiên còn hạn (ADR-052).
     setResumable(loadKioskSession())
   }, [])
 
@@ -33,8 +31,6 @@ export default function KioskPage() {
     const newCode = [...code]
     newCode[index] = char
     setCode(newCode)
-
-    // Auto advance to next input
     if (char && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
@@ -43,7 +39,6 @@ export default function KioskPage() {
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace') {
       if (!code[index] && index > 0) {
-        // Move to previous input and clear it
         inputRefs.current[index - 1]?.focus()
         const newCode = [...code]
         newCode[index - 1] = ''
@@ -84,34 +79,28 @@ export default function KioskPage() {
     inputRefs.current[0]?.focus()
   }
 
-  // Mã hợp lệ → BE đã tạo phiên phỏng vấn THẬT + cấp token phạm vi phiên (ADR-052).
   const handleStartInterview = async () => {
     if (!isCodeComplete || checking) return
     setChecking(true)
     setError(null)
     try {
-      setInterviewSessionToken(null) // bỏ token phiên cũ còn sót trên máy dùng chung
+      setInterviewSessionToken(null)
       const info = await interviewService.validateInterviewCode(fullCode)
       if (!info.valid) {
         const messages: Record<string, string> = {
-          not_found: 'Mã phỏng vấn không tồn tại. Vui lòng kiểm tra lại từng ký tự.',
-          used: 'Mã này đã được sử dụng. Liên hệ nhân viên tuyển dụng để được cấp mã mới.',
-          expired: 'Mã đã hết hạn (hiệu lực 2 giờ). Liên hệ nhân viên tuyển dụng để được cấp mã mới.',
+          not_found: t('kiosk.errors.notFound'),
+          used: t('kiosk.errors.used'),
+          expired: t('kiosk.errors.expired'),
         }
-        setError(messages[info.reason ?? ''] ?? 'Mã phỏng vấn không hợp lệ, đã sử dụng hoặc hết hạn.')
+        setError(messages[info.reason ?? ''] ?? t('kiosk.errors.invalid'))
         resetCode()
         return
       }
       saveKioskSession(info)
-      // Bật toàn màn hình NGAY trong cú click này — requestFullscreen chỉ được chấp nhận
-      // trong một thao tác người dùng, không gọi được sau khi đã điều hướng (ADR-054).
       await requestFullscreen()
       navigate('/kiosk/interview')
-    } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không kết nối được hệ thống. Vui lòng báo nhân viên lễ tân.'
-      setError(message)
+    } catch {
+      setError(t('kiosk.errors.connectionFailed'))
     } finally {
       setChecking(false)
     }
@@ -119,13 +108,11 @@ export default function KioskPage() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-slate-100 antialiased flex flex-col relative overflow-hidden">
-      {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[40rem] w-[40rem] rounded-full bg-brand-600/20 blur-3xl"></div>
         <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-ai-600/15 blur-3xl"></div>
       </div>
 
-      {/* Header */}
       <header className="relative flex items-center justify-between px-8 h-16">
         <div className="flex items-center gap-2.5">
           <svg
@@ -136,26 +123,13 @@ export default function KioskPage() {
             aria-label="ARISP"
           >
             <defs>
-              <linearGradient
-                id="lg-k"
-                x1="12"
-                y1="10"
-                x2="84"
-                y2="86"
-                gradientUnits="userSpaceOnUse"
-              >
+              <linearGradient id="lg-k" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse">
                 <stop stopColor="#6366f1" />
                 <stop offset="1" stopColor="#a855f7" />
               </linearGradient>
             </defs>
             <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#lg-k)" />
-            <path
-              d="M30 70 L48 26 L66 70"
-              stroke="white"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M30 70 L48 26 L66 70" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M38 56 H58" stroke="white" strokeWidth="8" strokeLinecap="round" />
             <path
               d="M70 20 C71.4 27 72.5 28.1 79.5 29.5 C72.5 30.9 71.4 32 70 39 C68.6 32 67.5 30.9 60.5 29.5 C67.5 28.1 68.6 27 70 20 Z"
@@ -168,14 +142,12 @@ export default function KioskPage() {
           </span>
         </div>
         <span className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-white/10">
-          <Lock className="w-3.5 h-3.5" /> Chế độ khoá · Văn phòng
+          <Lock className="w-3.5 h-3.5" /> {t('kiosk.mode')}
         </span>
       </header>
 
-      {/* Center */}
       <main className="relative flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-lg text-center">
-          {/* Icon */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -190,7 +162,7 @@ export default function KioskPage() {
             transition={{ delay: 0.1 }}
             className="mt-6 font-display text-3xl font-extrabold leading-[1.25]"
           >
-            Nhập mã phỏng vấn
+            {t('kiosk.title')}
           </motion.h1>
           <motion.p
             initial={{ y: 10, opacity: 0 }}
@@ -198,10 +170,9 @@ export default function KioskPage() {
             transition={{ delay: 0.2 }}
             className="mt-2 text-slate-400"
           >
-            Nhập mã 6 ký tự do nhân viên tuyển dụng cung cấp để bắt đầu phỏng vấn.
+            {t('kiosk.subtitle')}
           </motion.p>
 
-          {/* Code inputs */}
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -229,7 +200,6 @@ export default function KioskPage() {
             ))}
           </motion.div>
 
-          {/* Start button */}
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -253,17 +223,16 @@ export default function KioskPage() {
             >
               {checking ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" /> Đang kiểm tra mã...
+                  <Loader2 className="h-5 w-5 animate-spin" /> {t('kiosk.checkingCode')}
                 </>
               ) : (
                 <>
-                  Bắt đầu phỏng vấn <ArrowRight className="w-5 h-5" />
+                  {t('kiosk.startButton')} <ArrowRight className="w-5 h-5" />
                 </>
               )}
             </button>
           </motion.div>
 
-          {/* Info badges */}
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -271,13 +240,13 @@ export default function KioskPage() {
             className="mt-6 flex items-center justify-center gap-6 text-xs text-slate-500"
           >
             <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" /> Mã hiệu lực 2 giờ
+              <Clock className="w-3.5 h-3.5" /> {t('kiosk.validity.hours')}
             </span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> Dùng một lần
+              <ShieldCheck className="w-3.5 h-3.5" /> {t('kiosk.validity.oneTime')}
             </span>
             <span className="flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" /> Tự khôi phục khi mất kết nối
+              <RefreshCw className="w-3.5 h-3.5" /> {t('kiosk.validity.autoRecover')}
             </span>
           </motion.div>
 
@@ -287,12 +256,11 @@ export default function KioskPage() {
             transition={{ delay: 0.6 }}
             className="mt-8 text-sm text-slate-500"
           >
-            Chưa có mã? Vui lòng liên hệ nhân viên tuyển dụng tại quầy lễ tân.
+            {t('kiosk.noCode')}
           </motion.p>
         </div>
       </main>
 
-      {/* Buổi đang dở trên chính máy này (reload/mất điện) — vào lại không cần mã mới */}
       {resumable && (
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -304,7 +272,7 @@ export default function KioskPage() {
             onClick={() => navigate('/kiosk/interview')}
             className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 hover:bg-white/10"
           >
-            Tiếp tục buổi phỏng vấn đang dở
+            {t('kiosk.continue')}
             {resumable.candidateName ? ` — ${resumable.candidateName}` : ''}
           </button>
         </motion.div>

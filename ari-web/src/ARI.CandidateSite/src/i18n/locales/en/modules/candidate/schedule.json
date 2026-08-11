@@ -1,0 +1,44 @@
+{
+  "pageTitle": "Your Interview Schedule",
+  "pageDescription": "Schedule assigned by HR. Please confirm or decline with a reason for rescheduling.",
+  "errors": {
+    "loadFailed": "Failed to load schedule.",
+    "confirmFailed": "Failed to confirm schedule.",
+    "declineFailed": "Failed to submit reason.",
+    "dismissFailed": "Failed to dismiss schedule.",
+    "reasonTooShort": "Please enter a reason (at least 3 characters).",
+    "alreadyResponded": "This schedule has already been responded to and cannot be changed."
+  },
+  "loginRequired": {
+    "message": "Please log in to the Candidate Portal to view and confirm your interview schedule.",
+    "button": "Log in to continue"
+  },
+  "noSchedule": "HR has not scheduled an interview for you yet. You will receive a notification when a schedule is available.",
+  "awaitingSection": {
+    "badge": "Declined",
+    "title": "Interview · Round {{round}}",
+    "message": "You declined this schedule{{declineReason}}. HR will schedule another time slot and notify you.",
+    "dismissButton": "Dismiss from list"
+  },
+  "scheduleItem": {
+    "interviewRound": "{{jobTitle || 'Interview'}} · Round {{round}}",
+    "confirmed": "Confirmed",
+    "pendingConfirmation": "Pending confirmation",
+    "confirmedLocked": "You have confirmed attendance. This decision is locked and cannot be changed.",
+    "confirmButton": "Confirm attendance",
+    "declineButton": "Decline / Reschedule"
+  },
+  "practiceLink": "Go to application to practice interview",
+  "modal": {
+    "confirmTitle": "Confirm attendance?",
+    "declineTitle": "Decline / Request reschedule?",
+    "confirmSummary": "{{jobTitle || 'Interview'}} · Round {{round}} — {{day}}, {{time}}",
+    "declineReasonLabel": "Reason you cannot attend (HR will schedule another time):",
+    "declineReasonPlaceholder": "Example: Conflict with school exam, busy at work...",
+    "warning": "Are you sure about your decision? After clicking, you will not be able to modify this choice.",
+    "warningDecline": " HR will arrange another time slot based on your reason.",
+    "laterButton": "Later",
+    "confirmButton": "I'm sure — Confirm",
+    "declineButton": "I'm sure — Decline"
+  }
+}

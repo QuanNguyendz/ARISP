@@ -1,0 +1,10 @@
+{
+  "documentViewer": {
+    "defaultFileName": "Document",
+    "docxError": "Cannot display DOCX file directly (may be due to CORS or corrupted file). Please download to view.",
+    "loading": "Building document content...",
+    "download": "Download",
+    "close": "Close",
+    "unsupportedFormat": "This file format is not supported for direct viewing. Please download to open."
+  }
+}

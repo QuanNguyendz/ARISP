@@ -297,7 +297,7 @@ function RoundPlaceholder({
           <CalendarClock className="h-6 w-6" />
         </div>
         <p className="mt-3 font-semibold text-ink-800">
-          Vòng {s.roundNumber}: Lịch phỏng vấn đã được xếp
+          {t('scheduled.title', { round: s.roundNumber })}
         </p>
         {s.scheduledAt && (
           <p className="mt-2 text-base font-bold text-blue-700">
@@ -306,7 +306,7 @@ function RoundPlaceholder({
           </p>
         )}
         <p className="mt-2 text-xs text-ink-500">
-          Vui lòng chuẩn bị thiết bị, microphone/camera và mã phỏng vấn trước thời gian bắt đầu.
+          {t('scheduled.preparationHint')}
         </p>
       </div>
     )
@@ -340,10 +340,10 @@ function RoundPlaceholder({
           <CalendarPlus className="h-6 w-6" />
         </div>
         <p className="mt-3 font-semibold text-ink-800">
-          Vòng {s.roundNumber}: Lời mời phỏng vấn
+          {t('invited.title', { round: s.roundNumber })}
         </p>
         <p className="mt-1 text-sm text-ink-500">
-          Bạn đã nhận được lời mời cho vòng phỏng vấn này. Vui lòng kiểm tra email hoặc đăng ký lịch phỏng vấn.
+          {t('invited.description')}
         </p>
       </div>
     )
@@ -354,9 +354,9 @@ function RoundPlaceholder({
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
           <Video className="h-6 w-6" />
         </div>
-        <p className="mt-3 font-semibold text-ink-700">Vòng {s.roundNumber}: Chưa diễn ra</p>
+        <p className="mt-3 font-semibold text-ink-700">{t('notStarted.title', { round: s.roundNumber })}</p>
         <p className="mt-1 text-sm text-ink-500">
-          Vòng phỏng vấn này chưa bắt đầu. Bạn sẽ nhận được thông báo khi kết quả vòng trước được phê duyệt.
+          {t('notStarted.description')}
         </p>
       </div>
     )
@@ -399,16 +399,16 @@ function RoundButton({
       return { cls: 'bg-brand-50 text-brand-700', icon: Clock, label: t('badge.inProgress') }
     }
     if (s.status === 'scheduled') {
-      return { cls: 'bg-blue-50 text-blue-700', icon: CalendarClock, label: 'Đã xếp lịch' }
+      return { cls: 'bg-blue-50 text-blue-700', icon: CalendarClock, label: t('badge.scheduled') }
     }
     if (s.status === 'missed') {
       return { cls: 'bg-amber-50 text-amber-700', icon: AlertTriangle, label: t('badge.missed') }
     }
     if (s.status === 'invited') {
-      return { cls: 'bg-purple-50 text-purple-700', icon: CalendarPlus, label: 'Được mời' }
+      return { cls: 'bg-purple-50 text-purple-700', icon: CalendarPlus, label: t('badge.invited') }
     }
     if (s.status === 'not_started') {
-      return { cls: 'bg-ink-100 text-ink-400', icon: Clock, label: 'Chưa phỏng vấn' }
+      return { cls: 'bg-ink-100 text-ink-400', icon: Clock, label: t('badge.notStarted') }
     }
     return { cls: 'bg-ink-100 text-ink-500', icon: Clock, label: t('badge.noResult') }
   }

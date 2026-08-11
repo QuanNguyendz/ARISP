@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -27,16 +28,15 @@ import {
 
 type Phase = 'intro' | 'live' | 'ended'
 
-/** Giây → M:SS cho đồng hồ đếm ngược. */
 function mmss(total: number): string {
   const s = Math.max(0, Math.floor(total))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** Số giây tự quay về màn nhập mã sau khi kết thúc — máy Kiosk phải sẵn sàng cho người kế tiếp. */
 const AUTO_RESET_SECONDS = 30
 
 export default function KioskInterviewPage() {
+  const { t } = useTranslation('modules/kiosk')
   const navigate = useNavigate()
   const [session] = useState<KioskSession | null>(() => loadKioskSession())
   const [phase, setPhase] = useState<Phase>('intro')
@@ -47,14 +47,12 @@ export default function KioskInterviewPage() {
   const selfVideoRef = useRef<HTMLVideoElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
 
-  // Phiên đã được tạo lúc xác thực mã → chỉ tham gia. Buổi thật: có avatar + quay video (ADR-052).
   const interview = useInterviewSession({
     existingSessionId: session?.sessionId ?? null,
     sessionType: 'real',
     recordVideo: true,
   })
 
-  // Khoá màn hình + ghi lại mọi lần rời đi; chỉ bật khi đã vào phòng phỏng vấn (ADR-054).
   const lockdown = useKioskLockdown(session?.sessionId ?? null, phase === 'live')
 
   const stopStream = useCallback(() => {
@@ -64,7 +62,6 @@ export default function KioskInterviewPage() {
 
   useEffect(() => () => stopStream(), [stopStream])
 
-  // Không có phiên (vào thẳng URL / token hết hạn) → trả về màn nhập mã.
   useEffect(() => {
     if (!session) navigate('/kiosk', { replace: true })
   }, [session, navigate])
@@ -81,7 +78,6 @@ export default function KioskInterviewPage() {
     }
   }, [phase])
 
-  /** Kết thúc: chốt video → tải lên storage → thoát toàn màn hình → dọn phiên khỏi máy Kiosk. */
   const finishSession = useCallback(async () => {
     setPhase('ended')
     setRecordingState('saving')
@@ -92,12 +88,10 @@ export default function KioskInterviewPage() {
     clearKioskSession()
   }, [interview, stopStream])
 
-  // Server báo kết thúc (hết câu hỏi / hết giờ) → cùng luồng chốt như bấm nút.
   useEffect(() => {
     if (interview.status === 'ended' && phase === 'live') void finishSession()
   }, [interview.status, phase, finishSession])
 
-  // Màn kết thúc tự đếm ngược rồi quay về nhập mã cho ứng viên kế tiếp.
   useEffect(() => {
     if (phase !== 'ended') return
     const id = window.setInterval(() => {
@@ -134,14 +128,13 @@ export default function KioskInterviewPage() {
           ARISP <span className="font-medium text-slate-400">Kiosk</span>
         </span>
         <span className="hidden rounded-full bg-white/5 px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10 sm:inline">
-          {session.candidateName || 'Ứng viên'} · {session.jobTitle || 'Vị trí ứng tuyển'} · Vòng{' '}
-          {session.roundNumber}
+          {session.candidateName || t('kioskInterview.roleUser')} · {session.jobTitle || ''} · Vòng {session.roundNumber}
         </span>
       </div>
       <div className="flex items-center gap-3">
         {phase === 'live' && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300 ring-1 ring-red-500/30">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> Đang ghi hình
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> {t('kioskInterview.status.recording')}
           </span>
         )}
         {interview.remainingSeconds !== null && phase === 'live' && (
@@ -159,7 +152,6 @@ export default function KioskInterviewPage() {
     </header>
   )
 
-  // ===== INTRO + KIỂM TRA THIẾT BỊ (ADR-040) =====
   if (phase === 'intro') {
     return (
       <div className="flex min-h-screen flex-col bg-ink-950 text-slate-100">
@@ -167,36 +159,31 @@ export default function KioskInterviewPage() {
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-8">
           <div className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-br from-brand-600/15 to-ai-600/10 p-5">
             <h1 className="font-display text-2xl font-bold text-white">
-              Xin chào {session.candidateName || 'bạn'}!
+              {t('kioskInterview.greeting', { name: session.candidateName || '' })}
             </h1>
             <p className="mt-1 text-slate-300">
-              Buổi phỏng vấn <b>chính thức</b> vòng {session.roundNumber}
-              {session.jobTitle ? ` — ${session.jobTitle}` : ''}.
+              {t('kioskInterview.interviewInfo', { round: session.roundNumber, jobTitle: session.jobTitle ? ` — ${session.jobTitle}` : '' })}
             </p>
             <ul className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <li className="flex items-start gap-2">
-                <Video className="mt-0.5 h-4 w-4 shrink-0 text-red-300" /> Buổi phỏng vấn được ghi
-                hình để bộ phận tuyển dụng đánh giá.
+                <Video className="mt-0.5 h-4 w-4 shrink-0 text-red-300" /> {t('kioskInterview.intro.recordingNotice')}
               </li>
               <li className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> Video tự động
-                xoá sau thời gian lưu trữ quy định.
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> {t('kioskInterview.intro.recordingPrivacy')}
               </li>
               <li className="flex items-start gap-2">
-                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> Trả lời bằng giọng nói;
-                có thể sửa lại nội dung trước khi gửi.
+                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" /> {t('kioskInterview.intro.voiceAnswer')}
               </li>
               <li className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /> Hết thời lượng, AI sẽ
-                khép lại buổi phỏng vấn.
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /> {t('kioskInterview.intro.timeLimit')}
               </li>
             </ul>
           </div>
 
           <div className="flex flex-1 items-center">
             <DeviceCheck
-              title="Kiểm tra thiết bị trước khi vào phòng"
-              startLabel="Vào phòng phỏng vấn"
+              title={t('kioskInterview.deviceCheck.title')}
+              startLabel={t('kioskInterview.deviceCheck.startLabel')}
               onReady={handleReady}
               onCancel={() => navigate('/kiosk')}
             />
@@ -206,7 +193,6 @@ export default function KioskInterviewPage() {
     )
   }
 
-  // ===== KẾT THÚC =====
   if (phase === 'ended') {
     return (
       <div className="grid min-h-screen place-items-center bg-ink-950 px-4">
@@ -219,60 +205,52 @@ export default function KioskInterviewPage() {
             <CheckCircle2 className="h-12 w-12 text-emerald-400" />
           </div>
           <h1 className="mb-3 font-display text-3xl font-bold text-white">
-            Cảm ơn {session.candidateName || 'bạn'}!
+            {t('kioskInterview.thanks', { name: session.candidateName || '' })}
           </h1>
-          <p className="mb-6 text-slate-400">
-            Buổi phỏng vấn đã hoàn tất. Bộ phận tuyển dụng sẽ xem xét và phản hồi kết quả qua email.
-          </p>
+          <p className="mb-6 text-slate-400">{t('kioskInterview.completion')}</p>
 
           <div className="mb-8 flex items-center justify-center gap-2 text-sm">
             {recordingState === 'saving' && (
               <span className="inline-flex items-center gap-2 text-slate-300">
-                <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu bản ghi hình...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t('kioskInterview.recordingSaving')}
               </span>
             )}
             {recordingState === 'saved' && (
               <span className="inline-flex items-center gap-2 text-emerald-300">
-                <ShieldCheck className="h-4 w-4" /> Đã lưu bản ghi hình
+                <ShieldCheck className="h-4 w-4" /> {t('kioskInterview.recordingSaved')}
               </span>
             )}
             {recordingState === 'error' && (
               <span className="inline-flex items-center gap-2 text-amber-300">
-                <AlertTriangle className="h-4 w-4" /> Không lưu được bản ghi hình — vui lòng báo
-                nhân viên lễ tân.
+                <AlertTriangle className="h-4 w-4" /> {t('kioskInterview.recordingFailed')}
               </span>
             )}
           </div>
 
-          {/* Đã ghi nhận rời màn hình → nói thẳng cho ứng viên biết là có trong báo cáo (ADR-054) */}
           {lockdown.exitCount > 0 && (
             <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-              Ghi nhận <b>{lockdown.exitCount}</b> lần rời khỏi màn hình phỏng vấn — thông tin này
-              được gửi kèm kết quả cho bộ phận tuyển dụng.
+              {t('kioskInterview.exitRecorded', { count: lockdown.exitCount })}
             </div>
           )}
 
           <p className="text-xs text-slate-500">
-            Màn hình tự trở về trang nhập mã sau {resetIn}s
+            {t('kioskInterview.autoReset', { seconds: resetIn })}
           </p>
           <button
             onClick={() => navigate('/kiosk', { replace: true })}
             disabled={recordingState === 'saving'}
             className="mt-3 rounded-xl bg-white/10 px-6 py-3 font-semibold text-white hover:bg-white/20 disabled:opacity-50"
           >
-            Về màn hình nhập mã
+            {t('kioskInterview.returnToCode')}
           </button>
         </motion.div>
       </div>
     )
   }
 
-  // ===== PHÒNG PHỎNG VẤN =====
   const starting = interview.status === 'starting'
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-ink-950 text-slate-100">
-      {/* Rời toàn màn hình → CHẶN toàn bộ giao diện phỏng vấn cho tới khi quay lại.
-          Trình duyệt chỉ cho bật lại toàn màn hình từ một thao tác người dùng → phải là nút bấm. */}
       {!lockdown.isFullscreen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink-950/95 px-6 backdrop-blur">
           <div className="max-w-md text-center">
@@ -280,20 +258,19 @@ export default function KioskInterviewPage() {
               <AlertTriangle className="h-8 w-8" />
             </div>
             <h2 className="font-display text-2xl font-bold text-white">
-              Bạn đã rời khỏi màn hình phỏng vấn
+              {t('kioskInterview.exitWarning.title')}
             </h2>
             <p className="mt-2 text-slate-400">
-              Buổi phỏng vấn phải chạy ở chế độ toàn màn hình. Vui lòng quay lại để tiếp tục — hệ
-              thống đã ghi nhận lần rời đi này.
+              {t('kioskInterview.exitWarning.message')}
             </p>
             <p className="mt-3 text-sm font-semibold text-amber-300">
-              Số lần rời khỏi màn hình: {lockdown.exitCount}
+              {t('kioskInterview.exitWarning.exitCount', { count: lockdown.exitCount })}
             </p>
             <button
               onClick={() => void lockdown.requestFullscreen()}
               className="mt-6 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-4 text-base font-bold text-white hover:opacity-95"
             >
-              Quay lại toàn màn hình
+              {t('kioskInterview.fullscreenReturn')}
             </button>
           </div>
         </div>
@@ -302,7 +279,6 @@ export default function KioskInterviewPage() {
       {header}
 
       <main className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_380px]">
-        {/* Sân khấu AI */}
         <section className="relative min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
           <video
             ref={interview.videoRef}
@@ -321,13 +297,12 @@ export default function KioskInterviewPage() {
                   <Bot className="h-12 w-12 text-white" />
                 </div>
                 <p className="mt-4 text-sm text-slate-400">
-                  {starting ? 'Đang kết nối phòng phỏng vấn...' : 'Người phỏng vấn AI'}
+                  {starting ? t('kioskInterview.status.connecting') : t('kioskInterview.status.aiInterviewerIdle')}
                 </p>
               </div>
             </div>
           )}
 
-          {/* Ô tự xem */}
           <video
             ref={selfVideoRef}
             autoPlay
@@ -338,21 +313,18 @@ export default function KioskInterviewPage() {
 
           {interview.timeUp && (
             <div className="absolute inset-x-0 top-4 mx-auto w-fit rounded-full bg-amber-500/20 px-4 py-1.5 text-sm text-amber-200 ring-1 ring-amber-500/40">
-              Đã hết thời lượng — AI đang khép lại buổi phỏng vấn
+              {t('kioskInterview.timeUp')}
             </div>
           )}
         </section>
 
-        {/* Hội thoại + trả lời */}
         <section className="flex min-h-0 flex-col gap-3">
           <div
             ref={transcriptRef}
             className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-3"
           >
             {interview.messages.length === 0 && (
-              <p className="text-sm text-slate-500">
-                Nội dung hội thoại sẽ hiển thị tại đây khi buổi phỏng vấn bắt đầu.
-              </p>
+              <p className="text-sm text-slate-500">{t('kioskInterview.emptyTranscript')}</p>
             )}
             {interview.messages.map((m, i) => (
               <div
@@ -362,7 +334,7 @@ export default function KioskInterviewPage() {
                 }`}
               >
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  {m.role === 'ai' ? 'Người phỏng vấn AI' : 'Bạn'}
+                  {m.role === 'ai' ? t('kioskInterview.roleAi') : t('kioskInterview.roleUser')}
                 </div>
                 {m.text}
               </div>
@@ -380,45 +352,41 @@ export default function KioskInterviewPage() {
                 {interview.micEnabled ? (
                   <>
                     <Mic className="h-3.5 w-3.5 text-emerald-400" />
-                    {interview.listening ? 'Đang nghe...' : 'Mic đang bật'}
+                    {interview.listening ? t('kioskInterview.micStatus.listening') : t('kioskInterview.micStatus.micOn')}
                   </>
                 ) : (
                   <>
-                    <Keyboard className="h-3.5 w-3.5" /> Đang nhập bằng bàn phím
+                    <Keyboard className="h-3.5 w-3.5" /> {t('kioskInterview.micStatus.typing')}
                   </>
                 )}
               </span>
-              <span>{interview.answerText.length} ký tự</span>
+              <span>{t('kioskInterview.charCount', { count: interview.answerText.length })}</span>
             </div>
             <textarea
               value={interview.answerText}
               onChange={(e) => interview.setAnswerText(e.target.value)}
-              placeholder="Câu trả lời của bạn (có thể sửa lại nội dung thu âm trước khi gửi)"
+              placeholder={t('kioskInterview.answerPlaceholder')}
               className="h-24 w-full resize-none rounded-xl border border-white/10 bg-ink-950/60 p-3 text-sm text-slate-100 outline-none focus:border-brand-500"
             />
             <div className="mt-2 flex items-center gap-2">
               <button
                 onClick={interview.toggleMic}
                 className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-200 hover:bg-white/10"
-                title={interview.micEnabled ? 'Tắt mic' : 'Bật mic'}
+                title={t('kioskInterview.toggleMic')}
               >
-                {interview.micEnabled ? (
-                  <Mic className="h-5 w-5" />
-                ) : (
-                  <MicOff className="h-5 w-5 text-red-400" />
-                )}
+                {interview.micEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-red-400" />}
               </button>
               <button
                 onClick={interview.submitAnswer}
                 disabled={!interview.answerText.trim() || interview.aiSpeaking}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-40"
               >
-                <Send className="h-4 w-4" /> Gửi trả lời
+                <Send className="h-4 w-4" /> {t('kioskInterview.submitAnswer')}
               </button>
               <button
                 onClick={endSession}
                 className="rounded-xl bg-red-600/90 p-2.5 text-white hover:bg-red-600"
-                title="Kết thúc phỏng vấn"
+                title={t('kioskInterview.endInterview')}
               >
                 <Phone className="h-5 w-5 rotate-[135deg]" />
               </button>

@@ -1,0 +1,35 @@
+{
+  "title": "Kiểm tra thiết bị",
+  "subtitle": "Cần bật camera và micro để vào phỏng vấn. Quyền truy cập chỉ dùng trong phiên này.",
+  "startLabel": "Bắt đầu",
+  "camera": "Camera",
+  "microphone": "Micro",
+  "microphoneLevel": "Mức âm micro",
+  "cameraStatus": {
+    "notSeeing": "Không thấy hình ảnh",
+    "blockedOrDark": "Camera đang bị che hoặc phòng quá tối. Hãy bỏ vật che ống kính / bật thêm đèn.",
+    "blocked": "Camera đang bị che hoặc quá tối",
+    "blockedExplanation": "Vì lý do minh bạch của buổi phỏng vấn, bạn cần để camera nhìn rõ khuôn mặt. Hãy bỏ vật che ống kính hoặc bật thêm ánh sáng — nút vào phỏng vấn sẽ mở lại ngay khi thấy hình."
+  },
+  "microphoneStatus": {
+    "speakNow": "Hãy thử nói — vạch sẽ nhảy theo giọng của bạn.",
+    "noSignal": "Chưa nhận được micro."
+  },
+  "noDeviceWarning": "Không có camera/micro hoạt động sẽ không thể vào phỏng vấn.",
+  "ready": "Sẵn sàng",
+  "notReady": "Chưa sẵn sàng",
+  "back": "Quay lại",
+  "retry": "Thử lại",
+  "allowCameraMic": "Cho phép camera & micro",
+  "checking": "Đang kiểm tra…",
+  "blockedByUser": "Bạn đã chặn quyền camera/micro",
+  "deviceNotFound": "Không tìm thấy camera hoặc micro",
+  "accessLost": "Mất quyền truy cập camera/micro",
+  "cannotAccessDevice": "Không truy cập được thiết bị",
+  "errorHelp": {
+    "denied": "Mở biểu tượng quyền trên thanh địa chỉ trình duyệt → cho phép Camera & Micro → nhấn Thử lại.",
+    "notfound": "Hãy kết nối camera/micro và đảm bảo không ứng dụng khác đang chiếm dụng, rồi Thử lại.",
+    "lost": "Quyền camera/micro vừa bị tắt hoặc thiết bị bị ngắt. Hãy bật lại quyền rồi nhấn Thử lại để vào phỏng vấn.",
+    "other": "Vui lòng kiểm tra thiết bị rồi thử lại."
+  }
+}
