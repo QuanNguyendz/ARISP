@@ -131,7 +131,7 @@ internal static class InterviewServiceFactory
     /// <summary>Storage chỉ dùng ở luồng lưu video Kiosk (ADR-052) — không chạm trong các test này.</summary>
     private sealed class ThrowingFileStorageService : IFileStorageService
     {
-        public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => throw new NotImplementedException();
         public Task DeleteAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();

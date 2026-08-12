@@ -176,7 +176,7 @@ namespace ARI.Application.CandidatePortal
             if (!string.IsNullOrEmpty(acc.ProfileCvUrl))
                 await _fileStorage.DeleteAsync(acc.ProfileCvUrl);
 
-            var storageKey = await _fileStorage.SaveAsync(bytes, command.FileName, mime);
+            var storageKey = await _fileStorage.SaveAsync(bytes, command.FileName, mime, StorageFolder.Cv);
             var originalFileName = System.IO.Path.GetFileName(command.FileName);
 
             acc.ProfileCvUrl = storageKey;

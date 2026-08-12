@@ -17,7 +17,8 @@ namespace ARI.Application.Interfaces
         /// <param name="content">Nội dung file (bytes).</param>
         /// <param name="originalFileName">Tên file gốc — chỉ dùng để lấy phần mở rộng.</param>
         /// <param name="contentType">MIME type (vd application/pdf).</param>
-        Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default);
+        /// <param name="folder">Nhóm thư mục đích — bắt buộc, để mỗi loại file nằm một nhánh riêng.</param>
+        Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default);
 
         /// <summary>
         /// Chuyển <c>storageKey</c> thành URL client dùng được.

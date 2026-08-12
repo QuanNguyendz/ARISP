@@ -37,11 +37,13 @@ namespace ARI.Infrastructure.Storage
             return string.IsNullOrEmpty(value) ? "application/octet-stream" : value;
         }
 
-        public async Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default)
+        public async Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default)
         {
             var ext = Path.GetExtension(originalFileName);
+            // KeyPrefix = prefix gốc tuỳ chọn của cả bucket (vd tách môi trường), KHÔNG phải tên loại file.
+            // Tên loại file do `folder` quyết định → cv/, jd/, recordings/, playbooks/.
             var prefix = string.IsNullOrWhiteSpace(_options.KeyPrefix) ? string.Empty : _options.KeyPrefix.Trim('/') + "/";
-            var key = $"{prefix}{Guid.NewGuid()}{ext}";
+            var key = $"{prefix}{folder.ToSegment()}/{Guid.NewGuid()}{ext}";
 
             using var ms = new MemoryStream(content);
             var request = new PutObjectRequest

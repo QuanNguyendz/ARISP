@@ -80,7 +80,7 @@ namespace ARI.Application.Applications.Commands.SubmitApplication
             string cvFileUrl;
             try
             {
-                cvFileUrl = await _fileStorage.SaveAsync(cvBytes, command.FileName, contentType);
+                cvFileUrl = await _fileStorage.SaveAsync(cvBytes, command.FileName, contentType, StorageFolder.Cv);
             }
             catch (Exception ex)
             {

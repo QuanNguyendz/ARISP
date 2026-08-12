@@ -12,18 +12,18 @@ namespace ARI.Application.UnitTests.TestSupport;
 /// </summary>
 public sealed class RecordingFileStorage : IFileStorageService
 {
-    public List<(string FileName, string ContentType)> Saved { get; } = new();
+    public List<(string FileName, string ContentType, StorageFolder Folder)> Saved { get; } = new();
     public List<string> Deleted { get; } = new();
     public bool ThrowOnSave { get; set; }
 
     /// <summary>Bytes trả về khi <see cref="ReadAllBytesAsync"/> được gọi (null = không tìm thấy file).</summary>
     public byte[]? FileBytes { get; set; }
 
-    public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default)
+    public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default)
     {
         if (ThrowOnSave) throw new InvalidOperationException("storage down");
-        Saved.Add((originalFileName, contentType));
-        return Task.FromResult($"stored/{originalFileName}");
+        Saved.Add((originalFileName, contentType, folder));
+        return Task.FromResult($"{folder.ToSegment()}/{originalFileName}");
     }
 
     public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");

@@ -59,7 +59,7 @@ public class UploadPlaybookCommandHandlerTests
         Assert.Equal("pdf", doc.FileFormat);            // ext bỏ dấu chấm
         Assert.Equal("question_bank", doc.DocumentType); // trim
         Assert.Equal("job", doc.Scope);
-        Assert.Equal("stored/pb.pdf", doc.FileUrl);
+        Assert.Equal("playbooks/pb.pdf", doc.FileUrl);
 
         var ingest = Assert.Single(rag.Ingested);
         Assert.Equal("playbook", ingest.SourceType);
@@ -99,6 +99,6 @@ public class UploadPlaybookCommandHandlerTests
         Assert.True(res.IsFailure);
         Assert.Equal(CommonErrorCodes.ServerError, res.ErrorCode);
         Assert.Contains("Xử lý playbook thất bại", res.Error);
-        Assert.Contains("stored/pb.pdf", storage.Deleted);   // bù trừ xoá file đã lưu
+        Assert.Contains("playbooks/pb.pdf", storage.Deleted);   // bù trừ xoá file đã lưu
     }
 }
