@@ -22,6 +22,8 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useDebouncedValue } from '@ari/shared/hooks/useDebouncedValue'
+import { useJobSearchStore } from '@/store/jobSearchStore'
 import CandidateHeader from '@/app/layouts/CandidateHeader'
 import jobService from '@ari/shared/fservices/job'
 import type { JobFacets } from '@ari/shared/fservices/job'
@@ -850,7 +852,11 @@ export default function FindJob() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated } = useAuthStore()
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '')
+  // Từ khoá dùng chung với ô tìm ở header — gõ ở ô nào cũng lọc ngay, hai ô luôn cùng nội dung.
+  const searchQuery = useJobSearchStore((s) => s.query)
+  const setSearchQuery = useJobSearchStore((s) => s.setQuery)
+  // Chỉ gọi API khi ngừng gõ để không bắn request theo từng ký tự (ô nhập vẫn phản hồi tức thì).
+  const debouncedSearch = useDebouncedValue(searchQuery, 300)
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
   const [facets, setFacets] = useState<JobFacets>(EMPTY_FACETS)
   const [cities, setCities] = useState<City[]>([])
@@ -886,7 +892,7 @@ export default function FindJob() {
     loadFacets()
   }, [])
 
-  // Nhận từ khoá từ ô tìm ở header (?search=) khi đang ở trang việc làm → áp vào ô tìm rồi dọn URL.
+  // Link ngoài mở kèm ?search=<từ khoá> → nạp vào ô tìm rồi dọn URL (deep link, chạy 1 lần).
   useEffect(() => {
     const q = searchParams.get('search')
     if (q !== null) {
@@ -895,11 +901,11 @@ export default function FindJob() {
       searchParams.delete('search')
       setSearchParams(searchParams, { replace: true })
     }
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, setSearchQuery])
 
   // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
   const queryParams = {
-    search: searchQuery || undefined,
+    search: debouncedSearch || undefined,
     categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
     employmentTypes:
       filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
@@ -1042,7 +1048,7 @@ export default function FindJob() {
   // Đổi bộ lọc / tìm kiếm / sắp xếp → quay về trang 1.
   useEffect(() => {
     setPage(1)
-  }, [JSON.stringify(filters), searchQuery, sortBy, minSalary, maxSalary, salaryIsNegotiable])
+  }, [JSON.stringify(filters), debouncedSearch, sortBy, minSalary, maxSalary, salaryIsNegotiable])
 
   const goToPage = (next: number) => {
     const clamped = Math.min(Math.max(1, next), totalPages)

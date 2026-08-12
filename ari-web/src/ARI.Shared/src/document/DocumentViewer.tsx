@@ -37,7 +37,13 @@ function detectKind(nameOrUrl: string): DocKind {
   return 'other'
 }
 
-function DocxRender({ url, t }: { url: string; t: ReturnType<typeof useTranslation<'modules/shared/documentViewer'>['t']> }) {
+function DocxRender({
+  url,
+  t,
+}: {
+  url: string
+  t: ReturnType<typeof useTranslation<'modules/shared/documentViewer'>>['t']
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

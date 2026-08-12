@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-08-05
+**Last updated:** 2026-08-11
 
 ---
 
@@ -23,6 +23,7 @@ _Chưa có task nào đang thực hiện._
 ### FE UI Redesign (mới) – từ mockup `design/mockups/`
 - [ ] Áp design system + logo ARISP vào `frontend` thật (token màu brand/ai/ink, font Plus Jakarta Sans/Inter).
 - [ ] Dark/light theme toggle toàn FE (lưu localStorage / `preferred_theme`), no-flash init.
+  - [x] 2026-08-11 **Vá lớp override dark mode** — bổ sung ~60 rule cho các class sáng còn sót (nền tint 50/100, viền/ring tint, chữ 600–800, gradient, thang xám) + `color-scheme` bám theo theme app thay vì OS.
 - [ ] **i18n UI candidate VI/EN** (react-i18next) — [ADR-033]; cột `candidate_accounts.preferred_locale`.
   - [x] 2026-07-03 **Cập nhật Candidate pages sử dụng i18n** — Translate ProfilePage, ApplicationsPage, SchedulePage, FeedbackPage, SettingsPage, SavedJobsPage sử dụng react-i18next với candidate.json (vi/en).
   - [x] 2026-07-13 **Cập nhật FindJobPage và ApplicationsPage i18n** — Hoàn thiện i18n cho FindJobPage (sort options, salary labels, deadline, posted date) và ApplicationsPage (FILTERS, scheduleInfo, roundTypeLabel, CV tooltips, error messages). Thêm keys mới vào landing.json và candidate.json.
@@ -131,6 +132,7 @@ _Chưa có task nào đang thực hiện._
 - [ ] EF Core migrations
 - [x] Candidate self-registration: email + password (role `Candidate`) – endpoint đã có
 - [ ] Candidate: tìm kiếm Job Posting IT (keyword, level, salary range, location)
+- [x] Candidate: ô tìm việc ở header lọc trực tiếp danh sách — dùng chung từ khoá với ô tìm ở hero `FindJobPage` (store `jobSearchStore`), debounce 300ms ✅ 2026-08-11
 - [ ] Candidate: xem Job Detail (tên công ty, JD, yêu cầu hiển thị công khai)
 - [ ] Candidate: self-apply → submit CV + thông tin cá nhân → tạo `Application`
 - [ ] HR Admin / Recruiter: xem danh sách ứng viên tự ứng tuyển qua Job Board (kèm CV)
@@ -322,6 +324,10 @@ _Chưa có task nào đang thực hiện._
 ---
 
 ## Completed
+
+- [x] 2026-08-11: **Vá lỗi hiển thị chế độ tối (dark mode override layer)** — dark mode ở FE là lớp `html.dark .<class> { … !important }` liệt kê tay trong `ARI.Shared/src/styles/index.css`, nên **class sáng nào không có trong danh sách vẫn giữ nền/chữ sáng**. Đối chiếu toàn bộ class "sáng" đang dùng trong `ARI.CandidateSite` + `ARI.Shared` với danh sách override → bổ sung phần còn thiếu: nền trắng mờ (`bg-white/50|70|95`, `hover:bg-white`, `hover:bg-white/90`), thang xám (`bg-ink-200|300`, `bg-ink-50/60`, `bg-ink-100/80`, `border-ink-300`, `ring-ink-200`, `hover:bg-ink-200`), nền tint 50/100 (`bg-brand-50/40` — item thông báo chưa đọc, `bg-ai-50/40|50`, `bg-{brand,ai,emerald,amber,red,blue,purple}-100`, `bg-blue-50`, `bg-purple-50`, các hover tương ứng), viền/ring tint (`border-{brand,ai,emerald,amber,red,blue,purple}-100|200`, `ring-{brand,ai,emerald,amber,red}-100|200`), **chữ tông đậm vốn dành cho chip nền sáng** (`text-{emerald,amber,red,blue,purple}-700|800`, `text-{brand,ai,emerald,amber,red,blue,purple}-600`, `text-brand-800`) và gradient còn sáng (`from-white`, `from-ink-50`, shimmer Skeleton `from-ink-200 via-ink-50 to-ink-200`). Thêm `html.dark { color-scheme: dark }` / `html:not(.dark) { color-scheme: light }` — trước đó `:root { color-scheme: light dark }` để **OS** quyết định nên bật tối trong app mà OS đang sáng thì thanh cuộn/popup select/date picker vẫn trắng. Sửa kèm badge số thông báo chưa đọc ở `CandidateHeader` (`ring-white` → thêm `dark:ring-ink-900`, theo đúng cách `ProfilePage`/`ApplicationsPage` đang làm). **Đợt 2 — biến thể (responsive/trạng thái):** `lg:bg-white`, `hover:text-brand-600`… là CLASS RIÊNG, không dính rule của `.bg-white`/`.text-brand-600` → khung nav dọc trang Hồ sơ (`ProfilePage` nav `lg:bg-white lg:border-ink-200`) vẫn trắng toát ở màn ≥1024px. Bổ sung kèm **đúng pseudo-class / media query gốc** (viết thiếu là rule đè cả lúc không hover, hoặc bung ra mọi bề rộng): nhóm `lg:` bọc trong `@media (min-width: 1024px)`, `focus-within:bg-white` (ô tìm ở header sáng lên khi focus), `focus:/focus-within:ring-brand-100`, `focus:ring-red-100`, `disabled:hover:*`, `hover:bg-*` (ink-50/100/200/300 + tint), `hover:text-*` (ink-600→900, brand-600/700, ai-600, amber-700, red-600), `.group:hover .group-hover:*`, cùng bộ alpha riêng của StaffSite (`bg-ink-50/20|40|50|70|80`, `border-ink-200/50…80`, `text-{ai,amber,brand}-800|900`, `text-indigo-*`, `text-ink-950`, `from-*`). Dùng script đối chiếu tự động (bóc mọi token utility trong file thiết kế sáng ↔ danh sách override, loại trừ màn tối sẵn: interview/kiosk/glass/DeviceCheck) — **từ 64 class thiếu về 0** (`ring-white` còn lại đã xử lý inline ở cả 5 chỗ). Build candidate + staff pass; đã kiểm rule `lg:` nằm đúng trong media query của CSS bundle.
+
+- [x] 2026-08-11: **Ô tìm việc ở header lọc trực tiếp (CandidateSite)** — ô tìm trên header giờ hoạt động y hệt ô tìm ở hero `FindJobPage`: gõ tới đâu lọc tới đó, bỏ luồng cũ "Enter → điều hướng `/jobs?search=<từ khoá>`". Thêm store dùng chung `@/store/jobSearchStore` (zustand: `query` + cờ `refocus`) để hai ô luôn cùng một từ khoá; gõ khi đang ở màn khác → tự mở `/jobs` rồi trả con trỏ về cuối ô (header render theo từng trang nên bị unmount khi đổi route). Thêm hook `@ari/shared/hooks/useDebouncedValue` (300ms) cho `FindJobPage` → không bắn request mỗi ký tự (ô nhập vẫn phản hồi tức thì); `?search=` giữ vai trò deep link chạy 1 lần. Thêm nút xoá từ khoá (X) + key i18n `jobs.clearSearch` (VI/EN). **Sửa kèm 3 lỗi build có sẵn từ commit i18n `3e634b88`** khiến nhánh `develop` không compile: `DeviceCheck.tsx` thiếu `)}` + `)` đóng JSX (TS1005), `DocumentViewer.tsx` sai kiểu prop `t` (đúng: `ReturnType<typeof useTranslation<...>>['t']`), `SearchableSelect.tsx` bỏ quên `resolvedEmptyText` (dùng lại + thêm 2 key `searchableSelect.selectPlaceholder`/`noResults` thay chuỗi VI hardcode). Build `candidate` + `staff` pass.
 
 - [x] 2026-08-11: **i18n Audit & Fix — Phase 1-4 (Frontend VI/EN)** — Hoàn thành audit toàn bộ i18n trên 57 pages/components. **Phase 1 (Shared Components):** Fix DeviceCheck.tsx (21 hardcoded VI → t()), AssignSchedulePanel.tsx (13), designSystem.tsx Pagination/ErrorAlert (7), SearchableSelect.tsx (4), DocumentViewer.tsx (6). Tạo 5 translation files mới: deviceCheck.json, assignSchedulePanel.json, designSystem.json, documentViewer.json, kiosk.json. **Phase 2:** Fix IDENTICAL keys trong nav.json (6 keys: HR Admin Workspace/Recruiter Workspace/Super Admin Workspace → VI). **Phase 3:** Fix SchedulePage.tsx (30+ VI → t()), KioskPage.tsx (15+ VI → t()), KioskInterviewPage.tsx (40+ VI → t()), SettingsPage.tsx (30+ VI → t()). Tạo schedule.json (VI/EN) cho SchedulePage, settings.json (VI/EN) cho SettingsPage. **Phase 4:** Fix ApplicationDetailPage.tsx (9 VI → t() + thêm keys scheduled/invited/notStarted badge), ProfilePage.tsx (7 VI → t() + privacyToggle/cvReview keys), FindJobPage.tsx (1 tooltip → t()). Fix duplicate/bổ sung missing keys trong applicationDetail.json (scheduled/invited/notStarted + badge keys). Tất cả shared components + CandidateSite pages giờ hỗ trợ VI ↔ EN switching.
 

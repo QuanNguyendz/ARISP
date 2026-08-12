@@ -422,7 +422,7 @@ function StatusRow({ Icon, label, ok, pending, warn, readyLabel, notReadyLabel }
         <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
       ) : (
         <span className="text-xs font-medium text-slate-500">{notReadyLabel}</span>
-      )
-    }
-  </div>
+      )}
+    </div>
+  )
 }
