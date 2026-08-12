@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Target,
   FileText,
-  Download,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -640,13 +639,15 @@ export default function JobPostingDetailPage() {
             >
               <Calendar className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Lịch phỏng vấn
             </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
-              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
-            >
-              <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
-            </button>
+            {job.roundConfigs?.some((r) => (r.roundType || '').toLowerCase() === 'online_test') && (
+              <button
+                type="button"
+                onClick={() => navigate(`/hr/jobs/${job.id}/online-test`)}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 font-medium hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
+              >
+                <ScrollText className="w-4 h-4" /> {t('onlineTestBank')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
@@ -795,28 +796,34 @@ export default function JobPostingDetailPage() {
               </h2>
               {job.jdFileUrl ? (
                 <div className="flex flex-wrap gap-3">
+                  {/* Đã duyệt → mở bản JD đã đóng dấu (có chữ ký số); chưa duyệt → mở file gốc. */}
                   <button
                     type="button"
                     onClick={() =>
-                      openDocument(job.jdFileUrl!, job.jdFileName || `${job.title} - JD`)
+                      openDocument(
+                        job.signedJdFileUrl || job.jdFileUrl!,
+                        job.jdFileName || `${job.title} - JD`,
+                      )
                     }
-                    className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ${
+                      job.signedJdFileUrl
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20'
+                        : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:bg-white/5 dark:text-ink-200 dark:hover:bg-white/10'
+                    }`}
                   >
-                    <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                    <FileText
+                      className={`h-4 w-4 ${job.signedJdFileUrl ? '' : 'text-brand-600 dark:text-brand-400'}`}
+                    />
                     {job.jdFileName || t('jdSection.originalJd')}
+                    {job.signedJdFileUrl && (
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        {t('jdSection.signedBadge')}
+                      </span>
+                    )}
                     {job.jdFileFormat && (
                       <span className="text-xs uppercase text-ink-400">{job.jdFileFormat}</span>
                     )}
                   </button>
-                  {job.signedJdFileUrl && (
-                    <button
-                      type="button"
-                      onClick={() => openDocument(job.signedJdFileUrl!, `${job.title} - JD`)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20"
-                    >
-                      <Download className="h-4 w-4" /> {t('jdSection.approvedJd')}
-                    </button>
-                  )}
                 </div>
               ) : (
                 <p className="text-sm text-ink-500 dark:text-ink-400">{t('jdSection.noJd')}</p>

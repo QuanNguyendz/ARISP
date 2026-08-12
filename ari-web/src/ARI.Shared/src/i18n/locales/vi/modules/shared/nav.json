@@ -1,6 +1,6 @@
 {
   "hr": {
-    "workspace": "HR Admin Workspace",
+    "workspace": "Không gian làm việc HR",
     "dashboard": "Tổng quan",
     "jobs": "Tin tuyển dụng",
     "candidates": "Ứng viên",
@@ -12,10 +12,10 @@
     "help": "Trợ giúp & tài liệu",
     "searchPlaceholder": "Tìm ứng viên, tin tuyển dụng...",
     "createJob": "Tạo tin",
-    "roleLabel": "HR Admin"
+    "roleLabel": "Quản trị HR"
   },
   "recruiter": {
-    "workspace": "Recruiter Workspace",
+    "workspace": "Không gian làm việc Recruiter",
     "dashboard": "Tổng quan",
     "jobs": "Tin tuyển dụng",
     "candidates": "Ứng viên",
@@ -25,10 +25,10 @@
     "settings": "Cài đặt",
     "searchPlaceholder": "Tìm tin tuyển dụng, ứng viên...",
     "createJob": "Tạo tin",
-    "roleLabel": "Recruiter"
+    "roleLabel": "Chuyên viên tuyển dụng"
   },
   "superAdmin": {
-    "workspace": "Super Admin Workspace",
+    "workspace": "Không gian làm việc Super Admin",
     "dashboard": "Tổng quan",
     "users": "Quản lý Users",
     "allUsers": "Tất cả người dùng",
@@ -38,6 +38,12 @@
     "searchPlaceholder": "Tìm user, audit log...",
     "addStaff": "Thêm staff",
     "roleLabel": "Super Admin"
+  },
+  "search": {
+    "jobs": "Tin tuyển dụng",
+    "candidates": "Ứng viên",
+    "noResults": "Không tìm thấy kết quả",
+    "loading": "Đang tìm..."
   },
   "shared": {
     "help": "Trợ giúp & tài liệu",

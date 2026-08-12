@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Palette,
   Bell,
@@ -44,13 +45,12 @@ function applyTheme(mode: ThemeMode) {
 }
 
 const SECTION_NAV = [
-  { id: 'appearance', label: 'Giao diện', Icon: Palette },
-  { id: 'notifications', label: 'Thông báo', Icon: Bell },
-  { id: 'privacy', label: 'Quyền riêng tư', Icon: Lock },
-  { id: 'sessions', label: 'Phiên đăng nhập', Icon: MonitorSmartphone },
+  { id: 'appearance', labelKey: 'settings.nav.appearance', Icon: Palette },
+  { id: 'notifications', labelKey: 'settings.nav.notifications', Icon: Bell },
+  { id: 'privacy', labelKey: 'settings.nav.privacy', Icon: Lock },
+  { id: 'sessions', labelKey: 'settings.nav.sessions', Icon: MonitorSmartphone },
 ]
 
-/** Công tắc bật/tắt dùng chung. */
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -67,14 +67,8 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   )
 }
 
-const NOTIF_ROWS: { key: keyof CandidateSettings; title: string; desc: string }[] = [
-  { key: 'interviewInvite', title: 'Lời mời phỏng vấn', desc: 'Khi bạn được mời vào vòng phỏng vấn' },
-  { key: 'result', title: 'Kết quả phỏng vấn', desc: 'Khi có kết quả Pass/Not Pass được HR xác nhận' },
-  { key: 'applicationUpdate', title: 'Cập nhật đơn ứng tuyển', desc: 'HR xem hồ sơ, thay đổi trạng thái' },
-  { key: 'jobSuggestion', title: 'Gợi ý việc làm phù hợp', desc: 'Việc làm mới khớp hồ sơ & kỹ năng của bạn' },
-]
-
 export default function SettingsPage() {
+  const { t } = useTranslation('modules/candidate/settings')
   const navigate = useNavigate()
   const { logout } = useAuthStore()
   const [settings, setSettings] = useState<CandidateSettings | null>(null)
@@ -97,7 +91,6 @@ export default function SettingsPage() {
     }
   }, [])
 
-  /** Cập nhật state + lưu lên server (auto-save). */
   const save = async (next: CandidateSettings) => {
     setSettings(next)
     setSaving(true)
@@ -133,7 +126,7 @@ export default function SettingsPage() {
   }
 
   const onLogoutAll = async () => {
-    if (!window.confirm('Đăng xuất khỏi tất cả thiết bị? Bạn sẽ cần đăng nhập lại.')) return
+    if (!window.confirm(t('settings.sessions.logoutAllConfirm'))) return
     setLoggingOut(true)
     try {
       await settingsService.logoutAllDevices()
@@ -146,22 +139,33 @@ export default function SettingsPage() {
     }
   }
 
+  const themeOptions = [
+    { mode: 'light' as const, label: t('settings.appearance.themeOptions.light'), Icon: Sun, iconCls: 'text-amber-500', bar: 'from-ink-50 to-white ring-ink-200' },
+    { mode: 'dark' as const, label: t('settings.appearance.themeOptions.dark'), Icon: Moon, iconCls: 'text-brand-500', bar: 'from-ink-900 to-ink-700 ring-ink-700' },
+    { mode: 'system' as const, label: t('settings.appearance.themeOptions.system'), Icon: Monitor, iconCls: 'text-ink-500', bar: 'from-white to-ink-900 ring-ink-200' },
+  ]
+
+  const notifRows = [
+    { key: 'interviewInvite' as const, title: t('settings.notifications.types.interviewInvite'), desc: t('settings.notifications.types.interviewInviteDesc') },
+    { key: 'result' as const, title: t('settings.notifications.types.result'), desc: t('settings.notifications.types.resultDesc') },
+    { key: 'applicationUpdate' as const, title: t('settings.notifications.types.applicationUpdate'), desc: t('settings.notifications.types.applicationUpdateDesc') },
+    { key: 'jobSuggestion' as const, title: t('settings.notifications.types.jobSuggestion'), desc: t('settings.notifications.types.jobSuggestionDesc') },
+  ]
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
-      {/* Breadcrumb */}
       <div className="mb-4 flex items-center gap-2 text-sm text-ink-400">
         <Link to="/jobs" className="hover:text-brand-600">
-          Trang chủ
+          {t('settings.home')}
         </Link>
         <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-ink-600">Cài đặt</span>
+        <span className="font-medium text-ink-600">{t('settings.title')}</span>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-        {/* Section nav */}
         <aside className="self-start lg:sticky lg:top-24">
           <nav className="rounded-2xl border border-ink-200 bg-white p-2 text-sm shadow-card">
-            {SECTION_NAV.map(({ id, label, Icon }) => (
+            {SECTION_NAV.map(({ id, labelKey, Icon }) => (
               <a
                 key={id}
                 href={`#${id}`}
@@ -172,15 +176,14 @@ export default function SettingsPage() {
                     : 'text-ink-600 hover:bg-ink-100'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${active === id ? '' : 'text-ink-400'}`} /> {label}
+                <Icon className={`h-4 w-4 ${active === id ? '' : 'text-ink-400'}`} /> {t(labelKey)}
               </a>
             ))}
           </nav>
         </aside>
 
-        {/* Content */}
         <div className="space-y-6">
-          <h1 className="font-display text-2xl font-extrabold text-ink-900">Cài đặt</h1>
+          <h1 className="font-display text-2xl font-extrabold text-ink-900">{t('settings.title')}</h1>
 
           {/* Appearance */}
           <section
@@ -188,17 +191,13 @@ export default function SettingsPage() {
             className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
-              <Palette className="h-5 w-5 text-brand-600" /> Giao diện
+              <Palette className="h-5 w-5 text-brand-600" /> {t('settings.appearance.sectionTitle')}
             </h2>
 
             <div className="mb-5">
-              <div className="mb-2 text-sm font-medium text-ink-600">Chủ đề</div>
+              <div className="mb-2 text-sm font-medium text-ink-600">{t('settings.appearance.theme')}</div>
               <div className="grid grid-cols-3 gap-3">
-                {([
-                  { mode: 'light' as const, label: 'Sáng', Icon: Sun, iconCls: 'text-amber-500', bar: 'from-ink-50 to-white ring-ink-200' },
-                  { mode: 'dark' as const, label: 'Tối', Icon: Moon, iconCls: 'text-brand-500', bar: 'from-ink-900 to-ink-700 ring-ink-700' },
-                  { mode: 'system' as const, label: 'Theo hệ thống', Icon: Monitor, iconCls: 'text-ink-500', bar: 'from-white to-ink-900 ring-ink-200' },
-                ]).map(({ mode, label, Icon, iconCls, bar }) => (
+                {themeOptions.map(({ mode, label, Icon, iconCls, bar }) => (
                   <button
                     key={mode}
                     onClick={() => onTheme(mode)}
@@ -219,9 +218,9 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between border-t border-ink-100 pt-4">
               <div>
-                <div className="text-sm font-semibold text-ink-800">Ngôn ngữ hiển thị</div>
+                <div className="text-sm font-semibold text-ink-800">{t('settings.appearance.displayLanguage')}</div>
                 <div className="text-xs text-ink-400">
-                  Ngôn ngữ giao diện ứng dụng (không ảnh hưởng ngôn ngữ phỏng vấn)
+                  {t('settings.appearance.displayLanguageHint')}
                 </div>
               </div>
               <select
@@ -242,15 +241,15 @@ export default function SettingsPage() {
             className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-1 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
-              <Bell className="h-5 w-5 text-brand-600" /> Thông báo
+              <Bell className="h-5 w-5 text-brand-600" /> {t('settings.notifications.sectionTitle')}
             </h2>
-            <p className="mb-4 text-sm text-ink-400">Chọn loại thông báo bạn muốn nhận và kênh nhận.</p>
+            <p className="mb-4 text-sm text-ink-400">{t('settings.notifications.sectionDesc')}</p>
 
             <div className="overflow-hidden rounded-xl border border-ink-200">
               <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-ink-100 bg-ink-50 px-4 py-2.5 text-xs font-semibold text-ink-500">
-                <span>Loại thông báo</span>
-                <span className="w-12 text-center">Email</span>
-                <span className="w-12 text-center">Đẩy</span>
+                <span>{t('settings.notifications.columns.type')}</span>
+                <span className="w-12 text-center">{t('settings.notifications.columns.email')}</span>
+                <span className="w-12 text-center">{t('settings.notifications.columns.push')}</span>
               </div>
               <div className="divide-y divide-ink-100">
                 {loading || !settings
@@ -261,7 +260,7 @@ export default function SettingsPage() {
                         <Skeleton className="h-6 w-11 rounded-full" />
                       </div>
                     ))
-                  : NOTIF_ROWS.map(({ key, title, desc }) => {
+                  : notifRows.map(({ key, title, desc }) => {
                       const pref = settings[key] as NotificationChannelPref
                       return (
                         <div
@@ -291,14 +290,14 @@ export default function SettingsPage() {
             className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
-              <Lock className="h-5 w-5 text-brand-600" /> Quyền riêng tư
+              <Lock className="h-5 w-5 text-brand-600" /> {t('settings.privacy.sectionTitle')}
             </h2>
             <div className="divide-y divide-ink-100">
               <div className="flex items-center justify-between py-3">
                 <div className="pr-4">
-                  <div className="text-sm font-semibold text-ink-800">Cho phép HR xem Profile Online mở rộng</div>
+                  <div className="text-sm font-semibold text-ink-800">{t('settings.privacy.allowHrViewProfile')}</div>
                   <div className="text-xs text-ink-400">
-                    Bật để HR xem các phần Kỹ năng, Kinh nghiệm, Học vấn trên Profile Online. Khi tắt, HR chỉ xem được thông tin cá nhân cơ bản và file CV đính kèm.
+                    {t('settings.privacy.allowHrViewProfileDesc')}
                   </div>
                 </div>
                 <Toggle
@@ -308,9 +307,9 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center justify-between py-3">
                 <div className="pr-4">
-                  <div className="text-sm font-semibold text-ink-800">Cho phép lưu bản ghi phỏng vấn</div>
+                  <div className="text-sm font-semibold text-ink-800">{t('settings.privacy.allowRecording')}</div>
                   <div className="text-xs text-ink-400">
-                    Bản ghi dùng để HR review & bạn xem lại trong Candidate Portal
+                    {t('settings.privacy.allowRecordingDesc')}
                   </div>
                 </div>
                 <Toggle
@@ -320,8 +319,8 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center justify-between py-3">
                 <div className="pr-4">
-                  <div className="text-sm font-semibold text-ink-800">Nhận email marketing</div>
-                  <div className="text-xs text-ink-400">Bản tin, mẹo tìm việc, sự kiện tuyển dụng</div>
+                  <div className="text-sm font-semibold text-ink-800">{t('settings.privacy.marketingEmail')}</div>
+                  <div className="text-xs text-ink-400">{t('settings.privacy.marketingEmailDesc')}</div>
                 </div>
                 <Toggle
                   on={settings?.marketingEmail ?? false}
@@ -330,9 +329,9 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center justify-between py-3">
                 <div className="pr-4">
-                  <div className="text-sm font-semibold text-ink-800">Tải dữ liệu của tôi</div>
+                  <div className="text-sm font-semibold text-ink-800">{t('settings.privacy.downloadData')}</div>
                   <div className="text-xs text-ink-400">
-                    Xuất toàn bộ dữ liệu hồ sơ, đơn ứng tuyển & kết quả (JSON)
+                    {t('settings.privacy.downloadDataDesc')}
                   </div>
                 </div>
                 <button
@@ -345,7 +344,7 @@ export default function SettingsPage() {
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  Tải xuống
+                  {t('settings.privacy.downloadData')}
                 </button>
               </div>
             </div>
@@ -357,7 +356,7 @@ export default function SettingsPage() {
             className="scroll-mt-24 rounded-2xl border border-ink-200 bg-white p-4 shadow-card sm:p-6"
           >
             <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
-              <MonitorSmartphone className="h-5 w-5 text-brand-600" /> Phiên đăng nhập
+              <MonitorSmartphone className="h-5 w-5 text-brand-600" /> {t('settings.sessions.sectionTitle')}
             </h2>
             <div className="space-y-3">
               <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
@@ -366,12 +365,12 @@ export default function SettingsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-ink-800">
-                    Trình duyệt hiện tại
+                    {t('settings.sessions.currentSession')}
                     <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                      Phiên này
+                      {t('settings.sessions.currentSessionBadge')}
                     </span>
                   </div>
-                  <div className="text-xs text-ink-400">Đang hoạt động</div>
+                  <div className="text-xs text-ink-400">{t('settings.sessions.status')}</div>
                 </div>
               </div>
             </div>
@@ -381,7 +380,7 @@ export default function SettingsPage() {
               className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
               {loggingOut && <Loader2 className="h-4 w-4 animate-spin" />}
-              Đăng xuất khỏi tất cả thiết bị
+              {t('settings.sessions.logoutAll')}
             </button>
           </section>
 
@@ -390,16 +389,16 @@ export default function SettingsPage() {
             <span className="flex items-center gap-2 text-sm text-ink-500">
               {saving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> Đang lưu…
+                  <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> {t('settings.saveBar.saving')}
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4 text-emerald-500" /> Thay đổi được lưu tự động
+                  <Check className="h-4 w-4 text-emerald-500" /> {t('settings.saveBar.saved')}
                 </>
               )}
             </span>
             <Link to="/candidate/profile" className="text-sm font-semibold text-brand-600 hover:underline">
-              Quản lý tài khoản & bảo mật →
+              {t('settings.saveBar.manageAccount')}
             </Link>
           </div>
         </div>

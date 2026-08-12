@@ -1,0 +1,66 @@
+{
+  "settings": {
+    "title": "Settings",
+    "home": "Home",
+    "nav": {
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "privacy": "Privacy",
+      "sessions": "Login Sessions"
+    },
+    "appearance": {
+      "sectionTitle": "Appearance",
+      "theme": "Theme",
+      "themeOptions": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      },
+      "displayLanguage": "Display Language",
+      "displayLanguageHint": "Application interface language (does not affect interview language)"
+    },
+    "notifications": {
+      "sectionTitle": "Notifications",
+      "sectionDesc": "Select notification types and channels you want to receive.",
+      "columns": {
+        "type": "Notification Type",
+        "email": "Email",
+        "push": "Push"
+      },
+      "types": {
+        "interviewInvite": "Interview Invitation",
+        "interviewInviteDesc": "When you're invited to an interview round",
+        "result": "Interview Result",
+        "resultDesc": "When Pass/Not Pass result is confirmed by HR",
+        "applicationUpdate": "Application Update",
+        "applicationUpdateDesc": "HR views your profile, status changes",
+        "jobSuggestion": "Matching Job Suggestions",
+        "jobSuggestionDesc": "New jobs matching your profile & skills"
+      }
+    },
+    "privacy": {
+      "sectionTitle": "Privacy",
+      "allowHrViewProfile": "Allow HR to view Extended Online Profile",
+      "allowHrViewProfileDesc": "Enable to allow HR to view Skills, Experience, Education sections on Online Profile. When off, HR can only see basic personal info and attached CV.",
+      "allowRecording": "Allow Recording Interview Sessions",
+      "allowRecordingDesc": "Recordings used for HR review & viewing in Candidate Portal",
+      "marketingEmail": "Receive Marketing Emails",
+      "marketingEmailDesc": "Newsletter, job tips, recruitment events",
+      "downloadData": "Download My Data",
+      "downloadDataDesc": "Export all profile, application & result data (JSON)"
+    },
+    "sessions": {
+      "sectionTitle": "Login Sessions",
+      "currentSession": "Current Browser",
+      "currentSessionBadge": "This session",
+      "status": "Active",
+      "logoutAll": "Logout from all devices",
+      "logoutAllConfirm": "Logout from all devices? You will need to log in again."
+    },
+    "saveBar": {
+      "saving": "Saving...",
+      "saved": "Changes saved automatically",
+      "manageAccount": "Manage Account & Security →"
+    }
+  }
+}

@@ -103,7 +103,20 @@
     "completeHint": "Thêm kỹ năng, kinh nghiệm và liên kết để đạt 100%.",
     "candidate": "Ứng viên",
     "notUpdatedYet": "Chưa cập nhật chức danh",
-    "home": "Trang chủ"
+    "home": "Trang chủ",
+    "myProfile": "Hồ sơ của tôi",
+    "privacyToggle": {
+      "title": "Quyền riêng tư Profile Online với Nhà tuyển dụng (HR)",
+      "sharingEnabled": "Đang Bật chia sẻ",
+      "privacyMode": "Chế độ Riêng tư",
+      "sharingEnabledDesc": "HR các công ty bạn ứng tuyển được quyền xem các phần Kỹ năng, Kinh nghiệm làm việc, Học vấn trên Profile Online này.",
+      "privacyModeDesc": "Đã tắt: HR chỉ xem được Thông tin cá nhân cơ bản & file CV đính kèm của bạn. Toàn bộ phần Kỹ năng, Kinh nghiệm sẽ được ẩn an toàn."
+    },
+    "cvReview": {
+      "title": "Phân tích định hướng CV bởi AI",
+      "suggestedPositionsTitle": "Vị trí công việc phù hợp gợi ý"
+    },
+    "skillRemoveLabel": "Xoá"
   },
   "applications": {
     "title": "Việc đã ứng tuyển",

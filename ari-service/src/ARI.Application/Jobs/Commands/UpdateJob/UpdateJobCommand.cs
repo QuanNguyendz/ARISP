@@ -15,7 +15,9 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
 {
     /// <summary>
     /// HR cập nhật job posting kèm cấu hình vòng phỏng vấn. Chỉ người tạo hoặc
-    /// SuperAdmin/HrAdmin; không cho cập nhật khi đã archived.
+    /// SuperAdmin/HrAdmin; không cho cập nhật khi đã archived. Recruiter chỉ được
+    /// sửa tin khi còn nháp (draft) hoặc bị từ chối (rejected) — đã gửi HR duyệt
+    /// (pending) hay đã duyệt (active...) thì khoá.
     /// </summary>
     public record UpdateJobCommand(Guid Id, CreateJobPostingRequest Request, Guid UserId, string? Role)
         : IRequest<Result<JobPostingResponse>>;
@@ -49,6 +51,18 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             // 2. Không cho update nếu Status == "archived"
             if (string.Equals(job.Status, "archived", StringComparison.OrdinalIgnoreCase))
                 return Result.Failure<JobPostingResponse>("Không thể cập nhật tin tuyển dụng đã lưu trữ (archived).");
+
+            // 2b. Recruiter chỉ được sửa tin khi còn nháp hoặc bị từ chối — đã gửi HR duyệt (pending)
+            //     hoặc đã duyệt (active...) thì khoá. SuperAdmin/HrAdmin không bị giới hạn này.
+            var isPrivileged = command.Role == AppRoles.SuperAdmin || command.Role == AppRoles.HrAdmin;
+            if (!isPrivileged &&
+                !string.Equals(job.Status, "draft", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(job.Status, "rejected", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<JobPostingResponse>(
+                    "Tin đã gửi HR duyệt hoặc đã được duyệt nên không thể chỉnh sửa. Chỉ sửa được tin ở trạng thái nháp hoặc khi bị từ chối.",
+                    CommonErrorCodes.Forbidden);
+            }
 
             // 3. Validation logic (Đồng bộ với CreateJob)
             var validationError = JobsSupport.ValidateJobRequest(request, job.ApplicationDeadline, isUpdate: true);

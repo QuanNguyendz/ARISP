@@ -472,7 +472,8 @@ export default function RecruiterJobDetailPage() {
 
   const canSubmit = job.status === 'draft' || job.status === 'rejected'
   const canClose = job.status === 'active'
-  const canEdit = job.status !== 'archived'
+  // Chỉ cho Recruiter sửa tin khi còn nháp hoặc bị HR từ chối — đã gửi duyệt (pending) / đã duyệt (active...) thì khoá.
+  const canEdit = job.status === 'draft' || job.status === 'rejected'
 
   return (
     <div className="p-6 lg:p-8">
@@ -556,7 +557,12 @@ export default function RecruiterJobDetailPage() {
             {job.jdFileUrl && (
               <button
                 type="button"
-                onClick={() => openDocument(job.jdFileUrl!, job.jdFileName || `${job.title} - JD`)}
+                onClick={() =>
+                  openDocument(
+                    job.signedJdFileUrl || job.jdFileUrl!,
+                    job.jdFileName || `${job.title} - JD`,
+                  )
+                }
                 className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
               >
                 <FileText className="h-4 w-4" /> {t('jdFile')}
@@ -568,12 +574,14 @@ export default function RecruiterJobDetailPage() {
             >
               <CalendarClock className="h-4 w-4" /> {t('interviewSchedule')}
             </Link>
-            <Link
-              to={`/recruiter/my-jobs/${job.id}/online-test`}
-              className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
-            >
-              <ScrollText className="h-4 w-4" /> {t('onlineTestBank')}
-            </Link>
+            {job.roundConfigs?.some((r) => (r.roundType || '').toLowerCase() === 'online_test') && (
+              <Link
+                to={`/recruiter/my-jobs/${job.id}/online-test`}
+                className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+              >
+                <ScrollText className="h-4 w-4" /> {t('onlineTestBank')}
+              </Link>
+            )}
             {canEdit && (
               <Link
                 to={`/recruiter/my-jobs/${job.id}/edit`}

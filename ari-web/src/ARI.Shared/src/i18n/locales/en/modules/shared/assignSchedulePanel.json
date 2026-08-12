@@ -1,0 +1,22 @@
+{
+  "title": "Schedule Interview · Round {{round}}",
+  "declineWarning": {
+    "title": "Candidate declined previous schedule (requested reschedule)",
+    "hint": "Please select a more suitable time slot for the candidate."
+  },
+  "scheduled": {
+    "title": "Interview scheduled for candidate",
+    "alreadyScheduled": "Real interview already scheduled",
+    "confirmed": "Confirmed",
+    "pendingConfirmation": "Pending confirmation"
+  },
+  "cannotAssign": "Please send interview invitation (approve CV) before scheduling for the candidate.",
+  "noSlots": "No available slots for round {{round}}. Please create time slots in the job schedule configuration page first.",
+  "loadError": "Failed to load time slots.",
+  "assignError": "Failed to assign schedule.",
+  "selectSlot": "Select assigned time slot",
+  "selectPlaceholder": "— Select time slot —",
+  "capacityHint": " ({{available}}/${total})",
+  "assignButton": "Assign schedule to candidate",
+  "assignHint": "After assigning, the candidate will receive the appointment notification and can practice for the interview."
+}

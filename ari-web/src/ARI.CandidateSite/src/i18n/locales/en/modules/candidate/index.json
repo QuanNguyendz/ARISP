@@ -103,7 +103,20 @@
     "completeHint": "Add skills, experience, and links to reach 100%.",
     "candidate": "Candidate",
     "notUpdatedYet": "No title updated yet",
-    "home": "Home"
+    "home": "Home",
+    "myProfile": "My Profile",
+    "privacyToggle": {
+      "title": "Online Profile Privacy with Employers (HR)",
+      "sharingEnabled": "Sharing Enabled",
+      "privacyMode": "Privacy Mode",
+      "sharingEnabledDesc": "HR from companies you apply to can view the Skills, Work Experience, and Education sections on this Online Profile.",
+      "privacyModeDesc": "Disabled: HR can only view Basic Personal Information & your attached CV. All Skills and Experience sections will be safely hidden."
+    },
+    "cvReview": {
+      "title": "AI Career Direction CV Analysis",
+      "suggestedPositionsTitle": "Suggested Matching Job Positions"
+    },
+    "skillRemoveLabel": "Remove"
   },
   "applications": {
     "title": "My Applications",

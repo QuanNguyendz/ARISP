@@ -137,15 +137,58 @@ public class UpdateJobCommandHandlerTests
     [Fact]
     public async Task Active_job_update_broadcasts_public_update()
     {
+        // Recruiter không sửa được tin active nên kịch bản này thuộc HrAdmin (người duyệt).
         var userId = Guid.NewGuid();
         var job = JobPostingData.Job(owner: userId, status: "active");
         var uow = new InMemoryUnitOfWork().Seed(job);
         var notif = new RecordingNotificationService();
 
-        var res = await Run(uow, notif, job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
+        var res = await Run(uow, notif, job.Id, JobPostingData.Request(), userId, AppRoles.HrAdmin);
 
         Assert.True(res.IsSuccess);
         Assert.Contains("ReceivePublicJobUpdate", notif.AllEvents);
+    }
+
+    [Theory]
+    [InlineData("pending")]
+    [InlineData("active")]
+    [InlineData("closed")]
+    public async Task Recruiter_cannot_edit_after_submitted_or_approved(string status)
+    {
+        var userId = Guid.NewGuid();
+        var job = JobPostingData.Job(owner: userId, status: status);
+        var uow = new InMemoryUnitOfWork().Seed(job);
+
+        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
+
+    [Theory]
+    [InlineData("draft")]
+    [InlineData("rejected")]
+    public async Task Recruiter_can_edit_draft_or_rejected(string status)
+    {
+        var userId = Guid.NewGuid();
+        var job = JobPostingData.Job(owner: userId, status: status);
+        var uow = new InMemoryUnitOfWork().Seed(job);
+
+        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
+
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Admin_can_edit_pending_job()
+    {
+        // SuperAdmin/HrAdmin không bị giới hạn theo trạng thái như Recruiter.
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
+        var uow = new InMemoryUnitOfWork().Seed(job);
+
+        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), Guid.NewGuid(), AppRoles.HrAdmin);
+
+        Assert.True(res.IsSuccess);
     }
 
     [Fact]

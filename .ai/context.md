@@ -233,7 +233,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | **Backend** | C#, ASP.NET Core (.NET 8) | Không dùng Node.js |
 | **API Style** | REST API + SignalR | SignalR cho session events |
 | **Realtime Media** | WebRTC | Audio stream + avatar video |
-| **Database** | PostgreSQL on Supabase | Chỉ host DB – không dùng Supabase SDK |
+| **Database** | PostgreSQL 17 + pgvector tự host (container trên VPS) | ADR-055 – bỏ Supabase khỏi production, Supabase còn là môi trường test. Không dùng SDK ở cả hai |
 | **ORM** | Entity Framework Core | |
 | **Auth** | JWT + Role-based Authorization | BCrypt hash cho tài khoản Candidate và mật khẩu phụ; **OAuth2 / OpenID Connect + Domain validation** cho nội bộ công ty |
 | **Cache** | Redis | |
@@ -263,7 +263,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 
 1. **Không tự ý thay đổi tech stack** khi chưa được user xác nhận.
 2. **Không hardcode secrets** – luôn dùng environment variables.
-3. **Không dùng Supabase SDK** – kết nối PostgreSQL trực tiếp qua connection string.
+3. **Không dùng Supabase SDK** – kết nối PostgreSQL trực tiếp qua connection string. Production dùng Postgres tự host trên VPS (ADR-055), Supabase chỉ còn là môi trường test.
 4. **Không đề xuất Node.js** cho backend.
 5. **Mọi thay đổi kiến trúc** cập nhật vào `.ai/architecture.md`.
 6. **Trước khi bắt đầu task mới** – kiểm tra `.ai/tasks.md`.

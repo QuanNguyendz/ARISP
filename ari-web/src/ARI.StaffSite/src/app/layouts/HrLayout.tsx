@@ -26,6 +26,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { useThemeStore } from '@ari/shared/store/theme'
 import { LanguageSwitcher } from '@ari/shared/ui/LanguageSwitcher'
 import { useHrNav } from '@/app/layouts/useWorkspaceNav'
+import GlobalSearch from '@/components/GlobalSearch'
 import {
   staffNotificationService,
   STAFF_NOTIF_REFRESH_EVENT,
@@ -251,25 +252,17 @@ export default function HrLayout() {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Search icon button (mobile only) */}
+          {/* Search icon button (mobile only) → mở danh sách ứng viên */}
           <button
+            onClick={() => navigate('/hr/candidates')}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 sm:hidden"
             aria-label={t('hr.searchPlaceholder')}
           >
             <Search className="w-5 h-5" />
           </button>
 
-          {/* Search */}
-          <div className="hidden flex-1 items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-3 py-2 max-w-md focus-within:border-brand-400 sm:flex">
-            <Search className="w-4 h-4 text-ink-400" />
-            <input
-              className="w-full bg-transparent text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400"
-              placeholder={t('hr.searchPlaceholder')}
-            />
-            <kbd className="hidden sm:inline rounded border border-ink-200 dark:border-white/10 bg-white dark:bg-white/10 px-1.5 text-[10px] font-semibold text-ink-400">
-              ⌘K
-            </kbd>
-          </div>
+          {/* Global search — tin tuyển dụng + ứng viên */}
+          <GlobalSearch scope="hr" placeholder={t('hr.searchPlaceholder')} />
 
           <div className="ml-auto flex items-center gap-1">
             {/* Notifications */}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Camera,
   Mic,
@@ -35,12 +36,17 @@ const DARK_SAMPLES_TO_BLOCK = 2
  * Khi bắt đầu, bàn giao luôn stream đang chạy cho caller (tránh prompt quyền lần hai).
  */
 export default function DeviceCheck({
-  title = 'Kiểm tra thiết bị',
-  subtitle = 'Cần bật camera và micro để vào phỏng vấn. Quyền truy cập chỉ dùng trong phiên này.',
-  startLabel = 'Bắt đầu',
+  title,
+  subtitle,
+  startLabel,
   onReady,
   onCancel,
 }: DeviceCheckProps) {
+  const { t } = useTranslation('modules/shared/deviceCheck')
+  const resolvedTitle = title ?? t('title')
+  const resolvedSubtitle = subtitle ?? t('subtitle')
+  const resolvedStartLabel = startLabel ?? t('startLabel')
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -206,8 +212,8 @@ export default function DeviceCheck({
   return (
     <div className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-ink-900/60 p-6 shadow-2xl sm:p-8">
       <div className="mb-6 text-center">
-        <h1 className="font-display text-2xl font-extrabold text-white">{title}</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">{subtitle}</p>
+        <h1 className="font-display text-2xl font-extrabold text-white">{resolvedTitle}</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">{resolvedSubtitle}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_240px]">
@@ -232,16 +238,16 @@ export default function DeviceCheck({
             <div className="absolute inset-0 grid place-items-center bg-black/70 text-center">
               <div className="px-6">
                 <EyeOff className="mx-auto h-9 w-9 text-amber-400" />
-                <p className="mt-2 text-sm font-semibold text-amber-200">Không thấy hình ảnh</p>
+                <p className="mt-2 text-sm font-semibold text-amber-200">{t('cameraStatus.notSeeing')}</p>
                 <p className="mt-1 text-xs text-slate-300">
-                  Camera đang bị che hoặc phòng quá tối. Hãy bỏ vật che ống kính / bật thêm đèn.
+                  {t('cameraStatus.blockedOrDark')}
                 </p>
               </div>
             </div>
           )}
           {camOk && !camDark && (
             <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-emerald-300 backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Camera
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> {t('camera')}
             </span>
           )}
         </div>
@@ -251,16 +257,26 @@ export default function DeviceCheck({
           <div className="space-y-3">
             <StatusRow
               Icon={Camera}
-              label="Camera"
+              label={t('camera')}
               ok={camOk && !camDark}
               pending={phase === 'requesting'}
-              warn={camOk && camDark ? 'Bị che / tối' : null}
+              warn={camOk && camDark ? t('cameraStatus.blocked') : null}
+              readyLabel={t('ready')}
+              notReadyLabel={t('notReady')}
             />
-            <StatusRow Icon={Mic} label="Micro" ok={micOk} pending={phase === 'requesting'} />
+            <StatusRow
+              Icon={Mic}
+              label={t('microphone')}
+              ok={micOk}
+              pending={phase === 'requesting'}
+              warn={undefined}
+              readyLabel={t('ready')}
+              notReadyLabel={t('notReady')}
+            />
 
             {/* Mic level */}
             <div className="rounded-xl border border-white/10 bg-ink-950/50 p-3">
-              <div className="mb-2 text-xs text-slate-400">Mức âm micro</div>
+              <div className="mb-2 text-xs text-slate-400">{t('microphoneLevel')}</div>
               <div className="flex items-end gap-1" aria-hidden>
                 {Array.from({ length: SEGMENTS }).map((_, i) => (
                   <span
@@ -279,14 +295,14 @@ export default function DeviceCheck({
                 ))}
               </div>
               <div className="mt-2 text-[11px] text-slate-500">
-                {micOk ? 'Hãy thử nói — vạch sẽ nhảy theo giọng của bạn.' : 'Chưa nhận được micro.'}
+                {micOk ? t('microphoneStatus.speakNow') : t('microphoneStatus.noSignal')}
               </div>
             </div>
           </div>
 
           <p className="flex items-start gap-1.5 text-[11px] text-slate-500">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            Không có camera/micro hoạt động sẽ không thể vào phỏng vấn.
+            {t('noDeviceWarning')}
           </p>
         </div>
       </div>
@@ -296,10 +312,9 @@ export default function DeviceCheck({
         <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           <EyeOff className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
           <div>
-            <div className="font-semibold">Camera đang bị che hoặc quá tối</div>
+            <div className="font-semibold">{t('cameraStatus.blocked')}</div>
             <div className="mt-1 text-amber-100/80">
-              Vì lý do minh bạch của buổi phỏng vấn, bạn cần để camera nhìn rõ khuôn mặt. Hãy bỏ vật
-              che ống kính hoặc bật thêm ánh sáng — nút vào phỏng vấn sẽ mở lại ngay khi thấy hình.
+              {t('cameraStatus.blockedExplanation')}
             </div>
           </div>
         </div>
@@ -312,21 +327,21 @@ export default function DeviceCheck({
           <div>
             <div className="font-semibold text-red-100">
               {errKind === 'denied'
-                ? 'Bạn đã chặn quyền camera/micro'
+                ? t('blockedByUser')
                 : errKind === 'notfound'
-                  ? 'Không tìm thấy camera hoặc micro'
+                  ? t('deviceNotFound')
                   : errKind === 'lost'
-                    ? 'Mất quyền truy cập camera/micro'
-                    : 'Không truy cập được thiết bị'}
+                    ? t('accessLost')
+                    : t('cannotAccessDevice')}
             </div>
             <div className="mt-1 text-red-200/80">
               {errKind === 'denied'
-                ? 'Mở biểu tượng quyền trên thanh địa chỉ trình duyệt → cho phép Camera & Micro → nhấn Thử lại.'
+                ? t('errorHelp.denied')
                 : errKind === 'notfound'
-                  ? 'Hãy kết nối camera/micro và đảm bảo không ứng dụng khác đang chiếm dụng, rồi Thử lại.'
+                  ? t('errorHelp.notfound')
                   : errKind === 'lost'
-                    ? 'Quyền camera/micro vừa bị tắt hoặc thiết bị bị ngắt. Hãy bật lại quyền rồi nhấn Thử lại để vào phỏng vấn.'
-                    : 'Vui lòng kiểm tra thiết bị rồi thử lại.'}
+                    ? t('errorHelp.lost')
+                    : t('errorHelp.other')}
             </div>
           </div>
         </div>
@@ -342,7 +357,7 @@ export default function DeviceCheck({
             }}
             className="rounded-xl px-5 py-3 text-sm font-medium text-slate-300 hover:bg-white/5"
           >
-            Quay lại
+            {t('back')}
           </button>
         )}
 
@@ -351,7 +366,7 @@ export default function DeviceCheck({
             onClick={start}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-90"
           >
-            <Camera className="h-4 w-4" /> Cho phép camera & micro
+            <Camera className="h-4 w-4" /> {t('allowCameraMic')}
           </button>
         )}
 
@@ -362,7 +377,7 @@ export default function DeviceCheck({
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-ai-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {ready ? <Check className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
-            {ready ? startLabel : camDark ? 'Camera bị che…' : 'Đang kiểm tra…'}
+            {ready ? resolvedStartLabel : camDark ? t('cameraStatus.blocked') : t('checking')}
           </button>
         )}
 
@@ -371,7 +386,7 @@ export default function DeviceCheck({
             onClick={start}
             className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/20"
           >
-            <RefreshCw className="h-4 w-4" /> Thử lại
+            <RefreshCw className="h-4 w-4" /> {t('retry')}
           </button>
         )}
       </div>
@@ -379,19 +394,17 @@ export default function DeviceCheck({
   )
 }
 
-function StatusRow({
-  Icon,
-  label,
-  ok,
-  pending,
-  warn,
-}: {
+interface StatusRowProps {
   Icon: typeof Camera
   label: string
   ok: boolean
   pending: boolean
   warn?: string | null
-}) {
+  readyLabel: string
+  notReadyLabel: string
+}
+
+function StatusRow({ Icon, label, ok, pending, warn, readyLabel, notReadyLabel }: StatusRowProps) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-white/10 bg-ink-950/50 px-3 py-2.5">
       <span className="flex items-center gap-2 text-sm text-slate-200">
@@ -403,12 +416,12 @@ function StatusRow({
         </span>
       ) : ok ? (
         <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
-          <Check className="h-3.5 w-3.5" /> Sẵn sàng
+          <Check className="h-3.5 w-3.5" /> {readyLabel}
         </span>
       ) : pending ? (
         <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
       ) : (
-        <span className="text-xs font-medium text-slate-500">Chưa sẵn sàng</span>
+        <span className="text-xs font-medium text-slate-500">{notReadyLabel}</span>
       )}
     </div>
   )

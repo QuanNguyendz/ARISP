@@ -98,5 +98,31 @@
   "noSession": {
     "title": "No round to display",
     "description": "When you complete an interview, results will appear here."
+  },
+  "scheduled": {
+    "title": "Round {{round}}: Interview scheduled",
+    "preparationHint": "Please prepare your device, microphone/camera, and interview code before the start time."
+  },
+  "invited": {
+    "title": "Round {{round}}: Interview invitation",
+    "description": "You have received an invitation for this interview round. Please check your email or register for an interview schedule."
+  },
+  "notStarted": {
+    "title": "Round {{round}}: Not yet held",
+    "description": "This interview round has not started yet. You will be notified when the previous round's results are approved."
+  },
+  "badge": {
+    "scheduled": "Scheduled",
+    "invited": "Invited",
+    "notStarted": "Not Interviewed",
+    "missed": "Missed",
+    "practice": "Practice",
+    "pass": "Pass",
+    "notPass": "Not Pass",
+    "pendingHr": "Pending HR",
+    "inProgress": "In Progress",
+    "noResult": "No result yet",
+    "practiceInterview": "Practice Interview",
+    "realInterview": "Real Interview"
   }
 }

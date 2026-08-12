@@ -19,6 +19,14 @@ import sharedLayoutVi from './locales/vi/modules/shared/layout.json'
 import sharedLayoutEn from './locales/en/modules/shared/layout.json'
 import sharedNavVi from './locales/vi/modules/shared/nav.json'
 import sharedNavEn from './locales/en/modules/shared/nav.json'
+import sharedDeviceCheckVi from './locales/vi/modules/shared/deviceCheck.json'
+import sharedDeviceCheckEn from './locales/en/modules/shared/deviceCheck.json'
+import sharedAssignSchedulePanelVi from './locales/vi/modules/shared/assignSchedulePanel.json'
+import sharedAssignSchedulePanelEn from './locales/en/modules/shared/assignSchedulePanel.json'
+import sharedDesignSystemVi from './locales/vi/modules/shared/designSystem.json'
+import sharedDesignSystemEn from './locales/en/modules/shared/designSystem.json'
+import sharedDocumentViewerVi from './locales/vi/modules/shared/documentViewer.json'
+import sharedDocumentViewerEn from './locales/en/modules/shared/documentViewer.json'
 
 export const sharedNamespaces = [
   'common',
@@ -30,6 +38,10 @@ export const sharedNamespaces = [
   'modules/shared/notifications',
   'modules/shared/layout',
   'modules/shared/nav',
+  'modules/shared/deviceCheck',
+  'modules/shared/assignSchedulePanel',
+  'modules/shared/designSystem',
+  'modules/shared/documentViewer',
 ]
 
 export const sharedResources = {
@@ -43,6 +55,10 @@ export const sharedResources = {
     'modules/shared/notifications': sharedNotificationsVi,
     'modules/shared/layout': sharedLayoutVi,
     'modules/shared/nav': sharedNavVi,
+    'modules/shared/deviceCheck': sharedDeviceCheckVi,
+    'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelVi,
+    'modules/shared/designSystem': sharedDesignSystemVi,
+    'modules/shared/documentViewer': sharedDocumentViewerVi,
   },
   en: {
     common: commonEn,
@@ -54,5 +70,9 @@ export const sharedResources = {
     'modules/shared/notifications': sharedNotificationsEn,
     'modules/shared/layout': sharedLayoutEn,
     'modules/shared/nav': sharedNavEn,
+    'modules/shared/deviceCheck': sharedDeviceCheckEn,
+    'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelEn,
+    'modules/shared/designSystem': sharedDesignSystemEn,
+    'modules/shared/documentViewer': sharedDocumentViewerEn,
   },
 }

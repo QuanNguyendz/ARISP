@@ -1,0 +1,16 @@
+{
+  "loading": "Loading data...",
+  "close": "Close",
+  "searchableSelect": {
+    "clearSelection": "Clear selection",
+    "typeToSearch": "Type to search...",
+    "selectPlaceholder": "— Select —",
+    "noResults": "No results"
+  },
+  "pagination": {
+    "pageLabel": "Page {{page}}/{{total}}",
+    "totalItems": "· {{total}} {{label}}",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
+  }
+}

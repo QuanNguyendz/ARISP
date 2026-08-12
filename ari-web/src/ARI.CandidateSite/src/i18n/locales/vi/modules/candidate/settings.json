@@ -1,0 +1,66 @@
+{
+  "settings": {
+    "title": "Cài đặt",
+    "home": "Trang chủ",
+    "nav": {
+      "appearance": "Giao diện",
+      "notifications": "Thông báo",
+      "privacy": "Quyền riêng tư",
+      "sessions": "Phiên đăng nhập"
+    },
+    "appearance": {
+      "sectionTitle": "Giao diện",
+      "theme": "Chủ đề",
+      "themeOptions": {
+        "light": "Sáng",
+        "dark": "Tối",
+        "system": "Theo hệ thống"
+      },
+      "displayLanguage": "Ngôn ngữ hiển thị",
+      "displayLanguageHint": "Ngôn ngữ giao diện ứng dụng (không ảnh hưởng ngôn ngữ phỏng vấn)"
+    },
+    "notifications": {
+      "sectionTitle": "Thông báo",
+      "sectionDesc": "Chọn loại thông báo bạn muốn nhận và kênh nhận.",
+      "columns": {
+        "type": "Loại thông báo",
+        "email": "Email",
+        "push": "Đẩy"
+      },
+      "types": {
+        "interviewInvite": "Lời mời phỏng vấn",
+        "interviewInviteDesc": "Khi bạn được mời vào vòng phỏng vấn",
+        "result": "Kết quả phỏng vấn",
+        "resultDesc": "Khi có kết quả Pass/Not Pass được HR xác nhận",
+        "applicationUpdate": "Cập nhật đơn ứng tuyển",
+        "applicationUpdateDesc": "HR xem hồ sơ, thay đổi trạng thái",
+        "jobSuggestion": "Gợi ý việc làm phù hợp",
+        "jobSuggestionDesc": "Việc làm mới khớp hồ sơ & kỹ năng của bạn"
+      }
+    },
+    "privacy": {
+      "sectionTitle": "Quyền riêng tư",
+      "allowHrViewProfile": "Cho phép HR xem Profile Online mở rộng",
+      "allowHrViewProfileDesc": "Bật để HR xem các phần Kỹ năng, Kinh nghiệm, Học vấn trên Profile Online. Khi tắt, HR chỉ xem được thông tin cá nhân cơ bản và file CV đính kèm.",
+      "allowRecording": "Cho phép lưu bản ghi phỏng vấn",
+      "allowRecordingDesc": "Bản ghi dùng để HR review & bạn xem lại trong Candidate Portal",
+      "marketingEmail": "Nhận email marketing",
+      "marketingEmailDesc": "Bản tin, mẹo tìm việc, sự kiện tuyển dụng",
+      "downloadData": "Tải dữ liệu của tôi",
+      "downloadDataDesc": "Xuất toàn bộ dữ liệu hồ sơ, đơn ứng tuyển & kết quả (JSON)"
+    },
+    "sessions": {
+      "sectionTitle": "Phiên đăng nhập",
+      "currentSession": "Trình duyệt hiện tại",
+      "currentSessionBadge": "Phiên này",
+      "status": "Đang hoạt động",
+      "logoutAll": "Đăng xuất khỏi tất cả thiết bị",
+      "logoutAllConfirm": "Đăng xuất khỏi tất cả thiết bị? Bạn sẽ cần đăng nhập lại."
+    },
+    "saveBar": {
+      "saving": "Đang lưu…",
+      "saved": "Thay đổi được lưu tự động",
+      "manageAccount": "Quản lý tài khoản & bảo mật →"
+    }
+  }
+}

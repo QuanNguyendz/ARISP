@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -22,6 +22,8 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useDebouncedValue } from '@ari/shared/hooks/useDebouncedValue'
+import { useJobSearchStore } from '@/store/jobSearchStore'
 import CandidateHeader from '@/app/layouts/CandidateHeader'
 import jobService from '@ari/shared/fservices/job'
 import type { JobFacets } from '@ari/shared/fservices/job'
@@ -692,7 +694,7 @@ function JobCard({ job, isSaved = false, onToggleSave, matchedSkills, applied = 
                 {hasMatch && (
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-ai-50 px-2 py-0.5 text-xs font-semibold text-ai-700 ring-1 ring-ai-200"
-                    title={`Khớp kỹ năng: ${matchedSkills!.join(', ')}`}
+                    title={t('jobDetail.skillMatchTooltip', { skills: matchedSkills!.join(', ') })}
                   >
                     <Sparkles className="w-3 h-3" />
                     {t('jobs.skillMatch', { count: matchedSkills!.length })}
@@ -848,8 +850,13 @@ function Pagination({
 export default function FindJob() {
   const { t } = useTranslation('landing')
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated } = useAuthStore()
-  const [searchQuery, setSearchQuery] = useState('')
+  // Từ khoá dùng chung với ô tìm ở header — gõ ở ô nào cũng lọc ngay, hai ô luôn cùng nội dung.
+  const searchQuery = useJobSearchStore((s) => s.query)
+  const setSearchQuery = useJobSearchStore((s) => s.setQuery)
+  // Chỉ gọi API khi ngừng gõ để không bắn request theo từng ký tự (ô nhập vẫn phản hồi tức thì).
+  const debouncedSearch = useDebouncedValue(searchQuery, 300)
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS)
   const [facets, setFacets] = useState<JobFacets>(EMPTY_FACETS)
   const [cities, setCities] = useState<City[]>([])
@@ -885,9 +892,20 @@ export default function FindJob() {
     loadFacets()
   }, [])
 
+  // Link ngoài mở kèm ?search=<từ khoá> → nạp vào ô tìm rồi dọn URL (deep link, chạy 1 lần).
+  useEffect(() => {
+    const q = searchParams.get('search')
+    if (q !== null) {
+      setSearchQuery(q)
+      setPage(1)
+      searchParams.delete('search')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams, setSearchQuery])
+
   // Load jobs kèm bộ lọc, sắp xếp, phân trang mỗi khi các state liên quan thay đổi
   const queryParams = {
-    search: searchQuery || undefined,
+    search: debouncedSearch || undefined,
     categories: filters.categories.length > 0 ? filters.categories.join(',') : undefined,
     employmentTypes:
       filters.employmentTypes.length > 0 ? filters.employmentTypes.join(',') : undefined,
@@ -1030,7 +1048,7 @@ export default function FindJob() {
   // Đổi bộ lọc / tìm kiếm / sắp xếp → quay về trang 1.
   useEffect(() => {
     setPage(1)
-  }, [JSON.stringify(filters), searchQuery, sortBy, minSalary, maxSalary, salaryIsNegotiable])
+  }, [JSON.stringify(filters), debouncedSearch, sortBy, minSalary, maxSalary, salaryIsNegotiable])
 
   const goToPage = (next: number) => {
     const clamped = Math.min(Math.max(1, next), totalPages)

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   CalendarCheck,
   Clock,
@@ -55,6 +56,7 @@ function timeRange(item: CandidateScheduleItem): string {
 type ModalState = { bookingId: string; action: 'confirm' | 'decline' } | null
 
 export default function CandidateSchedulePage() {
+  const { t } = useTranslation('modules/candidate/schedule')
   const queryClient = useQueryClient()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -73,9 +75,8 @@ export default function CandidateSchedulePage() {
   const awaiting = useMemo(() => data?.awaitingReschedule ?? [], [data])
 
   const needsLogin = error ? isUnauthorized(error) : false
-  const displayError = error && !needsLogin ? errMsg(error, 'Không tải được lịch phỏng vấn.') : ''
+  const displayError = error && !needsLogin ? errMsg(error, t('errors.loadFailed')) : ''
 
-  // Hộp thoại xác nhận (confirm / decline) + lý do từ chối + lỗi thao tác.
   const [modal, setModal] = useState<ModalState>(null)
   const [reason, setReason] = useState('')
   const [actionError, setActionError] = useState('')
@@ -87,7 +88,7 @@ export default function CandidateSchedulePage() {
       setModal(null)
       queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
     },
-    onError: (e) => setActionError(errMsg(e, 'Xác nhận lịch thất bại.')),
+    onError: (e) => setActionError(errMsg(e, t('errors.confirmFailed'))),
   })
 
   const declineMut = useMutation({
@@ -98,14 +99,13 @@ export default function CandidateSchedulePage() {
       setReason('')
       queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
     },
-    onError: (e) => setActionError(errMsg(e, 'Gửi lý do thất bại.')),
+    onError: (e) => setActionError(errMsg(e, t('errors.declineFailed'))),
   })
 
-  // Ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối — chỉ dọn hiển thị phía ứng viên.
   const dismissMut = useMutation({
     mutationFn: (bookingId: string) => scheduleService.dismissSchedule(bookingId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-schedule'] }),
-    onError: (e) => setActionError(errMsg(e, 'Xoá lịch thất bại.')),
+    onError: (e) => setActionError(errMsg(e, t('errors.dismissFailed'))),
   })
 
   const openModal = (bookingId: string, action: 'confirm' | 'decline') => {
@@ -126,14 +126,13 @@ export default function CandidateSchedulePage() {
       confirmMut.mutate(modal.bookingId)
     } else {
       if (reason.trim().length < 3) {
-        setActionError('Vui lòng nhập lý do (ít nhất 3 ký tự).')
+        setActionError(t('errors.reasonTooShort'))
         return
       }
       declineMut.mutate({ bookingId: modal.bookingId, reason: reason.trim() })
     }
   }
 
-  // Deep-link từ email: ?booking=&action=confirm|decline → tự mở hộp thoại đúng lịch (1 lần).
   useEffect(() => {
     if (deepLinkHandled.current || loading || !data) return
     const bookingId = searchParams.get('booking')
@@ -145,15 +144,13 @@ export default function CandidateSchedulePage() {
     if (target && target.confirmationStatus !== 'confirmed') {
       openModal(bookingId, action)
     } else {
-      // Lịch đã phản hồi rồi (hoặc không còn ở danh sách sắp tới) — báo nhẹ, không mở hộp thoại.
-      setActionError('Lịch này đã được phản hồi trước đó và không thể thay đổi.')
+      setActionError(t('errors.alreadyResponded'))
     }
-    // Dọn query param cho gọn URL.
     const next = new URLSearchParams(searchParams)
     next.delete('booking')
     next.delete('action')
     setSearchParams(next, { replace: true })
-  }, [loading, data, upcoming, searchParams, setSearchParams])
+  }, [loading, data, upcoming, searchParams, setSearchParams, t])
 
   const grouped = useMemo(() => {
     const map = new Map<string, CandidateScheduleItem[]>()
@@ -176,11 +173,8 @@ export default function CandidateSchedulePage() {
             <CalendarCheck className="h-6 w-6" />
           </span>
           <div>
-            <h1 className="text-xl font-bold text-ink-900">Lịch phỏng vấn của bạn</h1>
-            <p className="text-sm text-ink-500">
-              Lịch do bộ phận nhân sự xếp. Vui lòng xác nhận, hoặc từ chối kèm lý do để được xếp lịch
-              khác.
-            </p>
+            <h1 className="text-xl font-bold text-ink-900">{t('pageTitle')}</h1>
+            <p className="text-sm text-ink-500">{t('pageDescription')}</p>
           </div>
         </div>
 
@@ -193,16 +187,14 @@ export default function CandidateSchedulePage() {
         {needsLogin ? (
           <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm sm:p-10">
             <LogIn className="mx-auto mb-3 h-12 w-12 text-brand-500" />
-            <p className="mb-4 text-sm text-ink-600">
-              Vui lòng đăng nhập Portal ứng viên để xem và xác nhận lịch phỏng vấn của bạn.
-            </p>
+            <p className="mb-4 text-sm text-ink-600">{t('loginRequired.message')}</p>
             <Link
               to={`/auth/candidate-login?returnUrl=${encodeURIComponent(
                 location.pathname + location.search
               )}`}
               className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
             >
-              <LogIn className="h-4 w-4" /> Đăng nhập để tiếp tục
+              <LogIn className="h-4 w-4" /> {t('loginRequired.button')}
             </Link>
           </div>
         ) : displayError ? (
@@ -216,13 +208,10 @@ export default function CandidateSchedulePage() {
         ) : upcoming.length === 0 && awaiting.length === 0 ? (
           <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm sm:p-10">
             <CalendarX className="mx-auto mb-3 h-12 w-12 text-ink-300" />
-            <p className="text-sm text-ink-600">
-              Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo khi có lịch.
-            </p>
+            <p className="text-sm text-ink-600">{t('noSchedule')}</p>
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Lịch đã từ chối, đang chờ nhân sự xếp lại */}
             {awaiting.map((s) => (
               <div
                 key={s.bookingId}
@@ -231,15 +220,14 @@ export default function CandidateSchedulePage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="flex items-center gap-2 text-sm font-semibold text-amber-800">
                     <CalendarClock className="h-4 w-4" />
-                    {s.jobTitle || 'Phỏng vấn'} · Vòng {s.roundNumber}
+                    {t('awaitingSection.title', { round: s.roundNumber })}
                   </p>
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                    <X className="h-3.5 w-3.5" /> Đã từ chối
+                    <X className="h-3.5 w-3.5" /> {t('awaitingSection.badge')}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-amber-700">
-                  Bạn đã từ chối lịch{s.declineReason ? `: “${s.declineReason}”` : ''}. Nhân sự sẽ
-                  xếp một khung giờ khác và thông báo lại cho bạn.
+                  {t('awaitingSection.message', { declineReason: s.declineReason ? `: "${s.declineReason}"` : '' })}
                 </p>
                 <div className="mt-3 flex justify-end">
                   <button
@@ -253,13 +241,12 @@ export default function CandidateSchedulePage() {
                     ) : (
                       <Trash2 className="h-3.5 w-3.5" />
                     )}
-                    Xoá khỏi danh sách
+                    {t('awaitingSection.dismissButton')}
                   </button>
                 </div>
               </div>
             ))}
 
-            {/* Lịch sắp tới — xác nhận / từ chối (mỗi lịch phản hồi 1 lần) */}
             {grouped.map(([day, daySlots]) => (
               <div key={day} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
                 <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold capitalize text-ink-800">
@@ -277,24 +264,23 @@ export default function CandidateSchedulePage() {
                           <div>
                             <p className="text-sm font-semibold text-ink-900">{timeRange(s)}</p>
                             <p className="text-xs text-ink-500">
-                              {s.jobTitle || 'Phỏng vấn'} · Vòng {s.roundNumber}
+                              {t('scheduleItem.interviewRound', { jobTitle: s.jobTitle, round: s.roundNumber })}
                             </p>
                           </div>
                           {confirmed ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác nhận
+                              <CheckCircle2 className="h-3.5 w-3.5" /> {t('scheduleItem.confirmed')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                              <AlertCircle className="h-3.5 w-3.5" /> Chưa xác nhận
+                              <AlertCircle className="h-3.5 w-3.5" /> {t('scheduleItem.pendingConfirmation')}
                             </span>
                           )}
                         </div>
 
                         {confirmed ? (
                           <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-400">
-                            <Lock className="h-3.5 w-3.5" /> Bạn đã xác nhận tham dự. Quyết định đã
-                            được khoá và không thể thay đổi.
+                            <Lock className="h-3.5 w-3.5" /> {t('scheduleItem.confirmedLocked')}
                           </p>
                         ) : (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -303,14 +289,14 @@ export default function CandidateSchedulePage() {
                               onClick={() => openModal(s.bookingId, 'confirm')}
                               className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
                             >
-                              <CheckCircle2 className="h-4 w-4" /> Xác nhận tham dự
+                              <CheckCircle2 className="h-4 w-4" /> {t('scheduleItem.confirmButton')}
                             </button>
                             <button
                               type="button"
                               onClick={() => openModal(s.bookingId, 'decline')}
                               className="inline-flex items-center gap-1.5 rounded-xl border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
                             >
-                              <CalendarClock className="h-4 w-4" /> Từ chối / đổi lịch
+                              <CalendarClock className="h-4 w-4" /> {t('scheduleItem.declineButton')}
                             </button>
                           </div>
                         )}
@@ -326,14 +312,13 @@ export default function CandidateSchedulePage() {
                 href="/candidate/applications"
                 className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
               >
-                <Play className="h-4 w-4" /> Vào hồ sơ ứng tuyển để luyện tập phỏng vấn thử
+                <Play className="h-4 w-4" /> {t('practiceLink')}
               </a>
             )}
           </div>
         )}
       </div>
 
-      {/* Hộp thoại xác nhận — "bạn đã chắc chắn chưa?" + cảnh báo không thể thay đổi */}
       {modal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4"
@@ -354,23 +339,20 @@ export default function CandidateSchedulePage() {
                 </span>
               )}
               <h2 className="text-base font-bold text-ink-900">
-                {modal.action === 'confirm' ? 'Xác nhận tham dự?' : 'Từ chối / xin đổi lịch?'}
+                {modal.action === 'confirm' ? t('modal.confirmTitle') : t('modal.declineTitle')}
               </h2>
             </div>
 
             {modalItem && (
               <p className="mb-3 text-sm text-ink-600">
-                {modalItem.jobTitle || 'Phỏng vấn'} · Vòng {modalItem.roundNumber} —{' '}
-                <span className="font-semibold text-ink-800">
-                  {dayKey(modalItem.startTime)}, {timeRange(modalItem)}
-                </span>
+                {t('modal.confirmSummary', { jobTitle: modalItem.jobTitle, round: modalItem.roundNumber, day: dayKey(modalItem.startTime), time: timeRange(modalItem) })}
               </p>
             )}
 
             {modal.action === 'decline' && (
               <div className="mb-3">
                 <label className="mb-1 block text-xs font-medium text-ink-600">
-                  Lý do bạn không thể tham dự (nhân sự sẽ xếp lịch khác):
+                  {t('modal.declineReasonLabel')}
                 </label>
                 <textarea
                   value={reason}
@@ -378,20 +360,17 @@ export default function CandidateSchedulePage() {
                   rows={3}
                   maxLength={500}
                   autoFocus
-                  placeholder="Ví dụ: Trùng lịch thi ở trường, bận công việc..."
+                  placeholder={t('modal.declineReasonPlaceholder')}
                   className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 />
               </div>
             )}
 
-            {/* Cảnh báo không thể sửa lại */}
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p className="text-xs text-amber-800">
-                Bạn đã chắc chắn với quyết định của mình chưa?{' '}
-                <strong>Sau khi bấm, bạn sẽ không thể sửa lại lựa chọn này nữa.</strong>
-                {modal.action === 'decline' &&
-                  ' Nhân sự sẽ sắp xếp một khung giờ khác dựa trên lý do của bạn.'}
+                {t('modal.warning')}
+                {modal.action === 'decline' && t('modal.warningDecline')}
               </p>
             </div>
 
@@ -408,7 +387,7 @@ export default function CandidateSchedulePage() {
                 disabled={submitting}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100 disabled:opacity-50"
               >
-                <X className="h-4 w-4" /> Để sau
+                <X className="h-4 w-4" /> {t('modal.laterButton')}
               </button>
               <button
                 type="button"
@@ -427,7 +406,7 @@ export default function CandidateSchedulePage() {
                 ) : (
                   <X className="h-4 w-4" />
                 )}
-                {modal.action === 'confirm' ? 'Tôi chắc chắn — Xác nhận' : 'Tôi chắc chắn — Từ chối'}
+                {modal.action === 'confirm' ? t('modal.confirmButton') : t('modal.declineButton')}
               </button>
             </div>
           </div>

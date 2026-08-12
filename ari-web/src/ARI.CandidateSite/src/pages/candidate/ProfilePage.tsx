@@ -595,21 +595,21 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-ink-900 flex items-center gap-2">
-                        <span>Quyền riêng tư Profile Online với Nhà tuyển dụng (HR)</span>
+                        <span>{t('profile.privacyToggle.title')}</span>
                         {allowHrViewProfile ? (
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
-                            Đang Bật chia sẻ
+                            {t('profile.privacyToggle.sharingEnabled')}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
-                            🔒 Chế độ Riêng tư
+                            🔒 {t('profile.privacyToggle.privacyMode')}
                           </span>
                         )}
                       </h4>
                       <p className="mt-1 text-xs text-ink-600 leading-relaxed">
                         {allowHrViewProfile
-                          ? 'HR các công ty bạn ứng tuyển được quyền xem các phần Kỹ năng, Kinh nghiệm làm việc, Học vấn trên Profile Online này.'
-                          : 'Đã tắt: HR chỉ xem được Thông tin cá nhân cơ bản & file CV đính kèm của bạn. Toàn bộ phần Kỹ năng, Kinh nghiệm sẽ được ẩn an toàn.'}
+                          ? t('profile.privacyToggle.sharingEnabledDesc')
+                          : t('profile.privacyToggle.privacyModeDesc')}
                       </p>
                     </div>
                   </div>
@@ -753,7 +753,7 @@ export default function ProfilePage() {
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"
                 >
                   {s}
-                  <button onClick={() => removeSkill(s)} aria-label={`Xoá ${s}`}>
+                  <button onClick={() => removeSkill(s)} aria-label={`${t('profile.skillRemoveLabel')} ${s}`}>
                     <X className="h-3.5 w-3.5 cursor-pointer opacity-60 hover:opacity-100" />
                   </button>
                 </span>
@@ -1143,11 +1143,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function CvReviewCard({ review }: { review: CvReview }) {
-  const { t } = useTranslation('candidate')
+  const { t } = useTranslation('modules/candidate')
   return (
     <div className="mt-4 rounded-2xl border border-ai-200 bg-ai-50 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
-        <Sparkles className="h-4 w-4" /> Phân tích định hướng CV bởi AI (
+        <Sparkles className="h-4 w-4" /> {t('profile.cvReview.title')} (
         {review.reviewedBy ?? 'Gemini'})
       </div>
 
@@ -1158,7 +1158,7 @@ function CvReviewCard({ review }: { review: CvReview }) {
       {review.suggestedPositions && review.suggestedPositions.length > 0 && (
         <div className="mt-4 border-t border-ai-200/50 pt-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-700">
-            <Briefcase className="h-4 w-4 text-brand-600" /> Vị trí công việc phù hợp gợi ý
+            <Briefcase className="h-4 w-4 text-brand-600" /> {t('profile.cvReview.suggestedPositionsTitle')}
           </div>
           <div className="flex flex-wrap gap-2">
             {review.suggestedPositions.map((pos, i) => (

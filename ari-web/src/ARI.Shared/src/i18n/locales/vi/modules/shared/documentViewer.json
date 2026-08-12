@@ -1,0 +1,10 @@
+{
+  "documentViewer": {
+    "defaultFileName": "Tài liệu",
+    "docxError": "Không thể hiển thị file DOCX trực tiếp (có thể do CORS hoặc file lỗi). Hãy tải về để xem.",
+    "loading": "Đang dựng nội dung tài liệu...",
+    "download": "Tải về",
+    "close": "Đóng",
+    "unsupportedFormat": "Không hỗ trợ xem trực tiếp định dạng này. Hãy tải về để mở."
+  }
+}

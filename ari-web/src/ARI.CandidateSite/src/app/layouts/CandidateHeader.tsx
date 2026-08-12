@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useJobSearchStore } from '@/store/jobSearchStore'
 import { authService } from '@ari/shared/fservices/auth'
 import { notificationService, resolveNotifLink } from '@ari/shared/fservices/notification/notificationService'
 import type { NotificationItem } from '@ari/shared/fservices/notification/notificationService'
@@ -116,6 +117,41 @@ export default function CandidateHeader() {
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
   const rootRef = useRef<HTMLElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Từ khoá dùng chung với ô tìm ở hero trang việc làm — gõ tới đâu lọc danh sách tới đó.
+  const jobSearch = useJobSearchStore((s) => s.query)
+  const setJobSearch = useJobSearchStore((s) => s.setQuery)
+  const refocusSearch = useJobSearchStore((s) => s.refocus)
+  const requestRefocus = useJobSearchStore((s) => s.requestRefocus)
+  const clearRefocus = useJobSearchStore((s) => s.clearRefocus)
+
+  // Cả "/" lẫn "/jobs" đều render FindJobPage → đang ở đây thì gõ là lọc tại chỗ, không điều hướng.
+  const onJobsPage = pathname === '/' || pathname === '/jobs'
+
+  const handleSearchChange = (value: string) => {
+    setJobSearch(value)
+    // Ở màn khác: mở trang việc làm để thấy kết quả, kèm cờ lấy lại con trỏ sau khi chuyển route.
+    if (!onJobsPage && value.trim()) {
+      requestRefocus()
+      navigate('/jobs')
+    }
+  }
+
+  const clearSearch = () => {
+    setJobSearch('')
+    searchInputRef.current?.focus()
+  }
+
+  // Header bị unmount khi đổi trang → mount lại thì trả con trỏ về cuối ô tìm để gõ tiếp liền mạch.
+  useEffect(() => {
+    if (!refocusSearch) return
+    clearRefocus()
+    const el = searchInputRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [refocusSearch, clearRefocus])
 
   const langMap: Record<string, string> = { vi: 'VI', en: 'EN' }
 
@@ -261,17 +297,33 @@ export default function CandidateHeader() {
           })}
         </nav>
 
-        {/* Global search (trang trí) */}
+        {/* Global search — gõ tới đâu lọc danh sách việc làm tới đó (giống ô tìm ở hero) */}
         <div className="hidden max-w-sm flex-1 items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm focus-within:border-brand-400 focus-within:bg-white md:flex">
           <Search className="h-4 w-4 text-ink-400" />
           <input
+            ref={searchInputRef}
             className="w-full bg-transparent outline-none placeholder:text-ink-400"
             placeholder={t('jobs.searchPlaceholder')}
-            onFocus={() => navigate('/jobs')}
+            value={jobSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (!onJobsPage) navigate('/jobs')
+              }
+            }}
           />
-          <kbd className="hidden rounded border border-ink-200 bg-white px-1.5 text-[10px] font-semibold text-ink-400 lg:inline">
-            ⌘K
-          </kbd>
+          {jobSearch && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label={t('jobs.clearSearch')}
+              title={t('jobs.clearSearch')}
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-ink-400 hover:bg-ink-200 hover:text-ink-700"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Right cluster */}
@@ -355,7 +407,7 @@ export default function CandidateHeader() {
               >
                 <Bell className="h-5 w-5" />
                 {unread > 0 && (
-                  <span className="absolute right-1 top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                  <span className="absolute right-1 top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-ink-900">
                     {unread > 9 ? '9+' : unread}
                   </span>
                 )}
@@ -534,8 +586,25 @@ export default function CandidateHeader() {
             <input
               className="w-full bg-transparent outline-none placeholder:text-ink-400"
               placeholder={t('jobs.searchPlaceholder')}
-              onFocus={() => navigate('/jobs')}
+              value={jobSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  if (!onJobsPage) navigate('/jobs')
+                }
+              }}
             />
+            {jobSearch && (
+              <button
+                type="button"
+                onClick={() => setJobSearch('')}
+                aria-label={t('jobs.clearSearch')}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-ink-400 hover:bg-ink-200 hover:text-ink-700"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           {NAV.map((item) => {
             const active = item.match(pathname)
