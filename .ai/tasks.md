@@ -308,7 +308,9 @@ _Chưa có task nào đang thực hiện._
 - [x] Đóng cổng DB khỏi Internet: `ports: !override ["127.0.0.1:5432:5432"]` thay cho `8443` mở công khai; nhóm vào bằng SSH tunnel — 2026-08-12
 - [x] Cân lại ngân sách RAM VPS 4GB sau khi DB về cùng máy (3328M tổng, mọi container đều có limit) — 2026-08-12
 - [x] `docs/postgres-production-setup.md` — hướng dẫn DBeaver + SSH tunnel cho cả nhóm, tách quyền, sự cố thường gặp — 2026-08-12
-- [ ] Áp SQL tách quyền `arisp_app` / `arisp_dev` (đã soạn sẵn trong docs, chưa chạy trên VPS)
+- [x] Tách quyền DB: role `arisp_dev` (đọc/ghi dữ liệu, KHÔNG sửa được cấu trúc — kiểm chứng `DROP TABLE` bị chặn) + `ALTER DEFAULT PRIVILEGES` để bảng do migration sau này tạo cũng được cấp quyền — 2026-08-13
+- [x] Cấp SSH key cho 5 thành viên nhóm (`arisp-thanhvien1..5` trong `authorized_keys` của user `arisp`), thu hồi từng người bằng cách xoá 1 dòng — 2026-08-13
+- [ ] Áp `arisp_app` cho ứng dụng (backend hiện vẫn dùng `postgres` vì cần quyền tạo bảng khi chạy EF migration lúc boot)
 - [ ] Tự động copy bản backup ra ngoài VPS (R2 hoặc máy cá nhân)
 - [ ] Dọn thư mục `supabase/` (config.toml + migrations) còn sót từ giai đoạn đầu
 

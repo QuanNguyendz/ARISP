@@ -122,10 +122,19 @@ trong VPS mới nối tới Postgres. Vì thế:
 
 ---
 
-## Phần 3 — Tách quyền (khuyến nghị)
+## Phần 3 — Tách quyền
 
-Hiện mọi người dùng chung `postgres` superuser. Nên tách để một thao tác nhầm trong DBeaver
-không xoá được cả database:
+> **Đã áp dụng trên production (2026-08-13).** Role `arisp_dev` đã tồn tại; cả nhóm dùng role này
+> trong DBeaver, `postgres` superuser chỉ dành cho quản trị. Đã kiểm chứng: `arisp_dev` đọc/ghi được
+> dữ liệu nhưng `DROP TABLE` bị chặn (`must be owner of table`).
+>
+> Vật liệu phát cho nhóm (private key + hướng dẫn từng người + mật khẩu `arisp_dev`) nằm ở
+> `E:\ARISP-team-keys\PHAT-KEY-CHO-NHOM.md` trên máy trưởng nhóm — **ngoài repo, không commit**.
+>
+> `arisp_app` cho ứng dụng thì **chưa áp** — backend vẫn chạy bằng `postgres` vì nó cần quyền tạo
+> bảng để chạy EF migration lúc boot.
+
+SQL đã dùng (giữ lại để dựng lại môi trường khác):
 
 ```sql
 -- Tài khoản cho ứng dụng (cần quyền tạo bảng: backend chạy EF migration lúc boot)
