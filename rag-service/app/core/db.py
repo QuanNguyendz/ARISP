@@ -1,4 +1,8 @@
-"""Pool kết nối Postgres (asyncpg) tới Supabase — kết nối trực tiếp, không Supabase SDK.
+"""Pool kết nối Postgres (asyncpg) — kết nối trực tiếp, không dùng SDK của nhà cung cấp.
+
+Production nối tới container `postgres` trong arisp-network (ADR-055); môi trường
+test có thể trỏ sang Supabase pooler. Cả hai đều qua biến `DATABASE_*` nên đổi
+môi trường không cần sửa code.
 
 Bảng `document_chunks` do EF Core (backend .NET) sở hữu schema; service này chỉ
 đọc/ghi dữ liệu. Cột `embedding` là kiểu pgvector(1536).
@@ -17,9 +21,12 @@ _pool: asyncpg.Pool | None = None
 
 def _ssl_context() -> ssl.SSLContext | bool:
     settings = get_settings()
+    # Postgres nội bộ (ADR-055): DATABASE_SSLMODE=disable — container không phục vụ
+    # certificate, và traffic không rời bridge network của Docker.
     if settings.database_sslmode in ("disable", "allow", "prefer"):
         return False
-    # Supabase: bắt buộc SSL nhưng chứng chỉ pooler đôi khi self-signed -> không verify.
+    # Supabase (môi trường test): bắt buộc SSL nhưng chứng chỉ pooler đôi khi
+    # self-signed -> không verify.
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
