@@ -62,6 +62,7 @@
 ### ADR-002: Database Hosting
 - **Quyết định:** PostgreSQL hosted on Supabase, kết nối trực tiếp qua connection string.
 - **Ràng buộc:** Tuyệt đối không import/dùng Supabase client SDK.
+- ⚠️ **Phần "hosted on Supabase" đã bị ADR-055 thay thế (2026-08-12):** production nay chạy Postgres tự host trên VPS, Supabase lùi về môi trường test. Ràng buộc "không dùng SDK" **vẫn giữ nguyên** và nay áp cho cả hai môi trường.
 
 ### ADR-003: Realtime Communication – SignalR vs WebRTC
 - **SignalR:** session lifecycle events, question delivery, status updates, HR notifications.
@@ -742,3 +743,22 @@ public interface IEmbeddingProvider
 - **Ghi chú vòng trắc nghiệm:** slice Online Test (ADR-049) đã có đủ trên nhánh này; điểm yếu còn lại là **form tạo job chỉ chọn được `screening|technical`** nên vòng `online_test` phải tạo qua seed/SQL — follow-up nên bổ sung vào dropdown `CreateJobPostingPage`.
 - **Ảnh hưởng ADR khác:** bổ sung ADR-038 (làm rõ điểm 6: transcript giữ vĩnh viễn) và ADR-050 (buổi thử nay có màn xem lại thay vì chỉ "hiển thị trong mục Kết quả"); không đổi ADR-016/048/049.
 - **Không làm (follow-up):** `POST /api/interview/session/{id}/end` vẫn chỉ `[Authorize]` (không kiểm tra chủ sở hữu) — chưa siết vì Kiosk/real dùng chung đường này; `GET /api/applications/practice-eligibility/{id}` vẫn `[AllowAnonymous]`.
+
+### ADR-055: Production DB bỏ Supabase — Postgres tự host trên VPS, bind loopback cho SSH tunnel
+- **Ngày:** 2026-08-12. **Thay thế:** phần hosting của ADR-002.
+- **Bối cảnh:** Production nối tới Supabase từ đầu dự án. Yêu cầu mới: đưa dữ liệu production về hạ tầng tự quản, bỏ phụ thuộc bên thứ ba. DB `arisp_db` đã được dựng sẵn trên VPS bằng EF migrations, dữ liệu để sạch (chủ ý không mang data rác của Supabase sang). Đồng thời phát hiện DB đang nghe ở `161.248.147.38:8443` **mở thẳng ra Internet** bằng tài khoản `postgres` superuser — tái diễn đúng sự cố `5433` mà ADR-047 điểm 6 đã vá.
+- **Quyết định:**
+  1. **Container, không cài thẳng lên host.** Toàn hệ thống đã chạy bằng `docker compose` + pipeline deploy; cài lên host tạo mô hình vận hành thứ hai (systemd/apt/`pg_hba.conf`) phải học song song. Base compose đã khai báo sẵn `pgvector/pgvector:pg17` + healthcheck `pg_isready` — việc cần làm là cấu hình lại, không phải dựng mới. Phiên bản DB bị ghim trong git, `apt upgrade` trên host không thể vô tình nâng minor version.
+  2. **Bind mount `/var/lib/arisp/pgdata` thay named volume.** `docker compose down -v` không xoá được dữ liệu production, và biết chính xác đường dẫn để `pg_dump`/snapshot. Đổi ngay lúc DB còn trống vì sau này có dữ liệu thật thì tốn công hơn nhiều. Biến `PGDATA_PATH` cho phép máy dev Windows/macOS trỏ sang `./pgdata`.
+  3. **`ports: !override ["127.0.0.1:5432:5432"]`** — KHÔNG phải `!reset []` cũng không phải `ports:` thường. `ports:` thường **nối thêm** vào `"5433:5432"` (bind `0.0.0.0`) của base → DB lại hở ra Internet, đúng cái bẫy ADR-047 điểm 6. `!reset []` đóng sạch nhưng host không thấy cổng nào nên SSH tunnel cũng không tới được. `!override` thay hẳn list, giữ đúng một binding loopback. **Prefix `127.0.0.1:` là thứ giữ an toàn:** Docker chỉ tạo rule DNAT trên loopback nên cổng không ra Internet, bất kể ufw cấu hình thế nào (ufw không chặn được cổng do Docker publish).
+  4. **Truy cập nhóm bằng SSH tunnel, không mở cổng DB.** User `arisp` trên VPS, mỗi thành viên một public key trong `authorized_keys` — thu hồi từng người bằng cách xoá một dòng, không phải đổi mật khẩu DB cho cả nhóm. DBeaver: tab Main `localhost:5432`, tab SSH trỏ `161.248.147.38:22` + private key. Hướng dẫn đầy đủ ở `docs/postgres-production-setup.md`.
+  5. **Ngân sách RAM cân lại cho VPS 4GB:** backend 1024M + postgres 1024M + rag 768M (hạ từ 1G) + redis 192M + candidate 128M + staff 128M (hạ từ 256M — chỉ là nginx-alpine phục vụ file tĩnh) + nginx 64M = **3328M**, còn ~500M cho OS. RAM là nút thắt chứ không phải CPU; thêm dịch vụ hoặc gặp OOM thì nâng VPS 8GB chứ không siết tiếp.
+  6. **`SSL Mode=Disable` cho chuỗi kết nối nội bộ.** Container không phục vụ certificate; giữ `Require` như chuỗi Supabase cũ làm mọi kết nối chết ngay lúc boot. Traffic không rời bridge network. Phía Python, `DATABASE_SSLMODE=disable` được `_ssl_context()` hiểu đúng là tắt SSL.
+  7. **`backend.depends_on` thêm `postgres: service_healthy`.** Backend chạy EF migrations lúc boot (`AriDbContextInitialiser`, retry 3 lần × 3s ≈ 9 giây) — `initdb` trên thư mục rỗng ở lần deploy đầu lâu hơn cửa sổ đó.
+  8. **Backup trở thành việc bắt buộc.** Trước đây Supabase lo; nay volume Postgres là thứ **duy nhất** trên VPS không dựng lại được từ git + GHCR. `scripts/backup-db.sh`: `pg_dump -Fc` → `/var/backups/arisp/`, ghi `.tmp` rồi mới đổi tên (không bao giờ có dump dở dang trông như hợp lệ), **tự đọc mục lục bằng `pg_restore --list` để bắt lỗi hỏng ngay hôm nay thay vì lúc cần restore**, giữ 14 bản. Cron 03:00.
+- **Hệ quả / lưu ý vận hành:**
+  - Mật khẩu DB phải viết ở **3 chỗ** cùng giá trị: `POSTGRES_PASSWORD` (khởi tạo container), `ConnectionStrings__DefaultConnection` (.NET), `DATABASE_PASSWORD` (Python). Lệch một chỗ là service tương ứng không nối được.
+  - Named volume `postgres-data` cũ trên VPS **vẫn còn** sau thay đổi này. Phải copy/restore dữ liệu sang bind mount trước khi xoá nó.
+  - EF migrations tự tạo extension `vector` + `uuid-ossp` và toàn bộ schema, nên bind mount rỗng tự thành DB hoàn chỉnh khi backend khởi động. Repo có 25 migration, mới nhất `20260808091756_AddBookingCandidateDismissedAt`.
+  - Backup nằm cùng máy với DB không cứu được khi mất VPS — vẫn phải copy ra ngoài.
+- **Không làm (follow-up):** tách quyền `arisp_app`/`arisp_dev` khỏi `postgres` superuser đã soạn SQL trong `docs/postgres-production-setup.md` nhưng chưa áp; chưa tự động copy backup ra R2; thư mục `supabase/` (config.toml + migrations) còn sót lại từ giai đoạn đầu, chưa dọn.

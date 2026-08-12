@@ -1,0 +1,7 @@
+# Shell script phải giữ LF: đội dev làm trên Windows, git tự đổi sang CRLF khi
+# checkout, và script CRLF chạy trên VPS Linux sẽ chết với lỗi khó đoán
+# "bad interpreter: /bin/bash^M". Ghim eol=lf cho mọi thứ chạy phía server.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf

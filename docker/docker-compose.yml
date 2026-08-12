@@ -35,6 +35,11 @@ services:
       - /app/src/src/ARI.Domain/obj
       - /app/src/src/ARI.Infrastructure/obj
     depends_on:
+      # Backend chạy EF migrations lúc boot (AriDbContextInitialiser) nên phải đợi
+      # Postgres nhận kết nối. Quan trọng nhất ở lần deploy đầu: initdb trên thư mục
+      # rỗng lâu hơn cửa sổ retry ~9 giây (3 lần × 3s) của initialiser.
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       rag-service:
@@ -147,23 +152,33 @@ services:
       - arisp-network
     restart: unless-stopped
 
-  # --- Local PostgreSQL (Test Environment) ---
+  # --- PostgreSQL + pgvector (dev VÀ production — xem ADR-055) ---
+  # Trước đây prod chạy trên Supabase và container này chỉ dùng cho dev/test.
+  # Nay đây là DB production: mật khẩu lấy từ .env, dữ liệu nằm ở bind mount,
+  # cổng ra host do docker-compose.prod.yml quyết định (chỉ 127.0.0.1).
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg17
     container_name: arisp-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: arisp_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Default chỉ dành cho máy dev. Prod BẮT BUỘC đặt POSTGRES_PASSWORD trong .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_DB: ${POSTGRES_DB:-arisp_db}
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d arisp_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-arisp_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    # Bind mount thay cho named volume: `docker compose down -v` KHÔNG xoá được
+    # dữ liệu production, và biết chính xác đường dẫn để pg_dump/snapshot.
+    # Dev trên Windows/macOS đặt PGDATA_PATH=./pgdata trong .env nếu muốn.
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${PGDATA_PATH:-/var/lib/arisp/pgdata}:/var/lib/postgresql/data
+    # Mặc định /dev/shm của Docker là 64MB — không đủ cho truy vấn song song
+    # trên bảng lớn (Postgres báo "could not resize shared memory segment").
+    shm_size: 256mb
     networks:
       - arisp-network
     restart: unless-stopped
@@ -174,4 +189,6 @@ networks:
 
 volumes:
   redis-data:
-  postgres-data:
+  # postgres-data đã bỏ: dữ liệu Postgres chuyển sang bind mount ${PGDATA_PATH}
+  # để không bị `docker compose down -v` xoá mất. Volume cũ trên VPS vẫn còn —
+  # phải copy/restore dữ liệu sang bind mount trước khi xoá nó (ADR-055).

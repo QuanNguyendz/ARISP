@@ -8,8 +8,10 @@
 # Build tại chỗ trên VPS (chỉ khi cần chữa cháy, chậm và ngốn RAM):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
-# Cổng ra host ở prod: CHỈ nginx (80/443). backend/frontend/rag/redis giao tiếp
-# nội bộ qua arisp-network — trước đây redis:6379 và rag:8000 bị expose 0.0.0.0.
+# Cổng ra INTERNET ở prod: CHỈ nginx (80/443). backend/frontend/rag/redis giao
+# tiếp nội bộ qua arisp-network — trước đây redis:6379 và rag:8000 bị expose
+# 0.0.0.0. Riêng postgres bind 127.0.0.1:5432 (loopback, không ra Internet) để
+# nhóm dev vào được bằng SSH tunnel — xem ADR-055.
 # ============================================
 
 services:
@@ -39,7 +41,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # 256M → 128M: container chỉ là nginx-alpine phục vụ file tĩnh, thực tế
+          # dùng ~20M. Nhường chỗ cho Postgres nay chạy cùng máy (ADR-055).
+          memory: 128M
           cpus: "0.5"
 
   # --- Frontend Staff: serve static build via nginx ---
@@ -53,7 +57,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M     # xem ghi chú ở frontend-candidate
           cpus: "0.5"
 
   # --- RAG Interview Microservice: production build (nội bộ, không expose) ---
@@ -65,7 +69,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          # Hạ 1G → 768M nhường chỗ cho Postgres (ADR-055): DB nay chạy cùng máy.
+          # Ngân sách 4GB (xem tổng ở cuối file). Nghẽn thì nâng VPS 8GB,
+          # không siết thêm — 768M là sàn hợp lý cho LangChain + pool asyncpg.
+          memory: 768M
           cpus: "1.0"
 
   # --- Redis ---
@@ -74,27 +81,51 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # 256M → 192M: backend hiện chưa dùng Redis (SignalR chạy in-process,
+          # chưa đăng ký distributed cache) nên dung lượng thực tế rất nhỏ.
+          memory: 192M
           cpus: "0.25"
 
-  # --- Postgres local: CHỈ dùng cho dev/test, prod chạy DB trên Supabase ---
-  # Base compose bind 5433 ra 0.0.0.0 kèm mật khẩu dev mặc định (chấp nhận được ở
-  # máy dev). Trên VPS, Docker tự chèn rule iptables nên binding này vượt mặt ufw
-  # → cổng 5433 mở thẳng ra Internet. Không dịch vụ prod nào dùng container này,
-  # nên đóng cổng cho khớp nguyên tắc "prod chỉ hở nginx 80/443" ở đầu file.
+  # --- Postgres: ĐÂY LÀ DB PRODUCTION (ADR-055, thay Supabase) ---
+  #
+  # `!override` chứ KHÔNG phải `!reset []` hay `ports:` thường:
+  #   - `ports:` thường  → Compose NỐI THÊM vào list của base ("5433:5432" bind
+  #     0.0.0.0 vẫn còn) → DB lại hở ra Internet, đúng sự cố cũ ở ADR-047 điểm 6.
+  #   - `!reset []`      → đóng sạch, nhưng host không thấy cổng nào nên SSH
+  #     tunnel của DBeaver cũng không tới được DB.
+  #   - `!override`      → THAY HẲN list, giữ đúng một binding loopback.
+  #
+  # Prefix `127.0.0.1:` là thứ giữ an toàn: Docker chỉ tạo rule DNAT trên
+  # loopback nên cổng này KHÔNG ra Internet, bất kể ufw cấu hình thế nào.
+  # Nhóm dev vào bằng SSH tunnel tới cổng này (xem ADR-055).
   postgres:
-    ports: !reset []
+    ports: !override
+      - "127.0.0.1:5432:5432"
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: "0.25"
+          # 256M cũ là mức cho container dev bỏ không. DB thật có pgvector cần 1G
+          # để giữ shared buffers + index vector trong RAM.
+          memory: 1G
+          cpus: "1.0"
 
   # --- Nginx: SSL + config prod ---
+  #
+  # NGÂN SÁCH RAM TOÀN STACK (VPS 4GB, ~3.8GB khả dụng):
+  #   backend 1024M + postgres 1024M + rag 768M + redis 192M
+  #   + candidate 128M + staff 128M + nginx 64M  =  3328M (~3.25G)
+  #   → còn ~500M cho OS + Docker daemon + page cache.
+  # Đây là cấu hình tối thiểu khả dụng, không dư dả: RAM là nút thắt chứ không
+  # phải CPU. Thêm dịch vụ hoặc thấy OOM → nâng VPS lên 8GB (ADR-055).
   nginx:
     ports:
       - "80:80"
       - "443:443"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.5"
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       # conf.d.prod (KHÔNG phải conf.d): conf.d chứa config dev localhost/staff.localhost.
