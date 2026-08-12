@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Interfaces;
 using ARI.Application.Options;
 using ARI.Application.UnitTests.PracticeInterview;
 using ARI.Application.UnitTests.TestSupport;
@@ -104,13 +105,14 @@ public class SaveRecordingTests
         Assert.True(res.Value.Saved);
         Assert.Equal(10L, res.Value.SizeBytes);
 
-        // Storage nhận content-type gốc đã bỏ tham số codecs.
+        // Storage nhận content-type gốc đã bỏ tham số codecs, video vào thư mục riêng (không lẫn với CV).
         var saved = Assert.Single(storage.Saved);
         Assert.Equal("kiosk.webm", saved.FileName);
         Assert.Equal("video/webm", saved.ContentType);
+        Assert.Equal(StorageFolder.Recording, saved.Folder);
 
         // Phiên được đóng dấu key + kích thước + hạn lưu ≈ now+7d, chưa xoá.
-        Assert.Equal("stored/kiosk.webm", session.RecordingUrl);
+        Assert.Equal("recordings/kiosk.webm", session.RecordingUrl);
         Assert.Equal(10L, session.RecordingSizeBytes!.Value);
         Assert.NotNull(session.RecordingExpiresAt);
         Assert.InRange(session.RecordingExpiresAt!.Value, expectedExpiry.AddMinutes(-1), expectedExpiry.AddMinutes(1));
@@ -132,7 +134,7 @@ public class SaveRecordingTests
 
         Assert.True(res.IsSuccess);
         Assert.Contains("stored/old.webm", storage.Deleted);   // xoá key cũ trước
-        Assert.Equal("stored/new.webm", session.RecordingUrl); // trỏ sang bản mới
+        Assert.Equal("recordings/new.webm", session.RecordingUrl); // trỏ sang bản mới
         Assert.Null(session.RecordingDeletedAt);               // reset cờ đã xoá
     }
 }

@@ -8,11 +8,12 @@ namespace ARI.Infrastructure.Storage
 {
     /// <summary>
     /// Lưu file vào thư mục "uploads" trên đĩa local — dùng cho môi trường dev.
-    /// storageKey có dạng "/uploads/&lt;guid&gt;.ext" và được phục vụ tĩnh qua middleware
-    /// UseStaticFiles(RequestPath="/uploads") trong Program.cs.
+    /// storageKey có dạng "/uploads/&lt;folder&gt;/&lt;guid&gt;.ext" và được phục vụ tĩnh qua middleware
+    /// UseStaticFiles(RequestPath="/uploads") trong Program.cs (middleware tự phục vụ cả thư mục con).
     /// </summary>
     public class LocalFileStorageService : IFileStorageService
     {
+        private const string UrlPrefix = "/uploads/";
         private readonly string _uploadsFolder;
 
         public LocalFileStorageService()
@@ -20,17 +21,38 @@ namespace ARI.Infrastructure.Storage
             _uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
         }
 
-        public async Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, CancellationToken ct = default)
+        public async Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default)
         {
-            if (!Directory.Exists(_uploadsFolder))
-                Directory.CreateDirectory(_uploadsFolder);
+            var segment = folder.ToSegment();
+            var targetFolder = Path.Combine(_uploadsFolder, segment);
+            if (!Directory.Exists(targetFolder))
+                Directory.CreateDirectory(targetFolder);
 
             var ext = Path.GetExtension(originalFileName);
             var uniqueFileName = $"{Guid.NewGuid()}{ext}";
-            var filePath = Path.Combine(_uploadsFolder, uniqueFileName);
+            var filePath = Path.Combine(targetFolder, uniqueFileName);
             await File.WriteAllBytesAsync(filePath, content, ct);
 
-            return $"/uploads/{uniqueFileName}";
+            return $"{UrlPrefix}{segment}/{uniqueFileName}";
+        }
+
+        /// <summary>
+        /// storageKey → đường dẫn tuyệt đối trên đĩa. Giữ nguyên thư mục con của key mới
+        /// ("/uploads/cv/x.pdf") và vẫn đọc được key cũ phẳng ("/uploads/x.pdf").
+        /// Trả về <c>null</c> nếu key thoát ra ngoài thư mục uploads (chặn path traversal).
+        /// </summary>
+        private string? ResolvePath(string storageKey)
+        {
+            if (string.IsNullOrEmpty(storageKey)) return null;
+
+            var relative = storageKey.Replace('\\', '/').TrimStart('/');
+            if (relative.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+                relative = relative.Substring("uploads/".Length);
+            if (string.IsNullOrEmpty(relative)) return null;
+
+            var fullPath = Path.GetFullPath(Path.Combine(_uploadsFolder, relative));
+            var rootPath = Path.GetFullPath(_uploadsFolder) + Path.DirectorySeparatorChar;
+            return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase) ? fullPath : null;
         }
 
         public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default)
@@ -50,10 +72,8 @@ namespace ARI.Infrastructure.Storage
         {
             try
             {
-                if (string.IsNullOrEmpty(storageKey)) return Task.CompletedTask;
-                var fileName = Path.GetFileName(storageKey);
-                var filePath = Path.Combine(_uploadsFolder, fileName);
-                if (File.Exists(filePath))
+                var filePath = ResolvePath(storageKey);
+                if (filePath != null && File.Exists(filePath))
                     File.Delete(filePath);
             }
             catch { /* best-effort */ }
@@ -62,10 +82,8 @@ namespace ARI.Infrastructure.Storage
 
         public async Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(storageKey)) return null;
-            var fileName = Path.GetFileName(storageKey);
-            var filePath = Path.Combine(_uploadsFolder, fileName);
-            if (!File.Exists(filePath)) return null;
+            var filePath = ResolvePath(storageKey);
+            if (filePath == null || !File.Exists(filePath)) return null;
             return await File.ReadAllBytesAsync(filePath, ct);
         }
     }

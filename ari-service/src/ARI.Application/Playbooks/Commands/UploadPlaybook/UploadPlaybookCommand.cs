@@ -61,7 +61,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
             string storageKey;
             try
             {
-                storageKey = await _fileStorage.SaveAsync(request.Bytes, request.FileName, contentType, ct);
+                storageKey = await _fileStorage.SaveAsync(request.Bytes, request.FileName, contentType, StorageFolder.Playbook, ct);
             }
             catch (Exception ex)
             {

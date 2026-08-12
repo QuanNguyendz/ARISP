@@ -40,7 +40,7 @@ public class SubmitApplicationCommandHandlerTests
 
         Assert.True(res.IsSuccess);
         Assert.Equal("CV nội dung", svc.LastRequest!.CvText);
-        Assert.Equal("stored/cv.pdf", svc.LastRequest.CvFileUrl);
+        Assert.Equal("cv/cv.pdf", svc.LastRequest.CvFileUrl);
         Assert.Equal(Md5Hex(CvBytes), svc.LastRequest.CvFileHash);
         Assert.Equal("job_board", svc.LastSource);
     }
@@ -81,7 +81,7 @@ public class SubmitApplicationCommandHandlerTests
         var res = await Run(svc, new StubDocumentParser(), storage, Command("cv.pdf"));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("stored/cv.pdf", storage.Deleted); // file đã lưu được dọn khi ghi DB lỗi
+        Assert.Contains("cv/cv.pdf", storage.Deleted); // file đã lưu được dọn khi ghi DB lỗi
     }
 
     [Fact]

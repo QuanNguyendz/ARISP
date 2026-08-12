@@ -13,8 +13,12 @@ namespace ARI.Infrastructure.Storage
         public string Bucket { get; set; } = string.Empty;
         /// <summary>R2 dùng "auto".</summary>
         public string Region { get; set; } = "auto";
-        /// <summary>Prefix key trong bucket, vd "cv".</summary>
-        public string KeyPrefix { get; set; } = "cv";
+        /// <summary>
+        /// Prefix gốc tuỳ chọn cho TOÀN bucket (vd "prod" khi dùng chung bucket giữa các môi trường).
+        /// Để rỗng là mặc định. KHÔNG dùng để phân loại file — loại file do <c>StorageFolder</c>
+        /// quyết định (cv/, jd/, recordings/, playbooks/).
+        /// </summary>
+        public string KeyPrefix { get; set; } = string.Empty;
         /// <summary>Thời hạn presigned URL (phút).</summary>
         public int UrlExpiryMinutes { get; set; } = 60;
     }

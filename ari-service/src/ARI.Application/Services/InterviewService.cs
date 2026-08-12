@@ -1134,7 +1134,7 @@ namespace ARI.Application.Services
             string storageKey;
             try
             {
-                storageKey = await _fileStorage.SaveAsync(content, safeName, baseContentType, ct);
+                storageKey = await _fileStorage.SaveAsync(content, safeName, baseContentType, StorageFolder.Recording, ct);
             }
             catch (Exception ex)
             {
