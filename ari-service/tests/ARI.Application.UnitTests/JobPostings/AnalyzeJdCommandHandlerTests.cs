@@ -45,7 +45,7 @@ public class AnalyzeJdCommandHandlerTests
         Assert.True(res.Value.IsValidJd);
         Assert.Equal("Senior Backend Engineer", res.Value.Title);
         Assert.Equal("backend", res.Value.JobCategory);
-        Assert.Equal("stored/jd.pdf", res.Value.JdFileUrl);
+        Assert.Equal("jd/jd.pdf", res.Value.JdFileUrl);
         Assert.Equal("pdf", res.Value.JdFileFormat);
         Assert.Contains("C#", res.Value.Skills);
     }
@@ -84,7 +84,7 @@ public class AnalyzeJdCommandHandlerTests
 
         Assert.True(res.IsSuccess);           // vẫn success để người dùng nhập tay
         Assert.False(res.Value.IsValidJd);
-        Assert.Equal("stored/jd.pdf", res.Value.JdFileUrl);
+        Assert.Equal("jd/jd.pdf", res.Value.JdFileUrl);
         Assert.Equal("raw jd text", res.Value.JobDescription); // fallback text đã parse
     }
 

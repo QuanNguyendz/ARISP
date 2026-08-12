@@ -808,7 +808,7 @@ namespace ARI.Application.CandidatePortal
             string cvFileUrl;
             try
             {
-                cvFileUrl = await _fileStorage.SaveAsync(bytes, fileName, mime);
+                cvFileUrl = await _fileStorage.SaveAsync(bytes, fileName, mime, StorageFolder.Cv);
             }
             catch (Exception ex)
             {

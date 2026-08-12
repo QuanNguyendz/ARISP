@@ -173,7 +173,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                                 // File đã đóng dấu luôn là PDF, kể cả khi gốc là DOCX.
                                 var baseName = Path.GetFileNameWithoutExtension(job.JdFileName ?? "JD") + ".pdf";
                                 var signedName = JobsSupport.AppendSuffix(baseName, "-da-duyet");
-                                job.SignedJdFileUrl = await _fileStorage.SaveAsync(stamped, signedName, "application/pdf", ct);
+                                job.SignedJdFileUrl = await _fileStorage.SaveAsync(stamped, signedName, "application/pdf", StorageFolder.Jd, ct);
                             }
                         }
                         catch (Exception exStamp)

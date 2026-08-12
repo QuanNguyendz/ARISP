@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.CandidatePortal;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
+using ARI.Application.Interfaces;
 using ARI.Application.UnitTests.ApplicationFlow;
 using ARI.Application.UnitTests.JobBoard;
 using ARI.Application.UnitTests.TestSupport;
@@ -75,10 +76,11 @@ public class ApplyToJobCommandHandlerTests
         Assert.NotNull(res.Value.Application);
         Assert.Equal("cv_submitted", res.Value.Application!.Status);
 
-        // File CV: lưu đúng 1 bản với MIME theo đuôi .pdf.
+        // File CV: lưu đúng 1 bản với MIME theo đuôi .pdf, vào thư mục cv/.
         var saved = Assert.Single(storage.Saved);
         Assert.Equal("myresume.pdf", saved.FileName);
         Assert.Equal("application/pdf", saved.ContentType);
+        Assert.Equal(StorageFolder.Cv, saved.Folder);
 
         // Request chuyển cho service: source + trim + hash + CV text + URL bản đã lưu.
         Assert.Equal("job_board", app.LastSource);
@@ -89,7 +91,7 @@ public class ApplyToJobCommandHandlerTests
         Assert.Equal("Nguyen Van A", req.CandidateName);   // trim
         Assert.Equal("0900000000", req.CandidatePhone);    // trim
         Assert.Equal("30 ngày", req.NoticePeriod);         // trim
-        Assert.Equal("stored/myresume.pdf", req.CvFileUrl);
+        Assert.Equal("cv/myresume.pdf", req.CvFileUrl);
         Assert.Equal("Nội dung CV đã parse", req.CvText);
         Assert.Equal(expectedHash, req.CvFileHash);
     }
@@ -130,7 +132,7 @@ public class ApplyToJobCommandHandlerTests
         Assert.True(res.IsFailure);
         Assert.Contains("Tin tuyển dụng đã đóng", res.Error);   // lỗi service propagate
         Assert.Single(storage.Saved);                          // đã lưu CV
-        Assert.Contains("stored/cv.pdf", storage.Deleted);     // rồi bù trừ xoá đi
+        Assert.Contains("cv/cv.pdf", storage.Deleted);     // rồi bù trừ xoá đi
         Assert.NotNull(app.LastRequest);                       // service ĐÃ được gọi
     }
 }

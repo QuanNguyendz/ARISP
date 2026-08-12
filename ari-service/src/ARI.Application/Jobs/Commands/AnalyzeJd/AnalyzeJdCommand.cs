@@ -56,7 +56,7 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
             string storageKey;
             try
             {
-                storageKey = await _fileStorage.SaveAsync(bytes, fileName, contentType, ct);
+                storageKey = await _fileStorage.SaveAsync(bytes, fileName, contentType, StorageFolder.Jd, ct);
             }
             catch (Exception ex)
             {
