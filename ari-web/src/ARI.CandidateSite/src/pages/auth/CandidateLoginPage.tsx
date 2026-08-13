@@ -239,6 +239,7 @@ export default function CandidateLoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('candidateLogin.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -265,6 +266,7 @@ export default function CandidateLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('candidateLogin.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
+                  autoComplete="current-password"
                   required
                 />
                 <button

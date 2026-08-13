@@ -103,20 +103,20 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/privacy"
                   className="text-text-secondary hover:text-white transition-colors text-sm"
                 >
                   Chính sách bảo mật
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/terms"
                   className="text-text-secondary hover:text-white transition-colors text-sm"
                 >
                   Điều khoản sử dụng
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Mail,
   Lock,
@@ -186,7 +186,10 @@ export default function CandidateRegisterPage() {
           </h1>
           <p className="mt-1 text-ink-500">{t('candidateRegister.subtitle')}</p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          {/* autoComplete="off" + "new-password": báo cho trình duyệt đây là form tạo
+              tài khoản mới, không phải đăng nhập — nếu không Chrome sẽ tự điền
+              email/mật khẩu đã lưu của tài khoản khác vào đây. */}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4" autoComplete="off">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600">
                 {t('candidateRegister.fullNameLabel')}
@@ -199,6 +202,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder={t('candidateRegister.fullNamePlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -216,6 +220,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('candidateRegister.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -233,6 +238,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('candidateRegister.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
+                  autoComplete="new-password"
                   required
                 />
                 <button
@@ -274,6 +280,7 @@ export default function CandidateRegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder={t('candidateRegister.confirmPasswordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
+                  autoComplete="new-password"
                   required
                 />
                 <button
@@ -303,10 +310,28 @@ export default function CandidateRegisterPage() {
                 className="mt-0.5 rounded border-ink-300 text-brand-600"
               />
               <span>
-                {t('candidateRegister.agreeTerms', {
-                  terms: t('candidateRegister.terms'),
-                  privacy: t('candidateRegister.privacy'),
-                })}
+                <Trans
+                  i18nKey="candidateRegister.agreeTerms"
+                  t={t}
+                  components={{
+                    terms: (
+                      <Link
+                        to="/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-600 hover:underline"
+                      />
+                    ),
+                    privacy: (
+                      <Link
+                        to="/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-600 hover:underline"
+                      />
+                    ),
+                  }}
+                />
               </span>
             </label>
 

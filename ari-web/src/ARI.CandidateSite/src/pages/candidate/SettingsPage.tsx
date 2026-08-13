@@ -21,29 +21,8 @@ import { settingsService } from '@/fservices/settings/settingsService'
 import type { CandidateSettings, NotificationChannelPref } from '@/fservices/settings/settingsService'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 import Select from '@ari/shared/ui/Select'
-
-type ThemeMode = 'light' | 'dark' | 'system'
-
-function currentThemeMode(): ThemeMode {
-  const t = localStorage.getItem('theme')
-  if (t === 'dark') return 'dark'
-  if (t === 'light') return 'light'
-  return 'system'
-}
-
-function applyTheme(mode: ThemeMode) {
-  const root = document.documentElement
-  if (mode === 'dark') {
-    root.classList.add('dark')
-    localStorage.setItem('theme', 'dark')
-  } else if (mode === 'light') {
-    root.classList.remove('dark')
-    localStorage.setItem('theme', 'light')
-  } else {
-    localStorage.removeItem('theme')
-    root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches)
-  }
-}
+import { applyThemeMode, readThemeMode } from '@ari/shared/store/theme'
+import type { ThemeMode } from '@ari/shared/store/theme'
 
 const SECTION_NAV = [
   { id: 'appearance', labelKey: 'settings.nav.appearance', Icon: Palette },
@@ -74,7 +53,7 @@ export default function SettingsPage() {
   const { logout } = useAuthStore()
   const [settings, setSettings] = useState<CandidateSettings | null>(null)
   const [loading, setLoading] = useState(true)
-  const [theme, setTheme] = useState<ThemeMode>(currentThemeMode)
+  const [theme, setTheme] = useState<ThemeMode>(readThemeMode)
   const [active, setActive] = useState('appearance')
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -112,7 +91,7 @@ export default function SettingsPage() {
 
   const onTheme = (mode: ThemeMode) => {
     setTheme(mode)
-    applyTheme(mode)
+    applyThemeMode(mode)
   }
 
   const onExport = async () => {
