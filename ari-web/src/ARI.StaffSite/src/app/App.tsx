@@ -18,7 +18,6 @@ import StaffHomeRedirect from './StaffHomeRedirect'
 // Pages: lazy-load → mỗi page thành 1 chunk riêng, chỉ tải khi vào route đó.
 // Auth
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
-const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@ari/shared/authflows/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@ari/shared/authflows/ResetPasswordPage'))
 const OAuthCallbackPage = lazy(() => import('@ari/shared/authflows/OAuthCallbackPage'))
@@ -104,14 +103,8 @@ function App() {
               </GuestRoute>
             }
           />
-          <Route
-            path="/auth/register"
-            element={
-              <GuestRoute>
-                <RegisterPage />
-              </GuestRoute>
-            }
-          />
+          {/* Không có /auth/register: tài khoản nội bộ do Super Admin cấp trước
+              (pre-provisioning), HR xin thêm qua luồng AccountRequest — ADR-023/041. */}
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
