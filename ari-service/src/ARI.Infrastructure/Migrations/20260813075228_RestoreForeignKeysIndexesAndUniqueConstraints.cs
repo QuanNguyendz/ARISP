@@ -10,6 +10,100 @@ namespace ARI.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // ---------------------------------------------------------------------------
+            // Gỡ LỚP THỦ CÔNG CŨ trước khi EF dựng lại lớp của chính nó.
+            //
+            // Vì sao cần: lớp khoá ngoại/index/unique này từng được áp TAY bằng SQL lên
+            // Supabase (môi trường test) nên DB đó ĐÃ CÓ SẴN các đối tượng trùng tên —
+            // `CREATE INDEX idx_webhook_deliveries_next_retry` sẽ nổ 42P07 "already exists".
+            // Production dựng lại ở ADR-055 thì không có gì trong số này, nên toàn bộ khối
+            // dưới đây là no-op ở đó (mọi lệnh đều `IF EXISTS`).
+            //
+            // Chỉ gỡ những thứ migration này TỰ DỰNG LẠI ngay sau đó. Cố ý GIỮ
+            // `interview_round_configs_job_posting_id_round_number_key`: migration này không
+            // tạo lại nó, gỡ đi là Supabase mất luôn ràng buộc 1 vòng/lần cấu hình.
+            // ---------------------------------------------------------------------------
+            migrationBuilder.Sql(@"
+                -- Khoá ngoại cũ (tên mặc định Postgres *_fkey) — EF tạo lại với tên FK_*
+                ALTER TABLE answers                  DROP CONSTRAINT IF EXISTS answers_question_id_fkey;
+                ALTER TABLE answers                  DROP CONSTRAINT IF EXISTS answers_session_id_fkey;
+                ALTER TABLE applications             DROP CONSTRAINT IF EXISTS applications_candidate_account_id_fkey;
+                ALTER TABLE applications             DROP CONSTRAINT IF EXISTS applications_job_posting_id_fkey;
+                ALTER TABLE audit_logs               DROP CONSTRAINT IF EXISTS audit_logs_actor_user_id_fkey;
+                ALTER TABLE availability_slots       DROP CONSTRAINT IF EXISTS availability_slots_job_posting_id_fkey;
+                ALTER TABLE candidate_refresh_tokens DROP CONSTRAINT IF EXISTS candidate_refresh_tokens_candidate_account_id_fkey;
+                ALTER TABLE cheat_detection_signals  DROP CONSTRAINT IF EXISTS cheat_detection_signals_session_id_fkey;
+                ALTER TABLE evaluations              DROP CONSTRAINT IF EXISTS evaluations_application_id_fkey;
+                ALTER TABLE evaluations              DROP CONSTRAINT IF EXISTS evaluations_session_id_fkey;
+                ALTER TABLE hr_reviews               DROP CONSTRAINT IF EXISTS hr_reviews_evaluation_id_fkey;
+                ALTER TABLE hr_reviews               DROP CONSTRAINT IF EXISTS hr_reviews_reviewed_by_user_id_fkey;
+                ALTER TABLE interview_bookings       DROP CONSTRAINT IF EXISTS interview_bookings_application_id_fkey;
+                ALTER TABLE interview_bookings       DROP CONSTRAINT IF EXISTS interview_bookings_availability_slot_id_fkey;
+                ALTER TABLE interview_bookings       DROP CONSTRAINT IF EXISTS interview_bookings_rescheduled_from_id_fkey;
+                ALTER TABLE interview_codes          DROP CONSTRAINT IF EXISTS interview_codes_application_id_fkey;
+                ALTER TABLE interview_codes          DROP CONSTRAINT IF EXISTS interview_codes_created_by_user_id_fkey;
+                ALTER TABLE interview_round_configs  DROP CONSTRAINT IF EXISTS interview_round_configs_job_posting_id_fkey;
+                ALTER TABLE interview_sessions       DROP CONSTRAINT IF EXISTS interview_sessions_application_id_fkey;
+                ALTER TABLE job_postings             DROP CONSTRAINT IF EXISTS job_postings_created_by_user_id_fkey;
+                ALTER TABLE must_ask_tracking        DROP CONSTRAINT IF EXISTS must_ask_tracking_playbook_document_id_fkey;
+                ALTER TABLE must_ask_tracking        DROP CONSTRAINT IF EXISTS must_ask_tracking_question_id_fkey;
+                ALTER TABLE must_ask_tracking        DROP CONSTRAINT IF EXISTS must_ask_tracking_session_id_fkey;
+                ALTER TABLE online_test_questions    DROP CONSTRAINT IF EXISTS online_test_questions_job_posting_id_fkey;
+                ALTER TABLE online_test_submissions  DROP CONSTRAINT IF EXISTS online_test_submissions_application_id_fkey;
+                ALTER TABLE playbook_documents       DROP CONSTRAINT IF EXISTS playbook_documents_uploaded_by_user_id_fkey;
+                ALTER TABLE questions                DROP CONSTRAINT IF EXISTS questions_session_id_fkey;
+                ALTER TABLE refresh_tokens           DROP CONSTRAINT IF EXISTS refresh_tokens_user_id_fkey;
+
+                -- Ràng buộc UNIQUE cũ — EF tạo lại thành unique index tên ux_*
+                ALTER TABLE users                    DROP CONSTRAINT IF EXISTS users_email_key;
+                ALTER TABLE candidate_accounts       DROP CONSTRAINT IF EXISTS candidate_accounts_email_key;
+                ALTER TABLE system_settings          DROP CONSTRAINT IF EXISTS system_settings_key_key;
+                ALTER TABLE interview_codes          DROP CONSTRAINT IF EXISTS interview_codes_code_key;
+                ALTER TABLE refresh_tokens           DROP CONSTRAINT IF EXISTS refresh_tokens_token_hash_key;
+                ALTER TABLE candidate_refresh_tokens DROP CONSTRAINT IF EXISTS candidate_refresh_tokens_token_hash_key;
+                ALTER TABLE magic_links              DROP CONSTRAINT IF EXISTS magic_links_token_hash_key;
+                ALTER TABLE evaluations              DROP CONSTRAINT IF EXISTS evaluations_session_id_key;
+
+                -- Index đặt tay: 14 cái EF tạo lại NGUYÊN TÊN, 14 cái còn lại là bản trùng
+                -- của index EF đã quản lý (ix_*) hoặc của chính unique/FK phía trên.
+                DROP INDEX IF EXISTS idx_applications_active_deleted;
+                DROP INDEX IF EXISTS idx_applications_candidate_account_id;
+                DROP INDEX IF EXISTS idx_applications_job_posting_id;
+                DROP INDEX IF EXISTS idx_audit_logs_actor_user_id;
+                DROP INDEX IF EXISTS idx_availability_slots_job_posting;
+                DROP INDEX IF EXISTS idx_candidate_accounts_active;
+                DROP INDEX IF EXISTS idx_candidate_accounts_email;
+                DROP INDEX IF EXISTS idx_cheat_signals_session;
+                DROP INDEX IF EXISTS idx_document_chunks_source;
+                DROP INDEX IF EXISTS idx_evaluations_application_id;
+                DROP INDEX IF EXISTS idx_evaluations_session_type;
+                DROP INDEX IF EXISTS idx_interview_bookings_application_id;
+                DROP INDEX IF EXISTS idx_interview_codes_application_id;
+                DROP INDEX IF EXISTS idx_interview_codes_code;
+                DROP INDEX IF EXISTS idx_interview_codes_expires_at;
+                DROP INDEX IF EXISTS idx_interview_sessions_application_id;
+                DROP INDEX IF EXISTS idx_interview_sessions_session_type;
+                DROP INDEX IF EXISTS idx_job_postings_active_deleted;
+                DROP INDEX IF EXISTS idx_job_postings_public_active;
+                DROP INDEX IF EXISTS idx_job_postings_public_filters;
+                DROP INDEX IF EXISTS idx_job_postings_salary;
+                DROP INDEX IF EXISTS idx_job_postings_skills;
+                DROP INDEX IF EXISTS idx_online_test_questions_job;
+                DROP INDEX IF EXISTS idx_online_test_submissions_app;
+                DROP INDEX IF EXISTS idx_playbook_docs_active_deleted;
+                DROP INDEX IF EXISTS idx_playbook_documents_scope;
+                DROP INDEX IF EXISTS idx_users_active_deleted;
+                DROP INDEX IF EXISTS idx_webhook_deliveries_next_retry;
+
+                -- Index vector cũ: ivfflat → thay bằng HNSW ở phần dưới của migration này.
+                DROP INDEX IF EXISTS document_chunks_embedding_idx;
+
+                -- ix_evaluations_session_id: DropIndex ngay sau đây sẽ nổ nếu DB chưa có nó
+                -- (Supabase từng thay bằng constraint evaluations_session_id_key). Tạo tạm để
+                -- lệnh DropIndex do EF sinh ra luôn có thứ để xoá.
+                CREATE INDEX IF NOT EXISTS ix_evaluations_session_id ON evaluations (session_id);
+            ");
+
             migrationBuilder.DropIndex(
                 name: "ix_evaluations_session_id",
                 table: "evaluations");
