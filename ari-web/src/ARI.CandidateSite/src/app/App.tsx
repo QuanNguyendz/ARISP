@@ -43,7 +43,6 @@ const InterviewRoomPage = lazy(() => import('@pages/interview/InterviewRoomPage'
 const PracticeSessionPage = lazy(() => import('@pages/interview/PracticeSessionPage'))
 
 // Landing / Job board
-const HomePage = lazy(() => import('@pages/landing/HomePage'))
 const FindJobPage = lazy(() => import('@pages/landing/FindJobPage'))
 const JobDetailPage = lazy(() => import('@pages/job-board/JobDetailPage'))
 const JobApplyPage = lazy(() => import('@pages/job-board/ApplyPage'))
@@ -84,7 +83,6 @@ function App() {
           {/* ==================== PUBLIC ROUTES ==================== */}
           {/* Job board công khai cho khách + ứng viên (site này chỉ phục vụ ứng viên — ADR-046). */}
           <Route path="/" element={<FindJobPage />} />
-          <Route path="/employer" element={<HomePage />} />
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route
             path="/auth/candidate-login"
