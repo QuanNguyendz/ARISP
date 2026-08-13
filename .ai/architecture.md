@@ -784,7 +784,7 @@ public interface IEmbeddingProvider
 
   Nguyên nhân: lớp này được **áp tay bằng SQL thẳng lên Supabase**, không bao giờ nằm trong migration EF — vi phạm chính quy tắc "mọi thay đổi schema qua EF Core Migration". ADR-055 dựng production từ số 0 bằng migration trên bind mount rỗng, nên EF chỉ tạo được những gì nó biết. Lớp thủ công bốc hơi im lặng.
 
-  Bằng chứng khẳng định giả thuyết: 6 bảng không có FK nào trên Supabase (`account_requests`, `cv_jd_analyses`, `interview_invites`, `notifications`, `saved_jobs`, `document_chunks`) — 5 cái đầu **đúng là 5 bảng thiếu trong `docs/database/schema.sql`**, tức bảng sinh ra *sau* khi lớp thủ công được áp nên không bao giờ được thêm FK.
+  Bằng chứng khẳng định giả thuyết: 6 bảng không có FK nào trên Supabase (`account_requests`, `cv_jd_analyses`, `interview_invites`, `notifications`, `saved_jobs`, `document_chunks`) — 5 cái đầu **đúng là 5 bảng thiếu trong `docs/database/schema.sql`** (file nay đã xoá, xem cuối ADR này), tức bảng sinh ra *sau* khi lớp thủ công được áp nên không bao giờ được thêm FK.
 
   Nghiêm trọng nhất không phải FK mà là 8 ràng buộc UNIQUE bị mất: `users(email)`, `candidate_accounts(email)`, `interview_codes(code)`, `system_settings(key)`, `evaluations(session_id)` và 3 `token_hash`. Production hiện **cho phép trùng email tài khoản và trùng mã phỏng vấn 6 ký tự** — mã Kiosk vốn dựa vào tính duy nhất để định danh phiên.
 
@@ -803,3 +803,4 @@ public interface IEmbeddingProvider
   UNION ALL SELECT 'settings', key, count(*) FROM system_settings GROUP BY key HAVING count(*)>1;
   ```
   Rỗng thì `ADD CONSTRAINT` chạy sạch; có dòng nào thì phải gộp/xoá bản trùng trước.
+- **Dọn kèm — xoá `docs/database/` (`schema.sql` + `schema.md`), 2026-08-13:** hai file này chính là bản ghi chép bằng văn bản của lớp thủ công nói trên, và cũng là thứ đã lệch xa nhất (dừng ở 2026-06-15: 25/30 bảng, thiếu 5 bảng mới + các cột của ADR-051/052). Giữ chúng lúc chưa khôi phục thì còn giá trị tham chiếu, nhưng khi lớp khoá ngoại đã nằm trong migration EF thì giá trị độc nhất đó hết. **Không thay bằng file mô tả khác** — đẻ thêm một tài liệu schema viết tay chính là tái lập đúng cái nguyên nhân gốc. Cần SQL đầy đủ thì sinh bằng `dotnet ef migrations script --idempotent` (đọc thẳng từ code, không cần kết nối DB, luôn khớp 100%); hướng dẫn đặt trong README thay cho dòng trỏ tới file cũ.

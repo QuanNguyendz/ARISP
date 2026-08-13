@@ -80,8 +80,7 @@ ARISP/
 ├── rag-service/              # Python + FastAPI + LangChain/LangGraph (Hybrid RAG)
 ├── docker/                   # Dockerfile, docker-compose files
 ├── nginx/                    # Nginx config
-├── docs/                     # Tài liệu đặc tả kỹ thuật
-│   └── database/             # schema.sql và schema.md chi tiết
+├── docs/                     # Tài liệu vận hành (setup Postgres, R2, kiosk, test plan)
 ├── scripts/                  # Script vận hành (backup DB, deploy…)
 ├── .ai/                      # Context dự án dành cho AI tools (Source of Truth)
 ├── AGENTS.md                 # Bridge file cho Antigravity
@@ -309,4 +308,14 @@ Type: `feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `setup`
 | [`.ai/tasks.md`](.ai/tasks.md) | AI tools + Dev | Trạng thái task chi tiết theo phase |
 | [`.ai/coding-rules.md`](.ai/coding-rules.md) | AI tools + Dev | Coding standards & conventions |
 | [`.ai/glossary.md`](.ai/glossary.md) | AI tools + Dev | Thuật ngữ domain |
-| [`docs/database/schema.md`](docs/database/schema.md) | Dev + DBA | Đặc tả database schema, changelog, migration rules |
+| [`docs/postgres-production-setup.md`](docs/postgres-production-setup.md) | Dev + DBA | Dựng Postgres production, SSH tunnel, phân quyền, backup |
+
+> **Database schema:** không còn file đặc tả viết tay. Nguồn sự thật duy nhất là **EF Core migrations** (`ari-service/src/ARI.Infrastructure/Migrations/`). Cần script SQL đầy đủ thì sinh ra bằng:
+>
+> ```bash
+> cd ari-service
+> dotnet ef migrations script --idempotent \
+>   --project src/ARI.Infrastructure --startup-project src/ARI.API -o schema.sql
+> ```
+>
+> Lệnh này đọc thẳng từ code, không cần kết nối DB, và luôn đúng 100% với schema thật — khác với file viết tay vốn lệch dần (xem ADR-056: một bản `schema.sql` cũ từng là nơi duy nhất ghi lại lớp khoá ngoại, và lớp đó đã mất khỏi production vì không nằm trong migration).
