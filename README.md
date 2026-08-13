@@ -83,7 +83,6 @@ ARISP/
 ├── docs/                     # Tài liệu đặc tả kỹ thuật
 │   └── database/             # schema.sql và schema.md chi tiết
 ├── scripts/                  # Script vận hành (backup DB, deploy…)
-├── supabase/                 # Supabase config & migrations (môi trường test)
 ├── .ai/                      # Context dự án dành cho AI tools (Source of Truth)
 ├── AGENTS.md                 # Bridge file cho Antigravity
 ├── CLAUDE.md                 # Bridge file cho Claude Code
