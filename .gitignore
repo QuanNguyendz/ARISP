@@ -68,12 +68,9 @@ docker/.env
 !docker/.env.example
 ari-web/src/*/.env
 !ari-web/src/*/.env.example
-supabase/.env.keys
 
 # Google OAuth credentials for MCP (Docs/Drive) – NEVER commit
 .secrets/
-supabase/.env.local
-supabase/.env.*.local
 
 # -----------------------------------------------------------------------
 # Node.js & React Frontend (Vite / npm)
@@ -133,12 +130,6 @@ _ReSharper.**/
 *.db-journal
 *.db-shm
 *.db-wal
-
-# -----------------------------------------------------------------------
-# Supabase & Local Services
-# -----------------------------------------------------------------------
-supabase/.temp/
-supabase/.branches/
 
 # -----------------------------------------------------------------------
 # Uploads / Static Media Files (CVs, images, etc.)

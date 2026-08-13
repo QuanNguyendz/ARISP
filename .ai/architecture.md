@@ -765,4 +765,42 @@ public interface IEmbeddingProvider
   - Named volume `postgres-data` cũ trên VPS **vẫn còn** sau thay đổi này. Phải copy/restore dữ liệu sang bind mount trước khi xoá nó.
   - EF migrations tự tạo extension `vector` + `uuid-ossp` và toàn bộ schema, nên bind mount rỗng tự thành DB hoàn chỉnh khi backend khởi động. Repo có 25 migration, mới nhất `20260808091756_AddBookingCandidateDismissedAt`.
   - Backup nằm cùng máy với DB không cứu được khi mất VPS — vẫn phải copy ra ngoài.
-- **Không làm (follow-up):** tách quyền `arisp_app`/`arisp_dev` khỏi `postgres` superuser đã soạn SQL trong `docs/postgres-production-setup.md` nhưng chưa áp; chưa tự động copy backup ra R2; thư mục `supabase/` (config.toml + migrations) còn sót lại từ giai đoạn đầu, chưa dọn.
+- **Không làm (follow-up):** tách quyền `arisp_app`/`arisp_dev` khỏi `postgres` superuser đã soạn SQL trong `docs/postgres-production-setup.md` nhưng chưa áp; chưa tự động copy backup ra R2. ~~thư mục `supabase/` còn sót lại từ giai đoạn đầu~~ → **đã dọn 2026-08-13**: `config.toml` + file migration đều là scaffold Supabase CLI không ai chạy, và file "migration" có **0 `CREATE TABLE`** (chỉ extension/grant boilerplate lúc schema còn rỗng) nên không mất gì; thư mục còn link nhầm sang project `axmvshinerfsebdcljqe` thay vì project test `mwdfddlmkfdmzdckfpgx` đang dùng.
+
+---
+
+### ADR-056: Khôi phục khoá ngoại + ràng buộc UNIQUE + index vận hành vào migration EF
+
+- **Ngày:** 2026-08-13
+- **Trạng thái:** Đã triển khai (chưa áp lên production)
+- **Bối cảnh:** Đối chiếu Supabase (môi trường test, sống liên tục từ tháng 5) với DB production dựng lại ở ADR-055 phát hiện production **thiếu nguyên một lớp schema**:
+
+  | | Supabase | Production (dựng từ migration EF) |
+  |---|---|---|
+  | Khoá ngoại | 29 | **1** |
+  | Ràng buộc UNIQUE | 44 | **36** |
+  | Index `idx_*` (đặt tay) | 28 | **0** |
+  | Index vector ANN | ivfflat | **không có** |
+
+  Nguyên nhân: lớp này được **áp tay bằng SQL thẳng lên Supabase**, không bao giờ nằm trong migration EF — vi phạm chính quy tắc "mọi thay đổi schema qua EF Core Migration". ADR-055 dựng production từ số 0 bằng migration trên bind mount rỗng, nên EF chỉ tạo được những gì nó biết. Lớp thủ công bốc hơi im lặng.
+
+  Bằng chứng khẳng định giả thuyết: 6 bảng không có FK nào trên Supabase (`account_requests`, `cv_jd_analyses`, `interview_invites`, `notifications`, `saved_jobs`, `document_chunks`) — 5 cái đầu **đúng là 5 bảng thiếu trong `docs/database/schema.sql`** (file nay đã xoá, xem cuối ADR này), tức bảng sinh ra *sau* khi lớp thủ công được áp nên không bao giờ được thêm FK.
+
+  Nghiêm trọng nhất không phải FK mà là 8 ràng buộc UNIQUE bị mất: `users(email)`, `candidate_accounts(email)`, `interview_codes(code)`, `system_settings(key)`, `evaluations(session_id)` và 3 `token_hash`. Production hiện **cho phép trùng email tài khoản và trùng mã phỏng vấn 6 ký tự** — mã Kiosk vốn dựa vào tính duy nhất để định danh phiên.
+
+- **Quyết định:**
+  1. **Toàn bộ lớp vào `OnModelCreating`** (`ConfigureRelationships` + `ConfigureOperationalIndexes`), không phải SQL rời. Migration `20260813075228_RestoreForeignKeysIndexesAndUniqueConstraints`: 38 khoá ngoại, 43 index (8 unique), **0 `AlterColumn`/`AddColumn`/`DropColumn`** — thuần bổ sung ràng buộc, không chạm dữ liệu; `Down()` đối xứng đủ.
+  2. **Quan hệ khai KHÔNG dùng navigation property** — `HasOne<T>().WithMany().HasForeignKey(x => x.XId)`. Entity giữ nguyên `Guid` trần, tầng service join thủ công như cũ: DB được thêm ràng buộc mà không một dòng query nào phải đổi.
+  3. **Delete behavior:** `Cascade` (19) cho quan hệ cha–con thật; `NoAction` (19) cho tham chiếu cần giữ. Khớp từng cái một với Supabase. Hệ thống dùng soft delete nên cascade hầu như không kích hoạt trong vận hành — nó là lưới an toàn cho xoá cứng.
+  4. **Bổ sung 10 FK mới** cho các bảng chưa từng có (Supabase cũng thiếu). `account_requests` để `NoAction` cả 3 tham chiếu vì đó là hồ sơ kiểm toán ai-xin-ai-duyệt (ADR-041), không được biến mất theo người dùng.
+  5. **ivfflat → HNSW** cho `document_chunks.embedding`. ivfflat phải học phân cụm từ dữ liệu lúc tạo; production đang trắng nên tạo bây giờ ra index rác phải `REINDEX` sau. HNSW xây tăng dần theo từng lần chèn, không cần huấn luyện lại. Đây là thời điểm duy nhất đổi được mà không tốn gì.
+  6. **Năm cột cố tình KHÔNG đặt FK:** `audit_logs.entity_id`, `playbook_documents.scope_ref_id`, `document_chunks.source_id` (đều đa hình theo cột `*_type`/`scope` đi kèm); `account_requests.batch_id` (id gom nhóm, không có bảng đích); `questions.playbook_chunk_id` — `rag-service` **xoá cứng** chunk mỗi lần nạp lại tài liệu (`DELETE FROM document_chunks WHERE source_type=$1 AND source_id=$2`) nên FK ở đây sẽ chặn đứng việc nạp lại; cột này hiện cũng chưa dùng ở đâu trong code.
+- **Kiểm chứng:** dựng container `pgvector/pgvector:pg17` trắng, áp cả 26 migration, rồi so **từng ràng buộc** với Supabase theo chữ ký (bảng.cột → bảng đích [hành vi xoá]) vì tên index/constraint hai bên khác nhau. Kết quả: **0 khoá ngoại thiếu, 0 UNIQUE thiếu**. 12 index báo "thiếu" đã truy từng cái: 6 là **trùng lặp sẵn bên Supabase** (cặp `idx_*` + `ix_*` cùng cột), 6 còn lại là hợp nhất có chủ ý (bỏ index thường khi đã có UNIQUE cùng cột; `online_test_submissions(application_id)` nằm trong composite unique dẫn đầu; ivfflat→HNSW). Test: **680/680 pass**.
+- **Chênh lệch CÒN LẠI, cố ý không khôi phục:** Supabase có **51 cột `character varying(n)`**, bản dựng từ EF để `text` hết. Trong Postgres `text` và `varchar(n)` **giống hệt nhau về hiệu năng lẫn lưu trữ**, chỉ khác ở chỗ chặn độ dài — mà độ dài đã được validate ở tầng ứng dụng. Các cột `varchar` đó cũng do lớp SQL tay tạo ra, không phải ý định của model EF (entity không khai `HasMaxLength`). Khôi phục 51 giới hạn độ dài là thay đổi riêng, rủi ro riêng (đặt sai một con số là từ chối dữ liệu hợp lệ lúc chạy), nên tách khỏi đợt này.
+- **Trước khi áp lên production:** dữ liệu hiện có (13 tài khoản nhân sự + 6 dòng `system_settings`) được chép từ Supabase vốn đã có sẵn UNIQUE nên về nguyên tắc không thể trùng, nhưng production đã chạy ~1 ngày **không có ràng buộc** — chạy kiểm tra trước cho chắc:
+  ```sql
+  SELECT 'users' t, email v, count(*) FROM users GROUP BY email HAVING count(*)>1
+  UNION ALL SELECT 'settings', key, count(*) FROM system_settings GROUP BY key HAVING count(*)>1;
+  ```
+  Rỗng thì `ADD CONSTRAINT` chạy sạch; có dòng nào thì phải gộp/xoá bản trùng trước.
+- **Dọn kèm — xoá `docs/database/` (`schema.sql` + `schema.md`), 2026-08-13:** hai file này chính là bản ghi chép bằng văn bản của lớp thủ công nói trên, và cũng là thứ đã lệch xa nhất (dừng ở 2026-06-15: 25/30 bảng, thiếu 5 bảng mới + các cột của ADR-051/052). Giữ chúng lúc chưa khôi phục thì còn giá trị tham chiếu, nhưng khi lớp khoá ngoại đã nằm trong migration EF thì giá trị độc nhất đó hết. **Không thay bằng file mô tả khác** — đẻ thêm một tài liệu schema viết tay chính là tái lập đúng cái nguyên nhân gốc. Cần SQL đầy đủ thì sinh bằng `dotnet ef migrations script --idempotent` (đọc thẳng từ code, không cần kết nối DB, luôn khớp 100%); hướng dẫn đặt trong README thay cho dòng trỏ tới file cũ.
