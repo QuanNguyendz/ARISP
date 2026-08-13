@@ -24,7 +24,7 @@ import {
   ScrollText,
   Sparkles,
 } from 'lucide-react'
-import { ErrorAlert, Pagination } from '@ari/shared/ui'
+import { ErrorAlert, Pagination, Select } from '@ari/shared/ui'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import jobService from '@ari/shared/fservices/job'
@@ -746,33 +746,32 @@ export default function RecruiterJobDetailPage() {
                   <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
                     {t('filters.filterByStatus')}
                   </span>
-                  <select
+                  <Select
                     value={activeTab === 'cv_review' ? cvStatusFilter : interviewStatusFilter}
-                    onChange={(e) =>
-                      activeTab === 'cv_review'
-                        ? setCvStatusFilter(e.target.value)
-                        : setInterviewStatusFilter(e.target.value)
+                    onChange={(v) =>
+                      activeTab === 'cv_review' ? setCvStatusFilter(v) : setInterviewStatusFilter(v)
                     }
-                    className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
-                  >
-                    <option value="all">{t('filters.allStatuses')}</option>
-                    {activeTab === 'cv_review' ? (
-                      <>
-                        <option value="cv_submitted">{t('filters.cvSubmitted')}</option>
-                        <option value="invited">{t('filters.invited')}</option>
-                        <option value="cv_rejected">{t('filters.cvRejected')}</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="invited">{t('filters.waitingForInvite')}</option>
-                        <option value="screening">{t('filters.invitedWaitingSchedule')}</option>
-                        <option value="interview">{t('filters.scheduledInterview')}</option>
-                        <option value="pass">{t('funnel.pass')}</option>
-                        <option value="not_pass">{t('funnel.screening')}</option>
-                        <option value="withdrawn">{t('filters.withdrawn')}</option>
-                      </>
-                    )}
-                  </select>
+                    ariaLabel={t('filters.filterByStatus')}
+                    className="min-w-[11rem]"
+                    buttonClassName="rounded-lg px-3 py-1.5 text-xs"
+                    options={[
+                      { value: 'all', label: t('filters.allStatuses') },
+                      ...(activeTab === 'cv_review'
+                        ? [
+                            { value: 'cv_submitted', label: t('filters.cvSubmitted') },
+                            { value: 'invited', label: t('filters.invited') },
+                            { value: 'cv_rejected', label: t('filters.cvRejected') },
+                          ]
+                        : [
+                            { value: 'invited', label: t('filters.waitingForInvite') },
+                            { value: 'screening', label: t('filters.invitedWaitingSchedule') },
+                            { value: 'interview', label: t('filters.scheduledInterview') },
+                            { value: 'pass', label: t('funnel.pass') },
+                            { value: 'not_pass', label: t('funnel.screening') },
+                            { value: 'withdrawn', label: t('filters.withdrawn') },
+                          ]),
+                    ]}
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
@@ -781,19 +780,19 @@ export default function RecruiterJobDetailPage() {
                     ? t('filters.sortByRelevance')
                     : t('filters.sortByScore')}
                 </span>
-                <select
+                <Select
                   value={activeTab === 'cv_review' ? cvSortOrder : interviewSortOrder}
-                  onChange={(e) =>
-                    activeTab === 'cv_review'
-                      ? setCvSortOrder(e.target.value)
-                      : setInterviewSortOrder(e.target.value)
+                  onChange={(v) =>
+                    activeTab === 'cv_review' ? setCvSortOrder(v) : setInterviewSortOrder(v)
                   }
-                  className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
-                >
-                  <option value="desc">{t('filters.sortDesc')}</option>
-                  <option value="asc">{t('filters.sortAsc')}</option>
-                  <option value="default">{t('filters.sortDefault')}</option>
-                </select>
+                  className="min-w-[10rem]"
+                  buttonClassName="rounded-lg px-3 py-1.5 text-xs"
+                  options={[
+                    { value: 'desc', label: t('filters.sortDesc') },
+                    { value: 'asc', label: t('filters.sortAsc') },
+                    { value: 'default', label: t('filters.sortDefault') },
+                  ]}
+                />
               </div>
             </div>
 

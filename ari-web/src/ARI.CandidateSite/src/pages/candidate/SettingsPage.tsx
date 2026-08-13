@@ -20,6 +20,7 @@ import { authService } from '@ari/shared/fservices/auth'
 import { settingsService } from '@/fservices/settings/settingsService'
 import type { CandidateSettings, NotificationChannelPref } from '@/fservices/settings/settingsService'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
+import Select from '@ari/shared/ui/Select'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -223,15 +224,17 @@ export default function SettingsPage() {
                   {t('settings.appearance.displayLanguageHint')}
                 </div>
               </div>
-              <select
+              <Select
                 value={settings?.language ?? 'vi'}
                 disabled={!settings}
-                onChange={(e) => settings && save({ ...settings, language: e.target.value })}
-                className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none focus:border-brand-500"
-              >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
-              </select>
+                onChange={(v) => settings && save({ ...settings, language: v })}
+                options={[
+                  { value: 'vi', label: 'Tiếng Việt' },
+                  { value: 'en', label: 'English' },
+                ]}
+                align="right"
+                className="min-w-[9rem]"
+              />
             </div>
           </section>
 

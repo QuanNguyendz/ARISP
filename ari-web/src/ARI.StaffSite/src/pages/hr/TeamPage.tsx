@@ -16,7 +16,7 @@ import {
   XCircle,
   AlertCircle,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import { PageHeader, StatsGrid, ErrorAlert, EmptyState, Pagination, Select } from '@ari/shared/ui'
 import { RequestListSkeleton } from './_skeletons'
 import {
   accountRequestService,
@@ -392,14 +392,16 @@ function RequestModal({
                 placeholder={t('placeholder.fullName')}
                 className={inputCls}
               />
-              <select
+              <Select
                 value={r.role}
-                onChange={(e) => update(i, 'role', e.target.value)}
-                className={inputCls}
-              >
-                <option value="recruiter">{t('roles.recruiter')}</option>
-                <option value="hr_admin">{t('roles.hrAdmin')}</option>
-              </select>
+                onChange={(v) => update(i, 'role', v)}
+                options={[
+                  { value: 'recruiter', label: t('roles.recruiter') },
+                  { value: 'hr_admin', label: t('roles.hrAdmin') },
+                ]}
+                className="w-full"
+                buttonClassName="rounded-lg px-2.5 py-2 text-sm"
+              />
               <input
                 value={r.department || ''}
                 onChange={(e) => update(i, 'department', e.target.value)}

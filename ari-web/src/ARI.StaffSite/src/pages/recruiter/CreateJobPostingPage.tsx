@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import jobService from '@ari/shared/fservices/job'
-import { ErrorAlert } from '@ari/shared/ui'
+import { ErrorAlert, Select } from '@ari/shared/ui'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
 interface CreateJobPostingPageProps {
@@ -348,31 +348,43 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
               </div>
               <div>
                 <label className={label}>{t('form.category')}</label>
-                <select value={jobCategory} onChange={(e) => setJobCategory(e.target.value)} className={input}>
-                  <option value="">— {t('options.selectCategory')} —</option>
-                  <option value="backend">Backend</option>
-                  <option value="frontend">Frontend</option>
-                  <option value="devops">DevOps / Infra</option>
-                  <option value="qa">QA / Testing</option>
-                  <option value="data">Data</option>
-                  <option value="ai_ml">AI / ML</option>
-                  <option value="mobile">Mobile</option>
-                  <option value="pm">Project Manager</option>
-                  <option value="designer">Designer</option>
-                  <option value="other">Khác</option>
-                </select>
+                <Select
+                  value={jobCategory}
+                  onChange={setJobCategory}
+                  placeholder={`— ${t('options.selectCategory')} —`}
+                  className="w-full"
+                  buttonClassName="px-4 py-2.5 text-sm"
+                  options={[
+                    { value: 'backend', label: 'Backend' },
+                    { value: 'frontend', label: 'Frontend' },
+                    { value: 'devops', label: 'DevOps / Infra' },
+                    { value: 'qa', label: 'QA / Testing' },
+                    { value: 'data', label: 'Data' },
+                    { value: 'ai_ml', label: 'AI / ML' },
+                    { value: 'mobile', label: 'Mobile' },
+                    { value: 'pm', label: 'Project Manager' },
+                    { value: 'designer', label: 'Designer' },
+                    { value: 'other', label: 'Khác' },
+                  ]}
+                />
               </div>
               <div>
                 <label className={label}>{t('form.level')}</label>
-                <select value={experienceLevel} onChange={(e) => setExperienceLevel(e.target.value)} className={input}>
-                  <option value="intern">Intern</option>
-                  <option value="fresher">Fresher</option>
-                  <option value="junior">Junior</option>
-                  <option value="middle">Middle</option>
-                  <option value="senior">Senior</option>
-                  <option value="lead">Lead</option>
-                  <option value="manager">Manager</option>
-                </select>
+                <Select
+                  value={experienceLevel}
+                  onChange={setExperienceLevel}
+                  className="w-full"
+                  buttonClassName="px-4 py-2.5 text-sm"
+                  options={[
+                    { value: 'intern', label: 'Intern' },
+                    { value: 'fresher', label: 'Fresher' },
+                    { value: 'junior', label: 'Junior' },
+                    { value: 'middle', label: 'Middle' },
+                    { value: 'senior', label: 'Senior' },
+                    { value: 'lead', label: 'Lead' },
+                    { value: 'manager', label: 'Manager' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -418,29 +430,47 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className={label}>{t('form.employmentType')}</label>
-                <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className={input}>
-                  <option value="full_time">Toàn thời gian</option>
-                  <option value="part_time">Bán thời gian</option>
-                  <option value="contract">Hợp đồng</option>
-                  <option value="internship">Thực tập</option>
-                  <option value="freelance">Freelance</option>
-                </select>
+                <Select
+                  value={employmentType}
+                  onChange={setEmploymentType}
+                  className="w-full"
+                  buttonClassName="px-4 py-2.5 text-sm"
+                  options={[
+                    { value: 'full_time', label: 'Toàn thời gian' },
+                    { value: 'part_time', label: 'Bán thời gian' },
+                    { value: 'contract', label: 'Hợp đồng' },
+                    { value: 'internship', label: 'Thực tập' },
+                    { value: 'freelance', label: 'Freelance' },
+                  ]}
+                />
               </div>
               <div>
                 <label className={label}>{t('form.workLocation')}</label>
-                <select value={workMode} onChange={(e) => setWorkMode(e.target.value)} className={input}>
-                  <option value="onsite">{t('options.onsite')}</option>
-                  <option value="hybrid">{t('options.hybrid')}</option>
-                  <option value="remote">{t('options.remoteWork')}</option>
-                </select>
+                <Select
+                  value={workMode}
+                  onChange={setWorkMode}
+                  className="w-full"
+                  buttonClassName="px-4 py-2.5 text-sm"
+                  options={[
+                    { value: 'onsite', label: t('options.onsite') },
+                    { value: 'hybrid', label: t('options.hybrid') },
+                    { value: 'remote', label: t('options.remoteWork') },
+                  ]}
+                />
               </div>
               <div>
                 <label className={label}>{t('form.interviewMode')}<RequiredStar /></label>
-                <select value={interviewMode} onChange={(e) => setInterviewMode(e.target.value as any)} className={input}>
-                  <option value="remote">{t('options.remote')}</option>
-                  <option value="onsite">{t('options.onsiteInterview')}</option>
-                  <option value="both">{t('options.hybridInterview')}</option>
-                </select>
+                <Select
+                  value={interviewMode}
+                  onChange={(v) => setInterviewMode(v as typeof interviewMode)}
+                  className="w-full"
+                  buttonClassName="px-4 py-2.5 text-sm"
+                  options={[
+                    { value: 'remote', label: t('options.remote') },
+                    { value: 'onsite', label: t('options.onsiteInterview') },
+                    { value: 'both', label: t('options.hybridInterview') },
+                  ]}
+                />
               </div>
             </div>
 
@@ -476,10 +506,16 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                   <input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMin')} className={`${input} min-w-0`} />
                   <input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value === '' ? '' : Number(e.target.value))} placeholder={t('form.salaryMax')} className={`${input} min-w-0`} />
-                  <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)} className={`${input} min-w-0 sm:col-span-2 md:col-span-1`}>
-                    <option value="VND">VND</option>
-                    <option value="USD">USD</option>
-                  </select>
+                  <Select
+                    value={salaryCurrency}
+                    onChange={setSalaryCurrency}
+                    className="min-w-0 sm:col-span-2 md:col-span-1"
+                    buttonClassName="px-4 py-2.5 text-sm"
+                    options={[
+                      { value: 'VND', label: 'VND' },
+                      { value: 'USD', label: 'USD' },
+                    ]}
+                  />
                 </div>
               )}
             </div>
@@ -516,11 +552,17 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                     <div className="text-sm font-semibold text-ink-900 dark:text-white">{t('form.round', { number: round.roundNumber })}</div>
                     <div>
                       <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.roundType')}</label>
-                      <select value={round.roundType} onChange={(e) => changeRound(idx, 'roundType', e.target.value)} className={`${input} py-2`}>
-                        <option value="screening">{t('form.screening')}</option>
-                        <option value="technical">{t('form.technical')}</option>
-                        <option value="online_test">{t('form.onlineTest')}</option>
-                      </select>
+                      <Select
+                        value={round.roundType}
+                        onChange={(v) => changeRound(idx, 'roundType', v)}
+                        className="w-full"
+                        buttonClassName="px-4 py-2 text-sm"
+                        options={[
+                          { value: 'screening', label: t('form.screening') },
+                          { value: 'technical', label: t('form.technical') },
+                          { value: 'online_test', label: t('form.onlineTest') },
+                        ]}
+                      />
                       {round.roundType === 'online_test' && (
                         <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{t('form.onlineTestHint')}</p>
                       )}
@@ -528,10 +570,16 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.language')}</label>
-                        <select value={round.interviewLanguage} onChange={(e) => changeRound(idx, 'interviewLanguage', e.target.value)} className={`${input} py-2`}>
-                          <option value="vi">{t('form.vietnamese')}</option>
-                          <option value="en">{t('form.english')}</option>
-                        </select>
+                        <Select
+                          value={round.interviewLanguage ?? 'vi'}
+                          onChange={(v) => changeRound(idx, 'interviewLanguage', v)}
+                          className="w-full"
+                          buttonClassName="px-4 py-2 text-sm"
+                          options={[
+                            { value: 'vi', label: t('form.vietnamese') },
+                            { value: 'en', label: t('form.english') },
+                          ]}
+                        />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.minutes')}</label>

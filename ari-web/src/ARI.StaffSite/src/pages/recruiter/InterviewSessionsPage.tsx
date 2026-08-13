@@ -8,7 +8,7 @@ import {
   Bell, RefreshCw, Plus, Filter, MessageSquare, X, CalendarDays, UserX,
   KeyRound, Copy, Check
 } from 'lucide-react'
-import { PageHeader, EmptyState, ErrorAlert } from '@ari/shared/ui'
+import { PageHeader, EmptyState, ErrorAlert, Select } from '@ari/shared/ui'
 import { applicationService } from '@ari/shared/fservices/application'
 import {
   interviewService,
@@ -1086,14 +1086,16 @@ export default function RecruiterInterviewSessionsPage() {
 
           <div className="flex items-center gap-1.5">
             <Filter className="w-4 h-4 text-ink-400" />
-            <select
+            <Select
               value={jobStatusFilter}
-              onChange={e => updateParam('status', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-800 dark:text-ink-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-            >
-              <option value="active">Vị trí đang tuyển dụng</option>
-              <option value="closed">Vị trí đã đóng tuyển</option>
-            </select>
+              onChange={(v) => updateParam('status', v)}
+              options={[
+                { value: 'active', label: 'Vị trí đang tuyển dụng' },
+                { value: 'closed', label: 'Vị trí đã đóng tuyển' },
+              ]}
+              className="min-w-[12rem]"
+              buttonClassName="px-3 py-2 text-xs font-semibold"
+            />
           </div>
         </div>
       </div>
