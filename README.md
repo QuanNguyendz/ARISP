@@ -72,13 +72,18 @@ ARISP/
 │   │   ├── ARI.Domain/         # Entities, Value Objects, Domain Events
 │   │   └── ARI.Infrastructure/ # EF Core, Repositories, External Services
 │   └── tests/                # Unit / functional tests
-├── frontend/                 # React + TypeScript + TailwindCSS
+├── ari-web/                  # React + TypeScript + TailwindCSS (npm workspaces)
+│   └── src/
+│       ├── ARI.CandidateSite/  # Site ứng viên (public, port 3000)
+│       ├── ARI.StaffSite/      # Site nội bộ HR/Recruiter/Super Admin (port 3001)
+│       └── ARI.Shared/         # UI, hooks, fservices dùng chung
+├── rag-service/              # Python + FastAPI + LangChain/LangGraph (Hybrid RAG)
 ├── docker/                   # Dockerfile, docker-compose files
 ├── nginx/                    # Nginx config
 ├── docs/                     # Tài liệu đặc tả kỹ thuật
 │   └── database/             # schema.sql và schema.md chi tiết
-├── public/                   # Static assets
-├── supabase/                 # Supabase config & migrations
+├── scripts/                  # Script vận hành (backup DB, deploy…)
+├── supabase/                 # Supabase config & migrations (môi trường test)
 ├── .ai/                      # Context dự án dành cho AI tools (Source of Truth)
 ├── AGENTS.md                 # Bridge file cho Antigravity
 ├── CLAUDE.md                 # Bridge file cho Claude Code
