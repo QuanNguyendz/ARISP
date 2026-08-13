@@ -53,7 +53,9 @@
     "filter": "Lọc",
     "clear": "Xoá lọc",
     "markAllRead": "Đánh dấu đã đọc",
-    "seeAllNotifications": "Xem tất cả thông báo"
+    "seeAllNotifications": "Xem tất cả thông báo",
+    "showPassword": "Hiện mật khẩu",
+    "hidePassword": "Ẩn mật khẩu"
   },
   "status": {
     "active": "Đang hoạt động",

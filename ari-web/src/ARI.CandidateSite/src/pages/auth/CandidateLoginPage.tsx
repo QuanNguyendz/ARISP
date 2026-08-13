@@ -1,19 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-  Sparkles,
-  Check,
-} from 'lucide-react'
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Sparkles, Check } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
+import PasswordToggle from '@ari/shared/ui/PasswordToggle'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -250,8 +241,11 @@ export default function CandidateLoginPage() {
                 <label className="block text-sm font-medium text-ink-600">
                   {t('candidateLogin.passwordLabel')}
                 </label>
+                {/* tabIndex={-1}: Tab từ ô email phải nhảy thẳng xuống ô mật khẩu,
+                    không dừng ở đây (xem PasswordToggle). */}
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => navigate('/auth/forgot-password')}
                   className="text-sm font-medium text-brand-600 hover:underline"
                 >
@@ -269,13 +263,10 @@ export default function CandidateLoginPage() {
                   autoComplete="current-password"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-ink-400 hover:text-ink-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <PasswordToggle
+                  visible={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                />
               </div>
             </div>
 

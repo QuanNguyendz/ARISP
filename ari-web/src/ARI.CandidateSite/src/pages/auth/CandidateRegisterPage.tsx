@@ -4,8 +4,6 @@ import { Trans, useTranslation } from 'react-i18next'
 import {
   Mail,
   Lock,
-  Eye,
-  EyeOff,
   User,
   ArrowRight,
   Loader2,
@@ -15,6 +13,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
+import PasswordToggle from '@ari/shared/ui/PasswordToggle'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -241,13 +240,10 @@ export default function CandidateRegisterPage() {
                   autoComplete="new-password"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-ink-400 hover:text-ink-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <PasswordToggle
+                  visible={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                />
               </div>
 
               {/* Password strength */}
@@ -283,17 +279,10 @@ export default function CandidateRegisterPage() {
                   autoComplete="new-password"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="text-ink-400 hover:text-ink-600"
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
+                <PasswordToggle
+                  visible={showConfirmPassword}
+                  onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+                />
               </div>
               {confirmPassword.length > 0 && !passwordsMatch && (
                 <p className="mt-1 text-xs text-red-500">

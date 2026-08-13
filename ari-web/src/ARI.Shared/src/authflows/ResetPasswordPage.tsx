@@ -7,8 +7,6 @@ import {
   LockKeyhole,
   ShieldCheck,
   LogIn,
-  Eye,
-  EyeOff,
   Check,
   CheckCircle2,
   XCircle,
@@ -16,6 +14,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
+import PasswordToggle from '@ari/shared/ui/PasswordToggle'
 
 // Quy tắc mật khẩu mirror theo backend (AuthController.IsValidCandidatePassword)
 const SPECIAL_CHARS = '!@#$%^&*'
@@ -195,13 +194,10 @@ export default function ResetPasswordPage() {
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="text-ink-400 hover:text-ink-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <PasswordToggle
+                    visible={showPassword}
+                    onToggle={() => setShowPassword((v) => !v)}
+                  />
                 </div>
 
                 {/* Strength meter */}
@@ -247,17 +243,10 @@ export default function ResetPasswordPage() {
                     className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((v) => !v)}
-                    className="text-ink-400 hover:text-ink-600"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
+                  <PasswordToggle
+                    visible={showConfirmPassword}
+                    onToggle={() => setShowConfirmPassword((v) => !v)}
+                  />
                 </div>
                 {confirmPassword.length > 0 && (
                   <p
