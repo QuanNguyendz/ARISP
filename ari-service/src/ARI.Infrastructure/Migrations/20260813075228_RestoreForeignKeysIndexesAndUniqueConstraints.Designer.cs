@@ -5,6 +5,7 @@ using System.Net;
 using ARI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -13,9 +14,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ARI.Infrastructure.Migrations
 {
     [DbContext(typeof(AriDbContext))]
-    partial class AriDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260813075228_RestoreForeignKeysIndexesAndUniqueConstraints")]
+    partial class RestoreForeignKeysIndexesAndUniqueConstraints
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -250,8 +250,11 @@ namespace ARI.Infrastructure.Data
                 .HasIndex(q => q.SessionId).HasDatabaseName("ix_questions_session_id");
             modelBuilder.Entity<Answer>()
                 .HasIndex(a => a.SessionId).HasDatabaseName("ix_answers_session_id");
+            // Mỗi phiên chỉ có 1 bản đánh giá. Đường chấm lại (RegenerateEvaluationAsync) xoá CỨNG
+            // bản cũ trước khi ghi mới (Evaluation không phải ISoftDelete) nên ràng buộc này an toàn.
+            // Supabase có 2 index chồng nhau trên cột này (1 unique + 1 thường); ở đây gộp làm 1.
             modelBuilder.Entity<Evaluation>()
-                .HasIndex(e => e.SessionId).HasDatabaseName("ix_evaluations_session_id");
+                .HasIndex(e => e.SessionId).IsUnique().HasDatabaseName("ix_evaluations_session_id");
             modelBuilder.Entity<Evaluation>()
                 .HasIndex(e => e.ApplicationId).HasDatabaseName("ix_evaluations_application_id");
             modelBuilder.Entity<HrReview>()
@@ -273,6 +276,264 @@ namespace ARI.Infrastructure.Data
                 .IsUnique()
                 .HasFilter("status = 'scheduled'")
                 .HasDatabaseName("ux_interview_bookings_app_round_scheduled");
+
+            ConfigureRelationships(modelBuilder);
+            ConfigureOperationalIndexes(modelBuilder);
+        }
+
+        /// <summary>
+        /// Khoá ngoại cho toàn bộ schema. Trước đây lớp này được áp TAY bằng SQL thẳng lên
+        /// Supabase nên không nằm trong migration — khi ADR-055 dựng lại DB production từ
+        /// migration EF trên thư mục trống thì toàn bộ 29 khoá ngoại biến mất im lặng.
+        /// Khai ở đây để mọi lần dựng DB sau này đều có, không thể mất lần nữa.
+        ///
+        /// Cố tình KHÔNG dùng navigation property: entity giữ nguyên kiểu Guid trần, tầng
+        /// service vẫn join thủ công như cũ — chỉ DB được thêm ràng buộc, không dòng query nào đổi.
+        ///
+        /// Quy ước Delete behavior:
+        ///   Cascade  — quan hệ cha–con thật, xoá cha thì con vô nghĩa (câu hỏi của phiên đã xoá).
+        ///   NoAction — tham chiếu cần giữ; chặn xoá nhầm dữ liệu tuyển dụng/kiểm toán.
+        /// Hệ thống dùng soft delete (SaveChangesAsync đổi Delete → Modified) nên cascade hầu
+        /// như không kích hoạt trong vận hành thường — nó là lưới an toàn cho xoá cứng.
+        /// </summary>
+        private static void ConfigureRelationships(ModelBuilder modelBuilder)
+        {
+            // ===== users =====
+            modelBuilder.Entity<RefreshToken>()
+                .HasOne<User>().WithMany().HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AuditLog>()
+                .HasOne<User>().WithMany().HasForeignKey(a => a.ActorUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<HrReview>()
+                .HasOne<User>().WithMany().HasForeignKey(h => h.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<InterviewCode>()
+                .HasOne<User>().WithMany().HasForeignKey(c => c.CreatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JobPosting>()
+                .HasOne<User>().WithMany().HasForeignKey(j => j.CreatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JobPosting>()
+                .HasOne<User>().WithMany().HasForeignKey(j => j.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasOne<User>().WithMany().HasForeignKey(p => p.UploadedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            // account_requests là hồ sơ kiểm toán "ai xin tạo tài khoản, ai duyệt" (ADR-041):
+            // không được biến mất theo người dùng → NoAction cho cả 3 tham chiếu.
+            modelBuilder.Entity<AccountRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.RequestedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<AccountRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<AccountRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.CreatedUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Notification>()
+                .HasOne<User>().WithMany().HasForeignKey(n => n.RecipientUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ===== candidate_accounts =====
+            modelBuilder.Entity<CandidateRefreshToken>()
+                .HasOne<CandidateAccount>().WithMany().HasForeignKey(t => t.CandidateAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasOne<CandidateAccount>().WithMany().HasForeignKey(a => a.CandidateAccountId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<SavedJob>()
+                .HasOne<CandidateAccount>().WithMany().HasForeignKey(s => s.CandidateAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Notification>()
+                .HasOne<CandidateAccount>().WithMany().HasForeignKey(n => n.CandidateAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ===== job_postings =====
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(a => a.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AvailabilitySlot>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(s => s.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<InterviewRoundConfig>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(r => r.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<OnlineTestQuestion>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(q => q.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<CvJdAnalysis>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(c => c.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<SavedJob>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(s => s.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ===== applications =====
+            modelBuilder.Entity<InterviewSession>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(s => s.ApplicationId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Evaluation>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(e => e.ApplicationId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<InterviewCode>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(c => c.ApplicationId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<InterviewBooking>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(b => b.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(s => s.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<InterviewInvite>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(i => i.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ===== interview_sessions =====
+            modelBuilder.Entity<Question>()
+                .HasOne<InterviewSession>().WithMany().HasForeignKey(q => q.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Answer>()
+                .HasOne<InterviewSession>().WithMany().HasForeignKey(a => a.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<CheatDetectionSignal>()
+                .HasOne<InterviewSession>().WithMany().HasForeignKey(c => c.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<MustAskTracking>()
+                .HasOne<InterviewSession>().WithMany().HasForeignKey(m => m.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Evaluation>()
+                .HasOne<InterviewSession>().WithMany().HasForeignKey(e => e.SessionId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // ===== questions / evaluations / slots / playbook =====
+            modelBuilder.Entity<Answer>()
+                .HasOne<Question>().WithMany().HasForeignKey(a => a.QuestionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<MustAskTracking>()
+                .HasOne<Question>().WithMany().HasForeignKey(m => m.QuestionId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<HrReview>()
+                .HasOne<Evaluation>().WithMany().HasForeignKey(h => h.EvaluationId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<InterviewBooking>()
+                .HasOne<AvailabilitySlot>().WithMany().HasForeignKey(b => b.AvailabilitySlotId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<MustAskTracking>()
+                .HasOne<PlaybookDocument>().WithMany().HasForeignKey(m => m.PlaybookDocumentId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Đổi lịch trỏ về booking cũ (tự tham chiếu) — giữ vết, không xoá theo.
+            modelBuilder.Entity<InterviewBooking>()
+                .HasOne<InterviewBooking>().WithMany().HasForeignKey(b => b.RescheduledFromId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Quan hệ DUY NHẤT đã tồn tại sẵn (sinh ra do navigation property có từ trước).
+            // Khai tường minh để EF dùng lại đúng quan hệ đó thay vì tạo thêm quan hệ bóng.
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasOne(a => a.CvJdAnalysis).WithMany().HasForeignKey(a => a.CvJdAnalysisId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // ===== CỐ TÌNH KHÔNG ĐẶT KHOÁ NGOẠI =====
+            // audit_logs.entity_id        — đa hình theo entity_type (trỏ nhiều bảng khác nhau).
+            // playbook_documents.scope_ref_id — đa hình theo scope (org | job_posting | round).
+            // document_chunks.source_id   — đa hình theo source_type (jd | cv | playbook).
+            // account_requests.batch_id   — id gom nhóm, KHÔNG có bảng đích nào tồn tại.
+            // questions.playbook_chunk_id — rag-service xoá cứng chunk mỗi lần nạp lại tài liệu
+            //   (DELETE FROM document_chunks WHERE source_type=$1 AND source_id=$2), nên khoá ngoại
+            //   ở đây sẽ chặn đứng việc nạp lại. Cột này hiện cũng chưa được dùng ở đâu trong code.
+        }
+
+        /// <summary>
+        /// Index vận hành — cũng thuộc lớp áp tay đã mất cùng khoá ngoại ở ADR-055.
+        /// Không khai lại index cho cột khoá ngoại: EF tự tạo cho mỗi quan hệ ở trên.
+        /// </summary>
+        private static void ConfigureOperationalIndexes(ModelBuilder modelBuilder)
+        {
+            // --- Lọc soft delete: mọi truy vấn đều kèm "deleted_at IS NULL" (query filter toàn cục).
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasIndex(a => a.DeletedAt).HasDatabaseName("idx_applications_active_deleted");
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => j.DeletedAt).HasDatabaseName("idx_job_postings_active_deleted");
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.DeletedAt).HasDatabaseName("idx_users_active_deleted");
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasIndex(p => p.DeletedAt).HasDatabaseName("idx_playbook_docs_active_deleted");
+
+            // === RÀNG BUỘC DUY NHẤT — cũng thuộc lớp áp tay đã mất ở ADR-055 ===
+            // Không có chúng, DB cho phép trùng email tài khoản, trùng mã phỏng vấn 6 ký tự,
+            // trùng khoá cấu hình hệ thống và trùng token đăng nhập. Khôi phục ĐÚNG như Supabase
+            // (không kèm filter deleted_at) — đây là hành vi ứng dụng đã chạy suốt nhiều tháng:
+            // email của tài khoản đã xoá mềm sẽ không dùng lại được, và đó là chủ ý cho hệ nội bộ.
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email).IsUnique().HasDatabaseName("ux_users_email");
+            modelBuilder.Entity<CandidateAccount>()
+                .HasIndex(c => c.Email).IsUnique().HasDatabaseName("ux_candidate_accounts_email");
+            modelBuilder.Entity<SystemSetting>()
+                .HasIndex(s => s.Key).IsUnique().HasDatabaseName("ux_system_settings_key");
+            modelBuilder.Entity<InterviewCode>()
+                .HasIndex(c => c.Code).IsUnique().HasDatabaseName("ux_interview_codes_code");
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(t => t.TokenHash).IsUnique().HasDatabaseName("ux_refresh_tokens_token_hash");
+            modelBuilder.Entity<CandidateRefreshToken>()
+                .HasIndex(t => t.TokenHash).IsUnique().HasDatabaseName("ux_candidate_refresh_tokens_token_hash");
+            modelBuilder.Entity<MagicLink>()
+                .HasIndex(m => m.TokenHash).IsUnique().HasDatabaseName("ux_magic_links_token_hash");
+
+            // --- Job Board: bộ lọc công khai + tìm theo kỹ năng.
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => new { j.IsPublicListing, j.Status })
+                .HasFilter("deleted_at IS NULL")
+                .HasDatabaseName("idx_job_postings_public_active");
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => new { j.IsPublicListing, j.Status, j.WorkMode, j.ExperienceLevel, j.JobCategory })
+                .HasFilter("deleted_at IS NULL AND is_public_listing = true")
+                .HasDatabaseName("idx_job_postings_public_filters");
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => new { j.SalaryMin, j.SalaryMax })
+                .HasFilter("deleted_at IS NULL AND salary_is_negotiable = false")
+                .HasDatabaseName("idx_job_postings_salary");
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => j.Skills)
+                .HasMethod("gin")
+                .HasDatabaseName("idx_job_postings_skills");
+
+            // --- Tác vụ nền quét mã hết hạn (tra mã đã có ux_interview_codes_code ở trên).
+            modelBuilder.Entity<InterviewCode>()
+                .HasIndex(c => c.ExpiresAt)
+                .HasFilter("used_at IS NULL")
+                .HasDatabaseName("idx_interview_codes_expires_at");
+
+            // --- Tách buổi thử / buổi thật (ADR-051 lọc session_type ở nhiều đường đọc).
+            modelBuilder.Entity<InterviewSession>()
+                .HasIndex(s => s.SessionType).HasDatabaseName("idx_interview_sessions_session_type");
+            modelBuilder.Entity<Evaluation>()
+                .HasIndex(e => e.SessionType).HasDatabaseName("idx_evaluations_session_type");
+
+            // --- Playbook theo phạm vi (đa hình, không có khoá ngoại nên phải tự khai index).
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasIndex(p => new { p.Scope, p.ScopeRefId }).HasDatabaseName("idx_playbook_documents_scope");
+
+            // --- Job retry webhook nền.
+            modelBuilder.Entity<WebhookDelivery>()
+                .HasIndex(w => w.NextRetryAt)
+                .HasFilter("delivered_at IS NULL")
+                .HasDatabaseName("idx_webhook_deliveries_next_retry");
+
+            // --- RAG: lọc chunk theo nguồn (đa hình) + tìm kiếm vector.
+            modelBuilder.Entity<DocumentChunk>()
+                .HasIndex(c => new { c.SourceType, c.SourceId }).HasDatabaseName("idx_document_chunks_source");
+
+            // Index ANN cho tìm kiếm ngữ nghĩa. Supabase đang dùng ivfflat, ở đây CỐ Ý đổi sang
+            // HNSW: ivfflat phải "học" phân cụm từ dữ liệu lúc tạo, mà DB production hiện trắng
+            // → tạo bây giờ sẽ ra index phân cụm rác, phải REINDEX lại sau khi có dữ liệu.
+            // HNSW xây dựng tăng dần theo từng lần chèn, không cần huấn luyện lại, recall tốt hơn
+            // ở cùng mức tốc độ. Đây là thời điểm duy nhất đổi được mà không tốn gì.
+            modelBuilder.Entity<DocumentChunk>()
+                .HasIndex(c => c.Embedding)
+                .HasMethod("hnsw")
+                .HasOperators("vector_cosine_ops")
+                .HasDatabaseName("idx_document_chunks_embedding_hnsw");
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
