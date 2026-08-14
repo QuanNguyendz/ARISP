@@ -15,10 +15,7 @@
   "status": {
     "pendingHrReview": "Chờ HR xác nhận"
   },
-  "verdict": {
-    "pass": "Pass",
-    "notPass": "Not Pass"
-  },
+  "verdict": "Verdict",
   "evaluations": "Đánh giá",
   "criterionScores": "Điểm theo tiêu chí",
   "noCriterionData": "Chưa có dữ liệu điểm tiêu chí.",
@@ -29,13 +26,11 @@
   "questionAnalysis": "Phân tích theo câu hỏi",
   "aiComment": "AI nhận xét",
   "recordingTranscript": "Bản ghi buổi phỏng vấn",
-  "viewFullTranscript": "Xem transcript đầy đủ",
   "recordingExpiresAt": "Video tự động xoá sau {{date}}",
   "recordingDeleted": "Video đã được xoá tự động ngày {{date}} theo chính sách lưu trữ.",
   "recordingNone": "Buổi phỏng vấn này chưa có bản ghi hình.",
   "aiVerdict": "Verdict của AI",
   "recommendation": "Đề xuất",
-  "inviteNextRound": "Mời phỏng vấn Vòng {{round}}",
   "hrDecision": "Quyết định của HR",
   "hrDecisionHint": "Xác nhận verdict của AI hoặc ghi đè (bắt buộc nêu lý do).",
   "confirming": "Đang xác nhận...",
@@ -45,11 +40,22 @@
   "overrideReason": "Lý do ghi đè",
   "overrideReasonPlaceholder": "Bắt buộc — giải thích vì sao thay đổi verdict của AI...",
   "saveAndSendResult": "Lưu & gửi kết quả",
-  "saveAndInviteNext": "Lưu & mời Round tiếp theo",
   "confirmed": "Đã xác nhận",
-  "verdict": "Verdict",
   "cvJdMatch": "Match CV–JD",
   "confirmError": "Không thể xác nhận kết quả lúc này.",
   "overrideReasonRequired": "Vui lòng nhập lý do đổi kết quả.",
-  "overrideError": "Không thể đổi kết quả lúc này."
+  "overrideError": "Không thể đổi kết quả lúc này.",
+  "verdictPass": "Đạt",
+  "verdictNotPass": "Không đạt",
+  "notScored": "Chưa chấm",
+  "candidateAnswer": "Câu trả lời của ứng viên",
+  "noAnswer": "Ứng viên không trả lời câu này.",
+  "improvementNote": "Gợi ý cải thiện",
+  "languageOverall": "Điểm chung",
+  "grammar": "Ngữ pháp",
+  "comprehension": "Nghe hiểu",
+  "aiReasoning": "Nhận định của AI",
+  "integritySignals": "Tín hiệu tính toàn vẹn",
+  "cheatScore": "Điểm nghi vấn",
+  "noCheatSignals": "Không ghi nhận dấu hiệu bất thường nào trong buổi phỏng vấn."
 }

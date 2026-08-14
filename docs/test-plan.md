@@ -181,7 +181,7 @@
 
 ## A3. Evaluation review + HR review (41)
 
-### GetEvaluationDetailQueryHandler (7)
+### GetEvaluationDetailQueryHandler (9)
 | Test | Kiểm chứng |
 |---|---|
 | Not_found_fails | id lạ → 'Evaluation not found'. |
@@ -191,6 +191,8 @@
 | Application_not_found_fails | App chưa seed → fail. |
 | Includes_hr_review_when_present | Có review → gồm final verdict + IsOverride. |
 | Resolves_recording_url_from_session | Real → resolve recording '/files/...' + expiry. |
+| Attaches_cv_jd_match_from_linked_analysis | Hồ sơ có `CvJdAnalysisId` → trả đúng `CvMatchScore`/`CvMatchSummary` của bản phân tích đó (màn duyệt trước đây vẽ cứng 87). |
+| Cv_match_is_null_when_application_has_no_analysis | Hồ sơ chưa phân tích → cả 2 trường null để FE ẩn thẻ thay vì bịa số. |
 
 ### GetEvaluationsByApplicationQueryHandler (4)
 | Test | Kiểm chứng |

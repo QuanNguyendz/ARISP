@@ -122,4 +122,41 @@ public class GetEvaluationDetailQueryHandlerTests
         Assert.Equal("/files/rec/interview.webm", res.Value!.RecordingUrl); // resolve qua storage
         Assert.Equal(expiresAt, res.Value.RecordingExpiresAt);
     }
+
+    [Fact]
+    public async Task Attaches_cv_jd_match_from_linked_analysis()
+    {
+        var job = EvaluationData.Job();
+        var analysis = new CvJdAnalysis
+        {
+            JobPostingId = job.Id,
+            MatchScore = 73,
+            Summary = "Khớp phần lớn kỹ năng backend, thiếu kinh nghiệm Kubernetes.",
+        };
+        var app = EvaluationData.App(job.Id);
+        app.CvJdAnalysisId = analysis.Id;
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval).Seed(analysis);
+
+        var res = await Run(uow, eval.Id);
+
+        // Màn duyệt trước đây vẽ cứng số 87 cho mọi hồ sơ — nay phải là điểm thật của hồ sơ này.
+        Assert.Equal(73, res.Value!.CvMatchScore);
+        Assert.Equal(analysis.Summary, res.Value.CvMatchSummary);
+    }
+
+    [Fact]
+    public async Task Cv_match_is_null_when_application_has_no_analysis()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id); // CvJdAnalysisId = null
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.Id);
+
+        // Null để FE ẩn hẳn thẻ, thay vì bịa ra một con số.
+        Assert.Null(res.Value!.CvMatchScore);
+        Assert.Null(res.Value.CvMatchSummary);
+    }
 }

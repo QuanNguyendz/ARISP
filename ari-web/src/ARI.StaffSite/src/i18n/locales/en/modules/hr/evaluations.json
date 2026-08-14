@@ -15,10 +15,7 @@
   "status": {
     "pendingHrReview": "Awaiting HR Review"
   },
-  "verdict": {
-    "pass": "Pass",
-    "notPass": "Not Pass"
-  },
+  "verdict": "Verdict",
   "evaluations": "Evaluations",
   "criterionScores": "Scores by Criterion",
   "noCriterionData": "No criterion score data available.",
@@ -29,13 +26,11 @@
   "questionAnalysis": "Per-Question Analysis",
   "aiComment": "AI Comment",
   "recordingTranscript": "Interview recording",
-  "viewFullTranscript": "View Full Transcript",
   "recordingExpiresAt": "Video is deleted automatically after {{date}}",
   "recordingDeleted": "Video was automatically deleted on {{date}} per the retention policy.",
   "recordingNone": "No recording available for this interview.",
   "aiVerdict": "AI Verdict",
   "recommendation": "Recommendation",
-  "inviteNextRound": "Invite to Round {{round}}",
   "hrDecision": "HR Decision",
   "hrDecisionHint": "Confirm AI verdict or override (reason required).",
   "confirming": "Confirming...",
@@ -45,11 +40,22 @@
   "overrideReason": "Override Reason",
   "overrideReasonPlaceholder": "Required — explain why you changed AI verdict...",
   "saveAndSendResult": "Save & Send Result",
-  "saveAndInviteNext": "Save & Invite Next Round",
   "confirmed": "Confirmed",
-  "verdict": "Verdict",
   "cvJdMatch": "CV–JD Match",
   "confirmError": "Unable to confirm result at this time.",
   "overrideReasonRequired": "Please enter the reason for override.",
-  "overrideError": "Unable to override result at this time."
+  "overrideError": "Unable to override result at this time.",
+  "verdictPass": "Pass",
+  "verdictNotPass": "Not pass",
+  "notScored": "Not scored",
+  "candidateAnswer": "Candidate's answer",
+  "noAnswer": "The candidate did not answer this question.",
+  "improvementNote": "Improvement note",
+  "languageOverall": "Overall",
+  "grammar": "Grammar",
+  "comprehension": "Comprehension",
+  "aiReasoning": "AI reasoning",
+  "integritySignals": "Integrity signals",
+  "cheatScore": "Suspicion score",
+  "noCheatSignals": "No unusual behaviour was recorded during the interview."
 }
