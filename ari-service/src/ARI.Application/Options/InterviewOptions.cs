@@ -27,8 +27,10 @@ namespace ARI.Application.Options
         /// <summary>
         /// Trần thời lượng phỏng vấn THẬT (phút) — ADR-052. Hết giờ xử lý y hệt practice:
         /// khoá mic → AI nói câu kết → đóng phiên. &lt;= 0 = không giới hạn.
+        /// Giữ &lt;= trần mỗi phiên của gói LiveAvatar đang dùng (Essential = 20'), nếu không
+        /// avatar bị nhà cung cấp cắt giữa chừng còn buổi phỏng vấn vẫn chạy tiếp câm lặng.
         /// </summary>
-        public int RealMaxDurationMinutes { get; set; } = 45;
+        public int RealMaxDurationMinutes { get; set; } = 20;
 
         /// <summary>
         /// Hạn lưu video phỏng vấn thật (ngày) — ADR-052. Job dọn dẹp chạy hằng ngày xoá file

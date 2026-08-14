@@ -800,7 +800,7 @@
 |---|---|
 | Không session. | Failure 'Không tìm thấy phiên phỏng vấn.' (App thiếu → 'Không tìm thấy hồ sơ...'). |
 | Session + App owned by A → gọi bằng B, không kiosk. | Failure 'Bạn không có quyền truy cập...' |
-| REAL session, kiosk=true, providers throw. | Success (kiosk bypass); MaxDurationSeconds 2700 (45'), Deepgram/HeyGen null (nuốt lỗi). |
+| REAL session, kiosk=true, providers throw. | Success (kiosk bypass); MaxDurationSeconds 1200 (20' — trần gói LiveAvatar Essential), Deepgram/HeyGen null (nuốt lỗi). |
 | PRACTICE owned by A, PracticeUseAvatar=false. | Success; HeyGen null (không mint avatar practice); MaxDurationSeconds 1200 (20'). |
 
 ### B20. SendInterviewInviteCommand (`ApplicationCommands.cs`)
