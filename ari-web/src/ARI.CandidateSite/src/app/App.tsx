@@ -83,7 +83,8 @@ function App() {
           {/* ==================== PUBLIC ROUTES ==================== */}
           {/* Job board công khai cho khách + ứng viên (site này chỉ phục vụ ứng viên — ADR-046). */}
           <Route path="/" element={<FindJobPage />} />
-          <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+          {/* Site này không có `/auth/login` — nút quay lại phải trỏ màn đăng nhập ứng viên. */}
+          <Route path="/auth/callback" element={<OAuthCallbackPage loginPath="/auth/candidate-login" />} />
           <Route
             path="/auth/candidate-login"
             element={

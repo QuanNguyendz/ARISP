@@ -146,11 +146,14 @@ namespace ARI.API.Controllers
 
             if (signIn.IsFailure)
             {
+                // Mọi nhánh thất bại đều PHẢI redirect về frontend. Trước đây DomainNotAllowed trả
+                // Forbid() → trình duyệt dừng ở trang 403 trắng của chính API (localhost:5000), người
+                // dùng không có đường quay lại màn đăng nhập ngoài việc tự sửa URL.
                 return signIn.ErrorCode switch
                 {
-                    AuthErrorCodes.DomainNotAllowed => Forbid(),
-                    AuthErrorCodes.PendingApproval => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "pending_approval") })),
-                    _ => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", "account_not_provisioned") })),
+                    AuthErrorCodes.DomainNotAllowed => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", AuthErrorCodes.DomainNotAllowed) })),
+                    AuthErrorCodes.PendingApproval => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", AuthErrorCodes.PendingApproval) })),
+                    _ => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", AuthErrorCodes.NotProvisioned) })),
                 };
             }
 
