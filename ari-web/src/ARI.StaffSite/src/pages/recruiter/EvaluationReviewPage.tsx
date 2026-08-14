@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -660,8 +660,18 @@ export default function RecruiterEvaluationReviewPage() {
 
   // Detail view
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-4 sm:px-6 h-14 sm:h-16">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
+      {/*
+        `top-16 z-10` chứ KHÔNG phải `top-0 z-20`.
+
+        `<main>` của layout mang `overflow-auto` nhưng KHÔNG bao giờ cuộn: cha nó là
+        `min-h-screen` (cao theo nội dung) nên main nở ra hết cỡ, người dùng cuộn cả trang.
+        Vì thế `sticky` ở đây bám vào VIEWPORT chứ không bám vào main — trùng đúng chỗ topbar
+        của layout đang bám. Cùng `top-0` và cùng `z-20`, mà thanh này đứng sau trong DOM, nên
+        nó ĐÈ LÊN topbar: cuộn xuống là ô tìm kiếm, chuông và menu người dùng biến mất.
+        `top-16` = chiều cao topbar (h-16), `z-10` thấp hơn để không bao giờ phủ lên nữa.
+      */}
+      <header className="sticky top-16 z-10 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/90 dark:bg-ink-900/90 backdrop-blur px-4 sm:px-6 h-14">
         <button
           onClick={closeDetail}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
@@ -669,9 +679,15 @@ export default function RecruiterEvaluationReviewPage() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-400">
-          <Link to="#" onClick={closeDetail} className="shrink-0 hover:text-brand-600 dark:text-brand-400">
+          {/* Nút, không phải <Link to="#"> — thẻ neo "#" ghi thêm một mục vào lịch sử và nhảy
+              hash lên URL, bấm Back sau đó không trả về danh sách như người dùng mong đợi. */}
+          <button
+            type="button"
+            onClick={closeDetail}
+            className="shrink-0 hover:text-brand-600 dark:hover:text-brand-400"
+          >
             {t('evaluations')}
-          </Link>
+          </button>
           <ChevronRight className="h-4 w-4 shrink-0" />
           <span className="truncate text-ink-600 dark:text-ink-300 font-medium">
             {selectedEvaluation.candidateName} · {selectedEvaluation.jobTitle}
@@ -681,7 +697,7 @@ export default function RecruiterEvaluationReviewPage() {
             thông báo nào), và trùng với chuông THẬT trên thanh header của layout ngay phía trên. */}
       </header>
 
-      <main className="p-4 sm:p-6 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="p-4 sm:p-6 lg:p-8 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT: report */}
         <div className="space-y-6">
           {/* Candidate header */}
@@ -960,7 +976,9 @@ export default function RecruiterEvaluationReviewPage() {
         </div>
 
         {/* RIGHT: verdict & decision */}
-        <aside className="space-y-5 xl:sticky xl:top-24 self-start">
+        {/* top-32 = topbar layout (h-16, 64px) + thanh breadcrumb (h-14, 56px) + thở một chút.
+            `top-24` cũ khiến cột này trôi lên NẰM DƯỚI thanh breadcrumb khi cuộn. */}
+        <aside className="space-y-5 xl:sticky xl:top-32 self-start">
           {/* Verdict AI. Trước đây badge LUÔN xanh lá kèm dấu tick bất kể AI chấm gì — hồ sơ
               "Không đạt" vẫn hiện dấu tick xanh; và dòng đề xuất luôn ghi cứng "mời vòng N+1"
               dù API đã trả `recommendedNextStep`. */}
@@ -1135,7 +1153,7 @@ export default function RecruiterEvaluationReviewPage() {
             </div>
           )}
         </aside>
-      </main>
-    </>
+      </div>
+    </div>
   )
 }
