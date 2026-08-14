@@ -62,7 +62,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error }),
+                    // Kèm `code` để FE hiện được lối thoát (nút đặt mật khẩu) thay vì chỉ in câu lỗi —
+                    // trước đây nhánh này là nhánh DUY NHẤT không trả code nên FE không phân biệt được.
+                    AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error, code = "passwordless_google" }),
                     AuthErrorCodes.EmailNotVerified => StatusCode(403, new { message = result.Error, code = "email_not_verified" }),
                     _ => Unauthorized(new { message = result.Error }),
                 };

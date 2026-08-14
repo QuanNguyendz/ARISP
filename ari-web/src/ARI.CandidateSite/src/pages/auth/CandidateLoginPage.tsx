@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Sparkles, Check } from 'lucide-react'
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  Sparkles,
+  Check,
+  KeyRound,
+} from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
 import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
@@ -69,6 +78,9 @@ export default function CandidateLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [needsVerification, setNeedsVerification] = useState(false)
+  // Tài khoản có thật nhưng chưa từng đặt mật khẩu (đăng ký bằng Google) — không phải sai mật khẩu,
+  // nên phải chỉ đường đặt mật khẩu thay vì để người dùng thử đi thử lại.
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false)
   const [resending, setResending] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
@@ -82,6 +94,7 @@ export default function CandidateLoginPage() {
     e.preventDefault()
     setError('')
     setNeedsVerification(false)
+    setNeedsPasswordSetup(false)
     setResendMessage('')
     setIsLoading(true)
 
@@ -98,6 +111,9 @@ export default function CandidateLoginPage() {
     } catch (err: any) {
       if (err.code === 'email_not_verified') {
         setNeedsVerification(true)
+      }
+      if (err.code === 'passwordless_google') {
+        setNeedsPasswordSetup(true)
       }
       setError(err.message || tErrors('server.internal'))
     } finally {
@@ -300,6 +316,23 @@ export default function CandidateLoginPage() {
                       {resendMessage && (
                         <p className="mt-1 text-sm text-emerald-600">{resendMessage}</p>
                       )}
+                    </div>
+                  )}
+                  {needsPasswordSetup && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(`/auth/forgot-password?email=${encodeURIComponent(email)}`)
+                        }
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        {t('candidateLogin.setPasswordForAccount')}
+                      </button>
+                      <p className="mt-1 text-xs text-ink-500">
+                        {t('candidateLogin.sameAccountHint')}
+                      </p>
                     </div>
                   )}
                 </div>

@@ -156,6 +156,48 @@ public class CompleteExternalCandidateSignInCommandHandlerTests
     }
 
     [Fact]
+    public async Task Google_signin_wipes_password_set_on_an_unverified_account()
+    {
+        // Chiếm tài khoản trước: kẻ xấu đăng ký form web bằng email nạn nhân và đặt mật khẩu của hắn.
+        // Tài khoản nằm im vì EmailVerified=false. Khi chủ email thật đăng nhập Google, nếu ta chỉ set
+        // EmailVerified=true thì hoá ra xác minh hộ mật khẩu của kẻ xấu → hắn đăng nhập được.
+        var cand = new CandidateAccount
+        {
+            Email = "victim@gmail.com",
+            PasswordHash = "hash-cua-ke-xau",
+            EmailVerified = false,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService())
+            .Handle(new CompleteExternalCandidateSignInCommand("victim@gmail.com", "Victim"), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(cand.EmailVerified);
+        Assert.Equal(string.Empty, cand.PasswordHash);   // mật khẩu của kẻ xấu bị vô hiệu
+    }
+
+    [Fact]
+    public async Task Google_signin_keeps_password_of_an_already_verified_account()
+    {
+        // Ngược lại: tài khoản đã xác minh email thì mật khẩu là của chính chủ — không được đụng vào,
+        // nếu không mỗi lần đăng nhập bằng Google là người dùng mất mật khẩu đang dùng.
+        var cand = new CandidateAccount
+        {
+            Email = "owner@gmail.com",
+            PasswordHash = "hash-cua-chinh-chu",
+            EmailVerified = true,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService())
+            .Handle(new CompleteExternalCandidateSignInCommand("owner@gmail.com", null), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("hash-cua-chinh-chu", cand.PasswordHash);
+    }
+
+    [Fact]
     public async Task Disabled_candidate_is_rejected()
     {
         var cand = new CandidateAccount { Email = "me@example.io", PasswordHash = "", EmailVerified = true, IsActive = false };

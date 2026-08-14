@@ -55,7 +55,28 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
                     return Result.Failure<ExternalSignInTokens>("Account disabled.", AuthErrorCodes.AccountDisabled);
 
                 candidate.LastLoginAt = DateTimeOffset.UtcNow;
-                if (!candidate.EmailVerified) candidate.EmailVerified = true;
+
+                // CHỐNG CHIẾM TÀI KHOẢN TRƯỚC (pre-hijacking):
+                // Kẻ xấu đăng ký form web bằng email của người khác và đặt mật khẩu của HẮN. Tài khoản
+                // đó nằm im với EmailVerified=false nên hắn chưa vào được. Nhưng khi chủ nhân thật của
+                // email đăng nhập bằng Google, ta tìm thấy đúng tài khoản này và đánh dấu đã xác minh —
+                // tức là VÔ TÌNH XÁC MINH HỘ cho mật khẩu của kẻ xấu, từ đó hắn đăng nhập được và đọc
+                // được CV, hồ sơ ứng tuyển, kết quả phỏng vấn của nạn nhân.
+                //
+                // Vì vậy: mật khẩu đặt trên một tài khoản CHƯA từng xác minh email là mật khẩu không ai
+                // chứng minh được quyền sở hữu → xoá đi trước khi đánh dấu xác minh. Google vừa xác thực
+                // người đang đứng đây mới là chủ email.
+                //
+                // Người dùng ngay tình đăng ký bằng mật khẩu, chưa bấm link xác minh rồi quay sang đăng
+                // nhập Google cũng rơi vào nhánh này và mất mật khẩu vừa đặt. Đó là đánh đổi có chủ ý:
+                // họ đang đăng nhập được và đặt lại mật khẩu ngay trong Hồ sơ → Đặt mật khẩu, còn kịch
+                // bản kia là mất tài khoản.
+                if (!candidate.EmailVerified)
+                {
+                    candidate.PasswordHash = string.Empty;
+                    candidate.EmailVerified = true;
+                }
+
                 _unitOfWork.Repository<CandidateAccount>().Update(candidate);
                 await _unitOfWork.SaveChangesAsync();
             }
