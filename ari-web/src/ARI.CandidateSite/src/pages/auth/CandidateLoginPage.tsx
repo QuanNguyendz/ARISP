@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Sparkles, Check } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
+import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
 import PasswordToggle from '@ari/shared/ui/PasswordToggle'
 
 // Logo component
@@ -70,6 +71,12 @@ export default function CandidateLoginPage() {
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resending, setResending] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
+
+  // Đăng nhập Google hỏng → OAuthCallbackPage trả về đây kèm lý do (xem useOAuthRedirectError).
+  const oauthError = useOAuthRedirectError()
+  useEffect(() => {
+    if (oauthError) setError(oauthError)
+  }, [oauthError])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

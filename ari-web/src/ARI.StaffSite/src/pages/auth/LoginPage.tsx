@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Mail, Lock, ArrowRight, Loader2, AlertCircle, ShieldAlert } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
 import { PasswordToggle } from '@ari/shared/ui'
 
 // Logo component
@@ -82,6 +83,13 @@ export default function LoginPage() {
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const userRole = useAuthStore((state) => state.user?.role)
+
+  // Đăng nhập Google hỏng (sai tên miền, chưa được cấp tài khoản...) → OAuthCallbackPage trả
+  // về đây kèm lý do. Nạp vào chính state `error` để lần submit sau ghi đè như lỗi thường.
+  const oauthError = useOAuthRedirectError()
+  useEffect(() => {
+    if (oauthError) setError(oauthError)
+  }, [oauthError])
 
   useEffect(() => {
     if (isAuthenticated && userRole) {

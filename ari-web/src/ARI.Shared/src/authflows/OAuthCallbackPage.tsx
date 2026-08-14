@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
 import { useAuthStore } from '@ari/shared/store/auth'
 
+/**
+ * Chỉ còn 2 trạng thái vẽ ra màn hình. Mọi thất bại kiểu "thử lại bằng tài khoản khác"
+ * (sai tên miền, chưa được cấp tài khoản, lỗi kỹ thuật) được đẩy thẳng về màn đăng nhập
+ * kèm banner đỏ: đó chính là nơi người dùng phải thao tác tiếp, nên dựng thêm một màn
+ * trung gian chỉ tốn một cú bấm mà không thêm thông tin gì.
+ *
+ * `pending` thì ngược lại — không có gì để thử lại, đây là TRẠNG THÁI (tài khoản đã ghi
+ * nhận, đang chờ quản trị viên duyệt) chứ không phải lỗi; nhét vào banner đỏ trên form
+ * đăng nhập sẽ mô tả sai tình huống, nên giữ màn riêng.
+ */
 type CallbackState =
   | { kind: 'loading'; message: string }
   | { kind: 'pending'; message: string }
-  | { kind: 'error'; message: string }
 
 /**
  * Mã lỗi backend (AuthErrorCodes) → khoá i18n. Trước đây trang này in thẳng giá trị
@@ -86,15 +95,15 @@ export default function OAuthCallbackPage({ loginPath = '/auth/login' }: OAuthCa
       return
     }
 
-    // `rejected` = backend từ chối có lý do rõ ràng (sai domain, chưa được cấp tài khoản);
-    // `error` = sự cố kỹ thuật giữa chừng. Cả hai đều hiện thẻ lỗi kèm nút quay lại đăng nhập.
-    if (status === 'rejected' || status === 'error') {
-      setCallbackState({ kind: 'error', message: describe('oauthCallback.errorDefault') })
-      return
-    }
-
-    setCallbackState({ kind: 'error', message: t('oauthCallback.noValidInfo') })
-  }, [navigate, parsedCallback, setAuthFromResponse, t])
+    // `rejected` = backend từ chối có lý do rõ ràng (sai tên miền, chưa được cấp tài khoản);
+    // `error` = sự cố kỹ thuật giữa chừng; không status nào khớp = vào thẳng URL này không
+    // qua luồng OAuth. Cả ba đều trả về màn đăng nhập kèm lý do.
+    const failure =
+      status === 'rejected' || status === 'error'
+        ? describe('oauthCallback.errorDefault')
+        : t('oauthCallback.noValidInfo')
+    navigate(loginPath, { replace: true, state: { authError: failure } })
+  }, [loginPath, navigate, parsedCallback, setAuthFromResponse, t])
 
   const isLoading = callbackState.kind === 'loading'
   const isPending = callbackState.kind === 'pending'
@@ -107,32 +116,23 @@ export default function OAuthCallbackPage({ loginPath = '/auth/login' }: OAuthCa
         <div className="flex flex-col items-center text-center">
           <div
             className={`mb-5 flex h-16 w-16 items-center justify-center rounded-full ${
-              isPending
-                ? 'bg-amber-100 text-amber-600'
-                : isLoading
-                  ? 'bg-brand-50 text-brand-600'
-                  : 'bg-red-100 text-red-600'
+              isPending ? 'bg-amber-100 text-amber-600' : 'bg-brand-50 text-brand-600'
             }`}
           >
-            {isLoading ? (
-              <Loader2 className="h-8 w-8 animate-spin" />
-            ) : isPending ? (
+            {isPending ? (
               <CheckCircle2 className="h-8 w-8" />
             ) : (
-              <AlertCircle className="h-8 w-8" />
+              <Loader2 className="h-8 w-8 animate-spin" />
             )}
           </div>
 
           <h1 className="mb-3 font-display text-2xl font-extrabold text-ink-900">
-            {isLoading
-              ? t('oauthCallback.processing')
-              : isPending
-                ? t('oauthCallback.accountPending')
-                : t('oauthCallback.cannotLogin')}
+            {isPending ? t('oauthCallback.accountPending') : t('oauthCallback.processing')}
           </h1>
 
           <p className="mb-8 text-sm leading-6 text-ink-500">{callbackState.message}</p>
 
+          {/* Chỉ `pending` mới dừng lại ở đây; `loading` sẽ tự chuyển tiếp nên không có nút. */}
           {!isLoading && (
             <button
               type="button"
