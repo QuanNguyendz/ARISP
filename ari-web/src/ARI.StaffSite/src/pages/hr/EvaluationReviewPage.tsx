@@ -22,8 +22,8 @@ import {
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
-import { EvaluationListSkeleton } from './_skeletons'
-import { Pagination } from '@ari/shared/ui'
+import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
+import { PageHeader, StatsGrid, Pagination } from '@ari/shared/ui'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
 /**
@@ -327,12 +327,26 @@ export default function EvaluationReviewPage() {
     return { total, completed, pending, highScore, pass, notPass }
   }, [evaluations])
 
+  // Màu theo cùng quy ước với các màn staff khác (xem CandidatesPage): tổng = xanh dương,
+  // chờ = hổ phách, đang chạy = tím, đạt = xanh lá.
   const stats = useMemo(
     () => [
-      { label: t('stats.total'), value: counts.total.toString() },
-      { label: t('stats.completed'), value: counts.completed.toString() },
-      { label: t('stats.pending'), value: counts.pending.toString() },
-      { label: t('stats.highScore'), value: counts.highScore.toString() },
+      { label: t('stats.total'), value: counts.total, color: 'text-blue-600 dark:text-blue-400' },
+      {
+        label: t('stats.completed'),
+        value: counts.completed,
+        color: 'text-violet-600 dark:text-violet-400',
+      },
+      {
+        label: t('stats.pending'),
+        value: counts.pending,
+        color: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        label: t('stats.highScore'),
+        value: counts.highScore,
+        color: 'text-emerald-600 dark:text-emerald-400',
+      },
     ],
     [counts, t]
   )
@@ -370,33 +384,25 @@ export default function EvaluationReviewPage() {
   // List view
   if (!selectedEvaluation) {
     return (
-      <main className="p-6 space-y-6 bg-ink-50 dark:bg-ink-950">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
-              {t('title')}
-            </h1>
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('subtitle')}</p>
-          </div>
-        </div>
+      <main className="min-h-screen bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8">
+        {/* Dùng PageHeader + StatsGrid CHUNG thay vì tự dựng lại. Bản tự dựng trước đây là lý do
+            màn này lệch hẳn phần còn lại: tiêu đề `font-display font-extrabold` (các màn khác
+            `font-semibold`), thẻ số liệu đảo ngược (số to trên, nhãn nhỏ dưới, toàn màu đen)
+            trong khi chuẩn là nhãn trên - số dưới có màu theo nhóm; và quan trọng nhất là MẤT
+            hiệu ứng trôi lên `initial={{opacity:0,y:20}}` vốn nằm sẵn trong 2 component đó. */}
+        <PageHeader title={t('title')} description={t('subtitle')} />
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
-            >
-              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
-                {stat.value}
-              </div>
-              <div className="text-xs font-medium text-ink-500 dark:text-ink-400 mt-0.5">{stat.label}</div>
-            </div>
-          ))}
-        </div>
+        {/* Skeleton lúc tải giống các màn khác — trước đây thẻ số liệu hiện ngay số 0 rồi mới
+            nhảy sang số thật, đọc thoáng qua tưởng là "không có đánh giá nào". */}
+        {loading ? <HrStatsSkeleton /> : <StatsGrid stats={stats} />}
 
-        {/* Search & Filters */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm">
+        {/* Thanh tìm kiếm & lọc — nối tiếp nhịp trôi lên sau 4 thẻ số liệu (mỗi thẻ 0.05s). */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm"
+        >
           <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
             <div className="relative w-full sm:flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -474,7 +480,7 @@ export default function EvaluationReviewPage() {
               Không đạt ({counts.notPass})
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {loading ? (
           <EvaluationListSkeleton rows={4} />
@@ -493,14 +499,14 @@ export default function EvaluationReviewPage() {
             {paginatedGroupedSessions.map((group, i) => {
               const isExpanded = Boolean(expandedGroups[group.groupId])
               return (
-                // Hiệu ứng vào trang giống mọi màn staff khác (MyJobsPage/CandidatesPage):
-                // stagger nhẹ theo thứ tự thẻ. Trước đây màn này chỉ animate phần mở rộng
-                // bên trong nên chuyển sang là danh sách hiện ra khô cứng, lệch hẳn nhịp.
+                // Nối tiếp nhịp trôi lên: header → 4 thẻ số liệu (0.05s/thẻ) → thanh lọc (0.2)
+                // → danh sách từ 0.25. Trước đây màn này chỉ animate phần mở rộng bên trong
+                // nên chuyển sang là cả trang hiện ra khô cứng, lệch hẳn các màn còn lại.
                 <motion.div
                   key={group.groupId}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                  transition={{ delay: 0.25 + Math.min(i * 0.04, 0.3) }}
                   className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card"
                 >
                   {/* Session Group Header */}
