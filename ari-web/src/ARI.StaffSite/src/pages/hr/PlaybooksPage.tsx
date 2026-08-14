@@ -15,7 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react'
-import { PageHeader, ErrorAlert, EmptyState, Pagination } from '@ari/shared/ui'
+import { PageHeader, ErrorAlert, EmptyState, Pagination, Select } from '@ari/shared/ui'
 import { CardGridSkeleton } from './_skeletons'
 import { playbookService } from '@/fservices/playbook/playbookService'
 import type { PlaybookItem } from '@/fservices/playbook/playbookService'
@@ -355,29 +355,25 @@ function UploadModal({
               <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
                 {t('documentType')}
               </label>
-              <select
+              <Select
                 value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-                className={inputCls}
-              >
-                {DOC_TYPES.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+                onChange={setDocumentType}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
+                options={DOC_TYPES.map(([v, l]) => ({ value: v, label: l }))}
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
                 {t('scope')}
               </label>
-              <select value={scope} onChange={(e) => setScope(e.target.value)} className={inputCls}>
-                {SCOPES.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={scope}
+                onChange={setScope}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
+                options={SCOPES.map(([v, l]) => ({ value: v, label: l }))}
+              />
             </div>
           </div>
 
@@ -387,18 +383,14 @@ function UploadModal({
                 <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
                   {t('jobPosting')}
                 </label>
-                <select
+                <Select
                   value={scopeRefId}
-                  onChange={(e) => setScopeRefId(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">— {t('selectJob')} —</option>
-                  {jobs.map((j) => (
-                    <option key={j.id} value={j.id}>
-                      {j.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setScopeRefId}
+                  placeholder={`— ${t('selectJob')} —`}
+                  className="w-full"
+                  buttonClassName="px-3 py-2.5 text-sm"
+                  options={jobs.map((j) => ({ value: j.id, label: j.title }))}
+                />
               </div>
               {scope === 'round' && (
                 <div>

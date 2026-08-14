@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -12,26 +12,29 @@ import {
   ChevronRight,
   Languages,
   ArrowLeft,
-  Bell,
   Search,
   Eye,
   Award,
   XCircle,
+  AlertTriangle,
   X,
 } from 'lucide-react'
-import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
-import { EvaluationListSkeleton } from './_skeletons'
-import { Pagination } from '@ari/shared/ui'
+import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
+import { PageHeader, StatsGrid, Pagination } from '@ari/shared/ui'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
-function formatVerdictLabel(verdict?: string) {
-  if (!verdict) return '—'
+/**
+ * Backend từng trả verdict ở nhiều dạng (`pass`, `not_pass`, `verdict.pass`...). Kiểm `not`
+ * TRƯỚC vì chuỗi "not_pass" cũng chứa "pass" — thứ tự ngược lại sẽ đọc "Không đạt" thành "Đạt".
+ */
+function isPassVerdict(verdict?: string | null): boolean {
+  if (!verdict) return false
   const v = verdict.toLowerCase().trim()
-  if (v === 'pass' || v === 'verdict.pass' || v.includes('pass')) return 'Đạt'
-  if (v === 'not_pass' || v === 'verdict.notpass' || v.includes('not')) return 'Không đạt'
-  return verdict
+  if (v.includes('not')) return false
+  return v.includes('pass')
 }
 
 function formatDate(dateString?: string) {
@@ -95,6 +98,8 @@ export default function EvaluationReviewPage() {
   const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
+  /** Verdict nhân sự chọn khi ghi đè. null = chưa mở khối ghi đè (lúc mở sẽ đặt mặc định). */
+  const [overrideVerdict, setOverrideVerdict] = useState<'pass' | 'not_pass' | null>(null)
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
@@ -134,6 +139,7 @@ export default function EvaluationReviewPage() {
   })
 
   const evaluations = evaluationsResponse?.items || []
+
   const displayError = error ? t('loadingError') : null
 
   const filteredEvaluations = useMemo(() => {
@@ -149,7 +155,7 @@ export default function EvaluationReviewPage() {
 
       if (statusFilter === 'pending') return e.status === 'pending'
       const verdict = e.finalVerdict ?? e.aiVerdict
-      const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+      const isPass = isPassVerdict(verdict)
       if (statusFilter === 'pass') return isPass && e.status !== 'pending'
       if (statusFilter === 'not_pass') return !isPass && e.status !== 'pending'
       return true
@@ -199,7 +205,7 @@ export default function EvaluationReviewPage() {
         grp.pendingCount += 1
       } else {
         const verdict = evalItem.finalVerdict ?? evalItem.aiVerdict
-        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+        const isPass = isPassVerdict(verdict)
         if (isPass) grp.passCount += 1
         else grp.notPassCount += 1
       }
@@ -291,7 +297,10 @@ export default function EvaluationReviewPage() {
     try {
       setSubmittingAction('override')
       setActionError(null)
-      await evaluationService.overrideEvaluation(selectedEvaluation, trimmedReason)
+      // Gửi ĐÚNG verdict nhân sự chọn. Trước đây service tự lật ngược verdict của AI nên hai
+      // nút chọn trên UI chỉ là trang trí — bấm gì cũng ra cùng một kết quả.
+      const verdict = overrideVerdict ?? (aiPassed ? 'not_pass' : 'pass')
+      await evaluationService.overrideEvaluation(selectedEvaluation, trimmedReason, verdict)
       await refreshListAndSelection(selectedEvaluation.id)
     } catch (submitError) {
       console.error(submitError)
@@ -308,22 +317,36 @@ export default function EvaluationReviewPage() {
     const highScore = evaluations.filter((item) => (item.overallScore ?? 0) >= 80).length
     const pass = evaluations.filter((item) => {
       const v = item.finalVerdict ?? item.aiVerdict
-      return item.status !== 'pending' && (v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+      return item.status !== 'pending' && isPassVerdict(v)
     }).length
     const notPass = evaluations.filter((item) => {
       const v = item.finalVerdict ?? item.aiVerdict
-      return item.status !== 'pending' && !(v === 'pass' || v === 'verdict.pass' || (v && v.toLowerCase().includes('pass')))
+      return item.status !== 'pending' && !isPassVerdict(v)
     }).length
 
     return { total, completed, pending, highScore, pass, notPass }
   }, [evaluations])
 
+  // Màu theo cùng quy ước với các màn staff khác (xem CandidatesPage): tổng = xanh dương,
+  // chờ = hổ phách, đang chạy = tím, đạt = xanh lá.
   const stats = useMemo(
     () => [
-      { label: t('stats.total'), value: counts.total.toString() },
-      { label: t('stats.completed'), value: counts.completed.toString() },
-      { label: t('stats.pending'), value: counts.pending.toString() },
-      { label: t('stats.highScore'), value: counts.highScore.toString() },
+      { label: t('stats.total'), value: counts.total, color: 'text-blue-600 dark:text-blue-400' },
+      {
+        label: t('stats.completed'),
+        value: counts.completed,
+        color: 'text-violet-600 dark:text-violet-400',
+      },
+      {
+        label: t('stats.pending'),
+        value: counts.pending,
+        color: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        label: t('stats.highScore'),
+        value: counts.highScore,
+        color: 'text-emerald-600 dark:text-emerald-400',
+      },
     ],
     [counts, t]
   )
@@ -332,6 +355,20 @@ export default function EvaluationReviewPage() {
     () => Object.entries(selectedEvaluation?.criterionScores ?? {}),
     [selectedEvaluation]
   )
+
+  const aiPassed = isPassVerdict(selectedEvaluation?.aiVerdict)
+
+  /** Nhãn verdict qua i18n — trước đây hàm này ghi cứng "Đạt"/"Không đạt" giữa một màn đã i18n. */
+  const verdictLabel = (verdict?: string | null) =>
+    verdict ? (isPassVerdict(verdict) ? t('verdictPass') : t('verdictNotPass')) : '—'
+
+  /** Mở khối ghi đè thì đặt sẵn verdict ở phía NGƯỢC với AI — đó là lý do người ta bấm Ghi đè. */
+  const toggleOverrideMode = () => {
+    setIsOverrideMode((open) => {
+      if (!open) setOverrideVerdict(aiPassed ? 'not_pass' : 'pass')
+      return !open
+    })
+  }
 
   if (loadingDetail) {
     return (
@@ -347,33 +384,25 @@ export default function EvaluationReviewPage() {
   // List view
   if (!selectedEvaluation) {
     return (
-      <main className="p-6 space-y-6 bg-ink-50 dark:bg-ink-950">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
-              {t('title')}
-            </h1>
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('subtitle')}</p>
-          </div>
-        </div>
+      <main className="min-h-screen bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8">
+        {/* Dùng PageHeader + StatsGrid CHUNG thay vì tự dựng lại. Bản tự dựng trước đây là lý do
+            màn này lệch hẳn phần còn lại: tiêu đề `font-display font-extrabold` (các màn khác
+            `font-semibold`), thẻ số liệu đảo ngược (số to trên, nhãn nhỏ dưới, toàn màu đen)
+            trong khi chuẩn là nhãn trên - số dưới có màu theo nhóm; và quan trọng nhất là MẤT
+            hiệu ứng trôi lên `initial={{opacity:0,y:20}}` vốn nằm sẵn trong 2 component đó. */}
+        <PageHeader title={t('title')} description={t('subtitle')} />
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 shadow-card"
-            >
-              <div className="font-display text-2xl font-extrabold text-ink-900 dark:text-white">
-                {stat.value}
-              </div>
-              <div className="text-xs font-medium text-ink-500 dark:text-ink-400 mt-0.5">{stat.label}</div>
-            </div>
-          ))}
-        </div>
+        {/* Skeleton lúc tải giống các màn khác — trước đây thẻ số liệu hiện ngay số 0 rồi mới
+            nhảy sang số thật, đọc thoáng qua tưởng là "không có đánh giá nào". */}
+        {loading ? <HrStatsSkeleton /> : <StatsGrid stats={stats} />}
 
-        {/* Search & Filters */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm">
+        {/* Thanh tìm kiếm & lọc — nối tiếp nhịp trôi lên sau 4 thẻ số liệu (mỗi thẻ 0.05s). */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-white/5 p-3 rounded-2xl border border-ink-200 dark:border-white/10 shadow-sm"
+        >
           <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
             <div className="relative w-full sm:flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -451,7 +480,7 @@ export default function EvaluationReviewPage() {
               Không đạt ({counts.notPass})
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {loading ? (
           <EvaluationListSkeleton rows={4} />
@@ -467,11 +496,17 @@ export default function EvaluationReviewPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {paginatedGroupedSessions.map((group) => {
+            {paginatedGroupedSessions.map((group, i) => {
               const isExpanded = Boolean(expandedGroups[group.groupId])
               return (
-                <div
+                // Nối tiếp nhịp trôi lên: header → 4 thẻ số liệu (0.05s/thẻ) → thanh lọc (0.2)
+                // → danh sách từ 0.25. Trước đây màn này chỉ animate phần mở rộng bên trong
+                // nên chuyển sang là cả trang hiện ra khô cứng, lệch hẳn các màn còn lại.
+                <motion.div
                   key={group.groupId}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 + Math.min(i * 0.04, 0.3) }}
                   className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card"
                 >
                   {/* Session Group Header */}
@@ -531,7 +566,7 @@ export default function EvaluationReviewPage() {
                         const overallScore = evaluation.overallScore ?? 0
                         const isPending = evaluation.status === 'pending'
                         const verdict = evaluation.finalVerdict ?? evaluation.aiVerdict
-                        const isPass = verdict === 'pass' || verdict === 'verdict.pass' || (verdict && verdict.toLowerCase().includes('pass'))
+                        const isPass = isPassVerdict(verdict)
 
                         return (
                           <div
@@ -590,7 +625,7 @@ export default function EvaluationReviewPage() {
                       })}
                     </div>
                   )}
-                </div>
+                </motion.div>
               )
             })}
           </div>
@@ -611,8 +646,18 @@ export default function EvaluationReviewPage() {
 
   // Detail view
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur px-4 sm:px-6 h-14 sm:h-16">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
+      {/*
+        `top-16 z-10` chứ KHÔNG phải `top-0 z-20`.
+
+        `<main>` của layout mang `overflow-auto` nhưng KHÔNG bao giờ cuộn: cha nó là
+        `min-h-screen` (cao theo nội dung) nên main nở ra hết cỡ, người dùng cuộn cả trang.
+        Vì thế `sticky` ở đây bám vào VIEWPORT chứ không bám vào main — trùng đúng chỗ topbar
+        của layout đang bám. Cùng `top-0` và cùng `z-20`, mà thanh này đứng sau trong DOM, nên
+        nó ĐÈ LÊN topbar: cuộn xuống là ô tìm kiếm, chuông và menu người dùng biến mất.
+        `top-16` = chiều cao topbar (h-16), `z-10` thấp hơn để không bao giờ phủ lên nữa.
+      */}
+      <header className="sticky top-16 z-10 flex items-center gap-2 border-b border-ink-200 dark:border-white/10 bg-white/90 dark:bg-ink-900/90 backdrop-blur px-4 sm:px-6 h-14">
         <button
           onClick={closeDetail}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
@@ -620,21 +665,25 @@ export default function EvaluationReviewPage() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-400">
-          <Link to="#" onClick={closeDetail} className="shrink-0 hover:text-brand-600 dark:text-brand-400">
+          {/* Nút, không phải <Link to="#"> — thẻ neo "#" ghi thêm một mục vào lịch sử và nhảy
+              hash lên URL, bấm Back sau đó không trả về danh sách như người dùng mong đợi. */}
+          <button
+            type="button"
+            onClick={closeDetail}
+            className="shrink-0 hover:text-brand-600 dark:hover:text-brand-400"
+          >
             {t('evaluations')}
-          </Link>
+          </button>
           <ChevronRight className="h-4 w-4 shrink-0" />
           <span className="truncate text-ink-600 dark:text-ink-300 font-medium">
             {selectedEvaluation.candidateName} · {selectedEvaluation.jobTitle}
           </span>
         </div>
-        <button className="ml-auto relative grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-ink-100 dark:hover:bg-white/10">
-          <Bell className="w-5 h-5 text-ink-600 dark:text-ink-400" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
-        </button>
+        {/* Đã gỡ nút chuông ở đây: không có onClick, chấm đỏ vẽ cứng (luôn hiện dù không có
+            thông báo nào), và trùng với chuông THẬT trên thanh header của layout ngay phía trên. */}
       </header>
 
-      <main className="p-4 sm:p-6 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="p-4 sm:p-6 lg:p-8 grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT: report */}
         <div className="space-y-6">
           {/* Candidate header */}
@@ -675,7 +724,7 @@ export default function EvaluationReviewPage() {
                         : 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
                   }`}
                 >
-                  {formatVerdictLabel(selectedEvaluation.finalVerdict ?? selectedEvaluation.aiVerdict)}
+                  {verdictLabel(selectedEvaluation.finalVerdict ?? selectedEvaluation.aiVerdict)}
                 </span>
               )}
             </div>
@@ -707,78 +756,184 @@ export default function EvaluationReviewPage() {
               )}
             </div>
 
+            {/* Đánh giá ngôn ngữ: API trả 6 chỉ số nhưng màn này trước đây chỉ vẽ 3
+                (CEFR / trôi chảy / từ vựng), bỏ mất ngữ pháp, khả năng nghe hiểu và điểm chung. */}
             {selectedEvaluation.languageAssessment && (
-              <div className="mt-6 rounded-xl border border-ai-200 bg-ai-50/50 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-ai-700">
+              <div className="mt-6 rounded-xl border border-ai-200 dark:border-ai-500/30 bg-ai-50/50 dark:bg-ai-500/10 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ai-700 dark:text-ai-400">
                   <Languages className="w-4 h-4" />
                   {t('languageAssessment')} ({selectedEvaluation.languageAssessment.language})
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs sm:gap-3 sm:text-sm">
-                  <div className="min-w-0 rounded-lg bg-white p-2">
-                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
-                      {selectedEvaluation.languageAssessment.cefrLevel ?? '—'}
+                  {[
+                    { label: t('cefr'), value: selectedEvaluation.languageAssessment.cefrLevel },
+                    { label: t('languageOverall'), value: selectedEvaluation.languageAssessment.overallScore },
+                    { label: t('fluency'), value: selectedEvaluation.languageAssessment.fluency },
+                    { label: t('grammar'), value: selectedEvaluation.languageAssessment.grammar },
+                    { label: t('vocabulary'), value: selectedEvaluation.languageAssessment.vocabulary },
+                    { label: t('comprehension'), value: selectedEvaluation.languageAssessment.comprehension },
+                  ].map((metric) => (
+                    <div
+                      key={metric.label}
+                      className="min-w-0 rounded-lg bg-white dark:bg-white/10 p-2"
+                    >
+                      <div className="truncate font-display text-base font-extrabold text-ink-900 dark:text-white sm:text-lg">
+                        {metric.value ?? '—'}
+                      </div>
+                      <div className="text-xs text-ink-400">{metric.label}</div>
                     </div>
-                    <div className="text-xs text-ink-400">{t('cefr')}</div>
-                  </div>
-                  <div className="min-w-0 rounded-lg bg-white p-2">
-                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
-                      {selectedEvaluation.languageAssessment.fluency ?? '—'}
-                    </div>
-                    <div className="text-xs text-ink-400">{t('fluency')}</div>
-                  </div>
-                  <div className="min-w-0 rounded-lg bg-white p-2">
-                    <div className="truncate font-display text-base font-extrabold text-ink-900 sm:text-lg">
-                      {selectedEvaluation.languageAssessment.vocabulary ?? '—'}
-                    </div>
-                    <div className="text-xs text-ink-400">{t('vocabulary')}</div>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Per-question */}
+          {/* Nhận định tổng của AI — `reasoning` vốn có trong API nhưng chưa bao giờ được hiện,
+              trong khi đây là phần giải thích VÌ SAO ra verdict đó. */}
+          {selectedEvaluation.reasoning && (
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+              <h2 className="font-display text-lg font-bold mb-3 text-ink-900 dark:text-white">
+                {t('aiReasoning')}
+              </h2>
+              <p className="whitespace-pre-wrap text-sm leading-6 text-ink-600 dark:text-ink-300">
+                {selectedEvaluation.reasoning}
+              </p>
+            </div>
+          )}
+
+          {/* Tín hiệu gian lận (ADR-054) — hạ tầng đã ghi nhận thật từ Kiosk nhưng màn duyệt
+              chưa hề hiển thị, nên nhân sự duyệt mà không biết buổi thi có bất thường hay không. */}
+          {(selectedEvaluation.cheatScore != null ||
+            (selectedEvaluation.cheatSignals && selectedEvaluation.cheatSignals.length > 0)) && (
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-display text-lg font-bold text-ink-900 dark:text-white">
+                  {t('integritySignals')}
+                </h2>
+                {selectedEvaluation.cheatScore != null && (
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      selectedEvaluation.cheatScore >= 60
+                        ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                        : selectedEvaluation.cheatScore >= 30
+                          ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                          : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
+                    {t('cheatScore')}: {selectedEvaluation.cheatScore}/100
+                  </span>
+                )}
+              </div>
+              {selectedEvaluation.cheatSignals && selectedEvaluation.cheatSignals.length > 0 ? (
+                <ul className="space-y-2">
+                  {selectedEvaluation.cheatSignals.map((signal, index) => (
+                    <li
+                      key={`${signal.type}-${index}`}
+                      className="flex items-start gap-2 rounded-lg bg-ink-50 dark:bg-white/5 p-3 text-sm"
+                    >
+                      <AlertTriangle
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                          signal.severity === 'high'
+                            ? 'text-red-500'
+                            : signal.severity === 'medium'
+                              ? 'text-amber-500'
+                              : 'text-ink-400'
+                        }`}
+                      />
+                      <span className="text-ink-600 dark:text-ink-300">{signal.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-ink-500 dark:text-ink-400">{t('noCheatSignals')}</p>
+              )}
+            </div>
+          )}
+
+          {/* Phân tích từng câu. Trước đây chỉ hiện `analysis` — bỏ mất chính CÂU TRẢ LỜI của
+              ứng viên và `feedback`, tức nhân sự đọc nhận xét mà không biết ứng viên đã nói gì.
+              Điểm để `null` (không phải 0) khi AI không chấm được — xem ADR-053. */}
           {selectedEvaluation.questionAnalyses &&
             selectedEvaluation.questionAnalyses.length > 0 && (
-              <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
-                <h2 className="font-display text-lg font-bold mb-4">{t('questionAnalysis')}</h2>
+              <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+                <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
+                  {t('questionAnalysis')}
+                </h2>
                 <div className="space-y-3">
-                  {selectedEvaluation.questionAnalyses.map((item, index) => (
-                    <details
-                      key={`${item.question}-${index}`}
-                      className="group rounded-xl border border-ink-200"
-                      open={index === 0}
-                    >
-                      <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium">
-                          <span className="grid h-6 w-6 place-items-center rounded-full bg-ink-100 text-xs">
-                            {index + 1}
+                  {selectedEvaluation.questionAnalyses.map((item, index) => {
+                    const hasScore = typeof item.score === 'number'
+                    return (
+                      <details
+                        key={`${item.question}-${index}`}
+                        className="group rounded-xl border border-ink-200 dark:border-white/10"
+                        open={index === 0}
+                      >
+                        <summary className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3">
+                          <span className="flex min-w-0 items-start gap-2 text-sm font-medium text-ink-800 dark:text-ink-200">
+                            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-100 dark:bg-white/10 text-xs">
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0">{item.question}</span>
                           </span>
-                          {item.question}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getScoreBgColor(item.score)} ${getScoreTextColor(item.score)}`}
-                          >
-                            {item.score}/10
+                          <span className="flex shrink-0 items-center gap-2">
+                            {hasScore ? (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getScoreBgColor(item.score)} ${getScoreTextColor(item.score)}`}
+                              >
+                                {item.score}/10
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-ink-100 dark:bg-white/10 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
+                                {t('notScored')}
+                              </span>
+                            )}
+                            <ChevronDown className="w-4 h-4 text-ink-400 group-open:rotate-180 transition" />
                           </span>
-                          <ChevronDown className="w-4 h-4 text-ink-400 group-open:rotate-180 transition" />
-                        </span>
-                      </summary>
-                      <div className="border-t border-ink-100 px-4 py-3 text-sm text-ink-600">
-                        <p>
-                          <b className="text-ink-800">{t('aiComment')}:</b> {item.analysis}
-                        </p>
-                      </div>
-                    </details>
-                  ))}
+                        </summary>
+                        <div className="space-y-3 border-t border-ink-100 dark:border-white/10 px-4 py-3 text-sm">
+                          <div>
+                            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                              {t('candidateAnswer')}
+                            </div>
+                            {item.answer?.trim() ? (
+                              <p className="whitespace-pre-wrap rounded-lg bg-ink-50 dark:bg-white/5 p-3 text-ink-700 dark:text-ink-300">
+                                {item.answer}
+                              </p>
+                            ) : (
+                              <p className="italic text-ink-400">{t('noAnswer')}</p>
+                            )}
+                          </div>
+                          {item.analysis && (
+                            <div>
+                              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                                {t('aiComment')}
+                              </div>
+                              <p className="text-ink-600 dark:text-ink-300">{item.analysis}</p>
+                            </div>
+                          )}
+                          {item.feedback && (
+                            <div>
+                              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                                {t('improvementNote')}
+                              </div>
+                              <p className="text-ink-600 dark:text-ink-300">{item.feedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-          {/* Bản ghi hình buổi phỏng vấn thật (ADR-052) — tự xoá khi hết hạn lưu */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
-            <h2 className="font-display text-lg font-bold mb-4">{t('recordingTranscript')}</h2>
+          {/* Bản ghi hình buổi phỏng vấn thật (ADR-052) — tự xoá khi hết hạn lưu.
+              Trước đây khối này là placeholder chết: nút Play và link "xem transcript" đều
+              không gắn onClick, nên nhân sự bấm mãi không ra gì. */}
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+            <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
+              {t('recordingTranscript')}
+            </h2>
             {selectedEvaluation.recordingUrl ? (
               <>
                 <video
@@ -787,7 +942,7 @@ export default function EvaluationReviewPage() {
                   className="aspect-video w-full rounded-xl bg-ink-900"
                 />
                 {selectedEvaluation.recordingExpiresAt && (
-                  <p className="mt-2 text-xs text-ink-500">
+                  <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
                     {t('recordingExpiresAt', {
                       date: new Date(selectedEvaluation.recordingExpiresAt).toLocaleString(),
                     })}
@@ -795,7 +950,7 @@ export default function EvaluationReviewPage() {
                 )}
               </>
             ) : (
-              <div className="aspect-video rounded-xl bg-ink-100 dark:bg-white/5 grid place-items-center px-6 text-center text-sm text-ink-500">
+              <div className="aspect-video rounded-xl bg-ink-100 dark:bg-white/5 grid place-items-center px-6 text-center text-sm text-ink-500 dark:text-ink-400">
                 {selectedEvaluation.recordingDeletedAt
                   ? t('recordingDeleted', {
                       date: new Date(selectedEvaluation.recordingDeletedAt).toLocaleDateString(),
@@ -807,46 +962,61 @@ export default function EvaluationReviewPage() {
         </div>
 
         {/* RIGHT: verdict & decision */}
-        <aside className="space-y-5 xl:sticky xl:top-24 self-start">
-          {/* AI verdict */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card text-center">
-            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700">
-              Verdict của AI
+        {/* top-32 = topbar layout (h-16, 64px) + thanh breadcrumb (h-14, 56px) + thở một chút.
+            `top-24` cũ khiến cột này trôi lên NẰM DƯỚI thanh breadcrumb khi cuộn. */}
+        <aside className="space-y-5 xl:sticky xl:top-32 self-start">
+          {/* Verdict AI. Trước đây badge LUÔN xanh lá kèm dấu tick bất kể AI chấm gì — hồ sơ
+              "Không đạt" vẫn hiện dấu tick xanh; và dòng đề xuất luôn ghi cứng "mời vòng N+1"
+              dù API đã trả `recommendedNextStep`. */}
+          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card text-center">
+            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-ai-700 dark:text-ai-400">
+              {t('aiVerdict')}
             </div>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-base font-bold text-emerald-700 ring-1 ring-emerald-200">
-              <CheckCircle2 className="w-5 h-5" />
-              {formatVerdictLabel(selectedEvaluation.aiVerdict)}
+            <div
+              className={`mt-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-base font-bold ring-1 ${
+                aiPassed
+                  ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 ring-emerald-200 dark:ring-emerald-500/30'
+                  : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 ring-red-200 dark:ring-red-500/30'
+              }`}
+            >
+              {aiPassed ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+              {verdictLabel(selectedEvaluation.aiVerdict)}
             </div>
-            <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none">
-              {selectedEvaluation.overallScore ?? 0}
+            <div className="mt-4 font-display text-4xl sm:text-5xl font-extrabold leading-none text-ink-900 dark:text-white">
+              {/* Chưa chấm thì hiện "—", không phải 0 — 0 điểm là một kết quả khác hẳn (ADR-053). */}
+              {selectedEvaluation.overallScore ?? '—'}
               <span className="text-lg text-ink-400">/100</span>
             </div>
-            <p className="mt-3 text-sm text-ink-500">
-              {t('recommendation')}:{' '}
-              <b className="text-ink-700">
-                {t('inviteNextRound', { round: selectedEvaluation.roundNumber + 1 })}
-              </b>
-            </p>
+            {selectedEvaluation.recommendedNextStep && (
+              <p className="mt-3 text-sm text-ink-500 dark:text-ink-400">
+                {t('recommendation')}:{' '}
+                <b className="text-ink-700 dark:text-ink-200">
+                  {selectedEvaluation.recommendedNextStep}
+                </b>
+              </p>
+            )}
           </div>
 
-          {/* HR decision */}
+          {/* Quyết định của nhân sự */}
           {!selectedEvaluation.hrReview ? (
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6 shadow-card">
-              <h3 className="font-display font-bold">{t('hrDecision')}</h3>
-              <p className="mt-1 text-sm text-ink-500">{t('hrDecisionHint')}</p>
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
+              <h3 className="font-display font-bold text-ink-900 dark:text-white">
+                {t('hrDecision')}
+              </h3>
+              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('hrDecisionHint')}</p>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
                   onClick={handleConfirm}
                   disabled={submittingAction !== null}
-                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${submittingAction === 'confirm' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'} disabled:opacity-50`}
+                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${submittingAction === 'confirm' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400' : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'} disabled:opacity-50`}
                 >
                   {submittingAction === 'confirm' ? t('confirming') : t('confirmAi')}
                 </button>
                 <button
-                  onClick={() => setIsOverrideMode(!isOverrideMode)}
+                  onClick={toggleOverrideMode}
                   disabled={submittingAction !== null}
-                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${isOverrideMode ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-ink-200 text-ink-600 hover:border-ink-300'} disabled:opacity-50`}
+                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${isOverrideMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-ink-300'} disabled:opacity-50`}
                 >
                   {t('override')}
                 </button>
@@ -861,20 +1031,40 @@ export default function EvaluationReviewPage() {
                     className="mt-4 space-y-3 overflow-hidden"
                   >
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                      <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
                         {t('overrideVerdict')}
                       </label>
+                      {/* Hai nút này trước đây KHÔNG có onClick và "Đạt" luôn tô như đang chọn,
+                          trong khi service tự lật ngược verdict của AI — nhân sự bấm "Đạt" nhưng
+                          thứ gửi đi lại là kết quả ngược với AI. Nay là lựa chọn thật, mặc định
+                          đặt sẵn ở phía ngược với AI (vì đó mới là lý do người ta bấm Ghi đè). */}
                       <div className="grid grid-cols-2 gap-2">
-                        <button className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-                          Đạt
+                        <button
+                          type="button"
+                          onClick={() => setOverrideVerdict('pass')}
+                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                            overrideVerdict === 'pass'
+                              ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                              : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-emerald-300'
+                          }`}
+                        >
+                          {t('verdictPass')}
                         </button>
-                        <button className="rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-600 hover:border-red-300">
-                          Không đạt
+                        <button
+                          type="button"
+                          onClick={() => setOverrideVerdict('not_pass')}
+                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                            overrideVerdict === 'not_pass'
+                              ? 'border-red-300 bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                              : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-red-300'
+                          }`}
+                        >
+                          {t('verdictNotPass')}
                         </button>
                       </div>
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-ink-600">
+                      <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
                         {t('overrideReason')} <span className="text-red-500">*</span>
                       </label>
                       <textarea
@@ -882,7 +1072,7 @@ export default function EvaluationReviewPage() {
                         value={overrideReason}
                         onChange={(e) => setOverrideReason(e.target.value)}
                         placeholder={t('overrideReasonPlaceholder')}
-                        className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                        className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/30"
                       />
                     </div>
                   </motion.div>
@@ -890,56 +1080,66 @@ export default function EvaluationReviewPage() {
               </AnimatePresence>
 
               {actionError && (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div className="mt-4 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
                   {actionError}
                 </div>
               )}
 
-              <div className="mt-4 space-y-2">
+              {isOverrideMode && (
                 <button
                   onClick={handleOverride}
-                  disabled={submittingAction !== null || !isOverrideMode || !overrideReason.trim()}
-                  className="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+                  disabled={submittingAction !== null || !overrideReason.trim()}
+                  className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
                 >
-                  {t('saveAndSendResult')}
+                  {submittingAction === 'override' ? t('confirming') : t('saveAndSendResult')}
                 </button>
-                <button className="w-full rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
-                  {t('saveAndInviteNext')}
-                </button>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6 shadow-card">
-              <h3 className="font-display font-bold text-emerald-800">{t('confirmed')}</h3>
-              <p className="mt-1 text-sm text-emerald-700">
-                {t('verdict')}:{' '}
-                <b>
-                  {formatVerdictLabel(selectedEvaluation.hrReview.finalVerdict)}
-                </b>
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-4 sm:p-6 shadow-card">
+              <h3 className="font-display font-bold text-emerald-800 dark:text-emerald-400">
+                {t('confirmed')}
+              </h3>
+              <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+                {t('verdict')}: <b>{verdictLabel(selectedEvaluation.hrReview.finalVerdict)}</b>
               </p>
               {selectedEvaluation.hrReview.isOverride &&
                 selectedEvaluation.hrReview.overrideReason && (
-                  <div className="mt-3 p-3 rounded-lg bg-white text-sm text-ink-600">
+                  <div className="mt-3 p-3 rounded-lg bg-white dark:bg-white/10 text-sm text-ink-600 dark:text-ink-300">
                     <b>{t('overrideReason')}:</b> {selectedEvaluation.hrReview.overrideReason}
                   </div>
                 )}
             </div>
           )}
 
-          {/* CV-JD match */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5 font-semibold text-ai-700">
-                Match CV-JD
-              </span>
-              <span className="font-display text-xl font-extrabold text-ai-700">87</span>
+          {/* Điểm khớp CV-JD (ADR-030). Trước đây thẻ này vẽ CỨNG số 87 và thanh w-[87%] cho
+              MỌI hồ sơ — một con số bịa đặt trình bày như dữ liệu thật. Nay lấy từ bản phân tích
+              Gemini gắn với hồ sơ; hồ sơ chưa có phân tích thì ẩn thẻ thay vì bịa số. */}
+          {selectedEvaluation.cvMatchScore != null && (
+            <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1.5 font-semibold text-ai-700 dark:text-ai-400">
+                  {t('cvJdMatch')}
+                </span>
+                <span className="font-display text-xl font-extrabold text-ai-700 dark:text-ai-400">
+                  {selectedEvaluation.cvMatchScore}
+                </span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-ai-100 dark:bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-600 to-ai-600"
+                  style={{ width: `${Math.min(100, Math.max(0, selectedEvaluation.cvMatchScore))}%` }}
+                />
+              </div>
+              {selectedEvaluation.cvMatchSummary && (
+                <p className="mt-3 text-xs leading-5 text-ink-500 dark:text-ink-400">
+                  {selectedEvaluation.cvMatchSummary}
+                </p>
+              )}
             </div>
-            <div className="mt-2 h-2 rounded-full bg-ai-100">
-              <div className="h-full w-[87%] rounded-full bg-gradient-to-r from-brand-600 to-ai-600" />
-            </div>
-          </div>
+          )}
         </aside>
-      </main>
-    </>
+      </div>
+    </div>
   )
 }

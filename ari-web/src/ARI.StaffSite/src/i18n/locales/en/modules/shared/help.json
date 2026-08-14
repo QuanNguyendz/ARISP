@@ -1,0 +1,212 @@
+{
+  "title": "Help & documentation",
+  "subtitle": "How to run ARISP for your role",
+  "roles": {
+    "hrLead": "HR Lead",
+    "recruiter": "Recruiter"
+  },
+  "quickStart": {
+    "title": "Quick start",
+    "subtitle": "Follow this order for your first opening",
+    "hrSteps": [
+      "Create the job posting: paste the JD or upload a PDF/DOCX file (the system extracts it to pre-fill the form), then choose how many rounds and the type of each one (screening / technical / online test).",
+      "Configure the scoring criteria and interview persona per round. The interview language is detected from the JD automatically — you do not pick it.",
+      "Upload a Playbook so the AI interviews in your company's style. Read the Playbook section below before writing the file.",
+      "Declare the on-site interview time slots for each round — this is the pool recruiters assign from.",
+      "Approve draft postings submitted by recruiters, then publish.",
+      "After each interview: open Evaluations, read the AI report, then Confirm or Override (an override requires a reason)."
+    ],
+    "recruiterSteps": [
+      "Create a job posting as a draft and send it to the HR Lead for approval. You can upload a JD file to pre-fill the form.",
+      "Open Candidates to review submitted applications and the CV-JD match score the AI produced at application time.",
+      "Pick suitable candidates and assign them an interview slot from that round's pool. The candidate is notified and either confirms or declines.",
+      "On the interview day, issue the 6-character interview code the candidate enters at the on-site kiosk.",
+      "Track outcomes in Evaluations. The final decision belongs to the HR Lead."
+    ]
+  },
+  "flow": {
+    "title": "End-to-end recruitment flow",
+    "subtitle": "From publishing a posting to a final decision",
+    "phases": [
+      "Publishing: the HR Lead configures the role, its rounds, scoring criteria, Playbook and interview time slots.",
+      "Candidates apply themselves on the job board. Gemini scores the CV-JD match once and attaches it to the application — it is never re-run.",
+      "Staff screen applications and assign a real interview slot. The candidate confirms or declines so they can be reassigned.",
+      "Once scheduled, the candidate unlocks one practice interview for that round — visible only to them, hidden from staff, and it never affects the outcome.",
+      "Real interview on site: the candidate enters the 6-character code at the kiosk. Real sessions are recorded and the video is deleted automatically after 7 days.",
+      "The AI scores the session and produces a report: overall score, per-criterion scores, per-question analysis and language assessment. The AI never changes the application status itself.",
+      "The HR Lead confirms or overrides. An application only becomes Passed after clearing every round of that posting."
+    ]
+  },
+  "duties": {
+    "title": "What your role covers",
+    "hrSubtitle": "The HR Lead owns configuration and makes the final call",
+    "recruiterSubtitle": "Recruiters run day-to-day work on the postings they own",
+    "hrItems": [
+      "Create, edit and publish postings; approve drafts submitted by recruiters",
+      "Configure interview rounds, scoring criteria, persona and the online test question bank",
+      "Upload and manage Playbooks across all three scopes (company / posting / round)",
+      "Declare on-site interview time slots for each round",
+      "Confirm or Override AI results — overrides require a reason and are written to the audit log",
+      "Review real interview video within the 7-day retention window"
+    ],
+    "recruiterItems": [
+      "Create postings as drafts and submit them for HR Lead approval",
+      "Manage candidates for the postings you created",
+      "Assign interview slots to candidates from the round's pool",
+      "Issue 6-character interview codes for on-site kiosk sessions",
+      "Track the AI evaluation reports",
+      "Cannot upload Playbooks and does not make the final decision"
+    ]
+  },
+  "playbook": {
+    "title": "Interview Playbook",
+    "subtitle": "The documents that decide what the AI asks and how it asks",
+    "intro": "A Playbook is an internal document that gets split into pieces, embedded as vectors and loaded into the knowledge base. During a real interview the AI retrieves the most relevant pieces from the JD, the CV and the Playbook to generate questions and to score answers. Practice interviews deliberately do NOT use the Playbook — only the JD and CV — so never use a practice session to check whether your Playbook took effect.",
+    "scopes": {
+      "title": "Three scopes and their priority",
+      "note": "When several documents are relevant at once, the system prefers the one with the higher weight. Company-wide documents are deliberately the lowest so that guidance written for a specific posting or round always outranks the general rules.",
+      "colScope": "Scope",
+      "colWhen": "Use it for",
+      "colWeight": "Weight",
+      "org": {
+        "name": "Company",
+        "when": "Rules that apply everywhere: culture, banned topics, general tone"
+      },
+      "jobPosting": {
+        "name": "Posting",
+        "when": "Content valid for one role only: its question bank, its competency framework"
+      },
+      "round": {
+        "name": "Round",
+        "when": "Content specific to one round: must-ask questions, technical scenarios, difficulty"
+      }
+    },
+    "docTypes": {
+      "title": "The ten document types",
+      "note": "The document type is stored alongside every piece and tells the AI what that piece is for. Choosing the wrong type does not break anything but it does hurt retrieval accuracy.",
+      "styleGuide": {
+        "name": "Style guide",
+        "desc": "Tone, how to lead the conversation, how to respond, how to close the session."
+      },
+      "questionBank": {
+        "name": "Question bank",
+        "desc": "Interview questions grouped by topic and difficulty for the AI to draw from."
+      },
+      "competencyFramework": {
+        "name": "Competency framework",
+        "desc": "Scoring criteria and what each band means. Use the exact criterion names from the posting."
+      },
+      "cultureGuide": {
+        "name": "Culture & values",
+        "desc": "Company values and how to recognise a good fit from an answer."
+      },
+      "compliance": {
+        "name": "Banned questions",
+        "desc": "Topics that must never be asked and what to do if the candidate raises them."
+      },
+      "redFlag": {
+        "name": "Red flags",
+        "desc": "Suspicious signals and the follow-up question that verifies them."
+      },
+      "technicalScenario": {
+        "name": "Technical scenario",
+        "desc": "Real situations for the candidate to work through, plus the points to listen for."
+      },
+      "expectedAnswer": {
+        "name": "Expected answers",
+        "desc": "The key points of a good answer, used as the basis for per-question scoring."
+      },
+      "mustAsk": {
+        "name": "Must-ask questions",
+        "desc": "Questions that have to be asked before closing; the system tracks whether they were."
+      },
+      "roundPlaybook": {
+        "name": "Round playbook",
+        "desc": "A combined guidance pack for one specific interview round."
+      }
+    },
+    "chunking": {
+      "title": "How to write the file",
+      "subtitle": "Five rules that follow exactly how the system splits documents",
+      "warning": "The system splits documents on BLANK LINES, not on headings. Any block of 1000 characters or more is hard-cut every 500 characters, mid-sentence and mid-word. During the interview the AI only ever sees individual pieces — never the text before or after them.",
+      "rules": [
+        "Separate every idea with exactly one blank line. That is the only boundary the system understands.",
+        "Keep each block under 1000 characters, ideally 150–400. Above that it gets hard-cut mid-sentence.",
+        "Write each block so it stands alone: repeat the role name, round number and criterion name inside the block.",
+        "Never leave a heading alone on its own line followed by a blank line — it becomes a meaningless few-dozen-character piece. Put the label at the start of the content block instead.",
+        "Avoid tables and multi-level bullets: separated from their column header or parent line they lose all meaning."
+      ],
+      "badTitle": "Broken",
+      "badExample": "## Question bank\n\n- Ask about experience\n- Ask about the hardest project",
+      "badWhy": "Becomes 2 pieces: one containing only the words \"Question bank\", and one stub of bullets with no idea which role or round they belong to.",
+      "goodTitle": "Correct",
+      "goodExample": "[QUESTION - BASIC] Fresher .NET role, topic experience: Tell me about the hardest project you have worked on. Expected answer: states their personal role, a concrete difficulty, and how they handled it.",
+      "goodWhy": "One self-contained piece. Pulled out of the file on its own, it still works."
+    },
+    "template": {
+      "title": "Optimised template",
+      "subtitle": "A sample file that already follows every rule above",
+      "intro": "Download the sample, replace everything in angle brackets with real content, delete the blocks you do not need, then upload it. The structure has been verified against the system's own splitter.",
+      "highlights": [
+        "Splits into 18 pieces, none anywhere near the hard-cut threshold — the longest is 279 characters.",
+        "No junk pieces: every piece carries a label and real content, with no stand-alone headings.",
+        "Every piece repeats the role and round, so it still makes sense in isolation.",
+        "Covers nine groups: style, must-ask questions, a three-tier question bank, scoring criteria, red flags, banned topics, culture, technical scenarios and the closing line.",
+        "The usage note sits at the top of the file and says plainly that it must be deleted before upload."
+      ],
+      "download": "Download template (.md)",
+      "goToPlaybooks": "Go to Playbooks",
+      "downloaded": "Downloaded"
+    }
+  },
+  "faq": {
+    "title": "Frequently asked",
+    "hr": {
+      "questions": [
+        "How long after upload can the AI use a Playbook?",
+        "Why doesn't the practice interview follow the Playbook I just uploaded?",
+        "Is overriding an AI result recorded anywhere?",
+        "The candidate passed round 1, so why isn't the application marked Passed?",
+        "How long is interview video kept?",
+        "How do I edit a Playbook?"
+      ],
+      "answers": [
+        "Immediately. Splitting and loading into the knowledge base happens synchronously during upload; once the status reads Loaded into RAG it is live for the next interview.",
+        "Practice sessions deliberately use only the JD and CV, never the internal Playbook. To verify a Playbook you have to look at a real interview.",
+        "Yes. An override requires a reason, and both the action and the reason are written to the system audit log.",
+        "An application only becomes Passed after clearing every round declared on the posting. Part-way through, the card shows Round N of M.",
+        "Seven days from the end of the session, then the file is deleted automatically. The transcript and the evaluation report are kept permanently.",
+        "You cannot edit in place. Delete the old document and upload the new version — deleting also removes its loaded pieces from the knowledge base."
+      ]
+    },
+    "recruiter": {
+      "questions": [
+        "How many times can an interview code be used, and for how long?",
+        "What do I do when a candidate declines their slot?",
+        "Why can't I see a candidate's practice interview?",
+        "Should I reject applications based on the CV-JD match score?",
+        "I created a posting — why isn't it live?",
+        "Can I change an AI result?"
+      ],
+      "answers": [
+        "A code works exactly once and expires after 2 hours by default. It is 6 alphanumeric characters and is only valid for real on-site kiosk sessions.",
+        "Their place in that slot is returned to the pool immediately — just assign them a different slot. The reason they gave is shown on the scheduling panel.",
+        "Practice sessions are the candidate's private space and are deliberately hidden from staff. You only see a flag for whether they used their attempt.",
+        "No. It is a reference figure only; candidates can apply regardless of score. The decision stays with the reviewer.",
+        "Postings created by recruiters stay as drafts and need HR Lead approval before they go live.",
+        "No. Only the HR Lead can Confirm or Override the final result."
+      ]
+    }
+  },
+  "support": {
+    "title": "When something breaks",
+    "subtitle": "Common situations to check before escalating to engineering",
+    "items": [
+      "The candidate's code is rejected: check whether it has already been used or is past the 2-hour window, and issue a new one if needed.",
+      "The kiosk cannot find the microphone or camera: grant browser permission and reload — the device check screen reports the status again.",
+      "The interview loses connection mid-session: the session stays alive, and the candidate resumes exactly where they left off.",
+      "Playbook upload fails to read the file: confirm it is PDF, DOCX, TXT or MD, and that the PDF is not a scanned image — scans contain no extractable text.",
+      "An evaluation report has no video: check the retention note; past 7 days the file has been deleted by policy."
+    ]
+  }
+}

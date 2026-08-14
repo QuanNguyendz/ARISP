@@ -66,6 +66,18 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
                     response.RecordingUrl = await _fileStorage.GetUrlAsync(session.RecordingUrl, ct);
             }
 
+            // Điểm khớp CV-JD đã chấm sẵn lúc ứng tuyển (ADR-030) — chỉ đọc lại, KHÔNG gọi Gemini.
+            if (application.CvJdAnalysisId.HasValue)
+            {
+                var analysis = await _unitOfWork.Repository<CvJdAnalysis>()
+                    .GetByIdAsync(application.CvJdAnalysisId.Value, ct);
+                if (analysis != null)
+                {
+                    response.CvMatchScore = analysis.MatchScore;
+                    response.CvMatchSummary = analysis.Summary;
+                }
+            }
+
             return Result.Success(response);
         }
     }

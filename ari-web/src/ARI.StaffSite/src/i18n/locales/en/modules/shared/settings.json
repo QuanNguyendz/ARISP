@@ -1,0 +1,54 @@
+{
+  "title": "Settings",
+  "description": "Manage your profile and personal preferences",
+  "tabsLabel": "Settings sections",
+  "tabs": {
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "security": "Security"
+  },
+  "roles": {
+    "hr_admin": "HR Lead",
+    "recruiter": "Recruiter",
+    "super_admin": "Super Admin"
+  },
+  "profile": {
+    "title": "Profile",
+    "fullName": "Full name",
+    "department": "Department",
+    "departmentPlaceholder": "e.g. Technology recruitment",
+    "email": "Email",
+    "emailLocked": "Email is your sign-in identity; only a Super Admin can change it.",
+    "role": "Role",
+    "roleLocked": "Roles are granted by a Super Admin.",
+    "saveChanges": "Save changes",
+    "saved": "Profile saved.",
+    "nameRequired": "Please enter your full name.",
+    "loadError": "Could not load your profile.",
+    "saveError": "Could not save your profile."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "email": {
+      "title": "Email notifications",
+      "description": "Get an email for new candidates and interview results"
+    },
+    "browser": {
+      "title": "In-app notifications",
+      "description": "Get notifications on the bell icon"
+    }
+  },
+  "security": {
+    "title": "Change password",
+    "setTitle": "Set a password",
+    "googleOnlyHint": "Your account signs in with Google and has no password yet. Set one to be able to use either method.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "rule": "At least 8 characters, with upper case, lower case and a digit.",
+    "changePassword": "Change password",
+    "setPassword": "Set password",
+    "mismatch": "The two new passwords do not match.",
+    "changeError": "Could not change your password."
+  }
+}

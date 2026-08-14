@@ -56,13 +56,19 @@ export const evaluationService = {
     })
   },
 
+  /**
+   * Ghi đè verdict của AI. `finalVerdict` do người dùng chọn — trước đây hàm này tự lật ngược
+   * verdict của AI nên hai nút Đạt / Không đạt trên màn duyệt chỉ là trang trí. Vẫn giữ cách
+   * lật ngược làm mặc định khi nơi gọi không truyền gì (đúng ý định thường gặp của "Ghi đè").
+   */
   async overrideEvaluation(
     evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>,
-    reason: string
+    reason: string,
+    finalVerdict?: 'pass' | 'not_pass'
   ): Promise<{ success: boolean }> {
     return this.submitReview({
       evaluationId: evaluation.id,
-      finalVerdict: evaluation.aiVerdict === 'pass' ? 'not_pass' : 'pass',
+      finalVerdict: finalVerdict ?? (evaluation.aiVerdict === 'pass' ? 'not_pass' : 'pass'),
       overrideReason: reason,
     })
   },

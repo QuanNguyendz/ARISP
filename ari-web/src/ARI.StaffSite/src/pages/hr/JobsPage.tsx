@@ -16,7 +16,7 @@ import {
   Filter,
   X,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination } from '@ari/shared/ui'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Pagination, Select } from '@ari/shared/ui'
 import { HrStatsSkeleton, JobListSkeleton } from './_skeletons'
 import { jobService } from '@ari/shared/fservices/job'
 import { useAuthStore } from '@ari/shared/store/auth'
@@ -288,48 +288,47 @@ export default function HrJobsPage() {
 
             {/* Status Filter */}
             <div>
-              <select
+              <Select
                 value={selectedStatus}
-                onChange={(e) => updateParam('status', e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="active">{t('status.active')}</option>
-                <option value="pending">{t('status.pending')}</option>
-                <option value="draft">{t('status.draft')}</option>
-                <option value="paused">{t('status.paused')}</option>
-                <option value="closed">{t('status.closed')}</option>
-                <option value="rejected">{t('status.rejected')}</option>
-              </select>
+                onChange={(v) => updateParam('status', v)}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'Tất cả trạng thái' },
+                  { value: 'active', label: t('status.active') },
+                  { value: 'pending', label: t('status.pending') },
+                  { value: 'draft', label: t('status.draft') },
+                  { value: 'paused', label: t('status.paused') },
+                  { value: 'closed', label: t('status.closed') },
+                  { value: 'rejected', label: t('status.rejected') },
+                ]}
+              />
             </div>
 
             {/* Employee Filter */}
             <div>
-              <select
+              <Select
                 value={selectedEmployee}
-                onChange={(e) => updateParam('employee', e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-              >
-                <option value="all">Lọc theo người phụ trách</option>
-                {uniqueEmployees.map((emp) => (
-                  <option key={emp} value={emp}>
-                    {emp}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => updateParam('employee', v)}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'Lọc theo người phụ trách' },
+                  ...uniqueEmployees.map((emp) => ({ value: emp, label: emp })),
+                ]}
+              />
             </div>
 
             {/* Urgent Filter */}
             <div>
-              <select
+              <Select
                 value={selectedUrgent}
-                onChange={(e) => updateParam('urgent', e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-              >
-                <option value="all">Tất cả mức độ</option>
-                <option value="urgent">Tin tuyển gấp</option>
-                <option value="normal">Bình thường</option>
-              </select>
+                onChange={(v) => updateParam('urgent', v)}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'Tất cả mức độ' },
+                  { value: 'urgent', label: 'Tin tuyển gấp' },
+                  { value: 'normal', label: 'Bình thường' },
+                ]}
+              />
             </div>
 
             {/* Date Range: From Date */}

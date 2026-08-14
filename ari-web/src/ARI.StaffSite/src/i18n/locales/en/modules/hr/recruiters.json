@@ -1,0 +1,53 @@
+{
+  "title": "Assignment & recruiter load",
+  "subtitle": "Track each recruiter's load, spot bottlenecks and rebalance the work",
+  "loadError": "Could not load the recruiter list.",
+  "locked": "Locked",
+  "slaBreach": "Stalled {{days}}d",
+  "reqLoad": "{{active}}/{{total}} open reqs",
+  "pipelineCount": "{{count}} in pipeline",
+  "stats": {
+    "recruiters": "Recruiters",
+    "activeJobs": "Open reqs",
+    "pipeline": "In pipeline",
+    "breaching": "Stalled recruiters"
+  },
+  "bottleneck": {
+    "drafts": "Drafts to approve",
+    "draftsHint": "Draft postings waiting for HR Lead approval. This bottleneck is on your side, not the recruiter's.",
+    "unscreened": "Unscreened",
+    "unscreenedHint": "Freshly submitted applications the recruiter has not reviewed yet.",
+    "scheduling": "Awaiting scheduling",
+    "schedulingHint": "Screened but not yet assigned a real interview slot.",
+    "declined": "Needs rebooking",
+    "declinedHint": "The candidate declined, the slot went back to the pool and is waiting for a new assignment.",
+    "reviews": "Waiting on you",
+    "reviewsHint": "The AI finished scoring a real interview but nobody has confirmed or overridden the result."
+  },
+  "empty": {
+    "title": "No recruiters yet",
+    "description": "Submit an account request for a Super Admin to approve, then assign postings to them.",
+    "action": "Request an account"
+  },
+  "handover": {
+    "open": "Reassign a posting",
+    "title": "Reassign job posting",
+    "subtitle": "Move a posting currently owned by {{name}} to another recruiter",
+    "jobLabel": "Posting to move",
+    "jobPlaceholder": "Select a job posting...",
+    "jobCandidates": "{{count}} applications",
+    "loadingJobs": "Loading postings...",
+    "targetLabel": "Assign to",
+    "targetPlaceholder": "Select the receiving recruiter...",
+    "targetLoad": "{{jobs}} reqs · {{pipeline}} in pipeline",
+    "noTarget": "There is no other active recruiter to receive this posting.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "e.g. rebalancing load, recruiter on leave...",
+    "reasonHint": "The reason is written to the audit log and sent with the notification to both people.",
+    "pickJob": "Please pick the posting to move.",
+    "pickTarget": "Please pick the receiving recruiter.",
+    "cancel": "Cancel",
+    "submit": "Reassign",
+    "error": "Reassignment failed."
+  }
+}

@@ -1,19 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-  Sparkles,
-  Check,
-} from 'lucide-react'
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Sparkles, Check } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
+import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
+import PasswordToggle from '@ari/shared/ui/PasswordToggle'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -79,6 +71,12 @@ export default function CandidateLoginPage() {
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resending, setResending] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
+
+  // Đăng nhập Google hỏng → OAuthCallbackPage trả về đây kèm lý do (xem useOAuthRedirectError).
+  const oauthError = useOAuthRedirectError()
+  useEffect(() => {
+    if (oauthError) setError(oauthError)
+  }, [oauthError])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -239,6 +237,7 @@ export default function CandidateLoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('candidateLogin.emailPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -249,8 +248,11 @@ export default function CandidateLoginPage() {
                 <label className="block text-sm font-medium text-ink-600">
                   {t('candidateLogin.passwordLabel')}
                 </label>
+                {/* tabIndex={-1}: Tab từ ô email phải nhảy thẳng xuống ô mật khẩu,
+                    không dừng ở đây (xem PasswordToggle). */}
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => navigate('/auth/forgot-password')}
                   className="text-sm font-medium text-brand-600 hover:underline"
                 >
@@ -265,15 +267,13 @@ export default function CandidateLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('candidateLogin.passwordPlaceholder')}
                   className="w-full bg-transparent text-sm outline-none"
+                  autoComplete="current-password"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-ink-400 hover:text-ink-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <PasswordToggle
+                  visible={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                />
               </div>
             </div>
 

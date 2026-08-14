@@ -26,7 +26,12 @@ from app.core.embeddings import embed_text, to_pgvector
 
 # Trọng số scope (ADR-025). playbook tinh chỉnh thêm theo metadata.scope bên dưới.
 _BASE_WEIGHT = {"cv": 1.0, "jd": 1.0, "playbook": 0.8}
-_PLAYBOOK_SCOPE_WEIGHT = {"company": 0.6, "job_posting": 1.0, "round": 1.0}
+# Khoá phải khớp giá trị .NET THỰC SỰ ghi vào metadata: PlaybookDocument.Scope nhận
+# "org" | "job_posting" | "round" (PlaybooksController chặn giá trị khác). Bản cũ để "company"
+# — key không bao giờ khớp nên playbook cấp công ty rơi về mặc định 0.8 thay vì 0.6, tức nó
+# cạnh tranh với tài liệu riêng của tin/vòng mạnh hơn thiết kế. Giữ "company" như bí danh
+# phòng khi có dữ liệu cũ dùng tên đó.
+_PLAYBOOK_SCOPE_WEIGHT = {"org": 0.6, "company": 0.6, "job_posting": 1.0, "round": 1.0}
 
 
 @dataclass(frozen=True)

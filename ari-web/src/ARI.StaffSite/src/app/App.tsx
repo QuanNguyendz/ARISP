@@ -18,7 +18,6 @@ import StaffHomeRedirect from './StaffHomeRedirect'
 // Pages: lazy-load → mỗi page thành 1 chunk riêng, chỉ tải khi vào route đó.
 // Auth
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
-const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@ari/shared/authflows/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@ari/shared/authflows/ResetPasswordPage'))
 const OAuthCallbackPage = lazy(() => import('@ari/shared/authflows/OAuthCallbackPage'))
@@ -39,7 +38,9 @@ const HrCandidateDetailPage = lazy(() => import('@/pages/hr/CandidateDetailPage'
 const HrEvaluationsPage = lazy(() => import('@/pages/hr/EvaluationReviewPage'))
 const HrReportsPage = lazy(() => import('@/pages/hr/ReportsPage'))
 const HrPlaybooksPage = lazy(() => import('@/pages/hr/PlaybooksPage'))
+const HrHelpPage = lazy(() => import('@/pages/hr/HelpPage'))
 const HrTeamPage = lazy(() => import('@/pages/hr/TeamPage'))
+const HrRecruiterWorkloadPage = lazy(() => import('@/pages/hr/RecruiterWorkloadPage'))
 const HrInterviewsPage = lazy(() => import('@/pages/hr/InterviewSessionsPage'))
 const HrJobDetailPage = lazy(() => import('@/pages/hr/JobPostingDetailPage'))
 const HrSettingsPage = lazy(() => import('@/pages/hr/SettingsPage'))
@@ -58,6 +59,7 @@ const RecruiterCandidateDetailPage = lazy(() => import('@/pages/recruiter/Candid
 const RecruiterEvaluationsPage = lazy(() => import('@/pages/recruiter/EvaluationReviewPage'))
 const RecruiterInterviewsPage = lazy(() => import('@/pages/recruiter/InterviewSessionsPage'))
 const RecruiterSettingsPage = lazy(() => import('@/pages/recruiter/SettingsPage'))
+const RecruiterHelpPage = lazy(() => import('@/pages/recruiter/HelpPage'))
 const RecruiterNotificationsPage = lazy(() => import('@/pages/recruiter/NotificationsPage'))
 
 const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
@@ -104,14 +106,8 @@ function App() {
               </GuestRoute>
             }
           />
-          <Route
-            path="/auth/register"
-            element={
-              <GuestRoute>
-                <RegisterPage />
-              </GuestRoute>
-            }
-          />
+          {/* Không có /auth/register: tài khoản nội bộ do Super Admin cấp trước
+              (pre-provisioning), HR xin thêm qua luồng AccountRequest — ADR-023/041. */}
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
@@ -153,7 +149,9 @@ function App() {
             <Route path="/hr/evaluations" element={<HrEvaluationsPage />} />
             <Route path="/hr/reports" element={<HrReportsPage />} />
             <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
+            <Route path="/hr/help" element={<HrHelpPage />} />
             <Route path="/hr/team" element={<HrTeamPage />} />
+            <Route path="/hr/recruiters" element={<HrRecruiterWorkloadPage />} />
             <Route path="/hr/interviews" element={<HrInterviewsPage />} />
             <Route path="/hr/notifications" element={<HrNotificationsPage />} />
             <Route path="/hr/settings" element={<HrSettingsPage />} />
@@ -185,6 +183,7 @@ function App() {
             <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
             <Route path="/recruiter/notifications" element={<RecruiterNotificationsPage />} />
             <Route path="/recruiter/settings" element={<RecruiterSettingsPage />} />
+            <Route path="/recruiter/help" element={<RecruiterHelpPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/404" replace />} />

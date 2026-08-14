@@ -20,29 +20,9 @@ import { authService } from '@ari/shared/fservices/auth'
 import { settingsService } from '@/fservices/settings/settingsService'
 import type { CandidateSettings, NotificationChannelPref } from '@/fservices/settings/settingsService'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
-
-type ThemeMode = 'light' | 'dark' | 'system'
-
-function currentThemeMode(): ThemeMode {
-  const t = localStorage.getItem('theme')
-  if (t === 'dark') return 'dark'
-  if (t === 'light') return 'light'
-  return 'system'
-}
-
-function applyTheme(mode: ThemeMode) {
-  const root = document.documentElement
-  if (mode === 'dark') {
-    root.classList.add('dark')
-    localStorage.setItem('theme', 'dark')
-  } else if (mode === 'light') {
-    root.classList.remove('dark')
-    localStorage.setItem('theme', 'light')
-  } else {
-    localStorage.removeItem('theme')
-    root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches)
-  }
-}
+import Select from '@ari/shared/ui/Select'
+import { applyThemeMode, readThemeMode } from '@ari/shared/store/theme'
+import type { ThemeMode } from '@ari/shared/store/theme'
 
 const SECTION_NAV = [
   { id: 'appearance', labelKey: 'settings.nav.appearance', Icon: Palette },
@@ -73,7 +53,7 @@ export default function SettingsPage() {
   const { logout } = useAuthStore()
   const [settings, setSettings] = useState<CandidateSettings | null>(null)
   const [loading, setLoading] = useState(true)
-  const [theme, setTheme] = useState<ThemeMode>(currentThemeMode)
+  const [theme, setTheme] = useState<ThemeMode>(readThemeMode)
   const [active, setActive] = useState('appearance')
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -111,7 +91,7 @@ export default function SettingsPage() {
 
   const onTheme = (mode: ThemeMode) => {
     setTheme(mode)
-    applyTheme(mode)
+    applyThemeMode(mode)
   }
 
   const onExport = async () => {
@@ -223,15 +203,17 @@ export default function SettingsPage() {
                   {t('settings.appearance.displayLanguageHint')}
                 </div>
               </div>
-              <select
+              <Select
                 value={settings?.language ?? 'vi'}
                 disabled={!settings}
-                onChange={(e) => settings && save({ ...settings, language: e.target.value })}
-                className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none focus:border-brand-500"
-              >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
-              </select>
+                onChange={(v) => settings && save({ ...settings, language: v })}
+                options={[
+                  { value: 'vi', label: 'Tiếng Việt' },
+                  { value: 'en', label: 'English' },
+                ]}
+                align="right"
+                className="min-w-[9rem]"
+              />
             </div>
           </section>
 

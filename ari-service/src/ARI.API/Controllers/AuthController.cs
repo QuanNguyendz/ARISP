@@ -146,11 +146,14 @@ namespace ARI.API.Controllers
 
             if (signIn.IsFailure)
             {
+                // Mọi nhánh thất bại đều PHẢI redirect về frontend. Trước đây DomainNotAllowed trả
+                // Forbid() → trình duyệt dừng ở trang 403 trắng của chính API (localhost:5000), người
+                // dùng không có đường quay lại màn đăng nhập ngoài việc tự sửa URL.
                 return signIn.ErrorCode switch
                 {
-                    AuthErrorCodes.DomainNotAllowed => Forbid(),
-                    AuthErrorCodes.PendingApproval => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", "pending_approval") })),
-                    _ => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", "account_not_provisioned") })),
+                    AuthErrorCodes.DomainNotAllowed => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", AuthErrorCodes.DomainNotAllowed) })),
+                    AuthErrorCodes.PendingApproval => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "pending"), ("message", AuthErrorCodes.PendingApproval) })),
+                    _ => Redirect(BuildRedirectUrl(returnUrl, new[] { ("status", "rejected"), ("message", AuthErrorCodes.NotProvisioned) })),
                 };
             }
 
@@ -473,7 +476,13 @@ namespace ARI.API.Controllers
 
             if (!isLocal && !allowedExternal)
             {
-                target = !string.IsNullOrEmpty(adminFrontend) ? adminFrontend : "/admin";
+                // Rơi về đây nghĩa là returnUrl không thuộc origin nào đã khai (cấu hình sai hoặc
+                // bị chèn). Phải trả về ĐÚNG trang callback của staff chứ không phải gốc site:
+                // `status`/`message` chỉ được đọc ở `/auth/callback`, ném vào `/` thì tham số rơi
+                // vào hư không — người dùng thấy trang chủ kèm query lạ, không có báo lỗi nào.
+                target = !string.IsNullOrEmpty(adminFrontend)
+                    ? $"{adminFrontend.TrimEnd('/')}/auth/callback"
+                    : "/auth/callback";
             }
 
             if (queryPairs != null && queryPairs.Length > 0)

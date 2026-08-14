@@ -12,7 +12,7 @@ namespace ARI.Application.UnitTests.Interviews;
 /// <summary>
 /// Cấp cấu hình media cho phiên (<see cref="ARI.Application.Services.InterviewService"/>
 /// <c>GetMediaConfigAsync</c>, test-plan B19): guard phiên/hồ sơ, IDOR (kiosk bypass), token media
-/// best-effort (provider lỗi → null, không sập phòng), trần thời lượng theo loại phiên (real 45' / practice 20').
+/// best-effort (provider lỗi → null, không sập phòng), trần thời lượng theo loại phiên (real/practice đều 20').
 /// </summary>
 public class GetMediaConfigTests
 {
@@ -60,7 +60,7 @@ public class GetMediaConfigTests
     }
 
     [Fact]
-    public async Task Kiosk_real_session_succeeds_with_45min_cap_and_null_providers()
+    public async Task Kiosk_real_session_succeeds_with_default_cap_and_null_providers()
     {
         var app = SchedulingData.Application(Guid.NewGuid(), Guid.NewGuid());
         var session = Session(app.Id, "real");
@@ -71,7 +71,7 @@ public class GetMediaConfigTests
 
         Assert.True(res.IsSuccess);
         Assert.Equal("real", res.Value.SessionType);
-        Assert.Equal(2700, res.Value.MaxDurationSeconds);   // 45' × 60
+        Assert.Equal(1200, res.Value.MaxDurationSeconds);   // 20' × 60 — trần mỗi phiên gói LiveAvatar Essential
         Assert.Null(res.Value.Deepgram);
         Assert.Null(res.Value.HeyGen);
     }

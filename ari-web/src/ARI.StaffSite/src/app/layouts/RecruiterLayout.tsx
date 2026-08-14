@@ -17,6 +17,7 @@ export default function RecruiterLayout() {
       searchPath="/recruiter/candidates"
       globalSearchScope="recruiter"
       settingsPath="/recruiter/settings"
+      helpPath="/recruiter/help"
       notificationsPath="/recruiter/notifications"
       primaryAction={{ label: t('recruiter.createJob'), to: '/recruiter/jobs/create', icon: Plus }}
     />

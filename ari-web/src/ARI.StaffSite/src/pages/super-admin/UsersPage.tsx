@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { PageHeader, StatsGrid, EmptyState, ErrorAlert } from '@ari/shared/ui'
+import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Select } from '@ari/shared/ui'
 import { useAuthStore } from '@ari/shared/store/auth'
 import {
   adminService,
@@ -225,19 +225,22 @@ export default function UsersPage() {
             className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 pl-10 pr-4 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
           />
         </form>
-        <select
+        <Select
           value={roleFilter}
-          onChange={(e) => {
+          onChange={(v) => {
             setPage(1)
-            setRoleFilter(e.target.value)
+            setRoleFilter(v)
           }}
-          className="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
-        >
-          <option value="all">{t('filters.allRoles')}</option>
-          <option value="super_admin">{t('filters.superAdmin')}</option>
-          <option value="hr_admin">{t('filters.hrAdmin')}</option>
-          <option value="recruiter">{t('filters.recruiter')}</option>
-        </select>
+          ariaLabel={t('filters.allRoles')}
+          className="min-w-[11rem]"
+          buttonClassName="px-4 py-2.5 text-sm"
+          options={[
+            { value: 'all', label: t('filters.allRoles') },
+            { value: 'super_admin', label: t('filters.superAdmin') },
+            { value: 'hr_admin', label: t('filters.hrAdmin') },
+            { value: 'recruiter', label: t('filters.recruiter') },
+          ]}
+        />
       </div>
 
       {loading ? (
@@ -301,17 +304,17 @@ export default function UsersPage() {
                             {roleLabel(u.role)}
                           </span>
                         ) : (
-                          <select
+                          <Select
                             value={u.role.toLowerCase().replace(/\s+/g, '_')}
                             disabled={busyId === u.id}
-                            onChange={(e) =>
-                              handleChangeRole(u, e.target.value as 'hr_admin' | 'recruiter')
-                            }
-                            className="w-full max-w-[140px] rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs text-ink-700 dark:text-ink-200 outline-none focus:border-brand-400 disabled:opacity-50"
-                          >
-                            <option value="hr_admin">{t('filters.hrAdmin')}</option>
-                            <option value="recruiter">{t('filters.recruiter')}</option>
-                          </select>
+                            onChange={(v) => handleChangeRole(u, v as 'hr_admin' | 'recruiter')}
+                            className="w-full max-w-[140px]"
+                            buttonClassName="rounded-lg px-2 py-1 text-xs"
+                            options={[
+                              { value: 'hr_admin', label: t('filters.hrAdmin') },
+                              { value: 'recruiter', label: t('filters.recruiter') },
+                            ]}
+                          />
                         )}
                       </td>
                       <td className="px-4 py-4 sm:px-6">
@@ -589,16 +592,16 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
               <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
                 {t('createModal.role')}
               </label>
-              <select
+              <Select
                 value={form.role}
-                onChange={(e) =>
-                  setForm({ ...form, role: e.target.value as 'hr_admin' | 'recruiter' })
-                }
-                className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
-              >
-                <option value="recruiter">{t('filters.recruiter')}</option>
-                <option value="hr_admin">{t('filters.hrAdmin')}</option>
-              </select>
+                onChange={(v) => setForm({ ...form, role: v as 'hr_admin' | 'recruiter' })}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
+                options={[
+                  { value: 'recruiter', label: t('filters.recruiter') },
+                  { value: 'hr_admin', label: t('filters.hrAdmin') },
+                ]}
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">

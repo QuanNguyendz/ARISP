@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { scheduleService } from '@ari/shared/fservices/schedule'
 import type { AvailabilitySlot } from '@ari/shared/types/job'
+import Select from './Select'
 
 /**
  * Panel HR gán cứng 1 khung giờ (trong kho slot của tin) cho 1 ứng viên — ADR-048.
@@ -187,22 +188,25 @@ export default function AssignSchedulePanel({
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
             </div>
           )}
-          <label className="block text-xs font-medium text-ink-600 dark:text-ink-300">
+          <div className="block text-xs font-medium text-ink-600 dark:text-ink-300">
             {t('selectSlot')}
-            <select
+            <Select
               value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-white/10 dark:bg-ink-900 dark:text-white dark:focus:ring-brand-500/20"
-            >
-              <option value="">{t('selectPlaceholder')}</option>
-              {openSlots.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {slotLabel(s)}
-                  {s.capacity > 1 ? ` (${t('capacityHint', { available: s.capacity - s.bookedCount, total: s.capacity })})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setSelected}
+              placeholder={t('selectPlaceholder')}
+              ariaLabel={t('selectSlot')}
+              className="mt-1 w-full"
+              buttonClassName="px-3 py-2.5 text-sm"
+              options={openSlots.map((s) => ({
+                value: s.id,
+                label:
+                  slotLabel(s) +
+                  (s.capacity > 1
+                    ? ` (${t('capacityHint', { available: s.capacity - s.bookedCount, total: s.capacity })})`
+                    : ''),
+              }))}
+            />
+          </div>
           <button
             type="button"
             onClick={assign}

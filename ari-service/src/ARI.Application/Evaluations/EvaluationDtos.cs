@@ -158,6 +158,15 @@ namespace ARI.Application.Evaluations
         /// <summary>Thời điểm video đã bị xoá theo hạn lưu (để HR không tưởng là mất dữ liệu).</summary>
         public DateTimeOffset? RecordingDeletedAt { get; set; }
 
+        /// <summary>
+        /// Điểm khớp CV-JD do Gemini chấm (ADR-030), lấy từ `cv_jd_analyses` gắn với hồ sơ.
+        /// Null = hồ sơ nộp trước khi có phân tích (không chạy lại — kết quả dùng 1 lần per CV+JD).
+        /// Trước đây màn đánh giá vẽ cứng số 87 nên nhân sự đọc phải một con số bịa.
+        /// </summary>
+        public int? CvMatchScore { get; set; }
+        /// <summary>Tóm tắt của cùng bản phân tích CV-JD — hiện kèm điểm để biết điểm đó từ đâu ra.</summary>
+        public string? CvMatchSummary { get; set; }
+
         public static EvaluationDetailResponse FromEntity(
             Evaluation eval, 
             ARI.Domain.Entities.Application app, 

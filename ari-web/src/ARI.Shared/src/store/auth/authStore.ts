@@ -32,7 +32,13 @@ function parseJwtPayload(token: string): JwtPayload | null {
 
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const decoded = JSON.parse(window.atob(padded)) as JwtPayload;
+
+    // `atob` trả về "binary string": mỗi ký tự = 1 BYTE (0–255). Payload JWT là JSON mã hoá
+    // UTF-8, nên ký tự tiếng Việt (nhiều byte) bị đọc thành từng byte rời → "Quân Nguyễn"
+    // hiện thành "QuÃ¢n Nguyá»…n" (â = C3 A2, ễ = E1 BB 85). Phải gom byte lại rồi giải mã UTF-8.
+    const binary = window.atob(padded);
+    const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+    const decoded = JSON.parse(new TextDecoder('utf-8').decode(bytes)) as JwtPayload;
     return decoded;
   } catch {
     return null;
@@ -96,6 +102,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'arisp-auth',
+      // v1: tên lưu ở v0 được giải mã bằng `atob` nên tiếng Việt bị hỏng và nằm lì trong
+      // localStorage tới khi hết hạn đăng nhập (7 ngày) — refresh token KHÔNG cập nhật lại
+      // `user`. Migrate giải lại tên từ chính access token đang lưu bằng bộ giải mã đã sửa,
+      // nên người đang đăng nhập tự khỏi ngay lần tải trang kế tiếp, không phải đăng nhập lại.
+      version: 1,
+      migrate: (persisted, fromVersion) => {
+        const state = persisted as Partial<AuthState> | undefined;
+        if (state && fromVersion < 1 && state.user && state.tokens?.accessToken) {
+          const name = parseJwtPayload(state.tokens.accessToken)?.name;
+          if (name) {
+            state.user = { ...state.user, name };
+          }
+        }
+        return state as AuthState;
+      },
       partialize: (state) => ({
         user: state.user,
         tokens: state.tokens,

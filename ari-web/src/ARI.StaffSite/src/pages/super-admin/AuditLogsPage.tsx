@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Activity, ChevronLeft, ChevronRight } from 'lucide-react'
-import { PageHeader, EmptyState, ErrorAlert } from '@ari/shared/ui'
+import { PageHeader, EmptyState, ErrorAlert, Select } from '@ari/shared/ui'
 import { adminService, type AuditLogEntry } from '@/fservices/admin'
 import { auditActionLabel, timeAgo } from '@/utils/adminLabels'
 import { LogListSkeleton } from './_skeletons'
@@ -84,20 +84,16 @@ export default function AuditLogsPage() {
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
       <div className="mb-6">
-        <select
+        <Select
           value={action}
-          onChange={(e) => {
+          onChange={(v) => {
             setPage(1)
-            setAction(e.target.value)
+            setAction(v)
           }}
-          className="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400"
-        >
-          {actionOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={actionOptions.map((o) => ({ value: o.value, label: o.label }))}
+          className="w-full max-w-xs"
+          buttonClassName="px-4 py-2.5 text-sm"
+        />
       </div>
 
       {loading ? (

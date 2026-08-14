@@ -1,0 +1,212 @@
+{
+  "title": "Trợ giúp & tài liệu",
+  "subtitle": "Hướng dẫn sử dụng ARISP theo đúng vai trò của bạn",
+  "roles": {
+    "hrLead": "HR Lead",
+    "recruiter": "Chuyên viên tuyển dụng"
+  },
+  "quickStart": {
+    "title": "Bắt đầu nhanh",
+    "subtitle": "Làm theo thứ tự này cho vị trí tuyển dụng đầu tiên",
+    "hrSteps": [
+      "Tạo tin tuyển dụng: nhập JD (dán text hoặc tải file PDF/DOCX — hệ thống tự trích xuất để điền form), chọn số vòng và loại từng vòng (sơ loại / kỹ thuật / trắc nghiệm).",
+      "Cấu hình tiêu chí chấm và persona phỏng vấn cho từng vòng. Ngôn ngữ phỏng vấn do AI tự nhận từ JD, không cần chọn tay.",
+      "Tải Playbook lên để AI hỏi đúng phong cách công ty. Xem mục Playbook bên dưới trước khi soạn file.",
+      "Khai báo khung giờ phỏng vấn thật cho từng vòng — đây là kho slot để nhân sự gán cho ứng viên.",
+      "Duyệt tin của Recruiter tạo nháp, rồi đăng tin.",
+      "Sau mỗi buổi phỏng vấn: mở Đánh giá & Xác nhận, đọc báo cáo AI rồi Xác nhận hoặc Ghi đè (ghi đè bắt buộc nhập lý do)."
+    ],
+    "recruiterSteps": [
+      "Tạo tin tuyển dụng ở dạng nháp và gửi HR Lead duyệt. Có thể tải file JD để hệ thống tự điền form.",
+      "Vào Ứng viên để xem hồ sơ đã nộp, đọc điểm khớp CV-JD do AI chấm sẵn lúc ứng tuyển.",
+      "Chọn ứng viên phù hợp rồi gán lịch phỏng vấn từ kho khung giờ của vòng đó. Ứng viên nhận thông báo và xác nhận hoặc báo bận.",
+      "Đến ngày phỏng vấn, cấp Mã phỏng vấn 6 ký tự cho ứng viên nhập tại máy Kiosk ở văn phòng.",
+      "Theo dõi kết quả ở màn Đánh giá & Xác nhận. Quyết định cuối cùng do HR Lead chốt."
+    ]
+  },
+  "flow": {
+    "title": "Luồng tuyển dụng đầy đủ",
+    "subtitle": "Từ lúc đăng tin tới lúc chốt kết quả",
+    "phases": [
+      "Đăng tin: HR Lead cấu hình vị trí, các vòng, tiêu chí chấm, Playbook và khung giờ phỏng vấn.",
+      "Ứng viên tự ứng tuyển trên Job Board. Gemini chấm điểm khớp CV-JD một lần rồi đính vào hồ sơ, không chấm lại.",
+      "Nhân sự sàng hồ sơ và gán lịch phỏng vấn thật. Ứng viên xác nhận hoặc báo bận để được gán lại.",
+      "Sau khi có lịch, ứng viên được mở một lượt phỏng vấn thử cho vòng đó — chỉ ứng viên xem lại được, nhân sự không thấy và không ảnh hưởng kết quả.",
+      "Phỏng vấn thật tại văn phòng: ứng viên nhập mã 6 ký tự tại Kiosk. Buổi thật có quay hình, lưu 7 ngày rồi tự xoá.",
+      "AI chấm và sinh báo cáo: điểm tổng, điểm từng tiêu chí, phân tích từng câu, đánh giá ngôn ngữ. AI không tự đổi trạng thái hồ sơ.",
+      "HR Lead xác nhận hoặc ghi đè. Hồ sơ chỉ chuyển thành Đạt khi đã qua HẾT các vòng của tin đó."
+    ]
+  },
+  "duties": {
+    "title": "Việc thuộc quyền của bạn",
+    "hrSubtitle": "HR Lead có toàn quyền cấu hình và là người chốt kết quả cuối",
+    "recruiterSubtitle": "Chuyên viên tuyển dụng vận hành hằng ngày trên các tin mình phụ trách",
+    "hrItems": [
+      "Tạo, sửa và đăng tin tuyển dụng; duyệt tin nháp do Recruiter gửi lên",
+      "Cấu hình vòng phỏng vấn, tiêu chí chấm, persona và ngân hàng câu hỏi trắc nghiệm",
+      "Tải và quản lý Playbook ở cả ba phạm vi (công ty / theo tin / theo vòng)",
+      "Khai báo khung giờ phỏng vấn thật cho từng vòng",
+      "Xác nhận hoặc Ghi đè kết quả AI — ghi đè bắt buộc nhập lý do và được ghi vào nhật ký",
+      "Xem lại video buổi phỏng vấn thật trong thời hạn lưu 7 ngày"
+    ],
+    "recruiterItems": [
+      "Tạo tin ở dạng nháp và gửi HR Lead duyệt",
+      "Quản lý ứng viên của các tin mình tạo",
+      "Gán lịch phỏng vấn cho ứng viên từ kho khung giờ của vòng",
+      "Cấp mã phỏng vấn 6 ký tự cho buổi thật tại Kiosk",
+      "Theo dõi báo cáo đánh giá của AI",
+      "Không có quyền tải Playbook và không phải người chốt kết quả cuối"
+    ]
+  },
+  "playbook": {
+    "title": "Playbook phỏng vấn",
+    "subtitle": "Tài liệu quyết định AI hỏi gì và hỏi theo phong cách nào",
+    "intro": "Playbook là tài liệu nội bộ được cắt nhỏ, mã hoá thành vector và nạp vào kho tri thức. Trong buổi phỏng vấn thật, AI truy xuất các đoạn liên quan nhất từ JD, CV và Playbook để sinh câu hỏi cũng như chấm điểm. Buổi phỏng vấn thử KHÔNG dùng Playbook — chỉ dùng JD và CV — nên đừng lấy buổi thử để kiểm tra xem Playbook có ăn hay không.",
+    "scopes": {
+      "title": "Ba phạm vi và mức ưu tiên",
+      "note": "Khi nhiều tài liệu cùng liên quan, hệ thống ưu tiên tài liệu có trọng số cao hơn. Tài liệu cấp công ty cố ý để thấp nhất, để hướng dẫn riêng của một tin hay một vòng luôn đè lên quy định chung.",
+      "colScope": "Phạm vi",
+      "colWhen": "Dùng khi nào",
+      "colWeight": "Trọng số",
+      "org": {
+        "name": "Công ty",
+        "when": "Quy định áp cho mọi vị trí: văn hoá, điều cấm hỏi, giọng điệu chung"
+      },
+      "jobPosting": {
+        "name": "Theo tin",
+        "when": "Nội dung chỉ đúng cho một vị trí: ngân hàng câu hỏi, khung năng lực của vị trí đó"
+      },
+      "round": {
+        "name": "Theo vòng",
+        "when": "Nội dung riêng của một vòng: câu bắt buộc, kịch bản kỹ thuật, độ khó"
+      }
+    },
+    "docTypes": {
+      "title": "Mười loại tài liệu",
+      "note": "Loại tài liệu được lưu kèm từng đoạn và dùng để AI hiểu đoạn đó phục vụ việc gì. Chọn sai loại không gây lỗi nhưng làm giảm độ chính xác khi truy xuất.",
+      "styleGuide": {
+        "name": "Hướng dẫn phong cách",
+        "desc": "Giọng điệu, cách dẫn dắt, cách phản hồi, cách kết thúc buổi phỏng vấn."
+      },
+      "questionBank": {
+        "name": "Ngân hàng câu hỏi",
+        "desc": "Câu hỏi phỏng vấn theo chủ đề và mức độ để AI chọn dùng."
+      },
+      "competencyFramework": {
+        "name": "Khung năng lực",
+        "desc": "Tiêu chí chấm và mô tả từng mức điểm. Dùng đúng tên tiêu chí đã khai trong tin."
+      },
+      "cultureGuide": {
+        "name": "Văn hoá & giá trị",
+        "desc": "Giá trị công ty và cách nhận biết ứng viên phù hợp qua câu trả lời."
+      },
+      "compliance": {
+        "name": "Quy định không được hỏi",
+        "desc": "Danh sách chủ đề cấm và cách xử lý khi ứng viên tự nhắc tới."
+      },
+      "redFlag": {
+        "name": "Dấu hiệu cảnh báo",
+        "desc": "Biểu hiện đáng ngờ và câu hỏi kiểm chứng đi kèm."
+      },
+      "technicalScenario": {
+        "name": "Kịch bản kỹ thuật",
+        "desc": "Tình huống thực tế để ứng viên xử lý, kèm những ý cần nghe được."
+      },
+      "expectedAnswer": {
+        "name": "Đáp án mong đợi",
+        "desc": "Ý chính của câu trả lời tốt, làm căn cứ chấm điểm từng câu."
+      },
+      "mustAsk": {
+        "name": "Câu hỏi bắt buộc",
+        "desc": "Câu buộc phải hỏi trước khi kết thúc; hệ thống theo dõi đã hỏi hay chưa."
+      },
+      "roundPlaybook": {
+        "name": "Playbook theo vòng",
+        "desc": "Gói hướng dẫn tổng hợp cho riêng một vòng phỏng vấn."
+      }
+    },
+    "chunking": {
+      "title": "Cách soạn file để AI dùng được",
+      "subtitle": "Năm quy tắc bám theo đúng cách hệ thống cắt tài liệu",
+      "warning": "Hệ thống cắt tài liệu theo DÒNG TRỐNG, không theo tiêu đề. Khối dài từ 1000 ký tự trở lên bị cắt cứng mỗi 500 ký tự, đứt giữa câu và giữa từ. Lúc phỏng vấn, AI chỉ nhận được từng đoạn rời — không có đoạn trước và đoạn sau đi kèm.",
+      "rules": [
+        "Ngăn cách mỗi ý bằng đúng một dòng trống. Đây là ranh giới cắt duy nhất mà hệ thống hiểu.",
+        "Giữ mỗi khối dưới 1000 ký tự, tốt nhất là 150–400. Vượt ngưỡng là bị cắt cứng giữa câu.",
+        "Viết mỗi khối tự đứng một mình hiểu được: nhắc lại tên vị trí, số vòng, tên tiêu chí ngay trong khối.",
+        "Đừng để tiêu đề đứng riêng một dòng rồi cách dòng trống — nó thành một đoạn vài chục ký tự vô nghĩa. Gắn nhãn vào ngay đầu khối nội dung.",
+        "Tránh bảng biểu và gạch đầu dòng nhiều cấp: tách ra khỏi tiêu đề cột hoặc dòng cha là mất nghĩa."
+      ],
+      "badTitle": "Cách viết hỏng",
+      "badExample": "## Ngân hàng câu hỏi\n\n- Hỏi về kinh nghiệm\n- Hỏi về dự án khó nhất",
+      "badWhy": "Thành 2 đoạn: một đoạn chỉ có chữ \"Ngân hàng câu hỏi\", một đoạn gạch đầu dòng cụt lủn không biết thuộc vị trí nào, vòng nào.",
+      "goodTitle": "Cách viết đúng",
+      "goodExample": "[CÂU HỎI - CƠ BẢN] Vị trí Fresher .NET, chủ đề kinh nghiệm: Kể về dự án khó nhất bạn từng làm. Đáp án mong đợi: nêu được vai trò cá nhân, khó khăn cụ thể, cách xử lý.",
+      "goodWhy": "Một đoạn trọn vẹn, tự đủ ngữ cảnh. Tách ra khỏi file vẫn dùng được nguyên."
+    },
+    "template": {
+      "title": "Template tối ưu",
+      "subtitle": "File mẫu đã tuân thủ sẵn toàn bộ quy tắc ở trên",
+      "intro": "Tải file mẫu về, thay các chỗ trong ngoặc nhọn bằng nội dung thật, xoá khối không dùng rồi tải lên. Cấu trúc file đã được kiểm chứng bằng chính bộ cắt của hệ thống.",
+      "highlights": [
+        "Cắt ra 18 đoạn, không đoạn nào chạm ngưỡng bị cắt cứng — dài nhất 279 ký tự.",
+        "Không có đoạn rác: mọi đoạn đều mang nhãn và nội dung thật, không có tiêu đề đứng riêng.",
+        "Mỗi đoạn tự nhắc lại vị trí và vòng nên tách ra vẫn hiểu được.",
+        "Phủ đủ chín nhóm: phong cách, câu bắt buộc, ngân hàng câu hỏi ba mức, tiêu chí chấm, cảnh báo, điều cấm hỏi, văn hoá, kịch bản kỹ thuật và câu kết thúc.",
+        "Khối hướng dẫn nằm ở đầu file và có ghi rõ phải xoá trước khi tải lên."
+      ],
+      "download": "Tải template (.md)",
+      "goToPlaybooks": "Tới trang Playbook",
+      "downloaded": "Đã tải xuống"
+    }
+  },
+  "faq": {
+    "title": "Câu hỏi thường gặp",
+    "hr": {
+      "questions": [
+        "Tải Playbook xong bao lâu thì AI dùng được?",
+        "Vì sao phỏng vấn thử không hỏi giống Playbook tôi vừa tải?",
+        "Ghi đè kết quả AI có bị ghi lại không?",
+        "Vì sao ứng viên đã đạt vòng 1 mà hồ sơ vẫn chưa hiện Đạt?",
+        "Video phỏng vấn lưu được bao lâu?",
+        "Sửa Playbook thì làm thế nào?"
+      ],
+      "answers": [
+        "Ngay khi tải lên xong. Hệ thống cắt nhỏ và nạp vào kho tri thức đồng bộ trong lúc tải, trạng thái chuyển sang Đã nạp RAG là dùng được cho buổi phỏng vấn kế tiếp.",
+        "Buổi thử cố ý chỉ dùng JD và CV, không nạp Playbook nội bộ. Muốn kiểm tra Playbook phải xem ở buổi phỏng vấn thật.",
+        "Có. Ghi đè bắt buộc nhập lý do, và cả thao tác lẫn lý do đều được lưu vào nhật ký hệ thống.",
+        "Hồ sơ chỉ chuyển thành Đạt khi đã qua hết số vòng khai báo trong tin. Đang giữa chừng thì thẻ hồ sơ hiện Qua vòng N/M.",
+        "Bảy ngày kể từ khi buổi phỏng vấn kết thúc, sau đó file tự xoá. Bản ghi lời thoại và báo cáo đánh giá vẫn giữ lại vĩnh viễn.",
+        "Không sửa trực tiếp được. Xoá tài liệu cũ rồi tải bản mới lên — xoá sẽ gỡ luôn các đoạn đã nạp khỏi kho tri thức."
+      ]
+    },
+    "recruiter": {
+      "questions": [
+        "Mã phỏng vấn dùng được mấy lần và trong bao lâu?",
+        "Ứng viên báo bận thì xử lý thế nào?",
+        "Vì sao tôi không thấy buổi phỏng vấn thử của ứng viên?",
+        "Điểm khớp CV-JD có phải căn cứ để loại hồ sơ không?",
+        "Tôi tạo tin xong sao chưa thấy đăng?",
+        "Tôi có sửa được kết quả AI không?"
+      ],
+      "answers": [
+        "Mã dùng đúng một lần, mặc định hết hạn sau 2 giờ, gồm 6 ký tự chữ và số. Mã chỉ dành cho buổi phỏng vấn thật tại Kiosk.",
+        "Chỗ trong khung giờ đó được trả lại kho ngay, bạn chỉ cần gán lại một khung giờ khác cho ứng viên. Lý do báo bận hiện trên bảng gán lịch.",
+        "Buổi thử là không gian riêng của ứng viên, cố ý ẩn hoàn toàn với nhân sự. Bạn chỉ thấy cờ đánh dấu ứng viên đã dùng lượt thử hay chưa.",
+        "Không. Điểm này chỉ để tham khảo, ứng viên vẫn ứng tuyển được dù điểm thấp. Quyết định vẫn do người xét.",
+        "Tin do Chuyên viên tuyển dụng tạo nằm ở dạng nháp và cần HR Lead duyệt trước khi đăng.",
+        "Không. Chỉ HR Lead mới được Xác nhận hoặc Ghi đè kết quả cuối cùng."
+      ]
+    }
+  },
+  "support": {
+    "title": "Khi gặp sự cố",
+    "subtitle": "Vài tình huống hay gặp và hướng xử lý trước khi báo kỹ thuật",
+    "items": [
+      "Ứng viên nhập mã báo sai: kiểm tra mã đã dùng hoặc đã quá 2 giờ chưa, cấp mã mới nếu cần.",
+      "Kiosk không thấy micro hoặc camera: cho phép quyền truy cập trong trình duyệt rồi tải lại trang, màn kiểm tra thiết bị sẽ báo lại trạng thái.",
+      "Buổi phỏng vấn mất kết nối giữa chừng: phiên vẫn giữ nguyên, ứng viên vào lại là tiếp tục đúng chỗ đang dở.",
+      "Tải Playbook báo lỗi đọc file: kiểm tra file có phải PDF, DOCX, TXT hoặc MD không, và PDF có phải bản scan ảnh không — bản scan không trích được chữ.",
+      "Báo cáo đánh giá không có video: kiểm tra dòng ghi chú hạn lưu, quá 7 ngày là file đã tự xoá theo chính sách."
+    ]
+  }
+}

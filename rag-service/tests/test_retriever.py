@@ -23,6 +23,10 @@ def test_scope_weight_cv_jd_high():
 
 
 def test_scope_weight_playbook_by_scope():
+    # "org" là giá trị .NET THỰC SỰ ghi (PlaybookDocument.Scope). Trước đây bảng trọng số chỉ
+    # có khoá "company" nên ca này rơi về 0.8 — và chính test cũ cũng dùng "company" nên không
+    # ai phát hiện. Giữ cả hai khoá: "org" cho dữ liệu thật, "company" cho dữ liệu cũ nếu có.
+    assert _scope_weight(_cand("playbook", {"scope": "org"})) == 0.6
     assert _scope_weight(_cand("playbook", {"scope": "company"})) == 0.6
     assert _scope_weight(_cand("playbook", {"scope": "job_posting"})) == 1.0
     assert _scope_weight(_cand("playbook", {"scope": "round"})) == 1.0

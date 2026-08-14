@@ -53,7 +53,9 @@
     "filter": "Filter",
     "clear": "Clear",
     "markAllRead": "Mark all as read",
-    "seeAllNotifications": "See all notifications"
+    "seeAllNotifications": "See all notifications",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "status": {
     "active": "Active",

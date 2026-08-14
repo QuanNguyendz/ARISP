@@ -25,6 +25,9 @@ export interface EvaluationReport {
   recordingUrl?: string | null;
   recordingExpiresAt?: string | null;
   recordingDeletedAt?: string | null;
+  /** Điểm khớp CV-JD do Gemini chấm lúc ứng tuyển (ADR-030). Null = hồ sơ chưa có phân tích. */
+  cvMatchScore?: number | null;
+  cvMatchSummary?: string | null;
 }
 
 export interface CriterionScore {

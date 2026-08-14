@@ -1,0 +1,53 @@
+{
+  "title": "Phân công & tải tuyển dụng",
+  "subtitle": "Theo dõi tải của từng chuyên viên, phát hiện nút thắt và cân lại việc",
+  "loadError": "Không tải được danh sách chuyên viên tuyển dụng.",
+  "locked": "Đang khoá",
+  "slaBreach": "Tắc {{days}} ngày",
+  "reqLoad": "{{active}}/{{total}} tin đang tuyển",
+  "pipelineCount": "{{count}} hồ sơ đang chạy",
+  "stats": {
+    "recruiters": "Chuyên viên",
+    "activeJobs": "Tin đang tuyển",
+    "pipeline": "Hồ sơ đang chạy",
+    "breaching": "Người đang tắc"
+  },
+  "bottleneck": {
+    "drafts": "Chờ duyệt tin",
+    "draftsHint": "Tin nháp đang chờ HR Lead duyệt. Nút thắt này nằm ở phía bạn, không phải chuyên viên.",
+    "unscreened": "Chưa sàng hồ sơ",
+    "unscreenedHint": "Hồ sơ vừa nộp, chuyên viên chưa xem để quyết định có mời phỏng vấn hay không.",
+    "scheduling": "Chờ gán lịch",
+    "schedulingHint": "Đã qua sàng nhưng chưa được gán khung giờ phỏng vấn thật.",
+    "declined": "Cần gán lại",
+    "declinedHint": "Ứng viên đã báo bận, chỗ đã trả lại kho và đang chờ gán khung giờ khác.",
+    "reviews": "Chờ bạn xác nhận",
+    "reviewsHint": "AI đã chấm xong buổi phỏng vấn thật nhưng chưa ai xác nhận hay ghi đè kết quả."
+  },
+  "empty": {
+    "title": "Chưa có chuyên viên tuyển dụng nào",
+    "description": "Gửi yêu cầu cấp tài khoản để Super Admin duyệt, sau đó phân công tin cho họ.",
+    "action": "Yêu cầu cấp tài khoản"
+  },
+  "handover": {
+    "open": "Chuyển giao tin",
+    "title": "Chuyển giao tin tuyển dụng",
+    "subtitle": "Chuyển một tin đang do {{name}} phụ trách sang chuyên viên khác",
+    "jobLabel": "Tin cần chuyển",
+    "jobPlaceholder": "Chọn tin tuyển dụng...",
+    "jobCandidates": "{{count}} hồ sơ",
+    "loadingJobs": "Đang tải danh sách tin...",
+    "targetLabel": "Chuyển cho",
+    "targetPlaceholder": "Chọn chuyên viên nhận...",
+    "targetLoad": "{{jobs}} tin · {{pipeline}} hồ sơ",
+    "noTarget": "Không có chuyên viên nào khác đang hoạt động để nhận tin.",
+    "reasonLabel": "Lý do chuyển giao",
+    "reasonPlaceholder": "Ví dụ: cân lại tải, chuyên viên nghỉ phép...",
+    "reasonHint": "Lý do được lưu vào nhật ký hệ thống và gửi kèm thông báo cho cả hai bên.",
+    "pickJob": "Vui lòng chọn tin cần chuyển.",
+    "pickTarget": "Vui lòng chọn chuyên viên nhận.",
+    "cancel": "Huỷ",
+    "submit": "Chuyển giao",
+    "error": "Chuyển giao thất bại."
+  }
+}

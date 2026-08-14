@@ -181,7 +181,7 @@
 
 ## A3. Evaluation review + HR review (41)
 
-### GetEvaluationDetailQueryHandler (7)
+### GetEvaluationDetailQueryHandler (9)
 | Test | Kiểm chứng |
 |---|---|
 | Not_found_fails | id lạ → 'Evaluation not found'. |
@@ -191,6 +191,22 @@
 | Application_not_found_fails | App chưa seed → fail. |
 | Includes_hr_review_when_present | Có review → gồm final verdict + IsOverride. |
 | Resolves_recording_url_from_session | Real → resolve recording '/files/...' + expiry. |
+| Attaches_cv_jd_match_from_linked_analysis | Hồ sơ có `CvJdAnalysisId` → trả đúng `CvMatchScore`/`CvMatchSummary` của bản phân tích đó (màn duyệt trước đây vẽ cứng 87). |
+| Cv_match_is_null_when_application_has_no_analysis | Hồ sơ chưa phân tích → cả 2 trường null để FE ẩn thẻ thay vì bịa số. |
+
+### RecruiterWorkloadTests — Phân công & tải tuyển dụng (9)
+| Test | Kiểm chứng |
+|---|---|
+| No_recruiters_returns_empty | Chưa có recruiter nào → danh sách rỗng. |
+| Counts_req_load_and_stage_bottlenecks_with_age | Đếm đúng req load + 3 nhóm nút thắt kèm tuổi chờ; tin nháp KHÔNG tính vào tải đang tuyển; hồ sơ `pass` rời khỏi pipeline đang chạy. |
+| Scheduled_application_leaves_awaiting_scheduling_bucket | Đã gán lịch → rời nhóm "chờ gán lịch". |
+| Declined_booking_counts_until_rebooked | Ứng viên báo bận → nằm ở nhóm "cần gán lại" cho tới khi có lịch mới. |
+| Practice_evaluations_never_count_as_pending_review | Buổi THỬ không bao giờ vào hàng chờ duyệt của nhân sự (ADR-051); chỉ buổi thật, kèm tuổi chờ. |
+| Most_stalled_recruiter_sorts_first | Người tắc lâu nhất xếp đầu danh sách. |
+| Reassign_moves_ownership_and_notifies_both_sides | Chuyển giao ghi `CreatedByUserId` mới + 2 thông báo + 2 sự kiện realtime + AuditLog giữ lại người phụ trách cũ và lý do (không escape tiếng Việt). |
+| Reassign_rejects_non_recruiter_target | Không chuyển được cho HR Lead/Super Admin; chủ sở hữu giữ nguyên. |
+| Reassign_rejects_locked_target | Không chuyển vào tài khoản đang khoá — tin sẽ không ai xử lý được. |
+| Reassign_rejects_same_owner | Chuyển cho chính người đang phụ trách → lỗi, không ghi audit. |
 
 ### GetEvaluationsByApplicationQueryHandler (4)
 | Test | Kiểm chứng |
@@ -800,7 +816,7 @@
 |---|---|
 | Không session. | Failure 'Không tìm thấy phiên phỏng vấn.' (App thiếu → 'Không tìm thấy hồ sơ...'). |
 | Session + App owned by A → gọi bằng B, không kiosk. | Failure 'Bạn không có quyền truy cập...' |
-| REAL session, kiosk=true, providers throw. | Success (kiosk bypass); MaxDurationSeconds 2700 (45'), Deepgram/HeyGen null (nuốt lỗi). |
+| REAL session, kiosk=true, providers throw. | Success (kiosk bypass); MaxDurationSeconds 1200 (20' — trần gói LiveAvatar Essential), Deepgram/HeyGen null (nuốt lỗi). |
 | PRACTICE owned by A, PracticeUseAvatar=false. | Success; HeyGen null (không mint avatar practice); MaxDurationSeconds 1200 (20'). |
 
 ### B20. SendInterviewInviteCommand (`ApplicationCommands.cs`)

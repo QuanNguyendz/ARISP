@@ -1,8 +1,12 @@
 using System;
 using System.Linq;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Auth;
+using ARI.Application.Auth.Queries.GetRecruiters;
+using ARI.Application.Jobs.Commands.ReassignJob;
+using ARI.Application.Common;
 using ARI.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +24,56 @@ namespace ARI.API.Controllers
         public StaffProfileController(ISender sender)
         {
             _sender = sender;
+        }
+
+        /// <summary>GET /api/staff/profile — hồ sơ của chính người đang đăng nhập.</summary>
+        [HttpGet]
+        public async Task<IActionResult> GetProfile()
+        {
+            var userId = GetActorId();
+            if (userId == null) return Unauthorized();
+
+            var result = await _sender.Send(new GetStaffProfileQuery(userId.Value));
+            if (result.IsFailure) return NotFound(new { message = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        /// <summary>PUT /api/staff/profile — đổi họ tên / phòng ban. Email và vai trò không sửa được.</summary>
+        [HttpPut]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateStaffProfileRequest request)
+        {
+            var userId = GetActorId();
+            if (userId == null) return Unauthorized();
+
+            var result = await _sender.Send(new UpdateStaffProfileCommand(userId.Value, request.FullName, request.Department));
+            if (result.IsFailure)
+                return result.ErrorCode == CommonErrorCodes.NotFound
+                    ? NotFound(new { message = result.Error })
+                    : BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        /// <summary>POST /api/staff/profile/change-password — đổi, hoặc đặt lần đầu với tài khoản Google.</summary>
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangeStaffPasswordRequest request)
+        {
+            var userId = GetActorId();
+            if (userId == null) return Unauthorized();
+
+            var result = await _sender.Send(new ChangeStaffPasswordCommand(userId.Value, request.CurrentPassword, request.NewPassword));
+            if (result.IsFailure)
+            {
+                return result.ErrorCode switch
+                {
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    "wrong_current_password" => BadRequest(new { message = result.Error, code = "wrong_current_password" }),
+                    _ => BadRequest(new { message = result.Error }),
+                };
+            }
+
+            return Ok(new { message = result.Value, hasPassword = true });
         }
 
         [HttpGet("settings")]
@@ -44,6 +98,55 @@ namespace ARI.API.Controllers
             if (result.IsFailure) return NotFound(new { message = result.Error });
 
             return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// GET /api/staff/recruiters — danh sách Recruiter kèm khối lượng công việc, cho màn
+        /// "Quản lý Recruiter" của HR Lead. `HrManagement` = HR Admin hoặc Super Admin; Recruiter
+        /// không xem được danh sách đồng nghiệp. Chỉ đọc — mọi thao tác vòng đời tài khoản vẫn
+        /// nằm ở AdminController với policy SuperAdminOnly (ADR-023/041).
+        /// </summary>
+        [HttpGet("/api/staff/recruiters")]
+        [Authorize(Policy = "HrManagement")]
+        public async Task<IActionResult> GetRecruiters(CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetRecruitersQuery(), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        /// <summary>GET /api/staff/recruiters/{id}/jobs — tin người này đang phụ trách (để chọn khi chuyển giao).</summary>
+        [HttpGet("/api/staff/recruiters/{id:guid}/jobs")]
+        [Authorize(Policy = "HrManagement")]
+        public async Task<IActionResult> GetRecruiterJobs(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetRecruiterJobsQuery(id), ct);
+            if (result.IsFailure) return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// POST /api/staff/jobs/{id}/reassign — chuyển giao tin sang Recruiter khác (cân tải).
+        /// `HrManagement`: Recruiter không tự chuyển việc của mình cho người khác được.
+        /// </summary>
+        [HttpPost("/api/staff/jobs/{id:guid}/reassign")]
+        [Authorize(Policy = "HrManagement")]
+        public async Task<IActionResult> ReassignJob(Guid id, [FromBody] ReassignJobRequest request, CancellationToken ct)
+        {
+            var actorId = GetActorId();
+            if (actorId == null) return Unauthorized();
+
+            var result = await _sender.Send(
+                new ReassignJobCommand(id, request.ToRecruiterId, actorId.Value, request.Reason), ct);
+
+            if (result.IsFailure)
+                return result.ErrorCode == CommonErrorCodes.NotFound
+                    ? NotFound(new { message = result.Error })
+                    : BadRequest(new { message = result.Error });
+
+            return Ok(new { message = result.Value });
         }
 
         private Guid? GetActorId()

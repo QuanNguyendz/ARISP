@@ -33,6 +33,7 @@ import { provinceService } from '@/fservices/location/provinceService'
 import type { City } from '@/fservices/location/provinceService'
 import { profileService } from '@ari/shared/fservices/profile/profileService'
 import SearchableSelect from '@ari/shared/ui/SearchableSelect'
+import Select from '@ari/shared/ui/Select'
 import type { JobPosting } from '@ari/shared/types/job'
 
 // ============== CONSTANTS ==============
@@ -1230,22 +1231,33 @@ export default function FindJob() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-ink-600 font-medium">{t('jobs.sortBy')}:</span>
-              <select
+              <Select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 cursor-pointer"
-              >
-                <option value="newest">{t('jobs.sortNewest')}</option>
-                {profileSkills.length > 0 && (
-                  <option value="relevance">{t('jobs.sortRelevance')}</option>
-                )}
-                <option value="salary_desc" disabled={salaryIsNegotiable}>
-                  {salaryIsNegotiable ? t('jobs.sortSalaryHighDisabled') : t('jobs.sortSalaryHigh')}
-                </option>
-                <option value="salary_asc" disabled={salaryIsNegotiable}>
-                  {salaryIsNegotiable ? t('jobs.sortSalaryLowDisabled') : t('jobs.sortSalaryLow')}
-                </option>
-              </select>
+                onChange={(v) => setSortBy(v as typeof sortBy)}
+                ariaLabel={t('jobs.sortBy')}
+                align="right"
+                className="min-w-[11rem]"
+                options={[
+                  { value: 'newest', label: t('jobs.sortNewest') },
+                  ...(profileSkills.length > 0
+                    ? [{ value: 'relevance', label: t('jobs.sortRelevance') }]
+                    : []),
+                  {
+                    value: 'salary_desc',
+                    label: salaryIsNegotiable
+                      ? t('jobs.sortSalaryHighDisabled')
+                      : t('jobs.sortSalaryHigh'),
+                    disabled: salaryIsNegotiable,
+                  },
+                  {
+                    value: 'salary_asc',
+                    label: salaryIsNegotiable
+                      ? t('jobs.sortSalaryLowDisabled')
+                      : t('jobs.sortSalaryLow'),
+                    disabled: salaryIsNegotiable,
+                  },
+                ]}
+              />
             </div>
           </div>
 

@@ -9,10 +9,6 @@ import {
   type SupportedLanguage,
 } from '@ari/shared/i18n'
 
-// ===== LANDING (site-specific) =====
-import landingHomeVi from './locales/vi/modules/landing/home.json'
-import landingHomeEn from './locales/en/modules/landing/home.json'
-
 // ===== INTERVIEW MODULES =====
 import interviewRoomVi from './locales/vi/modules/interview/room.json'
 import interviewRoomEn from './locales/en/modules/interview/room.json'
@@ -52,7 +48,6 @@ import applyEn from './locales/en/modules/job-board/apply.json'
 export const resources = {
   vi: {
     ...sharedResources.vi,
-    'modules/landing/home': landingHomeVi,
     // Interview module
     'modules/interview/room': interviewRoomVi,
     'modules/interview/practice': interviewPracticeVi,
@@ -74,7 +69,6 @@ export const resources = {
   },
   en: {
     ...sharedResources.en,
-    'modules/landing/home': landingHomeEn,
     // Interview module
     'modules/interview/room': interviewRoomEn,
     'modules/interview/practice': interviewPracticeEn,
@@ -98,7 +92,6 @@ export const resources = {
 
 // Namespace riêng của site (namespace dùng chung nằm trong sharedNamespaces).
 const siteNamespaces = [
-  'modules/landing/home',
   'modules/interview/room',
   'modules/interview/practice',
   'modules/candidate',
