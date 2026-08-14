@@ -230,8 +230,9 @@ export default function HrLayout() {
             </Link>
           ))}
           <div className="pt-3 mt-3 border-t border-ink-100 dark:border-white/10"></div>
+          {/* Trước đây trỏ /hr/settings — bấm "Trợ giúp & tài liệu" lại ra trang Cài đặt. */}
           <Link
-            to="/hr/settings"
+            to="/hr/help"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
           >
             <CircleHelp className="w-[18px] h-[18px]" />

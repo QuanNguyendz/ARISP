@@ -38,6 +38,7 @@ const HrCandidateDetailPage = lazy(() => import('@/pages/hr/CandidateDetailPage'
 const HrEvaluationsPage = lazy(() => import('@/pages/hr/EvaluationReviewPage'))
 const HrReportsPage = lazy(() => import('@/pages/hr/ReportsPage'))
 const HrPlaybooksPage = lazy(() => import('@/pages/hr/PlaybooksPage'))
+const HrHelpPage = lazy(() => import('@/pages/hr/HelpPage'))
 const HrTeamPage = lazy(() => import('@/pages/hr/TeamPage'))
 const HrInterviewsPage = lazy(() => import('@/pages/hr/InterviewSessionsPage'))
 const HrJobDetailPage = lazy(() => import('@/pages/hr/JobPostingDetailPage'))
@@ -57,6 +58,7 @@ const RecruiterCandidateDetailPage = lazy(() => import('@/pages/recruiter/Candid
 const RecruiterEvaluationsPage = lazy(() => import('@/pages/recruiter/EvaluationReviewPage'))
 const RecruiterInterviewsPage = lazy(() => import('@/pages/recruiter/InterviewSessionsPage'))
 const RecruiterSettingsPage = lazy(() => import('@/pages/recruiter/SettingsPage'))
+const RecruiterHelpPage = lazy(() => import('@/pages/recruiter/HelpPage'))
 const RecruiterNotificationsPage = lazy(() => import('@/pages/recruiter/NotificationsPage'))
 
 const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
@@ -146,6 +148,7 @@ function App() {
             <Route path="/hr/evaluations" element={<HrEvaluationsPage />} />
             <Route path="/hr/reports" element={<HrReportsPage />} />
             <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
+            <Route path="/hr/help" element={<HrHelpPage />} />
             <Route path="/hr/team" element={<HrTeamPage />} />
             <Route path="/hr/interviews" element={<HrInterviewsPage />} />
             <Route path="/hr/notifications" element={<HrNotificationsPage />} />
@@ -178,6 +181,7 @@ function App() {
             <Route path="/recruiter/interviews" element={<RecruiterInterviewsPage />} />
             <Route path="/recruiter/notifications" element={<RecruiterNotificationsPage />} />
             <Route path="/recruiter/settings" element={<RecruiterSettingsPage />} />
+            <Route path="/recruiter/help" element={<RecruiterHelpPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/404" replace />} />

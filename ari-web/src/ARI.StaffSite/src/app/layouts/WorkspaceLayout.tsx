@@ -86,6 +86,8 @@ interface WorkspaceLayoutProps {
   primaryAction?: WorkspacePrimaryAction
   /** Đường dẫn trang cài đặt (hiện ở cuối sidebar + menu user) */
   settingsPath?: string
+  /** Đường dẫn trang Trợ giúp & tài liệu. Không truyền = ẩn mục này khỏi sidebar. */
+  helpPath?: string
   /** Đường dẫn trang thông báo đầy đủ (link "Xem tất cả" ở cuối dropdown chuông) */
   notificationsPath?: string
 }
@@ -141,6 +143,7 @@ export default function WorkspaceLayout({
   globalSearchScope,
   primaryAction,
   settingsPath,
+  helpPath,
   notificationsPath,
 }: WorkspaceLayoutProps) {
   const location = useLocation()
@@ -374,11 +377,14 @@ export default function WorkspaceLayout({
         </Link>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm font-medium">
           {renderNav()}
-          {settingsPath && (
+          {/* Mục này trước đây trỏ `settingsPath` — bấm "Trợ giúp & tài liệu" lại ra trang Cài đặt.
+              Nay dùng `helpPath` riêng; khu vực nào chưa có trang trợ giúp thì không truyền và
+              mục bị ẩn hẳn, tốt hơn là để một link dẫn sai chỗ. */}
+          {helpPath && (
             <>
               <div className="pt-3 mt-3 border-t border-ink-100 dark:border-white/10" />
               <Link
-                to={settingsPath}
+                to={helpPath}
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
               >
                 <CircleHelp className="w-[18px] h-[18px]" />

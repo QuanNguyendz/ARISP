@@ -20,6 +20,8 @@ import hrEvaluationsVi from './locales/vi/modules/hr/evaluations.json'
 import hrEvaluationsEn from './locales/en/modules/hr/evaluations.json'
 import hrReportsVi from './locales/vi/modules/hr/reports.json'
 import hrReportsEn from './locales/en/modules/hr/reports.json'
+import sharedHelpVi from './locales/vi/modules/shared/help.json'
+import sharedHelpEn from './locales/en/modules/shared/help.json'
 import hrPlaybooksVi from './locales/vi/modules/hr/playbooks.json'
 import hrPlaybooksEn from './locales/en/modules/hr/playbooks.json'
 import hrTeamVi from './locales/vi/modules/hr/team.json'
@@ -80,6 +82,7 @@ export const resources = {
     'modules/hr/candidates': hrCandidatesVi,
     'modules/hr/evaluations': hrEvaluationsVi,
     'modules/hr/reports': hrReportsVi,
+    'modules/shared/help': sharedHelpVi,
     'modules/hr/playbooks': hrPlaybooksVi,
     'modules/hr/team': hrTeamVi,
     'modules/hr/settings': hrSettingsVi,
@@ -114,6 +117,7 @@ export const resources = {
     'modules/hr/candidates': hrCandidatesEn,
     'modules/hr/evaluations': hrEvaluationsEn,
     'modules/hr/reports': hrReportsEn,
+    'modules/shared/help': sharedHelpEn,
     'modules/hr/playbooks': hrPlaybooksEn,
     'modules/hr/team': hrTeamEn,
     'modules/hr/settings': hrSettingsEn,
