@@ -476,7 +476,13 @@ namespace ARI.API.Controllers
 
             if (!isLocal && !allowedExternal)
             {
-                target = !string.IsNullOrEmpty(adminFrontend) ? adminFrontend : "/admin";
+                // Rơi về đây nghĩa là returnUrl không thuộc origin nào đã khai (cấu hình sai hoặc
+                // bị chèn). Phải trả về ĐÚNG trang callback của staff chứ không phải gốc site:
+                // `status`/`message` chỉ được đọc ở `/auth/callback`, ném vào `/` thì tham số rơi
+                // vào hư không — người dùng thấy trang chủ kèm query lạ, không có báo lỗi nào.
+                target = !string.IsNullOrEmpty(adminFrontend)
+                    ? $"{adminFrontend.TrimEnd('/')}/auth/callback"
+                    : "/auth/callback";
             }
 
             if (queryPairs != null && queryPairs.Length > 0)
