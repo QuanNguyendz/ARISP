@@ -17,7 +17,10 @@ export interface StaffProfile {
   hasPassword: boolean
 }
 
-/** Recruiter kèm khối lượng công việc — màn Quản lý Recruiter của HR Lead (chỉ đọc). */
+/**
+ * Tải tuyển dụng của một Recruiter — màn "Phân công & tải tuyển dụng" của HR Lead.
+ * Cấu trúc theo nghiệp vụ ATS: req load + nút thắt theo giai đoạn + tuổi chờ (SLA).
+ */
 export interface RecruiterOverview {
   id: string
   fullName: string
@@ -26,12 +29,31 @@ export interface RecruiterOverview {
   isActive: boolean
   lockReason?: string | null
   lastLoginAt?: string | null
-  createdAt: string
+
   jobsTotal: number
   jobsActive: number
-  jobsDraft: number
-  candidatesTotal: number
+
+  draftsAwaitingApproval: number
+  draftsOldestDays: number
+  applicationsUnscreened: number
+  unscreenedOldestDays: number
+  awaitingScheduling: number
+  awaitingSchedulingOldestDays: number
+  declinedNeedRebooking: number
   pendingReviews: number
+  pendingReviewsOldestDays: number
+
+  activePipeline: number
+  hired: number
+  oldestBottleneckDays: number
+}
+
+export interface RecruiterJobBrief {
+  id: string
+  title: string
+  status: string
+  candidates: number
+  createdAt: string
 }
 
 export const profileService = {
@@ -60,6 +82,18 @@ export const profileService = {
   },
   getRecruiters: async (): Promise<RecruiterOverview[]> => {
     const res = await apiClient.get('/staff/recruiters')
+    return res.data
+  },
+  getRecruiterJobs: async (recruiterId: string): Promise<RecruiterJobBrief[]> => {
+    const res = await apiClient.get(`/staff/recruiters/${recruiterId}/jobs`)
+    return res.data
+  },
+  /** Chuyển giao tin sang recruiter khác — thao tác cân tải của HR Lead. */
+  reassignJob: async (
+    jobId: string,
+    payload: { toRecruiterId: string; reason?: string }
+  ): Promise<{ message: string }> => {
+    const res = await apiClient.post(`/staff/jobs/${jobId}/reassign`, payload)
     return res.data
   },
 }

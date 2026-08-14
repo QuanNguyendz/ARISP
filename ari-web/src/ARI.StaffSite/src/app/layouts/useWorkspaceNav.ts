@@ -13,6 +13,7 @@ import {
   Activity,
   Shield,
   List,
+  Scale,
   LucideIcon,
 } from 'lucide-react'
 
@@ -37,6 +38,9 @@ export function useHrNav(): NavItem[] {
     { icon: Video, label: t('hr.interviews'), path: '/hr/interviews' },
     { icon: ClipboardCheck, label: t('hr.evaluations'), path: '/hr/evaluations' },
     { icon: BookOpen, label: t('hr.playbooks'), path: '/hr/playbooks' },
+    // Hai mục khác nhau, cố ý tách: "Phân công" là vận hành hằng ngày (ai đang gánh gì, chỗ nào
+    // tắc, chuyển giao tin); "Yêu cầu tài khoản" là hành chính (xin Super Admin cấp tài khoản mới).
+    { icon: Scale, label: t('hr.recruiters'), path: '/hr/recruiters' },
     { icon: UserCog, label: t('hr.team'), path: '/hr/team' },
     { icon: Settings, label: t('hr.settings'), path: '/hr/settings' },
   ]

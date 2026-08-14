@@ -40,6 +40,7 @@ const HrReportsPage = lazy(() => import('@/pages/hr/ReportsPage'))
 const HrPlaybooksPage = lazy(() => import('@/pages/hr/PlaybooksPage'))
 const HrHelpPage = lazy(() => import('@/pages/hr/HelpPage'))
 const HrTeamPage = lazy(() => import('@/pages/hr/TeamPage'))
+const HrRecruiterWorkloadPage = lazy(() => import('@/pages/hr/RecruiterWorkloadPage'))
 const HrInterviewsPage = lazy(() => import('@/pages/hr/InterviewSessionsPage'))
 const HrJobDetailPage = lazy(() => import('@/pages/hr/JobPostingDetailPage'))
 const HrSettingsPage = lazy(() => import('@/pages/hr/SettingsPage'))
@@ -150,6 +151,7 @@ function App() {
             <Route path="/hr/playbooks" element={<HrPlaybooksPage />} />
             <Route path="/hr/help" element={<HrHelpPage />} />
             <Route path="/hr/team" element={<HrTeamPage />} />
+            <Route path="/hr/recruiters" element={<HrRecruiterWorkloadPage />} />
             <Route path="/hr/interviews" element={<HrInterviewsPage />} />
             <Route path="/hr/notifications" element={<HrNotificationsPage />} />
             <Route path="/hr/settings" element={<HrSettingsPage />} />

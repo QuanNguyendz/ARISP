@@ -26,6 +26,8 @@ import sharedHelpVi from './locales/vi/modules/shared/help.json'
 import sharedHelpEn from './locales/en/modules/shared/help.json'
 import hrPlaybooksVi from './locales/vi/modules/hr/playbooks.json'
 import hrPlaybooksEn from './locales/en/modules/hr/playbooks.json'
+import hrRecruitersVi from './locales/vi/modules/hr/recruiters.json'
+import hrRecruitersEn from './locales/en/modules/hr/recruiters.json'
 import hrTeamVi from './locales/vi/modules/hr/team.json'
 import hrTeamEn from './locales/en/modules/hr/team.json'
 import hrCandidateDetailVi from './locales/vi/modules/hr/candidateDetail.json'
@@ -83,6 +85,7 @@ export const resources = {
     'modules/shared/settings': sharedSettingsVi,
     'modules/shared/help': sharedHelpVi,
     'modules/hr/playbooks': hrPlaybooksVi,
+    'modules/hr/recruiters': hrRecruitersVi,
     'modules/hr/team': hrTeamVi,
     'modules/hr/candidateDetail': hrCandidateDetailVi,
     'modules/hr/interviewSessions': hrInterviewSessionsVi,
@@ -117,6 +120,7 @@ export const resources = {
     'modules/shared/settings': sharedSettingsEn,
     'modules/shared/help': sharedHelpEn,
     'modules/hr/playbooks': hrPlaybooksEn,
+    'modules/hr/recruiters': hrRecruitersEn,
     'modules/hr/team': hrTeamEn,
     'modules/hr/candidateDetail': hrCandidateDetailEn,
     'modules/hr/interviewSessions': hrInterviewSessionsEn,
@@ -152,6 +156,7 @@ const siteNamespaces = [
   'modules/shared/settings',
   'modules/shared/help',
   'modules/hr/playbooks',
+  'modules/hr/recruiters',
   'modules/hr/team',
   'modules/hr/candidateDetail',
   'modules/hr/interviewSessions',
