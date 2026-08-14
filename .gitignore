@@ -69,6 +69,10 @@ docker/.env
 ari-web/src/*/.env
 !ari-web/src/*/.env.example
 
+# Dữ liệu của container Postgres chạy local (bind mount PGDATA_PATH=./pgdata — ADR-055).
+# Là thư mục dữ liệu thật của Postgres: không bao giờ commit.
+docker/pgdata/
+
 # Google OAuth credentials for MCP (Docs/Drive) – NEVER commit
 .secrets/
 

@@ -23,6 +23,11 @@ namespace ARI.Application
             configuration.GetSection("Scheduling").Bind(schedulingOptions);
             services.AddSingleton(schedulingOptions);
 
+            // Realtime tầng database (ADR-057) — bind section "Realtime" (LISTEN/NOTIFY của Postgres).
+            var realtimeOptions = new RealtimeOptions();
+            configuration.GetSection("Realtime").Bind(realtimeOptions);
+            services.AddSingleton(realtimeOptions);
+
             // CQRS: MediatR pipeline (thứ tự đăng ký = thứ tự chạy) + FluentValidation validators.
             services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
             services.AddMediatR(cfg =>
