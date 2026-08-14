@@ -1,0 +1,54 @@
+{
+  "title": "Cài đặt",
+  "description": "Quản lý hồ sơ và cài đặt cá nhân",
+  "tabsLabel": "Nhóm cài đặt",
+  "tabs": {
+    "profile": "Hồ sơ",
+    "notifications": "Thông báo",
+    "security": "Bảo mật"
+  },
+  "roles": {
+    "hr_admin": "HR Lead",
+    "recruiter": "Chuyên viên tuyển dụng",
+    "super_admin": "Super Admin"
+  },
+  "profile": {
+    "title": "Hồ sơ",
+    "fullName": "Họ tên",
+    "department": "Phòng ban",
+    "departmentPlaceholder": "Ví dụ: Tuyển dụng khối Công nghệ",
+    "email": "Email",
+    "emailLocked": "Email là danh tính đăng nhập, chỉ Super Admin thay đổi được.",
+    "role": "Vai trò",
+    "roleLocked": "Vai trò do Super Admin cấp.",
+    "saveChanges": "Lưu thay đổi",
+    "saved": "Đã lưu hồ sơ.",
+    "nameRequired": "Vui lòng nhập họ tên.",
+    "loadError": "Không tải được hồ sơ.",
+    "saveError": "Không lưu được hồ sơ."
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "email": {
+      "title": "Email thông báo",
+      "description": "Nhận email khi có ứng viên mới hoặc kết quả phỏng vấn"
+    },
+    "browser": {
+      "title": "Thông báo trong hệ thống",
+      "description": "Nhận thông báo trên biểu tượng chuông"
+    }
+  },
+  "security": {
+    "title": "Đổi mật khẩu",
+    "setTitle": "Đặt mật khẩu",
+    "googleOnlyHint": "Tài khoản của bạn đang đăng nhập bằng Google và chưa có mật khẩu. Đặt mật khẩu để đăng nhập được bằng cả hai cách.",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Nhập lại mật khẩu mới",
+    "rule": "Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.",
+    "changePassword": "Đổi mật khẩu",
+    "setPassword": "Đặt mật khẩu",
+    "mismatch": "Hai mật khẩu mới không khớp nhau.",
+    "changeError": "Không đổi được mật khẩu."
+  }
+}

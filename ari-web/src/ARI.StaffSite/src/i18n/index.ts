@@ -20,14 +20,14 @@ import hrEvaluationsVi from './locales/vi/modules/hr/evaluations.json'
 import hrEvaluationsEn from './locales/en/modules/hr/evaluations.json'
 import hrReportsVi from './locales/vi/modules/hr/reports.json'
 import hrReportsEn from './locales/en/modules/hr/reports.json'
+import sharedSettingsVi from './locales/vi/modules/shared/settings.json'
+import sharedSettingsEn from './locales/en/modules/shared/settings.json'
 import sharedHelpVi from './locales/vi/modules/shared/help.json'
 import sharedHelpEn from './locales/en/modules/shared/help.json'
 import hrPlaybooksVi from './locales/vi/modules/hr/playbooks.json'
 import hrPlaybooksEn from './locales/en/modules/hr/playbooks.json'
 import hrTeamVi from './locales/vi/modules/hr/team.json'
 import hrTeamEn from './locales/en/modules/hr/team.json'
-import hrSettingsVi from './locales/vi/modules/hr/settings.json'
-import hrSettingsEn from './locales/en/modules/hr/settings.json'
 import hrCandidateDetailVi from './locales/vi/modules/hr/candidateDetail.json'
 import hrCandidateDetailEn from './locales/en/modules/hr/candidateDetail.json'
 import hrInterviewSessionsVi from './locales/vi/modules/hr/interviewSessions.json'
@@ -46,8 +46,6 @@ import recruiterInterviewsVi from './locales/vi/modules/recruiter/interviews.jso
 import recruiterInterviewsEn from './locales/en/modules/recruiter/interviews.json'
 import recruiterEvaluationsVi from './locales/vi/modules/recruiter/evaluations.json'
 import recruiterEvaluationsEn from './locales/en/modules/recruiter/evaluations.json'
-import recruiterSettingsVi from './locales/vi/modules/recruiter/settings.json'
-import recruiterSettingsEn from './locales/en/modules/recruiter/settings.json'
 import recruiterJobDetailVi from './locales/vi/modules/recruiter/jobDetail.json'
 import recruiterJobDetailEn from './locales/en/modules/recruiter/jobDetail.json'
 import recruiterCandidateDetailVi from './locales/vi/modules/recruiter/candidateDetail.json'
@@ -82,10 +80,10 @@ export const resources = {
     'modules/hr/candidates': hrCandidatesVi,
     'modules/hr/evaluations': hrEvaluationsVi,
     'modules/hr/reports': hrReportsVi,
+    'modules/shared/settings': sharedSettingsVi,
     'modules/shared/help': sharedHelpVi,
     'modules/hr/playbooks': hrPlaybooksVi,
     'modules/hr/team': hrTeamVi,
-    'modules/hr/settings': hrSettingsVi,
     'modules/hr/candidateDetail': hrCandidateDetailVi,
     'modules/hr/interviewSessions': hrInterviewSessionsVi,
     'modules/hr/jobPostingDetail': hrJobPostingDetailVi,
@@ -95,7 +93,6 @@ export const resources = {
     'modules/recruiter/candidates': recruiterCandidatesVi,
     'modules/recruiter/interviews': recruiterInterviewsVi,
     'modules/recruiter/evaluations': recruiterEvaluationsVi,
-    'modules/recruiter/settings': recruiterSettingsVi,
     'modules/recruiter/jobDetail': recruiterJobDetailVi,
     'modules/recruiter/candidateDetail': recruiterCandidateDetailVi,
     'modules/recruiter/interviewCode': recruiterInterviewCodeVi,
@@ -117,10 +114,10 @@ export const resources = {
     'modules/hr/candidates': hrCandidatesEn,
     'modules/hr/evaluations': hrEvaluationsEn,
     'modules/hr/reports': hrReportsEn,
+    'modules/shared/settings': sharedSettingsEn,
     'modules/shared/help': sharedHelpEn,
     'modules/hr/playbooks': hrPlaybooksEn,
     'modules/hr/team': hrTeamEn,
-    'modules/hr/settings': hrSettingsEn,
     'modules/hr/candidateDetail': hrCandidateDetailEn,
     'modules/hr/interviewSessions': hrInterviewSessionsEn,
     'modules/hr/jobPostingDetail': hrJobPostingDetailEn,
@@ -130,7 +127,6 @@ export const resources = {
     'modules/recruiter/candidates': recruiterCandidatesEn,
     'modules/recruiter/interviews': recruiterInterviewsEn,
     'modules/recruiter/evaluations': recruiterEvaluationsEn,
-    'modules/recruiter/settings': recruiterSettingsEn,
     'modules/recruiter/jobDetail': recruiterJobDetailEn,
     'modules/recruiter/candidateDetail': recruiterCandidateDetailEn,
     'modules/recruiter/interviewCode': recruiterInterviewCodeEn,
@@ -153,9 +149,10 @@ const siteNamespaces = [
   'modules/hr/candidates',
   'modules/hr/evaluations',
   'modules/hr/reports',
+  'modules/shared/settings',
+  'modules/shared/help',
   'modules/hr/playbooks',
   'modules/hr/team',
-  'modules/hr/settings',
   'modules/hr/candidateDetail',
   'modules/hr/interviewSessions',
   'modules/hr/jobPostingDetail',
@@ -164,7 +161,6 @@ const siteNamespaces = [
   'modules/recruiter/candidates',
   'modules/recruiter/interviews',
   'modules/recruiter/evaluations',
-  'modules/recruiter/settings',
   'modules/recruiter/jobDetail',
   'modules/recruiter/candidateDetail',
   'modules/recruiter/interviewCode',
