@@ -50,6 +50,8 @@ export interface CandidateProfile {
   profileCvUrl?: string | null
   cvFileName?: string | null
   cvDownloadUrl?: string | null
+  /** Ảnh đại diện đã sẵn sàng hiển thị: ảnh tự tải lên hoặc ảnh lấy từ tài khoản Google. */
+  avatarUrl?: string | null
   emailVerified: boolean
   hasPassword: boolean
   cvReview?: CvReview | null
@@ -126,6 +128,18 @@ export const profileService = {
       // Phân tích Gemini chạy đồng bộ + retry backoff (503/429) → vượt timeout mặc định 30s.
       timeout: AI_REQUEST_TIMEOUT_MS,
     })
+    return data
+  },
+
+  /** Tải ảnh đại diện (JPG/PNG/WEBP, tối đa 2MB). Trả URL đã sẵn sàng hiển thị. */
+  async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
+    const formData = new FormData()
+    formData.append('avatarFile', file)
+    const { data } = await apiClient.post<{ avatarUrl: string }>(
+      '/portal/profile/avatar',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
     return data
   },
 

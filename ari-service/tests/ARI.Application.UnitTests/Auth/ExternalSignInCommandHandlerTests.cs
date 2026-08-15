@@ -156,6 +156,71 @@ public class CompleteExternalCandidateSignInCommandHandlerTests
     }
 
     [Fact]
+    public async Task Jit_lay_anh_dai_dien_tu_google()
+    {
+        var uow = new InMemoryUnitOfWork();
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("https://lh3.googleusercontent.com/a/abc", Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Anh_google_chi_dien_vao_cho_trong_khong_de_anh_tu_tai_len()
+    {
+        // Ứng viên đã tự chọn ảnh — mỗi lần đăng nhập Google không được đạp mất lựa chọn đó.
+        var cand = new CandidateAccount
+        {
+            Email = "me@example.io",
+            EmailVerified = true,
+            AvatarUrl = "avatars/anh-toi-tu-chon.png",
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("avatars/anh-toi-tu-chon.png", cand.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Tai_khoan_chua_co_anh_thi_nhan_anh_google()
+    {
+        var cand = new CandidateAccount { Email = "me@example.io", EmailVerified = true, AvatarUrl = null };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("https://lh3.googleusercontent.com/a/abc", cand.AvatarUrl);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("avatars/gia-mao.png")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task Picture_khong_phai_url_http_bi_bo_qua(string? picture)
+    {
+        // Cột AvatarUrl dùng chung cho cả storageKey, nên giá trị lạ lọt vào sẽ bị hiểu nhầm
+        // thành khoá file khi dựng URL hiển thị.
+        var uow = new InMemoryUnitOfWork();
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", picture), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Null(Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
+    }
+
+    [Fact]
     public async Task Google_signin_wipes_password_set_on_an_unverified_account()
     {
         // Chiếm tài khoản trước: kẻ xấu đăng ký form web bằng email nạn nhân và đặt mật khẩu của hắn.

@@ -15,7 +15,9 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
     /// Đuôi nghiệp vụ của Google OAuth callback cho CANDIDATE: KHÔNG validate domain,
     /// JIT tạo CandidateAccount nếu chưa có (ứng viên đăng ký tự do), mint token.
     /// </summary>
-    public record CompleteExternalCandidateSignInCommand(string Email, string? Name) : IRequest<Result<ExternalSignInTokens>>;
+    /// <param name="Picture">URL ảnh đại diện Google (claim "picture") — dùng làm ảnh ban đầu, tuỳ chọn.</param>
+    public record CompleteExternalCandidateSignInCommand(string Email, string? Name, string? Picture = null)
+        : IRequest<Result<ExternalSignInTokens>>;
 
     public class CompleteExternalCandidateSignInCommandHandler
         : IRequestHandler<CompleteExternalCandidateSignInCommand, Result<ExternalSignInTokens>>
@@ -44,6 +46,7 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
                     PasswordHash = string.Empty,
                     FullName = string.IsNullOrWhiteSpace(request.Name) ? email.Split('@')[0] : request.Name,
                     EmailVerified = true,
+                    AvatarUrl = NormalizePicture(request.Picture),
                     LastLoginAt = DateTimeOffset.UtcNow
                 };
                 await _unitOfWork.Repository<CandidateAccount>().AddAsync(candidate, ct);
@@ -77,6 +80,11 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
                     candidate.EmailVerified = true;
                 }
 
+                // Ảnh Google chỉ ĐIỀN VÀO CHỖ TRỐNG, không bao giờ ghi đè: ứng viên đã tự tải ảnh lên
+                // thì mỗi lần đăng nhập Google sẽ đạp mất lựa chọn của họ.
+                if (string.IsNullOrWhiteSpace(candidate.AvatarUrl))
+                    candidate.AvatarUrl = NormalizePicture(request.Picture);
+
                 _unitOfWork.Repository<CandidateAccount>().Update(candidate);
                 await _unitOfWork.SaveChangesAsync();
             }
@@ -85,6 +93,20 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
             var refreshToken = await AuthSupport.IssueRefreshTokenForCandidateAsync(_unitOfWork, candidate.Id, ct);
 
             return Result.Success(new ExternalSignInTokens(token, refreshToken, AppRoles.Candidate));
+        }
+
+        /// <summary>
+        /// Chỉ nhận URL http(s) tuyệt đối. Cột <c>AvatarUrl</c> dùng chung cho cả storageKey của ảnh tự
+        /// tải lên, nên một giá trị lạ lọt vào đây sẽ bị hiểu nhầm thành khoá file khi dựng URL.
+        /// </summary>
+        private static string? NormalizePicture(string? picture)
+        {
+            if (string.IsNullOrWhiteSpace(picture)) return null;
+            var trimmed = picture.Trim();
+            return Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                    ? trimmed
+                    : null;
         }
     }
 }

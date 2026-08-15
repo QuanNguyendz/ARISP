@@ -207,6 +207,8 @@ namespace ARI.API.Controllers
             var externalPrincipal = result.Principal;
             var rawEmail = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email || c.Type == "email")?.Value;
             var name = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name || c.Type == "name")?.Value;
+            // Ảnh đại diện Google (claim map trong DependencyInjection). Chỉ dùng làm ảnh ban đầu.
+            var picture = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == "picture")?.Value;
 
             if (string.IsNullOrEmpty(rawEmail))
             {
@@ -215,7 +217,7 @@ namespace ARI.API.Controllers
                 return Redirect(noEmailUrl);
             }
 
-            var signIn = await _sender.Send(new CompleteExternalCandidateSignInCommand(rawEmail, name));
+            var signIn = await _sender.Send(new CompleteExternalCandidateSignInCommand(rawEmail, name, picture));
             await HttpContext.SignOutAsync("External");
 
             if (signIn.IsFailure)

@@ -13,6 +13,12 @@ namespace ARI.Domain.Entities
         public string? ProfileCvUrl { get; set; }
         public string? ProfileCvFileName { get; set; }   // Tên file CV gốc (hiển thị + gợi ý tên khi tải về)
 
+        // Ảnh đại diện. Chứa MỘT TRONG HAI dạng:
+        //   - storageKey của file ứng viên tự tải lên (IFileStorageService, thư mục avatars/)
+        //   - URL tuyệt đối http(s) lấy từ tài khoản Google lúc đăng nhập (claim "picture")
+        // Phân biệt bằng tiền tố "http" khi dựng URL trả về cho client.
+        public string? AvatarUrl { get; set; }
+
         // Hồ sơ cá nhân mở rộng (Candidate Profile)
         public string? Location { get; set; }                // Chuỗi hiển thị gộp "Phường X, Tỉnh Y" (denormalized)
         // Địa giới hành chính theo Provinces Open API v2 (sau sáp nhập 07/2025): 2 cấp Tỉnh → Phường/Xã
