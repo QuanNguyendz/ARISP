@@ -20,7 +20,14 @@ public sealed class RecordingNotificationService : INotificationService
     /// <summary>Nếu true: mọi Publish* ném lỗi (mô phỏng SignalR chết) để test đường best-effort.</summary>
     public bool ThrowOnPublish { get; set; }
 
-    public Task SendEmailAsync(string toEmail, string subject, string content, CancellationToken ct = default) => Task.CompletedTask;
+    /// <summary>Thư đã gửi qua kênh notification (vd thư mời phỏng vấn kèm lịch) — để assert nội dung.</summary>
+    public List<(string To, string Subject, string Body)> Emails { get; } = new();
+
+    public Task SendEmailAsync(string toEmail, string subject, string content, CancellationToken ct = default)
+    {
+        Emails.Add((toEmail, subject, content));
+        return Task.CompletedTask;
+    }
     public Task SendSlackNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
     public Task SendTeamsNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
     public Task PublishInterviewSessionEventAsync(Guid sessionId, string eventType, object payload, CancellationToken ct = default)

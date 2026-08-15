@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
-import { Shield, Webhook, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
+import { Shield, Webhook, MapPin, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
 import { PageHeader, ErrorAlert } from '@ari/shared/ui'
 import { adminService, type SystemSettingItem } from '@/fservices/admin'
 import { SettingsSkeleton } from './_skeletons'
 
-type TabId = 'auth' | 'integrations'
+type TabId = 'auth' | 'interview' | 'integrations'
 
 const SETTING_KEYS = {
   allowedEmailDomains: 'allowed_email_domains',
+  // Địa điểm phỏng vấn — in vào thư mời gửi ứng viên (single-tenant: một văn phòng dùng chung).
+  interviewLocationAddress: 'interview_location_address',
+  interviewLocationDirections: 'interview_location_directions',
+  interviewLocationMapUrl: 'interview_location_map_url',
   atsWebhookUrl: 'ats_webhook_url',
   atsWebhookSecret: 'ats_webhook_secret',
   slackWebhookUrl: 'slack_webhook_url',
@@ -72,6 +76,9 @@ export default function SuperAdminSettingsPage() {
       },
     ]
     ;[
+      SETTING_KEYS.interviewLocationAddress,
+      SETTING_KEYS.interviewLocationDirections,
+      SETTING_KEYS.interviewLocationMapUrl,
       SETTING_KEYS.atsWebhookUrl,
       SETTING_KEYS.atsWebhookSecret,
       SETTING_KEYS.slackWebhookUrl,
@@ -80,7 +87,9 @@ export default function SuperAdminSettingsPage() {
       items.push({
         key: k,
         value: values[k] || '',
-        description: t(`integrations.descriptions.${k}`),
+        description: k.startsWith('interview_')
+          ? t(`interview.descriptions.${k}`)
+          : t(`integrations.descriptions.${k}`),
       })
     })
     return items
@@ -103,6 +112,7 @@ export default function SuperAdminSettingsPage() {
 
   const tabs = [
     { id: 'auth' as const, label: t('tabs.auth'), icon: Shield },
+    { id: 'interview' as const, label: t('tabs.interview'), icon: MapPin },
     { id: 'integrations' as const, label: t('tabs.integrations'), icon: Webhook },
   ]
 
@@ -239,6 +249,81 @@ export default function SuperAdminSettingsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {tab === 'interview' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+                    {t('interview.title')}
+                  </h3>
+                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                    {t('interview.description')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                    {t('interview.address')}
+                  </label>
+                  <input
+                    type="text"
+                    value={values[SETTING_KEYS.interviewLocationAddress] || ''}
+                    onChange={(e) =>
+                      setValues({
+                        ...values,
+                        [SETTING_KEYS.interviewLocationAddress]: e.target.value,
+                      })
+                    }
+                    placeholder={t('interview.addressPlaceholder')}
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-ink-400">{t('interview.addressHint')}</p>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                    {t('interview.directions')}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={values[SETTING_KEYS.interviewLocationDirections] || ''}
+                    onChange={(e) =>
+                      setValues({
+                        ...values,
+                        [SETTING_KEYS.interviewLocationDirections]: e.target.value,
+                      })
+                    }
+                    placeholder={t('interview.directionsPlaceholder')}
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-ink-400">{t('interview.directionsHint')}</p>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                    {t('interview.mapUrl')}
+                  </label>
+                  <input
+                    type="url"
+                    value={values[SETTING_KEYS.interviewLocationMapUrl] || ''}
+                    onChange={(e) =>
+                      setValues({
+                        ...values,
+                        [SETTING_KEYS.interviewLocationMapUrl]: e.target.value,
+                      })
+                    }
+                    placeholder="https://maps.app.goo.gl/..."
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-ink-400">{t('interview.mapUrlHint')}</p>
+                </div>
+
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-3 text-xs text-amber-800 dark:text-amber-300">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{t('interview.notice')}</span>
+                </div>
               </div>
             )}
 

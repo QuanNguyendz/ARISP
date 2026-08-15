@@ -118,12 +118,20 @@ namespace ARI.Application.CandidatePortal
                     .GroupBy(s => s.Id)
                     .ToDictionary(g => g.Key, g => g.First());
 
-                // Tổng số vòng theo cấu hình job — mốc để biết khi nào mới là "Đạt" (ADR-053).
-                var roundConfigCounts = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                // Cấu hình vòng của các job liên quan — dùng cho cả tổng số vòng (mốc "Đạt", ADR-053)
+                // lẫn LOẠI vòng (vòng trắc nghiệm không có phỏng vấn thử).
+                var roundConfigRows = (await _unitOfWork.Repository<InterviewRoundConfig>()
                         .QueryAsync(q => q.Where(r => jobIds.Contains(r.JobPostingId))
-                            .Select(r => new { r.JobPostingId, r.RoundNumber })))
+                            .Select(r => new { r.JobPostingId, r.RoundNumber, r.RoundType })))
+                    .ToList();
+
+                var roundConfigCounts = roundConfigRows
                     .GroupBy(r => r.JobPostingId)
                     .ToDictionary(g => g.Key, g => Math.Max(1, g.Max(x => x.RoundNumber)));
+
+                var roundTypeByJobRound = roundConfigRows
+                    .GroupBy(r => (r.JobPostingId, r.RoundNumber))
+                    .ToDictionary(g => g.Key, g => g.First().RoundType);
 
                 // Lời mời theo vòng — để xác định "vòng đang hoạt động" (vòng được mời mới nhất).
                 var invites = appIds.Count > 0
@@ -153,6 +161,9 @@ namespace ARI.Application.CandidatePortal
                         bool practiceUsedForRound = maxPractice > 0
                             && allSessions.Count(s => s.ApplicationId == a.Id && s.SessionType == "practice" && s.RoundNumber == activeRound) >= maxPractice;
                         bool realDoneForRound = allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real" && s.RoundNumber == activeRound);
+                        // Vòng trắc nghiệm không hỗ trợ phỏng vấn thử — không hiện lối vào ngay từ đầu.
+                        roundTypeByJobRound.TryGetValue((a.JobPostingId, activeRound), out var activeRoundType);
+                        bool onlineTestRound = ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(activeRoundType);
 
                         // Số vòng THẬT đã được HR xác nhận Đạt — dựng nhãn "Qua vòng N/M" (ADR-053).
                         var totalRounds = roundConfigCounts.TryGetValue(a.JobPostingId, out var tr) ? tr : 1;
@@ -246,7 +257,7 @@ namespace ARI.Application.CandidatePortal
                             a.PracticeSessionUsed,
                             // ADR-038: phỏng vấn thử mở cho ứng viên ĐÃ QUA vòng CV, tính theo TỪNG VÒNG
                             // (1 lượt/vòng) — vòng kế mở lại thử khi được mời lên vòng đó.
-                            PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound,
+                            PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound && !onlineTestRound,
                             ActiveRound = activeRound,
                             TotalRounds = totalRounds,
                             PassedRounds = passedRounds,

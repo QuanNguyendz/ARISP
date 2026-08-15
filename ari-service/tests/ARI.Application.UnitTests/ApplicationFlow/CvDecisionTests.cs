@@ -11,14 +11,13 @@ using Xunit;
 namespace ARI.Application.UnitTests.ApplicationFlow;
 
 /// <summary>
-/// Quyết định vòng duyệt CV (ADR-048): mời phỏng vấn (<see cref="ApplicationService.SendInterviewInviteAsync"/>),
-/// duyệt (<see cref="ApplicationService.AcceptApplicationAsync"/> → screening + tạo InterviewInvite + chuông,
-/// KHÔNG gửi email — email gộp gửi 1 lần khi gán lịch) và từ chối
+/// Quyết định vòng duyệt CV (ADR-048/059): mở vòng (<see cref="ApplicationService.OpenRoundForSchedulingAsync"/>
+/// → screening + đánh dấu vòng đang hoạt động, KHÔNG gửi email — thư mời kèm giờ hẹn do bước xếp lịch gửi),
+/// duyệt (<see cref="ApplicationService.AcceptApplicationAsync"/>) và từ chối
 /// (<see cref="ApplicationService.RejectApplicationAsync"/> → cv_rejected + thư cảm ơn).
 /// </summary>
 public class CvDecisionTests
 {
-    private const string BaseUrl = "https://portal.test";
     private readonly Guid _accountId = Guid.NewGuid();
 
     private (InMemoryUnitOfWork uow, RecordingNotificationService notif, RecordingEmailService email, ARI.Domain.Entities.Application app, JobPosting job)
@@ -33,24 +32,24 @@ public class CvDecisionTests
     private static ApplicationService Svc(InMemoryUnitOfWork uow, RecordingNotificationService notif, RecordingEmailService email)
         => ApplicationServiceFactory.Create(uow, notif, email, new RecordingRagIngestionService());
 
-    // ---------- SendInterviewInviteAsync ----------
+    // ---------- OpenRoundForSchedulingAsync ----------
 
     [Fact]
-    public async Task Send_invite_app_not_found_fails()
+    public async Task Open_round_app_not_found_fails()
     {
         var res = await Svc(new InMemoryUnitOfWork(), new RecordingNotificationService(), new RecordingEmailService())
-            .SendInterviewInviteAsync(Guid.NewGuid(), BaseUrl, 1, CancellationToken.None);
+            .OpenRoundForSchedulingAsync(Guid.NewGuid(), 1, CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Không tìm thấy hồ sơ", res.Error);
     }
 
     [Fact]
-    public async Task Send_invite_creates_invite_promotes_to_screening_and_emails()
+    public async Task Open_round_creates_invite_and_promotes_to_screening_without_email()
     {
         var (uow, notif, email, app, _) = Seed(status: "cv_submitted", ttlHours: 10);
 
-        var res = await Svc(uow, notif, email).SendInterviewInviteAsync(app.Id, BaseUrl, 1, CancellationToken.None);
+        var res = await Svc(uow, notif, email).OpenRoundForSchedulingAsync(app.Id, 1, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         var invite = Assert.Single(uow.Repo<InterviewInvite>().Items);
@@ -58,29 +57,29 @@ public class CvDecisionTests
         Assert.False(string.IsNullOrEmpty(invite.TokenHash));
         Assert.True(invite.ExpiresAt > DateTimeOffset.UtcNow.AddHours(9)); // TTL theo job (10h)
         Assert.Equal("screening", app.Status);
-        Assert.Single(email.Sent);
+        Assert.Empty(email.Sent); // ADR-059: mở vòng không gửi thư; thư mời kèm giờ hẹn do bước xếp lịch gửi
     }
 
     [Fact]
-    public async Task Send_invite_deletes_old_unused_invite_of_same_round()
+    public async Task Open_round_deletes_old_unused_invite_of_same_round()
     {
         var (uow, notif, email, app, _) = Seed();
         var old = new InterviewInvite { ApplicationId = app.Id, RoundNumber = 1, TokenHash = "OLD", ScheduledAt = null };
         uow.Seed(old);
 
-        await Svc(uow, notif, email).SendInterviewInviteAsync(app.Id, BaseUrl, 1, CancellationToken.None);
+        await Svc(uow, notif, email).OpenRoundForSchedulingAsync(app.Id, 1, CancellationToken.None);
 
         var invite = Assert.Single(uow.Repo<InterviewInvite>().Items); // cũ chưa dùng bị xoá, chỉ còn 1 mới
         Assert.NotEqual("OLD", invite.TokenHash);
     }
 
     [Fact]
-    public async Task Send_invite_keeps_already_scheduled_invite()
+    public async Task Open_round_keeps_already_scheduled_invite()
     {
         var (uow, notif, email, app, _) = Seed();
         uow.Seed(new InterviewInvite { ApplicationId = app.Id, RoundNumber = 1, TokenHash = "SCHEDULED", ScheduledAt = DateTimeOffset.UtcNow });
 
-        await Svc(uow, notif, email).SendInterviewInviteAsync(app.Id, BaseUrl, 1, CancellationToken.None);
+        await Svc(uow, notif, email).OpenRoundForSchedulingAsync(app.Id, 1, CancellationToken.None);
 
         var round1 = uow.Repo<InterviewInvite>().Items.Where(i => i.RoundNumber == 1).ToList();
         Assert.Equal(2, round1.Count); // invite đã đặt lịch được giữ, thêm 1 invite mới
@@ -93,7 +92,7 @@ public class CvDecisionTests
     public async Task Accept_app_not_found_fails()
     {
         var res = await Svc(new InMemoryUnitOfWork(), new RecordingNotificationService(), new RecordingEmailService())
-            .AcceptApplicationAsync(Guid.NewGuid(), BaseUrl, CancellationToken.None);
+            .AcceptApplicationAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Không tìm thấy hồ sơ", res.Error);
@@ -104,7 +103,7 @@ public class CvDecisionTests
     {
         var (uow, notif, email, app, _) = Seed(status: "interview");
 
-        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, BaseUrl, CancellationToken.None);
+        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Chỉ có thể duyệt", res.Error);
@@ -116,7 +115,7 @@ public class CvDecisionTests
     {
         var (uow, notif, email, app, _) = Seed(status: "cv_submitted", accountId: _accountId);
 
-        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, BaseUrl, CancellationToken.None);
+        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("screening", app.Status);
@@ -132,7 +131,7 @@ public class CvDecisionTests
     {
         var (uow, notif, email, app, _) = Seed(status: "invited");
 
-        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, BaseUrl, CancellationToken.None);
+        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("screening", app.Status);

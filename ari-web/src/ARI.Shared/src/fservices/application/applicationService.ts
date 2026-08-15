@@ -71,12 +71,16 @@ export const applicationService = {
     return data
   },
 
-  async sendInvite(applicationId: string): Promise<void> {
-    await apiClient.post(`/applications/${applicationId}/send-invite`)
-  },
-
-  async acceptApplication(applicationId: string): Promise<void> {
-    await apiClient.post(`/applications/${applicationId}/accept`)
+  /**
+   * Duyệt CV KÈM khung giờ vòng 1 — backend chốt chỗ rồi gửi thư mời phỏng vấn có giờ hẹn.
+   * `slotId` là bắt buộc: duyệt suông sẽ để ứng viên không nhận được thư nào.
+   */
+  async acceptApplication(applicationId: string, slotId: string): Promise<{ bookingId: string }> {
+    const { data } = await apiClient.post<{ bookingId: string }>(
+      `/applications/${applicationId}/accept`,
+      { slotId }
+    )
+    return data
   },
 
   async rejectApplication(applicationId: string): Promise<void> {

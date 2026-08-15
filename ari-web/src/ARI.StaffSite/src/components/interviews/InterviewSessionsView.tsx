@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
 import { Briefcase, CalendarDays, ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react'
@@ -7,7 +8,7 @@ import { interviewService, type InterviewSlotDetail } from '@ari/shared/fservice
 import { JobCard } from './JobCard'
 import { interviewKeys } from './interviewQueryKeys'
 import { fmtDate, isSameDay } from './format'
-import { WORKSPACES, type WorkspaceVariant } from './workspaceConfig'
+import { INTERVIEWS_NS, WORKSPACES, type WorkspaceVariant } from './workspaceConfig'
 
 const PAGE_SIZE = 5
 
@@ -20,6 +21,7 @@ const PAGE_SIZE = 5
  * và đường dẫn — xem `workspaceConfig.ts`.
  */
 export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }) {
+  const { t } = useTranslation(INTERVIEWS_NS)
   const workspace = WORKSPACES[variant]
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -66,7 +68,7 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
     placeholderData: keepPreviousData,
   })
 
-  const error = fetchError ? 'Không tải được danh sách vị trí phỏng vấn. Vui lòng thử lại.' : null
+  const error = fetchError ? t('view.loadError') : null
 
   const statusFiltered = useMemo(() => {
     let list = jobs
@@ -114,16 +116,16 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
 
   return (
     <div className="p-6 lg:p-8 bg-ink-50 dark:bg-ink-950 min-h-screen">
-      <PageHeader title={workspace.title} description={workspace.description} />
+      <PageHeader title={t(workspace.titleKey)} description={t(workspace.descriptionKey)} />
 
       {error && <ErrorAlert message={error} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: workspace.jobsStatLabel, value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
-          { label: 'Tổng ca phỏng vấn', value: totalSlots, color: 'text-brand-600 dark:text-brand-400' },
-          { label: 'Ứng viên đang giữ chỗ', value: totalBooked, color: 'text-ai-600 dark:text-ai-400' },
-          { label: 'Ứng viên đã xác nhận', value: totalConfirmed, color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: t(workspace.jobsStatKey), value: jobs.length, color: 'text-blue-600 dark:text-blue-400' },
+          { label: t('stats.slots'), value: totalSlots, color: 'text-brand-600 dark:text-brand-400' },
+          { label: t('stats.booked'), value: totalBooked, color: 'text-ai-600 dark:text-ai-400' },
+          { label: t('stats.confirmed'), value: totalConfirmed, color: 'text-emerald-600 dark:text-emerald-400' },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -141,7 +143,7 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
           <input
             value={search}
             onChange={(e) => updateParam('search', e.target.value)}
-            placeholder={workspace.searchPlaceholder}
+            placeholder={t(workspace.searchPlaceholderKey)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
           />
         </div>
@@ -158,7 +160,7 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
             {dateFilter && (
               <button
                 onClick={() => updateParam('date', '')}
-                title="Xóa lọc ngày"
+                title={t('view.clearDateTitle')}
                 className="absolute right-2 p-1 text-ink-400 hover:text-ink-600 dark:hover:text-white"
               >
                 <X className="w-3.5 h-3.5" />
@@ -172,8 +174,8 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
               value={jobStatusFilter}
               onChange={(v) => updateParam('status', v)}
               options={[
-                { value: 'active', label: 'Vị trí đang tuyển dụng' },
-                { value: 'closed', label: 'Vị trí đã đóng tuyển' },
+                { value: 'active', label: t('view.statusActive') },
+                { value: 'closed', label: t('view.statusClosed') },
               ]}
               className="min-w-[12rem]"
               buttonClassName="px-3 py-2 text-xs font-semibold"
@@ -187,13 +189,15 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 shrink-0" />
             <span>
-              Đang lọc các vị trí &amp; ca phỏng vấn diễn ra vào ngày{' '}
+              {t('view.dateBanner')}{' '}
               <strong className="underline">{fmtDate(dateFilter)}</strong>
             </span>
-            {loadingSlotsForFilter && <span className="text-[11px] italic animate-pulse">(Đang quét danh sách ca...)</span>}
+            {loadingSlotsForFilter && (
+              <span className="text-[11px] italic animate-pulse">{t('view.scanning')}</span>
+            )}
           </div>
           <button onClick={() => updateParam('date', '')} className="font-semibold text-brand-800 hover:underline">
-            Xóa lọc
+            {t('view.clearDate')}
           </button>
         </div>
       )}
@@ -218,8 +222,10 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Briefcase className="w-7 h-7 text-ink-400" />}
-          title={jobs.length === 0 ? workspace.emptyTitleNoJobs : 'Không tìm thấy vị trí phù hợp'}
-          description={jobs.length === 0 ? workspace.emptyDescriptionNoJobs : 'Thử thay đổi từ khóa hoặc bộ lọc.'}
+          title={jobs.length === 0 ? t(workspace.emptyTitleKey) : t('view.noMatchTitle')}
+          description={
+            jobs.length === 0 ? t(workspace.emptyDescriptionKey) : t('view.noMatchDescription')
+          }
         />
       ) : (
         <>
@@ -232,14 +238,19 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
           {totalPages > 1 && (
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-ink-200 dark:border-white/10">
               <p className="text-xs text-ink-500 dark:text-ink-400 font-medium">
-                Hiển thị {paginatedJobs.length} trên tổng số {filtered.length} vị trí (Trang {currentPage}/{totalPages})
+                {t('view.pagination', {
+                  shown: paginatedJobs.length,
+                  total: filtered.length,
+                  page: currentPage,
+                  pages: totalPages,
+                })}
               </p>
               <div className="flex items-center gap-1.5">
                 <button
                   disabled={currentPage === 1}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   className="p-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 transition-colors"
-                  title="Trang trước"
+                  title={t('view.prevPage')}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -262,7 +273,7 @@ export function InterviewSessionsView({ variant }: { variant: WorkspaceVariant }
                   disabled={currentPage === totalPages}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   className="p-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 disabled:opacity-40 transition-colors"
-                  title="Trang sau"
+                  title={t('view.nextPage')}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

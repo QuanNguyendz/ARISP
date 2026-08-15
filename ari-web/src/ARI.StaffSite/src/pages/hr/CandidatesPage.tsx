@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState, Fragment } from 'react'
+import { useEffect, useMemo, useState, Fragment } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Mail, Eye, Loader2, ChevronRight, ChevronDown, Calendar, Briefcase, X, Phone, FileText, User, UserCheck, Lock, GraduationCap, Award, Globe, Link2 } from 'lucide-react'
+import { Search, Mail, Eye, ChevronRight, ChevronDown, Calendar, Briefcase, X, Phone, FileText, User, UserCheck, Lock, GraduationCap, Award, Globe, Link2 } from 'lucide-react'
 import {
   PageHeader,
   StatsGrid,
@@ -149,7 +149,6 @@ export default function CandidatesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [invitingId, setInvitingId] = useState<string | null>(null)
   const [selectedProfileApp, setSelectedProfileApp] = useState<HrApplicationItem | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -303,21 +302,6 @@ export default function CandidatesPage() {
     [groupedCandidates, page]
   )
 
-
-  const handleInvite = async (e: React.MouseEvent, app: HrApplicationItem) => {
-    e.stopPropagation()
-    setNotice('')
-    setError('')
-    setInvitingId(app.id)
-    try {
-      await applicationService.sendInvite(app.id)
-      setNotice(t('inviteSuccess', { email: app.candidateEmail }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('inviteError'))
-    } finally {
-      setInvitingId(null)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8">
@@ -637,18 +621,6 @@ export default function CandidatesPage() {
                                                       <span>Xem CV</span>
                                                     </button>
                                                   )}
-                                                  <button
-                                                    onClick={(e) => handleInvite(e, app)}
-                                                    disabled={invitingId === app.id}
-                                                    title={t('sendInvite')}
-                                                    className="p-1.5 rounded-lg border border-ink-200 dark:border-white/10 hover:bg-ink-100 dark:hover:bg-white/10 text-ink-600 dark:text-ink-300 transition-colors disabled:opacity-50"
-                                                  >
-                                                    {invitingId === app.id ? (
-                                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                      <Mail className="w-3.5 h-3.5" />
-                                                    )}
-                                                  </button>
                                                   <button
                                                     onClick={() => navigate(`/hr/candidates/${app.id}`)}
                                                     title={t('viewDetails')}

@@ -6,7 +6,8 @@
   "saveSuccess": "Đã lưu cài đặt hệ thống.",
   "tabs": {
     "auth": "Đăng nhập & miền email",
-    "integrations": "Tích hợp & Webhook"
+    "integrations": "Tích hợp & Webhook",
+    "interview": "Phỏng vấn"
   },
   "auth": {
     "title": "Miền email được phép",
@@ -20,6 +21,24 @@
     "empty": "Chưa có miền nào. Khi trống, mọi miền email sẽ bị chặn đăng nhập qua Google.",
     "removeDomainAria": "Xóa {{domain}}",
     "invalidDomain": "\"{{domain}}\" không phải miền hợp lệ."
+  },
+  "interview": {
+    "title": "Địa điểm phỏng vấn",
+    "description": "Thông tin này được in vào thư mời phỏng vấn gửi ứng viên (giờ hẹn — địa điểm — chỉ dẫn). Toàn hệ thống dùng chung một địa điểm.",
+    "address": "Địa chỉ văn phòng",
+    "addressPlaceholder": "Tầng 3, Toà nhà ABC, 266 Đội Cấn, Ba Đình, Hà Nội",
+    "addressHint": "Ghi đủ tầng / toà nhà / số nhà để ứng viên tìm được, đừng chỉ ghi tên thành phố.",
+    "directions": "Chỉ dẫn đường đi",
+    "directionsPlaceholder": "Vào sảnh toà nhà, đi thang máy L4 hoặc L5 phía bên trái, phòng ngay sau quầy lễ tân.",
+    "directionsHint": "Không bắt buộc. Vài dòng ngắn giúp ứng viên khỏi lạc trong toà nhà lớn.",
+    "mapUrl": "Liên kết bản đồ",
+    "mapUrlHint": "Không bắt buộc. Dán link Google Maps — thư mời sẽ hiện thành nút \"xem bản đồ\".",
+    "notice": "Để trống địa chỉ thì thư mời sẽ bỏ hẳn dòng địa điểm — thà thiếu còn hơn ghi sai chỗ hẹn. Vòng thi trắc nghiệm làm trực tuyến nên không dùng thông tin này.",
+    "descriptions": {
+      "interview_location_address": "Địa chỉ văn phòng in trong thư mời phỏng vấn",
+      "interview_location_directions": "Chỉ dẫn đường đi in trong thư mời phỏng vấn",
+      "interview_location_map_url": "Link bản đồ đính kèm trong thư mời phỏng vấn"
+    }
   },
   "integrations": {
     "title": "Webhook & tích hợp",

@@ -79,7 +79,12 @@ export default function JobPostingDetailPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchProcessing, setBatchProcessing] = useState<boolean>(false)
-  const [inviteModalTarget, setInviteModalTarget] = useState<{ id: string; name: string; targetRound: number } | null>(null)
+  // Modal chọn ca dùng chung cho DUYỆT CV (mode 'accept') lẫn xếp lịch vòng sau (mode 'assign').
+  const [inviteModalTarget, setInviteModalTarget] = useState<{
+    applications: { id: string; name: string }[]
+    mode: 'accept' | 'assign'
+    targetRound: number
+  } | null>(null)
 
   const activeRoundNumber = useMemo(() => {
     return activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0
@@ -143,30 +148,19 @@ export default function JobPostingDetailPage() {
     interviewSortOrder,
   ])
 
-  const handleBatchAccept = async () => {
+  // Duyệt hàng loạt cũng phải kèm lịch: mở modal chọn MỘT ca cho cả nhóm đã chọn.
+  const handleBatchAccept = () => {
     if (selectedIds.length === 0) return
-    if (!window.confirm(t('confirmDialogs.batchAccept', { count: selectedIds.length }))) return
-    setBatchProcessing(true)
     setActionError(null)
     setNotice(null)
-    try {
-      let successCount = 0
-      let failCount = 0
-      const results = await Promise.allSettled(
-        selectedIds.map((id) => applicationService.acceptApplication(id))
-      )
-      results.forEach((res) => {
-        if (res.status === 'fulfilled') successCount++
-        else failCount++
-      })
-      setNotice(t('notices.batchAcceptSuccess', { success: successCount, failed: failCount }))
-      setSelectedIds([])
-      await loadApps()
-    } catch (err) {
-      setActionError(t('errors.batchAccept'))
-    } finally {
-      setBatchProcessing(false)
-    }
+    setInviteModalTarget({
+      applications: selectedIds.map((appId) => ({
+        id: appId,
+        name: apps.find((a) => a.id === appId)?.candidateName || t('candidate'),
+      })),
+      mode: 'accept',
+      targetRound: 1,
+    })
   }
 
   const handleBatchReject = async () => {
@@ -195,45 +189,32 @@ export default function JobPostingDetailPage() {
     }
   }
 
-  const handleBatchInvite = async () => {
+  // "Mời" hàng loạt = xếp lịch hàng loạt: thư mời chỉ có nghĩa khi kèm giờ hẹn (ADR-059).
+  const handleBatchInvite = () => {
     if (selectedIds.length === 0) return
-    if (!window.confirm(t('confirmDialogs.batchInvite', { count: selectedIds.length }))) return
-    setBatchProcessing(true)
     setActionError(null)
     setNotice(null)
-    try {
-      let successCount = 0
-      let failCount = 0
-      const results = await Promise.allSettled(
-        selectedIds.map((id) => applicationService.sendInvite(id))
-      )
-      results.forEach((res) => {
-        if (res.status === 'fulfilled') successCount++
-        else failCount++
-      })
-      setNotice(t('notices.batchInviteSuccess', { success: successCount, failed: failCount }))
-      setSelectedIds([])
-      await loadApps()
-    } catch (err) {
-      setActionError(t('errors.batchInvite'))
-    } finally {
-      setBatchProcessing(false)
-    }
+    setInviteModalTarget({
+      applications: selectedIds.map((appId) => ({
+        id: appId,
+        name: apps.find((a) => a.id === appId)?.candidateName || t('candidate'),
+      })),
+      mode: 'assign',
+      targetRound: activeRoundNumber > 0 ? activeRoundNumber : 1,
+    })
   }
 
-  const handleAccept = async (appId: string) => {
-    setProcessingAppId(appId)
+  // Duyệt CV không còn gọi thẳng API: phải chọn khung giờ vòng 1 để ứng viên nhận được thư mời.
+  const handleAccept = (appId: string) => {
     setActionError(null)
     setNotice(null)
-    try {
-      await applicationService.acceptApplication(appId)
-      setNotice(t('notices.acceptSuccess'))
-      await loadApps()
-    } catch (err) {
-      setActionError(t('errors.acceptApplication'))
-    } finally {
-      setProcessingAppId(null)
-    }
+    setInviteModalTarget({
+      applications: [
+        { id: appId, name: apps.find((a) => a.id === appId)?.candidateName || t('candidate') },
+      ],
+      mode: 'accept',
+      targetRound: 1,
+    })
   }
 
   const handleReject = async (appId: string) => {
@@ -421,7 +402,10 @@ export default function JobPostingDetailPage() {
       setNotice(t('notices.jobApproveSuccess'))
       await load()
     } catch (err: unknown) {
-      setActionError(t('errors.approveJob'))
+      // Ưu tiên thông báo của server: nó nói rõ vì sao không duyệt được (vd ngân hàng đề trắc
+      // nghiệm chưa đủ câu), còn chuỗi mặc định chỉ nói "duyệt thất bại".
+      const e = err as { response?: { data?: { message?: string } } }
+      setActionError(e?.response?.data?.message || t('errors.approveJob'))
     } finally {
       setBusy(false)
     }
@@ -1312,10 +1296,16 @@ export default function JobPostingDetailPage() {
                                 <button
                                   onClick={() => {
                                     const targetRound = activeRoundNumber > 0 ? activeRoundNumber : (a.currentRound && a.currentRound > 0 ? a.currentRound : 1)
-                                    setInviteModalTarget({ id: a.id, name: a.candidateName || t('candidate'), targetRound })
+                                    setInviteModalTarget({
+                                      applications: [
+                                        { id: a.id, name: a.candidateName || t('candidate') },
+                                      ],
+                                      mode: 'assign',
+                                      targetRound,
+                                    })
                                   }}
                                   disabled={
-                                    inviteModalTarget?.id === a.id ||
+                                    inviteModalTarget?.applications.some((x) => x.id === a.id) ||
                                     (a.currentRound != null &&
                                       activeRoundNumber > 0 &&
                                       a.currentRound > activeRoundNumber) ||
@@ -1323,7 +1313,7 @@ export default function JobPostingDetailPage() {
                                   }
                                   className="flex flex-1 items-center justify-center gap-1 py-1.5 text-xs bg-brand-600 text-white hover:bg-brand-700 rounded-lg transition-colors font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                                 >
-                                  {inviteModalTarget?.id === a.id ? (
+                                  {inviteModalTarget?.applications.some((x) => x.id === a.id) ? (
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                   ) : (
                                     <Send className="w-3 h-3" />
@@ -1560,13 +1550,14 @@ export default function JobPostingDetailPage() {
 
       {inviteModalTarget && id && (
         <InviteAndScheduleModal
-          applicationId={inviteModalTarget.id}
-          candidateName={inviteModalTarget.name}
+          applications={inviteModalTarget.applications}
+          mode={inviteModalTarget.mode}
           jobPostingId={id}
           targetRoundNumber={inviteModalTarget.targetRound}
           onClose={() => setInviteModalTarget(null)}
           onSuccess={(msg) => {
             setNotice(msg)
+            setSelectedIds([])
             void loadApps()
           }}
         />

@@ -53,6 +53,12 @@ jobs:
         working-directory: ari-web
         run: npm ci
 
+      # i18n hỏng thì IM LẶNG: màn vẫn chạy, chỉ là chọn EN vẫn ra tiếng Việt. Cổng này bắt đúng
+      # dấu vết đã lộ ra lỗi đó — namespace không còn ai dùng (xem ADR-059 điểm 10).
+      - name: Check i18n namespaces
+        working-directory: ari-web
+        run: npm run check:i18n
+
       # Build cả 2 site: candidate và staff có thể hỏng độc lập nhau.
       - name: Build all workspaces
         working-directory: ari-web

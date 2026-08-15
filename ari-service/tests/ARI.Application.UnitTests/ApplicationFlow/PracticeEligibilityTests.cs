@@ -54,6 +54,39 @@ public class PracticeEligibilityTests
         Assert.False(res.Value); // đã dùng lượt của vòng 1
     }
 
+    /// <summary>
+    /// Vòng trắc nghiệm không có phỏng vấn thử: buổi thử là hội thoại với AI, không có gì để "thử"
+    /// với bài chọn đáp án — và cho thử sẽ lộ chính ngân hàng đề.
+    /// </summary>
+    [Fact]
+    public async Task Not_eligible_when_round_is_online_test()
+    {
+        var job = ApplicationData.Job();
+        var app = ApplicationData.Application(job.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" });
+
+        var res = await Run(uow, app.Id, 1);
+
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value);
+    }
+
+    [Fact]
+    public async Task Eligible_when_round_is_conversational_even_if_another_round_is_online_test()
+    {
+        var job = ApplicationData.Job();
+        var app = ApplicationData.Application(job.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" })
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 2, RoundType = "technical" });
+
+        var res = await Run(uow, app.Id, 2);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value);
+    }
+
     [Fact]
     public async Task Other_round_practice_does_not_block()
     {
