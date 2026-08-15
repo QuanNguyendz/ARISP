@@ -14,7 +14,10 @@
     "success": "Đã phân tích JD và điền tự động các trường. Bạn có thể chỉnh sửa lại.",
     "warning": "File đã được lưu nhưng AI chưa nhận diện rõ là JD. Vui lòng kiểm tra và nhập thủ công.",
     "successTitle": "Thành công",
-    "warningTitle": "Cảnh báo"
+    "warningTitle": "Cảnh báo",
+    "clickToView": "Bấm để xem nội dung file",
+    "clickToViewHint": "Bấm vào tên file để xem lại JD",
+    "removeFile": "Gỡ file JD"
   },
   "form": {
     "generalInfo": "Thông tin chung",
@@ -52,6 +55,7 @@
     "language": "Ngôn ngữ",
     "vietnamese": "Tiếng Việt",
     "english": "Tiếng Anh",
+    "onlineTestLanguageNotice": "Đề thi phải viết bằng {{language}}. Sau khi tạo tin, vào \"Ngân hàng câu hỏi\" cập nhật đề đúng ngôn ngữ này — file Excel nhập lên sẽ bị kiểm tra và từ chối nếu sai ngôn ngữ.",
     "minutes": "Phút",
     "minutesMax": "Tối đa 20 phút",
     "visibility": "Hiển thị",

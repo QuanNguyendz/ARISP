@@ -17,6 +17,7 @@ import {
   Upload,
   Download,
   FileSpreadsheet,
+  Languages,
 } from 'lucide-react'
 import { ErrorAlert } from '@ari/shared/ui'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
@@ -373,6 +374,29 @@ export default function JobOnlineTestPage() {
                 {t('bank.import.title')}
               </h2>
               <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">{t('bank.import.hint')}</p>
+              {/* Ngôn ngữ đề do cấu hình VÒNG trắc nghiệm quyết định (không sửa được ở màn này) — nói rõ
+                  ra đây vì file nhập lên sai ngôn ngữ sẽ bị BE từ chối. */}
+              {bank?.language ? (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-2 dark:border-brand-500/30 dark:bg-brand-500/10">
+                  <Languages className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
+                  <p className="text-xs leading-relaxed text-brand-800 dark:text-brand-200">
+                    {t('bank.import.languageNotice', {
+                      language: bank.language === 'en' ? t('bank.language.en') : t('bank.language.vi'),
+                    })}
+                  </p>
+                </div>
+              ) : (
+                bank && (
+                  // Lối vào màn này đã bị ẩn khi tin không có vòng trắc nghiệm, nhưng URL trực tiếp vẫn
+                  // tới được — nói rõ để không ai soạn cả ngân hàng đề rồi mới phát hiện chẳng ai thi.
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                      {t('bank.import.noRoundNotice')}
+                    </p>
+                  </div>
+                )
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
