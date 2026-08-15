@@ -35,9 +35,16 @@ namespace ARI.Application.Auth.Commands.CandidateLogin
             if (candidate == null)
                 return Result.Failure<AuthResponse>("Sai email hoặc mật khẩu.", AuthErrorCodes.InvalidCredentials);
 
-            // Tài khoản tạo qua Google Sign-In không có mật khẩu → hướng dẫn đăng nhập bằng Google
+            // Tài khoản CHƯA ĐẶT mật khẩu (tạo qua Google Sign-In nên chưa từng có mật khẩu nào).
+            // Không phải "tài khoản khác": mỗi email chỉ có duy nhất một CandidateAccount, đăng nhập
+            // Google và đăng nhập mật khẩu vào cùng một hồ sơ. Câu thông báo cũ ("Tài khoản này đăng ký
+            // qua Google") khiến người dùng tưởng email của mình thuộc về một tài khoản riêng biệt, nên
+            // nêu thẳng lối thoát: đăng nhập bằng Google, hoặc đặt mật khẩu qua "Quên mật khẩu".
             if (string.IsNullOrEmpty(candidate.PasswordHash))
-                return Result.Failure<AuthResponse>("Tài khoản này đăng ký qua Google. Vui lòng đăng nhập bằng Google.", AuthErrorCodes.PasswordlessGoogle);
+                return Result.Failure<AuthResponse>(
+                    "Tài khoản này chưa đặt mật khẩu vì bạn đăng ký bằng Google. Hãy đăng nhập bằng Google, "
+                    + "hoặc dùng \"Quên mật khẩu?\" để đặt mật khẩu cho chính tài khoản này.",
+                    AuthErrorCodes.PasswordlessGoogle);
 
             if (!_passwordHasher.Verify(request.Password, candidate.PasswordHash))
                 return Result.Failure<AuthResponse>("Sai email hoặc mật khẩu.", AuthErrorCodes.InvalidCredentials);

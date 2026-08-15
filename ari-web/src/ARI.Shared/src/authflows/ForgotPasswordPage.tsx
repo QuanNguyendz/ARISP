@@ -54,7 +54,9 @@ export default function ForgotPasswordPage() {
   const isStaff = searchParams.get('audience') === 'staff'
   const loginPath = isStaff ? '/auth/login' : '/auth/candidate-login'
 
-  const [email, setEmail] = useState('')
+  // Màn đăng nhập đẩy sang kèm ?email= khi tài khoản chưa đặt mật khẩu (đăng ký bằng Google) —
+  // điền sẵn để người dùng không phải gõ lại đúng email vừa nhập.
+  const [email, setEmail] = useState(searchParams.get('email') ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)

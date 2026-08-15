@@ -18,6 +18,7 @@ import {
   X,
   Trash2,
   Loader2,
+  Camera,
   AlertCircle,
   Check,
   BadgeCheck,
@@ -140,6 +141,8 @@ export default function ProfilePage() {
   const [cvError, setCvError] = useState('')
   const [cvNotice, setCvNotice] = useState('')
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
   const [provinces, setProvinces] = useState<Province[]>([])
   const [allowHrViewProfile, setAllowHrViewProfile] = useState<boolean>(true)
   const [privacySaving, setPrivacySaving] = useState(false)
@@ -365,6 +368,33 @@ export default function ProfilePage() {
     }
   }
 
+  async function onAvatarPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // Reset ngay: không xoá value thì chọn lại đúng file vừa chọn sẽ không bắn onChange lần nữa.
+    e.target.value = ''
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError(t('profile.avatarTypeError'))
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError(t('profile.avatarSizeError'))
+      return
+    }
+
+    setAvatarUploading(true)
+    setError('')
+    try {
+      const res = await profileService.uploadAvatar(file)
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: res.avatarUrl } : prev))
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || t('profile.avatarUploadFailed'))
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
   async function handleCvUpload(file: File) {
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
     if (ext !== '.pdf' && ext !== '.docx') {
@@ -485,9 +515,40 @@ export default function ProfilePage() {
             <div className="h-24 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
             <div className="px-4 sm:px-6 pb-2">
               <div className="-mt-10">
-                <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
-                  {initials}
-                </span>
+                <div className="relative inline-block">
+                  {profile.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt={profile.fullName || t('profile.candidate')}
+                      className="h-16 w-16 rounded-2xl object-cover shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20"
+                    />
+                  ) : (
+                    <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
+                      {initials}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    title={t('profile.changeAvatar')}
+                    aria-label={t('profile.changeAvatar')}
+                    className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-brand-600 text-white shadow-card transition hover:bg-brand-700 disabled:opacity-60 dark:border-ink-900"
+                  >
+                    {avatarUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={onAvatarPicked}
+                  />
+                </div>
               </div>
               <div className="mt-3">
                 <h1 className="font-display text-xl sm:text-2xl font-extrabold leading-tight">
@@ -546,7 +607,7 @@ export default function ProfilePage() {
                     <input
                       inputMode="tel"
                       className="w-full bg-transparent text-sm outline-none"
-                      placeholder={t('profile.headlinePlaceholder')}
+                      placeholder={t('profile.phonePlaceholder')}
                       value={profile.phone || ''}
                       onChange={(e) => patch({ phone: e.target.value.replace(/[^\d+\-() ]/g, '') })}
                     />

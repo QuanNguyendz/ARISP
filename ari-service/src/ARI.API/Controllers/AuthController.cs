@@ -62,7 +62,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error }),
+                    // Kèm `code` để FE hiện được lối thoát (nút đặt mật khẩu) thay vì chỉ in câu lỗi —
+                    // trước đây nhánh này là nhánh DUY NHẤT không trả code nên FE không phân biệt được.
+                    AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error, code = "passwordless_google" }),
                     AuthErrorCodes.EmailNotVerified => StatusCode(403, new { message = result.Error, code = "email_not_verified" }),
                     _ => Unauthorized(new { message = result.Error }),
                 };
@@ -205,6 +207,8 @@ namespace ARI.API.Controllers
             var externalPrincipal = result.Principal;
             var rawEmail = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email || c.Type == "email")?.Value;
             var name = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name || c.Type == "name")?.Value;
+            // Ảnh đại diện Google (claim map trong DependencyInjection). Chỉ dùng làm ảnh ban đầu.
+            var picture = externalPrincipal?.Claims.FirstOrDefault(c => c.Type == "picture")?.Value;
 
             if (string.IsNullOrEmpty(rawEmail))
             {
@@ -213,7 +217,7 @@ namespace ARI.API.Controllers
                 return Redirect(noEmailUrl);
             }
 
-            var signIn = await _sender.Send(new CompleteExternalCandidateSignInCommand(rawEmail, name));
+            var signIn = await _sender.Send(new CompleteExternalCandidateSignInCommand(rawEmail, name, picture));
             await HttpContext.SignOutAsync("External");
 
             if (signIn.IsFailure)

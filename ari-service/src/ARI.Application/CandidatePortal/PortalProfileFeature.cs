@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -194,6 +195,79 @@ namespace ARI.Application.CandidatePortal
                 reviewResp,
                 reviewResult.IsSuccess,
                 reviewResult.IsFailure ? reviewResult.Error : null));
+        }
+    }
+
+    // ============================================================
+    // POST /api/portal/profile/avatar
+    // ============================================================
+
+    public record UploadedAvatarDto(string AvatarUrl);
+
+    /// <summary>Ảnh đại diện ứng viên tự tải lên. Ext đã chuẩn hoá chữ thường, kèm dấu chấm.</summary>
+    public record UploadAvatarCommand(Guid CandidateId, byte[] Bytes, string FileName, string Ext)
+        : IRequest<Result<UploadedAvatarDto>>;
+
+    public class UploadAvatarCommandHandler : IRequestHandler<UploadAvatarCommand, Result<UploadedAvatarDto>>
+    {
+        /// <summary>Ảnh đại diện không cần lớn — 2MB đủ cho ảnh vuông chất lượng cao.</summary>
+        public const int MaxBytes = 2 * 1024 * 1024;
+
+        private static readonly Dictionary<string, string> AllowedTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".jpg"] = "image/jpeg",
+            [".jpeg"] = "image/jpeg",
+            [".png"] = "image/png",
+            [".webp"] = "image/webp",
+        };
+
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IFileStorageService _fileStorage;
+
+        public UploadAvatarCommandHandler(IUnitOfWork unitOfWork, IFileStorageService fileStorage)
+        {
+            _unitOfWork = unitOfWork;
+            _fileStorage = fileStorage;
+        }
+
+        public async Task<Result<UploadedAvatarDto>> Handle(UploadAvatarCommand command, CancellationToken ct)
+        {
+            if (!AllowedTypes.TryGetValue(command.Ext, out var mime))
+                return Result.Failure<UploadedAvatarDto>("Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP.");
+
+            if (command.Bytes.Length == 0)
+                return Result.Failure<UploadedAvatarDto>("File ảnh rỗng.");
+
+            if (command.Bytes.Length > MaxBytes)
+                return Result.Failure<UploadedAvatarDto>("Ảnh vượt quá 2MB. Vui lòng chọn ảnh nhỏ hơn.");
+
+            var acc = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(command.CandidateId, ct);
+            if (acc == null)
+                return Result.Failure<UploadedAvatarDto>("Không tìm thấy tài khoản ứng viên.", CommonErrorCodes.NotFound);
+
+            // Xoá ảnh cũ để không tích tụ rác trên storage — nhưng CHỈ khi đó là file của ta.
+            // Ảnh Google là URL tuyệt đối trỏ sang máy chủ Google, gọi DeleteAsync với nó là vô nghĩa.
+            var previous = acc.AvatarUrl;
+            var previousIsOurFile = !string.IsNullOrEmpty(previous)
+                && !previous!.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                && !previous.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+            var storageKey = await _fileStorage.SaveAsync(command.Bytes, command.FileName, mime, StorageFolder.Avatar, ct);
+
+            acc.AvatarUrl = storageKey;
+            acc.UpdatedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<CandidateAccount>().Update(acc);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // Xoá sau khi đã lưu bản ghi mới: đổi thứ tự thì upload lỗi giữa chừng là mất luôn ảnh cũ.
+            if (previousIsOurFile)
+            {
+                try { await _fileStorage.DeleteAsync(previous!, ct); }
+                catch { /* best-effort — file rác không đáng để hỏng cả thao tác */ }
+            }
+
+            var url = await PortalSupport.ResolveAvatarUrlAsync(acc.AvatarUrl, _fileStorage);
+            return Result.Success(new UploadedAvatarDto(url ?? string.Empty));
         }
     }
 
