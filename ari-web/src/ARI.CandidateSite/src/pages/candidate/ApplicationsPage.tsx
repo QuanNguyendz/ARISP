@@ -722,7 +722,7 @@ export default function ApplicationsPage() {
                 <div className="-mt-10">
                   {profile?.avatarUrl ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={resolveAssetUrl(profile.avatarUrl)}
                       alt={displayName}
                       className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20"
                     />

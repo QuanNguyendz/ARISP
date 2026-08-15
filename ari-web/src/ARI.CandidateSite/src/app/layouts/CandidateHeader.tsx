@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useCandidateAvatar } from '@/fservices/profile/avatarQuery'
 import { useJobSearchStore } from '@/store/jobSearchStore'
 import { authService } from '@ari/shared/fservices/auth'
 import { notificationService, resolveNotifLink } from '@ari/shared/fservices/notification/notificationService'
@@ -94,6 +95,41 @@ function initialsOf(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase()
 }
 
+/**
+ * Ảnh đại diện ở header. Rơi về chữ cái đầu khi chưa có ảnh — hoặc khi ảnh không tải được
+ * (URL R2 presigned hết hạn) để không bao giờ hiện ô ảnh vỡ.
+ */
+function HeaderAvatar({
+  src,
+  initials,
+  className,
+}: {
+  src: string
+  initials: string
+  className: string
+}) {
+  const [broken, setBroken] = useState(false)
+  useEffect(() => setBroken(false), [src])
+
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className={`${className} shrink-0 rounded-full object-cover`}
+        onError={() => setBroken(true)}
+      />
+    )
+  }
+  return (
+    <span
+      className={`${className} grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 font-bold text-white`}
+    >
+      {initials}
+    </span>
+  )
+}
+
 /** "2 giờ trước" / "Hôm qua" … từ ISO date. */
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -114,6 +150,7 @@ export default function CandidateHeader() {
   const navigate = useNavigate()
   const pathname = useLocation().pathname
   const { user, isAuthenticated, logout } = useAuthStore()
+  const avatarUrl = useCandidateAvatar()
   const [open, setOpen] = useState<Drop>(null)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
   const rootRef = useRef<HTMLElement>(null)
@@ -515,9 +552,7 @@ export default function CandidateHeader() {
                   onClick={toggle('user')}
                   className="flex items-center gap-1.5 rounded-lg p-1 pr-1.5 hover:bg-ink-100"
                 >
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-xs font-bold text-white">
-                    {initials}
-                  </span>
+                  <HeaderAvatar src={avatarUrl} initials={initials} className="h-8 w-8 text-xs" />
                   <ChevronDown className="hidden h-4 w-4 text-ink-400 sm:block" />
                 </button>
                 {open === 'user' && (
@@ -526,9 +561,11 @@ export default function CandidateHeader() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3 border-b border-ink-100 px-4 py-3">
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 text-sm font-bold text-white">
-                        {initials}
-                      </span>
+                      <HeaderAvatar
+                        src={avatarUrl}
+                        initials={initials}
+                        className="h-10 w-10 text-sm"
+                      />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-ink-900">
                           {user.name || t('header.candidate')}

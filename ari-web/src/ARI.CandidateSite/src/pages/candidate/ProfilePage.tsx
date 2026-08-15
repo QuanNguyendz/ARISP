@@ -38,6 +38,7 @@ import { settingsService } from '@/fservices/settings/settingsService'
 import { provinceService } from '@/fservices/location/provinceService'
 import type { Province } from '@/fservices/location/provinceService'
 import ChangePasswordModal from '@components/profile/ChangePasswordModal'
+import ImageCropModal from '@ari/shared/ui/ImageCropModal'
 import SearchableSelect from '@ari/shared/ui/SearchableSelect'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
@@ -49,6 +50,7 @@ import type {
   CvReview,
 } from '@ari/shared/fservices/profile/profileService'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useRefreshCandidateAvatar } from '@/fservices/profile/avatarQuery'
 
 // Kỹ năng & công nghệ phổ biến hiện nay (gợi ý nhanh để ứng viên thêm bằng 1 cú nhấp)
 const SUGGESTED_SKILLS = [
@@ -136,13 +138,19 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  // Vòng đời dải "Đã lưu hồ sơ": vào (trượt lên) → nán lại → trượt xuống rồi biến mất.
+  const [savedToast, setSavedToast] = useState<'in' | 'out' | null>(null)
   const [skillInput, setSkillInput] = useState('')
   const [cvUploading, setCvUploading] = useState(false)
   const [cvError, setCvError] = useState('')
   const [cvNotice, setCvNotice] = useState('')
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  // Ảnh vừa chọn, ĐANG chờ căn khung — chỉ gửi lên server sau khi ứng viên bấm lưu trong modal cắt.
+  const [avatarToCrop, setAvatarToCrop] = useState<File | null>(null)
+  const [avatarError, setAvatarError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const refreshHeaderAvatar = useRefreshCandidateAvatar()
   const [provinces, setProvinces] = useState<Province[]>([])
   const [allowHrViewProfile, setAllowHrViewProfile] = useState<boolean>(true)
   const [privacySaving, setPrivacySaving] = useState(false)
@@ -172,6 +180,24 @@ export default function ProfilePage() {
       })
       .catch(() => {})
   }, [t])
+
+  // Lưu xong: hiện dải xác nhận khoảng 2 giây rồi tự trượt xuống và tắt — không để nó nằm mãi
+  // dưới màn che mất nội dung. Đặt lại `savedAt` để lần lưu sau chạy lại đúng chuỗi hiệu ứng.
+  useEffect(() => {
+    if (!savedAt) return
+    setSavedToast('out')
+    const enter = setTimeout(() => setSavedToast('in'), 30)
+    const leave = setTimeout(() => setSavedToast('out'), 2200)
+    const unmount = setTimeout(() => {
+      setSavedToast(null)
+      setSavedAt(null)
+    }, 2500)
+    return () => {
+      clearTimeout(enter)
+      clearTimeout(leave)
+      clearTimeout(unmount)
+    }
+  }, [savedAt])
 
   async function handleToggleHrPrivacy() {
     const nextVal = !allowHrViewProfile
@@ -368,7 +394,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function onAvatarPicked(e: React.ChangeEvent<HTMLInputElement>) {
+  function onAvatarPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     // Reset ngay: không xoá value thì chọn lại đúng file vừa chọn sẽ không bắn onChange lần nữa.
     e.target.value = ''
@@ -378,18 +404,34 @@ export default function ProfilePage() {
       setError(t('profile.avatarTypeError'))
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
+    // Ngưỡng rộng hơn giới hạn 2MB của API vì ảnh gốc (ảnh chụp điện thoại) sẽ được cắt + resize
+    // xuống 512px trong ImageCropModal trước khi gửi — file thật gửi đi luôn nhỏ hơn nhiều.
+    if (file.size > 10 * 1024 * 1024) {
       setError(t('profile.avatarSizeError'))
       return
     }
 
-    setAvatarUploading(true)
     setError('')
+    setAvatarError('')
+    setAvatarToCrop(file)
+  }
+
+  /** Nhận ảnh đã cắt vuông từ modal → tải lên → đồng bộ cả ảnh trong header. */
+  async function handleAvatarCropped(cropped: File) {
+    setAvatarUploading(true)
+    setAvatarError('')
     try {
-      const res = await profileService.uploadAvatar(file)
+      const res = await profileService.uploadAvatar(cropped)
       setProfile((prev) => (prev ? { ...prev, avatarUrl: res.avatarUrl } : prev))
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || t('profile.avatarUploadFailed'))
+      // Header đọc ảnh qua react-query + authStore: cập nhật cả hai để ảnh góc phải đổi ngay,
+      // không phải tải lại trang.
+      updateUser({ avatarUrl: res.avatarUrl })
+      refreshHeaderAvatar()
+      setAvatarToCrop(null)
+    } catch (e) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string }
+      // Giữ modal mở kèm lỗi để ứng viên thử lại ngay, không mất khung đã căn.
+      setAvatarError(err?.response?.data?.message || err?.message || t('profile.avatarUploadFailed'))
     } finally {
       setAvatarUploading(false)
     }
@@ -518,7 +560,7 @@ export default function ProfilePage() {
                 <div className="relative inline-block">
                   {profile.avatarUrl ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={resolveAssetUrl(profile.avatarUrl)}
                       alt={profile.fullName || t('profile.candidate')}
                       className="h-16 w-16 rounded-2xl object-cover shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20"
                     />
@@ -1095,10 +1137,27 @@ export default function ProfilePage() {
           </button>
         </div>
       )}
-      {savedAt && !dirty && (
-        <div className="sticky bottom-4 z-20 mx-auto flex max-w-6xl items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 shadow-card">
+      {savedToast && !dirty && (
+        <div
+          className={`pointer-events-none sticky bottom-4 z-20 mx-auto flex max-w-6xl items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 shadow-card transition-all duration-300 ease-out ${
+            savedToast === 'in' ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
+          }`}
+        >
           <Check className="h-4 w-4" /> {t('profile.saved')}
         </div>
+      )}
+
+      {avatarToCrop && (
+        <ImageCropModal
+          file={avatarToCrop}
+          busy={avatarUploading}
+          errorMessage={avatarError}
+          onCancel={() => {
+            setAvatarToCrop(null)
+            setAvatarError('')
+          }}
+          onCropped={handleAvatarCropped}
+        />
       )}
 
       {pwdModalOpen && profile && (
