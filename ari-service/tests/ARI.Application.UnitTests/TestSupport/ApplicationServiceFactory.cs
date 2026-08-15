@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using ARI.Application.Interfaces;
 using ARI.Application.Services;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ARI.Application.UnitTests.TestSupport;
@@ -14,7 +16,16 @@ internal static class ApplicationServiceFactory
 {
     public static ApplicationService Create(
         IUnitOfWork uow, INotificationService notif, IEmailService email, IRagIngestionService rag)
-        => new(uow, rag, email, notif, new TestScopeFactory(uow), new MemoryCache(new MemoryCacheOptions()));
+        => new(uow, rag, email, notif, new TestScopeFactory(uow), new MemoryCache(new MemoryCacheOptions()), Configuration());
+
+    /// <summary>Chỉ cần base URL portal để link trong email không trỏ về máy dev.</summary>
+    private static IConfiguration Configuration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Frontend:CandidateBaseUrl"] = "https://arisp.test",
+            })
+            .Build();
 
     private sealed class TestScopeFactory : IServiceScopeFactory, IServiceScope
     {

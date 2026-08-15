@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -7,7 +8,7 @@ import { interviewService, type InterviewJobSummary } from '@ari/shared/fservice
 import { SlotCard } from './SlotCard'
 import { interviewKeys } from './interviewQueryKeys'
 import { fmtDate, fmtTime, isSameDay } from './format'
-import type { WorkspaceConfig } from './workspaceConfig'
+import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
 
 export function JobCard({
   job,
@@ -18,6 +19,7 @@ export function JobCard({
   dateFilter: string
   workspace: WorkspaceConfig
 }) {
+  const { t } = useTranslation(INTERVIEWS_NS)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -74,30 +76,32 @@ export function JobCard({
                     : 'bg-ink-100 text-ink-500 dark:bg-white/10 dark:text-ink-400'
                 }`}
               >
-                {isActive ? 'Đang tuyển' : 'Đã đóng'}
+                {isActive ? t('job.recruiting') : t('job.closed')}
               </span>
               {job.maxRound > 0 && (
                 <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400">
-                  Vòng {job.maxRound}
+                  {t('job.round', { number: job.maxRound })}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-4 flex-wrap">
               <span className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1 font-medium">
-                <Calendar className="w-3.5 h-3.5" /> {job.totalSlots} ca phỏng vấn
+                <Calendar className="w-3.5 h-3.5" /> {t('job.slots', { count: job.totalSlots })}
               </span>
               <span
                 className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1 font-medium"
-                title="Số ứng viên đang giữ chỗ (không tính người đã từ chối hoặc bị loại)"
+                title={t('job.bookedTitle')}
               >
-                <Users className="w-3.5 h-3.5" /> {job.totalBooked} ứng viên đã xếp lịch
+                <Users className="w-3.5 h-3.5" /> {t('job.booked', { count: job.totalBooked })}
               </span>
               <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" /> {job.totalConfirmed} xác nhận
+                <CheckCircle2 className="w-3.5 h-3.5" /> {t('job.confirmed', { count: job.totalConfirmed })}
               </span>
               {job.nextSlotTime && (
                 <span className="text-xs text-brand-600 dark:text-brand-400 font-semibold">
-                  Ca tiếp: {fmtDate(job.nextSlotTime)} {fmtTime(job.nextSlotTime)}
+                  {t('job.nextSlot', {
+                    when: `${fmtDate(job.nextSlotTime)} ${fmtTime(job.nextSlotTime)}`,
+                  })}
                 </span>
               )}
             </div>
@@ -111,7 +115,7 @@ export function JobCard({
             }}
             className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-medium text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
           >
-            <Eye className="w-3.5 h-3.5" /> Quản lý tin
+            <Eye className="w-3.5 h-3.5" /> {t('job.manage')}
           </button>
           {open ? <ChevronDown className="w-5 h-5 text-ink-400" /> : <ChevronRight className="w-5 h-5 text-ink-400" />}
         </div>
@@ -127,26 +131,24 @@ export function JobCard({
           >
             <div className="border-t border-ink-100 dark:border-white/10 p-4 lg:p-5 bg-ink-50/50 dark:bg-white/[0.02]">
               {isLoading ? (
-                <p className="text-sm text-ink-400 text-center py-6">Đang tải ca phỏng vấn...</p>
+                <p className="text-sm text-ink-400 text-center py-6">{t('job.loadingSlots')}</p>
               ) : job.totalSlots === 0 ? (
                 <div className="text-center py-8 bg-white dark:bg-white/5 rounded-2xl border border-dashed border-ink-200 dark:border-white/10 p-6">
                   <Calendar className="w-8 h-8 text-ink-300 dark:text-white/20 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-ink-700 dark:text-ink-200">
-                    Vị trí này chưa có ca phỏng vấn nào được tạo
+                    {t('job.noSlotsTitle')}
                   </p>
-                  <p className="text-xs text-ink-400 mt-1 mb-4">
-                    Hãy mở trang chi tiết vị trí tuyển dụng để cấu hình các khung giờ phỏng vấn.
-                  </p>
+                  <p className="text-xs text-ink-400 mt-1 mb-4">{t('job.noSlotsHint')}</p>
                   <button
                     onClick={() => navigate(workspace.jobHref(job.jobId))}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition-colors shadow-sm"
                   >
-                    <Plus className="w-4 h-4" /> Tạo ca phỏng vấn cho vị trí này
+                    <Plus className="w-4 h-4" /> {t('job.createSlot')}
                   </button>
                 </div>
               ) : filteredSlots.length === 0 ? (
                 <div className="text-center py-6 text-xs text-ink-400">
-                  Không có ca phỏng vấn nào trong ngày{' '}
+                  {t('job.noSlotsOnDate')}{' '}
                   <span className="font-semibold text-ink-700 dark:text-white">{dateFilter}</span>
                 </div>
               ) : (
@@ -156,7 +158,7 @@ export function JobCard({
                     .map(([round, rSlots]) => (
                       <div key={round}>
                         <p className="text-xs font-bold text-ink-500 dark:text-ink-400 uppercase tracking-wider mb-3">
-                          Vòng {round} ({rSlots.length} ca)
+                          {t('job.roundGroup', { round, count: rSlots.length })}
                         </p>
                         <div className="space-y-3">
                           {rSlots.map((slot) => (

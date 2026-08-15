@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   FileText,
   ExternalLink,
-  Send,
   KeyRound,
   Loader2,
   Mail,
@@ -55,7 +54,6 @@ export default function RecruiterCandidateDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [inviting, setInviting] = useState(false)
   const [coding, setCoding] = useState(false)
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -83,21 +81,6 @@ export default function RecruiterCandidateDetailPage() {
   }, [id, t])
 
   const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])
-
-  const sendInvite = async () => {
-    if (!id) return
-    setInviting(true)
-    setError('')
-    setNotice('')
-    try {
-      await applicationService.sendInvite(id)
-      setNotice(t('sent'))
-    } catch (e) {
-      setError(apiErr(e, t('sendError')))
-    } finally {
-      setInviting(false)
-    }
-  }
 
   const genCode = async () => {
     if (!id) return
@@ -339,18 +322,6 @@ export default function RecruiterCandidateDetailPage() {
                   <ExternalLink className="ml-auto h-3.5 w-3.5 text-ink-400" />
                 </button>
               )}
-              <button
-                onClick={sendInvite}
-                disabled={inviting}
-                className="flex w-full items-center gap-3 rounded-xl bg-brand-600 px-3 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {inviting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}{' '}
-                {t('sendMagicLink')}
-              </button>
               <button
                 onClick={genCode}
                 disabled={coding || !app.hasScheduledInterview}

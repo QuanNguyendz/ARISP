@@ -6,7 +6,8 @@
   "saveSuccess": "System settings saved.",
   "tabs": {
     "auth": "Login & Email Domains",
-    "integrations": "Integrations & Webhook"
+    "integrations": "Integrations & Webhook",
+    "interview": "Interview"
   },
   "auth": {
     "title": "Allowed Email Domains",
@@ -20,6 +21,24 @@
     "empty": "No domains yet. When empty, all email domains will be blocked from Google sign-in.",
     "removeDomainAria": "Remove {{domain}}",
     "invalidDomain": "\"{{domain}}\" is not a valid domain."
+  },
+  "interview": {
+    "title": "Interview location",
+    "description": "Printed in the interview invitation email (time — location — directions). One location is shared system-wide.",
+    "address": "Office address",
+    "addressPlaceholder": "3rd floor, ABC Building, 266 Doi Can, Ba Dinh, Hanoi",
+    "addressHint": "Include floor / building / street number so candidates can actually find it — not just the city.",
+    "directions": "Directions",
+    "directionsPlaceholder": "Enter the lobby, take lift L4 or L5 on the left, the room is right behind the reception desk.",
+    "directionsHint": "Optional. A couple of lines keeps candidates from getting lost in a large building.",
+    "mapUrl": "Map link",
+    "mapUrlHint": "Optional. Paste a Google Maps link — the invitation shows it as a \"view map\" link.",
+    "notice": "Leave the address empty and the invitation drops the location line entirely — better missing than wrong. Online test rounds are taken remotely and ignore this.",
+    "descriptions": {
+      "interview_location_address": "Office address printed in interview invitations",
+      "interview_location_directions": "Directions printed in interview invitations",
+      "interview_location_map_url": "Map link attached to interview invitations"
+    }
   },
   "integrations": {
     "title": "Webhook & Integrations",

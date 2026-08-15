@@ -63,7 +63,6 @@
   },
   "inviteSuccess": "Đã gửi magic link mời phỏng vấn tới {{email}}.",
   "inviteError": "Gửi lời mời thất bại.",
-  "sendInvite": "Gửi magic link mời phỏng vấn",
   "viewDetails": "Xem chi tiết",
   "candidateDetail": {
     "title": "Chi tiết ứng viên",

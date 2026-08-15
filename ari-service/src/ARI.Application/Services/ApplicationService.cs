@@ -24,6 +24,7 @@ namespace ARI.Application.Services
         private readonly INotificationService _notificationService;
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly IMemoryCache _cache;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         // Cache key cho danh sách toàn bộ ứng tuyển (HR view).
         private const string AllApplicationsCacheKey = "applications:all";
@@ -46,7 +47,8 @@ namespace ARI.Application.Services
             IEmailService emailService,
             INotificationService notificationService,
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
@@ -54,7 +56,14 @@ namespace ARI.Application.Services
             _notificationService = notificationService;
             _scopeFactory = scopeFactory;
             _cache = cache;
+            _configuration = configuration;
         }
+
+        /// <summary>Gốc Candidate Portal cho link trong email — không hardcode localhost vào thư gửi đi.</summary>
+        private string PortalBaseUrl =>
+            (_configuration["Frontend:CandidateBaseUrl"]
+             ?? _configuration["Authentication:AdminFrontendUrl"]
+             ?? "http://localhost:3000").TrimEnd('/');
 
         /// <summary>
         /// Hàm tiện ích dùng chung để Map Entity sang Response (Tránh lặp code)
@@ -292,7 +301,7 @@ namespace ARI.Application.Services
             <p style='color: #475569; font-size: 15px;'>Hồ sơ của bạn đã được chuyển tới bộ phận Tuyển dụng của chúng tôi. Chúng tôi sẽ xem xét và phản hồi lại cho bạn trong thời gian sớm nhất.</p>
             <p style='color: #475569; font-size: 15px;'>Bạn có thể theo dõi trạng thái hồ sơ của mình trực tiếp trên Candidate Portal:</p>
             <div style='text-align: center; margin: 28px 0;'>
-                <a href='http://localhost:3000/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ ứng tuyển</a>
+                <a href='{PortalBaseUrl}/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ ứng tuyển</a>
             </div>
             <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
             <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ nhân sự ARISP.</p>
@@ -891,17 +900,13 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// Gửi lời mời phỏng vấn theo vòng: tạo InterviewInvite (token hoá), email link CHỌN LỊCH
-        /// trên thiết bị cá nhân của ứng viên (base URL theo môi trường, không hardcode localhost).
+        /// Mở một vòng phỏng vấn cho hồ sơ: tạo <see cref="InterviewInvite"/> đánh dấu "vòng đang hoạt động"
+        /// (mọi nơi đọc vòng hiện tại đều lấy <c>max(RoundNumber)</c> của bảng này) và nâng hồ sơ khỏi
+        /// giai đoạn duyệt CV. <b>Không gửi email</b> — thư duy nhất gửi cho ứng viên là thư mời kèm giờ hẹn
+        /// ở bước xếp lịch (ADR-059); trước đây hàm này còn gửi một thư "nhân sự sẽ xếp lịch sau" nên ứng
+        /// viên nhận hai thư rời rạc, thư đầu không có thông tin nào dùng được.
         /// </summary>
-        /// <param name="frontendBaseUrl">Base URL portal ứng viên (controller truyền từ config).</param>
-        /// <param name="roundNumber">Vòng cần mời (mặc định 1).</param>
-        /// <param name="sendEmail">
-        /// Có gửi email báo "qua vòng CV" hay không. Luồng duyệt CV → gán lịch chỉ gửi MỘT email duy nhất
-        /// (email gộp ở bước gán slot đã kèm chúc mừng qua CV + lịch + 2 nút), nên <c>AcceptApplicationAsync</c>
-        /// gọi với <c>sendEmail: false</c> (chỉ đổi trạng thái + tạo token + chuông). Standalone "Mời" vẫn gửi.
-        /// </param>
-        public async Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default, bool sendEmail = true)
+        public async Task<Result<bool>> OpenRoundForSchedulingAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
@@ -909,11 +914,9 @@ namespace ARI.Application.Services
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
-            var baseUrl = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
 
-            // Sinh token thật (gửi email) + lưu hash. Một invite còn hiệu lực / (application, round):
-            // vô hiệu hoá invite cũ chưa dùng của vòng này trước khi tạo mới.
-            var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            // Một invite còn hiệu lực / (application, round): xoá invite cũ CHƯA gắn lịch của vòng này.
+            // Invite đã có lịch (ScheduledAt != null) là dấu vết lịch sử, giữ nguyên.
             var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
                 .FindAsync(i => i.ApplicationId == applicationId && i.RoundNumber == roundNumber && i.ScheduledAt == null, ct);
             foreach (var old in oldInvites)
@@ -923,58 +926,22 @@ namespace ARI.Application.Services
             {
                 ApplicationId = applicationId,
                 RoundNumber = roundNumber,
-                TokenHash = TokenHashing.Sha256Hex(rawToken),
+                // Cột TokenHash là NOT NULL từ thời ứng viên tự đặt lịch bằng link có token. Luồng đó đã bị
+                // ADR-048 gỡ bỏ và không dòng code nào còn đối chiếu giá trị này — sinh ngẫu nhiên để thoả
+                // ràng buộc, KHÔNG phát tán ra ngoài dưới bất kỳ dạng nào.
+                TokenHash = TokenHashing.Sha256Hex(Guid.NewGuid().ToString("N")),
                 ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
             };
             await _unitOfWork.Repository<InterviewInvite>().AddAsync(invite, ct);
 
-            // ADR-048: ứng viên KHÔNG tự chọn lịch nữa — nhân sự sẽ gán giờ cụ thể. Email chỉ báo qua vòng CV
-            // + hướng dẫn theo dõi Portal; giờ hẹn thật sẽ gửi ở email "Lịch phỏng vấn đã được xếp".
-            var portalLink = $"{baseUrl}/candidate/applications";
+            // Qua vòng CV → mở giai đoạn sơ loại/phỏng vấn (và bật phỏng vấn thử).
+            if (string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+                application.Status = "screening";
+            application.UpdatedAt = DateTimeOffset.UtcNow;
+            await _unitOfWork.SaveChangesAsync(ct);
 
-            var subject = "[ARISP] - Hồ sơ của bạn đã qua vòng duyệt CV";
-            var htmlMessage = $@"
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
-            <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
-            <p>Chúc mừng bạn! Hồ sơ ứng tuyển của bạn đã thông qua vòng duyệt hồ sơ (CV Review) — vòng {roundNumber}.</p>
-            <p><strong>Bộ phận nhân sự sẽ xếp lịch phỏng vấn</strong> và gửi thông báo giờ hẹn cụ thể cho bạn trong thời gian tới. Vui lòng theo dõi email và Candidate Portal.</p>
-            <p style='text-align: center; margin: 30px 0;'>
-                <a href='{portalLink}' style='padding: 12px 25px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>Vào Candidate Portal</a>
-            </p>
-            <p style='color: #666; font-size: 12px;'><i>Lưu ý: Buổi phỏng vấn thật diễn ra tại văn phòng — bạn sẽ nhập mã phỏng vấn (Interview Code) do nhân sự cấp tại chỗ. Sau khi có lịch, bạn có thể luyện tập với chế độ phỏng vấn thử trước ngày hẹn.</i></p>
-            <br/>
-            <p>Trân trọng,</p>
-            <p><strong>Đội ngũ nhân sự ARISP</strong></p>
-        </div>";
-
-            var emailCandidateAccount = application.CandidateAccountId.HasValue 
-                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
-                : null;
-            var settings = emailCandidateAccount != null && !string.IsNullOrEmpty(emailCandidateAccount.SettingsJson)
-                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(emailCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
-                : new ARI.Application.DTOs.CandidateSettingsDto();
-
-            try
-            {
-                if (sendEmail && settings.InterviewInvite.Email)
-                {
-                    await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage);
-                }
-
-                // Mời phỏng vấn = đã qua CV → mở giai đoạn sơ loại/phỏng vấn (và bật phỏng vấn thử).
-                // Nâng từ invited/cv_submitted → screening để PracticeAvailable = true.
-                if (string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
-                    application.Status = "screening";
-                application.UpdatedAt = DateTimeOffset.UtcNow;
-                await _unitOfWork.SaveChangesAsync(ct);
-
-                return Result<bool>.Success(true);
-            }
-            catch (Exception ex)
-            {
-                return Result<bool>.Failure($"Lỗi khi gọi dịch vụ gửi email: {ex.Message}");
-            }
+            return Result<bool>.Success(true);
         }
 
         /// <summary>
@@ -982,7 +949,7 @@ namespace ARI.Application.Services
         /// bước này — ứng viên chỉ nhận chuông báo qua CV; email mời phỏng vấn (gộp chúc mừng qua CV + lịch hẹn
         /// + 2 nút xác nhận/từ chối) được gửi MỘT LẦN DUY NHẤT khi HR gán khung giờ (AssignSlotCommand).
         /// </summary>
-        public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default)
+        public async Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
@@ -996,7 +963,7 @@ namespace ARI.Application.Services
 
             // Nâng trạng thái + tạo token đánh dấu vòng, NHƯNG không gửi email ở đây (sendEmail: false) —
             // chỉ gửi 1 email duy nhất khi gán lịch (email đó đã gộp chúc mừng qua CV + lịch + 2 nút).
-            var inviteResult = await SendInterviewInviteAsync(applicationId, frontendBaseUrl, 1, ct, sendEmail: false);
+            var inviteResult = await OpenRoundForSchedulingAsync(applicationId, 1, ct);
             if (inviteResult.IsFailure)
             {
                 return Result<bool>.Failure(inviteResult.Error);
@@ -1130,7 +1097,7 @@ namespace ARI.Application.Services
             <p>Chúng tôi rất ấn tượng với hồ sơ và kinh nghiệm của bạn. Tuy nhiên, sau khi xem xét kỹ lưỡng các yêu cầu hiện tại của công việc, chúng tôi rất tiếc chưa thể tiến xa hơn với bạn trong đợt tuyển dụng này.</p>
             <p>Thông tin của bạn sẽ được lưu giữ trong hệ thống cơ sở dữ liệu tài năng của chúng tôi. Nếu có các cơ hội phù hợp hơn trong tương lai, chúng tôi sẽ chủ động liên hệ lại.</p>
             <div style='text-align: center; margin: 28px 0;'>
-                <a href='http://localhost:3000/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ của bạn</a>
+                <a href='{PortalBaseUrl}/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ của bạn</a>
             </div>
             <p>Chúc bạn luôn nhiều sức khỏe và may mắn trên con đường sự nghiệp của mình.</p>
             <br/>
@@ -1174,13 +1141,20 @@ namespace ARI.Application.Services
 
         /// <summary>
         /// Còn được phỏng vấn thử cho vòng <paramref name="roundNumber"/> không (1 lượt / vòng).
-        /// Eligible = chưa có phiên practice nào của vòng này.
+        /// Eligible = vòng này KHÔNG phải trắc nghiệm và chưa có phiên practice nào của vòng.
         /// </summary>
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result.Failure<bool>("Application not found.");
+
+            // Vòng trắc nghiệm không hỗ trợ phỏng vấn thử (buổi thử là hội thoại với AI).
+            var roundConfig = (await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                    r => r.JobPostingId == application.JobPostingId && r.RoundNumber == roundNumber, ct))
+                .FirstOrDefault();
+            if (ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(roundConfig?.RoundType))
+                return Result.Success(false);
 
             var used = await _unitOfWork.Repository<InterviewSession>().FindAsync(
                 s => s.ApplicationId == applicationId && s.SessionType == "practice" && s.RoundNumber == roundNumber, ct);

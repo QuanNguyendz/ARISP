@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -14,9 +15,9 @@ import {
 import { applicationService } from '@ari/shared/fservices/application'
 import { interviewService, type SlotCandidate } from '@ari/shared/fservices/interview'
 import { RescheduleModal } from './RescheduleModal'
-import { declineReasonLabel, isRejected, stateOf } from './candidateState'
+import { declineReasonLabelKey, isRejected, stateOf } from './candidateState'
 import { fmtDur, initials } from './format'
-import type { WorkspaceConfig } from './workspaceConfig'
+import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
 
 export function CandidateRow({
   c,
@@ -37,6 +38,7 @@ export function CandidateRow({
   onReload: () => void
   workspace: WorkspaceConfig
 }) {
+  const { t } = useTranslation(INTERVIEWS_NS)
   const navigate = useNavigate()
   const [sendingReminder, setSendingReminder] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -58,7 +60,7 @@ export function CandidateRow({
       onReload()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(err?.response?.data?.message || 'Không thể cấp mã phỏng vấn.')
+      setToast(err?.response?.data?.message || t('candidate.genCodeError'))
       setTimeout(() => setToast(null), 3000)
     } finally {
       setGeneratingCode(false)
@@ -79,10 +81,10 @@ export function CandidateRow({
     setSendingReminder(true)
     try {
       const res = await interviewService.sendBookingReminder(c.bookingId)
-      setToast(res.message || 'Đã gửi email nhắc lịch thành công!')
+      setToast(res.message || t('candidate.remindSuccess'))
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(err?.response?.data?.message || 'Lỗi khi gửi email nhắc lịch.')
+      setToast(err?.response?.data?.message || t('candidate.remindError'))
     } finally {
       setSendingReminder(false)
       setTimeout(() => setToast(null), 3000)
@@ -90,13 +92,13 @@ export function CandidateRow({
   }
 
   const handleReject = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn loại ứng viên "${c.candidateName}" khỏi quy trình tuyển dụng không?`)) return
+    if (!window.confirm(t('candidate.rejectConfirm', { name: c.candidateName }))) return
     setRejecting(true)
     try {
       await applicationService.rejectApplication(c.applicationId)
       onReload()
     } catch {
-      setToast('Không thể loại ứng viên.')
+      setToast(t('candidate.rejectError'))
       setTimeout(() => setToast(null), 3000)
     } finally {
       setRejecting(false)
@@ -108,7 +110,7 @@ export function CandidateRow({
       ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
       : 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20'
 
-  const reasonLabel = declineReasonLabel(c)
+  const reasonLabelKey = declineReasonLabelKey(c)
 
   return (
     <div
@@ -136,13 +138,13 @@ export function CandidateRow({
 
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
           <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${state.chip}`}>
-            {state.label}
+            {t(state.labelKey)}
           </span>
 
           {c.verdict && (
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${verdictCls}`}>
-              {c.verdict === 'pass' ? 'Pass' : 'Not Pass'}
-              {c.overallScore != null && ` · ${c.overallScore}đ`}
+              {c.verdict === 'pass' ? t('candidate.pass') : t('candidate.notPass')}
+              {c.overallScore != null && ` · ${t('candidate.score', { score: c.overallScore })}`}
             </span>
           )}
 
@@ -159,9 +161,9 @@ export function CandidateRow({
               }`}
             >
               {c.sessionStatus === 'completed'
-                ? 'Hoàn tất'
+                ? t('candidate.sessionCompleted')
                 : c.sessionStatus === 'active'
-                  ? 'Đang thực hiện'
+                  ? t('candidate.sessionActive')
                   : c.sessionStatus}
             </span>
           )}
@@ -181,7 +183,7 @@ export function CandidateRow({
                 type="button"
                 onClick={() => handleCopyCode(c.interviewCode!)}
                 className="p-1 hover:bg-violet-100 dark:hover:bg-violet-500/20 rounded transition-colors text-violet-600 dark:text-violet-300"
-                title="Sao chép mã"
+                title={t('candidate.copyCode')}
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
@@ -190,43 +192,61 @@ export function CandidateRow({
             <button
               disabled={generatingCode || closed}
               onClick={handleGenCode}
-              title={closed ? `Lịch đã đóng (${state.label.toLowerCase()})` : 'Cấp mã phòng thi cho ca này'}
+              title={
+                closed
+                  ? t('candidate.closedTitle', { state: t(state.labelKey).toLowerCase() })
+                  : t('candidate.genCodeTitle')
+              }
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-violet-200 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-500/10 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <KeyRound className="w-3.5 h-3.5" />
-              <span>{generatingCode ? 'Đang tạo...' : 'Cấp mã'}</span>
+              <span>{generatingCode ? t('candidate.generating') : t('candidate.genCode')}</span>
             </button>
           )}
 
           <button
             disabled={sendingReminder || closed}
             onClick={handleRemind}
-            title={closed ? `Lịch đã đóng (${state.label.toLowerCase()})` : 'Gửi mail nhắc lịch phỏng vấn'}
+            title={
+              closed
+                ? t('candidate.closedTitle', { state: t(state.labelKey).toLowerCase() })
+                : t('candidate.remindTitle')
+            }
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/10 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Bell className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{sendingReminder ? 'Đang gửi...' : 'Nhắc lịch'}</span>
+            <span className="hidden md:inline">
+              {sendingReminder ? t('candidate.sending') : t('candidate.remind')}
+            </span>
           </button>
 
           {/* Dời lịch VẪN mở cho người báo bận / quá hạn — đó là cách xếp lại cho họ. */}
           <button
             disabled={rejected}
             onClick={() => setShowReschedule(true)}
-            title={rejected ? 'Hồ sơ đã bị loại khỏi quy trình' : 'Dời ứng viên sang ca phỏng vấn khác'}
+            title={
+              rejected ? t('candidate.rescheduleDisabledTitle') : t('candidate.rescheduleTitle')
+            }
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-brand-200 dark:border-brand-500/20 bg-brand-50/50 dark:bg-brand-500/10 text-xs font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Dời lịch</span>
+            <span className="hidden md:inline">{t('candidate.reschedule')}</span>
           </button>
 
           <button
             disabled={rejecting || rejected}
             onClick={handleReject}
-            title={rejected ? 'Ứng viên đã bị loại khỏi quy trình tuyển dụng' : 'Loại ứng viên khỏi quy trình tuyển dụng'}
+            title={rejected ? t('candidate.rejectedTitle') : t('candidate.rejectTitle')}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50/50 dark:bg-red-500/10 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <UserX className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{rejecting ? 'Đang loại...' : rejected ? 'Đã loại' : 'Loại'}</span>
+            <span className="hidden md:inline">
+              {rejecting
+                ? t('candidate.rejecting')
+                : rejected
+                  ? t('candidate.rejected')
+                  : t('candidate.reject')}
+            </span>
           </button>
 
           <button
@@ -239,7 +259,7 @@ export function CandidateRow({
             }
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 transition-colors"
           >
-            <Eye className="w-3.5 h-3.5" /> Xem
+            <Eye className="w-3.5 h-3.5" /> {t('candidate.view')}
           </button>
         </div>
       </div>
@@ -248,15 +268,15 @@ export function CandidateRow({
       {c.candidateState === 'expired_no_response' && (
         <div className="mt-1 text-xs bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 p-2.5 rounded-xl border border-orange-200 dark:border-orange-500/20 flex items-start gap-2">
           <MessageSquare className="w-4 h-4 shrink-0 mt-0.5 text-orange-500" />
-          <span>Hệ thống tự huỷ lịch vì ứng viên không xác nhận trong thời hạn. Có thể dời sang ca khác.</span>
+          <span>{t('candidate.expiredBanner')}</span>
         </div>
       )}
 
-      {reasonLabel && c.declineReason && (
+      {reasonLabelKey && c.declineReason && (
         <div className="mt-1 text-xs bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 p-2.5 rounded-xl border border-red-200 dark:border-red-500/20 flex items-start gap-2">
           <MessageSquare className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
           <div className="min-w-0">
-            <span className="font-bold">{reasonLabel} </span>
+            <span className="font-bold">{t(reasonLabelKey)} </span>
             <span className="break-words">&quot;{c.declineReason}&quot;</span>
           </div>
         </div>
