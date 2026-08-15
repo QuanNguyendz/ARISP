@@ -23,7 +23,7 @@
     "phonePlaceholder": "e.g. 0901 234 567",
     "changeAvatar": "Change profile photo",
     "avatarTypeError": "Only JPG, PNG or WEBP images are accepted.",
-    "avatarSizeError": "Image exceeds 2MB. Please choose a smaller one.",
+    "avatarSizeError": "Image exceeds 10MB. Please choose a smaller one.",
     "avatarUploadFailed": "Could not upload the photo. Please try again.",
     "headline": "Current Job Title",
     "headlinePlaceholder": "e.g. Frontend Engineer",

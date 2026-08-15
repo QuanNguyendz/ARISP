@@ -27,6 +27,8 @@ import sharedDesignSystemVi from './locales/vi/modules/shared/designSystem.json'
 import sharedDesignSystemEn from './locales/en/modules/shared/designSystem.json'
 import sharedDocumentViewerVi from './locales/vi/modules/shared/documentViewer.json'
 import sharedDocumentViewerEn from './locales/en/modules/shared/documentViewer.json'
+import sharedImageCropVi from './locales/vi/modules/shared/imageCrop.json'
+import sharedImageCropEn from './locales/en/modules/shared/imageCrop.json'
 
 export const sharedNamespaces = [
   'common',
@@ -42,6 +44,7 @@ export const sharedNamespaces = [
   'modules/shared/assignSchedulePanel',
   'modules/shared/designSystem',
   'modules/shared/documentViewer',
+  'modules/shared/imageCrop',
 ]
 
 export const sharedResources = {
@@ -59,6 +62,7 @@ export const sharedResources = {
     'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelVi,
     'modules/shared/designSystem': sharedDesignSystemVi,
     'modules/shared/documentViewer': sharedDocumentViewerVi,
+    'modules/shared/imageCrop': sharedImageCropVi,
   },
   en: {
     common: commonEn,
@@ -74,5 +78,6 @@ export const sharedResources = {
     'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelEn,
     'modules/shared/designSystem': sharedDesignSystemEn,
     'modules/shared/documentViewer': sharedDocumentViewerEn,
+    'modules/shared/imageCrop': sharedImageCropEn,
   },
 }
