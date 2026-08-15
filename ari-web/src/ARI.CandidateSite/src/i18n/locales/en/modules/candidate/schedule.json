@@ -1,6 +1,10 @@
 {
   "pageTitle": "Your Interview Schedule",
   "pageDescription": "Schedule assigned by HR. Please confirm or decline with a reason for rescheduling.",
+  "breadcrumb": {
+    "home": "Home"
+  },
+  "backToApplications": "Back to my applications",
   "errors": {
     "loadFailed": "Failed to load schedule.",
     "confirmFailed": "Failed to confirm schedule.",
@@ -13,26 +17,59 @@
     "message": "Please log in to the Candidate Portal to view and confirm your interview schedule.",
     "button": "Log in to continue"
   },
-  "noSchedule": "HR has not scheduled an interview for you yet. You will receive a notification when a schedule is available.",
+  "noScheduleTitle": "No interviews scheduled",
+  "noSchedule": "HR has not scheduled an interview for you yet. You will be notified as soon as one is set.",
+  "jobTitleFallback": "Interview",
+  "nextUp": {
+    "label": "Next up"
+  },
+  "summary": {
+    "upcoming": "Upcoming",
+    "pending": "Awaiting your confirmation",
+    "past": "Completed"
+  },
+  "relative": {
+    "inProgress": "In progress",
+    "minutes": "In {{count}} min",
+    "hours": "In {{count}} h",
+    "tomorrow": "Tomorrow",
+    "days": "In {{count}} days"
+  },
+  "dayGroup": {
+    "count": "{{count}} session(s)"
+  },
   "awaitingSection": {
     "badge": "Declined",
-    "title": "Interview · Round {{round}}",
+    "title": "{{jobTitle}} · Round {{round}}",
     "message": "You declined this schedule{{declineReason}}. HR will schedule another time slot and notify you.",
     "dismissButton": "Dismiss from list"
   },
   "scheduleItem": {
-    "interviewRound": "{{jobTitle || 'Interview'}} · Round {{round}}",
+    "roundLabel": "Round {{round}}",
     "confirmed": "Confirmed",
     "pendingConfirmation": "Pending confirmation",
     "confirmedLocked": "You have confirmed attendance. This decision is locked and cannot be changed.",
     "confirmButton": "Confirm attendance",
     "declineButton": "Decline / Reschedule"
   },
-  "practiceLink": "Go to application to practice interview",
+  "prep": {
+    "title": "What to prepare",
+    "item1": "Bring your ID card and the 6-character interview code to enter at the office Kiosk.",
+    "item2": "Arrive about 10 minutes early so there is time to check your microphone and camera.",
+    "item3": "The interview code is single-use and expires 2 hours after it is issued."
+  },
+  "practiceCard": {
+    "title": "Practice before the real thing",
+    "description": "Each round includes one practice interview so you can get used to the AI — it does not affect your hiring result."
+  },
+  "practiceLink": "Start practising",
+  "pastSection": {
+    "title": "Completed"
+  },
   "modal": {
     "confirmTitle": "Confirm attendance?",
     "declineTitle": "Decline / Request reschedule?",
-    "confirmSummary": "{{jobTitle || 'Interview'}} · Round {{round}} — {{day}}, {{time}}",
+    "confirmSummary": "{{jobTitle}} · Round {{round}} — {{day}}, {{time}}",
     "declineReasonLabel": "Reason you cannot attend (HR will schedule another time):",
     "declineReasonPlaceholder": "Example: Conflict with school exam, busy at work...",
     "warning": "Are you sure about your decision? After clicking, you will not be able to modify this choice.",

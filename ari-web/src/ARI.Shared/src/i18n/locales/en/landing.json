@@ -98,7 +98,7 @@
     "logout": "Log out",
     "myProfile": "My Profile",
     "myApplications": "My Applications",
-    "results": "Results & Interview Schedule",
+    "schedule": "Interview Schedule",
     "settings": "Settings",
     "markAllRead": "Mark all as read",
     "deleteAll": "Delete all",
@@ -144,11 +144,7 @@
       "languageDefault": "Vietnamese"
     },
     "sections": {
-      "skills": "Skills",
-      "aboutDepartment": "About the Department"
-    },
-    "company": {
-      "teamSize": "{{count}} engineers · Hybrid"
+      "skills": "Skills"
     },
     "apply": {
       "applyNow": "Apply now",
