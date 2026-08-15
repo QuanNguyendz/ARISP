@@ -15,7 +15,7 @@ import {
   X,
   User,
   FileText,
-  Clapperboard,
+  CalendarCheck,
   Settings,
   LogOut,
   Trash2,
@@ -168,11 +168,14 @@ export default function CandidateHeader() {
     },
   ]
 
+  // Mục cũ "Kết quả & lịch phỏng vấn" đã gỡ: màn Kết quả bị xoá nên `/candidate/results` chỉ còn
+  // là redirect về chính `/candidate/applications` — hai mục dẫn cùng một chỗ. Kết quả phỏng vấn
+  // nằm trong chi tiết từng hồ sơ; lịch phỏng vấn nay có màn riêng bên dưới.
   const USER_MENU = [
     { label: t('header.myProfile'), to: '/candidate/profile', icon: User },
     { label: t('header.myApplications'), to: '/candidate/applications', icon: FileText },
+    { label: t('header.schedule'), to: '/candidate/schedule', icon: CalendarCheck },
     { label: t('header.savedJobs'), to: '/candidate/saved-jobs', icon: Bookmark },
-    { label: t('header.results'), to: '/candidate/results', icon: Clapperboard },
     { label: t('header.settings'), to: '/candidate/settings', icon: Settings },
   ]
 

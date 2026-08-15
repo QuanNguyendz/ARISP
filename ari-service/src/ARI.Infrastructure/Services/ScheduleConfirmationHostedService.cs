@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
 using ARI.Application.Options;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -93,6 +94,9 @@ namespace ARI.Infrastructure.Services
             {
                 booking.ConfirmationStatus = "declined";
                 booking.DeclineReason = "[Hệ thống] Ứng viên không xác nhận lịch trong thời hạn.";
+                // Nguồn đóng lịch nằm ở CỘT chứ không ở nội dung câu trên: giao diện phải phân biệt
+                // được "quá hạn xác nhận" với "ứng viên báo bận" mà không đọc văn xuôi.
+                booking.DeclinedBy = BookingDeclinedBy.System;
                 booking.RespondedAt = now;
                 booking.Status = "declined"; // trả chỗ + gỡ khỏi unique 'scheduled' để nhân sự gán lịch mới
                 booking.UpdatedAt = now;

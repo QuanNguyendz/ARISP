@@ -87,10 +87,23 @@ namespace ARI.Application.Realtime
             "online_test_submissions",
             "evaluations",
             "interview_codes",
+            "interview_sessions",
+        };
+
+        /// <summary>
+        /// Bảng đã có sẵn <c>job_posting_id</c> trong payload nhưng vẫn phải tra tin để biết CHỦ TIN
+        /// (<c>job_postings.created_by_user_id</c> không nằm trên dòng của bảng này).
+        /// </summary>
+        private static readonly HashSet<string> JobScopedTables = new(StringComparer.Ordinal)
+        {
+            "availability_slots",
         };
 
         public static bool NeedsApplicationLookup(string? table) =>
             table is not null && ApplicationScopedTables.Contains(table);
+
+        public static bool NeedsJobLookup(string? table) =>
+            table is not null && JobScopedTables.Contains(table);
 
         /// <summary>
         /// Đọc payload JSON của pg_notify. Trả null nếu không parse được — listener bỏ qua thay vì chết,
@@ -175,7 +188,17 @@ namespace ARI.Application.Realtime
                 case "online_test_submissions":
                 case "evaluations":
                 case "interview_codes":
+                case "interview_sessions":
                     Add(users, lookup.CandidateAccountId);
+                    Add(users, lookup.JobOwnerUserId);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Khung giờ + sức chứa là dữ liệu VẬN HÀNH nội bộ: nhân sự sửa sức chứa ở màn cấu
+                // hình lịch thì màn Phỏng vấn phải thấy ngay. CỐ Ý không gửi cho ứng viên — họ không
+                // có việc gì với sức chứa của ca, và đây là kênh song song với API nên phải giữ
+                // đúng phạm vi tối thiểu.
+                case "availability_slots":
                     Add(users, lookup.JobOwnerUserId);
                     groups.Add(HrAdminGroup);
                     break;

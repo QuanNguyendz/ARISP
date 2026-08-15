@@ -175,6 +175,14 @@ namespace ARI.Application.DTOs
 
     /// <summary>
     /// Chi tiết một ca phỏng vấn (AvailabilitySlot), kèm thống kê đặt lịch.
+    ///
+    /// QUAN TRỌNG — <see cref="BookedCount"/> là SỐ CHỖ ĐANG BỊ CHIẾM (booking
+    /// <c>status = 'scheduled'</c>), KHÔNG phải tổng số dòng booking. Ứng viên báo bận / quá hạn
+    /// xác nhận / bị loại đều đã TRẢ chỗ (ADR-048) nên không tính vào đây — đúng bằng con số mà
+    /// server dùng để chặn khi gán và khi dời lịch. Trước đây trường này đếm mọi dòng nên giao
+    /// diện hiện những phân số vô nghĩa kiểu "4/3 ứng viên" trong khi server vẫn thấy còn chỗ
+    /// trống, và bộ lọc ca đích của màn Dời lịch giấu mất những ca thật ra nhận thêm được.
+    /// Muốn biết tổng số dòng thì dùng <see cref="TotalBookingRows"/>.
     /// </summary>
     public class InterviewSlotDetailDto
     {
@@ -185,10 +193,33 @@ namespace ARI.Application.DTOs
         public DateTimeOffset EndTime { get; set; }
         public string Timezone { get; set; } = "Asia/Ho_Chi_Minh";
         public int Capacity { get; set; }
+
+        /// <summary>Số chỗ đang bị chiếm = booking có <c>Status = "scheduled"</c>.</summary>
         public int BookedCount { get; set; }
-        public int ConfirmedCount { get; set; }   // ConfirmationStatus = confirmed
-        public int DeclinedCount { get; set; }    // ConfirmationStatus = declined
-        public int PendingCount { get; set; }     // ConfirmationStatus = pending
+
+        /// <summary>Số chỗ còn nhận thêm được, đã kẹp không âm. Tính sẵn để giao diện không tự trừ
+        /// (chỗ nào tự trừ là chỗ đó có cơ hội ra số âm khi ca bị vượt sức chứa).</summary>
+        public int SeatsAvailable { get; set; }
+
+        /// <summary>Đang giữ chỗ VÀ ứng viên đã xác nhận tham dự.</summary>
+        public int ConfirmedCount { get; set; }
+
+        /// <summary>Đang giữ chỗ NHƯNG ứng viên chưa phản hồi.</summary>
+        public int PendingCount { get; set; }
+
+        /// <summary>Đã từ chối (báo bận hoặc quá hạn xác nhận) — ĐÃ trả chỗ, không tính vào BookedCount.</summary>
+        public int DeclinedCount { get; set; }
+
+        /// <summary>Đã bị loại khỏi quy trình — ĐÃ trả chỗ, không tính vào BookedCount.</summary>
+        public int CancelledCount { get; set; }
+
+        /// <summary>Tổng mọi dòng booking từng gắn với ca này (kể cả đã đóng) — dùng để xem lịch sử ca.</summary>
+        public int TotalBookingRows { get; set; }
+
+        /// <summary>Số chỗ bị chiếm đã vượt sức chứa. Xảy ra với dữ liệu cũ bị lệch trước khi có
+        /// migration đối soát, hoặc khi nhân sự hạ sức chứa xuống dưới số người đang giữ chỗ.</summary>
+        public bool IsOverCapacity { get; set; }
+
         public bool IsPast { get; set; }          // StartTime < now
     }
 
@@ -199,11 +230,28 @@ namespace ARI.Application.DTOs
     {
         public Guid ApplicationId { get; set; }
         public Guid BookingId { get; set; }
+        public int RoundNumber { get; set; }
         public string CandidateName { get; set; } = string.Empty;
         public string CandidateEmail { get; set; } = string.Empty;
         public string ConfirmationStatus { get; set; } = "pending"; // pending | confirmed | declined
         public string? DeclineReason { get; set; }
-        public string BookingStatus { get; set; } = "scheduled";    // scheduled | completed | cancelled
+        public string BookingStatus { get; set; } = "scheduled";    // scheduled | declined | cancelled
+
+        /// <summary>
+        /// Trạng thái đã gộp sẵn cho giao diện — xem <see cref="Domain.Constants.SlotCandidateState"/>.
+        /// Tồn tại để giao diện KHÔNG phải suy luận từ tổ hợp (BookingStatus, ConfirmationStatus)
+        /// hay tệ hơn là dò chuỗi tiếng Việt trong <see cref="DeclineReason"/> — cách cũ gắn nhãn
+        /// "Từ chối (báo bận)" cho cả người bị hệ thống tự huỷ vì quá hạn xác nhận.
+        /// </summary>
+        public string CandidateState { get; set; } = Domain.Constants.SlotCandidateState.Pending;
+
+        /// <summary>Ứng viên này có đang chiếm một chỗ của ca không (BookingStatus = "scheduled").</summary>
+        public bool OccupiesSeat { get; set; }
+
+        /// <summary>Trạng thái hồ sơ ứng tuyển (không phải trạng thái lịch) — để giao diện phân biệt
+        /// "lịch bị đóng" với "hồ sơ đã bị loại khỏi quy trình".</summary>
+        public string? ApplicationStatus { get; set; }
+
         public Guid? SessionId { get; set; }
         public string? SessionStatus { get; set; }   // active | completed | aborted
         public int? DurationSeconds { get; set; }
@@ -217,5 +265,25 @@ namespace ARI.Application.DTOs
     public class RescheduleRequest
     {
         public Guid TargetSlotId { get; set; }
+    }
+
+    /// <summary>Dời NHIỀU ứng viên sang cùng một ca trong MỘT lần gọi (được ăn cả ngã về không).</summary>
+    public class RescheduleBatchRequest
+    {
+        public List<Guid> BookingIds { get; set; } = new();
+        public Guid TargetSlotId { get; set; }
+    }
+
+    /// <summary>Một booking không dời được, kèm lý do để giao diện hiện đúng người đúng việc.</summary>
+    public class RescheduleFailureDto
+    {
+        public Guid BookingId { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class RescheduleResultDto
+    {
+        public int MovedCount { get; set; }
+        public List<RescheduleFailureDto> Failed { get; set; } = new();
     }
 }

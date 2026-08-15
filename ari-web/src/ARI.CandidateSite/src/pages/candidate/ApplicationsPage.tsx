@@ -964,8 +964,11 @@ export default function ApplicationsPage() {
                     <CalendarClock className="h-4 w-4 text-brand-600" />{' '}
                     {t('applications.upcomingSchedule')}
                   </span>
+                  {/* Màn lịch trong app (có header/footer), không phải link sâu `/portal/...`
+                      vốn dành cho email — trang đó tự dựng shell riêng, bấm từ trong app sẽ
+                      mất luôn thanh điều hướng. */}
                   <Link
-                    to={`/portal/schedule/${nextSchedule.app.id}`}
+                    to="/candidate/schedule"
                     className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline"
                   >
                     {t('applications.viewAllSchedule')} <ChevronRight className="h-3.5 w-3.5" />

@@ -1,8 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Common;
 using ARI.Application.UnitTests.Scheduling;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -22,7 +24,7 @@ public class SendBookingReminderTests
     public async Task Missing_booking_fails_without_notifying()
     {
         var notif = new RecordingNotificationService();
-        var res = await Svc(new InMemoryUnitOfWork(), notif).SendBookingReminderAsync(Guid.NewGuid(), CancellationToken.None);
+        var res = await Svc(new InMemoryUnitOfWork(), notif).SendBookingReminderAsync(Guid.NewGuid(), Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Không tìm thấy lịch phỏng vấn", res.Error);
@@ -36,7 +38,7 @@ public class SendBookingReminderTests
         var booking = SchedulingData.Booking(Guid.NewGuid(), slot.Id); // App không seed
         var uow = new InMemoryUnitOfWork().Seed(slot).Seed(booking);
 
-        var res = await Svc(uow, new()).SendBookingReminderAsync(booking.Id, CancellationToken.None);
+        var res = await Svc(uow, new()).SendBookingReminderAsync(booking.Id, Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Không tìm thấy hồ sơ ứng viên", res.Error);
@@ -51,7 +53,7 @@ public class SendBookingReminderTests
         var booking = SchedulingData.Booking(app.Id, Guid.NewGuid()); // Slot không seed
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(booking);
 
-        var res = await Svc(uow, new()).SendBookingReminderAsync(booking.Id, CancellationToken.None);
+        var res = await Svc(uow, new()).SendBookingReminderAsync(booking.Id, Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Contains("Không tìm thấy ca phỏng vấn", res.Error);
@@ -69,7 +71,7 @@ public class SendBookingReminderTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot).Seed(booking);
         var notif = new RecordingNotificationService();
 
-        var res = await Svc(uow, notif).SendBookingReminderAsync(booking.Id, CancellationToken.None);
+        var res = await Svc(uow, notif).SendBookingReminderAsync(booking.Id, Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         var rec = Assert.Single(uow.Repo<Notification>().Items);
@@ -78,6 +80,25 @@ public class SendBookingReminderTests
         Assert.Contains((accId, "ReceiveUserNotification"), notif.UserEvents);
         Assert.True(booking.Reminder24hSent);
         Assert.True(uow.SaveChangesCount >= 1);
+    }
+
+    [Fact]
+    public async Task Khong_phai_chu_tin_thi_khong_nhac_lich_duoc()
+    {
+        var job = SchedulingData.Job(owner: Guid.NewGuid());
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+        var slot = SchedulingData.Slot(job.Id, round: 1);
+        var booking = SchedulingData.Booking(app.Id, slot.Id, round: 1);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot).Seed(booking);
+        var notif = new RecordingNotificationService();
+
+        var res = await Svc(uow, notif)
+            .SendBookingReminderAsync(booking.Id, Guid.NewGuid(), AppRoles.Recruiter, CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+        Assert.Empty(notif.UserEvents);
+        Assert.False(booking.Reminder24hSent);
     }
 
     [Fact]
@@ -90,7 +111,7 @@ public class SendBookingReminderTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot).Seed(booking);
         var notif = new RecordingNotificationService();
 
-        var res = await Svc(uow, notif).SendBookingReminderAsync(booking.Id, CancellationToken.None);
+        var res = await Svc(uow, notif).SendBookingReminderAsync(booking.Id, Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.Empty(uow.Repo<Notification>().Items); // không có account → không tạo bell

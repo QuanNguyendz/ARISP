@@ -64,8 +64,13 @@ namespace ARI.Application.OnlineTest
                 return Result.Failure<OnlineTestImportResultDto>("Không đọc được file Excel. Hãy dùng đúng định dạng .xlsx theo file mẫu.");
             }
 
+            // Ngôn ngữ cấu hình cho vòng trắc nghiệm của tin này (null = tin không có vòng trắc nghiệm
+            // hoặc chưa đặt ngôn ngữ → bỏ qua kiểm tra, không có gì để đối chiếu).
+            var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, command.JobPostingId, ct);
+
             var errors = new List<OnlineTestImportRowError>();
             var toAdd = new List<OnlineTestQuestion>();
+            var acceptedTexts = new List<string>();
             int rowNumber = 0; // khớp số dòng Excel: dòng 1 là tiêu đề
 
             foreach (var cells in rows)
@@ -90,6 +95,16 @@ namespace ARI.Application.OnlineTest
                     continue;
                 }
 
+                // Sai ngôn ngữ so với cấu hình vòng → từ chối đúng dòng đó, nêu rõ lý do.
+                if (OnlineTestLanguageGuard.RowViolatesLanguage(
+                        language, parsed!.QuestionText, string.Join(" ", parsed.Options)))
+                {
+                    errors.Add(new OnlineTestImportRowError(rowNumber, OnlineTestLanguageGuard.RowErrorMessage(language)));
+                    continue;
+                }
+
+                acceptedTexts.Add(parsed.QuestionText);
+
                 var correct = CreateOnlineTestQuestionCommandHandler.NormalizeCorrect(parsed!);
                 toAdd.Add(new OnlineTestQuestion
                 {
@@ -101,6 +116,13 @@ namespace ARI.Application.OnlineTest
                     CorrectOption = correct.First(),
                 });
             }
+
+            // Kiểm tra mức CẢ FILE: bắt trường hợp nhập nhầm nguyên file tiếng Anh vào vòng cấu hình
+            // tiếng Việt. Từ chối TOÀN BỘ file (chưa ghi gì vào DB) thay vì nhận một nửa — ngân hàng
+            // câu hỏi lẫn hai ngôn ngữ còn khó dọn hơn là nhập lại.
+            var fileError = OnlineTestLanguageGuard.CheckFile(language, acceptedTexts);
+            if (fileError != null)
+                return Result.Failure<OnlineTestImportResultDto>(fileError, "language_mismatch");
 
             if (toAdd.Count > 0)
             {

@@ -23,6 +23,7 @@ import { profileService } from '@ari/shared/fservices/profile/profileService'
 import type { CandidateProfile } from '@ari/shared/fservices/profile/profileService'
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import type { JobPosting } from '@ari/shared/types/job'
 
 /** Nhãn bắt buộc — dấu * đỏ. */
@@ -38,6 +39,7 @@ export default function ApplyPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { openDocument } = useDocumentViewer()
   const { isAuthenticated } = useAuthStore()
 
   const [job, setJob] = useState<JobPosting | null>(null)
@@ -327,15 +329,22 @@ export default function ApplyPage() {
                   )}
                 </span>
                 {hasProfileCv && profile?.profileCvUrl && (
-                  <a
-                    href={resolveAssetUrl(profile.profileCvUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      // Nút nằm TRONG <label>: không chặn thì cú bấm còn kích hoạt luôn radio
+                      // chọn CV của label đó, và nổi bọt lên handler chọn nguồn CV.
+                      e.preventDefault()
+                      e.stopPropagation()
+                      openDocument(
+                        resolveAssetUrl(profile.profileCvUrl),
+                        profile.cvFileName || undefined
+                      )
+                    }}
                     className="shrink-0 text-xs font-medium text-brand-600 hover:underline"
                   >
                     {t('cv.profile.view')}
-                  </a>
+                  </button>
                 )}
               </label>
 

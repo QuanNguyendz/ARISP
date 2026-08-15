@@ -18,7 +18,12 @@ namespace ARI.Application.DTOs
         int PassScore,
         int QuestionsPerTest,
         int DurationMinutes,
-        List<OnlineTestQuestionDto> Questions);
+        List<OnlineTestQuestionDto> Questions,
+        /// <summary>
+        /// Ngôn ngữ đề thi lấy từ cấu hình vòng trắc nghiệm ("vi"/"en"); null nếu tin chưa có vòng
+        /// trắc nghiệm. Đề nhập lên phải khớp giá trị này — xem OnlineTestLanguageGuard.
+        /// </summary>
+        string? Language = null);
 
     /// <summary>Câu hỏi hiển thị cho ứng viên khi làm bài — KHÔNG lộ đáp án đúng.</summary>
     public record CandidateTestQuestionDto(Guid Id, string QuestionText, List<string> Options, string QuestionType);

@@ -21,6 +21,13 @@ internal static class SchedulingData
         Title = "Backend Developer",
     };
 
+    /// <summary>Tạo tin và trả luôn id chủ tin — hầu hết test giờ phải truyền chủ tin để qua cửa kiểm quyền.</summary>
+    public static JobPosting Job(out Guid owner)
+    {
+        owner = Guid.NewGuid();
+        return Job(owner);
+    }
+
     public static ARI.Domain.Entities.Application Application(
         Guid jobId, Guid? accountId, string status = "screening", string email = "cand@example.io") => new()
     {
@@ -56,7 +63,7 @@ internal static class SchedulingData
 
     public static InterviewBooking Booking(
         Guid appId, Guid slotId, int round = 1, string status = "scheduled",
-        string confirmation = "pending", DateTimeOffset? respondedAt = null) => new()
+        string confirmation = "pending", DateTimeOffset? respondedAt = null, string? declinedBy = null) => new()
     {
         ApplicationId = appId,
         AvailabilitySlotId = slotId,
@@ -64,6 +71,7 @@ internal static class SchedulingData
         Status = status,
         ConfirmationStatus = confirmation,
         RespondedAt = respondedAt,
+        DeclinedBy = declinedBy,
     };
 }
 
@@ -93,17 +101,22 @@ internal sealed class SlotSqlEmulator
 
     private Task<int> Handle(string sql, object[] prms, CancellationToken ct)
     {
-        var slotId = (Guid)prms[1];
+        // Hai dạng tham số cùng tồn tại:
+        //   gán 1 người : {0}=now, {1}=slotId            (AssignSlot, huỷ lịch khi loại hồ sơ)
+        //   dời N người : {0}=now, {1}=số chỗ, {2}=slotId (RescheduleBookings — chiếm/trả cả nhóm)
+        var isBatch = prms.Length >= 3;
+        var slotId = (Guid)prms[isBatch ? 2 : 1];
+        var amount = isBatch ? Convert.ToInt32(prms[1]) : 1;
         if (!_booked.ContainsKey(slotId)) return Task.FromResult(0);
 
-        if (sql.Contains("booked_count + 1")) // chốt chỗ: chỉ tăng khi còn trống
+        if (sql.Contains("booked_count = booked_count +")) // chiếm chỗ: chỉ khi còn đủ cho CẢ nhóm
         {
-            if (_booked[slotId] < _capacity[slotId]) { _booked[slotId]++; return Task.FromResult(1); }
+            if (_booked[slotId] + amount <= _capacity[slotId]) { _booked[slotId] += amount; return Task.FromResult(1); }
             return Task.FromResult(0);
         }
-        if (sql.Contains("GREATEST(booked_count - 1")) // nhả chỗ (không âm)
+        if (sql.Contains("GREATEST(booked_count -")) // trả chỗ (không âm)
         {
-            _booked[slotId] = Math.Max(_booked[slotId] - 1, 0);
+            _booked[slotId] = Math.Max(_booked[slotId] - amount, 0);
             return Task.FromResult(1);
         }
         return Task.FromResult(0);

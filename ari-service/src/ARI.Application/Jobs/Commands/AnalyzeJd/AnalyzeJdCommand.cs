@@ -63,6 +63,11 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
                 return Result.Failure<AnalyzeJdResponse>($"Không thể lưu file JD: {ex.Message}", CommonErrorCodes.ServerError);
             }
 
+            // URL xem được ngay: FE mở file JD vừa tải lên trước cả khi tin được tạo. Trước đây FE nhận
+            // đúng storageKey ("jd/xxx.pdf") rồi ghép với base URL → 404, nên khung xem PDF trắng trơn
+            // còn DOCX rơi vào nhánh lỗi chung ("có thể do CORS").
+            var viewUrl = await _fileStorage.GetUrlAsync(storageKey, ct);
+
             // Gọi Gemini trích xuất (PDF gửi inline, DOCX dùng fallback text)
             var pdfBytes = ext == ".pdf" ? bytes : null;
             var extraction = await _geminiProvider.ExtractJobFromJdAsync(pdfBytes, ext == ".pdf" ? "application/pdf" : null, jdText, ct);
@@ -74,6 +79,7 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
                 {
                     IsValidJd = false,
                     JdFileUrl = storageKey,
+                    JdFileViewUrl = viewUrl,
                     JdFileName = fileName,
                     JdFileFormat = ext.TrimStart('.'),
                     JobDescription = string.IsNullOrWhiteSpace(jdText) ? null : jdText
@@ -85,6 +91,7 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
             {
                 IsValidJd = data.IsValidJd,
                 JdFileUrl = storageKey,
+                JdFileViewUrl = viewUrl,
                 JdFileName = fileName,
                 JdFileFormat = ext.TrimStart('.'),
                 Title = data.Title,

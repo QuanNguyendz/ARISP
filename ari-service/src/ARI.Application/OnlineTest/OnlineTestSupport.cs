@@ -26,6 +26,24 @@ namespace ARI.Application.OnlineTest
             return (isAdmin || job.CreatedByUserId == uid, job);
         }
 
+        /// <summary>
+        /// Ngôn ngữ đã cấu hình cho vòng trắc nghiệm của job ("vi"/"en"), null nếu tin không có vòng
+        /// trắc nghiệm nào hoặc chưa đặt ngôn ngữ. Lấy vòng trắc nghiệm ĐẦU TIÊN theo số vòng.
+        /// </summary>
+        public static async Task<string?> GetOnlineTestLanguageAsync(
+            IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
+        {
+            var rounds = await uow.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == jobPostingId, ct);
+
+            var round = rounds
+                .Where(r => string.Equals(r.RoundType, "online_test", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(r => r.RoundNumber)
+                .FirstOrDefault();
+
+            return OnlineTestLanguageGuard.Normalize(round?.InterviewLanguage);
+        }
+
         /// <summary>Xác thực ứng viên đăng nhập sở hữu hồ sơ (theo account id hoặc email claim, có auto-link).</summary>
         public static async Task<(bool ok, ARI.Domain.Entities.Application? app)> AuthorizeCandidateAsync(
             IUnitOfWork uow, Guid applicationId, Guid candidateAccountId, string? email, CancellationToken ct)

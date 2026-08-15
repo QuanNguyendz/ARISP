@@ -46,8 +46,10 @@ namespace ARI.Application.OnlineTest
                 .Select(OnlineTestMapping.ToDto)
                 .ToList();
 
+            var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, job.Id, ct);
+
             return Result.Success(new OnlineTestBankDto(
-                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions));
+                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions, language));
         }
     }
 
@@ -223,8 +225,10 @@ namespace ARI.Application.OnlineTest
                 .Select(OnlineTestMapping.ToDto)
                 .ToList();
 
+            var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, job.Id, ct);
+
             return Result.Success(new OnlineTestBankDto(
-                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions));
+                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions, language));
         }
     }
 

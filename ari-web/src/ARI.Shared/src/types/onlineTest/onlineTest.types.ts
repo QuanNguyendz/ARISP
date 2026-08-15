@@ -19,6 +19,11 @@ export interface OnlineTestBank {
   questionsPerTest: number
   durationMinutes: number
   questions: OnlineTestQuestion[]
+  /**
+   * Ngôn ngữ đề thi lấy từ cấu hình vòng trắc nghiệm ('vi' | 'en'); null khi tin chưa có vòng
+   * trắc nghiệm. Đề nhập lên phải khớp giá trị này (BE kiểm tra khi import Excel).
+   */
+  language?: 'vi' | 'en' | null
 }
 
 /** Câu hỏi hiển thị cho ứng viên — KHÔNG có đáp án đúng. */

@@ -84,8 +84,33 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
       queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
       queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
       queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] })
-      queryClient.invalidateQueries({ queryKey: ['open-slots', applicationId] })
+      // Màn Phỏng vấn của nhân sự: booking đổi là số chỗ của ca đổi theo. Payload của trigger chỉ
+      // mang bộ khoá cố định (không có availability_slot_id) nên phải huỷ hiệu lực theo TIỀN TỐ.
+      // Rẻ: react-query chỉ nạp lại query đang active, mà mỗi lúc chỉ có vài ca đang mở.
+      queryClient.invalidateQueries({ queryKey: ['interview-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['job-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['slot-candidates'] })
       refreshCandidateData()
+      break
+
+    // Sức chứa / khung giờ đổi ở màn cấu hình lịch → màn Phỏng vấn và modal "Dời lịch" phải thấy
+    // ngay. Đây chính là lỗi người dùng báo: tăng sức chứa xong mà modal vẫn hiện số cũ.
+    case 'availability_slots':
+      queryClient.invalidateQueries({ queryKey: ['interview-jobs'] })
+      queryClient.invalidateQueries({
+        queryKey: jobPostingId ? ['job-slots', jobPostingId] : ['job-slots'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: jobPostingId ? ['schedule-slots', jobPostingId] : ['schedule-slots'],
+      })
+      break
+
+    // Phiên phỏng vấn thật: huy hiệu "Đang thực hiện" trên màn Phỏng vấn trước đây không bao giờ
+    // tự đổi vì bảng này chưa được định tuyến.
+    case 'interview_sessions':
+      queryClient.invalidateQueries({ queryKey: ['slot-candidates'] })
+      queryClient.invalidateQueries({ queryKey: ['evaluations'] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
       break
 
     case 'online_test_submissions':
@@ -264,10 +289,10 @@ export const useAppNotifications = () => {
         case 'ReceiveSystemEvent':
           // Generic system events (e.g. Schedule Slot Booked, AI Evaluation Complete)
           if (payload?.type === 'SlotBooked' || payload?.Type === 'SlotBooked') {
-            queryClient.invalidateQueries({
-              queryKey: ['open-slots', payload?.applicationId || payload?.ApplicationId],
-            })
+            // (Đã gỡ khoá ['open-slots', …]: không component nào đăng ký nó — giữ lại chỉ là lời
+            //  hứa suông về việc màn hình sẽ tự làm mới.)
             queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] })
+            queryClient.invalidateQueries({ queryKey: ['job-slots'] })
             // Notification for Recruiter
             queryClient.invalidateQueries({ queryKey: ['notifications'] })
           } else if (

@@ -75,12 +75,28 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             job.Title = request.Title!.Trim();
             job.Department = request.Department?.Trim();
             job.JobDescription = request.JobDescription!.Trim();
-            // Chỉ ghi đè file JD khi request có gửi (tránh xoá file cũ khi edit không đổi JD)
-            if (!string.IsNullOrWhiteSpace(request.JdFileUrl))
+            // Chỉ ghi đè file JD khi request có gửi (tránh xoá file cũ khi edit không đổi JD).
+            //
+            // Bỏ qua URL tuyệt đối: màn sửa tin nhận `jdFileUrl` ĐÃ ĐƯỢC PRESIGN từ GetJobById rồi gửi
+            // ngược lên khi bấm Lưu. Ghi thẳng vào DB nghĩa là cột storageKey chứa một link CÓ HẠN —
+            // hết hạn là mọi thao tác đọc file (xem lại JD, đóng dấu JD lúc duyệt tin) hỏng vĩnh viễn
+            // vì GetUrlAsync thấy "https://" sẽ trả nguyên trạng chứ không presign lại.
+            var incomingJdKey = request.JdFileUrl?.Trim();
+            var isResolvedUrl = incomingJdKey != null
+                && (incomingJdKey.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || incomingJdKey.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(incomingJdKey) && !isResolvedUrl)
             {
-                job.JdFileUrl = request.JdFileUrl;
+                job.JdFileUrl = incomingJdKey;
                 job.JdFileName = request.JdFileName;
                 job.JdFileFormat = request.JdFileFormat;
+            }
+            else if (isResolvedUrl)
+            {
+                // Giữ nguyên khoá đang lưu, nhưng tên/định dạng vẫn cập nhật được.
+                job.JdFileName = request.JdFileName ?? job.JdFileName;
+                job.JdFileFormat = request.JdFileFormat ?? job.JdFileFormat;
             }
             job.InterviewMode = request.InterviewMode;
             job.IsPublicListing = request.IsPublicListing;

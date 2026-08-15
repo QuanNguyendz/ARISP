@@ -98,7 +98,7 @@
     "logout": "Đăng xuất",
     "myProfile": "Hồ sơ của tôi",
     "myApplications": "Đơn ứng tuyển",
-    "results": "Kết quả & lịch phỏng vấn",
+    "schedule": "Lịch phỏng vấn",
     "settings": "Cài đặt",
     "markAllRead": "Đánh dấu đã đọc",
     "deleteAll": "Xóa tất cả",
@@ -144,11 +144,7 @@
       "languageDefault": "Tiếng Việt"
     },
     "sections": {
-      "skills": "Kỹ năng",
-      "aboutDepartment": "Về phòng ban"
-    },
-    "company": {
-      "teamSize": "Đội ngũ ~{{count}} kỹ sư · Hybrid"
+      "skills": "Kỹ năng"
     },
     "apply": {
       "applyNow": "Ứng tuyển ngay",
