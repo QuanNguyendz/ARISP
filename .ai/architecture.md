@@ -814,7 +814,7 @@ public interface IEmbeddingProvider
 ### ADR-057: Realtime ở TẦNG DATABASE — trigger + LISTEN/NOTIFY, không phải push thủ công
 
 - **Ngày:** 2026-08-15
-- **Trạng thái:** Đã triển khai ở local/`develop` (**chưa áp lên production** — chờ kiểm chứng xong mới merge `main`)
+- **Trạng thái:** Đã triển khai — kiểm chứng trên container Postgres trắng rồi merge `develop` → `main` ngày 2026-08-15 (CI/CD tự deploy, EF migration chạy lúc boot tạo trigger trên production)
 - **Bối cảnh:** Hệ thống đã có realtime nhưng nguồn phát nằm **hoàn toàn ở tầng ứng dụng**: mỗi command sau khi ghi DB phải tự nhớ gọi `PublishUserEventAsync(...)` — khoảng 40 điểm gọi rải khắp `ARI.Application`. Mô hình "nhớ thì push" có hai điểm yếu cấu trúc:
 
   1. **Quên là hỏng im lặng.** `ReassignJobCommand` phát `eventType = "JobReassigned"` nhưng FE không có `case` nào bắt → rơi vào `default: console.warn`, chuông của cả hai recruiter chỉ sáng sau khi F5, dù row `Notification` đã nằm trong DB. Không có test nào bắt được lỗi loại này vì hai đầu nằm ở hai ngôn ngữ khác nhau.
