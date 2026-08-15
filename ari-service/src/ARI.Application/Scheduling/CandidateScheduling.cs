@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -251,6 +252,10 @@ namespace ARI.Application.Scheduling
 
             booking.ConfirmationStatus = "declined";
             booking.DeclineReason = reason;
+            // Ghi RÕ ai đóng lịch. Lý do là văn bản ứng viên tự nhập nên không thể dùng để phân biệt
+            // "báo bận" với "hệ thống tự huỷ do quá hạn" — trước đây giao diện dò chữ trong lý do và
+            // gắn nhãn sai (ADR bổ sung cùng đợt này).
+            booking.DeclinedBy = BookingDeclinedBy.Candidate;
             booking.RespondedAt = DateTimeOffset.UtcNow;
             // Trả chỗ cho khung giờ + gỡ khỏi unique index 'scheduled' để nhân sự có thể gán lịch mới.
             booking.Status = "declined";
