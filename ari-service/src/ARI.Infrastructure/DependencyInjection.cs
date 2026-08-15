@@ -8,6 +8,7 @@ using ARI.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ARI.Infrastructure
 {
@@ -188,6 +189,15 @@ namespace ARI.Infrastructure
 
             // Auto-reject lịch ứng viên không xác nhận trong thời hạn (ADR-048) — quét 30'/lần.
             services.AddHostedService<ScheduleConfirmationHostedService>();
+
+            // Realtime tầng database (ADR-057): LISTEN kênh NOTIFY của Postgres rồi chuyển tiếp sang
+            // SignalR. Dùng chung host/credential với EF, nhưng listener tự đặt lại Pooling=false +
+            // Multiplexing=false cho connection riêng của nó — xem DbChangeListenerHostedService.
+            services.AddHostedService(sp => new DbChangeListenerHostedService(
+                connectionString,
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<ARI.Application.Options.RealtimeOptions>(),
+                sp.GetRequiredService<ILogger<DbChangeListenerHostedService>>()));
 
             return services;
         }

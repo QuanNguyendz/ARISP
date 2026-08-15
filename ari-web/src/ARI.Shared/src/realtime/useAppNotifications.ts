@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@ari/shared/store/auth'
 import {
   STAFF_NOTIF_REFRESH_EVENT,
@@ -22,6 +22,104 @@ const refreshOnlineTestResults = () =>
 
 // Remove trailing "/api" if present and append hub path
 const HUB_URL = API_BASE_URL.replace(/\/api\/?$/, '') + '/hubs/app-notifications'
+
+/**
+ * Payload của sự kiện `ReceiveDbChange` (ADR-057) — do CHÍNH database phát qua trigger + NOTIFY,
+ * không phải do command chủ động push. Chỉ chứa khoá, không bao giờ chứa nội dung bản ghi.
+ *
+ * `op`: I = thêm, U = sửa, D = xoá, S = đổi hàng loạt, `resync` = listener vừa nối lại sau khi mất
+ * kết nối DB (những NOTIFY phát trong lúc đó đã mất) nên client phải nạp lại toàn bộ.
+ */
+type DbChangePayload = {
+  t?: string
+  op?: string
+  id?: string
+  jobPostingId?: string
+  applicationId?: string
+}
+
+/**
+ * Ánh xạ "bảng nào vừa đổi" → cache nào phải tải lại. Đây là nhánh realtime bắt được MỌI đường ghi
+ * (EF, sửa SQL tay, rag-service, job nền), khác với các case bên dưới vốn chỉ chạy khi command nhớ
+ * gọi Publish. Hai nhánh chồng nhau là bình thường: react-query gộp các lần refetch trùng khoá.
+ */
+const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
+  if (payload?.op === 'resync') {
+    queryClient.invalidateQueries()
+    refreshStaffBell()
+    refreshCandidateData()
+    refreshOnlineTestResults()
+    return
+  }
+
+  const { t, id, jobPostingId, applicationId } = payload ?? {}
+
+  switch (t) {
+    // Bảng dùng chung cho chuông của cả ứng viên lẫn nhân sự.
+    case 'notifications':
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      refreshStaffBell()
+      refreshCandidateData()
+      break
+
+    case 'applications':
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['application', applicationId ?? id] })
+      queryClient.invalidateQueries({ queryKey: ['job', jobPostingId, 'applications'] })
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+      refreshCandidateData()
+      break
+
+    case 'job_postings':
+      queryClient.invalidateQueries({ queryKey: ['public-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+      if (jobPostingId ?? id) queryClient.invalidateQueries({ queryKey: ['job', jobPostingId ?? id] })
+      break
+
+    case 'interview_bookings':
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
+      queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['open-slots', applicationId] })
+      refreshCandidateData()
+      break
+
+    case 'online_test_submissions':
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['job', jobPostingId, 'applications'] })
+      refreshOnlineTestResults()
+      refreshCandidateData()
+      break
+
+    case 'evaluations':
+      queryClient.invalidateQueries({ queryKey: ['evaluations'] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      refreshStaffBell()
+      break
+
+    case 'interview_codes':
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
+      refreshCandidateData()
+      break
+
+    case 'account_requests':
+    case 'users':
+      queryClient.invalidateQueries({ queryKey: ['pending-users'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-account-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['my-account-requests'] })
+      break
+
+    // Bảng chưa cần phản ánh lên UI — im lặng bỏ qua (khác nhánh eventType bên dưới, ở đây việc
+    // không map là chuyện bình thường vì trigger gắn trên toàn bộ bảng).
+    default:
+      break
+  }
+}
 
 export const useAppNotifications = () => {
   const queryClient = useQueryClient()
@@ -72,6 +170,11 @@ export const useAppNotifications = () => {
       console.log(`[SignalR] Received Event: ${eventType}`, payload)
 
       switch (eventType) {
+        case 'ReceiveDbChange':
+          // ADR-057: sự kiện phát ra từ chính database, không phụ thuộc command có nhớ push hay không.
+          handleDbChange(queryClient, payload as DbChangePayload)
+          break
+
         case 'ReceiveNewApplication':
           // Refresh applications list
           queryClient.invalidateQueries({ queryKey: ['applications'] })
@@ -126,6 +229,17 @@ export const useAppNotifications = () => {
           // Refresh candidate's application details
           queryClient.invalidateQueries({ queryKey: ['applications'] })
           queryClient.invalidateQueries({ queryKey: ['application', payload?.id] })
+          break
+
+        case 'JobReassigned':
+          // HR Lead bàn giao tin cho recruiter khác — cả người nhận lẫn người giao đều được đẩy.
+          // Trước đây không có case này nên event rơi vào `default`, chuông hai bên chỉ sáng sau khi F5.
+          queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+          queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
+          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          queryClient.invalidateQueries({ queryKey: ['notifications'] })
+          if (payload?.jobId) queryClient.invalidateQueries({ queryKey: ['job', payload.jobId] })
+          refreshStaffBell()
           break
 
         case 'ReceiveNewAccountRequest':

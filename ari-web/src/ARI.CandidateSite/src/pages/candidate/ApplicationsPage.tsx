@@ -720,9 +720,17 @@ export default function ApplicationsPage() {
               <div className="h-20 bg-gradient-to-r from-brand-600 via-ai-600 to-ai-500" />
               <div className="px-4 sm:px-6 pb-6">
                 <div className="-mt-10">
-                  <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
-                    {initials}
-                  </span>
+                  {profile?.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt={displayName}
+                      className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20"
+                    />
+                  ) : (
+                    <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-ai-600 text-xl sm:text-2xl font-extrabold text-white shadow-card ring-4 ring-white dark:ring-ink-900 sm:h-20 sm:w-20">
+                      {initials}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                   <div>

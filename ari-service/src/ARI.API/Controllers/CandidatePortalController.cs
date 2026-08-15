@@ -491,6 +491,42 @@ namespace ARI.API.Controllers
             });
         }
 
+        /// <summary>POST /api/portal/profile/avatar — tải lên ảnh đại diện (JPG/PNG/WEBP, tối đa 2MB).</summary>
+        [HttpPost("profile/avatar")]
+        [RequestSizeLimit(3 * 1024 * 1024)]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadAvatar(Microsoft.AspNetCore.Http.IFormFile? avatarFile)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            if (avatarFile == null || avatarFile.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn ảnh." });
+
+            var ext = System.IO.Path.GetExtension(avatarFile.FileName).ToLowerInvariant();
+
+            byte[] bytes;
+            using (var ms = new System.IO.MemoryStream())
+            {
+                await avatarFile.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            }
+
+            // Kiểm định dạng/kích thước nằm trong handler (UploadAvatarCommandHandler) để logic
+            // nghiệp vụ có một nguồn duy nhất và test được — controller chỉ trích file ra bytes.
+            var result = await _sender.Send(new UploadAvatarCommand(candidateId, bytes, avatarFile.FileName, ext));
+            if (result.IsFailure)
+            {
+                return result.ErrorCode switch
+                {
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error }),
+                };
+            }
+
+            return Ok(new { avatarUrl = result.Value.AvatarUrl });
+        }
+
         /// <summary>POST /api/portal/profile/change-password — đổi (hoặc đặt lần đầu cho tài khoản Google) mật khẩu.</summary>
         [HttpPost("profile/change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] CandidateChangePasswordRequest request)

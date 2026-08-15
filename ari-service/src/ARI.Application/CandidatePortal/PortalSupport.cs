@@ -145,7 +145,23 @@ namespace ARI.Application.CandidatePortal
                 resp.ProfileCvUrl = await fileStorage.GetUrlAsync(acc.ProfileCvUrl);
                 resp.CvDownloadUrl = await fileStorage.GetDownloadUrlAsync(acc.ProfileCvUrl, downloadName);
             }
+            resp.AvatarUrl = await ResolveAvatarUrlAsync(acc.AvatarUrl, fileStorage);
             return resp;
+        }
+
+        /// <summary>
+        /// <c>CandidateAccount.AvatarUrl</c> chứa một trong hai dạng: URL tuyệt đối lấy từ Google lúc
+        /// đăng nhập, hoặc storageKey của ảnh ứng viên tự tải lên. Ảnh Google trả thẳng; storageKey phải
+        /// đổi sang URL (R2 còn cần presign nên không ghép chuỗi tay được).
+        /// </summary>
+        public static async Task<string?> ResolveAvatarUrlAsync(string? avatar, IFileStorageService fileStorage)
+        {
+            if (string.IsNullOrWhiteSpace(avatar)) return null;
+            if (avatar.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || avatar.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return avatar;
+
+            return await fileStorage.GetUrlAsync(avatar);
         }
     }
 }

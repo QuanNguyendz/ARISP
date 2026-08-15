@@ -1,5 +1,7 @@
 using System;
+using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
@@ -175,6 +177,22 @@ namespace ARI.API
 
                     options.ClientId = googleClientId!;
                     options.ClientSecret = googleSecret!;
+
+                    // Ảnh đại diện Google: scope "profile" mặc định đã trả trường "picture" trong
+                    // userinfo, nhưng handler KHÔNG map sẵn thành claim. Đọc thẳng JSON rồi tự thêm
+                    // claim — cách này không phụ thuộc bảng ClaimActions mặc định của từng phiên bản
+                    // package. ExternalCandidateCallback đọc claim này làm ảnh đại diện ban đầu.
+                    options.Events.OnCreatingTicket = context =>
+                    {
+                        if (context.User.TryGetProperty("picture", out var pictureElement)
+                            && pictureElement.ValueKind == JsonValueKind.String)
+                        {
+                            var pictureUrl = pictureElement.GetString();
+                            if (!string.IsNullOrWhiteSpace(pictureUrl))
+                                context.Identity?.AddClaim(new Claim("picture", pictureUrl));
+                        }
+                        return Task.CompletedTask;
+                    };
                 });
             }
             else

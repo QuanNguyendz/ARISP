@@ -96,6 +96,8 @@ namespace ARI.Application.DTOs
         public string? ProfileCvUrl { get; set; }
         public string? CvFileName { get; set; }
         public string? CvDownloadUrl { get; set; }
+        /// <summary>URL ảnh đại diện đã sẵn sàng hiển thị (đã đổi storageKey → URL, hoặc URL Google giữ nguyên).</summary>
+        public string? AvatarUrl { get; set; }
         public bool EmailVerified { get; set; }
         public bool HasPassword { get; set; }
         public CvReviewResponse? CvReview { get; set; }

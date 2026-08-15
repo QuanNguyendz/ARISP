@@ -724,7 +724,7 @@
 | Test case | Kỳ vọng |
 |---|---|
 | Không account. | Failure 'Sai email hoặc mật khẩu.' InvalidCredentials; không Verify. |
-| PasswordHash rỗng (Google account). | Failure 'đăng ký qua Google...' PasswordlessGoogle. |
+| PasswordHash rỗng (tài khoản Google chưa đặt mật khẩu). | Failure 'chưa đặt mật khẩu... Quên mật khẩu?' PasswordlessGoogle; controller trả kèm `code = passwordless_google` để FE hiện nút đặt mật khẩu. |
 | EmailVerified=false, password đúng. | Failure 'chưa được xác minh...' EmailNotVerified; không cấp token. |
 | EmailVerified=true, đúng. | Success; LastLoginAt set; refresh token; Role Candidate; FullName fallback 'Candidate'. |
 

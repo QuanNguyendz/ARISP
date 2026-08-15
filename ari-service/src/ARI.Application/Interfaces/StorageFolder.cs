@@ -18,7 +18,10 @@ namespace ARI.Application.Interfaces
         Recording,
 
         /// <summary>Playbook phỏng vấn nội bộ (ADR-025).</summary>
-        Playbook
+        Playbook,
+
+        /// <summary>Ảnh đại diện ứng viên (ảnh tự tải lên; ảnh Google lưu thẳng URL, không qua đây).</summary>
+        Avatar
     }
 
     public static class StorageFolderExtensions
@@ -30,6 +33,7 @@ namespace ARI.Application.Interfaces
             StorageFolder.Jd => "jd",
             StorageFolder.Recording => "recordings",
             StorageFolder.Playbook => "playbooks",
+            StorageFolder.Avatar => "avatars",
             _ => "misc"
         };
     }

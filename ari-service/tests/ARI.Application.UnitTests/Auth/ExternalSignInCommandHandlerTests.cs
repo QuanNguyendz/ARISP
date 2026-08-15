@@ -156,6 +156,113 @@ public class CompleteExternalCandidateSignInCommandHandlerTests
     }
 
     [Fact]
+    public async Task Jit_lay_anh_dai_dien_tu_google()
+    {
+        var uow = new InMemoryUnitOfWork();
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("https://lh3.googleusercontent.com/a/abc", Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Anh_google_chi_dien_vao_cho_trong_khong_de_anh_tu_tai_len()
+    {
+        // Ứng viên đã tự chọn ảnh — mỗi lần đăng nhập Google không được đạp mất lựa chọn đó.
+        var cand = new CandidateAccount
+        {
+            Email = "me@example.io",
+            EmailVerified = true,
+            AvatarUrl = "avatars/anh-toi-tu-chon.png",
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("avatars/anh-toi-tu-chon.png", cand.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Tai_khoan_chua_co_anh_thi_nhan_anh_google()
+    {
+        var cand = new CandidateAccount { Email = "me@example.io", EmailVerified = true, AvatarUrl = null };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("https://lh3.googleusercontent.com/a/abc", cand.AvatarUrl);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("avatars/gia-mao.png")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task Picture_khong_phai_url_http_bi_bo_qua(string? picture)
+    {
+        // Cột AvatarUrl dùng chung cho cả storageKey, nên giá trị lạ lọt vào sẽ bị hiểu nhầm
+        // thành khoá file khi dựng URL hiển thị.
+        var uow = new InMemoryUnitOfWork();
+
+        var res = await Handler(uow, new FakeTokenService()).Handle(
+            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", picture), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Null(Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Google_signin_wipes_password_set_on_an_unverified_account()
+    {
+        // Chiếm tài khoản trước: kẻ xấu đăng ký form web bằng email nạn nhân và đặt mật khẩu của hắn.
+        // Tài khoản nằm im vì EmailVerified=false. Khi chủ email thật đăng nhập Google, nếu ta chỉ set
+        // EmailVerified=true thì hoá ra xác minh hộ mật khẩu của kẻ xấu → hắn đăng nhập được.
+        var cand = new CandidateAccount
+        {
+            Email = "victim@gmail.com",
+            PasswordHash = "hash-cua-ke-xau",
+            EmailVerified = false,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService())
+            .Handle(new CompleteExternalCandidateSignInCommand("victim@gmail.com", "Victim"), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(cand.EmailVerified);
+        Assert.Equal(string.Empty, cand.PasswordHash);   // mật khẩu của kẻ xấu bị vô hiệu
+    }
+
+    [Fact]
+    public async Task Google_signin_keeps_password_of_an_already_verified_account()
+    {
+        // Ngược lại: tài khoản đã xác minh email thì mật khẩu là của chính chủ — không được đụng vào,
+        // nếu không mỗi lần đăng nhập bằng Google là người dùng mất mật khẩu đang dùng.
+        var cand = new CandidateAccount
+        {
+            Email = "owner@gmail.com",
+            PasswordHash = "hash-cua-chinh-chu",
+            EmailVerified = true,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+
+        var res = await Handler(uow, new FakeTokenService())
+            .Handle(new CompleteExternalCandidateSignInCommand("owner@gmail.com", null), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("hash-cua-chinh-chu", cand.PasswordHash);
+    }
+
+    [Fact]
     public async Task Disabled_candidate_is_rejected()
     {
         var cand = new CandidateAccount { Email = "me@example.io", PasswordHash = "", EmailVerified = true, IsActive = false };
