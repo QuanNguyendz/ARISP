@@ -1,0 +1,11 @@
+{
+  "title": "Căn chỉnh ảnh",
+  "hint": "Kéo để chọn vùng hiển thị, cuộn chuột hoặc dùng thanh trượt để phóng to. Phần trong khung sẽ là ảnh đại diện của bạn.",
+  "zoom": "Phóng to",
+  "zoomIn": "Phóng to",
+  "zoomOut": "Thu nhỏ",
+  "reset": "Đặt lại",
+  "cancel": "Huỷ",
+  "apply": "Lưu ảnh",
+  "loadFailed": "Không đọc được ảnh này. Vui lòng chọn ảnh khác."
+}

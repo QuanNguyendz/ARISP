@@ -1,0 +1,11 @@
+{
+  "title": "Adjust your photo",
+  "hint": "Drag to choose the visible area, scroll or use the slider to zoom. Whatever fits the frame becomes your profile photo.",
+  "zoom": "Zoom",
+  "zoomIn": "Zoom in",
+  "zoomOut": "Zoom out",
+  "reset": "Reset",
+  "cancel": "Cancel",
+  "apply": "Save photo",
+  "loadFailed": "This image could not be read. Please choose another one."
+}
