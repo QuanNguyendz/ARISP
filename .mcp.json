@@ -12,8 +12,8 @@
       }
     },
     "cloudflare-bindings": {
-      "type": "sse",
-      "url": "https://bindings.mcp.cloudflare.com/sse"
+      "type": "http",
+      "url": "https://bindings.mcp.cloudflare.com/mcp"
     },
     "github": {
       "type": "http",

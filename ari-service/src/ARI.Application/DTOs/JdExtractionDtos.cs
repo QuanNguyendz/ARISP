@@ -71,6 +71,14 @@ namespace ARI.Application.DTOs
         public string JdFileName { get; set; } = string.Empty;
         public string JdFileFormat { get; set; } = string.Empty; // pdf | docx
 
+        /// <summary>
+        /// URL xem được ngay trên trình duyệt (presigned với R2, đường dẫn tĩnh với Local).
+        /// TÁCH RIÊNG khỏi <see cref="JdFileUrl"/>: cái kia là storageKey và phải được gửi nguyên trạng
+        /// trong payload tạo tin để DB lưu khoá — nếu nhét URL presigned vào đó thì DB giữ một link
+        /// HẾT HẠN, và mọi lần đọc file sau này (đóng dấu JD, xem lại) đều hỏng.
+        /// </summary>
+        public string JdFileViewUrl { get; set; } = string.Empty;
+
         // Dữ liệu auto-fill
         public string? Title { get; set; }
         public string? Department { get; set; }

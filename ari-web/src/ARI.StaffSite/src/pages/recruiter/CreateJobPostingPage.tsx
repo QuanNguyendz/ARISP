@@ -72,7 +72,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     { roundNumber: 3, roundType: 'technical', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
   ])
 
+  // `jdFileUrl` là storageKey gửi lên khi lưu tin; `jdFileViewUrl` là URL mở được trên trình duyệt.
+  // Trước đây dùng chung một biến nên khung xem nhận đúng storageKey → PDF trắng, DOCX báo lỗi.
   const [jdFileUrl, setJdFileUrl] = useState<string | undefined>()
+  const [jdFileViewUrl, setJdFileViewUrl] = useState<string | undefined>()
   const [jdFileName, setJdFileName] = useState<string | undefined>()
   const [jdFileFormat, setJdFileFormat] = useState<string | undefined>()
   const [analyzing, setAnalyzing] = useState(false)
@@ -114,8 +117,9 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setSkills(job.skills || [])
           setJdFileName(job.jdFileName)
           setJdFileFormat(job.jdFileFormat)
-          // Thiếu dòng này thì ở chế độ sửa tin, chip file JD không mở xem được (chỉ có tên file).
-          setJdFileUrl(job.jdFileUrl)
+          // Ở chế độ sửa tin, GetJobById ĐÃ presign sẵn `jdFileUrl` → dùng làm URL xem. Không đưa vào
+          // `jdFileUrl` (storageKey) vì giá trị đó được gửi ngược lên khi Lưu.
+          setJdFileViewUrl(job.jdFileUrl)
           setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
         } catch (err) {
@@ -134,6 +138,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     try {
       const r = await jobService.analyzeJd(file)
       setJdFileUrl(r.jdFileUrl)
+      // URL xem tách riêng khỏi storageKey: cái gửi lên khi tạo tin phải là KHOÁ, cái mở file phải là URL.
+      setJdFileViewUrl(r.jdFileViewUrl || undefined)
       setJdFileName(r.jdFileName)
       setJdFileFormat(r.jdFileFormat)
       if (r.title) setTitle(r.title)
@@ -323,9 +329,9 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                   Nay là <button> thật: con trỏ tay, icon mắt, gạch chân khi rê chuột, kèm tooltip. */}
               <button
                 type="button"
-                onClick={() => jdFileUrl && openDocument(jdFileUrl, jdFileName)}
-                disabled={!jdFileUrl}
-                title={jdFileUrl ? t('jdUpload.clickToView') : undefined}
+                onClick={() => jdFileViewUrl && openDocument(jdFileViewUrl, jdFileName)}
+                disabled={!jdFileViewUrl}
+                title={jdFileViewUrl ? t('jdUpload.clickToView') : undefined}
                 className="group inline-flex items-center gap-2 rounded-l-xl py-2 pl-3 pr-1 transition enabled:hover:bg-brand-50 disabled:cursor-default dark:enabled:hover:bg-brand-500/10"
               >
                 <FileText className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
@@ -333,21 +339,21 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                   {jdFileName}
                 </span>
                 {jdFileFormat && <span className="text-xs uppercase text-ink-400">{jdFileFormat}</span>}
-                {jdFileUrl && (
+                {jdFileViewUrl && (
                   <Eye className="h-3.5 w-3.5 shrink-0 text-ink-400 group-hover:text-brand-600 dark:group-hover:text-brand-400" />
                 )}
               </button>
               <button
                 type="button"
                 title={t('jdUpload.removeFile')}
-                onClick={() => { setJdFileName(undefined); setJdFileFormat(undefined); setJdFileUrl(undefined); setAnalyzeMsg(null); if (fileRef.current) fileRef.current.value = '' }}
+                onClick={() => { setJdFileName(undefined); setJdFileFormat(undefined); setJdFileUrl(undefined); setJdFileViewUrl(undefined); setAnalyzeMsg(null); if (fileRef.current) fileRef.current.value = '' }}
                 className="rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </span>
           )}
-          {jdFileName && jdFileUrl && (
+          {jdFileName && jdFileViewUrl && (
             <span className="text-xs text-ink-400 dark:text-ink-500">{t('jdUpload.clickToViewHint')}</span>
           )}
         </div>

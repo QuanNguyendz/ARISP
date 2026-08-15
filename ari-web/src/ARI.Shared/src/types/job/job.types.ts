@@ -103,7 +103,10 @@ export interface CreateJobPostingRequest {
 /** Kết quả phân tích JD (POST /jobs/analyze-jd) — auto-fill form + metadata file đã lưu. */
 export interface AnalyzeJdResult {
   isValidJd: boolean
+  /** storageKey — gửi NGUYÊN TRẠNG trong payload tạo tin, không dùng để hiển thị. */
   jdFileUrl: string
+  /** URL xem được trên trình duyệt (presigned với R2). Chỉ dùng để mở file, không gửi lên lại. */
+  jdFileViewUrl?: string
   jdFileName: string
   jdFileFormat: string
   title?: string
