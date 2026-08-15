@@ -106,8 +106,13 @@ function App() {
           <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
-          {/* Chọn lịch phỏng vấn từ email mời (token) — không cần đăng nhập đầy đủ */}
-          <Route path="/portal/schedule/:applicationId" element={<CandidateSchedulePage />} />
+          {/* Link sâu từ email mời. `standalone` vì route này KHÔNG bọc layout nào nên trang
+              phải tự dựng nền + lối quay lại. Tham số `:applicationId` chỉ để giữ nguyên dạng
+              link đã gửi trong email — trang trả TOÀN BỘ lịch của ứng viên, không lọc theo hồ sơ. */}
+          <Route
+            path="/portal/schedule/:applicationId"
+            element={<CandidateSchedulePage standalone />}
+          />
           <Route path="/jobs" element={<FindJobPage />} />
           <Route path="/jobs/:id" element={<JobDetailPage />} />
           <Route path="/jobs/:id/apply" element={<JobApplyPage />} />
@@ -126,6 +131,7 @@ function App() {
               element={<CandidateApplicationDetailPage />}
             />
             <Route path="/candidate/profile" element={<CandidateProfilePage />} />
+            <Route path="/candidate/schedule" element={<CandidateSchedulePage />} />
             <Route path="/candidate/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/candidate/notifications" element={<CandidateNotificationsPage />} />
             <Route path="/candidate/settings" element={<CandidateSettingsPage />} />

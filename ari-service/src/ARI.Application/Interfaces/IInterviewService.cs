@@ -19,11 +19,15 @@ namespace ARI.Application.Interfaces
         Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(Guid sessionId, Guid? accountId, string? email, bool kioskAuthorized = false, CancellationToken ct = default);
         Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(Guid? applicationId = null, CancellationToken ct = default);
         // ─── Interview Management: Job → Slot → Candidate ───
-        Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(CancellationToken ct = default);
-        Task<List<InterviewSlotDetailDto>> GetSlotsForJobAsync(Guid jobPostingId, CancellationToken ct = default);
-        Task<List<SlotCandidateDto>> GetCandidatesInSlotAsync(Guid slotId, CancellationToken ct = default);
-        Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, CancellationToken ct = default);
-        Task<Result<bool>> RescheduleBookingAsync(Guid bookingId, Guid targetSlotId, CancellationToken ct = default);
+        // Mọi hàm ở nhóm này nhận (userId, role) và tự kiểm quyền theo CHỦ TIN: policy "InternalStaff"
+        // ở controller chỉ chặn người ngoài công ty, không phân biệt được recruiter này với recruiter
+        // khác. Trước đây cả nhóm không kiểm gì nên đọc/ghi được lịch của tin người khác.
+        Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<List<InterviewSlotDetailDto>>> GetSlotsForJobAsync(Guid jobPostingId, Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<List<SlotCandidateDto>>> GetCandidatesInSlotAsync(Guid slotId, Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<bool>> RescheduleBookingAsync(Guid bookingId, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<RescheduleResultDto>> RescheduleBookingsAsync(IReadOnlyList<Guid> bookingIds, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default);
         // ─────────────────────────────────────────────────────
         Task<Result<StartSessionResponse>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default);
         Task<Result<string>> GenerateAndSendNextQuestionAsync(Guid sessionId, CancellationToken ct = default);

@@ -6,8 +6,10 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
+  AlertTriangle, Eye,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import jobService from '@ari/shared/fservices/job'
 import { ErrorAlert, Select } from '@ari/shared/ui'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
@@ -33,6 +35,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const navigate = useNavigate()
   const routerLocation = useLocation()
   const user = useAuthStore((state) => state.user)
+  const { openDocument } = useDocumentViewer()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(mode === 'edit')
   const [error, setError] = useState<string | null>(null)
@@ -60,11 +63,19 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const [skillInput, setSkillInput] = useState('')
   const [skills, setSkills] = useState<string[]>([])
   const [applicationDeadline, setApplicationDeadline] = useState('')
+  // Mặc định theo đúng phễu tuyển dụng thật: lọc bằng trắc nghiệm trước (rẻ, tự chấm), rồi sơ loại,
+  // rồi chuyên sâu kỹ thuật. Vòng trắc nghiệm dùng thời lượng riêng (30') vì không bị trần 20' của
+  // buổi phỏng vấn AI — xem ADR-049/050.
   const [rounds, setRounds] = useState<RoundConfig[]>([
-    { roundNumber: 1, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
+    { roundNumber: 1, roundType: 'online_test', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 30 },
+    { roundNumber: 2, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
+    { roundNumber: 3, roundType: 'technical', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
   ])
 
+  // `jdFileUrl` là storageKey gửi lên khi lưu tin; `jdFileViewUrl` là URL mở được trên trình duyệt.
+  // Trước đây dùng chung một biến nên khung xem nhận đúng storageKey → PDF trắng, DOCX báo lỗi.
   const [jdFileUrl, setJdFileUrl] = useState<string | undefined>()
+  const [jdFileViewUrl, setJdFileViewUrl] = useState<string | undefined>()
   const [jdFileName, setJdFileName] = useState<string | undefined>()
   const [jdFileFormat, setJdFileFormat] = useState<string | undefined>()
   const [analyzing, setAnalyzing] = useState(false)
@@ -106,6 +117,9 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setSkills(job.skills || [])
           setJdFileName(job.jdFileName)
           setJdFileFormat(job.jdFileFormat)
+          // Ở chế độ sửa tin, GetJobById ĐÃ presign sẵn `jdFileUrl` → dùng làm URL xem. Không đưa vào
+          // `jdFileUrl` (storageKey) vì giá trị đó được gửi ngược lên khi Lưu.
+          setJdFileViewUrl(job.jdFileUrl)
           setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
         } catch (err) {
@@ -124,6 +138,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     try {
       const r = await jobService.analyzeJd(file)
       setJdFileUrl(r.jdFileUrl)
+      // URL xem tách riêng khỏi storageKey: cái gửi lên khi tạo tin phải là KHOÁ, cái mở file phải là URL.
+      setJdFileViewUrl(r.jdFileViewUrl || undefined)
       setJdFileName(r.jdFileName)
       setJdFileFormat(r.jdFileFormat)
       if (r.title) setTitle(r.title)
@@ -308,18 +324,37 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           </button>
 
           {jdFileName && (
-            <span className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-700 dark:text-ink-200">
-              <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" />
-              <span className="max-w-[200px] truncate">{jdFileName}</span>
-              {jdFileFormat && <span className="text-xs uppercase text-ink-400">{jdFileFormat}</span>}
+            <span className="inline-flex items-center gap-1 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 pr-2 text-sm text-ink-700 dark:text-ink-200">
+              {/* Chip này MỞ ĐƯỢC file JD, nhưng trước đây nó là <span> trơn nên không ai đoán ra.
+                  Nay là <button> thật: con trỏ tay, icon mắt, gạch chân khi rê chuột, kèm tooltip. */}
               <button
                 type="button"
-                onClick={() => { setJdFileName(undefined); setJdFileFormat(undefined); setJdFileUrl(undefined); setAnalyzeMsg(null); if (fileRef.current) fileRef.current.value = '' }}
-                className="text-ink-400 hover:text-red-500"
+                onClick={() => jdFileViewUrl && openDocument(jdFileViewUrl, jdFileName)}
+                disabled={!jdFileViewUrl}
+                title={jdFileViewUrl ? t('jdUpload.clickToView') : undefined}
+                className="group inline-flex items-center gap-2 rounded-l-xl py-2 pl-3 pr-1 transition enabled:hover:bg-brand-50 disabled:cursor-default dark:enabled:hover:bg-brand-500/10"
+              >
+                <FileText className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                <span className="max-w-[200px] truncate group-enabled:group-hover:text-brand-700 group-enabled:group-hover:underline dark:group-enabled:group-hover:text-brand-300">
+                  {jdFileName}
+                </span>
+                {jdFileFormat && <span className="text-xs uppercase text-ink-400">{jdFileFormat}</span>}
+                {jdFileViewUrl && (
+                  <Eye className="h-3.5 w-3.5 shrink-0 text-ink-400 group-hover:text-brand-600 dark:group-hover:text-brand-400" />
+                )}
+              </button>
+              <button
+                type="button"
+                title={t('jdUpload.removeFile')}
+                onClick={() => { setJdFileName(undefined); setJdFileFormat(undefined); setJdFileUrl(undefined); setJdFileViewUrl(undefined); setAnalyzeMsg(null); if (fileRef.current) fileRef.current.value = '' }}
+                className="rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </span>
+          )}
+          {jdFileName && jdFileViewUrl && (
+            <span className="text-xs text-ink-400 dark:text-ink-500">{t('jdUpload.clickToViewHint')}</span>
           )}
         </div>
 
@@ -531,7 +566,9 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                 <PlusCircle className="h-3.5 w-3.5" /> {t('form.addRound')}
               </button>
             </div>
-            <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
+            {/* Cao hơn hẳn mức 320px cũ: 3 vòng mặc định trước đây không nằm gọn trong khung nên
+                người dùng phải cuộn mới thấy được toàn cảnh cấu hình vòng. */}
+            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
               <AnimatePresence initial={false}>
                 {rounds.map((round, idx) => {
                   // Vòng trắc nghiệm cấu hình thời gian riêng ở mục "Bài thi trắc nghiệm" → không áp trần 20 phút.
@@ -567,21 +604,24 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                         <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{t('form.onlineTestHint')}</p>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <div>
+                    {/* Ô "Phút" chỉ chứa 2–3 chữ số nên cho nó cột hẹp cố định; phần còn lại dành hết
+                        cho ô Ngôn ngữ. Chia đôi 50/50 như trước làm nút Select hẹp tới mức "Tiếng Việt"
+                        bị cắt thành "Tiếng ..." (Select dùng `truncate`), phải bấm mở mới đọc được. */}
+                    <div className="grid grid-cols-[minmax(0,1fr)_92px] gap-2">
+                      <div className="min-w-0">
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.language')}</label>
                         <Select
                           value={round.interviewLanguage ?? 'vi'}
                           onChange={(v) => changeRound(idx, 'interviewLanguage', v)}
                           className="w-full"
-                          buttonClassName="px-4 py-2 text-sm"
+                          buttonClassName="px-3 py-2 text-sm"
                           options={[
                             { value: 'vi', label: t('form.vietnamese') },
                             { value: 'en', label: t('form.english') },
                           ]}
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">{t('form.minutes')}</label>
                         <input
                           type="number"
@@ -610,6 +650,21 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                         {capped && <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">{t('form.minutesMax')}</p>}
                       </div>
                     </div>
+                    {/* Ngôn ngữ vòng trắc nghiệm quyết định ngôn ngữ của ĐỀ THI, mà đề nằm ở ngân hàng
+                        câu hỏi tạo sau — đổi ở đây mà quên cập nhật đề là ứng viên nhận bài sai ngôn ngữ. */}
+                    {round.roundType === 'online_test' && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                          {t('form.onlineTestLanguageNotice', {
+                            language:
+                              (round.interviewLanguage ?? 'vi') === 'en'
+                                ? t('form.english')
+                                : t('form.vietnamese'),
+                          })}
+                        </p>
+                      </div>
+                    )}
                   </motion.div>
                   )
                 })}

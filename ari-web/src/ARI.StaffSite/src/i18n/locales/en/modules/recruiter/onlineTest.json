@@ -21,7 +21,9 @@
       "templateError": "Failed to download the template.",
       "importError": "Failed to import the file. Check that it is a valid .xlsx.",
       "resultSummary": "Added {{imported}} question(s) · {{failed}} row error(s).",
-      "rowError": "Row {{row}}: {{message}}"
+      "rowError": "Row {{row}}: {{message}}",
+      "languageNotice": "This job’s online test round is configured in {{language}}. The Excel file you upload must be written in {{language}} — files in another language are rejected.",
+      "noRoundNotice": "This job has no Online Test round, so candidates will never be given a test. Edit the job and add an \"Online Test\" round before building the question bank."
     },
     "form": {
       "addTitle": "Add question",
@@ -61,6 +63,10 @@
       "minOptions": "A question needs at least 2 answer options.",
       "noCorrect": "Please select at least 1 correct answer.",
       "singleOne": "A single-answer question must have exactly 1 correct answer."
+    },
+    "language": {
+      "vi": "Vietnamese",
+      "en": "English"
     }
   },
   "results": {

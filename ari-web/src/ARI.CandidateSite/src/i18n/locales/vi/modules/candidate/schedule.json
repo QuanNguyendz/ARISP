@@ -1,6 +1,10 @@
 {
   "pageTitle": "Lịch phỏng vấn của bạn",
   "pageDescription": "Lịch do bộ phận nhân sự xếp. Vui lòng xác nhận, hoặc từ chối kèm lý do để được xếp lịch khác.",
+  "breadcrumb": {
+    "home": "Trang chủ"
+  },
+  "backToApplications": "Về hồ sơ ứng tuyển",
   "errors": {
     "loadFailed": "Không tải được lịch phỏng vấn.",
     "confirmFailed": "Xác nhận lịch thất bại.",
@@ -13,26 +17,59 @@
     "message": "Vui lòng đăng nhập Portal ứng viên để xem và xác nhận lịch phỏng vấn của bạn.",
     "button": "Đăng nhập để tiếp tục"
   },
-  "noSchedule": "Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo khi có lịch.",
+  "noScheduleTitle": "Chưa có lịch phỏng vấn",
+  "noSchedule": "Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo ngay khi có lịch.",
+  "jobTitleFallback": "Phỏng vấn",
+  "nextUp": {
+    "label": "Buổi gần nhất"
+  },
+  "summary": {
+    "upcoming": "Buổi sắp tới",
+    "pending": "Chờ bạn xác nhận",
+    "past": "Đã diễn ra"
+  },
+  "relative": {
+    "inProgress": "Đang diễn ra",
+    "minutes": "Còn {{count}} phút",
+    "hours": "Còn {{count}} giờ",
+    "tomorrow": "Ngày mai",
+    "days": "Còn {{count}} ngày"
+  },
+  "dayGroup": {
+    "count": "{{count}} buổi"
+  },
   "awaitingSection": {
     "badge": "Đã từ chối",
-    "title": "Phỏng vấn · Vòng {{round}}",
+    "title": "{{jobTitle}} · Vòng {{round}}",
     "message": "Bạn đã từ chối lịch{{declineReason}}. Nhân sự sẽ xếp một khung giờ khác và thông báo lại cho bạn.",
     "dismissButton": "Xoá khỏi danh sách"
   },
   "scheduleItem": {
-    "interviewRound": "{{jobTitle || 'Phỏng vấn'}} · Vòng {{round}}",
+    "roundLabel": "Vòng {{round}}",
     "confirmed": "Đã xác nhận",
     "pendingConfirmation": "Chưa xác nhận",
     "confirmedLocked": "Bạn đã xác nhận tham dự. Quyết định đã được khoá và không thể thay đổi.",
     "confirmButton": "Xác nhận tham dự",
     "declineButton": "Từ chối / đổi lịch"
   },
-  "practiceLink": "Vào hồ sơ ứng tuyển để luyện tập phỏng vấn thử",
+  "prep": {
+    "title": "Cần chuẩn bị gì",
+    "item1": "Mang theo CCCD/CMND và mã phỏng vấn 6 ký tự để nhập tại Kiosk ở văn phòng.",
+    "item2": "Có mặt trước giờ hẹn khoảng 10 phút để kịp kiểm tra micro và camera.",
+    "item3": "Mã phỏng vấn chỉ dùng được một lần và hết hạn sau 2 giờ kể từ lúc được cấp."
+  },
+  "practiceCard": {
+    "title": "Luyện tập trước buổi thật",
+    "description": "Mỗi vòng có 1 lượt phỏng vấn thử để bạn làm quen với AI — không ảnh hưởng kết quả tuyển dụng."
+  },
+  "practiceLink": "Vào luyện tập",
+  "pastSection": {
+    "title": "Đã diễn ra"
+  },
   "modal": {
     "confirmTitle": "Xác nhận tham dự?",
     "declineTitle": "Từ chối / xin đổi lịch?",
-    "confirmSummary": "{{jobTitle || 'Phỏng vấn'}} · Vòng {{round}} — {{day}}, {{time}}",
+    "confirmSummary": "{{jobTitle}} · Vòng {{round}} — {{day}}, {{time}}",
     "declineReasonLabel": "Lý do bạn không thể tham dự (nhân sự sẽ xếp lịch khác):",
     "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường, bận công việc...",
     "warning": "Bạn đã chắc chắn với quyết định của mình chưa? Sau khi bấm, bạn sẽ không thể sửa lại lựa chọn này nữa.",

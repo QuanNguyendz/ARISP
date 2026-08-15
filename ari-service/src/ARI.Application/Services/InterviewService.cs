@@ -9,10 +9,12 @@ using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Options;
+using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using ARI.Domain.Constants;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ARI.Application.Services
 {
@@ -30,6 +32,7 @@ namespace ARI.Application.Services
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly InterviewOptions _interviewOptions;
         private readonly IMemoryCache _cache;
+        private readonly ILogger<InterviewService>? _logger;
 
         // Cache key cho danh sách toàn bộ phiên phỏng vấn (HR view).
         private const string AllSessionsCacheKey = "interview-sessions:all";
@@ -46,8 +49,10 @@ namespace ARI.Application.Services
             IFileStorageService fileStorage,
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             IMemoryCache cache,
-            InterviewOptions? interviewOptions = null)
+            InterviewOptions? interviewOptions = null,
+            ILogger<InterviewService>? logger = null)
         {
+            _logger = logger;
             _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
@@ -308,14 +313,23 @@ namespace ARI.Application.Services
 
         // ─────────── Interview Management: Job → Slot → Candidate ───────────
 
-        /// <summary>Lấy danh sách tất cả vị trí tuyển dụng, kèm thống kê ca phỏng vấn & ứng viên.</summary>
-        public async Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(CancellationToken ct = default)
+        /// <summary>
+        /// Lấy danh sách vị trí tuyển dụng nhân sự này được quản lý, kèm thống kê ca phỏng vấn & ứng viên.
+        ///
+        /// Lọc Ở ĐÂY chứ không ở giao diện: trước đây endpoint trả TOÀN BỘ tin của hệ thống rồi màn
+        /// Recruiter tự lọc bằng danh sách hồ sơ của mình — mà nhánh dự phòng của nó lại là "không
+        /// lọc được thì hiện hết", nên recruiter chưa có hồ sơ nào thấy được mọi tin. Lọc ở server
+        /// cũng bỏ luôn được lời gọi API thứ hai lúc tải trang.
+        /// </summary>
+        public async Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(Guid? userId, string? role, CancellationToken ct = default)
         {
             var nowUtc = DateTimeOffset.UtcNow;
+            var isAdmin = role == AppRoles.SuperAdmin || role == AppRoles.HrAdmin;
 
-            // 1. Lấy tất cả JobPostings
+            // 1. Lấy JobPostings trong phạm vi quản lý
             var jobs = await _unitOfWork.Repository<JobPosting>()
-                .QueryAsync(q => q.OrderByDescending(j => j.CreatedAt)
+                .QueryAsync(q => q.Where(j => isAdmin || (userId != null && j.CreatedByUserId == userId))
+                    .OrderByDescending(j => j.CreatedAt)
                     .Select(j => new { j.Id, j.Title, j.Status, j.ApplicationDeadline }), ct);
             if (jobs.Count == 0) return new List<InterviewJobSummaryDto>();
 
@@ -332,7 +346,7 @@ namespace ARI.Application.Services
             var bookings = slotIds.Count > 0
                 ? await _unitOfWork.Repository<InterviewBooking>()
                     .QueryAsync(q => q.Where(b => slotIds.Contains(b.AvailabilitySlotId))
-                        .Select(b => new { b.ApplicationId, b.AvailabilitySlotId, b.ConfirmationStatus }), ct)
+                        .Select(b => new { b.ApplicationId, b.AvailabilitySlotId, b.Status, b.ConfirmationStatus }), ct)
                 : new List<dynamic>() as dynamic;
 
             // 4. Sessions
@@ -372,8 +386,13 @@ namespace ARI.Application.Services
                     JobTitle = job.Title,
                     JobStatus = effectiveStatus,
                     TotalSlots = jobSlots.Count,
-                    TotalBooked = jobBookings.Count,
-                    TotalConfirmed = jobBookings.Count(b => (string)b.ConfirmationStatus == "confirmed"),
+                    // Cùng vị từ chiếm chỗ với GetSlotsForJobAsync và migration đối soát. Bản cũ đếm
+                    // MỌI dòng booking nên thẻ tổng quan ở đầu trang nói một đằng, phân số từng ca
+                    // bên dưới nói một nẻo; và "đã xác nhận" còn đếm cả lịch sau đó đã bị huỷ.
+                    TotalBooked = jobBookings.Count(b => (string)b.Status == BookingStatus.Scheduled),
+                    TotalConfirmed = jobBookings.Count(b =>
+                        (string)b.Status == BookingStatus.Scheduled &&
+                        (string)b.ConfirmationStatus == BookingConfirmationStatus.Confirmed),
                     MaxRound = jobSlots.Count > 0 ? jobSlots.Max(s => s.RoundNumber) : 0,
                     TotalSessions = sessionsForJob.Count,
                     CompletedSessions = sessionsForJob.Count(s => (string)s.Status == "completed"),
@@ -389,17 +408,22 @@ namespace ARI.Application.Services
                 .ToList();
         }
 
-        /// <summary>Gửi email + notification nhắc lịch phỏng vấn cho ứng viên.</summary>
-        public async Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, CancellationToken ct = default)
+        /// <summary>Gửi email + notification nhắc lịch phỏng vấn cho ứng viên. Chỉ chủ tin hoặc admin.</summary>
+        public async Task<Result<bool>> SendBookingReminderAsync(
+            Guid bookingId, Guid? userId, string? role, CancellationToken ct = default)
         {
             var booking = await _unitOfWork.Repository<InterviewBooking>().GetByIdAsync(bookingId, ct);
-            if (booking == null) return Result.Failure<bool>("Không tìm thấy lịch phỏng vấn.");
+            if (booking == null) return Result.Failure<bool>("Không tìm thấy lịch phỏng vấn.", CommonErrorCodes.NotFound);
 
             var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(booking.ApplicationId, ct);
-            if (app == null) return Result.Failure<bool>("Không tìm thấy hồ sơ ứng viên.");
+            if (app == null) return Result.Failure<bool>("Không tìm thấy hồ sơ ứng viên.", CommonErrorCodes.NotFound);
+
+            var (canManage, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, app.JobPostingId, userId, role, ct);
+            if (!canManage)
+                return Result.Failure<bool>("Bạn không có quyền nhắc lịch cho ứng viên của tin này.", CommonErrorCodes.Forbidden);
 
             var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
-            if (slot == null) return Result.Failure<bool>("Không tìm thấy ca phỏng vấn.");
+            if (slot == null) return Result.Failure<bool>("Không tìm thấy ca phỏng vấn.", CommonErrorCodes.NotFound);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             var jobTitle = job?.Title ?? "vị trí ứng tuyển";
@@ -448,53 +472,170 @@ namespace ARI.Application.Services
             return Result.Success(true);
         }
 
-        /// <summary>Dời ứng viên sang một ca phỏng vấn mới.</summary>
-        public async Task<Result<bool>> RescheduleBookingAsync(Guid bookingId, Guid targetSlotId, CancellationToken ct = default)
+        /// <summary>Dời MỘT ứng viên sang ca khác — wrapper mỏng của bản nhiều người để chỉ có một đường code.</summary>
+        public async Task<Result<bool>> RescheduleBookingAsync(
+            Guid bookingId, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default)
         {
-            var booking = await _unitOfWork.Repository<InterviewBooking>().GetByIdAsync(bookingId, ct);
-            if (booking == null) return Result.Failure<bool>("Không tìm thấy lịch phỏng vấn.");
+            var result = await RescheduleBookingsAsync(new[] { bookingId }, targetSlotId, userId, role, ct);
+            if (result.IsFailure) return Result.Failure<bool>(result.Error!, result.ErrorCode!);
 
-            if (booking.AvailabilitySlotId == targetSlotId)
-                return Result.Failure<bool>("Ứng viên đã nằm trong ca này rồi.");
+            var failure = result.Value.Failed.FirstOrDefault();
+            if (failure != null) return Result.Failure<bool>(failure.Message);
+
+            return Result.Success(true);
+        }
+
+        /// <summary>
+        /// Dời một hoặc nhiều ứng viên sang CÙNG một ca phỏng vấn, theo kiểu ĐƯỢC ĂN CẢ NGÃ VỀ KHÔNG:
+        /// hoặc mọi người hợp lệ cùng được dời, hoặc không ai được dời.
+        ///
+        /// Trước đây giao diện gửi N request đơn lẻ tuần tự, nên dời 3 người vào ca còn 1 chỗ thì
+        /// người đầu lọt còn hai người sau thất bại lần lượt, không có gì hoàn tác — nhân sự nhìn
+        /// vào không biết ai đã chuyển ai chưa.
+        /// </summary>
+        public async Task<Result<RescheduleResultDto>> RescheduleBookingsAsync(
+            IReadOnlyList<Guid> bookingIds, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default)
+        {
+            if (bookingIds == null || bookingIds.Count == 0)
+                return Result.Failure<RescheduleResultDto>("Chưa chọn ứng viên nào để dời lịch.");
 
             var targetSlot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(targetSlotId, ct);
-            if (targetSlot == null) return Result.Failure<bool>("Không tìm thấy ca phỏng vấn đích.");
+            if (targetSlot == null)
+                return Result.Failure<RescheduleResultDto>("Không tìm thấy ca phỏng vấn đích.", CommonErrorCodes.NotFound);
 
-            if (targetSlot.RoundNumber != booking.RoundNumber)
-                return Result.Failure<bool>("Không thể dời sang ca phỏng vấn thuộc vòng thi khác.");
+            // Kiểm quyền THEO TIN của ca đích. Trước đây hàm này không kiểm quyền gì cả: mọi tài khoản
+            // nội bộ đều gọi được, và vì chỉ so khớp RoundNumber (vòng 1 thì tin nào cũng có) nên còn
+            // dời được ứng viên của tin người khác sang ca của mình.
+            var (canManage, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, targetSlot.JobPostingId, userId, role, ct);
+            if (!canManage)
+                return Result.Failure<RescheduleResultDto>("Bạn không có quyền xếp lịch cho tin tuyển dụng này.", CommonErrorCodes.Forbidden);
 
             if (targetSlot.StartTime <= DateTimeOffset.UtcNow)
-                return Result.Failure<bool>("Ca phỏng vấn mới đã diễn ra trong quá khứ.");
+                return Result.Failure<RescheduleResultDto>("Ca phỏng vấn đích đã diễn ra trong quá khứ.");
 
-            if (targetSlot.BookedCount >= targetSlot.Capacity)
-                return Result.Failure<bool>("Ca phỏng vấn mới đã đầy.");
+            var ids = bookingIds.Distinct().ToList();
+            var bookings = (await _unitOfWork.Repository<InterviewBooking>()
+                .FindAsync(b => ids.Contains(b.Id), ct)).ToList();
 
-            var oldSlot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
+            var appIds = bookings.Select(b => b.ApplicationId).Distinct().ToList();
+            var appJobById = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                    .QueryAsync(q => q.Where(a => appIds.Contains(a.Id)).Select(a => new { a.Id, a.JobPostingId }), ct))
+                .ToDictionary(a => a.Id, a => a.JobPostingId);
 
-            // Update slots booked counts
-            if (oldSlot != null)
+            // Lọc sạch trước khi chiếm chỗ — số chỗ cần chiếm phải là số người THẬT SỰ dời được.
+            var failed = new List<RescheduleFailureDto>();
+            var valid = new List<InterviewBooking>();
+
+            foreach (var id in ids)
             {
-                oldSlot.BookedCount = Math.Max(0, oldSlot.BookedCount - 1);
-                oldSlot.UpdatedAt = DateTimeOffset.UtcNow;
-                _unitOfWork.Repository<AvailabilitySlot>().Update(oldSlot);
+                var booking = bookings.FirstOrDefault(b => b.Id == id);
+                if (booking == null)
+                {
+                    failed.Add(new RescheduleFailureDto { BookingId = id, Message = "Không tìm thấy lịch phỏng vấn." });
+                    continue;
+                }
+
+                string? error = null;
+                if (booking.AvailabilitySlotId == targetSlotId)
+                    error = "Ứng viên đã nằm trong ca này rồi.";
+                else if (!appJobById.TryGetValue(booking.ApplicationId, out var jobId) || jobId != targetSlot.JobPostingId)
+                    error = "Ca phỏng vấn đích không thuộc tin tuyển dụng của ứng viên này.";
+                else if (targetSlot.RoundNumber != booking.RoundNumber)
+                    error = "Không thể dời sang ca phỏng vấn thuộc vòng thi khác.";
+                else if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
+                    error = "Hồ sơ đã bị loại khỏi quy trình nên không thể xếp lịch lại.";
+
+                if (error != null) failed.Add(new RescheduleFailureDto { BookingId = id, Message = error });
+                else valid.Add(booking);
             }
 
-            targetSlot.BookedCount += 1;
-            targetSlot.UpdatedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<AvailabilitySlot>().Update(targetSlot);
+            if (valid.Count == 0)
+                return Result.Success(new RescheduleResultDto { MovedCount = 0, Failed = failed });
 
-            // Update booking
-            booking.AvailabilitySlotId = targetSlot.Id;
-            booking.ConfirmationStatus = "pending";
-            booking.Status = "scheduled";
-            booking.DeclineReason = null;
-            booking.RespondedAt = null;
-            booking.UpdatedAt = DateTimeOffset.UtcNow;
-            _unitOfWork.Repository<InterviewBooking>().Update(booking);
+            var seatsNeeded = valid.Count;
+            var nowUtc = DateTimeOffset.UtcNow;
 
-            await _unitOfWork.SaveChangesAsync(ct);
+            // CHIẾM CHỖ NGUYÊN TỬ cho cả nhóm. Bản cũ đọc BookedCount rồi mới += 1 qua EF nên đua
+            // được với chính nó và với AssignSlot. Một câu UPDATE có điều kiện là cách repo này vốn
+            // đã dùng ở AssignSlotCommandHandler — dùng lại đúng mẫu đó.
+            var taken = await _unitOfWork.ExecuteSqlRawAsync(
+                "UPDATE availability_slots SET booked_count = booked_count + {1}, updated_at = {0} WHERE id = {2} AND booked_count + {1} <= capacity",
+                new object[] { nowUtc, seatsNeeded, targetSlot.Id }, ct);
+            if (taken == 0)
+            {
+                return Result.Failure<RescheduleResultDto>(
+                    $"Ca phỏng vấn đích không còn đủ {seatsNeeded} chỗ trống.", CommonErrorCodes.Conflict);
+            }
 
-            // Send notification + email
+            // Ghi nhớ ca cũ của những booking ĐANG giữ chỗ — chỉ những cái này mới phải trả chỗ.
+            // Bản cũ trả chỗ vô điều kiện, nên dời một ứng viên đã từ chối (đúng công dụng chính của
+            // nút "Dời lịch") sẽ trừ lần thứ hai vào chỗ mà DeclineScheduleCommand đã trả rồi.
+            var seatsToRelease = valid
+                .Where(b => string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(b => b.AvailabilitySlotId)
+                .Where(g => g.Key != targetSlot.Id)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            foreach (var booking in valid)
+            {
+                booking.AvailabilitySlotId = targetSlot.Id;
+                booking.Status = BookingStatus.Scheduled;
+                booking.ConfirmationStatus = BookingConfirmationStatus.Pending;
+                booking.DeclineReason = null;
+                booking.DeclinedBy = null;
+                booking.RespondedAt = null;
+                booking.CandidateDismissedAt = null;
+                booking.UpdatedAt = nowUtc;
+                _unitOfWork.Repository<InterviewBooking>().Update(booking);
+            }
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            catch (Exception)
+            {
+                // Trả lại chỗ vừa chiếm. Nguyên nhân thực tế hay gặp: unique index một booking
+                // 'scheduled' mỗi (hồ sơ, vòng) — ứng viên đã có lịch khác cho chính vòng này.
+                await _unitOfWork.ExecuteSqlRawAsync(
+                    "UPDATE availability_slots SET booked_count = GREATEST(booked_count - {1}, 0), updated_at = {0} WHERE id = {2}",
+                    new object[] { DateTimeOffset.UtcNow, seatsNeeded, targetSlot.Id }, ct);
+                return Result.Failure<RescheduleResultDto>(
+                    "Không thể hoàn tất dời lịch (có thể ứng viên đã có lịch khác ở vòng này). Vui lòng tải lại và thử lại.");
+            }
+
+            // Trả chỗ ca cũ SAU khi đã lưu thành công. Thứ tự chiếm-trước-trả-sau là cố ý: trả trước
+            // rồi chiếm hụt là đã cho đi cái chỗ ứng viên vẫn đang giữ. Chiếm trước chỉ dư tạm trong
+            // một transaction — lệch về phía an toàn, không bao giờ để lọt quá sức chứa.
+            foreach (var (slotId, count) in seatsToRelease)
+            {
+                try
+                {
+                    await _unitOfWork.ExecuteSqlRawAsync(
+                        "UPDATE availability_slots SET booked_count = GREATEST(booked_count - {1}, 0), updated_at = {0} WHERE id = {2}",
+                        new object[] { DateTimeOffset.UtcNow, count, slotId }, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Không trả được {Count} chỗ ở khung giờ cũ {SlotId} sau khi dời lịch.", count, slotId);
+                }
+            }
+
+            foreach (var booking in valid)
+            {
+                try { await NotifyRescheduledAsync(booking, targetSlot, ct); }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Không gửi được thông báo dời lịch cho booking {BookingId}.", booking.Id);
+                }
+            }
+
+            return Result.Success(new RescheduleResultDto { MovedCount = valid.Count, Failed = failed });
+        }
+
+        /// <summary>Báo cho ứng viên biết lịch đã được dời (bell + realtime + email). Best-effort.</summary>
+        private async Task NotifyRescheduledAsync(InterviewBooking booking, AvailabilitySlot targetSlot, CancellationToken ct)
+        {
             var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(booking.ApplicationId, ct);
             if (app != null)
             {
@@ -533,31 +674,53 @@ namespace ARI.Application.Services
                     </div>";
                 try { await _notificationService.SendEmailAsync(app.CandidateEmail, subject, html, ct); } catch { }
             }
-
-            return Result.Success(true);
         }
 
-        /// <summary>Lấy danh sách ca phỏng vấn theo job, kèm thống kê đặt lịch.</summary>
-        public async Task<List<InterviewSlotDetailDto>> GetSlotsForJobAsync(Guid jobPostingId, CancellationToken ct = default)
+        /// <summary>Lấy danh sách ca phỏng vấn theo job, kèm thống kê đặt lịch. Chỉ chủ tin hoặc admin.</summary>
+        public async Task<Result<List<InterviewSlotDetailDto>>> GetSlotsForJobAsync(
+            Guid jobPostingId, Guid? userId, string? role, CancellationToken ct = default)
         {
+            var (canManage, job) = await SchedulingSupport.CanManageAsync(_unitOfWork, jobPostingId, userId, role, ct);
+            if (job == null)
+                return Result.Failure<List<InterviewSlotDetailDto>>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
+            if (!canManage)
+                return Result.Failure<List<InterviewSlotDetailDto>>("Bạn không có quyền xem lịch phỏng vấn của tin này.", CommonErrorCodes.Forbidden);
+
             var nowUtc = DateTimeOffset.UtcNow;
 
             var slots = await _unitOfWork.Repository<AvailabilitySlot>()
                 .QueryAsync(q => q.Where(s => s.JobPostingId == jobPostingId)
                     .OrderBy(s => s.RoundNumber).ThenBy(s => s.StartTime)
                     .Select(s => new { s.Id, s.JobPostingId, s.RoundNumber, s.StartTime, s.EndTime, s.Timezone, s.Capacity, s.BookedCount }), ct);
-            if (slots.Count == 0) return new List<InterviewSlotDetailDto>();
+            if (slots.Count == 0) return Result.Success(new List<InterviewSlotDetailDto>());
 
             var slotIds = slots.Select(s => s.Id).ToList();
             var bookings = await _unitOfWork.Repository<InterviewBooking>()
                 .QueryAsync(q => q.Where(b => slotIds.Contains(b.AvailabilitySlotId))
-                    .Select(b => new { b.AvailabilitySlotId, b.ConfirmationStatus }), ct);
+                    .Select(b => new { b.AvailabilitySlotId, b.Status, b.ConfirmationStatus }), ct);
 
             var bookingsBySlot = bookings.GroupBy(b => b.AvailabilitySlotId).ToDictionary(g => g.Key, g => g.ToList());
 
-            return slots.Select(s =>
+            return Result.Success(slots.Select(s =>
             {
                 var bks = bookingsBySlot.TryGetValue(s.Id, out var bl) ? bl : new();
+
+                // Số chỗ bị chiếm SUY TỪ DÒNG BOOKING chứ không đọc cột `booked_count`: số hiển thị
+                // vì thế không thể trôi khỏi thực tế kể cả khi cột bị lệch. Cột vẫn giữ vai trò khoá
+                // tương tranh (một câu UPDATE nguyên tử) ở đường ghi — xem AssignSlotCommandHandler.
+                // Vị từ phải khớp từng chữ với migration ReconcileSlotBookedCount.
+                var seatsTaken = bks.Count(b => b.Status == BookingStatus.Scheduled);
+
+                // Cột và số suy ra lệch nhau là dấu hiệu có đường ghi nào đó quên cộng/trừ. Ghi log
+                // để lộ ra thay vì âm thầm, nhưng KHÔNG tự sửa: đây là endpoint đọc, ghi ở đây sẽ
+                // đua với câu UPDATE có điều kiện bên đường gán/dời lịch.
+                if (s.BookedCount != seatsTaken)
+                {
+                    _logger?.LogWarning(
+                        "booked_count lệch ở khung giờ {SlotId}: cột={Column}, số booking đang giữ chỗ={Derived}.",
+                        s.Id, s.BookedCount, seatsTaken);
+                }
+
                 return new InterviewSlotDetailDto
                 {
                     SlotId = s.Id,
@@ -567,68 +730,135 @@ namespace ARI.Application.Services
                     EndTime = s.EndTime,
                     Timezone = s.Timezone,
                     Capacity = s.Capacity,
-                    BookedCount = bks.Count,
-                    ConfirmedCount = bks.Count(b => b.ConfirmationStatus == "confirmed"),
-                    DeclinedCount = bks.Count(b => b.ConfirmationStatus == "declined"),
-                    PendingCount = bks.Count(b => b.ConfirmationStatus == "pending"),
+                    BookedCount = seatsTaken,
+                    SeatsAvailable = Math.Max(s.Capacity - seatsTaken, 0),
+                    ConfirmedCount = bks.Count(b => b.Status == BookingStatus.Scheduled && b.ConfirmationStatus == BookingConfirmationStatus.Confirmed),
+                    PendingCount = bks.Count(b => b.Status == BookingStatus.Scheduled && b.ConfirmationStatus == BookingConfirmationStatus.Pending),
+                    DeclinedCount = bks.Count(b => b.Status == BookingStatus.Declined),
+                    CancelledCount = bks.Count(b => b.Status == BookingStatus.Cancelled),
+                    TotalBookingRows = bks.Count,
+                    IsOverCapacity = seatsTaken > s.Capacity,
                     IsPast = s.StartTime < nowUtc
                 };
-            }).ToList();
+            }).ToList());
+        }
+
+        /// <summary>
+        /// Gộp (Status, ConfirmationStatus, DeclinedBy) thành MỘT trạng thái cho giao diện.
+        /// Đây là nơi DUY NHẤT giữ ánh xạ này — giao diện đọc thẳng kết quả, không tự suy luận và
+        /// tuyệt đối không dò nội dung DeclineReason (lý do là văn bản ứng viên tự nhập).
+        /// </summary>
+        internal static string ResolveCandidateState(string? status, string? confirmationStatus, string? declinedBy)
+        {
+            if (string.Equals(status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(confirmationStatus, BookingConfirmationStatus.Confirmed, StringComparison.OrdinalIgnoreCase)
+                    ? SlotCandidateState.Confirmed
+                    : SlotCandidateState.Pending;
+            }
+
+            if (string.Equals(status, BookingStatus.Declined, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(declinedBy, BookingDeclinedBy.System, StringComparison.OrdinalIgnoreCase)
+                    ? SlotCandidateState.ExpiredNoResponse
+                    : SlotCandidateState.DeclinedByCandidate;
+            }
+
+            // Còn lại là "cancelled". Chỉ nhân sự loại hồ sơ mới ghi declined_by = staff; giá trị
+            // khác (hoặc null với dữ liệu quá cũ) rơi về nhánh huỷ chung chung.
+            return string.Equals(declinedBy, BookingDeclinedBy.Staff, StringComparison.OrdinalIgnoreCase)
+                ? SlotCandidateState.RejectedByStaff
+                : SlotCandidateState.Cancelled;
         }
 
         /// <summary>Lấy danh sách ứng viên trong một ca phỏng vấn, kèm trạng thái phiên AI và kết quả đánh giá.</summary>
-        public async Task<List<SlotCandidateDto>> GetCandidatesInSlotAsync(Guid slotId, CancellationToken ct = default)
+        public async Task<Result<List<SlotCandidateDto>>> GetCandidatesInSlotAsync(
+            Guid slotId, Guid? userId, string? role, CancellationToken ct = default)
         {
+            var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(slotId, ct);
+            if (slot == null)
+                return Result.Failure<List<SlotCandidateDto>>("Không tìm thấy ca phỏng vấn.", CommonErrorCodes.NotFound);
+
+            var (canManage, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, slot.JobPostingId, userId, role, ct);
+            if (!canManage)
+                return Result.Failure<List<SlotCandidateDto>>("Bạn không có quyền xem ứng viên của ca phỏng vấn này.", CommonErrorCodes.Forbidden);
+
             var bookings = await _unitOfWork.Repository<InterviewBooking>()
                 .QueryAsync(q => q.Where(b => b.AvailabilitySlotId == slotId)
-                    .Select(b => new { b.Id, b.ApplicationId, b.ConfirmationStatus, b.DeclineReason, b.Status }), ct);
-            if (bookings.Count == 0) return new List<SlotCandidateDto>();
+                    .Select(b => new { b.Id, b.ApplicationId, b.RoundNumber, b.ConfirmationStatus, b.DeclineReason, b.DeclinedBy, b.Status }), ct);
+            if (bookings.Count == 0) return Result.Success(new List<SlotCandidateDto>());
 
             var appIds = bookings.Select(b => b.ApplicationId).Distinct().ToList();
+
+            // Phiên/đánh giá/mã đều gắn với (hồ sơ, VÒNG) chứ không gắn với ca phỏng vấn — không có
+            // khoá ngoại nào tới booking. Vậy nên vòng là mối liên kết mịn nhất có thể dùng, và
+            // BẮT BUỘC phải lọc theo nó: trước đây chỉ lọc theo hồ sơ nên một phiên đang chạy ở
+            // vòng 2 hiện thành huy hiệu "Đang thực hiện" trên dòng của vòng 1.
+            var rounds = bookings.Select(b => b.RoundNumber).Distinct().ToList();
 
             var apps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q.Where(a => appIds.Contains(a.Id))
                     .Select(a => new { a.Id, a.CandidateName, a.CandidateEmail, a.JobPostingId, a.Status }), ct);
 
             var sessions = await _unitOfWork.Repository<InterviewSession>()
-                .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId) && s.SessionType == "real")
-                    .Select(s => new { s.Id, s.ApplicationId, s.Status, s.DurationSeconds }), ct);
+                .QueryAsync(q => q.Where(s => appIds.Contains(s.ApplicationId) && s.SessionType == "real" && rounds.Contains(s.RoundNumber))
+                    .Select(s => new { s.Id, s.ApplicationId, s.RoundNumber, s.Status, s.DurationSeconds, s.StartedAt, s.CreatedAt }), ct);
 
             var evals = await _unitOfWork.Repository<Evaluation>()
-                .QueryAsync(q => q.Where(e => appIds.Contains(e.ApplicationId) && e.SessionType == "real")
-                    .Select(e => new { e.Id, e.ApplicationId, e.AiVerdict, e.OverallScore }), ct);
+                .QueryAsync(q => q.Where(e => appIds.Contains(e.ApplicationId) && e.SessionType == "real" && rounds.Contains(e.RoundNumber))
+                    .Select(e => new { e.Id, e.ApplicationId, e.RoundNumber, e.SessionId, e.AiVerdict, e.OverallScore, e.CreatedAt }), ct);
 
             var nowUtc = DateTimeOffset.UtcNow;
             var activeCodes = await _unitOfWork.Repository<InterviewCode>()
-                .QueryAsync(q => q.Where(c => appIds.Contains(c.ApplicationId) && !c.UsedAt.HasValue && c.ExpiresAt > nowUtc)
-                    .Select(c => new { c.ApplicationId, c.Code, c.ExpiresAt }), ct);
+                .QueryAsync(q => q.Where(c => appIds.Contains(c.ApplicationId) && rounds.Contains(c.RoundNumber) && !c.UsedAt.HasValue && c.ExpiresAt > nowUtc)
+                    .Select(c => new { c.ApplicationId, c.RoundNumber, c.Code, c.ExpiresAt, c.CreatedAt }), ct);
 
             var appById = apps.ToDictionary(a => a.Id);
-            var sessionByApp = sessions.GroupBy(s => s.ApplicationId).ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.Id).First());
-            var evalByApp = evals.GroupBy(e => e.ApplicationId).ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Id).First());
-            var codeByApp = activeCodes.GroupBy(c => c.ApplicationId).ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.ExpiresAt).First());
 
-            return bookings.Select(b =>
+            // Sắp theo THỜI GIAN. Bản cũ dùng OrderByDescending(x => x.Id) trên khoá Guid V4 — một
+            // thứ tự ổn định nhưng hoàn toàn ngẫu nhiên, nên có hồ sơ luôn hiện đúng phiên còn hồ sơ
+            // khác luôn hiện phiên cũ, và lỗi trông như dữ liệu thật chứ không như lỗi sắp xếp.
+            var sessionByAppRound = sessions
+                .GroupBy(s => (s.ApplicationId, s.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.StartedAt ?? s.CreatedAt).ThenByDescending(s => s.CreatedAt).First());
+            var evalsByAppRound = evals
+                .GroupBy(e => (e.ApplicationId, e.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).ToList());
+            var codeByAppRound = activeCodes
+                .GroupBy(c => (c.ApplicationId, c.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.ExpiresAt).ThenByDescending(c => c.CreatedAt).First());
+
+            return Result.Success(bookings.Select(b =>
             {
+                var key = (b.ApplicationId, b.RoundNumber);
                 appById.TryGetValue(b.ApplicationId, out var app);
-                sessionByApp.TryGetValue(b.ApplicationId, out var sess);
-                evalByApp.TryGetValue(b.ApplicationId, out var eval);
-                codeByApp.TryGetValue(b.ApplicationId, out var codeObj);
+                sessionByAppRound.TryGetValue(key, out var sess);
+                codeByAppRound.TryGetValue(key, out var codeObj);
 
-                bool isAppRejected = app != null && (
-                    string.Equals(app.Status, "not_pass", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(app.Status, "cv_rejected", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(app.Status, "failed", StringComparison.OrdinalIgnoreCase));
+                // Ưu tiên đánh giá của ĐÚNG phiên đang hiển thị; không có thì lấy bản mới nhất của vòng.
+                evalsByAppRound.TryGetValue(key, out var roundEvals);
+                var eval = sess != null
+                    ? roundEvals?.FirstOrDefault(e => e.SessionId == sess.Id) ?? roundEvals?.FirstOrDefault()
+                    : roundEvals?.FirstOrDefault();
 
+                // KHÔNG ghi đè ConfirmationStatus/BookingStatus/DeclineReason theo trạng thái hồ sơ
+                // nữa. Bản cũ làm vậy nên ba kết cục khác hẳn nhau (ứng viên báo bận / hệ thống huỷ
+                // vì quá hạn / nhân sự loại hồ sơ) bị gộp thành một nhãn không phân biệt được, và
+                // lý do thật của ứng viên bị xoá khỏi màn hình. Nay trạng thái hồ sơ đi riêng qua
+                // ApplicationStatus, còn CandidateState nói rõ lịch bị đóng vì đâu.
                 return new SlotCandidateDto
                 {
                     ApplicationId = b.ApplicationId,
                     BookingId = b.Id,
+                    RoundNumber = b.RoundNumber,
                     CandidateName = app?.CandidateName ?? "—",
                     CandidateEmail = app?.CandidateEmail ?? "—",
-                    ConfirmationStatus = isAppRejected ? "declined" : b.ConfirmationStatus,
-                    DeclineReason = isAppRejected ? "Đã bị loại khỏi quy trình tuyển dụng." : b.DeclineReason,
-                    BookingStatus = isAppRejected ? "cancelled" : b.Status,
+                    ConfirmationStatus = b.ConfirmationStatus,
+                    DeclineReason = b.DeclineReason,
+                    BookingStatus = b.Status,
+                    CandidateState = ResolveCandidateState(b.Status, b.ConfirmationStatus, b.DeclinedBy),
+                    OccupiesSeat = string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase),
+                    ApplicationStatus = app?.Status,
                     SessionId = sess?.Id,
                     SessionStatus = sess?.Status,
                     DurationSeconds = sess?.DurationSeconds,
@@ -638,7 +868,7 @@ namespace ARI.Application.Services
                     InterviewCode = codeObj?.Code,
                     CodeExpiresAt = codeObj?.ExpiresAt
                 };
-            }).ToList();
+            }).ToList());
         }
 
         // ────────────────────────────────────────────────────────────────────

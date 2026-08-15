@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using ARI.Application.UnitTests.ApplicationFlow;
 using ARI.Application.UnitTests.Scheduling;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -22,7 +23,7 @@ public class GetInterviewJobsTests
     [Fact]
     public async Task No_jobs_returns_empty_list()
     {
-        var result = await Svc(new InMemoryUnitOfWork()).GetInterviewJobsAsync(CancellationToken.None);
+        var result = await Svc(new InMemoryUnitOfWork()).GetInterviewJobsAsync(Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
         Assert.Empty(result);
     }
 
@@ -41,7 +42,7 @@ public class GetInterviewJobsTests
                   SchedulingData.Booking(appId2, slot2.Id, round: 2, confirmation: "pending"))
             .Seed(new InterviewSession { ApplicationId = appId1, RoundNumber = 1, SessionType = "real", Status = "completed" });
 
-        var result = await Svc(uow).GetInterviewJobsAsync(CancellationToken.None);
+        var result = await Svc(uow).GetInterviewJobsAsync(Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
 
         var dto = Assert.Single(result);
         Assert.Equal(job.Id, dto.JobId);
@@ -53,5 +54,52 @@ public class GetInterviewJobsTests
         Assert.Equal(1, dto.TotalSessions);
         Assert.Equal(1, dto.CompletedSessions);
         Assert.Equal(slot1.StartTime, dto.NextSlotTime); // ca tương lai gần nhất
+    }
+
+    /// <summary>
+    /// Thẻ tổng quan phải dùng CÙNG vị từ chiếm chỗ với danh sách ca bên dưới, nếu không đầu trang
+    /// nói một đằng, phân số từng ca nói một nẻo. Và "đã xác nhận" không được đếm lịch sau đó đã đóng.
+    /// </summary>
+    [Fact]
+    public async Task Chi_dem_booking_dang_giu_cho()
+    {
+        var job = ApplicationData.Job(status: "active");
+        var slot = SchedulingData.Slot(job.Id, round: 1, start: SchedulingData.Future);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot)
+            .Seed(SchedulingData.Booking(Guid.NewGuid(), slot.Id, status: BookingStatus.Scheduled, confirmation: "confirmed"),
+                  SchedulingData.Booking(Guid.NewGuid(), slot.Id, status: BookingStatus.Scheduled, confirmation: "pending"),
+                  SchedulingData.Booking(Guid.NewGuid(), slot.Id, status: BookingStatus.Declined, confirmation: "declined"),
+                  // Đã xác nhận rồi mới bị loại — không còn giữ chỗ, không được tính là "đã xác nhận".
+                  SchedulingData.Booking(Guid.NewGuid(), slot.Id, status: BookingStatus.Cancelled, confirmation: "confirmed"));
+
+        var result = await Svc(uow).GetInterviewJobsAsync(Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
+
+        var dto = Assert.Single(result);
+        Assert.Equal(2, dto.TotalBooked);
+        Assert.Equal(1, dto.TotalConfirmed);
+    }
+
+    /// <summary>Recruiter chỉ thấy tin của mình — trước đây nhánh dự phòng ở giao diện cho thấy TẤT CẢ.</summary>
+    [Fact]
+    public async Task Recruiter_chi_thay_tin_minh_tao()
+    {
+        var me = Guid.NewGuid();
+        var mine = SchedulingData.Job(me);
+        var theirs = SchedulingData.Job(Guid.NewGuid());
+        var uow = new InMemoryUnitOfWork().Seed(mine, theirs);
+
+        var result = await Svc(uow).GetInterviewJobsAsync(me, AppRoles.Recruiter, CancellationToken.None);
+
+        Assert.Equal(mine.Id, Assert.Single(result).JobId);
+    }
+
+    [Fact]
+    public async Task Admin_thay_moi_tin()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(SchedulingData.Job(), SchedulingData.Job());
+
+        var result = await Svc(uow).GetInterviewJobsAsync(Guid.NewGuid(), AppRoles.HrAdmin, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
     }
 }

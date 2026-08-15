@@ -177,7 +177,9 @@ namespace ARI.Infrastructure.Services
 
             var lookup = DbChangeRouter.NeedsApplicationLookup(change.Table) || change.Table == "applications"
                 ? await LookupApplicationAsync(scope, change, ct)
-                : DbChangeLookup.Empty;
+                : DbChangeRouter.NeedsJobLookup(change.Table)
+                    ? await LookupJobAsync(scope, change, ct)
+                    : DbChangeLookup.Empty;
 
             var dispatch = DbChangeRouter.Resolve(change, lookup);
             if (!dispatch.HasRecipients)
@@ -230,6 +232,33 @@ namespace ARI.Infrastructure.Services
                 CandidateAccountId = row.CandidateAccountId,
                 JobPostingId = row.JobPostingId,
                 JobOwnerUserId = row.OwnerUserId,
+            };
+        }
+
+        /// <summary>
+        /// Tra CHỦ TIN cho những bảng đã có <c>job_posting_id</c> sẵn trong payload (khung giờ).
+        /// Payload mang được id tin, nhưng người nhận lại là chủ tin — thông tin đó chỉ có ở
+        /// <c>job_postings.created_by_user_id</c>.
+        /// </summary>
+        private static async Task<DbChangeLookup> LookupJobAsync(
+            IServiceScope scope, DbChangeNotification change, CancellationToken ct)
+        {
+            if (change.JobPostingId is not { } jobId) return DbChangeLookup.Empty;
+
+            var db = scope.ServiceProvider.GetRequiredService<AriDbContext>();
+
+            var row = await db.Set<JobPosting>().IgnoreQueryFilters()
+                .Where(j => j.Id == jobId)
+                .Select(j => new { j.Id, j.CreatedByUserId })
+                .FirstOrDefaultAsync(ct);
+
+            // Tin đã bị xoá cứng: vẫn trả JobPostingId để router gửi cho nhóm hr_admin.
+            if (row is null) return new DbChangeLookup { JobPostingId = jobId };
+
+            return new DbChangeLookup
+            {
+                JobPostingId = row.Id,
+                JobOwnerUserId = row.CreatedByUserId,
             };
         }
 

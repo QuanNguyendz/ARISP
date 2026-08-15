@@ -25,6 +25,7 @@ import { profileService } from '@ari/shared/fservices/profile/profileService'
 import type { CvMatchResult } from '@ari/shared/fservices/profile/profileService'
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import type { JobPosting } from '@ari/shared/types/job'
 import { useAuthStore } from '@ari/shared/store/auth'
 import CandidateHeader from '@/app/layouts/CandidateHeader'
@@ -175,6 +176,7 @@ export default function JobDetailPage() {
   const { t } = useTranslation('landing')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { openDocument } = useDocumentViewer()
   const { isAuthenticated } = useAuthStore()
   const [job, setJob] = useState<JobPosting | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -494,18 +496,22 @@ export default function JobDetailPage() {
               </div>
             ) : match && match.hasCv ? (
               <div>
-                <a
-                  href={resolveAssetUrl(match.cvUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 flex items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-sm text-ink-700 hover:border-ai-300"
+                {/* Bản mobile của khối CV–JD. Cùng hành vi với bản desktop bên dưới: mở
+                    trình xem trong trang, KHÔNG nhảy tab. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openDocument(resolveAssetUrl(match.cvUrl), match.cvFileName || undefined)
+                  }
+                  title={t('jobDetail.match.viewCv')}
+                  className="mt-3 flex w-full items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-left text-sm text-ink-700 transition hover:border-ai-300 hover:bg-ai-50/40"
                 >
                   <FileText className="w-4 h-4 shrink-0 text-ai-600" />
                   <span className="flex-1 truncate">{match.cvFileName}</span>
-                  <span className="shrink-0 text-xs font-medium text-ai-700">
+                  <span className="shrink-0 text-xs font-medium text-ai-700 underline decoration-ai-300 underline-offset-2">
                     {t('jobDetail.match.viewCv')}
                   </span>
-                </a>
+                </button>
 
                 {match.analysis ? (
                   <>
@@ -665,19 +671,23 @@ export default function JobDetailPage() {
               </div>
             ) : match && match.hasCv ? (
               <div>
-                {/* CV đã có sẵn — hiện rõ tên file, bấm để xem */}
-                <a
-                  href={resolveAssetUrl(match.cvUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 flex items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-sm text-ink-700 hover:border-ai-300"
+                {/* CV đã có sẵn — bấm để xem NGAY TRONG TRANG. Mở tab mới sẽ ném người dùng
+                    sang trình xem PDF của trình duyệt, mất luôn ngữ cảnh tin tuyển dụng đang
+                    đọc; `DocumentViewer` còn xử lý được cả DOCX (tab ngoài thì tải file về). */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openDocument(resolveAssetUrl(match.cvUrl), match.cvFileName || undefined)
+                  }
+                  title={t('jobDetail.match.viewCv')}
+                  className="mt-3 flex w-full items-center gap-2 rounded-xl border border-ai-200 bg-white px-3 py-2 text-left text-sm text-ink-700 transition hover:border-ai-300 hover:bg-ai-50/40"
                 >
                   <FileText className="w-4 h-4 shrink-0 text-ai-600" />
                   <span className="flex-1 truncate">{match.cvFileName}</span>
-                  <span className="shrink-0 text-xs font-medium text-ai-700">
+                  <span className="shrink-0 text-xs font-medium text-ai-700 underline decoration-ai-300 underline-offset-2">
                     {t('jobDetail.match.viewCv')}
                   </span>
-                </a>
+                </button>
 
                 {match.analysis ? (
                   <>
@@ -783,26 +793,6 @@ export default function JobDetailPage() {
             ) : (
               <p className="mt-4 text-sm text-ink-500">{t('jobDetail.match.loadError')}</p>
             )}
-          </div>
-
-          {/* Company */}
-          <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
-            <div className="text-sm font-semibold mb-3">
-              {t('jobDetail.sections.aboutDepartment')}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">
-                  {job.department || t('jobDetail.header.department')}
-                </div>
-                <div className="text-xs text-ink-400">
-                  {t('jobDetail.company.teamSize', { count: 40 })}
-                </div>
-              </div>
-            </div>
           </div>
         </aside>
       </main>

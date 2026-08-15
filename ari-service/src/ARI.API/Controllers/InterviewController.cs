@@ -3,8 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
+using ARI.Application.Interfaces;
 using ARI.Application.Interviews;
 using ARI.Domain.Constants;
 using MediatR;
@@ -19,10 +21,28 @@ namespace ARI.API.Controllers
     public class InterviewController : ControllerBase
     {
         private readonly ISender _sender;
+        private readonly ICurrentUserService _currentUser;
 
-        public InterviewController(ISender sender)
+        public InterviewController(ISender sender, ICurrentUserService currentUser)
         {
             _sender = sender;
+            _currentUser = currentUser;
+        }
+
+        /// <summary>
+        /// Map lỗi nghiệp vụ ra đúng mã HTTP. Trước đây khối management/* trả BadRequest cho mọi
+        /// loại lỗi, nên "không có quyền" và "không tìm thấy" đều về 400 — giao diện không phân biệt
+        /// được để xử lý khác nhau.
+        /// </summary>
+        private IActionResult MapFailure(Result result)
+        {
+            return result.ErrorCode switch
+            {
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
+                CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
+                _ => BadRequest(new { message = result.Error }),
+            };
         }
 
         /// <summary>
@@ -129,7 +149,7 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetInterviewJobs(CancellationToken ct)
         {
-            var result = await _sender.Send(new GetInterviewJobsQuery(), ct);
+            var result = await _sender.Send(new GetInterviewJobsQuery(_currentUser.UserId, _currentUser.Role), ct);
             return Ok(result.Value);
         }
 
@@ -141,7 +161,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetSlotsForJob(Guid jobId, CancellationToken ct)
         {
-            var result = await _sender.Send(new GetSlotsForJobQuery(jobId), ct);
+            var result = await _sender.Send(new GetSlotsForJobQuery(jobId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }
 
@@ -153,7 +174,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetCandidatesInSlot(Guid slotId, CancellationToken ct)
         {
-            var result = await _sender.Send(new GetCandidatesInSlotQuery(slotId), ct);
+            var result = await _sender.Send(new GetCandidatesInSlotQuery(slotId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }
 
@@ -165,22 +187,39 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> SendBookingReminder(Guid bookingId, CancellationToken ct)
         {
-            var result = await _sender.Send(new SendBookingReminderCommand(bookingId), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            var result = await _sender.Send(new SendBookingReminderCommand(bookingId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
             return Ok(new { success = true, message = "Đã gửi nhắc nhở tới ứng viên." });
         }
 
         /// <summary>
         /// POST /api/interview/management/booking/{bookingId}/reschedule
-        /// Dời ứng viên sang ca phỏng vấn mới.
+        /// Dời một ứng viên sang ca phỏng vấn mới.
         /// </summary>
         [HttpPost("management/booking/{bookingId:guid}/reschedule")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> RescheduleBooking(Guid bookingId, [FromBody] RescheduleRequest request, CancellationToken ct)
         {
-            var result = await _sender.Send(new RescheduleBookingCommand(bookingId, request.TargetSlotId), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            var result = await _sender.Send(
+                new RescheduleBookingCommand(bookingId, request.TargetSlotId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
             return Ok(new { success = true, message = "Đã dời lịch thành công." });
+        }
+
+        /// <summary>
+        /// POST /api/interview/management/bookings/reschedule
+        /// Dời NHIỀU ứng viên sang cùng một ca, được ăn cả ngã về không: hoặc mọi người hợp lệ cùng
+        /// chuyển, hoặc không ai chuyển. Thay cho việc giao diện gửi N request tuần tự — cách cũ để
+        /// lại trạng thái dở dang khi ca đích không đủ chỗ cho cả nhóm.
+        /// </summary>
+        [HttpPost("management/bookings/reschedule")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> RescheduleBookings([FromBody] RescheduleBatchRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new RescheduleBookingsCommand(request.BookingIds, request.TargetSlotId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
         }
 
         // ────────────────────────────────────────────────────────────────────

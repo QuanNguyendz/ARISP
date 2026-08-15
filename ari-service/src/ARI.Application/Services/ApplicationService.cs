@@ -11,6 +11,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 
 namespace ARI.Application.Services
@@ -1067,28 +1068,46 @@ namespace ARI.Application.Services
 
             _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
 
-            // Hủy các lịch phỏng vấn đang chờ/đã đặt của ứng viên (nếu có)
+            // Đóng mọi lịch phỏng vấn chưa khép của ứng viên — kể cả lịch đã "declined", vì hồ sơ
+            // bị loại thì không còn lịch nào còn ý nghĩa.
             var activeBookings = await _unitOfWork.Repository<InterviewBooking>()
-                .FindAsync(b => b.ApplicationId == applicationId && b.Status != "cancelled", ct);
+                .FindAsync(b => b.ApplicationId == applicationId && b.Status != BookingStatus.Cancelled, ct);
+
+            // CHỈ booking đang thật sự giữ chỗ mới phải trả chỗ. Trước đây trừ cho MỌI booking trong
+            // danh sách trên, nên hồ sơ đã từ chối lịch (chỗ vốn đã được trả ở DeclineScheduleCommand
+            // / ScheduleConfirmationHostedService) bị trừ lần thứ hai → booked_count tụt xuống dưới
+            // số chỗ thực sự đang bị chiếm, và không có cơ chế nào đối soát lại nên lệch vĩnh viễn.
+            var slotsToRelease = new List<Guid>();
 
             foreach (var booking in activeBookings)
             {
-                booking.Status = "cancelled";
-                booking.ConfirmationStatus = "declined";
+                if (string.Equals(booking.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+                    slotsToRelease.Add(booking.AvailabilitySlotId);
+
+                booking.Status = BookingStatus.Cancelled;
+                booking.ConfirmationStatus = BookingConfirmationStatus.Declined;
+                booking.DeclinedBy = BookingDeclinedBy.Staff;
                 booking.DeclineReason = "Ứng viên đã bị loại khỏi quy trình tuyển dụng.";
                 booking.UpdatedAt = DateTimeOffset.UtcNow;
                 _unitOfWork.Repository<InterviewBooking>().Update(booking);
-
-                var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
-                if (slot != null)
-                {
-                    slot.BookedCount = Math.Max(slot.BookedCount - 1, 0);
-                    slot.UpdatedAt = DateTimeOffset.UtcNow;
-                    _unitOfWork.Repository<AvailabilitySlot>().Update(slot);
-                }
             }
 
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Trả chỗ SAU khi trạng thái "cancelled" đã được lưu, và bằng SQL nguyên tử thay vì
+            // đọc-rồi-ghi qua EF: cùng lúc có thể có người khác đang gán ứng viên vào chính ca này.
+            // Thứ tự này khớp ScheduleConfirmationHostedService — save lỗi thì không chỗ nào bị trả oan.
+            foreach (var slotId in slotsToRelease)
+            {
+                try
+                {
+                    await _unitOfWork.ExecuteSqlRawAsync(
+                        "UPDATE availability_slots SET booked_count = GREATEST(booked_count - 1, 0), updated_at = {0} WHERE id = {1}",
+                        new object[] { DateTimeOffset.UtcNow, slotId }, ct);
+                }
+                catch { /* best-effort — không chặn việc loại hồ sơ */ }
+            }
+
             _cache.Remove(AllApplicationsCacheKey);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);

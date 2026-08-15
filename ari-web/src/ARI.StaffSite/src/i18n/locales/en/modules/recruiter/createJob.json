@@ -14,7 +14,10 @@
     "success": "JD analyzed and fields auto-filled. You can still edit.",
     "warning": "File saved but AI couldn't identify it as JD clearly. Please check and fill in manually.",
     "successTitle": "Success",
-    "warningTitle": "Warning"
+    "warningTitle": "Warning",
+    "clickToView": "Click to view this file",
+    "clickToViewHint": "Click the file name to review the JD",
+    "removeFile": "Remove JD file"
   },
   "form": {
     "generalInfo": "General Information",
@@ -52,6 +55,7 @@
     "language": "Language",
     "vietnamese": "Vietnamese",
     "english": "English",
+    "onlineTestLanguageNotice": "Questions must be written in {{language}}. After creating the job, open \"Question bank\" and update the questions to match — uploaded Excel files are checked and rejected if the language does not match.",
     "minutes": "Minutes",
     "minutesMax": "Max 20 minutes",
     "visibility": "Visibility",

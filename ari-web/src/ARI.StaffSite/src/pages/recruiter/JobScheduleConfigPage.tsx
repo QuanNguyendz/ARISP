@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -16,6 +17,7 @@ import {
 import { ErrorAlert } from '@ari/shared/ui'
 import jobService from '@ari/shared/fservices/job'
 import { scheduleService } from '@ari/shared/fservices/schedule'
+import { interviewKeys } from '@/components/interviews/interviewQueryKeys'
 import type { JobPosting, AvailabilitySlot } from '@ari/shared/types/job'
 
 function errMsg(e: unknown, fallback: string): string {
@@ -38,10 +40,9 @@ function fmtRange(s: AvailabilitySlot): string {
 export default function JobScheduleConfigPage() {
   const { t } = useTranslation('modules/recruiter/scheduleConfig')
   const { id: jobId } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
   const [job, setJob] = useState<JobPosting | null>(null)
   const [round, setRound] = useState(1)
-  const [slots, setSlots] = useState<AvailabilitySlot[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -52,21 +53,35 @@ export default function JobScheduleConfigPage() {
 
   const rounds = useMemo(() => job?.roundConfigs ?? [], [job])
 
-  const loadSlots = useCallback(
-    async (r: number) => {
-      if (!jobId) return
-      try {
-        setLoading(true)
-        const data = await scheduleService.getSlots(jobId, r)
-        setSlots(data)
-      } catch (e) {
-        setError(errMsg(e, t('slotsLoadError')))
-      } finally {
-        setLoading(false)
-      }
-    },
-    [jobId, t]
-  )
+  // Qua react-query để realtime (ADR-057) làm mới được trang này khi người khác sửa khung giờ.
+  const {
+    data: slots = [],
+    isLoading: loading,
+    error: slotsError,
+  } = useQuery({
+    queryKey: ['schedule-slots', jobId, round],
+    queryFn: () => scheduleService.getSlots(jobId!, round),
+    enabled: !!jobId,
+    staleTime: 30_000,
+  })
+
+  /**
+   * Mọi thay đổi khung giờ đều phải chạm tới màn Phỏng vấn.
+   *
+   * Trước đây trang này chỉ splice kết quả vào state cục bộ và không gọi `useQueryClient` lần nào,
+   * nên tăng sức chứa xong thì màn Phỏng vấn (và modal "Dời lịch" trong đó) vẫn hiện số cũ cho tới
+   * khi tải lại toàn trang — đúng lỗi người dùng báo. Realtime cũng đã nối, nhưng invalidate ngay
+   * tại đây khiến việc sửa trong CÙNG một tab hiện tức thì, không phụ thuộc đường realtime.
+   */
+  const syncScheduleCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['schedule-slots', jobId] })
+    if (jobId) queryClient.invalidateQueries({ queryKey: interviewKeys.slots(jobId) })
+    queryClient.invalidateQueries({ queryKey: interviewKeys.jobs })
+  }
+
+  useEffect(() => {
+    if (slotsError) setError(errMsg(slotsError, t('slotsLoadError')))
+  }, [slotsError, t])
 
   useEffect(() => {
     if (!jobId) return
@@ -79,10 +94,6 @@ export default function JobScheduleConfigPage() {
       }
     })()
   }, [jobId, t])
-
-  useEffect(() => {
-    void loadSlots(round)
-  }, [round, loadSlots])
 
   const addSlot = async () => {
     if (!jobId) return
@@ -110,7 +121,7 @@ export default function JobScheduleConfigPage() {
       setStart('')
       setEnd('')
       setCapacity(1)
-      await loadSlots(round)
+      syncScheduleCaches()
     } catch (e) {
       setError(errMsg(e, t('actions.createError')))
     } finally {
@@ -122,8 +133,8 @@ export default function JobScheduleConfigPage() {
     const next = slot.capacity + delta
     if (next < 1 || next < slot.bookedCount) return
     try {
-      const updated = await scheduleService.updateSlotCapacity(slot.id, next)
-      setSlots((prev) => prev.map((s) => (s.id === slot.id ? updated : s)))
+      await scheduleService.updateSlotCapacity(slot.id, next)
+      syncScheduleCaches()
     } catch (e) {
       setError(errMsg(e, t('actions.capacityError')))
     }
@@ -132,7 +143,7 @@ export default function JobScheduleConfigPage() {
   const removeSlot = async (slot: AvailabilitySlot) => {
     try {
       await scheduleService.deleteSlot(slot.id)
-      setSlots((prev) => prev.filter((s) => s.id !== slot.id))
+      syncScheduleCaches()
     } catch (e) {
       setError(errMsg(e, t('actions.deleteError')))
     }

@@ -261,6 +261,19 @@ export const interviewService = {
     const { data } = await apiClient.post<{ success: boolean; message: string }>(`/interview/management/booking/${bookingId}/reschedule`, { targetSlotId });
     return data;
   },
+
+  /**
+   * Dời NHIỀU ứng viên sang cùng một ca trong MỘT request — được ăn cả ngã về không.
+   * Thay cho vòng lặp gửi N request tuần tự: cách cũ với ca còn 1 chỗ và 3 người thì người đầu
+   * lọt, hai người sau thất bại lần lượt và không có gì hoàn tác.
+   */
+  async rescheduleBookings(bookingIds: string[], targetSlotId: string): Promise<RescheduleResult> {
+    const { data } = await apiClient.post<RescheduleResult>('/interview/management/bookings/reschedule', {
+      bookingIds,
+      targetSlotId,
+    });
+    return data;
+  },
 };
 
 // ─── Interview Management DTOs ───────────────────────────────────────────────
@@ -286,21 +299,54 @@ export interface InterviewSlotDetail {
   endTime: string;
   timezone: string;
   capacity: number;
+  /**
+   * SỐ CHỖ ĐANG BỊ CHIẾM (booking `status = 'scheduled'`), không phải tổng số dòng booking.
+   * Người báo bận / quá hạn / bị loại đều đã trả chỗ nên không tính vào đây — đúng bằng con số
+   * server dùng để chặn khi gán và khi dời lịch. Muốn tổng số dòng thì dùng `totalBookingRows`.
+   */
   bookedCount: number;
+  /** Số chỗ còn nhận thêm được, đã kẹp không âm. Dùng thẳng, đừng tự trừ capacity - bookedCount. */
+  seatsAvailable: number;
   confirmedCount: number;
-  declinedCount: number;
   pendingCount: number;
+  /** Đã báo bận / quá hạn xác nhận — ĐÃ trả chỗ. */
+  declinedCount: number;
+  /** Đã bị loại khỏi quy trình — ĐÃ trả chỗ. */
+  cancelledCount: number;
+  totalBookingRows: number;
+  /** Số chỗ bị chiếm vượt quá sức chứa (dữ liệu cũ bị lệch, hoặc nhân sự hạ sức chứa). */
+  isOverCapacity: boolean;
   isPast: boolean;
 }
+
+/** Trạng thái ứng viên trong ca — server tính sẵn, giao diện KHÔNG tự suy luận. */
+export type CandidateState =
+  | 'pending'
+  | 'confirmed'
+  | 'declined_by_candidate'
+  | 'expired_no_response'
+  | 'rejected_by_staff'
+  | 'cancelled';
 
 export interface SlotCandidate {
   applicationId: string;
   bookingId: string;
+  roundNumber: number;
   candidateName: string;
   candidateEmail: string;
   confirmationStatus: string; // pending | confirmed | declined
   declineReason?: string | null;
-  bookingStatus: string;       // scheduled | completed | cancelled
+  bookingStatus: string;       // scheduled | declined | cancelled
+  /**
+   * Nguồn sự thật duy nhất cho nhãn + việc bật/tắt nút. Trước đây giao diện tự suy ra bằng cách
+   * dò chuỗi tiếng Việt trong `declineReason` nên gắn nhãn "Từ chối (báo bận)" cho cả người bị
+   * hệ thống huỷ vì quá hạn xác nhận.
+   */
+  candidateState: CandidateState;
+  /** Ứng viên này có đang chiếm một chỗ của ca không. */
+  occupiesSeat: boolean;
+  /** Trạng thái HỒ SƠ (khác trạng thái lịch) — để phân biệt "lịch đóng" với "hồ sơ bị loại". */
+  applicationStatus?: string | null;
   sessionId?: string | null;
   sessionStatus?: string | null;
   durationSeconds?: number | null;
@@ -309,4 +355,14 @@ export interface SlotCandidate {
   overallScore?: number | null;
   interviewCode?: string | null;
   codeExpiresAt?: string | null;
+}
+
+export interface RescheduleFailure {
+  bookingId: string;
+  message: string;
+}
+
+export interface RescheduleResult {
+  movedCount: number;
+  failed: RescheduleFailure[];
 }

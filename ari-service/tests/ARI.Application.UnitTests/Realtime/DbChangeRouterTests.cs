@@ -163,7 +163,7 @@ public class DbChangeRouterTests
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
 
-        foreach (var table in new[] { "interview_bookings", "online_test_submissions", "evaluations", "interview_codes" })
+        foreach (var table in new[] { "interview_bookings", "online_test_submissions", "evaluations", "interview_codes", "interview_sessions" })
         {
             Assert.True(DbChangeRouter.NeedsApplicationLookup(table));
 
@@ -179,6 +179,75 @@ public class DbChangeRouterTests
             Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
             Assert.Equal(appId, dispatch.Payload["applicationId"]);
         }
+    }
+
+    // ---------- Khung giờ / sức chứa ----------
+
+    [Fact]
+    public void Availability_slots_gui_chu_tin_va_nhom_hr()
+    {
+        var ownerId = Guid.NewGuid();
+        var jobId = Guid.NewGuid();
+
+        var change = DbChangeRouter.Parse(Payload("availability_slots", routing: $$"""{"job_posting_id":"{{jobId}}"}"""));
+        var dispatch = DbChangeRouter.Resolve(change, new DbChangeLookup { JobPostingId = jobId, JobOwnerUserId = ownerId });
+
+        Assert.Equal(new[] { ownerId }, dispatch.UserIds);
+        Assert.Equal(new[] { DbChangeRouter.HrAdminGroup }, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);
+        Assert.Equal(jobId, dispatch.Payload["jobPostingId"]);
+    }
+
+    /// <summary>
+    /// Sức chứa là dữ liệu vận hành nội bộ. Kể cả khi lookup vô tình mang theo id ứng viên thì
+    /// router cũng không được gửi cho họ — kênh realtime chạy song song với API nên phải giữ đúng
+    /// phạm vi tối thiểu.
+    /// </summary>
+    [Fact]
+    public void Availability_slots_khong_gui_cho_ung_vien()
+    {
+        var candidateId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("availability_slots")),
+            new DbChangeLookup { CandidateAccountId = candidateId, JobOwnerUserId = ownerId });
+
+        Assert.DoesNotContain(candidateId, dispatch.UserIds);
+        Assert.Contains(ownerId, dispatch.UserIds);
+    }
+
+    [Fact]
+    public void Availability_slots_can_tra_cuu_chu_tin_chu_khong_tra_ho_so()
+    {
+        Assert.True(DbChangeRouter.NeedsJobLookup("availability_slots"));
+        Assert.False(DbChangeRouter.NeedsApplicationLookup("availability_slots"));
+    }
+
+    /// <summary>Chặn việc mở rộng NeedsJobLookup quá tay: các bảng khác không được đi qua nhánh này.</summary>
+    [Theory]
+    [InlineData("job_postings")]
+    [InlineData("applications")]
+    [InlineData("interview_bookings")]
+    [InlineData("notifications")]
+    [InlineData(null)]
+    public void Bang_khac_khong_can_tra_cuu_tin(string? table)
+    {
+        Assert.False(DbChangeRouter.NeedsJobLookup(table));
+    }
+
+    /// <summary>Tin đã bị xoá cứng thì không còn chủ tin — sự kiện vẫn phải tới được nhóm hr_admin.</summary>
+    [Fact]
+    public void Availability_slots_khong_co_chu_tin_van_gui_nhom_hr()
+    {
+        var jobId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("availability_slots", routing: $$"""{"job_posting_id":"{{jobId}}"}""")),
+            new DbChangeLookup { JobPostingId = jobId });
+
+        Assert.Empty(dispatch.UserIds);
+        Assert.Equal(new[] { DbChangeRouter.HrAdminGroup }, dispatch.RoleGroups);
     }
 
     [Fact]

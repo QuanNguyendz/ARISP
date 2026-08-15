@@ -21,7 +21,9 @@
       "templateError": "Không tải được file mẫu.",
       "importError": "Không nhập được file. Kiểm tra lại định dạng .xlsx.",
       "resultSummary": "Đã thêm {{imported}} câu · {{failed}} dòng lỗi.",
-      "rowError": "Dòng {{row}}: {{message}}"
+      "rowError": "Dòng {{row}}: {{message}}",
+      "languageNotice": "Vòng trắc nghiệm của tin này cấu hình ngôn ngữ {{language}}. File Excel tải lên phải viết bằng {{language}} — sai ngôn ngữ sẽ bị từ chối.",
+      "noRoundNotice": "Tin tuyển dụng này chưa có vòng Online Test nào, nên ứng viên sẽ không được giao bài thi. Vào phần sửa tin để thêm vòng \"Online Test / Trắc nghiệm\" trước khi soạn ngân hàng đề."
     },
     "form": {
       "addTitle": "Thêm câu hỏi",
@@ -61,6 +63,10 @@
       "minOptions": "Câu hỏi cần ít nhất 2 phương án trả lời.",
       "noCorrect": "Vui lòng chọn ít nhất 1 đáp án đúng.",
       "singleOne": "Câu hỏi 1 đáp án chỉ được chọn đúng 1 đáp án đúng."
+    },
+    "language": {
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh"
     }
   },
   "results": {
