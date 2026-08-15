@@ -879,10 +879,28 @@ namespace ARI.Application.Services
             if (application == null)
                 return Result.Failure<StartSessionResponse>("Application not found.");
 
+            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            if (jobPosting == null)
+                return Result.Failure<StartSessionResponse>("Job posting not found.");
+
+            var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == jobPosting.Id && r.RoundNumber == request.RoundNumber, ct);
+            var roundConfig = roundConfigs.FirstOrDefault() ?? new InterviewRoundConfig
+            {
+                RoundType = request.RoundNumber == 1 ? "screening" : "technical",
+                InterviewCodeTtlHours = 2,
+                MaxDurationMinutes = 45
+            };
+
             // Giới hạn phỏng vấn thử theo VÒNG (ADR-038, mặc định 1 lượt/vòng).
             // Interview:PracticeAttemptsPerRound <= 0 = không giới hạn (chỉ dùng dev/test).
             if (request.SessionType == "practice")
             {
+                // Vòng trắc nghiệm KHÔNG có phỏng vấn thử: buổi thử là hội thoại với AI (STT/TTS/RAG),
+                // không có gì để "thử" với một bài chọn đáp án — và cho thử sẽ lộ chính ngân hàng đề.
+                if (InterviewInviteEmail.IsOnlineTest(roundConfig.RoundType))
+                    return Result.Failure<StartSessionResponse>("Vòng trắc nghiệm không có phỏng vấn thử.");
+
                 var maxAttempts = _interviewOptions.PracticeAttemptsPerRound;
                 if (maxAttempts > 0)
                 {
@@ -898,19 +916,6 @@ namespace ARI.Application.Services
                 application.PracticeSessionUsed = true;
                 _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
             }
-
-            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
-            if (jobPosting == null)
-                return Result.Failure<StartSessionResponse>("Job posting not found.");
-
-            var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
-                .FindAsync(r => r.JobPostingId == jobPosting.Id && r.RoundNumber == request.RoundNumber, ct);
-            var roundConfig = roundConfigs.FirstOrDefault() ?? new InterviewRoundConfig
-            {
-                RoundType = request.RoundNumber == 1 ? "screening" : "technical",
-                InterviewCodeTtlHours = 2,
-                MaxDurationMinutes = 45
-            };
 
             // Ngôn ngữ viết báo cáo = ngôn ngữ FE đang dùng (chỉ nhận vi|en), fallback ngôn ngữ phỏng vấn.
             var uiLanguage = (request.UiLanguage ?? string.Empty).Trim().ToLowerInvariant();
@@ -1668,6 +1673,8 @@ namespace ARI.Application.Services
                 // Auto-send email to Candidate if not progressed
                 if (!hasProgressed)
                 {
+                    // Link trong thư phải trỏ về portal thật của môi trường đang chạy, không phải máy dev.
+                    var portalBase = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
                     string emailBody;
                     string subject;
                     if (request.FinalVerdict == "pass")
@@ -1685,7 +1692,7 @@ namespace ARI.Application.Services
                                     <p>Đại diện bộ phận Nhân sự (HR) sẽ liên hệ trực tiếp với Anh/Chị trong vòng 1-2 ngày làm việc tới để trao đổi chi tiết về kế hoạch công việc, mức đãi ngộ và gửi Thư mời nhận việc chính thức (Offer Letter).</p>
                                     <p>Cảm ơn Anh/Chị đã luôn dành sự quan tâm và nỗ lực trong suốt hành trình tuyển dụng cùng ARISP.</p>
                                     <div style="text-align: center; margin: 30px 0;">
-                                        <a href="http://localhost:3000/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
+                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
                                     </div>
                                     <p style="margin-bottom: 0;">Trân trọng,<br><strong>Trưởng Ban Tuyển Dụng ARISP</strong></p>
                                 </div>
@@ -1709,7 +1716,7 @@ namespace ARI.Application.Services
                                     <p>Sau khi cân nhắc kỹ lưỡng dựa trên kết quả phỏng vấn và so sánh với định hướng hiện tại của vị trí, chúng tôi rất tiếc phải thông báo rằng chưa thể đồng hành cùng Anh/Chị trong dự án lần này.</p>
                                     <p>Hồ sơ năng lực của Anh/Chị sẽ được lưu trữ bảo mật trong Cơ sở dữ liệu ứng viên tiềm năng của ARISP. Chúng tôi sẽ chủ động liên hệ ngay khi có những cơ hội nghề nghiệp mới phù hợp hơn với thế mạnh của Anh/Chị.</p>
                                     <div style="text-align: center; margin: 30px 0;">
-                                        <a href="http://localhost:3000/candidate/applications/{{application.Id}}" style="background-color: #4b5563; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(75,85,99,0.2);">Xem thông tin hồ sơ</a>
+                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #4b5563; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(75,85,99,0.2);">Xem thông tin hồ sơ</a>
                                     </div>
                                     <p>Chúc Anh/Chị luôn dồi dào sức khỏe, may mắn và gặt hái được nhiều thành công rực rỡ trên con đường sự nghiệp sắp tới.</p>
                                     <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
@@ -1794,7 +1801,8 @@ namespace ARI.Application.Services
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
                 var baseUrl = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
-                var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+                // Chỉ để thoả cột TokenHash (NOT NULL) — không dòng nào còn đối chiếu giá trị này.
+                var rawToken = Guid.NewGuid().ToString("N");
 
                 var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
                     .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
@@ -1809,7 +1817,9 @@ namespace ARI.Application.Services
                     ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
                 }, ct);
 
-                var scheduleLink = $"{baseUrl}/portal/schedule/{application.Id}?token={rawToken}&round={nextRoundNumber}";
+                // ADR-048/059: ứng viên KHÔNG tự chọn giờ nữa — chỉ dẫn về Portal để theo dõi, thư mời
+                // kèm giờ hẹn sẽ do bước nhân sự xếp lịch gửi riêng. Token invite không phát ra ngoài.
+                var portalLink = $"{baseUrl}/candidate/applications/{application.Id}";
 
                 var emailBody = $$"""
                     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
@@ -1819,11 +1829,11 @@ namespace ARI.Application.Services
                         <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
                             <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
                             <p>Chúc mừng Anh/Chị đã hoàn thành xuất sắc vòng phỏng vấn số <strong>{{currentRoundNumber}}</strong>.</p>
-                            <p>Đội ngũ tuyển dụng ARISP trân trọng kính mời Anh/Chị tiếp tục tham gia vào <strong>Vòng phỏng vấn số {{nextRoundNumber}}</strong>.</p>
+                            <p>Đội ngũ tuyển dụng ARISP trân trọng kính mời Anh/Chị tiếp tục tham gia <strong>Vòng phỏng vấn số {{nextRoundNumber}}</strong>.</p>
+                            <p><strong>Bộ phận nhân sự sẽ xếp lịch vòng {{nextRoundNumber}}</strong> và gửi Anh/Chị một thư mời riêng kèm <strong>giờ hẹn cụ thể và địa điểm</strong>. Trong thư đó, Anh/Chị bấm xác nhận tham dự hoặc báo bận để được xếp khung giờ khác.</p>
                             <div style="margin: 30px 0; text-align: center;">
-                                <a href="{{scheduleLink}}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Đặt lịch phỏng vấn ngay</a>
+                                <a href="{{portalLink}}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Xem tiến trình hồ sơ</a>
                             </div>
-                            <p>Vui lòng mở liên kết trên (trên thiết bị cá nhân) để chọn khung giờ phỏng vấn vòng {{nextRoundNumber}}. Buổi phỏng vấn thật diễn ra tại văn phòng — bạn nhập mã phỏng vấn do nhân sự cấp tại chỗ.</p>
                             <p>Nếu gặp bất kỳ khó khăn hoặc cần hỗ trợ kỹ thuật, xin vui lòng phản hồi trực tiếp email này hoặc liên hệ bộ phận hỗ trợ tuyển dụng.</p>
                             <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
                         </div>

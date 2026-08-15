@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { AlertCircle, Loader2, RefreshCw, X } from 'lucide-react'
 import { interviewService, type SlotCandidate } from '@ari/shared/fservices/interview'
 import { interviewKeys } from './interviewQueryKeys'
 import { fmtDate, fmtTime } from './format'
+import { INTERVIEWS_NS } from './workspaceConfig'
 
 /**
  * Dời một hoặc nhiều ứng viên sang ca khác.
@@ -31,6 +33,7 @@ export function RescheduleModal({
   onClose: () => void
   onSuccess: () => void
 }) {
+  const { t } = useTranslation(INTERVIEWS_NS)
   const [selectedSlotId, setSelectedSlotId] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +71,9 @@ export function RescheduleModal({
       if (res.failed?.length) {
         setFailures(
           res.failed.map((f) => ({
-            name: candidates.find((c) => c.bookingId === f.bookingId)?.candidateName ?? 'Ứng viên',
+            name:
+              candidates.find((c) => c.bookingId === f.bookingId)?.candidateName ??
+              t('reschedule.fallbackName'),
             message: f.message,
           }))
         )
@@ -79,11 +84,11 @@ export function RescheduleModal({
         // Còn người thất bại thì GIỮ modal mở để nhân sự đọc lý do từng người.
         if (!res.failed?.length) onClose()
       } else if (!res.failed?.length) {
-        setError('Không dời được ứng viên nào. Vui lòng tải lại và thử lại.')
+        setError(t('reschedule.noneMoved'))
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setError(e?.response?.data?.message || 'Có lỗi xảy ra khi dời ca phỏng vấn.')
+      setError(e?.response?.data?.message || t('reschedule.error'))
     } finally {
       setSubmitting(false)
     }
@@ -99,7 +104,7 @@ export function RescheduleModal({
         <div className="flex items-center justify-between border-b border-ink-100 dark:border-white/10 pb-3">
           <h3 className="font-bold text-base text-ink-900 dark:text-white flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-brand-500" />
-            Dời lịch phỏng vấn ({candidates.length} ứng viên)
+            {t('reschedule.title', { count: candidates.length })}
           </h3>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-600 dark:hover:text-white">
             <X className="w-5 h-5" />
@@ -115,7 +120,8 @@ export function RescheduleModal({
         {failures.length > 0 && (
           <div className="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 p-2.5 space-y-1">
             <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {failures.length} ứng viên chưa dời được
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />{' '}
+              {t('reschedule.failed', { count: failures.length })}
             </p>
             {failures.map((f, i) => (
               <p key={i} className="text-[11px] text-amber-700 dark:text-amber-400">
@@ -127,29 +133,32 @@ export function RescheduleModal({
 
         <div className="text-xs text-ink-500 dark:text-ink-400 space-y-1">
           <p>
-            Ứng viên được chọn:{' '}
+            {t('reschedule.selectedCandidates')}{' '}
             <strong className="text-ink-900 dark:text-white">
               {candidates.map((c) => c.candidateName).join(', ')}
             </strong>
           </p>
           <p>
-            Vòng phỏng vấn: <strong>Vòng {currentRoundNumber}</strong>
+            {t('reschedule.roundLabel')}{' '}
+            <strong>{t('reschedule.roundValue', { number: currentRoundNumber })}</strong>
           </p>
         </div>
 
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-ink-700 dark:text-ink-200">
-            Chọn ca mới (vòng {currentRoundNumber}, còn ít nhất {candidates.length} chỗ):
+            {t('reschedule.chooseSlot', {
+              round: currentRoundNumber,
+              count: candidates.length,
+            })}
           </label>
 
           {isLoading ? (
             <p className="text-xs text-ink-400 flex items-center gap-2 py-3">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang tải danh sách ca...
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('reschedule.loadingSlots')}
             </p>
           ) : validSlots.length === 0 ? (
             <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20">
-              Không có ca nào của vòng {currentRoundNumber} còn đủ {candidates.length} chỗ trống. Hãy
-              tăng sức chứa của một ca, tạo ca mới, hoặc chọn ít ứng viên hơn.
+              {t('reschedule.noSlots', { round: currentRoundNumber, count: candidates.length })}
             </p>
           ) : (
             <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
@@ -173,7 +182,10 @@ export function RescheduleModal({
                     />
                     <div>
                       <p className="text-xs font-bold text-ink-900 dark:text-white">
-                        Vòng {s.roundNumber} · {fmtDate(s.startTime)}
+                        {t('reschedule.slotLine', {
+                          round: s.roundNumber,
+                          date: fmtDate(s.startTime),
+                        })}
                       </p>
                       <p className="text-xs text-ink-500">
                         {fmtTime(s.startTime)} – {fmtTime(s.endTime)}
@@ -181,7 +193,10 @@ export function RescheduleModal({
                     </div>
                   </div>
                   <span className="text-[11px] font-medium text-ink-400">
-                    Trống {s.seatsAvailable}/{s.capacity}
+                    {t('reschedule.seats', {
+                      available: s.seatsAvailable,
+                      capacity: s.capacity,
+                    })}
                   </span>
                 </label>
               ))}
@@ -194,7 +209,7 @@ export function RescheduleModal({
             onClick={onClose}
             className="px-4 py-2 text-xs font-medium text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10 rounded-xl"
           >
-            {failures.length > 0 ? 'Đóng' : 'Hủy'}
+            {failures.length > 0 ? t('reschedule.close') : t('reschedule.cancel')}
           </button>
           <button
             disabled={!selectedSlotId || submitting}
@@ -202,7 +217,9 @@ export function RescheduleModal({
             className="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-xl transition-colors inline-flex items-center gap-1.5"
           >
             {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {submitting ? 'Đang dời...' : `Xác nhận dời ${candidates.length} ứng viên`}
+            {submitting
+              ? t('reschedule.submitting')
+              : t('reschedule.confirm', { count: candidates.length })}
           </button>
         </div>
       </motion.div>

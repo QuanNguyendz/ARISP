@@ -16,9 +16,12 @@ import type { CandidateState, SlotCandidate } from '@ari/shared/fservices/interv
  *     chính mình.
  *
  * Nay server trả thẳng `candidateState`, và mọi quyết định hiển thị đọc từ bảng dưới đây.
+ *
+ * Nhãn ở đây là **khoá i18n** (`modules/staff/interviews`) — file này là module thuần, không gọi
+ * được hook dịch; component nhận khoá rồi tự dịch.
  */
 export interface CandidateStateStyle {
-  label: string
+  labelKey: string
   /** Lớp CSS cho chip trạng thái. */
   chip: string
   /** Lịch đã đóng (không còn giữ chỗ, không nhắc lịch / cấp mã được nữa). */
@@ -27,39 +30,39 @@ export interface CandidateStateStyle {
 
 export const CANDIDATE_STATE: Record<CandidateState, CandidateStateStyle> = {
   pending: {
-    label: 'Chờ xác nhận',
+    labelKey: 'state.pending',
     chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
     closed: false,
   },
   confirmed: {
-    label: 'Đã xác nhận',
+    labelKey: 'state.confirmed',
     chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     closed: false,
   },
   declined_by_candidate: {
-    label: 'Từ chối (báo bận)',
+    labelKey: 'state.declined_by_candidate',
     chip: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
     closed: true,
   },
   expired_no_response: {
-    label: 'Quá hạn xác nhận',
+    labelKey: 'state.expired_no_response',
     chip: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400',
     closed: true,
   },
   rejected_by_staff: {
-    label: 'Đã bị loại',
+    labelKey: 'state.rejected_by_staff',
     chip: 'bg-ink-200 text-ink-600 dark:bg-white/10 dark:text-ink-300',
     closed: true,
   },
   cancelled: {
-    label: 'Đã huỷ',
+    labelKey: 'state.cancelled',
     chip: 'bg-ink-200 text-ink-600 dark:bg-white/10 dark:text-ink-300',
     closed: true,
   },
 }
 
 const FALLBACK: CandidateStateStyle = {
-  label: 'Không rõ',
+  labelKey: 'state.unknown',
   chip: 'bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-300',
   closed: true,
 }
@@ -79,13 +82,13 @@ export const isSelectable = (c: SlotCandidate) => !isRejected(c)
 /** Cần cấp mã: lịch còn hiệu lực và chưa có mã nào còn hạn. */
 export const needsCode = (c: SlotCandidate) => !stateOf(c).closed && !c.interviewCode
 
-/** Nhãn cho khối lý do bên dưới dòng ứng viên. */
-export function declineReasonLabel(c: SlotCandidate): string | null {
+/** Khoá i18n cho nhãn khối lý do bên dưới dòng ứng viên. */
+export function declineReasonLabelKey(c: SlotCandidate): string | null {
   switch (c.candidateState) {
     case 'rejected_by_staff':
-      return 'Lý do loại:'
+      return 'candidate.reasonRejected'
     case 'declined_by_candidate':
-      return 'Lý do từ chối:'
+      return 'candidate.reasonDeclined'
     case 'expired_no_response':
       // Không lặp lại nguyên câu "[Hệ thống] …" của backend — nói thẳng chuyện gì đã xảy ra.
       return null

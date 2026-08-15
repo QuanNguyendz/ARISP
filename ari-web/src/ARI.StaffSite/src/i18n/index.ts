@@ -32,8 +32,8 @@ import hrTeamVi from './locales/vi/modules/hr/team.json'
 import hrTeamEn from './locales/en/modules/hr/team.json'
 import hrCandidateDetailVi from './locales/vi/modules/hr/candidateDetail.json'
 import hrCandidateDetailEn from './locales/en/modules/hr/candidateDetail.json'
-import hrInterviewSessionsVi from './locales/vi/modules/hr/interviewSessions.json'
-import hrInterviewSessionsEn from './locales/en/modules/hr/interviewSessions.json'
+import staffInterviewsVi from './locales/vi/modules/staff/interviews.json'
+import staffInterviewsEn from './locales/en/modules/staff/interviews.json'
 import hrJobPostingDetailVi from './locales/vi/modules/hr/jobPostingDetail.json'
 import hrJobPostingDetailEn from './locales/en/modules/hr/jobPostingDetail.json'
 
@@ -42,18 +42,10 @@ import recruiterDashboardVi from './locales/vi/modules/recruiter/dashboard.json'
 import recruiterDashboardEn from './locales/en/modules/recruiter/dashboard.json'
 import recruiterJobsVi from './locales/vi/modules/recruiter/jobs.json'
 import recruiterJobsEn from './locales/en/modules/recruiter/jobs.json'
-import recruiterCandidatesVi from './locales/vi/modules/recruiter/candidates.json'
-import recruiterCandidatesEn from './locales/en/modules/recruiter/candidates.json'
-import recruiterInterviewsVi from './locales/vi/modules/recruiter/interviews.json'
-import recruiterInterviewsEn from './locales/en/modules/recruiter/interviews.json'
-import recruiterEvaluationsVi from './locales/vi/modules/recruiter/evaluations.json'
-import recruiterEvaluationsEn from './locales/en/modules/recruiter/evaluations.json'
 import recruiterJobDetailVi from './locales/vi/modules/recruiter/jobDetail.json'
 import recruiterJobDetailEn from './locales/en/modules/recruiter/jobDetail.json'
 import recruiterCandidateDetailVi from './locales/vi/modules/recruiter/candidateDetail.json'
 import recruiterCandidateDetailEn from './locales/en/modules/recruiter/candidateDetail.json'
-import recruiterInterviewCodeVi from './locales/vi/modules/recruiter/interviewCode.json'
-import recruiterInterviewCodeEn from './locales/en/modules/recruiter/interviewCode.json'
 import recruiterScheduleConfigVi from './locales/vi/modules/recruiter/scheduleConfig.json'
 import recruiterScheduleConfigEn from './locales/en/modules/recruiter/scheduleConfig.json'
 import recruiterCreateJobVi from './locales/vi/modules/recruiter/createJob.json'
@@ -88,17 +80,13 @@ export const resources = {
     'modules/hr/recruiters': hrRecruitersVi,
     'modules/hr/team': hrTeamVi,
     'modules/hr/candidateDetail': hrCandidateDetailVi,
-    'modules/hr/interviewSessions': hrInterviewSessionsVi,
+    'modules/staff/interviews': staffInterviewsVi,
     'modules/hr/jobPostingDetail': hrJobPostingDetailVi,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardVi,
     'modules/recruiter/jobs': recruiterJobsVi,
-    'modules/recruiter/candidates': recruiterCandidatesVi,
-    'modules/recruiter/interviews': recruiterInterviewsVi,
-    'modules/recruiter/evaluations': recruiterEvaluationsVi,
     'modules/recruiter/jobDetail': recruiterJobDetailVi,
     'modules/recruiter/candidateDetail': recruiterCandidateDetailVi,
-    'modules/recruiter/interviewCode': recruiterInterviewCodeVi,
     'modules/recruiter/scheduleConfig': recruiterScheduleConfigVi,
     'modules/recruiter/createJob': recruiterCreateJobVi,
     'modules/recruiter/onlineTest': recruiterOnlineTestVi,
@@ -123,17 +111,13 @@ export const resources = {
     'modules/hr/recruiters': hrRecruitersEn,
     'modules/hr/team': hrTeamEn,
     'modules/hr/candidateDetail': hrCandidateDetailEn,
-    'modules/hr/interviewSessions': hrInterviewSessionsEn,
+    'modules/staff/interviews': staffInterviewsEn,
     'modules/hr/jobPostingDetail': hrJobPostingDetailEn,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardEn,
     'modules/recruiter/jobs': recruiterJobsEn,
-    'modules/recruiter/candidates': recruiterCandidatesEn,
-    'modules/recruiter/interviews': recruiterInterviewsEn,
-    'modules/recruiter/evaluations': recruiterEvaluationsEn,
     'modules/recruiter/jobDetail': recruiterJobDetailEn,
     'modules/recruiter/candidateDetail': recruiterCandidateDetailEn,
-    'modules/recruiter/interviewCode': recruiterInterviewCodeEn,
     'modules/recruiter/scheduleConfig': recruiterScheduleConfigEn,
     'modules/recruiter/createJob': recruiterCreateJobEn,
     'modules/recruiter/onlineTest': recruiterOnlineTestEn,
@@ -159,16 +143,12 @@ const siteNamespaces = [
   'modules/hr/recruiters',
   'modules/hr/team',
   'modules/hr/candidateDetail',
-  'modules/hr/interviewSessions',
+  'modules/staff/interviews',
   'modules/hr/jobPostingDetail',
   'modules/recruiter/dashboard',
   'modules/recruiter/jobs',
-  'modules/recruiter/candidates',
-  'modules/recruiter/interviews',
-  'modules/recruiter/evaluations',
   'modules/recruiter/jobDetail',
   'modules/recruiter/candidateDetail',
-  'modules/recruiter/interviewCode',
   'modules/recruiter/scheduleConfig',
   'modules/recruiter/createJob',
   'modules/recruiter/onlineTest',

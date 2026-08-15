@@ -32,8 +32,8 @@ internal sealed class FakeApplicationService : IApplicationService
     public Task<Result<List<ApplicationResponse>>> GetApplicationsForCreatorAsync(Guid creatorUserId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<ApplicationResponse>> GetApplicationByIdAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<ApplicationResponse>> UpdateApplicationStatusAsync(Guid id, string newStatus, CancellationToken ct = default) => throw new NotImplementedException();
-    public Task<Result<bool>> SendInterviewInviteAsync(Guid applicationId, string frontendBaseUrl, int roundNumber = 1, CancellationToken ct = default, bool sendEmail = true) => throw new NotImplementedException();
-    public Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, string frontendBaseUrl, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<bool>> OpenRoundForSchedulingAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default) => throw new NotImplementedException();
 }

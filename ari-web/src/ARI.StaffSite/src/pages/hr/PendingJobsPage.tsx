@@ -156,8 +156,10 @@ export default function PendingJobsPage() {
     try {
       await jobService.updateJobStatus(job.id, 'active')
       queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
-    } catch {
-      setError(t('approval.approveErrorMsg', { title: job.title }))
+    } catch (err) {
+      // Server nêu lý do cụ thể (vd tin có vòng trắc nghiệm nhưng ngân hàng đề chưa đủ câu).
+      const e = err as { response?: { data?: { message?: string } } }
+      setError(e?.response?.data?.message || t('approval.approveErrorMsg', { title: job.title }))
     } finally {
       setActionId(null)
     }

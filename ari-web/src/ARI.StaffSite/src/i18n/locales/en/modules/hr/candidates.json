@@ -63,7 +63,6 @@
   },
   "inviteSuccess": "Magic link invitation sent to {{email}}.",
   "inviteError": "Failed to send invitation.",
-  "sendInvite": "Send magic link invitation",
   "viewDetails": "View Details",
   "candidateDetail": {
     "title": "Candidate Details",

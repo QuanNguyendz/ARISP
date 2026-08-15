@@ -36,6 +36,13 @@ namespace ARI.API.Controllers
         public Guid? CandidateAccountId { get; set; }
     }
 
+    /// <summary>Body của POST /applications/{id}/accept — khung giờ vòng 1 gán kèm khi duyệt CV.</summary>
+    public class AcceptApplicationRequest
+    {
+        [Required(ErrorMessage = "Phải chọn khung giờ phỏng vấn vòng 1 khi duyệt hồ sơ.")]
+        public Guid SlotId { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     public class ApplicationsController : ControllerBase
@@ -173,31 +180,31 @@ namespace ARI.API.Controllers
             return Ok(new { eligible = result.Value });
         }
 
-        [HttpPost("{id}/send-invite")]
-        [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm gửi link mời
-        public async Task<IActionResult> SendInvite(Guid id, [FromQuery] int round, CancellationToken ct)
-        {
-            var roundNumber = round > 0 ? round : 1;
-            var result = await _sender.Send(new SendInterviewInviteCommand(id, roundNumber), ct);
-            if (result.IsFailure)
-            {
-                return BadRequest(new { message = result.Error });
-            }
-
-            return Ok(new { message = "Đã gửi email mời phỏng vấn (chọn lịch) cho ứng viên." });
-        }
-
+        /// <summary>
+        /// Duyệt CV kèm xếp lịch vòng 1 (một thao tác — không còn duyệt suông).
+        /// <c>slotId</c> bắt buộc: hệ thống chốt chỗ rồi gửi thư mời phỏng vấn kèm giờ hẹn.
+        /// </summary>
         [HttpPost("{id}/accept")]
         [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm duyệt hồ sơ
-        public async Task<IActionResult> Accept(Guid id, CancellationToken ct)
+        public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptApplicationRequest? request, CancellationToken ct)
         {
-            var result = await _sender.Send(new AcceptApplicationCommand(id), ct);
+            var result = await _sender.Send(
+                new AcceptApplicationCommand(id, request?.SlotId ?? Guid.Empty, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return result.ErrorCode switch
+                {
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error }),
+                };
             }
 
-            return Ok(new { message = "Đã duyệt hồ sơ ứng tuyển thành công và chuyển sang vòng 1." });
+            return Ok(new
+            {
+                message = "Đã duyệt hồ sơ, xếp lịch phỏng vấn vòng 1 và gửi thư mời cho ứng viên.",
+                bookingId = result.Value.BookingId,
+            });
         }
 
         [HttpPost("{id}/reject")]

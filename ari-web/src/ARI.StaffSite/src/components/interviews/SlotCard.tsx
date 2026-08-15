@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -21,7 +22,7 @@ import { RescheduleModal } from './RescheduleModal'
 import { interviewKeys } from './interviewQueryKeys'
 import { isSelectable, needsCode } from './candidateState'
 import { fmtDate, fmtTime } from './format'
-import type { WorkspaceConfig } from './workspaceConfig'
+import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
 
 export function SlotCard({
   slot,
@@ -32,6 +33,7 @@ export function SlotCard({
   jobId: string
   workspace: WorkspaceConfig
 }) {
+  const { t } = useTranslation(INTERVIEWS_NS)
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([])
@@ -72,13 +74,13 @@ export function SlotCard({
         slot.roundNumber
       ),
     onSuccess: (results) => {
-      flash(`Đã cấp mã phỏng vấn cho ${results?.length ?? selectedCandidates.length} ứng viên.`)
+      flash(t('slot.batchCodeSuccess', { count: results?.length ?? selectedCandidates.length }))
       setSelectedBookingIds([])
       reload()
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } }
-      flash(err?.response?.data?.message || 'Không thể cấp mã phỏng vấn hàng loạt.')
+      flash(err?.response?.data?.message || t('slot.batchCodeError'))
     },
   })
 
@@ -96,7 +98,7 @@ export function SlotCard({
       return ok
     },
     onSuccess: (ok) => {
-      flash(`Đã gửi mail nhắc lịch cho ${ok}/${selectedBookingIds.length} ứng viên.`)
+      flash(t('slot.batchRemindSuccess', { ok, total: selectedBookingIds.length }))
       setSelectedBookingIds([])
     },
   })
@@ -115,7 +117,7 @@ export function SlotCard({
       return ok
     },
     onSuccess: (ok) => {
-      flash(`Đã loại ${ok}/${selectedCandidates.length} ứng viên.`)
+      flash(t('slot.batchRejectSuccess', { ok, total: selectedCandidates.length }))
       setSelectedBookingIds([])
       reload()
     },
@@ -153,48 +155,51 @@ export function SlotCard({
                 {fmtDate(slot.startTime)} · {fmtTime(slot.startTime)} – {fmtTime(slot.endTime)}
               </span>
               <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400">
-                Vòng {slot.roundNumber}
+                {t('job.round', { number: slot.roundNumber })}
               </span>
               {slot.isPast && (
-                <span className="text-[11px] text-ink-400 bg-ink-100 dark:bg-white/10 px-2 py-0.5 rounded-md">Đã qua</span>
+                <span className="text-[11px] text-ink-400 bg-ink-100 dark:bg-white/10 px-2 py-0.5 rounded-md">
+                  {t('slot.past')}
+                </span>
               )}
               {slot.isOverCapacity && (
                 <span
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-md"
-                  title="Số người đang giữ chỗ nhiều hơn sức chứa. Hãy tăng sức chứa hoặc dời bớt ứng viên sang ca khác."
+                  title={t('slot.overCapacityTitle')}
                 >
-                  <AlertTriangle className="w-3 h-3" /> Vượt sức chứa
+                  <AlertTriangle className="w-3 h-3" /> {t('slot.overCapacity')}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <span
                 className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1 font-medium"
-                title="Số ứng viên đang GIỮ CHỖ / sức chứa của ca"
+                title={t('slot.seatsTitle')}
               >
-                <Users className="w-3.5 h-3.5" /> {slot.bookedCount}/{slot.capacity} ứng viên
+                <Users className="w-3.5 h-3.5" />{' '}
+                {t('slot.seats', { booked: slot.bookedCount, capacity: slot.capacity })}
               </span>
               {slot.confirmedCount > 0 && (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {slot.confirmedCount} xác nhận
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {t('slot.confirmed', { count: slot.confirmedCount })}
                 </span>
               )}
               {slot.pendingCount > 0 && (
                 <span className="text-xs text-amber-500 dark:text-amber-400 flex items-center gap-1 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5" /> {slot.pendingCount} chờ
+                  <AlertCircle className="w-3.5 h-3.5" /> {t('slot.pending', { count: slot.pendingCount })}
                 </span>
               )}
               {/* Đã trả chỗ → tách khỏi phân số bên trên, để dấu · cho thấy đây là nhóm khác. */}
               {(slot.declinedCount > 0 || slot.cancelledCount > 0) && (
                 <span
                   className="text-xs text-ink-400 flex items-center gap-1"
-                  title="Ứng viên từ chối hoặc bị loại đã trả lại chỗ nên không tính vào phân số bên trái."
+                  title={t('slot.releasedTitle')}
                 >
                   <XCircle className="w-3.5 h-3.5" />
-                  {slot.declinedCount > 0 && `${slot.declinedCount} từ chối`}
+                  {slot.declinedCount > 0 && t('slot.declined', { count: slot.declinedCount })}
                   {slot.declinedCount > 0 && slot.cancelledCount > 0 && ' · '}
-                  {slot.cancelledCount > 0 && `${slot.cancelledCount} đã loại`}
-                  <span className="hidden sm:inline"> (đã trả chỗ)</span>
+                  {slot.cancelledCount > 0 && t('slot.cancelled', { count: slot.cancelledCount })}
+                  <span className="hidden sm:inline">{t('slot.released')}</span>
                 </span>
               )}
             </div>
@@ -221,9 +226,9 @@ export function SlotCard({
           >
             <div className="border-t border-ink-100 dark:border-white/10 px-2 py-2">
               {isLoading ? (
-                <p className="text-sm text-ink-400 text-center py-4">Đang tải ứng viên...</p>
+                <p className="text-sm text-ink-400 text-center py-4">{t('slot.loadingCandidates')}</p>
               ) : candidates.length === 0 ? (
-                <p className="text-sm text-ink-400 text-center py-4">Chưa có ứng viên nào trong ca phỏng vấn này.</p>
+                <p className="text-sm text-ink-400 text-center py-4">{t('slot.noCandidates')}</p>
               ) : (
                 <>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 bg-ink-50/80 dark:bg-white/5 rounded-xl mb-3 border border-ink-100 dark:border-white/10">
@@ -238,8 +243,11 @@ export function SlotCard({
                         />
                         <span>
                           {selectedBookingIds.length > 0
-                            ? `Đã chọn (${selectedBookingIds.length}/${selectable.length})`
-                            : 'Chọn tất cả chưa loại'}
+                            ? t('slot.selected', {
+                                selected: selectedBookingIds.length,
+                                total: selectable.length,
+                              })
+                            : t('slot.selectAll')}
                         </span>
                       </label>
 
@@ -249,7 +257,7 @@ export function SlotCard({
                           onClick={() => setSelectedBookingIds(candidatesNeedingCode.map((c) => c.bookingId))}
                           className="px-2.5 py-1 rounded-md bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 hover:bg-violet-200 text-xs font-semibold transition-colors"
                         >
-                          ⚡ Chọn nhanh {candidatesNeedingCode.length} người chưa có mã
+                          ⚡ {t('slot.quickPick', { count: candidatesNeedingCode.length })}
                         </button>
                       )}
                     </div>
@@ -262,18 +270,18 @@ export function SlotCard({
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
                         >
                           <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                          <span>Cấp mã hàng loạt ({selectedBookingIds.length})</span>
+                          <span>{t('slot.batchCode', { count: selectedBookingIds.length })}</span>
                         </button>
                         <button
                           disabled={busy}
                           onClick={() => {
-                            if (window.confirm(`Loại ${selectedBookingIds.length} ứng viên khỏi quy trình tuyển dụng?`))
+                            if (window.confirm(t('slot.batchRejectConfirm', { count: selectedBookingIds.length })))
                               batchReject.mutate()
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
                         >
                           <UserX className="w-3.5 h-3.5 shrink-0" />
-                          <span>Loại hàng loạt ({selectedBookingIds.length})</span>
+                          <span>{t('slot.batchReject', { count: selectedBookingIds.length })}</span>
                         </button>
                         <button
                           disabled={busy}
@@ -281,7 +289,7 @@ export function SlotCard({
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
                         >
                           <Bell className="w-3.5 h-3.5 shrink-0" />
-                          <span>Nhắc lịch hàng loạt ({selectedBookingIds.length})</span>
+                          <span>{t('slot.batchRemind', { count: selectedBookingIds.length })}</span>
                         </button>
                         <button
                           disabled={busy}
@@ -289,7 +297,7 @@ export function SlotCard({
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
                         >
                           <RefreshCw className="w-3.5 h-3.5 shrink-0" />
-                          <span>Dời lịch hàng loạt ({selectedBookingIds.length})</span>
+                          <span>{t('slot.batchReschedule', { count: selectedBookingIds.length })}</span>
                         </button>
                       </div>
                     )}

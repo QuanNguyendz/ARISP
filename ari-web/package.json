@@ -19,6 +19,7 @@
     "preview:candidate": "npm run preview -w @ari/candidate-site",
     "preview:staff": "npm run preview -w @ari/staff-site",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "check:i18n": "node scripts/check-i18n-namespaces.mjs",
     "format": "prettier --write \"src/*/src/**/*.{ts,tsx,css}\"",
     "test": "npm run test --workspaces --if-present"
   },
