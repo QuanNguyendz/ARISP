@@ -20,6 +20,7 @@
     "email": "Email",
     "phone": "Phone Number",
     "phoneInvalid": "Invalid phone number (only 8-15 digits allowed)",
+    "phonePlaceholder": "e.g. 0901 234 567",
     "headline": "Current Job Title",
     "headlinePlaceholder": "e.g. Frontend Engineer",
     "desiredLocation": "Desired Work Location",

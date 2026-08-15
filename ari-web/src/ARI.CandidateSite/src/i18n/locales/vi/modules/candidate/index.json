@@ -20,6 +20,7 @@
     "email": "Email",
     "phone": "Số điện thoại",
     "phoneInvalid": "Số điện thoại không hợp lệ (chỉ chứa 8–15 chữ số)",
+    "phonePlaceholder": "VD: 0901 234 567",
     "headline": "Chức danh hiện tại",
     "headlinePlaceholder": "VD: Frontend Engineer",
     "desiredLocation": "Nơi làm việc mong muốn",

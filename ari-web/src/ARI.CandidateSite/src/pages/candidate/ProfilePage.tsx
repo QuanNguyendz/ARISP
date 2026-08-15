@@ -546,7 +546,7 @@ export default function ProfilePage() {
                     <input
                       inputMode="tel"
                       className="w-full bg-transparent text-sm outline-none"
-                      placeholder={t('profile.headlinePlaceholder')}
+                      placeholder={t('profile.phonePlaceholder')}
                       value={profile.phone || ''}
                       onChange={(e) => patch({ phone: e.target.value.replace(/[^\d+\-() ]/g, '') })}
                     />
