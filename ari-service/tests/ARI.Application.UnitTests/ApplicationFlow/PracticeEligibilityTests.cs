@@ -55,6 +55,96 @@ public class PracticeEligibilityTests
     }
 
     /// <summary>
+    /// Lỡ buổi phỏng vấn THẬT của vòng = trượt vòng đó → không còn phỏng vấn thử. Thử là để chuẩn bị
+    /// cho buổi thật, mà buổi thật đã trôi qua.
+    /// </summary>
+    [Fact]
+    public async Task Not_eligible_when_real_interview_slot_already_passed()
+    {
+        var job = ApplicationData.Job();
+        var app = ApplicationData.Application(job.Id);
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id,
+            RoundNumber = 1,
+            StartTime = DateTimeOffset.UtcNow.AddDays(-1),
+            EndTime = DateTimeOffset.UtcNow.AddDays(-1).AddHours(1),
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot)
+            .Seed(new InterviewBooking
+            {
+                ApplicationId = app.Id,
+                AvailabilitySlotId = slot.Id,
+                RoundNumber = 1,
+                Status = "scheduled",
+            });
+
+        var res = await Run(uow, app.Id, 1);
+
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value);
+    }
+
+    /// <summary>Lịch còn ở tương lai thì vẫn được thử — đó chính là lúc cần luyện tập.</summary>
+    [Fact]
+    public async Task Eligible_when_slot_is_still_upcoming()
+    {
+        var job = ApplicationData.Job();
+        var app = ApplicationData.Application(job.Id);
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id,
+            RoundNumber = 1,
+            StartTime = DateTimeOffset.UtcNow.AddDays(2),
+            EndTime = DateTimeOffset.UtcNow.AddDays(2).AddHours(1),
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot)
+            .Seed(new InterviewBooking
+            {
+                ApplicationId = app.Id,
+                AvailabilitySlotId = slot.Id,
+                RoundNumber = 1,
+                Status = "scheduled",
+            });
+
+        var res = await Run(uow, app.Id, 1);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value);
+    }
+
+    /// <summary>
+    /// Ứng viên BÁO BẬN (booking đã trả chỗ) không phải là lỡ buổi: nhân sự sẽ xếp ca khác,
+    /// nên vẫn còn quyền thử (ADR-048/058).
+    /// </summary>
+    [Fact]
+    public async Task Declined_booking_in_the_past_does_not_block_practice()
+    {
+        var job = ApplicationData.Job();
+        var app = ApplicationData.Application(job.Id);
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id,
+            RoundNumber = 1,
+            StartTime = DateTimeOffset.UtcNow.AddDays(-1),
+            EndTime = DateTimeOffset.UtcNow.AddDays(-1).AddHours(1),
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot)
+            .Seed(new InterviewBooking
+            {
+                ApplicationId = app.Id,
+                AvailabilitySlotId = slot.Id,
+                RoundNumber = 1,
+                Status = "declined",
+            });
+
+        var res = await Run(uow, app.Id, 1);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value);
+    }
+
+    /// <summary>
     /// Vòng trắc nghiệm không có phỏng vấn thử: buổi thử là hội thoại với AI, không có gì để "thử"
     /// với bài chọn đáp án — và cho thử sẽ lộ chính ngân hàng đề.
     /// </summary>

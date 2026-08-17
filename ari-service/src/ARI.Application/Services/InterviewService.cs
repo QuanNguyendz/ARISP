@@ -901,6 +901,13 @@ namespace ARI.Application.Services
                 if (InterviewInviteEmail.IsOnlineTest(roundConfig.RoundType))
                     return Result.Failure<StartSessionResponse>("Vòng trắc nghiệm không có phỏng vấn thử.");
 
+                // Lỡ buổi phỏng vấn thật của vòng = trượt vòng đó. Chặn ở đây vì đây là nguồn sự thật:
+                // cờ ẩn nút chỉ là lớp giao diện, gọi thẳng API vẫn phải bị từ chối.
+                if (await SchedulingSupport.HasMissedRealInterviewAsync(
+                        _unitOfWork, application.Id, request.RoundNumber, ct))
+                    return Result.Failure<StartSessionResponse>(
+                        "Buổi phỏng vấn thật của vòng này đã qua giờ hẹn, bạn không còn lượt phỏng vấn thử.");
+
                 var maxAttempts = _interviewOptions.PracticeAttemptsPerRound;
                 if (maxAttempts > 0)
                 {
