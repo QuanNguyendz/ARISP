@@ -181,6 +181,10 @@ namespace ARI.Infrastructure.Data
                 .Property(b => b.Reminder1hSent).HasColumnName("reminder_1h_sent");
             modelBuilder.Entity<InterviewBooking>()
                 .Property(b => b.Reminder24hSent).HasColumnName("reminder_24h_sent");
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.InviteEmailMessageId).HasColumnName("invite_email_message_id");
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.LastAutoReminderHours).HasColumnName("last_auto_reminder_hours");
 
             modelBuilder.Entity<MustAskTracking>()
                 .ToTable("must_ask_tracking");

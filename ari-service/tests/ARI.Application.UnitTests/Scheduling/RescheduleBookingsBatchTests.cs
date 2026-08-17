@@ -34,7 +34,7 @@ public class RescheduleBookingsBatchTests
         {
             var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
             uow.Seed(app);
-            var b = SchedulingData.Booking(app.Id, oldSlot.Id, round: 1);
+            var b = SchedulingData.DeclinedBooking(app.Id, oldSlot.Id, round: 1);
             uow.Seed(b);
             return b;
         }).ToList();
@@ -55,8 +55,9 @@ public class RescheduleBookingsBatchTests
     public async Task Du_cho_thi_doi_het_va_tra_dung_tung_ca_cu()
     {
         var job = SchedulingData.Job(out var owner);
-        var slotA = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 2);
-        var slotB = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 1);
+        // Ba ứng viên đều đã báo bận nên hai ca cũ đã ở trạng thái trả chỗ (booked = 0).
+        var slotA = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 0);
+        var slotB = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 0);
         var target = SchedulingData.Slot(job.Id, round: 1, capacity: 5, booked: 0);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(slotA).Seed(slotB).Seed(target);
 
@@ -64,14 +65,14 @@ public class RescheduleBookingsBatchTests
         {
             var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
             uow.Seed(app);
-            var b = SchedulingData.Booking(app.Id, slotA.Id, round: 1);
+            var b = SchedulingData.DeclinedBooking(app.Id, slotA.Id, round: 1);
             uow.Seed(b);
             return b;
         }).ToList();
 
         var appB = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
         uow.Seed(appB);
-        var fromB = SchedulingData.Booking(appB.Id, slotB.Id, round: 1);
+        var fromB = SchedulingData.DeclinedBooking(appB.Id, slotB.Id, round: 1);
         uow.Seed(fromB);
 
         var sql = new SlotSqlEmulator(uow);
@@ -83,8 +84,9 @@ public class RescheduleBookingsBatchTests
         Assert.Equal(3, res.Value.MovedCount);
         Assert.Empty(res.Value.Failed);
         Assert.Equal(3, sql.BookedCountOf(target.Id));
-        Assert.Equal(0, sql.BookedCountOf(slotA.Id)); // trả đúng 2
-        Assert.Equal(0, sql.BookedCountOf(slotB.Id)); // trả đúng 1
+        // Cả ba đều là người đã báo bận → chỗ ở ca cũ đã trả lúc từ chối, không trừ thêm lần nữa.
+        Assert.Equal(0, sql.BookedCountOf(slotA.Id));
+        Assert.Equal(0, sql.BookedCountOf(slotB.Id));
     }
 
     /// <summary>Booking hỏng phải rơi ra TRƯỚC khi tính số chỗ, nếu không sẽ chiếm dư chỗ của ca đích.</summary>
@@ -95,7 +97,7 @@ public class RescheduleBookingsBatchTests
         var oldSlot = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 1);
         var target = SchedulingData.Slot(job.Id, round: 1, capacity: 1, booked: 0); // vừa đúng 1 chỗ
         var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
-        var good = SchedulingData.Booking(app.Id, oldSlot.Id, round: 1);
+        var good = SchedulingData.DeclinedBooking(app.Id, oldSlot.Id, round: 1);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(oldSlot).Seed(target).Seed(app).Seed(good);
         var sql = new SlotSqlEmulator(uow);
 
@@ -131,7 +133,7 @@ public class RescheduleBookingsBatchTests
         var oldSlot = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 1);
         var target = SchedulingData.Slot(job.Id, round: 1, capacity: 1, booked: 0);
         var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
-        var booking = SchedulingData.Booking(app.Id, oldSlot.Id, round: 1);
+        var booking = SchedulingData.DeclinedBooking(app.Id, oldSlot.Id, round: 1);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(oldSlot).Seed(target).Seed(app).Seed(booking);
         var sql = new SlotSqlEmulator(uow);
 

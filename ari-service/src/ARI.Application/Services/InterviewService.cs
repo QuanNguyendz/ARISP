@@ -543,7 +543,14 @@ namespace ARI.Application.Services
                 else if (targetSlot.RoundNumber != booking.RoundNumber)
                     error = "Không thể dời sang ca phỏng vấn thuộc vòng thi khác.";
                 else if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
-                    error = "Hồ sơ đã bị loại khỏi quy trình nên không thể xếp lịch lại.";
+                    error = string.Equals(booking.DeclinedBy, BookingDeclinedBy.System, StringComparison.OrdinalIgnoreCase)
+                        ? "Ứng viên không tham dự buổi phỏng vấn đã hẹn nên hồ sơ đã dừng lại — không xếp lịch lại được."
+                        : "Hồ sơ đã bị loại khỏi quy trình nên không thể xếp lịch lại.";
+                // Dời lịch là ĐẶC QUYỀN của người chủ động báo bận: họ đã phản hồi và nêu lý do nên
+                // nhân sự biết đường xếp ca khác. Người đang giữ chỗ mà chưa phản hồi thì chưa có gì
+                // để dời — nếu ca sai thì huỷ ca đó, đừng đẩy ứng viên đi chỗ khác sau lưng họ.
+                else if (!string.Equals(booking.DeclinedBy, BookingDeclinedBy.Candidate, StringComparison.OrdinalIgnoreCase))
+                    error = "Chỉ dời lịch được cho ứng viên đã báo bận (từ chối lịch kèm lý do).";
 
                 if (error != null) failed.Add(new RescheduleFailureDto { BookingId = id, Message = error });
                 else valid.Add(booking);
@@ -764,8 +771,11 @@ namespace ARI.Application.Services
                     : SlotCandidateState.DeclinedByCandidate;
             }
 
-            // Còn lại là "cancelled". Chỉ nhân sự loại hồ sơ mới ghi declined_by = staff; giá trị
-            // khác (hoặc null với dữ liệu quá cũ) rơi về nhánh huỷ chung chung.
+            // Còn lại là "cancelled": hệ thống đóng vì ứng viên không tham dự, nhân sự loại hồ sơ,
+            // hoặc dữ liệu quá cũ không rõ nguồn.
+            if (string.Equals(declinedBy, BookingDeclinedBy.System, StringComparison.OrdinalIgnoreCase))
+                return SlotCandidateState.NoShow;
+
             return string.Equals(declinedBy, BookingDeclinedBy.Staff, StringComparison.OrdinalIgnoreCase)
                 ? SlotCandidateState.RejectedByStaff
                 : SlotCandidateState.Cancelled;

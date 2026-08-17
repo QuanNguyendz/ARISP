@@ -40,7 +40,11 @@ namespace ARI.Domain.Constants
         /// <summary>Ứng viên tự báo bận (kèm lý do tự nhập).</summary>
         public const string Candidate = "candidate";
 
-        /// <summary>Hệ thống tự huỷ vì quá hạn xác nhận (ScheduleConfirmationHostedService).</summary>
+        /// <summary>
+        /// Hệ thống tự đóng lịch: ứng viên không tham dự buổi phỏng vấn đã hẹn
+        /// (<c>InterviewScheduleFollowUpHostedService</c>). Dữ liệu cũ còn giá trị này cho trường
+        /// hợp "quá hạn xác nhận" của cơ chế auto-huỷ 48h đã bỏ.
+        /// </summary>
         public const string System = "system";
 
         /// <summary>Nhân sự loại hồ sơ khỏi quy trình tuyển dụng.</summary>
@@ -66,6 +70,13 @@ namespace ARI.Domain.Constants
 
         /// <summary>Hệ thống tự huỷ do quá hạn xác nhận — đã trả chỗ, vẫn có thể dời sang ca khác.</summary>
         public const string ExpiredNoResponse = "expired_no_response";
+
+        /// <summary>
+        /// Ứng viên KHÔNG tham dự buổi phỏng vấn đã hẹn (phớt lờ thư mời hoặc xác nhận rồi không
+        /// đến) → hệ thống tự đánh trượt. Khác <see cref="DeclinedByCandidate"/> ở chỗ KHÔNG xếp
+        /// lại lịch được: người báo bận thì được xếp ca khác, người không đến thì hồ sơ dừng lại.
+        /// </summary>
+        public const string NoShow = "no_show";
 
         /// <summary>Nhân sự đã loại hồ sơ — đã trả chỗ, KHÔNG thao tác gì thêm được.</summary>
         public const string RejectedByStaff = "rejected_by_staff";

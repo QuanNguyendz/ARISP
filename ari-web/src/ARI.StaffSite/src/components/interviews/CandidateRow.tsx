@@ -15,7 +15,7 @@ import {
 import { applicationService } from '@ari/shared/fservices/application'
 import { interviewService, type SlotCandidate } from '@ari/shared/fservices/interview'
 import { RescheduleModal } from './RescheduleModal'
-import { declineReasonLabelKey, isRejected, stateOf } from './candidateState'
+import { canReschedule, declineReasonLabelKey, isRejected, stateOf } from './candidateState'
 import { fmtDur, initials } from './format'
 import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
 
@@ -220,12 +220,14 @@ export function CandidateRow({
             </span>
           </button>
 
-          {/* Dời lịch VẪN mở cho người báo bận / quá hạn — đó là cách xếp lại cho họ. */}
+          {/* Dời lịch chỉ mở cho người ĐÃ BÁO BẬN — xem canReschedule. */}
           <button
-            disabled={rejected}
+            disabled={!canReschedule(c)}
             onClick={() => setShowReschedule(true)}
             title={
-              rejected ? t('candidate.rescheduleDisabledTitle') : t('candidate.rescheduleTitle')
+              canReschedule(c)
+                ? t('candidate.rescheduleTitle')
+                : t('candidate.rescheduleDisabledTitle')
             }
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-brand-200 dark:border-brand-500/20 bg-brand-50/50 dark:bg-brand-500/10 text-xs font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >

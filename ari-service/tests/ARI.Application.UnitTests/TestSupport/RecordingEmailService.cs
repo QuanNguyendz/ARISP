@@ -19,6 +19,14 @@ public sealed class RecordingEmailService : IEmailService
         Sent.Add((toEmail, subject, htmlMessage));
         return Task.CompletedTask;
     }
+
+    public Task<string?> SendThreadedEmailAsync(
+        string toEmail, string subject, string htmlMessage, string? inReplyToMessageId = null)
+    {
+        if (ThrowOnSend) throw new InvalidOperationException("email down");
+        Sent.Add((toEmail, subject, htmlMessage));
+        return Task.FromResult<string?>($"<test-{Sent.Count}@arisp>");
+    }
 }
 
 /// <summary>RAG ingestion giả — ghi lại tài liệu đã đẩy (sourceType/sourceId) để assert, không gọi service Python.</summary>

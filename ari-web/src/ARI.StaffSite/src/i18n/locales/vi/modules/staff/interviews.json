@@ -99,7 +99,7 @@
     "remindError": "Lỗi khi gửi email nhắc lịch.",
     "reschedule": "Dời lịch",
     "rescheduleTitle": "Dời ứng viên sang ca phỏng vấn khác",
-    "rescheduleDisabledTitle": "Hồ sơ đã bị loại khỏi quy trình",
+    "rescheduleDisabledTitle": "Chỉ dời lịch được cho ứng viên đã báo bận kèm lý do",
     "reject": "Loại",
     "rejecting": "Đang loại...",
     "rejected": "Đã loại",
@@ -119,7 +119,8 @@
     "expired_no_response": "Quá hạn xác nhận",
     "rejected_by_staff": "Đã bị loại",
     "cancelled": "Đã huỷ",
-    "unknown": "Không rõ"
+    "unknown": "Không rõ",
+    "no_show": "Không tham dự"
   },
   "reschedule": {
     "title": "Dời lịch phỏng vấn ({{count}} ứng viên)",

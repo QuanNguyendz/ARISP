@@ -315,7 +315,18 @@ namespace ARI.Application.Scheduling
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
                 var mail = await InterviewInviteEmail.BuildAsync(
                     _unitOfWork, _configuration, app, job, round, booking.Id, slot.StartTime, ct);
-                await _notificationService.SendEmailAsync(app.CandidateEmail, mail.Subject, mail.Html, ct);
+
+                // Giữ Message-Id để thư NHẮC LỊCH sau này trả lời vào đúng luồng thư mời này,
+                // thay vì đẻ ra một thư rời mà ứng viên phải tự đi tìm lại giờ hẹn.
+                var messageId = await _notificationService.SendThreadedEmailAsync(
+                    app.CandidateEmail, mail.Subject, mail.Html, null, ct);
+                if (!string.IsNullOrWhiteSpace(messageId))
+                {
+                    booking.InviteEmailMessageId = messageId;
+                    booking.UpdatedAt = DateTimeOffset.UtcNow;
+                    _unitOfWork.Repository<InterviewBooking>().Update(booking);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
             }
             catch { /* best-effort */ }
 

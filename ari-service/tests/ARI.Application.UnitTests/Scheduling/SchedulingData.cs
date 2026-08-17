@@ -73,6 +73,15 @@ internal static class SchedulingData
         RespondedAt = respondedAt,
         DeclinedBy = declinedBy,
     };
+
+    /// <summary>
+    /// Booking mà ứng viên ĐÃ BÁO BẬN (từ chối kèm lý do) — trạng thái DUY NHẤT dời lịch được
+    /// (ADR-059). Chỗ ở ca cũ đã được trả lúc từ chối nên ca đó để booked = 0.
+    /// </summary>
+    public static InterviewBooking DeclinedBooking(Guid appId, Guid slotId, int round = 1) =>
+        Booking(appId, slotId, round,
+            status: "declined", confirmation: "declined",
+            respondedAt: DateTimeOffset.UtcNow.AddHours(-6), declinedBy: "candidate");
 }
 
 /// <summary>
