@@ -25,6 +25,10 @@ class InterviewState(TypedDict, total=False):
     query: str
     retrieved: list[Candidate]
     retrieved_texts: list[str]
+    # Tách theo document_type của playbook: cấm hỏi / dấu hiệu đào sâu / đáp án mong đợi.
+    banned_topics: list[str]
+    red_flags: list[str]
+    expected_answers: list[str]
     question: str
 
 
@@ -34,8 +38,41 @@ def _build_filters(ctx: QuestionContext) -> list[ScopeFilter]:
         ScopeFilter("jd", ctx.job_posting_id),
     ]
     if ctx.session_type == "real":
-        filters.append(ScopeFilter("playbook", None))  # toàn bộ playbook
+        # Chỉ playbook thuộc phạm vi của tin + vòng này (org áp cho mọi tin) — xem ScopeFilter.
+        filters.append(
+            ScopeFilter(
+                "playbook",
+                None,
+                job_posting_id=ctx.job_posting_id,
+                round_number=ctx.round_number,
+            )
+        )
     return filters
+
+
+# Loại tài liệu quyết định CÁCH dùng, không chỉ là nhãn (ADR-025).
+_BANNED_TYPE = "compliance"
+_RED_FLAG_TYPE = "red_flag"
+_EXPECTED_TYPE = "expected_answer"
+
+
+def _split_by_document_type(candidates) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Tách chunk playbook theo document_type: (ngữ cảnh thường, cấm, red flag, đáp án mong đợi)."""
+    context: list[str] = []
+    banned: list[str] = []
+    red_flags: list[str] = []
+    expected: list[str] = []
+    for c in candidates:
+        doc_type = (c.metadata or {}).get("document_type")
+        if c.source_type == "playbook" and doc_type == _BANNED_TYPE:
+            banned.append(c.chunk_text)
+        elif c.source_type == "playbook" and doc_type == _RED_FLAG_TYPE:
+            red_flags.append(c.chunk_text)
+        elif c.source_type == "playbook" and doc_type == _EXPECTED_TYPE:
+            expected.append(c.chunk_text)
+        else:
+            context.append(f"[{c.source_type}] {c.chunk_text}")
+    return context, banned, red_flags, expected
 
 
 def _build_query(ctx: QuestionContext) -> str:
@@ -54,15 +91,30 @@ async def _retrieve_node(state: InterviewState) -> InterviewState:
     ctx = state["context"]
     query = _build_query(ctx)
     candidates = await hybrid_retrieve(query, _build_filters(ctx), top_k=None)
-    texts = [f"[{c.source_type}] {c.chunk_text}" for c in candidates]
-    return {"query": query, "retrieved": candidates, "retrieved_texts": texts}
+    texts, banned, red_flags, expected = _split_by_document_type(candidates)
+    return {
+        "query": query,
+        "retrieved": candidates,
+        "retrieved_texts": texts,
+        "banned_topics": banned,
+        "red_flags": red_flags,
+        "expected_answers": expected,
+    }
 
 
 async def _generate_node(state: InterviewState) -> InterviewState:
     ctx = state["context"]
     retrieved = state.get("retrieved_texts", [])
     messages = [
-        SystemMessage(content=question_system_prompt(ctx, retrieved)),
+        SystemMessage(
+            content=question_system_prompt(
+                ctx,
+                retrieved,
+                banned_topics=state.get("banned_topics", []),
+                red_flags=state.get("red_flags", []),
+                expected_answers=state.get("expected_answers", []),
+            )
+        ),
         HumanMessage(content=question_user_prompt(ctx)),
     ]
     # Đưa lịch sử hội thoại vào để model điều chỉnh adaptive

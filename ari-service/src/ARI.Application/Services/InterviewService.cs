@@ -9,6 +9,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Options;
+using ARI.Application.Playbooks;
 using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using ARI.Domain.Constants;
@@ -960,25 +961,25 @@ namespace ARI.Application.Services
             // Seed Must-Ask questions from Playbook into tracking if it's a real session
             if (request.SessionType == "real")
             {
-                var playbooks = await _unitOfWork.Repository<PlaybookDocument>()
-                    .FindAsync(p => p.Scope == "job_posting" && p.ScopeRefId == jobPosting.Id && p.DocumentType == "must_ask", ct);
-                
+                var playbooks = await PlaybookScope.MustAskDocumentsAsync(
+                    _unitOfWork, jobPosting.Id, session.RoundNumber, ct);
+
                 foreach (var playbook in playbooks)
                 {
-                    if (string.IsNullOrEmpty(playbook.ParsedText)) continue;
-                    
-                    var mustAskLines = playbook.ParsedText.Split(new[] { "\n", ";" }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var q in mustAskLines)
+                    // Must-ask CHẶN kết thúc phiên, nên mỗi dòng rác lọt vào đây là một câu AI buộc
+                    // phải hỏi ứng viên — việc tách câu nằm ở PlaybookScope để test được bằng bảng ca.
+                    foreach (var q in PlaybookScope.ParseMustAskLines(playbook.ParsedText))
                     {
                         var track = new MustAskTracking
                         {
                             SessionId = session.Id,
                             PlaybookDocumentId = playbook.Id,
-                            QuestionText = q.Trim()
+                            QuestionText = q
                         };
                         await _unitOfWork.Repository<MustAskTracking>().AddAsync(track, ct);
                     }
                 }
+
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
@@ -1048,11 +1049,36 @@ namespace ARI.Application.Services
                 .QueryAsync(q => q.Where(c => c.SourceType == "jd" && c.SourceId == jobPosting!.Id).Select(c => c.ChunkText), ct);
             ragContext.AddRange(jdChunks.Select(t => $"[JD Chunk] {t}"));
 
+            // Chủ đề CẤM hỏi (playbook loại compliance) — tách riêng khỏi ngữ cảnh tham khảo.
+            var prohibitedTopics = new List<string>();
+
             if (session.SessionType == "real")
             {
-                var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
-                    .QueryAsync(q => q.Where(c => c.SourceType == "playbook").Select(c => c.ChunkText), ct);
-                ragContext.AddRange(playbookChunks.Select(t => $"[Org Playbook] {t}"));
+                // CHỈ playbook thuộc phạm vi của tin + vòng này (ADR-025). Bản cũ lấy MỌI chunk
+                // playbook của hệ thống nên ngân hàng câu hỏi của vị trí khác lọt vào buổi phỏng vấn
+                // này, và tài liệu đã xoá vẫn tiếp tục có tiếng nói.
+                var eligibleIds = await PlaybookScope.EligibleDocumentIdsAsync(
+                    _unitOfWork, jobPosting!.Id, session.RoundNumber, ct);
+
+                if (eligibleIds.Count > 0)
+                {
+                    var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
+                        .QueryAsync(q => q.Where(c => c.SourceType == "playbook" && eligibleIds.Contains(c.SourceId))
+                            .Select(c => new { c.SourceId, c.ChunkText }), ct);
+
+                    // Loại tài liệu quyết định CÁCH dùng: compliance là ràng buộc cấm, không phải
+                    // tài liệu tham khảo — đưa nó vào ngữ cảnh chung là mời AI hỏi đúng câu bị cấm.
+                    var complianceIds = (await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(
+                            q => q.Where(p => eligibleIds.Contains(p.Id) && p.DocumentType == PlaybookScope.TypeCompliance)
+                                  .Select(p => p.Id), ct))
+                        .ToHashSet();
+
+                    foreach (var chunk in playbookChunks)
+                    {
+                        if (complianceIds.Contains(chunk.SourceId)) prohibitedTopics.Add(chunk.ChunkText);
+                        else ragContext.Add($"[Org Playbook] {chunk.ChunkText}");
+                    }
+                }
             }
 
             // 2. Select Next Question Strategy
@@ -1095,7 +1121,9 @@ namespace ARI.Application.Services
                 CandidateCv = application.CvText ?? "",
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
+                RoundNumber = session.RoundNumber,
                 PlaybookStyleGuides = ragContext.Where(r => r.StartsWith("[Org")).ToList(),
+                ProhibitedTopics = prohibitedTopics,
                 Language = session.InterviewLanguage,
                 ForceClosing = forceClosing
             };

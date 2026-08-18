@@ -22,7 +22,21 @@ END_MARKER = "[END_INTERVIEW]"
 MIN_QUESTIONS_BEFORE_END = 5
 
 
-def question_system_prompt(ctx: QuestionContext, retrieved: list[str]) -> str:
+def question_system_prompt(
+    ctx: QuestionContext,
+    retrieved: list[str],
+    *,
+    banned_topics: list[str] | None = None,
+    red_flags: list[str] | None = None,
+    expected_answers: list[str] | None = None,
+) -> str:
+    """Prompt sinh cau hoi.
+
+    Playbook khong phai mot ro tai lieu dong hang: `compliance` la chu de CAM hoi, `red_flag` la dau
+    hieu can dao sau, `expected_answer` dung de cham chu khong doc cho ung vien nghe (ADR-025).
+    Nhet chung vao "retrieved context" nhu ban cu chinh la dua cho mo hinh danh sach chu de nhay cam
+    roi mong no tu hieu la khong duoc hoi.
+    """
     lang = language_name(ctx.language)
 
     # Buộc đóng phiên (cap số câu phía .NET): chỉ sinh lời cảm ơn, không hỏi thêm.
@@ -65,6 +79,26 @@ def question_system_prompt(ctx: QuestionContext, retrieved: list[str]) -> str:
     if retrieved:
         sys += "\n\nRetrieved context (most relevant chunks):\n" + "\n".join(
             f"- {c}" for c in retrieved
+        )
+    if expected_answers:
+        sys += (
+            "\n\nWhat a strong answer covers (use this to judge and to probe deeper - "
+            "NEVER read it out or hint at it):\n"
+            + "\n".join(f"- {c}" for c in expected_answers)
+        )
+    if red_flags:
+        sys += (
+            "\n\nWarning signs - if the candidate shows any of these, probe deeper before moving on:\n"
+            + "\n".join(f"- {c}" for c in red_flags)
+        )
+    # Rang buoc CAM dat SAU moi ngu canh de khong bi cac doan phia tren pha loang.
+    combined_banned = list(banned_topics or []) + list(ctx.prohibited_topics or [])
+    if combined_banned:
+        sys += (
+            "\n\nHARD CONSTRAINT - NEVER ask about, hint at, or invite the candidate to discuss any "
+            "of the following topics (company compliance playbook). If the candidate raises one, "
+            "acknowledge briefly and move on without probing:\n"
+            + "\n".join(f"- {c}" for c in combined_banned)
         )
     if ctx.must_ask_questions:
         sys += (

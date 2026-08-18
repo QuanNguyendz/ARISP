@@ -73,9 +73,13 @@ class QuestionContext(CamelModel):
     job_description: str = ""
     candidate_cv: str = ""
     session_type: str = "real"  # practice | real
+    # Vòng hiện tại — quyết định playbook scope "round" nào được dùng (ADR-025).
+    round_number: int = 1
     chat_history: list[QuestionAnswer] = []
     must_ask_questions: list[str] = []
     playbook_style_guides: list[str] = []
+    # Chủ đề CẤM hỏi (playbook loại compliance). Là RÀNG BUỘC, không phải ngữ cảnh tham khảo.
+    prohibited_topics: list[str] = []
     language: str | None = None
     # Buộc kết thúc NGAY (cap số câu phía .NET): model chỉ sinh [END_INTERVIEW] + lời cảm ơn.
     force_closing: bool = False

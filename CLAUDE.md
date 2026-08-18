@@ -256,7 +256,7 @@ _Chưa có task nào đang thực hiện._
 | ADR-044 | Nối media thực tế: **client-SDK + BE mint token** (`/session/{id}/media-config`). Deepgram live (FE) + HeyGen Streaming Avatar (FE `speak`) + ElevenLabs voice route qua HeyGen; `SignalRNotificationService` đẩy `ReceiveQuestion`. Fallback mềm khi thiếu key. BE giữ key, không relay media |
 | ADR-018 | Language-aware AI: detect từ JD, điều chỉnh system prompt + TTS voice + STT languageCode |
 | ADR-023 | Auth nội bộ: Email + Password (chính) + Google OAuth2 optional; pre-provisioning + domain validation |
-| ADR-025 | Playbook scope: Company / Job Posting / Round; RAG weighted retrieve |
+| ADR-025 | **Playbook**: 3 scope `org`/`job_posting`/`round`, 10 loại tài liệu. **Phạm vi đọc từ bảng `playbook_documents`, không phải metadata chunk** — `org` áp mọi tin, `job_posting`/`round` phải khớp tin (và vòng); `deleted_at` loại ngay. **Xoá playbook = gỡ chunk trước, soft-delete sau** (gỡ lỗi thì không xoá mềm) — dùng lại `IngestAsync(text:"")`. **Loại tài liệu quyết định CÁCH dùng**: `compliance` là ràng buộc CẤM hỏi (không phải ngữ cảnh gợi ý), `expected_answer` cấm đọc cho ứng viên nghe, `must_ask` chặn kết thúc phiên. Trọng số hybrid chỉ còn việc xếp hạng (org 0.6, job/round 1.0) |
 | ADR-030 | Gemini 2.5 Flash cho CV-JD Analysis; GPT-4o cho phỏng vấn AI và RAG |
 | ADR-036 | File storage abstraction `IFileStorageService`: Local (dev) / Cloudflare R2 (prod, presigned URL); DB lưu storageKey |
 | ADR-041 | Vòng đời tài khoản staff: yêu cầu tạo (HR→SA duyệt) tách khỏi khóa/mở khóa (`AccountRequest` + `User.LockReason`) |

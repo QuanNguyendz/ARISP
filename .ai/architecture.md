@@ -223,32 +223,44 @@ public interface IEmbeddingProvider
 - **Report:** Fairness Report per Job Posting (cho SuperAdmin và HR Admin).
 - **Privacy:** Demographic data phải được Candidate đồng ý cung cấp (opt-in) và được mã hóa.
 
-### ADR-025: Interview Playbook – Org Knowledge Base
-- **Quyết định:** HR Admin upload tài liệu phỏng vấn nội bộ theo 3 cấp scope: Company / Job Posting / Round. Tài liệu được chunk, embed vào pgvector và retrieve trong RAG pipeline để AI phỏng vấn đúng phong cách + nội dung mong muốn của doanh nghiệp.
-- **Document types hỗ trợ:**
+### ADR-025: Interview Playbook – kho tri thức phỏng vấn nội bộ
+- **Quyết định:** HR upload tài liệu phỏng vấn nội bộ theo 3 cấp scope, hệ thống chunk+embed vào pgvector và truy hồi trong RAG khi phỏng vấn **thật** (buổi thử chỉ JD+CV — ADR-015/038/050).
+- **Loại tài liệu (khoá đúng như code — `PlaybooksPage.tsx` và `PlaybookScope`):**
 
-  | Type key | Mô tả | Scope |
+  | Type key | Mô tả | Cách hệ thống dùng |
   |---|---|---|
-  | `interview_style_guide` | Phong cách, tone, approach phỏng vấn | Company |
-  | `competency_framework` | Ma trận kỹ năng theo level | Company |
-  | `culture_values` | Văn hóa, giá trị cốt lõi, culture fit indicators | Company |
-  | `compliance_guide` | Câu hỏi không được hỏi (pháp lý) | Company |
-  | `red_flag_guide` | Dấu hiệu cần probe sâu hoặc loại bỏ | Company |
-  | `question_bank` | Ngân hàng câu hỏi gợi ý per vị trí | Job Posting |
-  | `technical_scenarios` | Bài toán / case study cụ thể | Job Posting |
-  | `expected_answers` | Hướng dẫn câu trả lời tốt cần đề cập | Job Posting |
-  | `must_ask` | Câu hỏi bắt buộc phải hỏi trước khi kết thúc | Job Posting |
-  | `round_playbook` | Playbook cụ thể per Round | Round |
-  | `past_transcripts` | Transcript phỏng vấn ẩn danh (AI học từ mẫu thành công) | Company / Job Posting |
+  | `style_guide` | Phong cách, tone phỏng vấn | Ngữ cảnh truy hồi |
+  | `competency_framework` | Ma trận kỹ năng theo cấp bậc | Ngữ cảnh truy hồi |
+  | `culture_guide` | Văn hoá, giá trị cốt lõi | Ngữ cảnh truy hồi |
+  | `compliance` | Chủ đề **CẤM hỏi** (pháp lý) | **Ràng buộc cấm** trong system prompt |
+  | `red_flag` | Dấu hiệu cần đào sâu | Khối "warning signs" riêng |
+  | `question_bank` | Ngân hàng câu hỏi gợi ý | Ngữ cảnh truy hồi |
+  | `technical_scenario` | Bài toán / case study | Ngữ cảnh truy hồi |
+  | `expected_answer` | Hướng dẫn câu trả lời tốt | Khối riêng, **cấm đọc cho ứng viên nghe** |
+  | `must_ask` | Câu hỏi bắt buộc | `MustAskTracking` — chặn kết thúc phiên |
+  | `round_playbook` | Playbook riêng cho một vòng | Ngữ cảnh truy hồi |
 
-- **Format upload:** PDF, DOCX, TXT, Markdown, JSON (question bank format).
-- **RAG weighting khi retrieve:**
-  - JD + CV: weight cao (candidate-specific)
-  - Company Playbook (style, compliance, values): weight trung bình (brand consistency)
-  - Job Posting Playbook (question_bank, scenarios, must_ask): weight cao (content accuracy)
-  - Round Playbook: weight cao (phù hợp vòng hiện tại)
-- **Must-ask enforcement:** `PlaybookService` track danh sách `must_ask` questions đã hỏi. `InterviewService` nhận signal "còn câu bắt buộc chưa hỏi" trước khi trigger điều kiện dừng.
-- **Ràng buộc:** Không lọt dữ liệu tài liệu phỏng vấn ra ngoài hệ thống.
+  Loại chưa khai báo → coi như ngữ cảnh thường (không im lặng bỏ qua).
+
+#### Phạm vi: ai được nói vào buổi phỏng vấn nào
+
+> Một tài liệu áp dụng cho (tin, vòng) khi:
+> `deleted_at IS NULL AND (scope='org' OR (scope_ref_id = tin AND (scope='job_posting' OR (scope='round' AND round_number = vòng))))`
+
+`org` áp cho **mọi** tin (phong cách/văn hoá/compliance của doanh nghiệp — hợp mô hình single-tenant); `job_posting` và `round` chỉ áp cho đúng tin, `round` thêm điều kiện đúng vòng.
+
+**Nguồn sự thật là bảng `playbook_documents`, KHÔNG phải metadata của chunk.** Metadata chỉ là bản sao lúc nạp: xoá tài liệu không sửa được nó, nên lọc theo metadata sẽ để tài liệu đã xoá tiếp tục có tiếng nói. rag-service lọc bằng subquery `source_id IN (SELECT id FROM playbook_documents WHERE …)` (dùng index `idx_playbook_documents_scope`); .NET dùng cùng vị từ qua `PlaybookScope.EligibleDocumentIdsAsync`. `DeletedAt == null` viết **tường minh** dù EF đã có global query filter — đây là luật nghiệp vụ, không nên phụ thuộc cấu hình ở tầng khác, và nhờ vậy test được bằng kho in-memory.
+
+**Trước khi có luật này** (phát hiện 2026-08-18) cả hai đường đều lấy TOÀN BỘ chunk playbook của hệ thống: `graph.py` lọc `ScopeFilter("playbook", None)`, còn `InterviewService` tự nạp mọi chunk rồi nhồi vào `PlaybookStyleGuides` gửi kèm — nên sửa mỗi rag-service là chưa đủ. Hệ quả: ngân hàng câu hỏi của vị trí này lọt vào buổi phỏng vấn vị trí khác, scope `round` vô nghĩa (không chỗ nào lọc theo vòng), và playbook đã xoá vẫn điều khiển AI vì `DeletePlaybookCommand` chỉ set `DeletedAt`.
+
+#### Xoá là hết ảnh hưởng
+`DeletePlaybookCommand` gỡ chunk **trước**, soft-delete sau; gỡ lỗi → `Result.Failure` và **không** xoá mềm (thà để tài liệu còn hiện cho nhân sự bấm lại, còn hơn một playbook vô hình vẫn nói vào tai AI). Gỡ chunk dùng lại `IngestAsync(text: "")` — rag-service đã có sẵn nhánh "text rỗng + replaceExisting → DELETE chunk cũ", không đẻ endpoint xoá riêng. File trong storage vẫn giữ (bản ghi chỉ soft-delete, khôi phục được bằng `ParsedText`).
+
+#### Trọng số truy hồi (hybrid RRF)
+Sau khi đã lọc đúng phạm vi, trọng số chỉ còn việc **xếp hạng**: JD/CV 1.0, playbook `org` 0.6, `job_posting`/`round` 1.0.
+
+#### Must-ask
+Chỉ phiên `real`. Nạp tài liệu `must_ask` của **cả** scope `job_posting` lẫn `round` đúng vòng (bản cũ chỉ đọc `job_posting` nên must-ask khai theo vòng mất trắng); cố ý **không** lấy scope `org` — câu bắt buộc là chuyện của từng vị trí. `PlaybookScope.ParseMustAskLines` tách **mỗi dòng một câu**, bỏ tiêu đề markdown/đường kẻ/dòng < 8 ký tự, gỡ bullet, khử trùng lặp; **không** tách theo `;` nữa (dấu chấm phẩy giữa câu là bình thường). Quan trọng vì must-ask **chặn điều kiện kết thúc phiên**: mỗi dòng rác lọt vào là một câu AI buộc phải hỏi ứng viên.
 
 ### ADR-026: Job Board (IT-focused)
 - **Quyết định:** Tích hợp Job Board IT vào nền tảng ARISP. Ứng viên tạo tài khoản, tìm kiếm và tự ứng tuyển.

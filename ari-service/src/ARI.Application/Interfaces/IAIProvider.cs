@@ -16,6 +16,16 @@ namespace ARI.Application.Interfaces
         public List<QuestionAnswerDto> ChatHistory { get; set; } = new();
         public List<string> MustAskQuestions { get; set; } = new();
         public List<string> PlaybookStyleGuides { get; set; } = new();
+
+        /// <summary>Vòng phỏng vấn hiện tại — quyết định playbook scope "round" nào được dùng (ADR-025).</summary>
+        public int RoundNumber { get; set; } = 1;
+
+        /// <summary>
+        /// Chủ đề CẤM hỏi, lấy từ playbook loại <c>compliance</c>. Là RÀNG BUỘC, không phải ngữ cảnh
+        /// tham khảo — trước đây nội dung này rơi vào cùng rổ với tài liệu thường, tức đưa cho AI danh
+        /// sách chủ đề nhạy cảm rồi mong nó tự hiểu là không được hỏi.
+        /// </summary>
+        public List<string> ProhibitedTopics { get; set; } = new();
         /// <summary>Ngôn ngữ phỏng vấn (ISO code, ADR-018) — AI hỏi + nhắc ứng viên theo ngôn ngữ này.</summary>
         public string? Language { get; set; }
         /// <summary>Buộc kết thúc NGAY (đạt cap số câu): AI chỉ sinh lời cảm ơn, không hỏi thêm.</summary>
