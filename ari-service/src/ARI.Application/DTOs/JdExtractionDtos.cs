@@ -66,6 +66,19 @@ namespace ARI.Application.DTOs
     {
         public bool IsValidJd { get; set; }
 
+        /// <summary>
+        /// AI KHÔNG chạy xong (lỗi dịch vụ / quá thời gian). Khác hẳn <see cref="IsValidJd"/>=false
+        /// vốn nghĩa là "AI đọc được nhưng nội dung không phải mô tả công việc" — hai nguyên nhân này
+        /// cần hai câu thông báo khác nhau, gộp lại là đổ oan cho file của người dùng.
+        /// </summary>
+        public bool AnalysisFailed { get; set; }
+
+        /// <summary>
+        /// PDF không rút được chữ nào (bản scan hoặc xuất từ slide toàn ảnh). AI vẫn có thể OCR nhưng
+        /// rất chậm và dễ trượt thời gian — biết được điều này thì thông báo mới chỉ đúng việc phải làm.
+        /// </summary>
+        public bool ScannedPdf { get; set; }
+
         // Thông tin file JD đã lưu (để gửi lại trong CreateJobPostingRequest)
         public string JdFileUrl { get; set; } = string.Empty;   // storageKey
         public string JdFileName { get; set; } = string.Empty;

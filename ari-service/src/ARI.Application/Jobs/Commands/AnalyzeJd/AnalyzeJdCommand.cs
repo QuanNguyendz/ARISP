@@ -18,6 +18,13 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
 
     public class AnalyzeJdCommandHandler : IRequestHandler<AnalyzeJdCommand, Result<AnalyzeJdResponse>>
     {
+        /// <summary>
+        /// Trần thời gian cho lượt gọi AI. Phải NGẮN HƠN timeout của trình duyệt (150s) để server còn
+        /// kịp trả lời tử tế; và ngắn hơn trần mặc định 100s của HttpClient để lỗi hiện ra ở đây,
+        /// nơi biết đường giải thích, chứ không phải ở tầng mạng.
+        /// </summary>
+        private const int AiTimeoutSeconds = 90;
+
         private readonly IDocumentParserService _documentParser;
         private readonly IFileStorageService _fileStorage;
         private readonly IGeminiProvider _geminiProvider;
@@ -68,9 +75,28 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
             // còn DOCX rơi vào nhánh lỗi chung ("có thể do CORS").
             var viewUrl = await _fileStorage.GetUrlAsync(storageKey, ct);
 
+            // PDF không rút được chữ nào = bản scan hoặc xuất từ slide toàn ảnh. AI vẫn OCR được nhưng
+            // rất chậm, và đây là lý do thật khiến lần phân tích trước trượt thời gian.
+            var scannedPdf = ext == ".pdf" && string.IsNullOrWhiteSpace(jdText);
+
+            // Bó thời gian gọi AI NGẮN HƠN timeout của trình duyệt: hết giờ ở đây thì người dùng nhận
+            // được câu trả lời tử tế (file đã lưu + lý do), thay vì trình duyệt tự huỷ request và server
+            // ghi 499 — lúc đó không ai nói được cho người dùng biết chuyện gì vừa xảy ra.
+            using var aiTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            aiTimeout.CancelAfter(TimeSpan.FromSeconds(AiTimeoutSeconds));
+
             // Gọi Gemini trích xuất (PDF gửi inline, DOCX dùng fallback text)
             var pdfBytes = ext == ".pdf" ? bytes : null;
-            var extraction = await _geminiProvider.ExtractJobFromJdAsync(pdfBytes, ext == ".pdf" ? "application/pdf" : null, jdText, ct);
+            Result<JdExtractionResultDto> extraction;
+            try
+            {
+                extraction = await _geminiProvider.ExtractJobFromJdAsync(
+                    pdfBytes, ext == ".pdf" ? "application/pdf" : null, jdText, aiTimeout.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                extraction = Result.Failure<JdExtractionResultDto>("Quá thời gian phân tích JD.");
+            }
 
             if (extraction.IsFailure)
             {
@@ -78,6 +104,8 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
                 return Result.Success(new AnalyzeJdResponse
                 {
                     IsValidJd = false,
+                    AnalysisFailed = true,
+                    ScannedPdf = scannedPdf,
                     JdFileUrl = storageKey,
                     JdFileViewUrl = viewUrl,
                     JdFileName = fileName,
@@ -90,6 +118,7 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
             var response = new AnalyzeJdResponse
             {
                 IsValidJd = data.IsValidJd,
+                ScannedPdf = scannedPdf,
                 JdFileUrl = storageKey,
                 JdFileViewUrl = viewUrl,
                 JdFileName = fileName,

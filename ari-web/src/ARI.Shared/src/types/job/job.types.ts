@@ -102,6 +102,10 @@ export interface CreateJobPostingRequest {
 
 /** Kết quả phân tích JD (POST /jobs/analyze-jd) — auto-fill form + metadata file đã lưu. */
 export interface AnalyzeJdResult {
+  /** true = AI không phân tích được (lỗi/quá thời gian) — KHÁC với "đọc được nhưng không phải JD". */
+  analysisFailed?: boolean
+  /** true = PDF không rút được chữ nào (bản scan / xuất từ slide ảnh). */
+  scannedPdf?: boolean
   isValidJd: boolean
   /** storageKey — gửi NGUYÊN TRẠNG trong payload tạo tin, không dùng để hiển thị. */
   jdFileUrl: string

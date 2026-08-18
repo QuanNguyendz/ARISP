@@ -12,12 +12,15 @@
     "analyzing": "Đang phân tích JD...",
     "changeJd": "Tải JD khác",
     "success": "Đã phân tích JD và điền tự động các trường. Bạn có thể chỉnh sửa lại.",
-    "warning": "File đã được lưu nhưng AI chưa nhận diện rõ là JD. Vui lòng kiểm tra và nhập thủ công.",
+    "warning": "File đã được lưu nhưng AI chưa nhận diện rõ đây là mô tả công việc. Vui lòng kiểm tra và nhập thủ công các trường bên dưới.",
     "successTitle": "Thành công",
     "warningTitle": "Cảnh báo",
     "clickToView": "Bấm để xem nội dung file",
     "clickToViewHint": "Bấm vào tên file để xem lại JD",
-    "removeFile": "Gỡ file JD"
+    "removeFile": "Gỡ file JD",
+    "failed": "File đã được lưu nhưng AI không phân tích xong (lỗi dịch vụ hoặc quá thời gian). Bạn nhập tay các trường bên dưới, hoặc thử lại với file nhẹ hơn.",
+    "failedScanned": "File PDF này chỉ chứa ảnh (bản scan hoặc xuất từ slide) nên AI không đọc được chữ trong thời gian cho phép. File vẫn được lưu — hãy nhập tay, hoặc dùng file JD dạng văn bản (không phải ảnh) để AI tự điền.",
+    "scannedHint": "Lưu ý: file PDF này không có chữ (toàn ảnh) nên kết quả tự điền có thể thiếu — hãy kiểm tra lại các trường."
   },
   "form": {
     "generalInfo": "Thông tin chung",
