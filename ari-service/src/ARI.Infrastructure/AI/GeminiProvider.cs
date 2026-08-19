@@ -119,6 +119,7 @@ namespace ARI.Infrastructure.AI
             byte[]? cvFileBytes, 
             string? cvMimeType, 
             string? fallbackCvText,
+            string? rubricInstruction = null,
             CancellationToken ct = default)
         {
             if (string.IsNullOrEmpty(_apiKey))
@@ -153,6 +154,14 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
   ""experience_relevance"": string (Tiếng Việt — mức độ phù hợp lĩnh vực với JD),
   ""overall_recommendation"": string (CHỈ chọn đúng một trong các giá trị tiếng Anh sau: 'Strong Hire', 'Hire', 'Proceed with caution', 'Reject')
 }";
+
+            // Doanh nghiệp có khai bộ tiêu chí → AI chấm TỪNG tiêu chí, backend cộng có trọng số.
+            // Không khai thì giữ nguyên hành vi cũ (AI tự cho match_score) để tin cũ không vỡ.
+            if (!string.IsNullOrWhiteSpace(rubricInstruction))
+            {
+                systemInstruction += "\n\n--- SCORING RUBRIC (bắt buộc tuân thủ) ---\n" + rubricInstruction
+                    + "\n\nNgoài các trường trên, BẮT BUỘC thêm khoá \"criterion_scores\": {\"<mã tiêu chí>\": <0-100>} chấm ĐÚNG và ĐỦ các mã tiêu chí liệt kê ở trên, không thêm mã nào khác. Mỗi điểm phải dựa trên bằng chứng có trong CV; thiếu bằng chứng thì cho điểm thấp, không suy diễn. Hệ thống sẽ TỰ TÍNH điểm tổng từ các tiêu chí này theo trọng số — match_score bạn đưa ra chỉ là ước lượng tham khảo.";
+            }
 
             var parts = new List<object>
             {

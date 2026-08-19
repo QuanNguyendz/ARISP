@@ -104,6 +104,9 @@ internal sealed class StubAiProvider : IAIProvider
     public int EvaluationCallCount { get; private set; }
     public int QuestionCallCount { get; private set; }
 
+    /// <summary>Ngữ cảnh lần chấm gần nhất — để kiểm bộ tiêu chí doanh nghiệp có tới được AI không (ADR-060).</summary>
+    public SessionContext? LastEvaluationContext { get; private set; }
+
     public async IAsyncEnumerable<string> StreamQuestionAsync(QuestionContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
         QuestionCallCount++;
@@ -115,6 +118,7 @@ internal sealed class StubAiProvider : IAIProvider
     public Task<EvaluationReport> GenerateEvaluationAsync(SessionContext ctx, CancellationToken ct)
     {
         EvaluationCallCount++;
+        LastEvaluationContext = ctx;
         return Task.FromResult(Evaluation);
     }
     public Task<string> DetectLanguageRequirementAsync(string jdText, CancellationToken ct) => Task.FromResult("vi");

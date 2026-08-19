@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
@@ -19,6 +20,37 @@ namespace ARI.Application.Scheduling
             if (userId is not { } uid || uid == Guid.Empty) return (false, job);
             var isAdmin = role == AppRoles.SuperAdmin || role == AppRoles.HrAdmin;
             return (isAdmin || job.CreatedByUserId == uid, job);
+        }
+
+        /// <summary>
+        /// Vòng này đã LỠ buổi phỏng vấn thật chưa: còn lịch hiệu lực (<c>scheduled</c>) đã qua giờ
+        /// mà không có phiên phỏng vấn THẬT nào của vòng.
+        ///
+        /// Lỡ buổi thật rồi thì phỏng vấn thử không còn nghĩa gì — thử là để chuẩn bị cho buổi thật,
+        /// mà buổi thật đã trôi qua. Booking đã <c>declined</c>/<c>cancelled</c> KHÔNG tính là lỡ:
+        /// đó là người báo bận hoặc bị hệ thống huỷ, nhân sự sẽ xếp lại ca khác (ADR-048/058).
+        /// </summary>
+        public static async Task<bool> HasMissedRealInterviewAsync(
+            IUnitOfWork unitOfWork, Guid applicationId, int roundNumber, CancellationToken ct)
+        {
+            var bookings = (await unitOfWork.Repository<InterviewBooking>().FindAsync(
+                b => b.ApplicationId == applicationId
+                     && b.RoundNumber == roundNumber
+                     && b.Status == BookingStatus.Scheduled, ct)).ToList();
+            if (bookings.Count == 0) return false;
+
+            var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
+            var slots = await unitOfWork.Repository<AvailabilitySlot>()
+                .FindAsync(s => slotIds.Contains(s.Id), ct);
+
+            var now = DateTimeOffset.UtcNow;
+            if (!slots.Any(s => s.EndTime <= now)) return false;
+
+            var realSessions = await unitOfWork.Repository<InterviewSession>().FindAsync(
+                s => s.ApplicationId == applicationId
+                     && s.RoundNumber == roundNumber
+                     && s.SessionType == "real", ct);
+            return !realSessions.Any();
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
@@ -38,16 +39,44 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
 
         public async Task<Result<UploadedPlaybookDto>> Handle(UploadPlaybookCommand request, CancellationToken ct)
         {
-            // Parse text (md/txt: parser xử lý như text; pdf/docx: trích xuất)
+            var isRubric = ScoringRubric.IsRubricType(request.DocumentType);
+
+            // Bộ tiêu chí chấm điểm là DỮ LIỆU (bảng Excel), không phải văn bản tự do: parse thành
+            // tiêu chí + trọng số và chặn ngay nếu tổng ≠ 100 — sai ở đây mà lọt xuống thì mọi điểm
+            // chấm về sau đều sai mà không ai biết (ADR-060).
+            string? rubricJson = null;
             string parsedText;
-            try
+            int? criteriaCount = null;
+
+            if (isRubric)
             {
-                using var stream = new MemoryStream(request.Bytes);
-                parsedText = (await _documentParser.ParseDocumentAsync(stream, request.Ext))?.Replace("\0", string.Empty) ?? string.Empty;
+                if (!string.Equals(request.Ext, ".xlsx", StringComparison.OrdinalIgnoreCase))
+                    return Result.Failure<UploadedPlaybookDto>(
+                        "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu. Hãy tải file mẫu rồi điền vào.");
+
+                var parsed = RubricSheet.Parse(request.Bytes);
+                var errors = parsed.Errors.Select(e => e.Row > 0 ? $"Dòng {e.Row}: {e.Message}" : e.Message).ToList();
+                errors.AddRange(ScoringRubric.Validate(parsed.Criteria));
+                if (errors.Count > 0)
+                    return Result.Failure<UploadedPlaybookDto>(string.Join(" | ", errors.Take(10)));
+
+                rubricJson = ScoringRubric.Serialize(parsed.Criteria);
+                criteriaCount = parsed.Criteria.Count;
+                // Văn bản cho RAG: chuẩn chấm từng tiêu chí để AI truy hồi khi cần diễn giải.
+                parsedText = ScoringRubric.ToPromptText(parsed.Criteria);
             }
-            catch (Exception ex)
+            else
             {
-                return Result.Failure<UploadedPlaybookDto>($"Không thể đọc nội dung file: {ex.Message}");
+                // Parse text (md/txt: parser xử lý như text; pdf/docx: trích xuất)
+                try
+                {
+                    using var stream = new MemoryStream(request.Bytes);
+                    parsedText = (await _documentParser.ParseDocumentAsync(stream, request.Ext))?.Replace("\0", string.Empty) ?? string.Empty;
+                }
+                catch (Exception ex)
+                {
+                    return Result.Failure<UploadedPlaybookDto>($"Không thể đọc nội dung file: {ex.Message}");
+                }
             }
 
             var contentType = request.Ext switch
@@ -55,6 +84,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 ".pdf" => "application/pdf",
                 ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 ".md" => "text/markdown",
+                ".xlsx" => RubricSheet.XlsxContentType,
                 _ => "text/plain"
             };
 
@@ -82,6 +112,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                     FileUrl = storageKey,
                     FileFormat = fileFormat,
                     ParsedText = parsedText,
+                    RubricJson = rubricJson,
                     Status = "ready",
                     UploadedByUserId = request.UserId
                 };
@@ -103,7 +134,8 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
 
                 return Result.Success(new UploadedPlaybookDto(
                     document.Id, document.Scope, document.ScopeRefId, document.RoundNumber, document.DocumentType,
-                    document.FileName, document.FileFormat, document.Status, document.CreatedAt));
+                    document.FileName, document.FileFormat, document.Status, document.CreatedAt,
+                    criteriaCount));
             }
             catch (Exception ex)
             {

@@ -12,12 +12,15 @@
     "analyzing": "Analyzing JD...",
     "changeJd": "Upload Different JD",
     "success": "JD analyzed and fields auto-filled. You can still edit.",
-    "warning": "File saved but AI couldn't identify it as JD clearly. Please check and fill in manually.",
+    "warning": "The file was saved but AI could not clearly recognise it as a job description. Please review and fill the fields below manually.",
     "successTitle": "Success",
     "warningTitle": "Warning",
     "clickToView": "Click to view this file",
     "clickToViewHint": "Click the file name to review the JD",
-    "removeFile": "Remove JD file"
+    "removeFile": "Remove JD file",
+    "failed": "The file was saved but AI did not finish the analysis (service error or timeout). Fill the fields manually, or retry with a smaller file.",
+    "failedScanned": "This PDF contains only images (a scan or slide export), so AI could not read its text in time. The file is still saved — fill the fields manually, or use a text-based JD file so AI can auto-fill.",
+    "scannedHint": "Note: this PDF has no text layer (images only), so the auto-filled values may be incomplete — please double-check them."
   },
   "form": {
     "generalInfo": "General Information",
@@ -66,7 +69,9 @@
     "urgent": "Urgent Hiring",
     "cancel": "Cancel",
     "save": "Save",
-    "createJob": "Create Job"
+    "createJob": "Create Job",
+    "interviewPassScore": "Interview pass score",
+    "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook."
   },
   "validation": {
     "requiredFields": "Title and Job Description are required.",

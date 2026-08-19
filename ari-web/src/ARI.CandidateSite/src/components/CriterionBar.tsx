@@ -7,6 +7,8 @@ import { scoreColor, type TFn } from '@pages/candidate/_reportUi'
  */
 export default function CriterionBar({ c, t }: { c: MyEvalCriterion; t: TFn }) {
   const pct = Math.max(0, Math.min(100, Math.round(c.score)))
+  // Nhãn doanh nghiệp tự đặt (ADR-060) thắng mọi từ điển: rubric là của họ, không dịch lại.
+  const companyLabel = c.label?.trim()
   // Bộ khoá chuẩn (prompt đã ghim) + các biến thể model hay trả về ("Technical Skills",
   // "Cultural Fit"…) — thiếu alias là nhãn rơi về tiếng Anh thô giữa màn tiếng Việt.
   const criterionLabels: Record<string, string> = {
@@ -29,13 +31,21 @@ export default function CriterionBar({ c, t }: { c: MyEvalCriterion; t: TFn }) {
   }
   const key = c.name.trim().toLowerCase().replace(/\s+/g, '_')
   const label =
+    companyLabel ||
     criterionLabels[key] ||
     c.name.replace(/_/g, ' ').replace(/^\w/, (ch: string) => ch.toUpperCase())
 
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-ink-700">{label}</span>
+        <span className="font-medium text-ink-700">
+          {label}
+          {/* Trọng số cho thấy tiêu chí này nặng bao nhiêu trong điểm tổng — không có thì bảng
+              điểm chỉ là 4 con số rời rạc, ứng viên không hiểu vì sao ra tổng đó. */}
+          {c.weight != null && (
+            <span className="ml-1.5 text-xs font-normal text-ink-500">{c.weight}%</span>
+          )}
+        </span>
         <span className="font-semibold text-ink-900">{pct}/100</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">

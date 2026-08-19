@@ -24,6 +24,7 @@ import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
 import { PageHeader, StatsGrid, Pagination } from '@ari/shared/ui'
+import { toCriterionRows } from '@ari/shared/utils'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
 /**
@@ -351,10 +352,8 @@ export default function EvaluationReviewPage() {
     [counts, t]
   )
 
-  const criterionEntries = useMemo(
-    () => Object.entries(selectedEvaluation?.criterionScores ?? {}),
-    [selectedEvaluation]
-  )
+  // Nhãn + trọng số do doanh nghiệp khai (ADR-060); bản đánh giá cũ vẫn đọc được dạng phẳng.
+  const criterionEntries = useMemo(() => toCriterionRows(selectedEvaluation), [selectedEvaluation])
 
   const aiPassed = isPassVerdict(selectedEvaluation?.aiVerdict)
 
@@ -737,16 +736,23 @@ export default function EvaluationReviewPage() {
             </h2>
             <div className="space-y-4">
               {criterionEntries.length > 0 ? (
-                criterionEntries.map(([criterion, score]) => (
-                  <div key={criterion}>
+                criterionEntries.map((row) => (
+                  <div key={row.key}>
                     <div className="mb-1 flex justify-between text-sm">
-                      <span className="text-ink-600 dark:text-ink-400">{criterion}</span>
-                      <span className="font-semibold text-ink-900 dark:text-white">{score}</span>
+                      <span className="text-ink-600 dark:text-ink-400">
+                        {row.label}
+                        {row.weight != null && (
+                          <span className="ml-1.5 text-xs text-ink-400 dark:text-ink-500">
+                            {row.weight}%
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-semibold text-ink-900 dark:text-white">{row.score}</span>
                     </div>
                     <div className="h-2 rounded-full bg-ink-100 dark:bg-white/10">
                       <div
-                        className={`h-full rounded-full ${getScoreColor(score)}`}
-                        style={{ width: `${score}%` }}
+                        className={`h-full rounded-full ${getScoreColor(row.score)}`}
+                        style={{ width: `${row.score}%` }}
                       />
                     </div>
                   </div>

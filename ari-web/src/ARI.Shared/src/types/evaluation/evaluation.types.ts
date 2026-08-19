@@ -7,6 +7,11 @@ export interface EvaluationReport {
   aiVerdict: 'pass' | 'not_pass' | string;
   overallScore?: number | null;
   criterionScores?: Record<string, number> | null;
+  /**
+   * Điểm từng tiêu chí kèm nhãn + trọng số doanh nghiệp khai, chụp lại lúc chấm (ADR-060).
+   * Null với bản đánh giá chấm trước khi tin khai bộ tiêu chí — khi đó chỉ có `criterionScores`.
+   */
+  criterionDetails?: CriterionDetail[] | null;
   reasoning?: string | null;
   recommendedNextStep?: string | null;
   questionAnalyses?: QuestionAnalysis[] | null;
@@ -35,6 +40,16 @@ export interface CriterionScore {
   score: number;
   maxScore: number;
   reasoning: string;
+}
+
+/** Một dòng điểm tiêu chí theo rubric doanh nghiệp (ADR-060). */
+export interface CriterionDetail {
+  key: string;
+  score: number;
+  /** Tên hiển thị doanh nghiệp đặt — null với bản đánh giá cũ. */
+  label?: string | null;
+  /** Trọng số (%) lúc chấm — null với bản đánh giá cũ. */
+  weight?: number | null;
 }
 
 export interface LanguageAssessment {

@@ -49,6 +49,11 @@ export const CANDIDATE_STATE: Record<CandidateState, CandidateStateStyle> = {
     chip: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400',
     closed: true,
   },
+  no_show: {
+    labelKey: 'state.no_show',
+    chip: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400',
+    closed: true,
+  },
   rejected_by_staff: {
     labelKey: 'state.rejected_by_staff',
     chip: 'bg-ink-200 text-ink-600 dark:bg-white/10 dark:text-ink-300',
@@ -72,6 +77,13 @@ export const stateOf = (c: SlotCandidate): CandidateStateStyle =>
 
 /** Hồ sơ đã bị nhân sự loại — trạng thái cuối, không thao tác gì thêm được. */
 export const isRejected = (c: SlotCandidate) => c.candidateState === 'rejected_by_staff'
+
+/**
+ * Dời lịch CHỈ dành cho ứng viên đã chủ động báo bận (ADR-059): họ đã phản hồi và nêu lý do nên
+ * nhân sự biết đường xếp ca khác. Người chưa phản hồi thì chưa có gì để dời; người không tham dự
+ * thì hồ sơ đã dừng lại. Server chặn y hệt — đây chỉ là lớp giao diện.
+ */
+export const canReschedule = (c: SlotCandidate) => c.candidateState === 'declined_by_candidate'
 
 /**
  * Chọn được để thao tác hàng loạt. CỐ Ý bao gồm cả người đã báo bận / quá hạn: dời lịch cho họ

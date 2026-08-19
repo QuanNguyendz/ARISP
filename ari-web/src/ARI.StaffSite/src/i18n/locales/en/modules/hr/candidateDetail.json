@@ -42,5 +42,6 @@
   "hrReviewed": "HR reviewed",
   "pass": "Pass",
   "notPass": "Not Pass",
-  "viewReport": "View report"
+  "viewReport": "View report",
+  "cvCriteriaTitle": "CV score by company criteria"
 }

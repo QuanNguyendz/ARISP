@@ -188,7 +188,7 @@ namespace ARI.Infrastructure
             services.AddHostedService<RecordingRetentionHostedService>();
 
             // Auto-reject lịch ứng viên không xác nhận trong thời hạn (ADR-048) — quét 30'/lần.
-            services.AddHostedService<ScheduleConfirmationHostedService>();
+            services.AddHostedService<InterviewScheduleFollowUpHostedService>();
 
             // Realtime tầng database (ADR-057): LISTEN kênh NOTIFY của Postgres rồi chuyển tiếp sang
             // SignalR. Dùng chung host/credential với EF, nhưng listener tự đặt lại Pooling=false +

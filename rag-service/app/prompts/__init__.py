@@ -22,7 +22,21 @@ END_MARKER = "[END_INTERVIEW]"
 MIN_QUESTIONS_BEFORE_END = 5
 
 
-def question_system_prompt(ctx: QuestionContext, retrieved: list[str]) -> str:
+def question_system_prompt(
+    ctx: QuestionContext,
+    retrieved: list[str],
+    *,
+    banned_topics: list[str] | None = None,
+    red_flags: list[str] | None = None,
+    expected_answers: list[str] | None = None,
+) -> str:
+    """Prompt sinh cau hoi.
+
+    Playbook khong phai mot ro tai lieu dong hang: `compliance` la chu de CAM hoi, `red_flag` la dau
+    hieu can dao sau, `expected_answer` dung de cham chu khong doc cho ung vien nghe (ADR-025).
+    Nhet chung vao "retrieved context" nhu ban cu chinh la dua cho mo hinh danh sach chu de nhay cam
+    roi mong no tu hieu la khong duoc hoi.
+    """
     lang = language_name(ctx.language)
 
     # Buộc đóng phiên (cap số câu phía .NET): chỉ sinh lời cảm ơn, không hỏi thêm.
@@ -66,6 +80,26 @@ def question_system_prompt(ctx: QuestionContext, retrieved: list[str]) -> str:
         sys += "\n\nRetrieved context (most relevant chunks):\n" + "\n".join(
             f"- {c}" for c in retrieved
         )
+    if expected_answers:
+        sys += (
+            "\n\nWhat a strong answer covers (use this to judge and to probe deeper - "
+            "NEVER read it out or hint at it):\n"
+            + "\n".join(f"- {c}" for c in expected_answers)
+        )
+    if red_flags:
+        sys += (
+            "\n\nWarning signs - if the candidate shows any of these, probe deeper before moving on:\n"
+            + "\n".join(f"- {c}" for c in red_flags)
+        )
+    # Rang buoc CAM dat SAU moi ngu canh de khong bi cac doan phia tren pha loang.
+    combined_banned = list(banned_topics or []) + list(ctx.prohibited_topics or [])
+    if combined_banned:
+        sys += (
+            "\n\nHARD CONSTRAINT - NEVER ask about, hint at, or invite the candidate to discuss any "
+            "of the following topics (company compliance playbook). If the candidate raises one, "
+            "acknowledge briefly and move on without probing:\n"
+            + "\n".join(f"- {c}" for c in combined_banned)
+        )
     if ctx.must_ask_questions:
         sys += (
             "\n\nYou MUST ask the following mandatory question now (rephrase naturally, keep its intent):\n"
@@ -97,6 +131,40 @@ def report_language_name(ctx: SessionContext) -> str:
     return language_name(ctx.report_language or ctx.language)
 
 
+def _criterion_key_rule(ctx: SessionContext) -> str:
+    """Khoá tiêu chí: của doanh nghiệp nếu có, không thì mới dùng bộ mặc định.
+
+    Bộ 8 khoá tiếng Anh viết cứng trước đây là lý do "chấm theo tiêu chí công ty" chỉ là hình thức:
+    doanh nghiệp khai gì cũng vậy, model vẫn chấm theo danh sách của chúng ta (ADR-060).
+    """
+    if ctx.criteria:
+        keys = ", ".join(c.key for c in ctx.criteria)
+        return (
+            "criterion_scores MUST contain EXACTLY these company-defined keys, all of them, "
+            f"no others: {keys}. Score each strictly against its standard listed in the rubric below, "
+            "based only on evidence from the answers. "
+            "Do NOT compute an overall score yourself — the system computes it from these weights. "
+        )
+    return (
+        "criterion_scores keys MUST be chosen ONLY from this fixed snake_case list: "
+        "technical, communication, problem_solving, culture_fit, experience, language, attitude, teamwork. "
+        "Use 3-6 of them, never invent other keys and never use display names. "
+    )
+
+
+def _rubric_block(ctx: SessionContext) -> str:
+    """Bảng tiêu chí + trọng số + chuẩn chấm của doanh nghiệp."""
+    if not ctx.criteria:
+        return ctx.scoring_rubric
+    lines = []
+    for c in ctx.criteria:
+        line = f"- {c.key} | {c.name} | weight {c.weight:g}%"
+        if c.description:
+            line += f" | standard: {c.description}"
+        lines.append(line)
+    return "COMPANY SCORING RUBRIC (weights sum to 100):" + chr(10) + chr(10).join(lines)
+
+
 def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
     import json
 
@@ -109,10 +177,8 @@ def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
         '"recommended_next_step": "<text>", "criterion_scores": {<criterion_key>: <0-100>}, '
         # Khoá tiêu chí phải nằm trong bộ cố định: FE dịch khoá sang VI/EN, model tự đặt tên
         # ("Cultural Fit", "Technical Skills") sẽ lọt ra màn hình dưới dạng tiếng Anh thô.
-        "criterion_scores keys MUST be chosen ONLY from this fixed snake_case list: "
-        "technical, communication, problem_solving, culture_fit, experience, language, attitude, teamwork. "
-        "Use 3-6 of them, never invent other keys and never use display names. "
-        '"question_analyses": [{"sequence_number": <int, from QA History>, "score": <0-100>, '
+        + _criterion_key_rule(ctx)
+        + '"question_analyses": [{"sequence_number": <int, from QA History>, "score": <0-100>, '
         '"analysis": "<what the answer covered and what was missing>", '
         '"feedback": "<one concrete, actionable improvement tip>"}]}. '
         # question_analyses trước đây để "<optional objects>" → model tự bịa khoá, FE parse ra rỗng.
@@ -130,7 +196,7 @@ def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
     user = (
         f"Job Description:\n{ctx.job_description[:4000]}\n\n"
         f"Candidate CV:\n{ctx.candidate_cv[:4000]}\n\n"
-        f"Scoring Rubric:\n{ctx.scoring_rubric}\n\n"
+        f"Scoring Rubric:\n{_rubric_block(ctx)}\n\n"
         f"QA History:\n{history}"
     )
     return system, user

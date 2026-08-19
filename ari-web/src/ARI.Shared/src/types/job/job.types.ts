@@ -51,6 +51,11 @@ export interface JobPosting {
   /** Số lượng cần tuyển (chỉ tiêu). Null/0 = không giới hạn. */
   vacancies?: number | null
   scoringRubric?: unknown
+  /**
+   * Điểm sàn để AI kết luận "đạt" ở buổi phỏng vấn (0–100, mặc định 70) — ADR-060.
+   * Chỉ áp dụng khi tin đã khai bộ tiêu chí chấm phỏng vấn trong Playbook.
+   */
+  interviewPassScore?: number
   rescheduleDeadlineHours?: number
   inviteTokenTtlHours?: number
   /** Số ứng viên đã ứng tuyển — trả về từ GET /jobs/admin */
@@ -79,6 +84,11 @@ export interface CreateJobPostingRequest {
   interviewMode: 'remote' | 'onsite' | 'both'
   isPublicListing: boolean
   languageRequirement?: string
+  /**
+   * Điểm sàn để AI kết luận "đạt" ở buổi phỏng vấn (0–100, mặc định 70) — ADR-060.
+   * Chỉ áp dụng khi tin đã khai bộ tiêu chí chấm phỏng vấn trong Playbook.
+   */
+  interviewPassScore?: number
   rescheduleDeadlineHours?: number
   inviteTokenTtlHours?: number
   roundConfigs: RoundConfig[]
@@ -102,6 +112,10 @@ export interface CreateJobPostingRequest {
 
 /** Kết quả phân tích JD (POST /jobs/analyze-jd) — auto-fill form + metadata file đã lưu. */
 export interface AnalyzeJdResult {
+  /** true = AI không phân tích được (lỗi/quá thời gian) — KHÁC với "đọc được nhưng không phải JD". */
+  analysisFailed?: boolean
+  /** true = PDF không rút được chữ nào (bản scan / xuất từ slide ảnh). */
+  scannedPdf?: boolean
   isValidJd: boolean
   /** storageKey — gửi NGUYÊN TRẠNG trong payload tạo tin, không dùng để hiển thị. */
   jdFileUrl: string

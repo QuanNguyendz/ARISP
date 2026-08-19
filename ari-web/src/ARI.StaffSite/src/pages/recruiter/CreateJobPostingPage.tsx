@@ -66,6 +66,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   // Mặc định theo đúng phễu tuyển dụng thật: lọc bằng trắc nghiệm trước (rẻ, tự chấm), rồi sơ loại,
   // rồi chuyên sâu kỹ thuật. Vòng trắc nghiệm dùng thời lượng riêng (30') vì không bị trần 20' của
   // buổi phỏng vấn AI — xem ADR-049/050.
+  const [interviewPassScore, setInterviewPassScore] = useState(70)
   const [rounds, setRounds] = useState<RoundConfig[]>([
     { roundNumber: 1, roundType: 'online_test', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 30 },
     { roundNumber: 2, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
@@ -122,6 +123,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setJdFileViewUrl(job.jdFileUrl)
           setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
+          setInterviewPassScore(job.interviewPassScore ?? 70)
         } catch (err) {
           setLoadError('Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.')
         } finally {
@@ -157,10 +159,19 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         if (r.salaryMin != null) setSalaryMin(r.salaryMin)
         if (r.salaryMax != null) setSalaryMax(r.salaryMax)
       }
+      // Ba nguyên nhân khác nhau, ba câu khác nhau: AI chết giữa chừng / PDF toàn ảnh không có chữ /
+      // đọc được nhưng nội dung không phải JD. Gộp chung là đổ oan cho file của người dùng.
       setAnalyzeMsg(
-        r.isValidJd
-          ? { type: 'ok', text: t('jdUpload.success') }
-          : { type: 'warn', text: t('jdUpload.warning') },
+        r.analysisFailed
+          ? { type: 'warn', text: t(r.scannedPdf ? 'jdUpload.failedScanned' : 'jdUpload.failed') }
+          : r.isValidJd
+            ? {
+                type: 'ok',
+                text: r.scannedPdf
+                  ? `${t('jdUpload.success')} ${t('jdUpload.scannedHint')}`
+                  : t('jdUpload.success'),
+              }
+            : { type: 'warn', text: t('jdUpload.warning') },
       )
     } catch (err: any) {
       setError(err?.response?.data?.message || t('validation.analyzeError'))
@@ -234,6 +245,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         isPublicListing,
         vacancies: vacancies === '' ? undefined : Number(vacancies),
         skills,
+        interviewPassScore,
         roundConfigs: rounds.map((r) =>
           r.roundType === 'online_test'
             ? { ...r, maxDurationMinutes: Math.max(r.maxDurationMinutes || 30, 1) }
@@ -298,13 +310,13 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       </motion.div>
 
       {error && (
-        <div className="mb-6 flex max-w-5xl items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="mb-6 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
         </div>
       )}
 
       {/* JD upload */}
-      <div className="mb-6 max-w-5xl rounded-2xl border border-brand-200 dark:border-brand-500/30 bg-gradient-to-b from-brand-50/60 dark:from-brand-500/10 to-white dark:to-white/5 p-6 shadow-card">
+      <div className="mb-6 rounded-2xl border border-brand-200 dark:border-brand-500/30 bg-gradient-to-b from-brand-50/60 dark:from-brand-500/10 to-white dark:to-white/5 p-6 shadow-card">
         <div className="flex items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-300">
           <Sparkles className="h-4 w-4" /> {mode === 'create' ? t('jdUpload.titleWithCreate') : t('jdUpload.title')}
         </div>
@@ -365,9 +377,12 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="grid max-w-5xl gap-6 grid-cols-1 lg:grid-cols-3">
+      <form
+        onSubmit={handleSubmit}
+        className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]"
+      >
         {/* Left */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6">
           <div className={`${card} space-y-5`}>
             <h2 className="border-b border-ink-100 dark:border-white/10 pb-2 text-base font-semibold text-ink-900 dark:text-white">{t('form.generalInfo')}</h2>
 
@@ -669,6 +684,28 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                   )
                 })}
               </AnimatePresence>
+            </div>
+
+            {/* Điểm sàn phỏng vấn (ADR-060): ngưỡng AI kết luận đạt/không đạt khi tin đã khai bộ
+                tiêu chí chấm. Đặt ở đây vì nó áp cho MỌI vòng phỏng vấn của tin, không phải từng vòng. */}
+            <div className="border-t border-ink-100 pt-3 dark:border-white/10">
+              <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">
+                {t('form.interviewPassScore')}
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                inputMode="numeric"
+                value={interviewPassScore}
+                onChange={(e) =>
+                  setInterviewPassScore(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                }
+                className={`${input} py-2`}
+              />
+              <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+                {t('form.interviewPassScoreHint')}
+              </p>
             </div>
           </div>
 

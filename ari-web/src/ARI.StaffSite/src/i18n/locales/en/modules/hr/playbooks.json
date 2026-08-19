@@ -17,7 +17,7 @@
   },
   "paginationLabel": "documents",
   "noPlaybooks": "No playbooks yet",
-  "noPlaybooksHint": "Upload interview documents (PDF/DOCX/TXT/MD) for AI to interview in company style.",
+  "noPlaybooksHint": "Upload interview documents (PDF/DOCX/TXT/MD) or a scoring rubric (.xlsx) so the AI interviews and scores per company configuration.",
   "docTypes": {
     "styleGuide": "Style Guide",
     "questionBank": "Question Bank",
@@ -28,7 +28,9 @@
     "technicalScenario": "Technical Scenario",
     "expectedAnswer": "Expected Answer",
     "mustAsk": "Must-Ask Questions",
-    "roundPlaybook": "Round Playbook"
+    "roundPlaybook": "Round Playbook",
+    "cvRubric": "CV Scoring Rubric",
+    "interviewRubric": "Interview Scoring Rubric"
   },
   "uploadTitle": "Upload Playbook",
   "uploadHint": "PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",
@@ -42,5 +44,9 @@
   "jobPosting": "Job Posting",
   "round": "Round",
   "cancel": "Cancel",
-  "upload": "Upload"
+  "upload": "Upload",
+  "criteriaCount": "{{count}} criteria",
+  "rubricHint": "A scoring rubric is an Excel sheet following the template: criterion key, display name, weight (%) and scoring standard. Weights must sum to exactly 100 — otherwise the file is rejected.",
+  "downloadTemplate": "Download template",
+  "templateDownloadError": "Could not download the template."
 }

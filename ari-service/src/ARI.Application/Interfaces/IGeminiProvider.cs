@@ -7,11 +7,16 @@ namespace ARI.Application.Interfaces
 {
     public interface IGeminiProvider
     {
+        /// <param name="rubricInstruction">
+        /// Bộ tiêu chí chấm điểm của doanh nghiệp + ngữ cảnh playbook liên quan (ADR-060).
+        /// Có giá trị thì AI phải chấm TỪNG tiêu chí; điểm tổng do backend cộng có trọng số.
+        /// </param>
         Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(
             string jdText,
             byte[]? cvFileBytes,
             string? cvMimeType,
             string? fallbackCvText,
+            string? rubricInstruction = null,
             CancellationToken ct = default);
 
         /// <summary>

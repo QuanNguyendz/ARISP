@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Interfaces;
 using ARI.Application.Playbooks.Commands.DeletePlaybook;
+using ARI.Application.Playbooks;
 using ARI.Application.Playbooks.Commands.UploadPlaybook;
 using ARI.Application.Playbooks.Queries.GetPlaybooks;
 using MediatR;
@@ -41,7 +42,21 @@ namespace ARI.API.Controllers
             return Ok(result.Value);
         }
 
-        /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD).</summary>
+        /// <summary>
+        /// Tải file Excel mẫu để khai bộ tiêu chí chấm điểm (ADR-060).
+        /// <c>type</c> = <c>cv_rubric</c> (chấm CV) hoặc <c>interview_rubric</c> (chấm phỏng vấn) —
+        /// mẫu khác nhau vì tiêu chí chấm hồ sơ khác hẳn tiêu chí chấm buổi phỏng vấn.
+        /// </summary>
+        [HttpGet("rubric-template")]
+        public IActionResult GetRubricTemplate([FromQuery] string? type)
+        {
+            var forCv = string.Equals(type?.Trim(), ScoringRubric.TypeCvRubric, StringComparison.OrdinalIgnoreCase);
+            var bytes = RubricSheet.BuildTemplate(forCv);
+            var fileName = forCv ? "mau-tieu-chi-cham-cv.xlsx" : "mau-tieu-chi-cham-phong-van.xlsx";
+            return File(bytes, RubricSheet.XlsxContentType, fileName);
+        }
+
+        /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD; riêng bộ tiêu chí chấm điểm là .xlsx).</summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadPlaybook([FromForm] UploadPlaybookForm form, CancellationToken ct)
@@ -71,9 +86,17 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = "roundNumber là bắt buộc khi scope = 'round'." });
 
             var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
-            var allowedExt = new[] { ".pdf", ".docx", ".txt", ".md" };
+            // Bộ tiêu chí chấm điểm là bảng số liệu → chỉ nhận .xlsx theo mẫu; tài liệu văn xuôi thì
+            // ngược lại, .xlsx không có nghĩa gì (ADR-060).
+            var isRubric = ScoringRubric.IsRubricType(documentType);
+            var allowedExt = isRubric ? new[] { ".xlsx" } : new[] { ".pdf", ".docx", ".txt", ".md" };
             if (string.IsNullOrEmpty(ext) || Array.IndexOf(allowedExt, ext) < 0)
-                return BadRequest(new { message = "Định dạng không hợp lệ. Chấp nhận .pdf, .docx, .txt, .md" });
+                return BadRequest(new
+                {
+                    message = isRubric
+                        ? "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu."
+                        : "Định dạng không hợp lệ. Chấp nhận .pdf, .docx, .txt, .md",
+                });
 
             byte[] bytes;
             using (var ms = new MemoryStream())

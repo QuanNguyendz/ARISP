@@ -325,6 +325,7 @@ export type CandidateState =
   | 'confirmed'
   | 'declined_by_candidate'
   | 'expired_no_response'
+  | 'no_show'
   | 'rejected_by_staff'
   | 'cancelled';
 

@@ -47,6 +47,22 @@ namespace ARI.API.Services
             }
         }
 
+        public async Task<string?> SendThreadedEmailAsync(
+            string toEmail, string subject, string content, string? inReplyToMessageId = null,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                return await _emailService.SendThreadedEmailAsync(toEmail, subject, content, inReplyToMessageId);
+            }
+            catch (Exception ex)
+            {
+                // Gửi thư hỏng không được chặn luồng nghiệp vụ — nơi gọi chỉ mất Message-Id để nối luồng.
+                _logger.LogError(ex, "Gửi email tới {Email} thất bại", toEmail);
+                return null;
+            }
+        }
+
         public Task SendSlackNotificationAsync(string message, CancellationToken ct = default)
         {
             _logger.LogInformation("[SLACK] {Message}", message);

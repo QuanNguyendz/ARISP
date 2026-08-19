@@ -20,6 +20,13 @@ namespace ARI.Application.DTOs
         [JsonPropertyName("match_score")]
         public int MatchScore { get; set; }
 
+        /// <summary>
+        /// Điểm từng tiêu chí do AI chấm khi doanh nghiệp có khai bộ tiêu chí (ADR-060).
+        /// Điểm tổng KHÔNG lấy từ <see cref="MatchScore"/> nữa mà do backend cộng có trọng số.
+        /// </summary>
+        [JsonPropertyName("criterion_scores")]
+        public Dictionary<string, decimal>? CriterionScores { get; set; }
+
         [JsonPropertyName("summary")]
         public string Summary { get; set; } = string.Empty;
 
