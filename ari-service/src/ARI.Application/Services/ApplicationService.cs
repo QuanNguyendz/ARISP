@@ -91,9 +91,26 @@ namespace ARI.Application.Services
                 InterviewScore = interviewScore,
                 InterviewDate = interviewDate,
                 MatchScore = application.CvJdAnalysis?.MatchScore,
-                CvJdSummary = application.CvJdAnalysis?.Summary
+                CvJdSummary = application.CvJdAnalysis?.Summary,
+                CvCriterionScores = MapCvCriterionScores(application.CvJdAnalysis?.CriterionScores)
             };
         }
+
+
+        /// <summary>
+        /// Đọc điểm tiêu chí chấm CV để hiển thị (ADR-060). Đọc được CẢ dạng phẳng cũ lẫn dạng có ảnh
+        /// chụp, nên hồ sơ chấm trước khi khai rubric vẫn hiện đúng.
+        /// </summary>
+        private static List<CvCriterionScoreDto> MapCvCriterionScores(string? json)
+            => ARI.Application.Playbooks.ScoringRubricSupport.ParseForDisplay(json)
+                .Select(c => new CvCriterionScoreDto
+                {
+                    Key = c.Key,
+                    Score = c.Score,
+                    Label = c.Label,
+                    Weight = c.Weight,
+                })
+                .ToList();
 
         public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
         {
@@ -1141,7 +1158,7 @@ namespace ARI.Application.Services
 
         /// <summary>
         /// Còn được phỏng vấn thử cho vòng <paramref name="roundNumber"/> không (1 lượt / vòng).
-        /// Eligible = vòng này KHÔNG phải trắc nghiệm và chưa có phiên practice nào của vòng.
+        /// Eligible = vòng này KHÔNG phải trắc nghiệm, chưa lỡ buổi thật, và chưa dùng lượt thử của vòng.
         /// </summary>
         public async Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default)
         {
@@ -1154,6 +1171,11 @@ namespace ARI.Application.Services
                     r => r.JobPostingId == application.JobPostingId && r.RoundNumber == roundNumber, ct))
                 .FirstOrDefault();
             if (ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(roundConfig?.RoundType))
+                return Result.Success(false);
+
+            // Đã lỡ buổi thật của vòng này → coi như trượt vòng, không mở phỏng vấn thử nữa.
+            if (await ARI.Application.Scheduling.SchedulingSupport.HasMissedRealInterviewAsync(
+                    _unitOfWork, applicationId, roundNumber, ct))
                 return Result.Success(false);
 
             var used = await _unitOfWork.Repository<InterviewSession>().FindAsync(

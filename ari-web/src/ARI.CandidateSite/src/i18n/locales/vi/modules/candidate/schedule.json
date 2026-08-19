@@ -70,12 +70,13 @@
     "confirmTitle": "Xác nhận tham dự?",
     "declineTitle": "Từ chối / xin đổi lịch?",
     "confirmSummary": "{{jobTitle}} · Vòng {{round}} — {{day}}, {{time}}",
-    "declineReasonLabel": "Lý do bạn không thể tham dự (nhân sự sẽ xếp lịch khác):",
-    "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường, bận công việc...",
+    "declineReasonLabel": "Lý do bạn không thể tham dự:",
+    "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường ngày 20/8. Em có thể tham dự sáng 22/8 hoặc chiều 23/8.",
     "warning": "Bạn đã chắc chắn với quyết định của mình chưa? Sau khi bấm, bạn sẽ không thể sửa lại lựa chọn này nữa.",
     "warningDecline": " Nhân sự sẽ sắp xếp một khung giờ khác dựa trên lý do của bạn.",
     "laterButton": "Để sau",
     "confirmButton": "Tôi chắc chắn — Xác nhận",
-    "declineButton": "Tôi chắc chắn — Từ chối"
+    "declineButton": "Tôi chắc chắn — Từ chối",
+    "declineReasonHint": "Hãy ghi rõ <b>những khung giờ bạn tham dự được</b> để nhân sự xếp ca phù hợp — hoặc nói rõ nếu bạn <b>không muốn tiếp tục</b> ứng tuyển."
   }
 }

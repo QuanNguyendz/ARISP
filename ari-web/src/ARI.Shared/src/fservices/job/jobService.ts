@@ -66,12 +66,16 @@ export const jobService = {
     return data
   },
 
-  // Staff: upload + phân tích JD (PDF/DOCX) → auto-fill form tạo tin
+  // Staff: upload + phân tích JD (PDF/DOCX) → auto-fill form tạo tin.
+  // Timeout riêng: Gemini đọc PDF nhiều trang (nhất là PDF toàn ảnh phải OCR) mất vài chục giây,
+  // vượt mức mặc định 30s của apiClient → request bị HUỶ giữa chừng, server ghi 499 và người dùng
+  // chỉ thấy "không phân tích được" dù AI vẫn đang chạy. Backend tự bó thời gian ngắn hơn số này.
   async analyzeJd(file: File): Promise<AnalyzeJdResult> {
     const formData = new FormData()
     formData.append('file', file)
     const { data } = await apiClient.post<AnalyzeJdResult>('/jobs/analyze-jd', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 150000,
     })
     return data
   },

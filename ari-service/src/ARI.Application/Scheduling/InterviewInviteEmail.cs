@@ -154,8 +154,8 @@ namespace ARI.Application.Scheduling
             <div style='background-color:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin:16px 0;'>
                 <p style='margin:0; color:#9a3412; font-size:13px;'>
                     <strong>Lưu ý:</strong> Mỗi lịch chỉ phản hồi <strong>một lần</strong> — sau khi bấm Xác nhận hoặc Đổi lịch, bạn sẽ <strong>không thể thay đổi</strong> lựa chọn.
-                    Nếu bạn <strong>không phản hồi trong vòng {deadlineHours} giờ</strong>, lịch sẽ tự động bị huỷ và nhân sự sẽ sắp xếp lại.
-                    Khi báo bận, vui lòng ghi rõ lý do để nhân sự xếp khung giờ phù hợp hơn.
+                    Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ của bạn sẽ <strong>dừng lại ở vòng này</strong>.
+                    Bận thì hãy bấm <strong>&quot;Tôi bận, xin đổi lịch&quot;</strong> và ghi rõ những khung giờ bạn tham dự được — nhân sự sẽ xếp ca khác cho bạn.
                 </p>
             </div>
 
@@ -166,6 +166,64 @@ namespace ARI.Application.Scheduling
         </div>";
 
             return new Content(subject, html);
+        }
+
+        /// <summary>
+        /// Thư NHẮC ứng viên chưa phản hồi lịch. Gửi dưới dạng trả lời thư mời (cùng luồng) nên chỉ
+        /// cần nhắc gọn: giờ hẹn, hạn chót là chính buổi hẹn, và hậu quả nếu im lặng.
+        /// </summary>
+        public static async Task<Content> BuildReminderAsync(
+            IUnitOfWork unitOfWork,
+            IConfiguration configuration,
+            ARI.Domain.Entities.Application app,
+            JobPosting? job,
+            int round,
+            Guid bookingId,
+            DateTimeOffset startTimeUtc,
+            CancellationToken ct = default)
+        {
+            var invite = await BuildAsync(unitOfWork, configuration, app, job, round, bookingId, startTimeUtc, ct);
+
+            var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
+            var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
+            var hoursLeft = Math.Max(1, (int)Math.Round((startTimeUtc - DateTimeOffset.UtcNow).TotalHours));
+
+            var baseUrl = (configuration["Frontend:CandidateBaseUrl"]
+                           ?? configuration["Authentication:AdminFrontendUrl"]
+                           ?? "http://localhost:3000").TrimEnd('/');
+            var confirmLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=confirm";
+            var declineLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=decline";
+
+            var html = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <p style='color:#334155; font-size:15px;'>Chào <strong>{app.CandidateName}</strong>,</p>
+            <p style='color:#334155; font-size:15px;'>Chúng tôi <strong>chưa nhận được phản hồi</strong> của bạn cho lịch phỏng vấn <strong>vòng {round}</strong> dưới đây.</p>
+            <p style='text-align:center; font-size:18px; font-weight:bold; color:#4f46e5; margin:18px 0;'>{whenText}</p>
+            <p style='color:#334155; font-size:15px;'>Buổi phỏng vấn diễn ra sau khoảng <strong>{hoursLeft} giờ</strong> nữa. Vui lòng chọn một trong hai:</p>
+            <table role='presentation' cellpadding='0' cellspacing='0' style='margin:16px auto;'>
+                <tr>
+                    <td style='padding:0 8px;'>
+                        <a href='{confirmLink}' style='display:inline-block; padding:12px 26px; background-color:#16a34a; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10003; Xác nhận tham dự</a>
+                    </td>
+                    <td style='padding:0 8px;'>
+                        <a href='{declineLink}' style='display:inline-block; padding:12px 26px; background-color:#dc2626; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10007; Tôi bận, xin đổi lịch</a>
+                    </td>
+                </tr>
+            </table>
+            <div style='background-color:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin:16px 0;'>
+                <p style='margin:0; color:#9a3412; font-size:13px;'>
+                    Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ sẽ <strong>dừng lại ở vòng này</strong>.
+                    Bận thì bấm &quot;Tôi bận, xin đổi lịch&quot; và ghi rõ khung giờ bạn tham dự được — nhân sự sẽ xếp ca khác.
+                </p>
+            </div>
+            <hr style='border:none; border-top:1px solid #e2e8f0; margin:22px 0;' />
+            <p style='color:#334155; font-size:14px; margin:0;'>Trân trọng,</p>
+            <p style='color:#334155; font-size:14px; margin:4px 0 0;'><strong>Đội ngũ nhân sự ARISP</strong></p>
+        </div>";
+
+            // Giữ nguyên tiêu đề gốc + tiền tố Re: — client thư gộp luồng theo References, nhưng
+            // tiêu đề trùng giúp cả những client chỉ gom theo tiêu đề.
+            return new Content($"Re: {invite.Subject}", html);
         }
 
         /// <summary>

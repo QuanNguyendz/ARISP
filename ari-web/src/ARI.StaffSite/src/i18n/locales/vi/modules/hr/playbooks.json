@@ -17,7 +17,7 @@
   },
   "paginationLabel": "tài liệu",
   "noPlaybooks": "Chưa có playbook",
-  "noPlaybooksHint": "Upload tài liệu phỏng vấn (PDF/DOCX/TXT/MD) để AI phỏng vấn đúng phong cách công ty.",
+  "noPlaybooksHint": "Upload tài liệu phỏng vấn (PDF/DOCX/TXT/MD) hoặc bộ tiêu chí chấm điểm (.xlsx) để AI phỏng vấn và chấm đúng cấu hình công ty.",
   "docTypes": {
     "styleGuide": "Hướng dẫn phong cách",
     "questionBank": "Ngân hàng câu hỏi",
@@ -28,7 +28,9 @@
     "technicalScenario": "Kịch bản kỹ thuật",
     "expectedAnswer": "Đáp án mong đợi",
     "mustAsk": "Câu hỏi bắt buộc",
-    "roundPlaybook": "Playbook theo vòng"
+    "roundPlaybook": "Playbook theo vòng",
+    "cvRubric": "Tiêu chí chấm CV",
+    "interviewRubric": "Tiêu chí chấm phỏng vấn"
   },
   "uploadTitle": "Upload Playbook",
   "uploadHint": "PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",
@@ -42,5 +44,9 @@
   "jobPosting": "Tin tuyển dụng",
   "round": "Vòng",
   "cancel": "Hủy",
-  "upload": "Upload"
+  "upload": "Upload",
+  "criteriaCount": "{{count}} tiêu chí",
+  "rubricHint": "Bộ tiêu chí là bảng Excel theo mẫu: mã tiêu chí, tên hiển thị, trọng số (%) và chuẩn chấm. Tổng trọng số phải đúng 100 — nếu không, hệ thống sẽ từ chối file.",
+  "downloadTemplate": "Tải file mẫu",
+  "templateDownloadError": "Không tải được file mẫu."
 }

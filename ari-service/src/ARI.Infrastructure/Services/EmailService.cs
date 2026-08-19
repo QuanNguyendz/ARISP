@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
+using MimeKit.Utils;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 
@@ -20,7 +21,11 @@ namespace ARI.Infrastructure.Services
             _configuration = configuration;
         }
 
-        public async Task SendEmailAsync(string toEmail, string subject, string htmlMessage)
+        public Task SendEmailAsync(string toEmail, string subject, string htmlMessage)
+            => SendThreadedEmailAsync(toEmail, subject, htmlMessage);
+
+        public async Task<string?> SendThreadedEmailAsync(
+            string toEmail, string subject, string htmlMessage, string? inReplyToMessageId = null)
         {
             // 1. Đọc thông tin cấu hình cổng SMTP Mail từ appsettings.json
             var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com";
@@ -44,6 +49,18 @@ namespace ARI.Infrastructure.Services
             var bodyBuilder = new BodyBuilder { HtmlBody = htmlMessage };
             emailMessage.Body = bodyBuilder.ToMessageBody();
 
+            // Sinh Message-Id tường minh (không dựa vào MimeKit tự sinh lúc gửi) để chắc chắn có giá
+            // trị trả về cho nơi gọi lưu lại làm mốc luồng thư.
+            emailMessage.MessageId = MimeUtils.GenerateMessageId();
+
+            // Nối thư vào đúng luồng của thư mời trước đó. Cần CẢ In-Reply-To lẫn References:
+            // Gmail gộp luồng theo References, các client khác đọc In-Reply-To.
+            if (!string.IsNullOrWhiteSpace(inReplyToMessageId))
+            {
+                emailMessage.InReplyTo = inReplyToMessageId;
+                emailMessage.References.Add(inReplyToMessageId);
+            }
+
             // 3. Kết nối cổng SMTP MailKit để ship thư đi thực tế
             using var client = new SmtpClient();
             try
@@ -56,6 +73,10 @@ namespace ARI.Infrastructure.Services
 
                 // Bắn thư đi
                 await client.SendAsync(emailMessage);
+
+                // MimeKit sinh Message-Id lúc gửi nếu chưa có. Trả về để nơi gọi lưu lại làm mốc
+                // cho các thư nhắc sau này bám vào cùng luồng.
+                return emailMessage.MessageId;
             }
             catch (Exception ex)
             {

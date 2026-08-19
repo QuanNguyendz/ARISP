@@ -32,8 +32,23 @@ namespace ARI.Domain.Entities
         /// (Status giữ nguyên "declined"/"cancelled"). Null = chưa ẩn.</summary>
         public DateTimeOffset? CandidateDismissedAt { get; set; }
 
+        /// <summary>Nhân sự đã bấm nút "Nhắc lịch" thủ công (khác với nhắc tự động bên dưới).</summary>
         public bool Reminder24hSent { get; set; } = false;
         public bool Reminder1hSent { get; set; } = false;
+
+        /// <summary>
+        /// <c>Message-Id</c> của THƯ MỜI đã gửi cho ứng viên. Thư nhắc lịch trả lời vào chính id này
+        /// (<c>In-Reply-To</c>/<c>References</c>) nên Gmail gộp chung một luồng với thư mời thay vì
+        /// đẻ ra một thư rời — ứng viên đọc lại được giờ hẹn ngay trên đầu luồng.
+        /// </summary>
+        public string? InviteEmailMessageId { get; set; }
+
+        /// <summary>
+        /// Mốc nhắc TỰ ĐỘNG gần nhất đã gửi, tính bằng số giờ trước giờ hẹn (vd 24 rồi 3).
+        /// Null = chưa nhắc lần nào. Mốc mới chỉ gửi khi nhỏ hơn mốc đã gửi → không nhắc lặp dù
+        /// worker quét 30 phút/lần. Tách khỏi <see cref="Reminder24hSent"/> vì cờ đó là nhắc TAY.
+        /// </summary>
+        public int? LastAutoReminderHours { get; set; }
         public Guid? RescheduledFromId { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -11,7 +11,15 @@ export interface PlaybookItem {
   status: string // processing | ready | error
   createdAt: string
   uploadedBy?: string | null
+  /** Số tiêu chí đọc được — chỉ có ở tài liệu bộ tiêu chí chấm điểm (ADR-060). */
+  criteriaCount?: number | null
 }
+
+/** Hai loại tài liệu là BẢNG SỐ LIỆU (.xlsx theo mẫu), không phải văn xuôi (ADR-060). */
+export const RUBRIC_DOC_TYPES = ['cv_rubric', 'interview_rubric'] as const
+
+export const isRubricDocType = (documentType: string) =>
+  (RUBRIC_DOC_TYPES as readonly string[]).includes(documentType)
 
 export interface UploadPlaybookPayload {
   file: File
@@ -42,6 +50,26 @@ export const playbookService = {
 
   async deletePlaybook(id: string): Promise<void> {
     await apiClient.delete(`/playbooks/${id}`)
+  },
+
+  /**
+   * Tải file Excel mẫu bộ tiêu chí. Đi qua apiClient (không mở tab thẳng URL) vì endpoint cần
+   * Authorization header — mở tab sẽ dính 401.
+   */
+  async downloadRubricTemplate(documentType: string): Promise<void> {
+    const { data } = await apiClient.get<Blob>('/playbooks/rubric-template', {
+      params: { type: documentType },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download =
+      documentType === 'cv_rubric' ? 'mau-tieu-chi-cham-cv.xlsx' : 'mau-tieu-chi-cham-phong-van.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   },
 }
 

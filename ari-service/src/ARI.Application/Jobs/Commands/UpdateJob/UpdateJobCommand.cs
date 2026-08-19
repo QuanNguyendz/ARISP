@@ -107,6 +107,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             job.RescheduleDeadlineHours = request.RescheduleDeadlineHours;
             job.InviteTokenTtlHours = request.InviteTokenTtlHours;
             job.ScoringRubric = request.ScoringRubric.HasValue ? request.ScoringRubric.Value.GetRawText() : null;
+            job.InterviewPassScore = Math.Clamp(request.InterviewPassScore, 0, 100);
             job.PersonaName = request.PersonaName;
             job.PersonaVoiceId = request.PersonaVoiceId;
             job.PersonaStyle = request.PersonaStyle;

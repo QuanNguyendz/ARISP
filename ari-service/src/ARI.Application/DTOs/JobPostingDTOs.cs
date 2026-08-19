@@ -25,6 +25,11 @@ namespace ARI.Application.DTOs
         public int InviteTokenTtlHours { get; set; } = 48;
         public List<RoundConfigDto> RoundConfigs { get; set; } = new();
         public JsonElement? ScoringRubric { get; set; } // JSON
+        /// <summary>
+        /// Điểm sàn để AI kết luận "đạt" ở buổi phỏng vấn (0–100, mặc định 70) — ADR-060. Chỉ có ý
+        /// nghĩa khi tin đã khai bộ tiêu chí chấm phỏng vấn; không khai thì verdict vẫn theo AI.
+        /// </summary>
+        public int InterviewPassScore { get; set; } = 70;
         public string? PersonaName { get; set; }
         public string? PersonaVoiceId { get; set; }
         public string? PersonaStyle { get; set; }
@@ -117,6 +122,11 @@ namespace ARI.Application.DTOs
         public bool IsUrgent { get; set; }
         public int? Vacancies { get; set; }
         public JsonElement? ScoringRubric { get; set; }
+        /// <summary>
+        /// Điểm sàn để AI kết luận "đạt" ở buổi phỏng vấn (0–100, mặc định 70) — ADR-060. Chỉ có ý
+        /// nghĩa khi tin đã khai bộ tiêu chí chấm phỏng vấn; không khai thì verdict vẫn theo AI.
+        /// </summary>
+        public int InterviewPassScore { get; set; } = 70;
 
         // ===== Phê duyệt của HR Leader =====
         public Guid? ApprovedByUserId { get; set; }
@@ -159,6 +169,7 @@ namespace ARI.Application.DTOs
                 IsUrgent = job.IsUrgent ?? false,
                 Vacancies = job.Vacancies,
                 ScoringRubric = !string.IsNullOrEmpty(job.ScoringRubric) ? JsonSerializer.Deserialize<JsonElement>(job.ScoringRubric, (JsonSerializerOptions?)null) : null,
+                InterviewPassScore = job.InterviewPassScore,
                 ApprovedByUserId = job.ApprovedByUserId,
                 ApprovedAt = job.ApprovedAt,
                 ApproverName = job.ApproverName,

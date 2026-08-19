@@ -18,6 +18,7 @@ công cụ truy hồi khác. Hàm này giữ chữ ký ổn định để các n
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass
 
 from app.config import get_settings
@@ -37,7 +38,12 @@ _PLAYBOOK_SCOPE_WEIGHT = {"org": 0.6, "company": 0.6, "job_posting": 1.0, "round
 @dataclass(frozen=True)
 class ScopeFilter:
     source_type: str
-    source_id: str | None = None  # None = mọi id của loại đó (vd toàn bộ playbook)
+    source_id: str | None = None  # None = mọi id của loại đó
+    # Chỉ dùng cho source_type="playbook": giới hạn theo PHẠM VI khai trong playbook_documents.
+    # Không có hai trường này thì "playbook" nghĩa là TOÀN BỘ playbook của hệ thống — đúng thứ đã
+    # khiến ngân hàng câu hỏi của tin này lọt vào buổi phỏng vấn của tin khác (ADR-025).
+    job_posting_id: str | None = None
+    round_number: int | None = None
 
 
 @dataclass
@@ -60,10 +66,23 @@ def _build_filter_clause(filters: list[ScopeFilter], start: int) -> tuple[str, l
     parts: list[str] = []
     params: list = []
     i = start
-    import uuid
 
     for f in filters:
-        if f.source_id is None:
+        if f.source_type == "playbook" and f.job_posting_id is not None:
+            # Phạm vi đọc từ playbook_documents chứ không từ metadata của chunk: bảng mới là nguồn
+            # sự thật (có deleted_at), metadata chỉ là bản sao lúc nạp — xoá tài liệu không sửa được
+            # bản sao đó. Nhờ vậy xoá playbook là hết ảnh hưởng NGAY, không cần nạp lại chunk.
+            parts.append(
+                f"(source_type = ${i} AND source_id IN ("
+                f"SELECT id FROM playbook_documents WHERE deleted_at IS NULL AND ("
+                f"scope = 'org' OR (scope_ref_id = ${i + 1} AND ("
+                f"scope = 'job_posting' OR (scope = 'round' AND round_number = ${i + 2}))))))"
+            )
+            params.append(f.source_type)
+            params.append(uuid.UUID(f.job_posting_id))
+            params.append(f.round_number if f.round_number is not None else -1)
+            i += 3
+        elif f.source_id is None:
             parts.append(f"(source_type = ${i})")
             params.append(f.source_type)
             i += 1

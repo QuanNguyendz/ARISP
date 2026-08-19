@@ -579,6 +579,11 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CriterionScores")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("criterion_scores");
+
                     b.Property<string>("CvHash")
                         .IsRequired()
                         .HasColumnType("text")
@@ -895,6 +900,14 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<string>("InterviewLink")
                         .HasColumnType("text")
                         .HasColumnName("interview_link");
+
+                    b.Property<string>("InviteEmailMessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("invite_email_message_id");
+
+                    b.Property<int?>("LastAutoReminderHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_auto_reminder_hours");
 
                     b.Property<bool>("Reminder1hSent")
                         .HasColumnType("boolean")
@@ -1228,6 +1241,10 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("interview_mode");
+
+                    b.Property<int>("InterviewPassScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("interview_pass_score");
 
                     b.Property<int>("InviteTokenTtlHours")
                         .HasColumnType("integer")
@@ -1692,6 +1709,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<int?>("RoundNumber")
                         .HasColumnType("integer")
                         .HasColumnName("round_number");
+
+                    b.Property<string>("RubricJson")
+                        .HasColumnType("text")
+                        .HasColumnName("rubric_json");
 
                     b.Property<string>("Scope")
                         .IsRequired()

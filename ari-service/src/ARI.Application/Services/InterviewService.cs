@@ -9,6 +9,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Options;
+using ARI.Application.Playbooks;
 using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using ARI.Domain.Constants;
@@ -543,7 +544,14 @@ namespace ARI.Application.Services
                 else if (targetSlot.RoundNumber != booking.RoundNumber)
                     error = "Không thể dời sang ca phỏng vấn thuộc vòng thi khác.";
                 else if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
-                    error = "Hồ sơ đã bị loại khỏi quy trình nên không thể xếp lịch lại.";
+                    error = string.Equals(booking.DeclinedBy, BookingDeclinedBy.System, StringComparison.OrdinalIgnoreCase)
+                        ? "Ứng viên không tham dự buổi phỏng vấn đã hẹn nên hồ sơ đã dừng lại — không xếp lịch lại được."
+                        : "Hồ sơ đã bị loại khỏi quy trình nên không thể xếp lịch lại.";
+                // Dời lịch là ĐẶC QUYỀN của người chủ động báo bận: họ đã phản hồi và nêu lý do nên
+                // nhân sự biết đường xếp ca khác. Người đang giữ chỗ mà chưa phản hồi thì chưa có gì
+                // để dời — nếu ca sai thì huỷ ca đó, đừng đẩy ứng viên đi chỗ khác sau lưng họ.
+                else if (!string.Equals(booking.DeclinedBy, BookingDeclinedBy.Candidate, StringComparison.OrdinalIgnoreCase))
+                    error = "Chỉ dời lịch được cho ứng viên đã báo bận (từ chối lịch kèm lý do).";
 
                 if (error != null) failed.Add(new RescheduleFailureDto { BookingId = id, Message = error });
                 else valid.Add(booking);
@@ -764,8 +772,11 @@ namespace ARI.Application.Services
                     : SlotCandidateState.DeclinedByCandidate;
             }
 
-            // Còn lại là "cancelled". Chỉ nhân sự loại hồ sơ mới ghi declined_by = staff; giá trị
-            // khác (hoặc null với dữ liệu quá cũ) rơi về nhánh huỷ chung chung.
+            // Còn lại là "cancelled": hệ thống đóng vì ứng viên không tham dự, nhân sự loại hồ sơ,
+            // hoặc dữ liệu quá cũ không rõ nguồn.
+            if (string.Equals(declinedBy, BookingDeclinedBy.System, StringComparison.OrdinalIgnoreCase))
+                return SlotCandidateState.NoShow;
+
             return string.Equals(declinedBy, BookingDeclinedBy.Staff, StringComparison.OrdinalIgnoreCase)
                 ? SlotCandidateState.RejectedByStaff
                 : SlotCandidateState.Cancelled;
@@ -901,6 +912,13 @@ namespace ARI.Application.Services
                 if (InterviewInviteEmail.IsOnlineTest(roundConfig.RoundType))
                     return Result.Failure<StartSessionResponse>("Vòng trắc nghiệm không có phỏng vấn thử.");
 
+                // Lỡ buổi phỏng vấn thật của vòng = trượt vòng đó. Chặn ở đây vì đây là nguồn sự thật:
+                // cờ ẩn nút chỉ là lớp giao diện, gọi thẳng API vẫn phải bị từ chối.
+                if (await SchedulingSupport.HasMissedRealInterviewAsync(
+                        _unitOfWork, application.Id, request.RoundNumber, ct))
+                    return Result.Failure<StartSessionResponse>(
+                        "Buổi phỏng vấn thật của vòng này đã qua giờ hẹn, bạn không còn lượt phỏng vấn thử.");
+
                 var maxAttempts = _interviewOptions.PracticeAttemptsPerRound;
                 if (maxAttempts > 0)
                 {
@@ -943,25 +961,25 @@ namespace ARI.Application.Services
             // Seed Must-Ask questions from Playbook into tracking if it's a real session
             if (request.SessionType == "real")
             {
-                var playbooks = await _unitOfWork.Repository<PlaybookDocument>()
-                    .FindAsync(p => p.Scope == "job_posting" && p.ScopeRefId == jobPosting.Id && p.DocumentType == "must_ask", ct);
-                
+                var playbooks = await PlaybookScope.MustAskDocumentsAsync(
+                    _unitOfWork, jobPosting.Id, session.RoundNumber, ct);
+
                 foreach (var playbook in playbooks)
                 {
-                    if (string.IsNullOrEmpty(playbook.ParsedText)) continue;
-                    
-                    var mustAskLines = playbook.ParsedText.Split(new[] { "\n", ";" }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var q in mustAskLines)
+                    // Must-ask CHẶN kết thúc phiên, nên mỗi dòng rác lọt vào đây là một câu AI buộc
+                    // phải hỏi ứng viên — việc tách câu nằm ở PlaybookScope để test được bằng bảng ca.
+                    foreach (var q in PlaybookScope.ParseMustAskLines(playbook.ParsedText))
                     {
                         var track = new MustAskTracking
                         {
                             SessionId = session.Id,
                             PlaybookDocumentId = playbook.Id,
-                            QuestionText = q.Trim()
+                            QuestionText = q
                         };
                         await _unitOfWork.Repository<MustAskTracking>().AddAsync(track, ct);
                     }
                 }
+
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
@@ -1031,11 +1049,36 @@ namespace ARI.Application.Services
                 .QueryAsync(q => q.Where(c => c.SourceType == "jd" && c.SourceId == jobPosting!.Id).Select(c => c.ChunkText), ct);
             ragContext.AddRange(jdChunks.Select(t => $"[JD Chunk] {t}"));
 
+            // Chủ đề CẤM hỏi (playbook loại compliance) — tách riêng khỏi ngữ cảnh tham khảo.
+            var prohibitedTopics = new List<string>();
+
             if (session.SessionType == "real")
             {
-                var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
-                    .QueryAsync(q => q.Where(c => c.SourceType == "playbook").Select(c => c.ChunkText), ct);
-                ragContext.AddRange(playbookChunks.Select(t => $"[Org Playbook] {t}"));
+                // CHỈ playbook thuộc phạm vi của tin + vòng này (ADR-025). Bản cũ lấy MỌI chunk
+                // playbook của hệ thống nên ngân hàng câu hỏi của vị trí khác lọt vào buổi phỏng vấn
+                // này, và tài liệu đã xoá vẫn tiếp tục có tiếng nói.
+                var eligibleIds = await PlaybookScope.EligibleDocumentIdsAsync(
+                    _unitOfWork, jobPosting!.Id, session.RoundNumber, ct);
+
+                if (eligibleIds.Count > 0)
+                {
+                    var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
+                        .QueryAsync(q => q.Where(c => c.SourceType == "playbook" && eligibleIds.Contains(c.SourceId))
+                            .Select(c => new { c.SourceId, c.ChunkText }), ct);
+
+                    // Loại tài liệu quyết định CÁCH dùng: compliance là ràng buộc cấm, không phải
+                    // tài liệu tham khảo — đưa nó vào ngữ cảnh chung là mời AI hỏi đúng câu bị cấm.
+                    var complianceIds = (await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(
+                            q => q.Where(p => eligibleIds.Contains(p.Id) && p.DocumentType == PlaybookScope.TypeCompliance)
+                                  .Select(p => p.Id), ct))
+                        .ToHashSet();
+
+                    foreach (var chunk in playbookChunks)
+                    {
+                        if (complianceIds.Contains(chunk.SourceId)) prohibitedTopics.Add(chunk.ChunkText);
+                        else ragContext.Add($"[Org Playbook] {chunk.ChunkText}");
+                    }
+                }
             }
 
             // 2. Select Next Question Strategy
@@ -1078,7 +1121,9 @@ namespace ARI.Application.Services
                 CandidateCv = application.CvText ?? "",
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
+                RoundNumber = session.RoundNumber,
                 PlaybookStyleGuides = ragContext.Where(r => r.StartsWith("[Org")).ToList(),
+                ProhibitedTopics = prohibitedTopics,
                 Language = session.InterviewLanguage,
                 ForceClosing = forceClosing
             };
@@ -1502,6 +1547,10 @@ namespace ARI.Application.Services
                 });
             }
 
+            // Bộ tiêu chí do doanh nghiệp khai (playbook interview_rubric) — vòng → tin → công ty.
+            var rubricCriteria = await PlaybookScope.ResolveRubricAsync(
+                _unitOfWork, jobPosting!.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric, ct);
+
             var evalCtx = new SessionContext
             {
                 SessionId = sessionId,
@@ -1510,6 +1559,7 @@ namespace ARI.Application.Services
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
                 ScoringRubric = jobPosting.ScoringRubric ?? "{}",
+                Criteria = rubricCriteria,
                 Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage,
                 // Báo cáo viết bằng ngôn ngữ ứng viên đang dùng trên web (ADR-051).
                 ReportLanguage = session.ReportLanguage ?? session.InterviewLanguage ?? "vi"
@@ -1517,6 +1567,35 @@ namespace ARI.Application.Services
 
             // Call AI provider to generate Verdict, Score, Reasoning, etc.
             var evalReport = await _aiProvider.GenerateEvaluationAsync(evalCtx, ct);
+
+            // ĐIỂM CUỐI DO BACKEND CỘNG, không lấy con số model tự đưa ra (ADR-060). Trước đây model
+            // vừa tự chọn tiêu chí trong một danh sách viết cứng, vừa tự cho điểm tổng — con số ấy
+            // không phải trung bình có trọng số của gì cả, nên "chấm theo tiêu chí" chỉ là hình thức.
+            var aiScores = ScoringRubricSupport.ParseScores(evalReport.CriterionScoresJson);
+            var overallScore = evalReport.Score;
+            var criterionScoresJson = evalReport.CriterionScoresJson;
+            var verdict = evalReport.Verdict;
+
+            if (rubricCriteria.Count > 0)
+            {
+                var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
+                if (computed.HasValue)
+                {
+                    overallScore = computed.Value;
+                    // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm
+                    // báo cáo cũ mất khả năng giải thích điểm của nó ra từ đâu.
+                    criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
+                    verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
+                }
+                else
+                {
+                    // Có rubric mà AI không chấm nổi tiêu chí nào → giữ nguyên kết quả của AI và ghi log,
+                    // KHÔNG âm thầm cho 0 điểm (thiếu dữ liệu không phải là điểm kém).
+                    _logger?.LogWarning(
+                        "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng AI không trả điểm tiêu chí nào — giữ điểm của AI.",
+                        sessionId, rubricCriteria.Count);
+                }
+            }
             
             // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
             // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
@@ -1554,9 +1633,9 @@ namespace ARI.Application.Services
                 ApplicationId = application.Id,
                 RoundNumber = session.RoundNumber,
                 SessionType = session.SessionType,
-                AiVerdict = evalReport.Verdict,
-                OverallScore = evalReport.Score,
-                CriterionScores = evalReport.CriterionScoresJson,
+                AiVerdict = verdict,
+                OverallScore = overallScore,
+                CriterionScores = criterionScoresJson,
                 Reasoning = evalReport.Reasoning,
                 RecommendedNextStep = evalReport.RecommendedNextStep,
                 QuestionAnalyses = evalReport.QuestionAnalysesJson,

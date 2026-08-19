@@ -164,6 +164,14 @@ namespace ARI.Application.CandidatePortal
                         // Vòng trắc nghiệm không hỗ trợ phỏng vấn thử — không hiện lối vào ngay từ đầu.
                         roundTypeByJobRound.TryGetValue((a.JobPostingId, activeRound), out var activeRoundType);
                         bool onlineTestRound = ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(activeRoundType);
+                        // Đã LỠ buổi thật của vòng (lịch còn hiệu lực nhưng qua giờ, không có phiên thật)
+                        // → coi như trượt vòng đó, phỏng vấn thử không còn nghĩa gì nữa.
+                        bool missedActiveRound = bookings.Any(b => b.ApplicationId == a.Id
+                            && slotById.ContainsKey(b.AvailabilitySlotId)
+                            && slotById[b.AvailabilitySlotId].RoundNumber == activeRound
+                            && slotById[b.AvailabilitySlotId].EndTime <= nowUtc
+                            && !allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real"
+                                && s.RoundNumber == activeRound));
 
                         // Số vòng THẬT đã được HR xác nhận Đạt — dựng nhãn "Qua vòng N/M" (ADR-053).
                         var totalRounds = roundConfigCounts.TryGetValue(a.JobPostingId, out var tr) ? tr : 1;
@@ -257,7 +265,8 @@ namespace ARI.Application.CandidatePortal
                             a.PracticeSessionUsed,
                             // ADR-038: phỏng vấn thử mở cho ứng viên ĐÃ QUA vòng CV, tính theo TỪNG VÒNG
                             // (1 lượt/vòng) — vòng kế mở lại thử khi được mời lên vòng đó.
-                            PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound && !realDoneForRound && !onlineTestRound,
+                            PracticeAvailable = PortalSupport.PracticeEligible(a.Status) && !practiceUsedForRound
+                                && !realDoneForRound && !onlineTestRound && !missedActiveRound,
                             ActiveRound = activeRound,
                             TotalRounds = totalRounds,
                             PassedRounds = passedRounds,

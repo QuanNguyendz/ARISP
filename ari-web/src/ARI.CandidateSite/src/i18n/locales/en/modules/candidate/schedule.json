@@ -70,12 +70,13 @@
     "confirmTitle": "Confirm attendance?",
     "declineTitle": "Decline / Request reschedule?",
     "confirmSummary": "{{jobTitle}} · Round {{round}} — {{day}}, {{time}}",
-    "declineReasonLabel": "Reason you cannot attend (HR will schedule another time):",
-    "declineReasonPlaceholder": "Example: Conflict with school exam, busy at work...",
+    "declineReasonLabel": "Why you cannot attend:",
+    "declineReasonPlaceholder": "e.g. I have an exam on Aug 20. I am free on the morning of Aug 22 or the afternoon of Aug 23.",
     "warning": "Are you sure about your decision? After clicking, you will not be able to modify this choice.",
     "warningDecline": " HR will arrange another time slot based on your reason.",
     "laterButton": "Later",
     "confirmButton": "I'm sure — Confirm",
-    "declineButton": "I'm sure — Decline"
+    "declineButton": "I'm sure — Decline",
+    "declineReasonHint": "Please state <b>the time slots you can attend</b> so HR can arrange another one — or say clearly if you <b>no longer wish to continue</b>."
   }
 }

@@ -29,6 +29,13 @@ namespace ARI.Domain.Entities
         public int OnlineTestQuestionsPerTest { get; set; } = 20;
         /// <summary>Thời lượng làm bài (phút). Mặc định 30.</summary>
         public int OnlineTestDurationMinutes { get; set; } = 30;
+
+        /// <summary>
+        /// Điểm sàn (%) để AI kết luận ĐẠT một vòng phỏng vấn. Mặc định 70 — cùng mô hình với
+        /// <see cref="OnlineTestPassScore"/>. Verdict suy từ điểm (ADR-060) chứ không để LLM tự phán;
+        /// HR vẫn Override được (ADR-053).
+        /// </summary>
+        public int InterviewPassScore { get; set; } = 70;
         public string? PersonaName { get; set; }
         public string? PersonaVoiceId { get; set; }
         public string? PersonaStyle { get; set; }

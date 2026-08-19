@@ -28,6 +28,18 @@ public sealed class RecordingNotificationService : INotificationService
         Emails.Add((toEmail, subject, content));
         return Task.CompletedTask;
     }
+    public Task<string?> SendThreadedEmailAsync(
+        string toEmail, string subject, string content, string? inReplyToMessageId = null,
+        CancellationToken ct = default)
+    {
+        Emails.Add((toEmail, subject, content));
+        InReplyTo.Add(inReplyToMessageId);
+        return Task.FromResult<string?>($"<test-{Emails.Count}@arisp>");
+    }
+
+    /// <summary>Thư thứ i trả lời vào Message-Id nào (null = thư mới) — để assert nhắc lịch bám luồng.</summary>
+    public List<string?> InReplyTo { get; } = new();
+
     public Task SendSlackNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
     public Task SendTeamsNotificationAsync(string message, CancellationToken ct = default) => Task.CompletedTask;
     public Task PublishInterviewSessionEventAsync(Guid sessionId, string eventType, object payload, CancellationToken ct = default)

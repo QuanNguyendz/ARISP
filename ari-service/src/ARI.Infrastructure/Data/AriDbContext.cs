@@ -108,6 +108,12 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<JobPosting>()
                 .Property(j => j.ScoringRubric)
                 .HasColumnType("jsonb");
+            modelBuilder.Entity<JobPosting>()
+                .Property(j => j.InterviewPassScore).HasColumnName("interview_pass_score");
+            modelBuilder.Entity<PlaybookDocument>()
+                .Property(p => p.RubricJson).HasColumnName("rubric_json");
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.CriterionScores).HasColumnName("criterion_scores").HasColumnType("jsonb");
 
             modelBuilder.Entity<ARI.Domain.Entities.Application>()
                 .Property(a => a.DemographicData)
@@ -181,6 +187,10 @@ namespace ARI.Infrastructure.Data
                 .Property(b => b.Reminder1hSent).HasColumnName("reminder_1h_sent");
             modelBuilder.Entity<InterviewBooking>()
                 .Property(b => b.Reminder24hSent).HasColumnName("reminder_24h_sent");
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.InviteEmailMessageId).HasColumnName("invite_email_message_id");
+            modelBuilder.Entity<InterviewBooking>()
+                .Property(b => b.LastAutoReminderHours).HasColumnName("last_auto_reminder_hours");
 
             modelBuilder.Entity<MustAskTracking>()
                 .ToTable("must_ask_tracking");

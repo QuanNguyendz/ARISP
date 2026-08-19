@@ -102,6 +102,22 @@ namespace ARI.Infrastructure.Services
             }
         }
 
+        public async Task<string?> SendThreadedEmailAsync(
+            string toEmail, string subject, string content, string? inReplyToMessageId = null,
+            CancellationToken ct = default)
+        {
+            Console.WriteLine($"[EMAIL] Sending threaded email to: {toEmail} | Subject: {subject}");
+            try
+            {
+                return await _emailService.SendThreadedEmailAsync(toEmail, subject, content, inReplyToMessageId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL ERROR] Failed to send email via SMTP: {ex.Message}");
+                return null;
+            }
+        }
+
         public Task SendSlackNotificationAsync(string message, CancellationToken ct = default)
         {
             Console.WriteLine($"[SLACK] Msg: {message}");

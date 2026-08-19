@@ -223,32 +223,44 @@ public interface IEmbeddingProvider
 - **Report:** Fairness Report per Job Posting (cho SuperAdmin và HR Admin).
 - **Privacy:** Demographic data phải được Candidate đồng ý cung cấp (opt-in) và được mã hóa.
 
-### ADR-025: Interview Playbook – Org Knowledge Base
-- **Quyết định:** HR Admin upload tài liệu phỏng vấn nội bộ theo 3 cấp scope: Company / Job Posting / Round. Tài liệu được chunk, embed vào pgvector và retrieve trong RAG pipeline để AI phỏng vấn đúng phong cách + nội dung mong muốn của doanh nghiệp.
-- **Document types hỗ trợ:**
+### ADR-025: Interview Playbook – kho tri thức phỏng vấn nội bộ
+- **Quyết định:** HR upload tài liệu phỏng vấn nội bộ theo 3 cấp scope, hệ thống chunk+embed vào pgvector và truy hồi trong RAG khi phỏng vấn **thật** (buổi thử chỉ JD+CV — ADR-015/038/050).
+- **Loại tài liệu (khoá đúng như code — `PlaybooksPage.tsx` và `PlaybookScope`):**
 
-  | Type key | Mô tả | Scope |
+  | Type key | Mô tả | Cách hệ thống dùng |
   |---|---|---|
-  | `interview_style_guide` | Phong cách, tone, approach phỏng vấn | Company |
-  | `competency_framework` | Ma trận kỹ năng theo level | Company |
-  | `culture_values` | Văn hóa, giá trị cốt lõi, culture fit indicators | Company |
-  | `compliance_guide` | Câu hỏi không được hỏi (pháp lý) | Company |
-  | `red_flag_guide` | Dấu hiệu cần probe sâu hoặc loại bỏ | Company |
-  | `question_bank` | Ngân hàng câu hỏi gợi ý per vị trí | Job Posting |
-  | `technical_scenarios` | Bài toán / case study cụ thể | Job Posting |
-  | `expected_answers` | Hướng dẫn câu trả lời tốt cần đề cập | Job Posting |
-  | `must_ask` | Câu hỏi bắt buộc phải hỏi trước khi kết thúc | Job Posting |
-  | `round_playbook` | Playbook cụ thể per Round | Round |
-  | `past_transcripts` | Transcript phỏng vấn ẩn danh (AI học từ mẫu thành công) | Company / Job Posting |
+  | `style_guide` | Phong cách, tone phỏng vấn | Ngữ cảnh truy hồi |
+  | `competency_framework` | Ma trận kỹ năng theo cấp bậc | Ngữ cảnh truy hồi |
+  | `culture_guide` | Văn hoá, giá trị cốt lõi | Ngữ cảnh truy hồi |
+  | `compliance` | Chủ đề **CẤM hỏi** (pháp lý) | **Ràng buộc cấm** trong system prompt |
+  | `red_flag` | Dấu hiệu cần đào sâu | Khối "warning signs" riêng |
+  | `question_bank` | Ngân hàng câu hỏi gợi ý | Ngữ cảnh truy hồi |
+  | `technical_scenario` | Bài toán / case study | Ngữ cảnh truy hồi |
+  | `expected_answer` | Hướng dẫn câu trả lời tốt | Khối riêng, **cấm đọc cho ứng viên nghe** |
+  | `must_ask` | Câu hỏi bắt buộc | `MustAskTracking` — chặn kết thúc phiên |
+  | `round_playbook` | Playbook riêng cho một vòng | Ngữ cảnh truy hồi |
 
-- **Format upload:** PDF, DOCX, TXT, Markdown, JSON (question bank format).
-- **RAG weighting khi retrieve:**
-  - JD + CV: weight cao (candidate-specific)
-  - Company Playbook (style, compliance, values): weight trung bình (brand consistency)
-  - Job Posting Playbook (question_bank, scenarios, must_ask): weight cao (content accuracy)
-  - Round Playbook: weight cao (phù hợp vòng hiện tại)
-- **Must-ask enforcement:** `PlaybookService` track danh sách `must_ask` questions đã hỏi. `InterviewService` nhận signal "còn câu bắt buộc chưa hỏi" trước khi trigger điều kiện dừng.
-- **Ràng buộc:** Không lọt dữ liệu tài liệu phỏng vấn ra ngoài hệ thống.
+  Loại chưa khai báo → coi như ngữ cảnh thường (không im lặng bỏ qua).
+
+#### Phạm vi: ai được nói vào buổi phỏng vấn nào
+
+> Một tài liệu áp dụng cho (tin, vòng) khi:
+> `deleted_at IS NULL AND (scope='org' OR (scope_ref_id = tin AND (scope='job_posting' OR (scope='round' AND round_number = vòng))))`
+
+`org` áp cho **mọi** tin (phong cách/văn hoá/compliance của doanh nghiệp — hợp mô hình single-tenant); `job_posting` và `round` chỉ áp cho đúng tin, `round` thêm điều kiện đúng vòng.
+
+**Nguồn sự thật là bảng `playbook_documents`, KHÔNG phải metadata của chunk.** Metadata chỉ là bản sao lúc nạp: xoá tài liệu không sửa được nó, nên lọc theo metadata sẽ để tài liệu đã xoá tiếp tục có tiếng nói. rag-service lọc bằng subquery `source_id IN (SELECT id FROM playbook_documents WHERE …)` (dùng index `idx_playbook_documents_scope`); .NET dùng cùng vị từ qua `PlaybookScope.EligibleDocumentIdsAsync`. `DeletedAt == null` viết **tường minh** dù EF đã có global query filter — đây là luật nghiệp vụ, không nên phụ thuộc cấu hình ở tầng khác, và nhờ vậy test được bằng kho in-memory.
+
+**Trước khi có luật này** (phát hiện 2026-08-18) cả hai đường đều lấy TOÀN BỘ chunk playbook của hệ thống: `graph.py` lọc `ScopeFilter("playbook", None)`, còn `InterviewService` tự nạp mọi chunk rồi nhồi vào `PlaybookStyleGuides` gửi kèm — nên sửa mỗi rag-service là chưa đủ. Hệ quả: ngân hàng câu hỏi của vị trí này lọt vào buổi phỏng vấn vị trí khác, scope `round` vô nghĩa (không chỗ nào lọc theo vòng), và playbook đã xoá vẫn điều khiển AI vì `DeletePlaybookCommand` chỉ set `DeletedAt`.
+
+#### Xoá là hết ảnh hưởng
+`DeletePlaybookCommand` gỡ chunk **trước**, soft-delete sau; gỡ lỗi → `Result.Failure` và **không** xoá mềm (thà để tài liệu còn hiện cho nhân sự bấm lại, còn hơn một playbook vô hình vẫn nói vào tai AI). Gỡ chunk dùng lại `IngestAsync(text: "")` — rag-service đã có sẵn nhánh "text rỗng + replaceExisting → DELETE chunk cũ", không đẻ endpoint xoá riêng. File trong storage vẫn giữ (bản ghi chỉ soft-delete, khôi phục được bằng `ParsedText`).
+
+#### Trọng số truy hồi (hybrid RRF)
+Sau khi đã lọc đúng phạm vi, trọng số chỉ còn việc **xếp hạng**: JD/CV 1.0, playbook `org` 0.6, `job_posting`/`round` 1.0.
+
+#### Must-ask
+Chỉ phiên `real`. Nạp tài liệu `must_ask` của **cả** scope `job_posting` lẫn `round` đúng vòng (bản cũ chỉ đọc `job_posting` nên must-ask khai theo vòng mất trắng); cố ý **không** lấy scope `org` — câu bắt buộc là chuyện của từng vị trí. `PlaybookScope.ParseMustAskLines` tách **mỗi dòng một câu**, bỏ tiêu đề markdown/đường kẻ/dòng < 8 ký tự, gỡ bullet, khử trùng lặp; **không** tách theo `;` nữa (dấu chấm phẩy giữa câu là bình thường). Quan trọng vì must-ask **chặn điều kiện kết thúc phiên**: mỗi dòng rác lọt vào là một câu AI buộc phải hỏi ứng viên.
 
 ### ADR-026: Job Board (IT-focused)
 - **Quyết định:** Tích hợp Job Board IT vào nền tảng ARISP. Ứng viên tạo tài khoản, tìm kiếm và tự ứng tuyển.
@@ -909,7 +921,9 @@ public interface IEmbeddingProvider
 
 3. **Địa điểm phỏng vấn là `SystemSetting`, không phải cột mới.** Ba khoá `interview_location_address` / `_directions` / `_map_url` trên bảng khoá-giá trị sẵn có (single-tenant: một doanh nghiệp, một văn phòng) → **không migration, không schema**. Super Admin nhập một lần ở tab "Phỏng vấn" trong Cấu hình hệ thống. **Chưa cấu hình thì bỏ hẳn dòng địa điểm** thay vì in chuỗi rỗng: thư mời thiếu địa chỉ còn hơn thư mời chỉ đường sai. Không dùng `job.Location` (thường chỉ ghi "Hà Nội") và không nhập tay mỗi lần gán lịch (lặp lại + dễ gõ sai).
 
-4. **Vòng trắc nghiệm không có phỏng vấn thử** — chặn ở **ba tầng** vì mỗi tầng là một cửa vào khác nhau: `PortalApplicationsFeature` (cờ `PracticeAvailable` → nút không hiện), `CheckPracticeEligibilityAsync` (endpoint kiểm điều kiện), và `StartSessionAsync` (**nguồn sự thật** — chặn cả khi gọi thẳng API). Lý do nghiệp vụ: buổi thử là hội thoại với AI (STT/RAG/TTS), không có gì để "thử" với một bài chọn đáp án, và cho thử sẽ **lộ chính ngân hàng đề**.
+4. **Hai trường hợp KHÔNG mở phỏng vấn thử**, chặn ở **ba tầng** vì mỗi tầng là một cửa vào khác nhau: `PortalApplicationsFeature` (cờ `PracticeAvailable` → nút không hiện), `CheckPracticeEligibilityAsync` (endpoint kiểm điều kiện), và `StartSessionAsync` (**nguồn sự thật** — chặn cả khi gọi thẳng API).
+   - **Vòng trắc nghiệm**: buổi thử là hội thoại với AI (STT/RAG/TTS), không có gì để "thử" với một bài chọn đáp án, và cho thử sẽ **lộ chính ngân hàng đề**.
+   - **Vòng đã lỡ buổi thật** (`SchedulingSupport.HasMissedRealInterviewAsync`: còn booking `scheduled` đã qua giờ mà không có phiên `real` nào của vòng): lỡ buổi rồi thì thử không còn nghĩa gì — thử là để chuẩn bị cho buổi thật, mà buổi thật đã trôi qua. **Báo bận / hệ thống huỷ vì quá hạn xác nhận KHÔNG tính là lỡ**: booking đó đã trả chỗ và nhân sự sẽ xếp ca khác (ADR-048/058), chặn thử ở đó là phạt nhầm người.
 
 5. **Không rời bản nháp khi ngân hàng đề chưa đủ.** `ValidateOnlineTestBankAsync` chặn ở **cả hai** cổng `draft → pending` và `draft → active` — chỉ chặn cổng gửi duyệt thì HR Leader publish thẳng từ nháp là lách được. Ngưỡng là `OnlineTestQuestionsPerTest` chứ không phải "có ít nhất 1 câu": mỗi lượt thi bốc N câu ngẫu nhiên, ngân hàng ít hơn N thì đề không dựng đúng cấu hình được. Thông báo lỗi nói rõ đang có bao nhiêu câu, cần bao nhiêu, và sửa ở đâu. Hai màn duyệt tin của HR trước đây **nuốt thông báo của server** (`t('errors.approveJob')` đổ đồng) nên nay ưu tiên `response.data.message`.
 
@@ -923,6 +937,63 @@ public interface IEmbeddingProvider
 
 10. **Dọn namespace i18n mồ côi — và phát hiện màn Phỏng vấn đã mất i18n.** Đối chiếu toàn bộ namespace đăng ký với namespace thực sự được `useTranslation` gọi (toàn StaffSite **không có lời gọi động nào**, nên phép đếm là chắc chắn) ra **5 namespace mồ côi**, chia hai nhóm khác hẳn nhau. Nhóm chết thật — xoá: `recruiter/interviewCode` (trang dùng nó bị ADR-058 xoá), `recruiter/candidates` và `recruiter/evaluations` (hai màn Recruiter vốn dùng chung namespace `hr/*`). Nhóm còn lại phơi ra một **regression của chính ADR-058**: gộp hai trang Phỏng vấn thành `components/interviews/*` nhưng **đánh rơi toàn bộ tầng i18n** — 87 chuỗi tiếng Việt viết cứng, kể cả tiêu đề màn trong `workspaceConfig.ts` — trong khi StaffSite có `LanguageSwitcher` ở cả hai layout, tức chọn EN thì màn này vẫn ra tiếng Việt. Hai namespace cũ (`hr/interviewSessions`, `recruiter/interviews`) hoá ra thuộc **màn khác** (danh sách phiên AI với tab all/active/completed) nên hầu như không tái dùng được. Nay dựng namespace **`modules/staff/interviews`** dùng chung cho cả hai khu vực (**125 khoá**, VI + EN) và nối vào 5 component. Hai module thuần không gọi được hook dịch (`workspaceConfig.ts`, `candidateState.ts`) nay giữ **khoá i18n** thay vì chuỗi (`titleKey`, `labelKey`, `declineReasonLabelKey`) — component nhận khoá rồi tự dịch. Kiểm bằng script: 0 khoá thiếu ở cả hai ngôn ngữ, 0 khoá thừa, 0 chuỗi hiển thị còn viết cứng, **0 namespace mồ côi còn lại**. Và vì lỗi này **im lặng** (màn vẫn chạy, chỉ là chọn EN vẫn ra tiếng Việt), dấu vết duy nhất lần ra được — namespace bỗng không còn ai dùng — nay thành **cổng CI** (`ari-web/scripts/check-i18n-namespaces.mjs`, chạy trong job Frontend). Cổng chỉ kiểm ở mức **namespace**, cố ý không kiểm từng khoá: khoá dựng động ở nhiều nơi hợp lệ (`t(state.labelKey)`, `` t(`integrations.descriptions.${k}`) ``) nên kiểm khoá sẽ đẻ báo động giả — một cổng hay báo sai còn tệ hơn không có cổng. Đã thử nghiệm ngược: cắm một namespace mồ côi giả vào thì CI đỏ đúng chỗ.
 
-**Kiểm chứng.** 14 test mới (7 cho luồng duyệt-kèm-ca gồm ca đầy/quá khứ/sai tin/sai vòng, 5 cho cổng ngân hàng đề, 2 cho phỏng vấn thử ở vòng trắc nghiệm) → **819/819 pass** (đã xoá 6 test của endpoint `send-invite` không còn tồn tại); build backend + typecheck + build cả hai site FE pass.
+11. **Phớt lờ thư mời ≠ báo bận: tách hai đường đi hẳn.** Cơ chế cũ (`ScheduleConfirmationHostedService`) quá hạn xác nhận 48h là **tự huỷ lịch rồi trả chỗ cho nhân sự xếp lại** — tức đối xử với người im lặng y hệt người chủ động báo bận, và người im lặng còn được giữ chỗ tới tận ngày hẹn của ca mới. Nay:
+   - **Dời lịch là ĐẶC QUYỀN của người báo bận** (`DeclinedBy = candidate`). Chặn ở server (`RescheduleBookingsAsync`) và ẩn nút ở giao diện (`canReschedule`). Kéo theo: nhánh trả chỗ ca cũ trong luồng dời lịch **không còn cơ hội chạy** (booking đã báo bận thì chỗ trả từ trước) — giữ lại làm lưới an toàn nếu luật nới ra, đã ghi rõ trong test.
+   - **Nhắc trước, trượt sau** (`InterviewScheduleFollowUpHostedService`): nhắc tại các mốc `Scheduling:ReminderHoursBeforeSlot` (mặc định **24h rồi 3h** trước giờ hẹn) qua **chuông trong Portal + email**; quá giờ hẹn cộng `NoShowGraceHours` (mặc định **2h**) mà không có phiên phỏng vấn THẬT nào → hồ sơ `not_pass`, booking `cancelled` + `declined_by = system`, trả chỗ, báo ứng viên + nhóm `hr_admin`.
+   - **Thư nhắc bám ĐÚNG luồng thư mời**, không đẻ thư mới: `IEmailService.SendThreadedEmailAsync` set `In-Reply-To` + `References` (cần cả hai — Gmail gộp theo `References`, client khác đọc `In-Reply-To`) và trả về `Message-Id` để `AssignSlotCommandHandler` lưu vào cột mới `interview_bookings.invite_email_message_id`. Cột `last_auto_reminder_hours` giữ mốc nhắc gần nhất nên worker quét 30 phút/lần không nhắc lặp; cố ý **tách khỏi** `reminder_24h_sent` vì cờ đó là nút "Nhắc lịch" bấm tay của nhân sự. Migration `AddBookingReminderThreading`: 2 cột nullable, `Down()` đối xứng.
+   - Trạng thái mới `SlotCandidateState.NoShow` để giao diện phân biệt "không tham dự" với "bị nhân sự loại" — hai thứ trước đây cùng rơi vào `cancelled`. Ô lý do từ chối của ứng viên nay gợi ý thẳng cách viết cho có ích: **ghi khung giờ tham dự được, hoặc nói rõ không tiếp tục nữa**. Banner "quá hạn" phía ứng viên bỏ câu hứa "sẽ được xếp lịch lại".
+
+**Kiểm chứng.** 17 test mới (7 cho luồng duyệt-kèm-ca gồm ca đầy/quá khứ/sai tin/sai vòng, 5 cho cổng ngân hàng đề, 2 cho phỏng vấn thử ở vòng trắc nghiệm, 3 cho phỏng vấn thử sau khi lỡ buổi) → **825/825 pass** (đã xoá 6 test của endpoint `send-invite` không còn tồn tại; 9 test dời lịch cũ được viết lại theo luật mới); build backend + typecheck + build cả hai site FE pass.
 
 **Chấp nhận đánh đổi.** (a) Duyệt hàng loạt nay dùng **một ca chung** cho cả nhóm và chạy **tuần tự** — sức chứa là tài nguyên tranh chấp, chạy song song thì các lỗi "hết chỗ" trả về cùng lúc không biết ai đã vào được; giao diện cảnh báo trước khi số ứng viên vượt số chỗ còn lại và báo rõ hồ sơ nào chưa xong. (b) Nhân sự **buộc phải mở khung giờ trước khi duyệt** — thêm một bước, nhưng đúng bằng cái giá của việc không bao giờ để ứng viên chờ một thư không tồn tại. (c) Endpoint `POST /applications/{id}/send-invite` (nút "Mời"/"Gửi lời mời" trên các màn chi tiết ứng viên) **vẫn gửi thư không kèm lịch** — giữ nguyên vì đó là đường riêng cho ứng viên đã qua CV, nhưng nó là chỗ duy nhất còn lại có thể sinh ra thư mời không giờ hẹn.
+
+---
+
+### ADR-060: Chấm điểm theo bộ tiêu chí của doanh nghiệp — AI chấm từng tiêu chí, backend cộng điểm
+
+- **Ngày:** 2026-08-19
+- **Trạng thái:** Đã triển khai
+- **Bối cảnh:** Yêu cầu là điểm CV–JD và điểm phỏng vấn phải chấm **theo tiêu chí công ty cấu hình**, các tiêu chí cộng lại đúng 100, và điểm cuối suy ra từ đó. Rà lại thì "chấm theo tiêu chí" đang là **hình thức ở cả ba tầng**:
+
+  | Chỗ | Hiện trạng trước |
+  |---|---|
+  | `JobPosting.ScoringRubric` | Có cột trong DB nhưng **không màn nào nhập** → luôn rỗng |
+  | Prompt chấm CV (Gemini) | Rỗng thì rơi về câu **viết cứng** *"Kinh nghiệm 40%, Kỹ năng 40%, Học vấn 20%"* |
+  | Prompt chấm phỏng vấn (rag-service) | **Ép cứng 8 khoá tiếng Anh** (`technical, communication, problem_solving…`) rồi hỏi luôn `score` tổng |
+
+  Con số `score` model trả về **không phải trung bình có trọng số của gì cả** — nó là một ước lượng rời rạc với `criterion_scores` nằm ngay bên cạnh. Doanh nghiệp khai rubric kiểu gì cũng vậy.
+
+- **Quyết định.**
+
+  1. **AI chỉ chấm TỪNG tiêu chí; điểm tổng do backend cộng.** `ScoringRubric.ComputeOverall` tính trung bình có trọng số rồi so với ngưỡng cấu hình để ra verdict. Prompt nói thẳng *"Do NOT compute an overall score yourself"*. Đây là ranh giới cốt lõi: **phán đoán định tính giao cho model, số học giữ ở backend** — số học là chỗ duy nhất kiểm chứng được bằng tay.
+
+  2. **Rubric khai bằng file Excel theo mẫu**, là một **loại tài liệu playbook** (`cv_rubric` / `interview_rubric`) chứ không phải một màn cấu hình riêng — dùng lại nguyên phạm vi org/tin/vòng + xoá mềm của ADR-025 và khuôn "tải mẫu → điền → upload → báo lỗi theo dòng" của ADR-049. Layout: `A` mã tiêu chí, `B` tên hiển thị, `C` trọng số (%), `D` chuẩn chấm. Chấp nhận `40`, `40%`, `40,5`.
+
+  3. **Tổng trọng số ≠ 100 bị chặn ngay tại cổng upload**, kèm thông báo nói rõ đang là bao nhiêu. Sai ở đây mà lọt xuống thì mọi điểm về sau đều sai **mà không ai biết** — không có tín hiệu nào để phát hiện.
+
+  4. **Tách bộ chấm CV và bộ chấm phỏng vấn**, phỏng vấn khai được theo từng vòng. Chọn theo thứ tự **vòng → tin → công ty** (`PlaybookScope.ResolveRubricAsync`).
+
+  5. **Giữ Gemini chấm CV** (ADR-030) nhưng nhồi thêm rubric + ngữ cảnh playbook truy hồi; `matchScore` cuối vẫn do backend cộng.
+
+  6. **Chưa khai rubric → giữ nguyên hành vi cũ.** Không rubric thì điểm và verdict của AI đi thẳng như trước. Tính năng này không được làm hỏng những tin chưa kịp cấu hình.
+
+- **Vì sao chụp ảnh nhãn + trọng số thay vì tham chiếu rubric sống.** Điểm lưu dạng `{"technical":{"score":88,"label":"Chuyên môn","weight":40}}` chứ không phải `{"technical":88}` + trỏ tới `playbook_documents`. Rubric là **tài liệu sống**: HR sửa trọng số hoặc xoá bộ cũ là chuyện thường. Nếu chỉ giữ khoá, một bản đánh giá 3 tháng trước sẽ hiện điểm 74 **cạnh bộ trọng số hiện tại** — không giải thích ra được 74 từ đâu, và không cách nào phát hiện là nó đã lệch. Ảnh chụp làm bản đánh giá **tự giải thích được vĩnh viễn**, đổi lại một ít dữ liệu lặp.
+
+- **Vì sao tiêu chí AI không chấm bị loại khỏi CẢ tử lẫn mẫu** (không tính 0 điểm). Model bỏ sót một tiêu chí là lỗi của model, không phải bằng chứng ứng viên kém ở đó. Tính 0 sẽ **đánh trượt oan** — với rubric 60/40, thiếu một mục kéo 90 điểm xuống 54. Nếu AI không chấm nổi tiêu chí nào, backend **giữ nguyên điểm của AI + ghi log cảnh báo**, không âm thầm cho 0.
+
+- **Hệ quả / cạm bẫy đã gặp.**
+  - **Hai chỗ đọc điểm tiêu chí suýt vỡ im lặng.** `PortalSupport.ParseCriterionScores` và `EvaluationDtos.FromEntity` đang `Deserialize<Dictionary<string, decimal>>` — dạng snapshot mới làm chúng **ném lỗi rồi trả rỗng**, tức ứng viên và HR mất sạch bảng điểm mà không có dấu hiệu gì. Nay cả hai đi qua `ScoringRubricSupport.ParseForDisplay`, đọc được **cả dạng phẳng cũ lẫn dạng snapshot mới**.
+  - **File mẫu tự sinh mà chính bộ đọc của mình không đọc nổi.** `BuildTemplate` ghi cell **thiếu `CellReference`**; Excel tự suy được nên mở bằng Excel vẫn đúng, nhưng `ReadRows` định vị cột **bằng** `CellReference` → đọc ra bảng rỗng. Test round-trip (dựng mẫu → đọc lại → validate) bắt được; test dùng file `.xlsx` ghi bằng `SharedString` — **khác đường ghi của mẫu** — để bộ đọc phải xử lý cả hai kiểu Excel thật.
+  - `InterviewService._logger` là nullable và toàn file dùng `_logger?.`; dòng log mới lỡ dùng `_logger.` → `ArgumentNullException` đúng vào nhánh "AI không chấm nổi tiêu chí nào".
+  - Migration `AddScoringRubricSupport` EF sinh ra hai default **nguy hiểm**: `interview_pass_score` mặc định `0` (mọi buổi phỏng vấn thành "đạt") và `criterion_scores` mặc định `""` (không hợp lệ với `jsonb`). Sửa tay thành `70` và `"{}"`.
+  - Khoá tiêu chí bắt buộc snake_case ≥ 2 ký tự, tối đa 20 tiêu chí; khoá model bịa thêm ngoài rubric bị **loại khỏi cả điểm lẫn ảnh chụp**.
+
+- **Thay đổi kèm theo.**
+  - Cột mới: `playbook_documents.rubric_json`, `job_postings.interview_pass_score` (mặc định 70), `cv_jd_analyses.criterion_scores` (jsonb, mặc định `{}`).
+  - `GET /api/playbooks/rubric-template?type=` tải file mẫu; upload rubric chỉ nhận `.xlsx` (tài liệu văn xuôi thì ngược lại, không nhận `.xlsx`).
+  - Danh sách playbook trả `criteriaCount` — phân biệt bộ đã đọc được tiêu chí với file chỉ mới nằm đó.
+  - FE: `PlaybooksPage` thêm 2 loại tài liệu + nút **Tải file mẫu** + đổi loại tài liệu thì bỏ file không còn hợp lệ; ô **Điểm sàn phỏng vấn** trong form tạo/sửa tin; `CriterionBar` và 2 màn `EvaluationReviewPage` ưu tiên **nhãn doanh nghiệp** (từ điển i18n chỉ còn là dự phòng cho dữ liệu cũ) và hiện trọng số; màn chi tiết ứng viên của HR hiện **bảng điểm CV theo tiêu chí**.
+
+**Kiểm chứng.** 47 test .NET mới + 6 test Python mới → **885/885** và **24/24** pass; build `ARI.API` + build cả hai site FE + `npm run check:i18n` pass.
+
+**Chấp nhận đánh đổi.** (a) Rubric khai bằng Excel chứ không phải form trên web — thêm một vòng tải file, đổi lại HR sửa/lưu trữ/gửi duyệt bộ tiêu chí bằng công cụ họ vốn dùng, và không phải dựng thêm một màn CRUD nữa. (b) Ngưỡng `InterviewPassScore` đặt ở **cấp tin**, không phải cấp vòng — vòng sau khó hơn vòng trước là chuyện thường, nhưng chưa có nhu cầu thật nên chưa tách; tách sau chỉ là thêm cột ở `InterviewRoundConfig`. (c) Điểm lặp nhãn + trọng số trong từng bản đánh giá (vài trăm byte/bản) — cái giá của việc báo cáo cũ tự giải thích được.

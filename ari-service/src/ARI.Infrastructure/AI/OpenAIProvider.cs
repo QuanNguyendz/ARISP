@@ -165,6 +165,15 @@ namespace ARI.Infrastructure.AI
             {
                 systemPrompt += "\nAdhere to company interview playbook style:\n" + string.Join("\n", ctx.PlaybookStyleGuides);
             }
+            // Ràng buộc cấm phải đứng RIÊNG và đứng SAU phần tài liệu tham khảo — nhét chung một rổ
+            // thì mô hình coi nó là chủ đề gợi ý. Đường rag-service cấm y hệt (prompts/__init__.py).
+            if (ctx.ProhibitedTopics.Count > 0)
+            {
+                systemPrompt += "\n\nHARD CONSTRAINT — NEVER ask about, hint at, or invite the candidate to "
+                    + "discuss any of the following topics (company compliance playbook). If the candidate "
+                    + "raises one, acknowledge briefly and move on without probing:\n"
+                    + string.Join("\n", ctx.ProhibitedTopics.Select(t => $"- {t}"));
+            }
 
             var userContent = $"Job Description: {ctx.JobDescription}\nCandidate CV: {ctx.CandidateCv}\n";
             if (ctx.MustAskQuestions.Count > 0)

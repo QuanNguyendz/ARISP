@@ -99,7 +99,7 @@
     "remindError": "Failed to send the reminder email.",
     "reschedule": "Reschedule",
     "rescheduleTitle": "Move this candidate to another interview slot",
-    "rescheduleDisabledTitle": "This application was rejected from the process",
+    "rescheduleDisabledTitle": "Only candidates who declined with a reason can be rescheduled",
     "reject": "Reject",
     "rejecting": "Rejecting...",
     "rejected": "Rejected",
@@ -119,7 +119,8 @@
     "expired_no_response": "Confirmation expired",
     "rejected_by_staff": "Rejected",
     "cancelled": "Cancelled",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "no_show": "No-show"
   },
   "reschedule": {
     "title": "Reschedule interview ({{count}} candidates)",
