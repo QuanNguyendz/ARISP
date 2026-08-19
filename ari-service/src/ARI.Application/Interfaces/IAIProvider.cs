@@ -46,6 +46,12 @@ namespace ARI.Application.Interfaces
         public string SessionType { get; set; } = "real";
         public List<QuestionAnswerDto> ChatHistory { get; set; } = new();
         public string ScoringRubric { get; set; } = "{}";
+
+        /// <summary>
+        /// Bộ tiêu chí chấm điểm của doanh nghiệp (ADR-060). Khi có, AI CHỈ chấm từng tiêu chí —
+        /// điểm tổng do backend cộng có trọng số, không lấy con số model tự đưa ra.
+        /// </summary>
+        public List<ARI.Application.Playbooks.RubricCriterion> Criteria { get; set; } = new();
         /// <summary>Ngôn ngữ phỏng vấn yêu cầu — đánh giá mức tuân thủ trong Language Assessment.</summary>
         public string? Language { get; set; }
         /// <summary>

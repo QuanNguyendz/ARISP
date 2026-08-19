@@ -17,6 +17,7 @@ import {
   Clock,
   CalendarClock,
   UserCheck,
+  Scale,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
@@ -202,6 +203,42 @@ export default function HrCandidateDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Điểm tổng CV đến từ đâu (ADR-060): khi tin đã khai bộ tiêu chí chấm CV, hiện luôn từng
+          tiêu chí + trọng số — trước đây HR chỉ thấy một con số phần trăm không giải thích được. */}
+      {!!app.cvCriterionScores?.length && (
+        <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-white/5 sm:p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
+            <Scale className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('cvCriteriaTitle')}
+          </h2>
+          <div className="space-y-3">
+            {app.cvCriterionScores.map((c) => {
+              const pct = Math.max(0, Math.min(100, Math.round(c.score)))
+              return (
+                <div key={c.key}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="text-ink-600 dark:text-ink-300">
+                      {c.label?.trim() || c.key}
+                      {c.weight != null && (
+                        <span className="ml-1.5 text-xs text-ink-400 dark:text-ink-500">
+                          {c.weight}%
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-ink-900 dark:text-white">{pct}/100</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-ink-100 dark:bg-white/10">
+                    <div
+                      className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-brand-500' : 'bg-amber-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

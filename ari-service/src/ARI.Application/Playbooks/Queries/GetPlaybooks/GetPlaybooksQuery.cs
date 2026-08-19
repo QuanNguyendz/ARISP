@@ -33,6 +33,8 @@ namespace ARI.Application.Playbooks.Queries.GetPlaybooks
                     {
                         d.Id, d.Scope, d.ScopeRefId, d.RoundNumber, d.DocumentType,
                         d.FileName, d.FileFormat, d.Status, d.CreatedAt, d.UploadedByUserId,
+                        // Chỉ tài liệu rubric mới có cột này (vài trăm byte) — không phải parsedText.
+                        d.RubricJson,
                     }), ct);
 
             var uploaderIds = docs.Select(d => d.UploadedByUserId).Distinct().ToList();
@@ -43,7 +45,8 @@ namespace ARI.Application.Playbooks.Queries.GetPlaybooks
             var items = docs.Select(d => new PlaybookListItemDto(
                 d.Id, d.Scope, d.ScopeRefId, d.RoundNumber, d.DocumentType,
                 d.FileName, d.FileFormat, d.Status, d.CreatedAt,
-                uploaderNames.TryGetValue(d.UploadedByUserId, out var n) ? n : null)).ToList();
+                uploaderNames.TryGetValue(d.UploadedByUserId, out var n) ? n : null,
+                string.IsNullOrWhiteSpace(d.RubricJson) ? null : ScoringRubric.Deserialize(d.RubricJson).Count)).ToList();
 
             return Result.Success(items);
         }

@@ -1547,6 +1547,10 @@ namespace ARI.Application.Services
                 });
             }
 
+            // Bộ tiêu chí do doanh nghiệp khai (playbook interview_rubric) — vòng → tin → công ty.
+            var rubricCriteria = await PlaybookScope.ResolveRubricAsync(
+                _unitOfWork, jobPosting!.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric, ct);
+
             var evalCtx = new SessionContext
             {
                 SessionId = sessionId,
@@ -1555,6 +1559,7 @@ namespace ARI.Application.Services
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
                 ScoringRubric = jobPosting.ScoringRubric ?? "{}",
+                Criteria = rubricCriteria,
                 Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage,
                 // Báo cáo viết bằng ngôn ngữ ứng viên đang dùng trên web (ADR-051).
                 ReportLanguage = session.ReportLanguage ?? session.InterviewLanguage ?? "vi"
@@ -1562,6 +1567,35 @@ namespace ARI.Application.Services
 
             // Call AI provider to generate Verdict, Score, Reasoning, etc.
             var evalReport = await _aiProvider.GenerateEvaluationAsync(evalCtx, ct);
+
+            // ĐIỂM CUỐI DO BACKEND CỘNG, không lấy con số model tự đưa ra (ADR-060). Trước đây model
+            // vừa tự chọn tiêu chí trong một danh sách viết cứng, vừa tự cho điểm tổng — con số ấy
+            // không phải trung bình có trọng số của gì cả, nên "chấm theo tiêu chí" chỉ là hình thức.
+            var aiScores = ScoringRubricSupport.ParseScores(evalReport.CriterionScoresJson);
+            var overallScore = evalReport.Score;
+            var criterionScoresJson = evalReport.CriterionScoresJson;
+            var verdict = evalReport.Verdict;
+
+            if (rubricCriteria.Count > 0)
+            {
+                var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
+                if (computed.HasValue)
+                {
+                    overallScore = computed.Value;
+                    // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm
+                    // báo cáo cũ mất khả năng giải thích điểm của nó ra từ đâu.
+                    criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
+                    verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
+                }
+                else
+                {
+                    // Có rubric mà AI không chấm nổi tiêu chí nào → giữ nguyên kết quả của AI và ghi log,
+                    // KHÔNG âm thầm cho 0 điểm (thiếu dữ liệu không phải là điểm kém).
+                    _logger?.LogWarning(
+                        "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng AI không trả điểm tiêu chí nào — giữ điểm của AI.",
+                        sessionId, rubricCriteria.Count);
+                }
+            }
             
             // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
             // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
@@ -1599,9 +1633,9 @@ namespace ARI.Application.Services
                 ApplicationId = application.Id,
                 RoundNumber = session.RoundNumber,
                 SessionType = session.SessionType,
-                AiVerdict = evalReport.Verdict,
-                OverallScore = evalReport.Score,
-                CriterionScores = evalReport.CriterionScoresJson,
+                AiVerdict = verdict,
+                OverallScore = overallScore,
+                CriterionScores = criterionScoresJson,
                 Reasoning = evalReport.Reasoning,
                 RecommendedNextStep = evalReport.RecommendedNextStep,
                 QuestionAnalyses = evalReport.QuestionAnalysesJson,

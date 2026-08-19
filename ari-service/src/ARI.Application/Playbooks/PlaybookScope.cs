@@ -79,6 +79,34 @@ namespace ARI.Application.Playbooks
             return docs.ToList();
         }
 
+        /// <summary>
+        /// Bộ tiêu chí chấm điểm áp dụng cho (tin, vòng). Thứ tự ưu tiên: <b>vòng → tin → công ty</b>
+        /// — vòng chuyên môn có thể có bộ riêng, không khai thì dùng bộ của tin, không nữa thì bộ chung
+        /// của doanh nghiệp. Trả về danh sách rỗng nếu chưa khai bộ nào (nơi gọi tự quyết định fallback).
+        /// </summary>
+        public static async Task<List<RubricCriterion>> ResolveRubricAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, string documentType,
+            CancellationToken ct = default)
+        {
+            var docs = (await unitOfWork.Repository<PlaybookDocument>().FindAsync(
+                p => p.DeletedAt == null
+                     && p.DocumentType == documentType
+                     && p.RubricJson != null
+                     && (p.Scope == ScopeOrg
+                         || (p.ScopeRefId == jobPostingId
+                             && (p.Scope == ScopeJobPosting
+                                 || (p.Scope == ScopeRound && p.RoundNumber == roundNumber)))),
+                ct)).ToList();
+
+            if (docs.Count == 0) return new List<RubricCriterion>();
+
+            var chosen = docs.FirstOrDefault(d => d.Scope == ScopeRound)
+                         ?? docs.FirstOrDefault(d => d.Scope == ScopeJobPosting)
+                         ?? docs.OrderByDescending(d => d.CreatedAt).First();
+
+            return ScoringRubric.Deserialize(chosen.RubricJson);
+        }
+
         // Đầu dòng markdown/liệt kê: "- ", "* ", "+ ", "1. ", "1) ", "•".
         private static readonly Regex BulletPrefix = new(@"^\s*([-*+•]|\d+[.)])\s+", RegexOptions.Compiled);
 

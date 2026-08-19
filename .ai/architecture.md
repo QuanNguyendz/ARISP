@@ -946,3 +946,54 @@ Chỉ phiên `real`. Nạp tài liệu `must_ask` của **cả** scope `job_post
 **Kiểm chứng.** 17 test mới (7 cho luồng duyệt-kèm-ca gồm ca đầy/quá khứ/sai tin/sai vòng, 5 cho cổng ngân hàng đề, 2 cho phỏng vấn thử ở vòng trắc nghiệm, 3 cho phỏng vấn thử sau khi lỡ buổi) → **825/825 pass** (đã xoá 6 test của endpoint `send-invite` không còn tồn tại; 9 test dời lịch cũ được viết lại theo luật mới); build backend + typecheck + build cả hai site FE pass.
 
 **Chấp nhận đánh đổi.** (a) Duyệt hàng loạt nay dùng **một ca chung** cho cả nhóm và chạy **tuần tự** — sức chứa là tài nguyên tranh chấp, chạy song song thì các lỗi "hết chỗ" trả về cùng lúc không biết ai đã vào được; giao diện cảnh báo trước khi số ứng viên vượt số chỗ còn lại và báo rõ hồ sơ nào chưa xong. (b) Nhân sự **buộc phải mở khung giờ trước khi duyệt** — thêm một bước, nhưng đúng bằng cái giá của việc không bao giờ để ứng viên chờ một thư không tồn tại. (c) Endpoint `POST /applications/{id}/send-invite` (nút "Mời"/"Gửi lời mời" trên các màn chi tiết ứng viên) **vẫn gửi thư không kèm lịch** — giữ nguyên vì đó là đường riêng cho ứng viên đã qua CV, nhưng nó là chỗ duy nhất còn lại có thể sinh ra thư mời không giờ hẹn.
+
+---
+
+### ADR-060: Chấm điểm theo bộ tiêu chí của doanh nghiệp — AI chấm từng tiêu chí, backend cộng điểm
+
+- **Ngày:** 2026-08-19
+- **Trạng thái:** Đã triển khai
+- **Bối cảnh:** Yêu cầu là điểm CV–JD và điểm phỏng vấn phải chấm **theo tiêu chí công ty cấu hình**, các tiêu chí cộng lại đúng 100, và điểm cuối suy ra từ đó. Rà lại thì "chấm theo tiêu chí" đang là **hình thức ở cả ba tầng**:
+
+  | Chỗ | Hiện trạng trước |
+  |---|---|
+  | `JobPosting.ScoringRubric` | Có cột trong DB nhưng **không màn nào nhập** → luôn rỗng |
+  | Prompt chấm CV (Gemini) | Rỗng thì rơi về câu **viết cứng** *"Kinh nghiệm 40%, Kỹ năng 40%, Học vấn 20%"* |
+  | Prompt chấm phỏng vấn (rag-service) | **Ép cứng 8 khoá tiếng Anh** (`technical, communication, problem_solving…`) rồi hỏi luôn `score` tổng |
+
+  Con số `score` model trả về **không phải trung bình có trọng số của gì cả** — nó là một ước lượng rời rạc với `criterion_scores` nằm ngay bên cạnh. Doanh nghiệp khai rubric kiểu gì cũng vậy.
+
+- **Quyết định.**
+
+  1. **AI chỉ chấm TỪNG tiêu chí; điểm tổng do backend cộng.** `ScoringRubric.ComputeOverall` tính trung bình có trọng số rồi so với ngưỡng cấu hình để ra verdict. Prompt nói thẳng *"Do NOT compute an overall score yourself"*. Đây là ranh giới cốt lõi: **phán đoán định tính giao cho model, số học giữ ở backend** — số học là chỗ duy nhất kiểm chứng được bằng tay.
+
+  2. **Rubric khai bằng file Excel theo mẫu**, là một **loại tài liệu playbook** (`cv_rubric` / `interview_rubric`) chứ không phải một màn cấu hình riêng — dùng lại nguyên phạm vi org/tin/vòng + xoá mềm của ADR-025 và khuôn "tải mẫu → điền → upload → báo lỗi theo dòng" của ADR-049. Layout: `A` mã tiêu chí, `B` tên hiển thị, `C` trọng số (%), `D` chuẩn chấm. Chấp nhận `40`, `40%`, `40,5`.
+
+  3. **Tổng trọng số ≠ 100 bị chặn ngay tại cổng upload**, kèm thông báo nói rõ đang là bao nhiêu. Sai ở đây mà lọt xuống thì mọi điểm về sau đều sai **mà không ai biết** — không có tín hiệu nào để phát hiện.
+
+  4. **Tách bộ chấm CV và bộ chấm phỏng vấn**, phỏng vấn khai được theo từng vòng. Chọn theo thứ tự **vòng → tin → công ty** (`PlaybookScope.ResolveRubricAsync`).
+
+  5. **Giữ Gemini chấm CV** (ADR-030) nhưng nhồi thêm rubric + ngữ cảnh playbook truy hồi; `matchScore` cuối vẫn do backend cộng.
+
+  6. **Chưa khai rubric → giữ nguyên hành vi cũ.** Không rubric thì điểm và verdict của AI đi thẳng như trước. Tính năng này không được làm hỏng những tin chưa kịp cấu hình.
+
+- **Vì sao chụp ảnh nhãn + trọng số thay vì tham chiếu rubric sống.** Điểm lưu dạng `{"technical":{"score":88,"label":"Chuyên môn","weight":40}}` chứ không phải `{"technical":88}` + trỏ tới `playbook_documents`. Rubric là **tài liệu sống**: HR sửa trọng số hoặc xoá bộ cũ là chuyện thường. Nếu chỉ giữ khoá, một bản đánh giá 3 tháng trước sẽ hiện điểm 74 **cạnh bộ trọng số hiện tại** — không giải thích ra được 74 từ đâu, và không cách nào phát hiện là nó đã lệch. Ảnh chụp làm bản đánh giá **tự giải thích được vĩnh viễn**, đổi lại một ít dữ liệu lặp.
+
+- **Vì sao tiêu chí AI không chấm bị loại khỏi CẢ tử lẫn mẫu** (không tính 0 điểm). Model bỏ sót một tiêu chí là lỗi của model, không phải bằng chứng ứng viên kém ở đó. Tính 0 sẽ **đánh trượt oan** — với rubric 60/40, thiếu một mục kéo 90 điểm xuống 54. Nếu AI không chấm nổi tiêu chí nào, backend **giữ nguyên điểm của AI + ghi log cảnh báo**, không âm thầm cho 0.
+
+- **Hệ quả / cạm bẫy đã gặp.**
+  - **Hai chỗ đọc điểm tiêu chí suýt vỡ im lặng.** `PortalSupport.ParseCriterionScores` và `EvaluationDtos.FromEntity` đang `Deserialize<Dictionary<string, decimal>>` — dạng snapshot mới làm chúng **ném lỗi rồi trả rỗng**, tức ứng viên và HR mất sạch bảng điểm mà không có dấu hiệu gì. Nay cả hai đi qua `ScoringRubricSupport.ParseForDisplay`, đọc được **cả dạng phẳng cũ lẫn dạng snapshot mới**.
+  - **File mẫu tự sinh mà chính bộ đọc của mình không đọc nổi.** `BuildTemplate` ghi cell **thiếu `CellReference`**; Excel tự suy được nên mở bằng Excel vẫn đúng, nhưng `ReadRows` định vị cột **bằng** `CellReference` → đọc ra bảng rỗng. Test round-trip (dựng mẫu → đọc lại → validate) bắt được; test dùng file `.xlsx` ghi bằng `SharedString` — **khác đường ghi của mẫu** — để bộ đọc phải xử lý cả hai kiểu Excel thật.
+  - `InterviewService._logger` là nullable và toàn file dùng `_logger?.`; dòng log mới lỡ dùng `_logger.` → `ArgumentNullException` đúng vào nhánh "AI không chấm nổi tiêu chí nào".
+  - Migration `AddScoringRubricSupport` EF sinh ra hai default **nguy hiểm**: `interview_pass_score` mặc định `0` (mọi buổi phỏng vấn thành "đạt") và `criterion_scores` mặc định `""` (không hợp lệ với `jsonb`). Sửa tay thành `70` và `"{}"`.
+  - Khoá tiêu chí bắt buộc snake_case ≥ 2 ký tự, tối đa 20 tiêu chí; khoá model bịa thêm ngoài rubric bị **loại khỏi cả điểm lẫn ảnh chụp**.
+
+- **Thay đổi kèm theo.**
+  - Cột mới: `playbook_documents.rubric_json`, `job_postings.interview_pass_score` (mặc định 70), `cv_jd_analyses.criterion_scores` (jsonb, mặc định `{}`).
+  - `GET /api/playbooks/rubric-template?type=` tải file mẫu; upload rubric chỉ nhận `.xlsx` (tài liệu văn xuôi thì ngược lại, không nhận `.xlsx`).
+  - Danh sách playbook trả `criteriaCount` — phân biệt bộ đã đọc được tiêu chí với file chỉ mới nằm đó.
+  - FE: `PlaybooksPage` thêm 2 loại tài liệu + nút **Tải file mẫu** + đổi loại tài liệu thì bỏ file không còn hợp lệ; ô **Điểm sàn phỏng vấn** trong form tạo/sửa tin; `CriterionBar` và 2 màn `EvaluationReviewPage` ưu tiên **nhãn doanh nghiệp** (từ điển i18n chỉ còn là dự phòng cho dữ liệu cũ) và hiện trọng số; màn chi tiết ứng viên của HR hiện **bảng điểm CV theo tiêu chí**.
+
+**Kiểm chứng.** 47 test .NET mới + 6 test Python mới → **885/885** và **24/24** pass; build `ARI.API` + build cả hai site FE + `npm run check:i18n` pass.
+
+**Chấp nhận đánh đổi.** (a) Rubric khai bằng Excel chứ không phải form trên web — thêm một vòng tải file, đổi lại HR sửa/lưu trữ/gửi duyệt bộ tiêu chí bằng công cụ họ vốn dùng, và không phải dựng thêm một màn CRUD nữa. (b) Ngưỡng `InterviewPassScore` đặt ở **cấp tin**, không phải cấp vòng — vòng sau khó hơn vòng trước là chuyện thường, nhưng chưa có nhu cầu thật nên chưa tách; tách sau chỉ là thêm cột ở `InterviewRoundConfig`. (c) Điểm lặp nhãn + trọng số trong từng bản đánh giá (vài trăm byte/bản) — cái giá của việc báo cáo cũ tự giải thích được.

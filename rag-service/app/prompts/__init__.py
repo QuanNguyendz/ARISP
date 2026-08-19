@@ -131,6 +131,40 @@ def report_language_name(ctx: SessionContext) -> str:
     return language_name(ctx.report_language or ctx.language)
 
 
+def _criterion_key_rule(ctx: SessionContext) -> str:
+    """Khoá tiêu chí: của doanh nghiệp nếu có, không thì mới dùng bộ mặc định.
+
+    Bộ 8 khoá tiếng Anh viết cứng trước đây là lý do "chấm theo tiêu chí công ty" chỉ là hình thức:
+    doanh nghiệp khai gì cũng vậy, model vẫn chấm theo danh sách của chúng ta (ADR-060).
+    """
+    if ctx.criteria:
+        keys = ", ".join(c.key for c in ctx.criteria)
+        return (
+            "criterion_scores MUST contain EXACTLY these company-defined keys, all of them, "
+            f"no others: {keys}. Score each strictly against its standard listed in the rubric below, "
+            "based only on evidence from the answers. "
+            "Do NOT compute an overall score yourself — the system computes it from these weights. "
+        )
+    return (
+        "criterion_scores keys MUST be chosen ONLY from this fixed snake_case list: "
+        "technical, communication, problem_solving, culture_fit, experience, language, attitude, teamwork. "
+        "Use 3-6 of them, never invent other keys and never use display names. "
+    )
+
+
+def _rubric_block(ctx: SessionContext) -> str:
+    """Bảng tiêu chí + trọng số + chuẩn chấm của doanh nghiệp."""
+    if not ctx.criteria:
+        return ctx.scoring_rubric
+    lines = []
+    for c in ctx.criteria:
+        line = f"- {c.key} | {c.name} | weight {c.weight:g}%"
+        if c.description:
+            line += f" | standard: {c.description}"
+        lines.append(line)
+    return "COMPANY SCORING RUBRIC (weights sum to 100):" + chr(10) + chr(10).join(lines)
+
+
 def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
     import json
 
@@ -143,10 +177,8 @@ def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
         '"recommended_next_step": "<text>", "criterion_scores": {<criterion_key>: <0-100>}, '
         # Khoá tiêu chí phải nằm trong bộ cố định: FE dịch khoá sang VI/EN, model tự đặt tên
         # ("Cultural Fit", "Technical Skills") sẽ lọt ra màn hình dưới dạng tiếng Anh thô.
-        "criterion_scores keys MUST be chosen ONLY from this fixed snake_case list: "
-        "technical, communication, problem_solving, culture_fit, experience, language, attitude, teamwork. "
-        "Use 3-6 of them, never invent other keys and never use display names. "
-        '"question_analyses": [{"sequence_number": <int, from QA History>, "score": <0-100>, '
+        + _criterion_key_rule(ctx)
+        + '"question_analyses": [{"sequence_number": <int, from QA History>, "score": <0-100>, '
         '"analysis": "<what the answer covered and what was missing>", '
         '"feedback": "<one concrete, actionable improvement tip>"}]}. '
         # question_analyses trước đây để "<optional objects>" → model tự bịa khoá, FE parse ra rỗng.
@@ -164,7 +196,7 @@ def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
     user = (
         f"Job Description:\n{ctx.job_description[:4000]}\n\n"
         f"Candidate CV:\n{ctx.candidate_cv[:4000]}\n\n"
-        f"Scoring Rubric:\n{ctx.scoring_rubric}\n\n"
+        f"Scoring Rubric:\n{_rubric_block(ctx)}\n\n"
         f"QA History:\n{history}"
     )
     return system, user

@@ -66,6 +66,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   // Mặc định theo đúng phễu tuyển dụng thật: lọc bằng trắc nghiệm trước (rẻ, tự chấm), rồi sơ loại,
   // rồi chuyên sâu kỹ thuật. Vòng trắc nghiệm dùng thời lượng riêng (30') vì không bị trần 20' của
   // buổi phỏng vấn AI — xem ADR-049/050.
+  const [interviewPassScore, setInterviewPassScore] = useState(70)
   const [rounds, setRounds] = useState<RoundConfig[]>([
     { roundNumber: 1, roundType: 'online_test', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: 30 },
     { roundNumber: 2, roundType: 'screening', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES },
@@ -122,6 +123,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setJdFileViewUrl(job.jdFileUrl)
           setApplicationDeadline(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '')
           setRounds(job.roundConfigs?.length ? job.roundConfigs : rounds)
+          setInterviewPassScore(job.interviewPassScore ?? 70)
         } catch (err) {
           setLoadError('Bạn không có quyền truy cập tin tuyển dụng này hoặc tin không tồn tại.')
         } finally {
@@ -243,6 +245,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         isPublicListing,
         vacancies: vacancies === '' ? undefined : Number(vacancies),
         skills,
+        interviewPassScore,
         roundConfigs: rounds.map((r) =>
           r.roundType === 'online_test'
             ? { ...r, maxDurationMinutes: Math.max(r.maxDurationMinutes || 30, 1) }
@@ -681,6 +684,28 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                   )
                 })}
               </AnimatePresence>
+            </div>
+
+            {/* Điểm sàn phỏng vấn (ADR-060): ngưỡng AI kết luận đạt/không đạt khi tin đã khai bộ
+                tiêu chí chấm. Đặt ở đây vì nó áp cho MỌI vòng phỏng vấn của tin, không phải từng vòng. */}
+            <div className="border-t border-ink-100 pt-3 dark:border-white/10">
+              <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">
+                {t('form.interviewPassScore')}
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                inputMode="numeric"
+                value={interviewPassScore}
+                onChange={(e) =>
+                  setInterviewPassScore(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                }
+                className={`${input} py-2`}
+              />
+              <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+                {t('form.interviewPassScoreHint')}
+              </p>
             </div>
           </div>
 

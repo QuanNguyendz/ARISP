@@ -95,6 +95,15 @@ class AnswerAnalysis(CamelModel):
     feedback: str = ""
 
 
+class RubricCriterion(CamelModel):
+    """Tiêu chí chấm điểm do doanh nghiệp khai (ADR-060)."""
+
+    key: str
+    name: str = ""
+    weight: float = 0
+    description: str | None = None
+
+
 class SessionContext(CamelModel):
     session_id: str
     job_description: str = ""
@@ -102,6 +111,8 @@ class SessionContext(CamelModel):
     session_type: str = "real"
     chat_history: list[QuestionAnswer] = []
     scoring_rubric: str = "{}"
+    # Có bộ tiêu chí thì model CHỈ chấm từng tiêu chí — điểm tổng do .NET cộng có trọng số.
+    criteria: list[RubricCriterion] = []
     language: str | None = None
     # Ngôn ngữ VIẾT báo cáo (tách khỏi ngôn ngữ phỏng vấn) — màn xem lại không trộn Việt–Anh.
     report_language: str | None = None

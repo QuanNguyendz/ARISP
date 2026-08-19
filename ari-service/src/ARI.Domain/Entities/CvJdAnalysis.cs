@@ -11,6 +11,12 @@ namespace ARI.Domain.Entities
         public string CvHash { get; set; } = string.Empty;   // để cache, không chạy lại Gemini
         public int MatchScore { get; set; }                  // 0–100
         public string Summary { get; set; } = string.Empty;
+        /// <summary>
+        /// Ảnh chụp điểm từng tiêu chí lúc chấm: <c>{key:{score,label,weight}}</c> (ADR-060).
+        /// Rỗng "{}" nghĩa là tin chưa khai bộ tiêu chí — điểm là phán đoán tổng thể của AI.
+        /// </summary>
+        public string CriterionScores { get; set; } = "{}";  // JSONB
+
         public string SkillsMatched { get; set; } = "[]";    // JSONB
         public string SkillsGaps { get; set; } = "[]";       // JSONB
         public string RedFlags { get; set; } = "[]";         // JSONB

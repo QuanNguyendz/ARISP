@@ -14,10 +14,12 @@ import {
   Layers,
   AlertCircle,
   CheckCircle2,
+  Download,
+  Scale,
 } from 'lucide-react'
 import { PageHeader, ErrorAlert, EmptyState, Pagination, Select } from '@ari/shared/ui'
 import { CardGridSkeleton } from './_skeletons'
-import { playbookService } from '@/fservices/playbook/playbookService'
+import { playbookService, isRubricDocType } from '@/fservices/playbook/playbookService'
 import type { PlaybookItem } from '@/fservices/playbook/playbookService'
 import jobService from '@ari/shared/fservices/job'
 import type { JobPosting } from '@ari/shared/types/job'
@@ -36,6 +38,8 @@ export default function HrPlaybooksPage() {
     ['expected_answer', t('docTypes.expectedAnswer')],
     ['must_ask', t('docTypes.mustAsk')],
     ['round_playbook', t('docTypes.roundPlaybook')],
+    ['cv_rubric', t('docTypes.cvRubric')],
+    ['interview_rubric', t('docTypes.interviewRubric')],
   ]
 
   const SCOPES: [string, string][] = [
@@ -156,8 +160,18 @@ export default function HrPlaybooksPage() {
                 className="group rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
               >
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400">
-                    <BookOpen className="h-5 w-5" />
+                  <span
+                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                      isRubricDocType(d.documentType)
+                        ? 'bg-ai-100 text-ai-600 dark:bg-ai-500/20 dark:text-ai-400'
+                        : 'bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400'
+                    }`}
+                  >
+                    {isRubricDocType(d.documentType) ? (
+                      <Scale className="h-5 w-5" />
+                    ) : (
+                      <BookOpen className="h-5 w-5" />
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <span
@@ -191,7 +205,15 @@ export default function HrPlaybooksPage() {
                   >
                     {d.status === 'ready' ? t('status.ready') : d.status}
                   </span>
-                  <span className="uppercase text-ink-400">{d.fileFormat}</span>
+                  <span className="flex items-center gap-2">
+                    {/* Số tiêu chí: phân biệt bộ đã đọc được với file chỉ mới nằm đó. */}
+                    {d.criteriaCount != null && (
+                      <span className="rounded-full bg-ai-100 px-2 py-0.5 text-ai-700 dark:bg-ai-500/20 dark:text-ai-400">
+                        {t('criteriaCount', { count: d.criteriaCount })}
+                      </span>
+                    )}
+                    <span className="uppercase text-ink-400">{d.fileFormat}</span>
+                  </span>
                 </div>
               </motion.div>
             )
@@ -236,6 +258,7 @@ function UploadModal({
   const [file, setFile] = useState<File | null>(null)
   const [scope, setScope] = useState('org')
   const [documentType, setDocumentType] = useState('style_guide')
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [scopeRefId, setScopeRefId] = useState('')
   const [roundNumber, setRoundNumber] = useState<number>(1)
   const [jobs, setJobs] = useState<JobPosting[]>([])
@@ -250,6 +273,35 @@ function UploadModal({
         .catch(() => {})
     }
   }, [scope, jobs.length])
+
+  const isRubric = isRubricDocType(documentType)
+
+  /**
+   * Đổi loại tài liệu thì BỎ file đang chọn nếu phần mở rộng không còn hợp lệ: rubric chỉ nhận
+   * .xlsx, tài liệu văn xuôi thì ngược lại — giữ nguyên là người dùng bấm Tải lên rồi mới ăn lỗi
+   * từ server mà không hiểu vì sao.
+   */
+  const changeDocumentType = (next: string) => {
+    setDocumentType(next)
+    setError('')
+    const ext = file?.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+    if (ext && (isRubricDocType(next) ? ext !== '.xlsx' : ext === '.xlsx')) {
+      setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const downloadTemplate = async () => {
+    setDownloadingTemplate(true)
+    setError('')
+    try {
+      await playbookService.downloadRubricTemplate(documentType)
+    } catch {
+      setError(t('templateDownloadError'))
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
 
   const submit = async () => {
     if (!file) {
@@ -292,6 +344,8 @@ function UploadModal({
     ['expected_answer', t('docTypes.expectedAnswer')],
     ['must_ask', t('docTypes.mustAsk')],
     ['round_playbook', t('docTypes.roundPlaybook')],
+    ['cv_rubric', t('docTypes.cvRubric')],
+    ['interview_rubric', t('docTypes.interviewRubric')],
   ]
 
   const SCOPES: [string, string][] = [
@@ -330,10 +384,31 @@ function UploadModal({
         )}
 
         <div className="space-y-4">
+          {/* Rubric là bảng số liệu: không đưa file mẫu thì HR không có cách nào đoán đúng layout
+              (mã tiêu chí / tên / trọng số / chuẩn chấm) và tổng trọng số phải bằng 100. */}
+          {isRubric && (
+            <div className="rounded-xl border border-ai-200 bg-ai-50/60 p-3 dark:border-ai-500/20 dark:bg-ai-500/10">
+              <p className="text-xs text-ai-800 dark:text-ai-300">{t('rubricHint')}</p>
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                disabled={downloadingTemplate}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-ai-300 bg-white px-3 py-1.5 text-xs font-semibold text-ai-700 hover:bg-ai-50 disabled:opacity-50 dark:border-ai-500/30 dark:bg-white/5 dark:text-ai-300"
+              >
+                {downloadingTemplate ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {t('downloadTemplate')}
+              </button>
+            </div>
+          )}
+
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.docx,.txt,.md"
+            accept={isRubric ? '.xlsx' : '.pdf,.docx,.txt,.md'}
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="hidden"
           />
@@ -357,7 +432,7 @@ function UploadModal({
               </label>
               <Select
                 value={documentType}
-                onChange={setDocumentType}
+                onChange={changeDocumentType}
                 className="w-full"
                 buttonClassName="px-3 py-2.5 text-sm"
                 options={DOC_TYPES.map(([v, l]) => ({ value: v, label: l }))}

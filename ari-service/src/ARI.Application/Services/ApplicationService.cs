@@ -91,9 +91,26 @@ namespace ARI.Application.Services
                 InterviewScore = interviewScore,
                 InterviewDate = interviewDate,
                 MatchScore = application.CvJdAnalysis?.MatchScore,
-                CvJdSummary = application.CvJdAnalysis?.Summary
+                CvJdSummary = application.CvJdAnalysis?.Summary,
+                CvCriterionScores = MapCvCriterionScores(application.CvJdAnalysis?.CriterionScores)
             };
         }
+
+
+        /// <summary>
+        /// Đọc điểm tiêu chí chấm CV để hiển thị (ADR-060). Đọc được CẢ dạng phẳng cũ lẫn dạng có ảnh
+        /// chụp, nên hồ sơ chấm trước khi khai rubric vẫn hiện đúng.
+        /// </summary>
+        private static List<CvCriterionScoreDto> MapCvCriterionScores(string? json)
+            => ARI.Application.Playbooks.ScoringRubricSupport.ParseForDisplay(json)
+                .Select(c => new CvCriterionScoreDto
+                {
+                    Key = c.Key,
+                    Score = c.Score,
+                    Label = c.Label,
+                    Weight = c.Weight,
+                })
+                .ToList();
 
         public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
         {

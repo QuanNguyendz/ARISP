@@ -28,18 +28,18 @@ namespace ARI.Application.CandidatePortal
             catch { return new List<string>(); }
         }
 
-        /// <summary>CriterionScores lưu dạng {"technical":88,...} → list {Name, Score} cho FE render thanh điểm.</summary>
+        /// <summary>
+        /// CriterionScores → list {Name, Score, Label, Weight} cho FE render thanh điểm.
+        ///
+        /// Đọc CẢ HAI dạng (ADR-060): dạng phẳng cũ <c>{"technical":88}</c> và dạng có ảnh chụp
+        /// <c>{"technical":{"score":88,"label":"Chuyên môn","weight":40}}</c>. Bản cũ deserialize thẳng
+        /// sang <c>Dictionary&lt;string,decimal&gt;</c> nên gặp dạng mới là ném lỗi rồi trả rỗng — ứng
+        /// viên mất sạch bảng điểm mà không có dấu hiệu gì.
+        /// </summary>
         public static List<object> ParseCriterionScores(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json)) return new List<object>();
-            try
-            {
-                var dict = JsonSerializer.Deserialize<Dictionary<string, decimal>>(json, JsonOpts);
-                if (dict == null) return new List<object>();
-                return dict.Select(kv => (object)new { Name = kv.Key, Score = kv.Value }).ToList();
-            }
-            catch { return new List<object>(); }
-        }
+            => ARI.Application.Playbooks.ScoringRubricSupport.ParseForDisplay(json)
+                .Select(c => (object)new { Name = c.Key, c.Score, c.Label, c.Weight })
+                .ToList();
 
         /// <summary>QuestionAnalyses lưu dạng mảng {Question, Answer, Score, Analysis, Feedback}.</summary>
         public static List<QuestionAnalysisDto> ParseQuestionAnalyses(string? json)

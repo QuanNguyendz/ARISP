@@ -1,8 +1,20 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace ARI.Application.DTOs
 {
+    /// <summary>Điểm một tiêu chí chấm CV kèm nhãn + trọng số tại thời điểm chấm (ADR-060).</summary>
+    public class CvCriterionScoreDto
+    {
+        public string Key { get; set; } = string.Empty;
+        public decimal Score { get; set; }
+        /// <summary>Tên hiển thị doanh nghiệp đặt. Null với bản phân tích cũ (dạng JSON phẳng).</summary>
+        public string? Label { get; set; }
+        /// <summary>Trọng số (%). Null với bản phân tích cũ.</summary>
+        public decimal? Weight { get; set; }
+    }
+
     public class SubmitApplicationRequest
     {
         public Guid JobPostingId { get; set; }
@@ -38,6 +50,13 @@ namespace ARI.Application.DTOs
 
         /// <summary>Tóm tắt CV từ kết quả phân tích CV-JD</summary>
         public string? CvJdSummary { get; set; }
+
+        /// <summary>
+        /// Điểm từng tiêu chí chấm CV kèm nhãn + trọng số của doanh nghiệp (ADR-060). Rỗng khi tin
+        /// chưa khai bộ tiêu chí chấm CV — khi đó <see cref="MatchScore"/> vẫn là con số Gemini tự
+        /// đưa ra và giao diện chỉ hiện điểm tổng như trước.
+        /// </summary>
+        public List<CvCriterionScoreDto> CvCriterionScores { get; set; } = new();
 
         /// <summary>
         /// True nếu ứng viên đã đặt lịch buổi phỏng vấn thật (InterviewBooking "scheduled") — điều kiện

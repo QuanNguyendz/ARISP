@@ -69,7 +69,9 @@
     "urgent": "Urgent Hiring",
     "cancel": "Cancel",
     "save": "Save",
-    "createJob": "Create Job"
+    "createJob": "Create Job",
+    "interviewPassScore": "Interview pass score",
+    "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook."
   },
   "validation": {
     "requiredFields": "Title and Job Description are required.",

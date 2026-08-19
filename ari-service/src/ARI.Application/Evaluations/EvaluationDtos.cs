@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ARI.Application.Playbooks;
 using ARI.Domain.Entities;
 
 namespace ARI.Application.Evaluations
@@ -18,13 +20,6 @@ namespace ARI.Application.Evaluations
         public string? CandidateFeedback { get; set; }
     }
 
-    public class CriterionScoreDto
-    {
-        public string Name { get; set; } = string.Empty;
-        public decimal Score { get; set; }
-        public decimal MaxScore { get; set; } = 100; // default to 100
-        public string Reasoning { get; set; } = string.Empty;
-    }
 
     public class QuestionAnalysisDto
     {
@@ -124,6 +119,17 @@ namespace ARI.Application.Evaluations
             };
     }
 
+    /// <summary>Điểm một tiêu chí kèm nhãn + trọng số tại thời điểm chấm (ADR-060).</summary>
+    public class CriterionScoreDto
+    {
+        public string Key { get; set; } = string.Empty;
+        public decimal Score { get; set; }
+        /// <summary>Tên hiển thị do doanh nghiệp đặt. Null với bản đánh giá cũ (dạng JSON phẳng).</summary>
+        public string? Label { get; set; }
+        /// <summary>Trọng số (%) của tiêu chí. Null với bản đánh giá cũ.</summary>
+        public decimal? Weight { get; set; }
+    }
+
     public class EvaluationDetailResponse
     {
         public Guid Id { get; set; }
@@ -134,6 +140,14 @@ namespace ARI.Application.Evaluations
         public string AiVerdict { get; set; } = string.Empty;
         public decimal? OverallScore { get; set; }
         public Dictionary<string, decimal>? CriterionScores { get; set; }
+
+        /// <summary>
+        /// Điểm từng tiêu chí kèm NHÃN và TRỌNG SỐ tại thời điểm chấm (ADR-060) — có giá trị khi tin
+        /// đã khai bộ tiêu chí. Giữ song song <see cref="CriterionScores"/> (chỉ điểm) để giao diện cũ
+        /// và các bản đánh giá trước ADR-060 không vỡ.
+        /// </summary>
+        public List<CriterionScoreDto>? CriterionDetails { get; set; }
+
         public string? Reasoning { get; set; }
         public string? RecommendedNextStep { get; set; }
         public List<QuestionAnalysisDto>? QuestionAnalyses { get; set; }
@@ -175,23 +189,24 @@ namespace ARI.Application.Evaluations
         {
             var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-            Dictionary<string, decimal>? parsedCriteria = null;
-            if (!string.IsNullOrEmpty(eval.CriterionScores))
-            {
-                try
-                {
-                    parsedCriteria = JsonSerializer.Deserialize<Dictionary<string, decimal>>(eval.CriterionScores, options);
-                }
-                catch
-                {
-                    // Fallback to case-insensitive if camelCase fails
-                    try
+            // Đọc CẢ HAI dạng JSON điểm tiêu chí (ADR-060): dạng phẳng cũ {"technical":88} và dạng có
+            // ảnh chụp {"technical":{"score":88,"label":…,"weight":…}}. Bản cũ deserialize thẳng sang
+            // Dictionary<string,decimal> nên gặp dạng mới là ném lỗi rồi bỏ trống — HR mất bảng điểm.
+            var criterionViews = ScoringRubricSupport.ParseForDisplay(eval.CriterionScores);
+            Dictionary<string, decimal>? parsedCriteria = criterionViews.Count == 0
+                ? null
+                : criterionViews.ToDictionary(c => c.Key, c => c.Score);
+            List<CriterionScoreDto>? criterionDetails = criterionViews.Count == 0
+                ? null
+                : criterionViews
+                    .Select(c => new CriterionScoreDto
                     {
-                        parsedCriteria = JsonSerializer.Deserialize<Dictionary<string, decimal>>(eval.CriterionScores);
-                    }
-                    catch { /* ignore */ }
-                }
-            }
+                        Key = c.Key,
+                        Score = c.Score,
+                        Label = c.Label,
+                        Weight = c.Weight,
+                    })
+                    .ToList();
 
             List<QuestionAnalysisDto>? parsedQuestions = null;
             if (!string.IsNullOrEmpty(eval.QuestionAnalyses))
@@ -233,6 +248,7 @@ namespace ARI.Application.Evaluations
                 AiVerdict = eval.AiVerdict,
                 OverallScore = eval.OverallScore,
                 CriterionScores = parsedCriteria,
+                CriterionDetails = criterionDetails,
                 Reasoning = eval.Reasoning,
                 RecommendedNextStep = eval.RecommendedNextStep,
                 QuestionAnalyses = parsedQuestions,

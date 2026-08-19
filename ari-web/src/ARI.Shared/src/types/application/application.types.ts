@@ -114,6 +114,13 @@ export interface MyApplicationItem {
 export interface MyEvalCriterion {
   name: string
   score: number
+  /**
+   * Tên tiêu chí do doanh nghiệp đặt, chụp lại lúc chấm (ADR-060). Null với bản đánh giá cũ —
+   * lúc đó mới rơi về từ điển nhãn i18n.
+   */
+  label?: string | null
+  /** Trọng số (%) của tiêu chí lúc chấm. Null với bản đánh giá cũ. */
+  weight?: number | null
 }
 
 export interface MyEvalQuestion {
@@ -275,6 +282,16 @@ export interface MyApplicationDetail {
  * Item hồ sơ ứng tuyển cho danh sách HR/Recruiter — khớp đúng JSON từ GET /applications
  * (ApplicationResponse ở backend). Status là chuỗi thô từ backend, map nhãn ở UI.
  */
+/** Một dòng điểm tiêu chí chấm CV (ADR-060). */
+export interface CvCriterionScore {
+  key: string
+  score: number
+  /** Tên hiển thị doanh nghiệp đặt — null với bản phân tích cũ. */
+  label?: string | null
+  /** Trọng số (%) — null với bản phân tích cũ. */
+  weight?: number | null
+}
+
 export interface HrApplicationItem {
   id: string
   jobPostingId: string
@@ -290,6 +307,11 @@ export interface HrApplicationItem {
   cvJdAnalysisId?: string
   matchScore?: number | null
   cvJdSummary?: string
+  /**
+   * Điểm từng tiêu chí chấm CV kèm nhãn + trọng số doanh nghiệp khai (ADR-060).
+   * Rỗng khi tin chưa khai bộ tiêu chí chấm CV — khi đó chỉ hiện điểm tổng như trước.
+   */
+  cvCriterionScores?: CvCriterionScore[]
   /** Ứng viên đã đặt lịch phỏng vấn thật → đủ điều kiện cấp Interview Code On-site (ADR-015/016). */
   hasScheduledInterview?: boolean
   currentRound?: number | null

@@ -19,10 +19,15 @@ internal sealed class FakeGeminiProvider : IGeminiProvider
     public Result<CvJdAnalysisResultDto> AnalyzeResult { get; set; } =
         Result.Success(new CvJdAnalysisResultDto { IsValidCv = true, MatchScore = 75, Summary = "ok", Provider = "Gemini" });
 
+    /// <summary>Chỉ dẫn rubric mà service truyền xuống (ADR-060) — để test khẳng định có gửi hay không.</summary>
+    public string? LastRubricInstruction { get; private set; }
+
     public Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(
-        string jdText, byte[]? cvFileBytes, string? cvMimeType, string? fallbackCvText, CancellationToken ct = default)
+        string jdText, byte[]? cvFileBytes, string? cvMimeType, string? fallbackCvText,
+        string? rubricInstruction = null, CancellationToken ct = default)
     {
         AnalyzeCallCount++;
+        LastRubricInstruction = rubricInstruction;
         return Task.FromResult(AnalyzeResult);
     }
 

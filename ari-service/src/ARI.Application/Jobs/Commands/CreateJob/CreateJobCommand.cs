@@ -68,6 +68,7 @@ namespace ARI.Application.Jobs.Commands.CreateJob
                 RescheduleDeadlineHours = request.RescheduleDeadlineHours,
                 InviteTokenTtlHours = request.InviteTokenTtlHours,
                 ScoringRubric = request.ScoringRubric.HasValue ? request.ScoringRubric.Value.GetRawText() : null,
+                InterviewPassScore = Math.Clamp(request.InterviewPassScore, 0, 100),
                 PersonaName = request.PersonaName,
                 PersonaVoiceId = request.PersonaVoiceId,
                 PersonaStyle = request.PersonaStyle,

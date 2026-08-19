@@ -108,6 +108,12 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<JobPosting>()
                 .Property(j => j.ScoringRubric)
                 .HasColumnType("jsonb");
+            modelBuilder.Entity<JobPosting>()
+                .Property(j => j.InterviewPassScore).HasColumnName("interview_pass_score");
+            modelBuilder.Entity<PlaybookDocument>()
+                .Property(p => p.RubricJson).HasColumnName("rubric_json");
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.CriterionScores).HasColumnName("criterion_scores").HasColumnType("jsonb");
 
             modelBuilder.Entity<ARI.Domain.Entities.Application>()
                 .Property(a => a.DemographicData)

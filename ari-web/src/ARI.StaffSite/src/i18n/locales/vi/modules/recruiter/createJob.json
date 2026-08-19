@@ -69,7 +69,9 @@
     "urgent": "Tuyển gấp",
     "cancel": "Hủy",
     "save": "Lưu",
-    "createJob": "Tạo tin"
+    "createJob": "Tạo tin",
+    "interviewPassScore": "Điểm sàn phỏng vấn",
+    "interviewPassScoreHint": "Từ điểm này trở lên AI kết luận \"đạt\" (0–100). Chỉ áp dụng khi đã khai bộ tiêu chí chấm phỏng vấn trong Playbook."
   },
   "validation": {
     "requiredFields": "Tiêu đề và Mô tả công việc là bắt buộc.",
