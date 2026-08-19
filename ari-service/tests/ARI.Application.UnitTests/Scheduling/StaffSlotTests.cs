@@ -13,331 +13,298 @@ using Xunit;
 
 namespace ARI.Application.UnitTests.Scheduling;
 
-/// <summary>
-/// Nhân sự quản lý kho khung giờ phỏng vấn thật (UC-39/40/41, StaffScheduling): xem danh sách slot theo job/vòng,
-/// tạo khung giờ (validate tương lai/sức chứa/vòng), xoá khung giờ (chặn khi đã có người đặt) và sửa sức chứa
-/// (không nhỏ hơn số đã đặt). Mọi thao tác qua cổng phân quyền chủ tin / admin (<c>SchedulingSupport.CanManage</c>).
-/// </summary>
-public class StaffSlotTests
+/// <summary>Hằng số dùng chung cho test kho khung giờ (bám GUID cố định của Report5 Unit v1.2).</summary>
+internal static class SlotIds
 {
-    private readonly Guid _ownerId = Guid.NewGuid();
+    public static readonly Guid Owner = Guid.Parse("86000000-0000-0000-0000-000000000001");
+    public static readonly Guid JobId = Guid.Parse("84000000-0000-0000-0000-000000000001");
+    public static readonly Guid SlotId = Guid.Parse("83000000-0000-0000-0000-000000000001");
+    public static readonly DateTimeOffset Future = DateTimeOffset.UtcNow.AddDays(3);
+    public static readonly DateTimeOffset Past = DateTimeOffset.UtcNow.AddDays(-3);
 
-    // ---------- GetAvailabilitySlotsQueryHandler ----------
+    public static JobPosting Job(Guid? owner = null)
+        => new() { Id = JobId, CreatedByUserId = owner ?? Owner, Title = "Backend Developer" };
 
-    private Task<Result<List<AvailabilitySlotResponse>>> RunGet(
-        InMemoryUnitOfWork uow, Guid jobId, int? round = null, Guid? user = null, string? role = null)
+    public static AvailabilitySlot Slot(Guid? id = null, int round = 1, int capacity = 2, int booked = 0, DateTimeOffset? start = null)
+        => new()
+        {
+            Id = id ?? SlotId, JobPostingId = JobId, RoundNumber = round,
+            StartTime = start ?? Future, EndTime = (start ?? Future).AddHours(1),
+            Timezone = "Asia/Ho_Chi_Minh", Capacity = capacity, BookedCount = booked,
+        };
+}
+
+/// <summary>
+/// Xem kho khung giờ theo job/vòng (<see cref="GetAvailabilitySlotsQueryHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "GetAvailabilitySlots" (UTCID01–05): bắt buộc jobId, tồn tại tin, phân quyền chủ tin/admin, sắp theo giờ, lỗi repo.
+/// </summary>
+public class GetAvailabilitySlotsQueryHandlerTests
+{
+    private static Task<Result<List<AvailabilitySlotResponse>>> Run(InMemoryUnitOfWork uow, Guid jobId)
         => new GetAvailabilitySlotsQueryHandler(uow)
-            .Handle(new GetAvailabilitySlotsQuery(jobId, round, user ?? _ownerId, role ?? AppRoles.Recruiter), CancellationToken.None);
+            .Handle(new GetAvailabilitySlotsQuery(jobId, 1, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
     [Fact]
-    public async Task GetSlots_empty_job_id_fails()
+    public async Task UTCID01_Empty_job_id()
     {
-        var res = await RunGet(new InMemoryUnitOfWork(), Guid.Empty);
-
+        var res = await Run(new InMemoryUnitOfWork(), Guid.Empty);
         Assert.True(res.IsFailure);
-        Assert.Contains("jobPostingId", res.Error);
+        Assert.Equal("jobPostingId là bắt buộc.", res.Error);
     }
 
     [Fact]
-    public async Task GetSlots_job_not_found_returns_not_found()
+    public async Task UTCID02_Job_not_found()
     {
-        var res = await RunGet(new InMemoryUnitOfWork(), Guid.NewGuid());
-
+        var res = await Run(new InMemoryUnitOfWork(), SlotIds.JobId);
         Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
     [Fact]
-    public async Task GetSlots_non_owner_recruiter_is_forbidden()
+    public async Task UTCID03_Cannot_manage_forbidden()
     {
-        var job = SchedulingData.Job(owner: Guid.NewGuid()); // chủ tin khác
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(SchedulingData.Slot(job.Id));
-
-        var res = await RunGet(uow, job.Id, user: _ownerId, role: AppRoles.Recruiter);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job(owner: Guid.NewGuid())).Seed(SlotIds.Slot());
+        var res = await Run(uow, SlotIds.JobId);
         Assert.True(res.IsFailure);
+        Assert.Equal("Bạn không có quyền xem lịch của tin này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
     [Fact]
-    public async Task GetSlots_owner_gets_slots_ordered_by_start_time()
+    public async Task UTCID04_Owner_gets_slots_ordered()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var later = SchedulingData.Slot(job.Id, start: SchedulingData.Future.AddDays(2));
-        var sooner = SchedulingData.Slot(job.Id, start: SchedulingData.Future);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(later, sooner);
+        var early = SlotIds.Slot(id: Guid.Parse("83000000-0000-0000-0000-000000000001"), start: SlotIds.Future);
+        var late = SlotIds.Slot(id: Guid.Parse("83000000-0000-0000-0000-000000000002"), start: SlotIds.Future.AddHours(5));
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(late, early);
 
-        var res = await RunGet(uow, job.Id);
+        var res = await Run(uow, SlotIds.JobId);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(2, res.Value!.Count);
-        Assert.Equal(sooner.Id, res.Value[0].Id); // sắp theo StartTime tăng dần
+        Assert.Equal(2, res.Value.Count);
+        Assert.Equal(early.Id, res.Value[0].Id);
     }
 
     [Fact]
-    public async Task GetSlots_filters_by_round()
+    public async Task UTCID05_Slot_repo_error()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var uow = new InMemoryUnitOfWork().Seed(job)
-            .Seed(SchedulingData.Slot(job.Id, round: 1), SchedulingData.Slot(job.Id, round: 2));
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).FailFindFor<AvailabilitySlot>("Slot DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, SlotIds.JobId));
+        Assert.Equal("Slot DB Error", ex.Message);
+    }
+}
 
-        var res = await RunGet(uow, job.Id, round: 2);
+/// <summary>
+/// Tạo khung giờ (<see cref="CreateSlotCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "CreateSlot" (UTCID01–09): validate jobId/giờ/tương lai/sức chứa/vòng, phân quyền, happy path, lỗi save.
+/// </summary>
+public class CreateSlotCommandHandlerTests
+{
+    private static Task<Result<AvailabilitySlotResponse>> Run(InMemoryUnitOfWork uow, CreateSlotRequest req)
+        => new CreateSlotCommandHandler(uow).Handle(new CreateSlotCommand(req, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
-        Assert.Equal(2, Assert.Single(res.Value!).RoundNumber);
+    private static CreateSlotRequest Req(Guid? jobId = null, int round = 1, int capacity = 2, DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh")
+        => new()
+        {
+            JobPostingId = jobId ?? SlotIds.JobId, RoundNumber = round, Capacity = capacity,
+            StartTime = start ?? SlotIds.Future, EndTime = end ?? (start ?? SlotIds.Future).AddHours(1), Timezone = tz,
+        };
+
+    [Fact]
+    public async Task UTCID01_Empty_job_id()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Req(jobId: Guid.Empty));
+        Assert.Equal("jobPostingId là bắt buộc.", res.Error);
     }
 
     [Fact]
-    public async Task GetSlots_admin_can_view_any_job()
+    public async Task UTCID02_End_not_after_start()
     {
-        var job = SchedulingData.Job(owner: Guid.NewGuid());
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(SchedulingData.Slot(job.Id));
-
-        var res = await RunGet(uow, job.Id, user: Guid.NewGuid(), role: AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
+        var res = await Run(new InMemoryUnitOfWork(), Req(start: SlotIds.Future, end: SlotIds.Future.AddHours(-1)));
+        Assert.Equal("Giờ kết thúc phải sau giờ bắt đầu.", res.Error);
     }
 
-    // ---------- CreateSlotCommandHandler ----------
-
-    private Task<Result<AvailabilitySlotResponse>> RunCreate(
-        InMemoryUnitOfWork uow, CreateSlotRequest req, Guid? user = null, string? role = null)
-        => new CreateSlotCommandHandler(uow)
-            .Handle(new CreateSlotCommand(req, user ?? _ownerId, role ?? AppRoles.Recruiter), CancellationToken.None);
+    [Fact]
+    public async Task UTCID03_Start_not_future()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Req(start: SlotIds.Past, end: SlotIds.Past.AddHours(1)));
+        Assert.Equal("Khung giờ phải nằm trong tương lai.", res.Error);
+    }
 
     [Fact]
-    public async Task Create_empty_job_id_fails()
+    public async Task UTCID04_Capacity_zero()
     {
-        var res = await RunCreate(new InMemoryUnitOfWork(), SchedulingData.SlotRequest(Guid.Empty));
+        var res = await Run(new InMemoryUnitOfWork(), Req(capacity: 0));
+        Assert.Equal("Sức chứa (capacity) tối thiểu là 1.", res.Error);
+    }
 
+    [Fact]
+    public async Task UTCID05_Round_zero()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Req(round: 0));
+        Assert.Equal("RoundNumber phải >= 1.", res.Error);
+    }
+
+    [Fact]
+    public async Task UTCID06_Job_missing()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Req());
         Assert.True(res.IsFailure);
-        Assert.Contains("jobPostingId", res.Error);
-    }
-
-    [Fact]
-    public async Task Create_end_before_start_fails()
-    {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var req = SchedulingData.SlotRequest(job.Id, start: SchedulingData.Future, end: SchedulingData.Future.AddHours(-1));
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, req);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Giờ kết thúc", res.Error);
-    }
-
-    [Fact]
-    public async Task Create_start_in_past_fails()
-    {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var req = SchedulingData.SlotRequest(job.Id, start: SchedulingData.Past, end: SchedulingData.Past.AddHours(1));
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, req);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("tương lai", res.Error);
-    }
-
-    [Fact]
-    public async Task Create_capacity_below_one_fails()
-    {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, capacity: 0));
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Sức chứa", res.Error);
-    }
-
-    [Fact]
-    public async Task Create_round_below_one_fails()
-    {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, round: 0));
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("RoundNumber", res.Error);
-    }
-
-    [Fact]
-    public async Task Create_job_not_found_returns_not_found()
-    {
-        // Request hợp lệ mọi mặt nhưng job không tồn tại → NotFound (validate xong mới kiểm tra quyền/tồn tại).
-        var res = await RunCreate(new InMemoryUnitOfWork(), SchedulingData.SlotRequest(Guid.NewGuid()));
-
-        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Create_non_owner_recruiter_is_forbidden()
+    public async Task UTCID07_Unauthorized()
     {
-        var job = SchedulingData.Job(owner: Guid.NewGuid());
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id), user: _ownerId, role: AppRoles.Recruiter);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job(owner: Guid.NewGuid()));
+        var res = await Run(uow, Req());
         Assert.True(res.IsFailure);
+        Assert.Equal("Bạn không có quyền tạo lịch cho tin này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Create_owner_persists_slot_with_zero_booked()
+    public async Task UTCID08_Valid_creates_slot()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, round: 2, capacity: 3));
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job());
+        var res = await Run(uow, Req(capacity: 2));
         Assert.True(res.IsSuccess);
-        Assert.Equal(0, res.Value!.BookedCount);
-        Assert.Equal(3, res.Value.Capacity);
-        Assert.Equal(2, res.Value.RoundNumber);
-        var stored = Assert.Single(uow.Repo<AvailabilitySlot>().Items);
-        Assert.Equal(0, stored.BookedCount);
+        Assert.Equal(0, res.Value.BookedCount);
+        Assert.Equal(2, res.Value.Capacity);
+        Assert.Single(uow.Repo<AvailabilitySlot>().Items);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
     [Fact]
-    public async Task Create_defaults_timezone_when_blank()
+    public async Task UTCID09_Save_error()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, tz: "   "));
-
-        Assert.Equal("Asia/Ho_Chi_Minh", res.Value!.Timezone);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, Req()));
+        Assert.Equal("Save Error", ex.Message);
     }
+}
 
-    // ---------- DeleteSlotCommandHandler ----------
-
-    private Task<Result> RunDelete(InMemoryUnitOfWork uow, Guid slotId, Guid? user = null, string? role = null)
-        => new DeleteSlotCommandHandler(uow)
-            .Handle(new DeleteSlotCommand(slotId, user ?? _ownerId, role ?? AppRoles.Recruiter), CancellationToken.None);
+/// <summary>
+/// Xoá khung giờ (<see cref="DeleteSlotCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "DeleteSlot" (UTCID01–05): tồn tại, phân quyền, chặn khi đã có người đặt, happy path, lỗi save.
+/// </summary>
+public class DeleteSlotCommandHandlerTests
+{
+    private static Task<Result> Run(InMemoryUnitOfWork uow)
+        => new DeleteSlotCommandHandler(uow).Handle(new DeleteSlotCommand(SlotIds.SlotId, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
     [Fact]
-    public async Task Delete_slot_not_found_returns_not_found()
+    public async Task UTCID01_Slot_missing()
     {
-        var res = await RunDelete(new InMemoryUnitOfWork(), Guid.NewGuid());
-
+        var res = await Run(new InMemoryUnitOfWork());
         Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy khung giờ.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Delete_non_owner_recruiter_is_forbidden()
+    public async Task UTCID02_Unauthorized()
     {
-        var job = SchedulingData.Job(owner: Guid.NewGuid());
-        var slot = SchedulingData.Slot(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunDelete(uow, slot.Id, user: _ownerId, role: AppRoles.Recruiter);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job(owner: Guid.NewGuid())).Seed(SlotIds.Slot());
+        var res = await Run(uow);
         Assert.True(res.IsFailure);
+        Assert.Equal("Bạn không có quyền xoá khung giờ này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-        Assert.Single(uow.Repo<AvailabilitySlot>().Items); // vẫn còn
     }
 
     [Fact]
-    public async Task Delete_booked_slot_is_rejected()
+    public async Task UTCID03_Booked_slot_rejected()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var slot = SchedulingData.Slot(job.Id, capacity: 2, booked: 1);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunDelete(uow, slot.Id);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(booked: 1));
+        var res = await Run(uow);
         Assert.True(res.IsFailure);
-        Assert.Contains("đã có ứng viên đặt", res.Error);
+        Assert.Equal("Không thể xoá khung giờ đã có ứng viên đặt lịch.", res.Error);
         Assert.Single(uow.Repo<AvailabilitySlot>().Items);
     }
 
     [Fact]
-    public async Task Delete_empty_slot_succeeds()
+    public async Task UTCID04_Empty_slot_deleted()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var slot = SchedulingData.Slot(job.Id, booked: 0);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunDelete(uow, slot.Id);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(booked: 0));
+        var res = await Run(uow);
         Assert.True(res.IsSuccess);
         Assert.Empty(uow.Repo<AvailabilitySlot>().Items);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
-    // ---------- UpdateSlotCapacityCommandHandler ----------
+    [Fact]
+    public async Task UTCID05_Save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(booked: 0)).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Save Error", ex.Message);
+    }
+}
 
-    private Task<Result<AvailabilitySlotResponse>> RunCapacity(
-        InMemoryUnitOfWork uow, Guid slotId, int capacity, Guid? user = null, string? role = null)
-        => new UpdateSlotCapacityCommandHandler(uow)
-            .Handle(new UpdateSlotCapacityCommand(slotId, capacity, user ?? _ownerId, role ?? AppRoles.Recruiter), CancellationToken.None);
+/// <summary>
+/// Sửa sức chứa khung giờ (<see cref="UpdateSlotCapacityCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "UpdateSlotCapacity" (UTCID01–06): tồn tại, phân quyền, tối thiểu 1, không nhỏ hơn số đã đặt, happy path, lỗi save.
+/// </summary>
+public class UpdateSlotCapacityCommandHandlerTests
+{
+    private static Task<Result<AvailabilitySlotResponse>> Run(InMemoryUnitOfWork uow, int capacity)
+        => new UpdateSlotCapacityCommandHandler(uow).Handle(new UpdateSlotCapacityCommand(SlotIds.SlotId, capacity, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
     [Fact]
-    public async Task UpdateCapacity_slot_not_found_returns_not_found()
+    public async Task UTCID01_Slot_missing()
     {
-        var res = await RunCapacity(new InMemoryUnitOfWork(), Guid.NewGuid(), 5);
-
+        var res = await Run(new InMemoryUnitOfWork(), 3);
         Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy khung giờ.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
     [Fact]
-    public async Task UpdateCapacity_non_owner_recruiter_is_forbidden()
+    public async Task UTCID02_Unauthorized()
     {
-        var job = SchedulingData.Job(owner: Guid.NewGuid());
-        var slot = SchedulingData.Slot(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunCapacity(uow, slot.Id, 5, user: _ownerId, role: AppRoles.Recruiter);
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job(owner: Guid.NewGuid())).Seed(SlotIds.Slot());
+        var res = await Run(uow, 3);
         Assert.True(res.IsFailure);
+        Assert.Equal("Bạn không có quyền sửa khung giờ này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
     [Fact]
-    public async Task UpdateCapacity_below_one_fails()
+    public async Task UTCID03_Capacity_below_one()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var slot = SchedulingData.Slot(job.Id, capacity: 2);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunCapacity(uow, slot.Id, 0);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Sức chứa tối thiểu", res.Error);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 2));
+        var res = await Run(uow, 0);
+        Assert.Equal("Sức chứa tối thiểu là 1.", res.Error);
     }
 
     [Fact]
-    public async Task UpdateCapacity_below_booked_count_fails()
+    public async Task UTCID04_Capacity_below_booked()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var slot = SchedulingData.Slot(job.Id, capacity: 5, booked: 3);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunCapacity(uow, slot.Id, 2); // < số đã đặt (3)
-
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 5, booked: 2));
+        var res = await Run(uow, 1);
         Assert.True(res.IsFailure);
-        Assert.Contains("không được nhỏ hơn số đã đặt", res.Error);
-        Assert.Equal(5, slot.Capacity); // giữ nguyên
+        Assert.Equal("Sức chứa không được nhỏ hơn số đã đặt (2).", res.Error);
     }
 
     [Fact]
-    public async Task UpdateCapacity_succeeds_and_persists()
+    public async Task UTCID05_Valid_update()
     {
-        var job = SchedulingData.Job(owner: _ownerId);
-        var slot = SchedulingData.Slot(job.Id, capacity: 2, booked: 1);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
-
-        var res = await RunCapacity(uow, slot.Id, 4);
-
+        var slot = SlotIds.Slot(capacity: 2, booked: 2);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot);
+        var res = await Run(uow, 3);
         Assert.True(res.IsSuccess);
-        Assert.Equal(4, res.Value!.Capacity);
-        Assert.Equal(4, slot.Capacity);
+        Assert.Equal(3, res.Value.Capacity);
+        Assert.Equal(2, res.Value.BookedCount);
+        Assert.Equal(3, slot.Capacity);
         Assert.Equal(1, uow.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UTCID06_Save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 2, booked: 2)).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, 3));
+        Assert.Equal("Save Error", ex.Message);
     }
 }

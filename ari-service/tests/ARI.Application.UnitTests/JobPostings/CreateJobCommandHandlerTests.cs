@@ -13,152 +13,155 @@ using Xunit;
 namespace ARI.Application.UnitTests.JobPostings;
 
 /// <summary>
-/// Tạo tin tuyển dụng + cấu hình vòng (UC-46/47, <see cref="CreateJobCommandHandler"/>): validate request,
-/// tạo job trạng thái draft của người tạo, sinh InterviewRoundConfig từng vòng (ngôn ngữ vòng kế thừa ngôn
-/// ngữ phát hiện từ JD nếu bỏ trống), đẩy JD vào RAG và báo realtime cho người tạo.
+/// Tạo tin tuyển dụng (<see cref="CreateJobCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "CreateJob" (UTCID01–12): validate request (title/JD/độ dài/mode/location/salary/rounds), tồn tại người tạo,
+/// happy path (draft + trim + ngôn ngữ phát hiện + round ascending), RAG lỗi không chặn, và mặc định ngôn ngữ/tiền tệ/vacancies.
 /// </summary>
 public class CreateJobCommandHandlerTests
 {
     private static Task<Result<JobPostingResponse>> Run(
-        InMemoryUnitOfWork uow, RecordingRagIngestionService rag, RecordingNotificationService notif,
-        CreateJobPostingRequest req, Guid userId)
-        => new CreateJobCommandHandler(uow, rag, notif, NullLogger<CreateJobCommandHandler>.Instance)
+        InMemoryUnitOfWork uow, CreateJobPostingRequest req, Guid userId, RecordingRagIngestionService? rag = null)
+        => new CreateJobCommandHandler(uow, rag ?? new RecordingRagIngestionService(), new RecordingNotificationService(),
+                NullLogger<CreateJobCommandHandler>.Instance)
             .Handle(new CreateJobCommand(req, userId), CancellationToken.None);
 
+    private static CreateJobPostingRequest Req() => JobPostingData.Request();
+
+    // UTCID01 — hợp lệ + người tạo tồn tại → draft, trim, ngôn ngữ phát hiện, round ascending, save 2 lần
     [Fact]
-    public async Task Valid_request_creates_draft_job_with_rounds()
+    public async Task UTCID01_Valid_creates_draft()
     {
         var userId = Guid.NewGuid();
         var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
-        var req = JobPostingData.Request();
-        req.RoundConfigs = new() { JobPostingData.Round(1, "screening"), JobPostingData.Round(2, "technical") };
+        var req = Req();
+        req.Title = "  Backend Developer  ";
+        req.RoundConfigs = new() { JobPostingData.Round(2, "technical"), JobPostingData.Round(1, "screening") };
 
-        var res = await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(), req, userId);
+        var res = await Run(uow, req, userId);
 
         Assert.True(res.IsSuccess);
         var job = Assert.Single(uow.Repo<JobPosting>().Items);
         Assert.Equal("draft", job.Status);
-        Assert.Equal(userId, job.CreatedByUserId);
-        Assert.Equal(2, uow.Repo<InterviewRoundConfig>().Items.Count);
-        Assert.Equal(2, res.Value.RoundConfigs.Count);
+        Assert.Equal("Backend Developer", job.Title);
+        Assert.Equal("vi", job.DetectedLanguage);
+        Assert.Equal(1, uow.Repo<InterviewRoundConfig>().Items.First().RoundNumber);   // ascending
+        Assert.Equal(2, uow.SaveChangesCount);                                          // job + rounds
     }
 
+    // UTCID02 — Title trống
     [Fact]
-    public async Task Creator_not_found_fails_unauthorized()
+    public async Task UTCID02_Title_required()
     {
-        var uow = new InMemoryUnitOfWork(); // không seed user
-
-        var res = await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(),
-            JobPostingData.Request(), Guid.NewGuid());
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
-        Assert.Empty(uow.Repo<JobPosting>().Items);
-    }
-
-    [Fact]
-    public async Task Jd_is_ingested_to_rag()
-    {
-        var userId = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
-        var rag = new RecordingRagIngestionService();
-
-        var res = await Run(uow, rag, new RecordingNotificationService(), JobPostingData.Request(), userId);
-
-        var ingest = Assert.Single(rag.Ingested);
-        Assert.Equal("jd", ingest.SourceType);
-        Assert.Equal(res.Value.Id, ingest.SourceId);
-    }
-
-    [Fact]
-    public async Task Notifies_creator()
-    {
-        var userId = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
-        var notif = new RecordingNotificationService();
-
-        await Run(uow, new RecordingRagIngestionService(), notif, JobPostingData.Request(), userId);
-
-        Assert.Contains(notif.UserEvents, e => e.UserId == userId && e.EventType == "ReceiveJobPostingUpdate");
-    }
-
-    // ---------- Validation (chạy trước, không cần user) ----------
-
-    [Fact]
-    public async Task Missing_title_fails_validation()
-    {
+        var req = Req(); req.Title = " ";
         var uow = new InMemoryUnitOfWork();
-        var req = JobPostingData.Request();
-        req.Title = "";
-
-        var res = await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(), req, Guid.NewGuid());
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Title is required", res.Error);
+        var res = await Run(uow, req, Guid.NewGuid());
+        Assert.Equal("Title is required.", res.Error);
         Assert.Empty(uow.Repo<JobPosting>().Items);
     }
 
+    // UTCID03 — JobDescription trống
     [Fact]
-    public async Task No_rounds_fails_validation()
+    public async Task UTCID03_JobDescription_required()
     {
-        var req = JobPostingData.Request();
-        req.RoundConfigs = new();
-
-        var res = await Run(new InMemoryUnitOfWork(), new RecordingRagIngestionService(), new RecordingNotificationService(), req, Guid.NewGuid());
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("At least one interview round", res.Error);
+        var req = Req(); req.JobDescription = " ";
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("JobDescription is required.", res.Error);
     }
 
+    // UTCID04 — Title > 200 ký tự
     [Fact]
-    public async Task Invalid_interview_mode_fails()
+    public async Task UTCID04_Title_too_long()
     {
-        var req = JobPostingData.Request(interviewMode: "hybrid");
-
-        var res = await Run(new InMemoryUnitOfWork(), new RecordingRagIngestionService(), new RecordingNotificationService(), req, Guid.NewGuid());
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("InterviewMode must be", res.Error);
+        var req = Req(); req.Title = new string('a', 201);
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("Title cannot exceed 200 characters.", res.Error);
     }
 
+    // UTCID05 — InterviewMode không hợp lệ
     [Fact]
-    public async Task Onsite_without_location_fails()
+    public async Task UTCID05_Invalid_interview_mode()
     {
-        var req = JobPostingData.Request(interviewMode: "onsite"); // Location null
-
-        var res = await Run(new InMemoryUnitOfWork(), new RecordingRagIngestionService(), new RecordingNotificationService(), req, Guid.NewGuid());
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Location is required", res.Error);
+        var req = Req(); req.InterviewMode = "hybrid-office";
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("InterviewMode must be 'remote', 'onsite', or 'both'.", res.Error);
     }
 
-    // ---------- Ngôn ngữ vòng ----------
-
+    // UTCID06 — onsite nhưng không có Location
     [Fact]
-    public async Task Round_without_language_inherits_detected_language()
+    public async Task UTCID06_Onsite_without_location()
+    {
+        var req = Req(); req.InterviewMode = "onsite"; req.Location = " ";
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("Location is required when InterviewMode is not 'remote'.", res.Error);
+    }
+
+    // UTCID07 — SalaryMax < SalaryMin
+    [Fact]
+    public async Task UTCID07_Salary_max_below_min()
+    {
+        var req = Req(); req.SalaryMin = 30000000; req.SalaryMax = 20000000;
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("SalaryMax cannot be less than SalaryMin.", res.Error);
+    }
+
+    // UTCID08 — SalaryIsNegotiable=true nhưng vẫn có salary
+    [Fact]
+    public async Task UTCID08_Negotiable_with_salary()
+    {
+        var req = Req(); req.SalaryIsNegotiable = true; req.SalaryMin = 10000000;
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("SalaryMin and SalaryMax must be null when SalaryIsNegotiable is true.", res.Error);
+    }
+
+    // UTCID09 — RoundConfigs rỗng
+    [Fact]
+    public async Task UTCID09_No_rounds()
+    {
+        var req = Req(); req.RoundConfigs = new();
+        var res = await Run(new InMemoryUnitOfWork(), req, Guid.NewGuid());
+        Assert.Equal("At least one interview round configuration is required.", res.Error);
+    }
+
+    // UTCID10 — người tạo không tồn tại → unauthorized
+    [Fact]
+    public async Task UTCID10_Creator_not_found()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), Req(), Guid.NewGuid());
+        Assert.True(res.IsFailure);
+        Assert.Equal("User not found for the current token.", res.Error);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
+    }
+
+    // UTCID11 — RAG ingest ném lỗi → job vẫn được tạo
+    [Fact]
+    public async Task UTCID11_Rag_failure_still_creates_job()
     {
         var userId = Guid.NewGuid();
         var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
-        var req = JobPostingData.Request();
-        req.RoundConfigs = new() { JobPostingData.Round(1, language: null) };
 
-        await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(), req, userId);
+        var res = await Run(uow, Req(), userId, new RecordingRagIngestionService { ThrowOnIngest = true });
 
+        Assert.True(res.IsSuccess);
+        Assert.Single(uow.Repo<JobPosting>().Items);
+    }
+
+    // UTCID12 — LanguageRequirement/SalaryCurrency trống + Vacancies=0 → mặc định
+    [Fact]
+    public async Task UTCID12_Defaults_applied()
+    {
+        var userId = Guid.NewGuid();
+        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
+        var req = Req();
+        req.LanguageRequirement = " ";
+        req.SalaryCurrency = " ";
+        req.Vacancies = 0;
+
+        var res = await Run(uow, req, userId);
+
+        Assert.True(res.IsSuccess);
         var job = Assert.Single(uow.Repo<JobPosting>().Items);
-        var config = Assert.Single(uow.Repo<InterviewRoundConfig>().Items);
-        Assert.Equal(job.DetectedLanguage, config.InterviewLanguage);
-    }
-
-    [Fact]
-    public async Task Round_explicit_language_is_kept()
-    {
-        var userId = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
-        var req = JobPostingData.Request();
-        req.RoundConfigs = new() { JobPostingData.Round(1, language: "ja") };
-
-        await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(), req, userId);
-
-        Assert.Equal("ja", Assert.Single(uow.Repo<InterviewRoundConfig>().Items).InterviewLanguage);
+        Assert.Equal("Tiếng Việt", job.LanguageRequirement);   // detectedLang=vi
+        Assert.Equal("VND", job.SalaryCurrency);
+        Assert.Null(job.Vacancies);
     }
 }

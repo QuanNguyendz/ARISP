@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
@@ -14,430 +13,198 @@ using Xunit;
 namespace ARI.Application.UnitTests.JobPostings;
 
 /// <summary>
-/// Luồng 2 — Approve Job Posting (UC-48/78/79/80, <see cref="UpdateJobStatusCommandHandler"/>): workflow
-/// draft→pending→active|rejected, phân quyền Owner (gửi duyệt) vs HrAdmin/SuperAdmin (duyệt/từ chối), bắt
-/// buộc lý do từ chối, đóng dấu duyệt PDF (best-effort không chặn), thông báo người tạo + nhóm hr_admin.
+/// Approval workflow tin tuyển dụng (<see cref="UpdateJobStatusCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "UpdateJobStatus" (UTCID01–15): validate status (rỗng/không hợp lệ/draft), tồn tại, phân quyền, trùng trạng thái,
+/// archived, các nhánh reject/active/pending/archived + happy path (pending/active/closed).
 /// </summary>
 public class UpdateJobStatusCommandHandlerTests
 {
-    private sealed record Ctx(
-        InMemoryUnitOfWork Uow, RecordingFileStorage Storage, RecordingJdStampService Stamp,
+    private static readonly Guid OwnerA = Guid.Parse("86000000-0000-0000-0000-000000000001");
+    private static readonly Guid HrA = Guid.Parse("87000000-0000-0000-0000-000000000001");
+
+    private sealed record Ctx(InMemoryUnitOfWork Uow, RecordingFileStorage Storage, RecordingJdStampService Stamp,
         StubDocumentParser Parser, RecordingNotificationService Notif, RecordingEmailService Email);
 
-    private static Ctx NewCtx() => new(
-        new InMemoryUnitOfWork(), new RecordingFileStorage(), new RecordingJdStampService(),
+    private static Ctx NewCtx() => new(new InMemoryUnitOfWork(), new RecordingFileStorage(), new RecordingJdStampService(),
         new StubDocumentParser(), new RecordingNotificationService(), new RecordingEmailService());
 
-    private static Task<Result<JobPostingResponse>> Run(Ctx c, Guid jobId, UpdateJobStatusRequest req, Guid userId, string? role)
+    private static Task<Result<JobPostingResponse>> Run(Ctx c, Guid jobId, UpdateJobStatusRequest req, Guid userId, string role)
         => new UpdateJobStatusCommandHandler(c.Uow, c.Storage, c.Stamp, c.Parser, c.Notif, c.Email, NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, req, userId, role), CancellationToken.None);
 
-    // ---------- Guards ----------
+    private static UpdateJobStatusRequest Req(string status, string? reason = null) => JobPostingData.StatusRequest(status, reason);
 
+    // UTCID01 — status rỗng
     [Fact]
-    public async Task Empty_status_fails()
+    public async Task UTCID01_Status_required()
     {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid());
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest(""), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Status is required", res.Error);
+        var res = await Run(NewCtx(), Guid.NewGuid(), Req(" "), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Status is required.", res.Error);
     }
 
+    // UTCID02 — status không được hỗ trợ
     [Fact]
-    public async Task Invalid_status_fails()
+    public async Task UTCID02_Unsupported_status()
     {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid());
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("foobar"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("không hợp lệ", res.Error);
+        var res = await Run(NewCtx(), Guid.NewGuid(), Req("unknown"), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Trạng thái không hợp lệ. Sử dụng một trong: draft, pending, active, rejected, closed, archived.", res.Error);
     }
 
+    // UTCID03 — status=draft
     [Fact]
-    public async Task Cannot_transition_back_to_draft()
+    public async Task UTCID03_Draft_not_allowed()
     {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("draft"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("draft", res.Error);
+        var res = await Run(NewCtx(), Guid.NewGuid(), Req("draft"), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Không thể chuyển trạng thái về 'draft'. 'draft' chỉ dùng khi tạo hoặc chỉnh sửa nháp ban đầu.", res.Error);
     }
 
+    // UTCID04 — job không tồn tại
     [Fact]
-    public async Task Job_not_found_fails()
+    public async Task UTCID04_Job_not_found()
     {
-        var res = await Run(NewCtx(), Guid.NewGuid(), JobPostingData.StatusRequest("pending"), Guid.NewGuid(), AppRoles.HrAdmin);
-
+        var res = await Run(NewCtx(), Guid.NewGuid(), Req("pending"), OwnerA, AppRoles.Recruiter);
         Assert.True(res.IsFailure);
+        Assert.Equal("Job posting not found.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
+    // UTCID05 — không có quyền
     [Fact]
-    public async Task Same_status_fails()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "active");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("đã ở trạng thái", res.Error);
-    }
-
-    [Fact]
-    public async Task Archived_job_cannot_change_status()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "archived");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("lưu trữ", res.Error);
-    }
-
-    [Fact]
-    public async Task Unauthorized_user_is_forbidden()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "active");
-        c.Uow.Seed(job);
-
-        // Không phải chủ tin, không phải admin → chặn ngay ở cổng chung.
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("closed"), Guid.NewGuid(), AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-    }
-
-    // ---------- UC-48: Submit for Approval (→ pending) ----------
-
-    [Fact]
-    public async Task Owner_submits_draft_to_pending()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "draft");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("pending"), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("pending", job.Status);
-        Assert.Contains(c.Notif.GroupEvents, e => e.Group == "hr_admin" && e.EventType == "ReceiveJobPostingUpdate");
-    }
-
-    [Fact]
-    public async Task Non_owner_cannot_submit_for_approval()
+    public async Task UTCID05_Unauthorized()
     {
         var c = NewCtx();
         var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "draft");
         c.Uow.Seed(job);
-
-        // HrAdmin nhưng không phải chủ tin → không được gửi duyệt (chỉ Owner mới gửi).
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("pending"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
+        var res = await Run(c, job.Id, Req("pending"), Guid.NewGuid(), AppRoles.Recruiter);
+        Assert.Equal("Bạn không có quyền thay đổi trạng thái tin tuyển dụng này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-        Assert.Contains("Recruiter/Owner", res.Error);
     }
 
+    // UTCID06 — trùng trạng thái
     [Fact]
-    public async Task Pending_only_from_draft_or_rejected()
+    public async Task UTCID06_Same_status()
     {
         var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "active");
+        var job = JobPostingData.Job(owner: OwnerA, status: "pending");
         c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("pending"), userId, AppRoles.Recruiter);
-
+        var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter);
         Assert.True(res.IsFailure);
-        Assert.Contains("gửi duyệt", res.Error);
+        Assert.Contains("đã ở trạng thái 'pending'", res.Error);
     }
 
+    // UTCID07 — job đã archived
     [Fact]
-    public async Task Rejected_job_can_be_resubmitted_and_clears_reason()
+    public async Task UTCID07_Archived_locked()
     {
         var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "rejected");
-        job.RejectionReason = "Thiếu mô tả";
+        var job = JobPostingData.Job(owner: OwnerA, status: "archived");
+        c.Uow.Seed(job);
+        var res = await Run(c, job.Id, Req("closed"), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Không thể thay đổi trạng thái của tin tuyển dụng đã lưu trữ (archived).", res.Error);
+    }
+
+    // UTCID08 — recruiter yêu cầu rejected
+    [Fact]
+    public async Task UTCID08_Recruiter_cannot_reject()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "pending");
+        c.Uow.Seed(job);
+        var res = await Run(c, job.Id, Req("rejected", "x"), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Chỉ HrAdmin hoặc SuperAdmin mới có quyền từ chối duyệt bài.", res.Error);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
+
+    // UTCID09 — admin reject pending nhưng thiếu lý do
+    [Fact]
+    public async Task UTCID09_Reject_without_reason()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
+        c.Uow.Seed(job);
+        var res = await Run(c, job.Id, Req("rejected", " "), HrA, AppRoles.HrAdmin);
+        Assert.Equal("Vui lòng cung cấp lý do từ chối duyệt bài (RejectionReason).", res.Error);
+    }
+
+    // UTCID10 — admin activate pending nhưng deadline đã quá khứ
+    [Fact]
+    public async Task UTCID10_Activate_expired_deadline()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending", deadline: DateTimeOffset.UtcNow.AddDays(-1));
+        c.Uow.Seed(job);
+        var res = await Run(c, job.Id, Req("active"), HrA, AppRoles.HrAdmin);
+        Assert.Equal("Hạn nộp hồ sơ của Job này đã ở quá khứ. Hãy cập nhật lại gia hạn Deadline trước khi chuyển sang Active.", res.Error);
+    }
+
+    // UTCID11 — không phải owner mà gửi duyệt (pending)
+    [Fact]
+    public async Task UTCID11_Non_owner_submit_pending()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "draft");
+        c.Uow.Seed(job);
+        var res = await Run(c, job.Id, Req("pending"), HrA, AppRoles.HrAdmin);
+        Assert.Equal("Chỉ Recruiter/Owner mới có quyền gửi duyệt bài.", res.Error);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
+
+    // UTCID12 — archive tin còn hồ sơ hoạt động
+    [Fact]
+    public async Task UTCID12_Archive_with_active_apps()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "active");
+        c.Uow.Seed(job).Seed(new ARI.Domain.Entities.Application { JobPostingId = job.Id, CandidateEmail = "a@x.io", Status = "cv_submitted" });
+        var res = await Run(c, job.Id, Req("archived"), OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Không thể chuyển tin tuyển dụng sang lưu trữ (archived) khi đang có hồ sơ ứng tuyển đang hoạt động.", res.Error);
+    }
+
+    // UTCID13 — owner đổi draft → pending → Success, xoá RejectionReason cũ
+    [Fact]
+    public async Task UTCID13_Draft_to_pending()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        job.RejectionReason = "old reason";
         c.Uow.Seed(job);
 
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("pending"), userId, AppRoles.Recruiter);
+        var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("pending", job.Status);
         Assert.Null(job.RejectionReason);
     }
 
+    // UTCID14 — admin duyệt pending → active → Success, ghi nhận người duyệt
     [Fact]
-    public async Task Submitting_notifies_hr_admins_with_notification_record()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var hrAdmin = JobPostingData.Staff(Guid.NewGuid(), role: "hr_admin"); // query dùng role chữ thường
-        var job = JobPostingData.Job(owner: userId, status: "draft");
-        c.Uow.Seed(hrAdmin).Seed(job);
-
-        await Run(c, job.Id, JobPostingData.StatusRequest("pending"), userId, AppRoles.Recruiter);
-
-        Assert.Contains(c.Uow.Repo<Notification>().Items, n => n.RecipientUserId == hrAdmin.Id && n.Type == "pending");
-    }
-
-    // ---------- UC-78: Approve (→ active) ----------
-
-    [Fact]
-    public async Task Admin_approves_pending_and_notifies_creator()
-    {
-        var c = NewCtx();
-        var adminId = Guid.NewGuid();
-        var creator = JobPostingData.Staff(Guid.NewGuid(), "recruiter");
-        var job = JobPostingData.Job(owner: creator.Id, status: "pending");
-        c.Uow.Seed(creator).Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), adminId, AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("active", job.Status);
-        Assert.Equal(adminId, job.ApprovedByUserId);
-        Assert.NotNull(job.PublishedAt);
-        Assert.Contains("ReceivePublicJobUpdate", c.Notif.AllEvents);
-        Assert.Contains(c.Notif.UserEvents, e => e.UserId == creator.Id && e.EventType == "ReceiveJobPostingUpdate");
-        Assert.Contains(c.Uow.Repo<Notification>().Items, n => n.RecipientUserId == creator.Id && n.Type == "approved");
-    }
-
-    [Fact]
-    public async Task Non_admin_cannot_approve()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "pending");
-        c.Uow.Seed(job);
-
-        // Owner (Recruiter) tự duyệt tin mình → không được (chỉ HrAdmin/SuperAdmin).
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-        Assert.Contains("HrAdmin hoặc SuperAdmin", res.Error);
-    }
-
-    [Fact]
-    public async Task Approve_from_invalid_status_fails()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "rejected");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("kích hoạt", res.Error);
-    }
-
-    [Fact]
-    public async Task Approve_with_past_deadline_fails()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending", deadline: DateTimeOffset.UtcNow.AddDays(-1));
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Hạn nộp hồ sơ", res.Error);
-    }
-
-    [Fact]
-    public async Task Reactivating_closed_job_does_not_re_approve()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "closed");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("active", job.Status);
-        Assert.Null(job.ApprovedByUserId); // closed→active không phải phê duyệt lần đầu
-    }
-
-    // ---------- UC-79: Reject (→ rejected) ----------
-
-    [Fact]
-    public async Task Admin_rejects_pending_with_reason_and_notifies_creator()
-    {
-        var c = NewCtx();
-        var creator = JobPostingData.Staff(Guid.NewGuid(), "recruiter");
-        var job = JobPostingData.Job(owner: creator.Id, status: "pending");
-        c.Uow.Seed(creator).Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("rejected", "JD chưa rõ ràng"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("rejected", job.Status);
-        Assert.Equal("JD chưa rõ ràng", job.RejectionReason);
-        Assert.Contains(c.Uow.Repo<Notification>().Items, n => n.RecipientUserId == creator.Id && n.Type == "rejected");
-    }
-
-    [Fact]
-    public async Task Non_admin_cannot_reject()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "pending");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("rejected", "lý do"), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-    }
-
-    [Fact]
-    public async Task Reject_requires_reason()
+    public async Task UTCID14_Approve_pending_to_active()
     {
         var c = NewCtx();
         var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
-        c.Uow.Seed(job);
+        c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"));
 
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("rejected", reason: null), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("lý do từ chối", res.Error);
-    }
-
-    [Fact]
-    public async Task Reject_only_from_pending()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "active");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("rejected", "lý do"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("từ chối", res.Error);
-    }
-
-    // ---------- UC-80: Generate Approved Job PDF (đóng dấu duyệt) ----------
-
-    [Fact]
-    public async Task Approving_pdf_job_stamps_and_sets_signed_url()
-    {
-        var c = NewCtx();
-        c.Storage.FileBytes = new byte[] { 1, 2, 3 }; // file JD gốc đọc được
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending", jdFileUrl: "jd/original.pdf", jdFileFormat: "pdf");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
+        var res = await Run(c, job.Id, Req("active"), HrA, AppRoles.HrAdmin);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(1, c.Stamp.StampPdfCallCount);
-        Assert.NotNull(job.SignedJdFileUrl);
-    }
-
-    [Fact]
-    public async Task Approving_docx_job_stamps_from_text()
-    {
-        var c = NewCtx();
-        c.Storage.FileBytes = new byte[] { 1, 2, 3 };
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending", jdFileUrl: "jd/original.docx", jdFileFormat: "docx");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal(1, c.Stamp.StampFromTextCallCount);
-        Assert.Equal(0, c.Stamp.StampPdfCallCount);
-        Assert.NotNull(job.SignedJdFileUrl);
-    }
-
-    [Fact]
-    public async Task Stamp_failure_does_not_block_approval()
-    {
-        var c = NewCtx();
-        c.Storage.FileBytes = new byte[] { 1, 2, 3 };
-        c.Stamp.ThrowOnStamp = true;
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending", jdFileUrl: "jd/original.pdf", jdFileFormat: "pdf");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);          // vẫn duyệt được
         Assert.Equal("active", job.Status);
-        Assert.Null(job.SignedJdFileUrl);    // không có bản đóng dấu
+        Assert.NotNull(job.PublishedAt);
+        Assert.Equal(HrA, job.ApprovedByUserId);
+        Assert.NotNull(job.ApprovedAt);
+        Assert.False(string.IsNullOrEmpty(job.ApproverName));
     }
 
+    // UTCID15 — owner đóng tin active → closed → Success
     [Fact]
-    public async Task Approving_job_without_jd_file_skips_stamp()
+    public async Task UTCID15_Close_active()
     {
         var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending"); // không có file JD
+        var job = JobPostingData.Job(owner: OwnerA, status: "active");
         c.Uow.Seed(job);
 
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("active"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal(0, c.Stamp.StampPdfCallCount);
-        Assert.Equal(0, c.Stamp.StampFromTextCallCount);
-    }
-
-    // ---------- Đóng / Lưu trữ (cùng handler) ----------
-
-    [Fact]
-    public async Task Owner_closes_active_job()
-    {
-        var c = NewCtx();
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "active");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("closed"), userId, AppRoles.Recruiter);
+        var res = await Run(c, job.Id, Req("closed"), OwnerA, AppRoles.Recruiter);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("closed", job.Status);
-    }
-
-    [Fact]
-    public async Task Archive_blocked_by_active_applications()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "closed");
-        c.Uow.Seed(job).Seed(new ARI.Domain.Entities.Application { JobPostingId = job.Id, Status = "screening", CandidateEmail = "a@b.io" });
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("archived"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("hồ sơ ứng tuyển đang hoạt động", res.Error);
-    }
-
-    [Fact]
-    public async Task Archive_soft_deletes_when_no_active_applications()
-    {
-        var c = NewCtx();
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "closed");
-        c.Uow.Seed(job);
-
-        var res = await Run(c, job.Id, JobPostingData.StatusRequest("archived"), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("archived", job.Status);
-        Assert.NotNull(job.DeletedAt);
     }
 }

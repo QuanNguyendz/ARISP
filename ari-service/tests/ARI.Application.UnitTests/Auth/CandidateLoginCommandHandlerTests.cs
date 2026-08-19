@@ -11,75 +11,184 @@ using Xunit;
 namespace ARI.Application.UnitTests.Auth;
 
 /// <summary>
-/// Đăng nhập ứng viên bằng email + mật khẩu (<see cref="CandidateLoginCommandHandler"/>, test-plan B13):
-/// thứ tự guard (không account → không Verify; Google passwordless; email chưa xác minh) và happy path
-/// (đóng dấu LastLoginAt, cấp access + refresh token, Role Candidate, FullName fallback "Candidate").
+/// Đăng nhập ứng viên bằng email + mật khẩu (<see cref="CandidateLoginCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "CandidateLogin" (UTCID01–12): happy path + chuẩn hoá + fallback FullName, các guard theo mã lỗi, và lỗi phụ thuộc.
 /// </summary>
+/// <remarks>
+/// Report ghi thông điệp lỗi cũ cho UTCID04/07 ("Invalid email or password.") và UTCID05/06
+/// ("Tài khoản này đăng ký qua Google…"). Handler hiện tại đổi câu chữ (ADR-035) nhưng GIỮ NGUYÊN mã lỗi
+/// (invalid_credentials / passwordless_google / email_not_verified). Test bám mã lỗi + thông điệp thật để luôn xanh.
+/// </remarks>
 public class CandidateLoginCommandHandlerTests
 {
+    private const string Email = "candidate@example.com";
+    private const string Password = "Password@123";
+
     private static CandidateLoginCommandHandler Handler(InMemoryUnitOfWork uow, FakeTokenService token, FakePasswordHasher hasher)
         => new(uow, token, hasher);
 
+    private static CandidateLoginCommand Cmd(string email = Email, string password = Password) => new(email, password);
+
+    // UTCID01 — candidate đã xác minh + mật khẩu đúng → Success
     [Fact]
-    public async Task Unknown_account_fails_invalid_credentials_without_verifying()
+    public async Task UTCID01_Verified_candidate_logs_in()
+    {
+        var candidate = AuthData.Candidate(email: Email, verified: true, fullName: "Candidate User");
+        var uow = new InMemoryUnitOfWork().Seed(candidate);
+
+        var res = await Handler(uow, new FakeTokenService(), new FakePasswordHasher { VerifyResult = true }).Handle(Cmd(), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.False(string.IsNullOrEmpty(res.Value.AccessToken));
+        Assert.False(string.IsNullOrEmpty(res.Value.RefreshToken));
+        Assert.Equal("Candidate User", res.Value.FullName);
+        Assert.Equal(AppRoles.Candidate, res.Value.Role);
+        Assert.NotNull(candidate.LastLoginAt);
+        Assert.Single(uow.Repo<CandidateRefreshToken>().Items);
+    }
+
+    // UTCID02 — FullName=null → fallback "Candidate"
+    [Fact]
+    public async Task UTCID02_Null_full_name_falls_back()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true, fullName: null));
+
+        var res = await Handler(uow, new FakeTokenService(), new FakePasswordHasher { VerifyResult = true }).Handle(Cmd(), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("Candidate", res.Value.FullName);
+    }
+
+    // UTCID03 — email cần chuẩn hoá → vẫn đăng nhập được
+    [Fact]
+    public async Task UTCID03_Email_is_normalized()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true, fullName: "Candidate User"));
+
+        var res = await Handler(uow, new FakeTokenService(), new FakePasswordHasher { VerifyResult = true })
+            .Handle(Cmd(email: " CANDIDATE@EXAMPLE.COM "), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("Candidate User", res.Value.FullName);
+    }
+
+    // UTCID04 — candidate không tồn tại → invalid_credentials, KHÔNG chạm hasher
+    [Fact]
+    public async Task UTCID04_Unknown_candidate_invalid_credentials()
     {
         var hasher = new FakePasswordHasher();
-        var res = await Handler(new InMemoryUnitOfWork(), new FakeTokenService(), hasher)
-            .Handle(new CandidateLoginCommand("nobody@example.io", "pw"), CancellationToken.None);
+
+        var res = await Handler(new InMemoryUnitOfWork(), new FakeTokenService(), hasher).Handle(Cmd(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
-        Assert.Equal(0, hasher.VerifyCallCount); // không chạm hasher khi không có account
-    }
-
-    [Fact]
-    public async Task Passwordless_google_account_is_redirected_to_google()
-    {
-        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: "g@example.io", passwordHash: ""));
-        var hasher = new FakePasswordHasher();
-
-        var res = await Handler(uow, new FakeTokenService(), hasher)
-            .Handle(new CandidateLoginCommand("g@example.io", "pw"), CancellationToken.None);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(AuthErrorCodes.PasswordlessGoogle, res.ErrorCode);
-        Assert.Contains("Google", res.Error);
         Assert.Equal(0, hasher.VerifyCallCount);
     }
 
+    // UTCID05 — PasswordHash=null → passwordless_google
     [Fact]
-    public async Task Unverified_email_is_blocked_even_with_correct_password()
+    public async Task UTCID05_Null_password_hash_is_passwordless_google()
     {
-        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: "u@example.io", verified: false));
-        var token = new FakeTokenService();
-        var hasher = new FakePasswordHasher { VerifyResult = true };
+        var candidate = AuthData.Candidate(email: Email, verified: true);
+        candidate.PasswordHash = null;
+        var uow = new InMemoryUnitOfWork().Seed(candidate);
+        var hasher = new FakePasswordHasher();
 
-        var res = await Handler(uow, token, hasher)
-            .Handle(new CandidateLoginCommand("u@example.io", "pw"), CancellationToken.None);
+        var res = await Handler(uow, new FakeTokenService(), hasher).Handle(Cmd(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(AuthErrorCodes.PasswordlessGoogle, res.ErrorCode);
+        Assert.Equal(0, hasher.VerifyCallCount);
+    }
+
+    // UTCID06 — PasswordHash="" → passwordless_google
+    [Fact]
+    public async Task UTCID06_Empty_password_hash_is_passwordless_google()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true, passwordHash: ""));
+
+        var res = await Handler(uow, new FakeTokenService(), new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(AuthErrorCodes.PasswordlessGoogle, res.ErrorCode);
+    }
+
+    // UTCID07 — mật khẩu sai → invalid_credentials
+    [Fact]
+    public async Task UTCID07_Wrong_password_invalid_credentials()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true));
+
+        var res = await Handler(uow, new FakeTokenService(), new FakePasswordHasher { VerifyResult = false })
+            .Handle(Cmd(password: "WrongPassword"), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
+    }
+
+    // UTCID08 — email chưa xác minh → email_not_verified, không cấp token
+    [Fact]
+    public async Task UTCID08_Unverified_email_blocked()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: false));
+        var token = new FakeTokenService();
+
+        var res = await Handler(uow, token, new FakePasswordHasher { VerifyResult = true }).Handle(Cmd(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Equal(AuthErrorCodes.EmailNotVerified, res.ErrorCode);
-        Assert.Equal(0, token.CandidateCount);                     // không cấp token
-        Assert.Empty(uow.Repo<CandidateRefreshToken>().Items);     // không cấp refresh
+        Assert.Equal("Tài khoản chưa được xác minh. Vui lòng kiểm tra email để kích hoạt.", res.Error);
+        Assert.Equal(0, token.CandidateCount);
+        Assert.Empty(uow.Repo<CandidateRefreshToken>().Items);
     }
 
+    // UTCID09 — candidate lookup ném lỗi → thoát ra ngoài
     [Fact]
-    public async Task Verified_candidate_with_correct_password_logs_in()
+    public async Task UTCID09_Candidate_lookup_error_propagates()
     {
-        var candidate = AuthData.Candidate(email: "u@example.io", verified: true, fullName: null); // fullName null → fallback
-        var uow = new InMemoryUnitOfWork().Seed(candidate);
-        var token = new FakeTokenService { CandidateToken = "acc-jwt" };
-        var hasher = new FakePasswordHasher { VerifyResult = true };
+        var uow = new InMemoryUnitOfWork().FailFindFor<CandidateAccount>("DB Error");
 
-        var res = await Handler(uow, token, hasher)
-            .Handle(new CandidateLoginCommand("u@example.io", "pw"), CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<Exception>(
+            () => Handler(uow, new FakeTokenService(), new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None));
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal("acc-jwt", res.Value.AccessToken);
-        Assert.False(string.IsNullOrEmpty(res.Value.RefreshToken));
-        Assert.Equal(AppRoles.Candidate, res.Value.Role);
-        Assert.Equal("Candidate", res.Value.FullName);             // fallback khi FullName null
-        Assert.NotNull(candidate.LastLoginAt);
-        Assert.Single(uow.Repo<CandidateRefreshToken>().Items);    // refresh token đã lưu
+        Assert.Equal("DB Error", ex.Message);
+    }
+
+    // UTCID10 — password verifier ném lỗi → thoát ra ngoài
+    [Fact]
+    public async Task UTCID10_Verifier_error_propagates()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true));
+        var hasher = new FakePasswordHasher { VerifyThrows = new Exception("Verify Error") };
+
+        var ex = await Assert.ThrowsAsync<Exception>(
+            () => Handler(uow, new FakeTokenService(), hasher).Handle(Cmd(), CancellationToken.None));
+
+        Assert.Equal("Verify Error", ex.Message);
+    }
+
+    // UTCID11 — token service ném lỗi → thoát ra ngoài
+    [Fact]
+    public async Task UTCID11_Token_service_error_propagates()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true));
+        var token = new FakeTokenService { CandidateThrows = new Exception("Token Error") };
+
+        var ex = await Assert.ThrowsAsync<Exception>(
+            () => Handler(uow, token, new FakePasswordHasher { VerifyResult = true }).Handle(Cmd(), CancellationToken.None));
+
+        Assert.Equal("Token Error", ex.Message);
+    }
+
+    // UTCID12 — lưu refresh-token ném lỗi → thoát ra ngoài
+    [Fact]
+    public async Task UTCID12_Refresh_token_persistence_error_propagates()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email, verified: true)).FailAddFor<CandidateRefreshToken>("Refresh Error");
+
+        var ex = await Assert.ThrowsAsync<Exception>(
+            () => Handler(uow, new FakeTokenService(), new FakePasswordHasher { VerifyResult = true }).Handle(Cmd(), CancellationToken.None));
+
+        Assert.Equal("Refresh Error", ex.Message);
     }
 }

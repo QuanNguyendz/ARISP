@@ -41,13 +41,17 @@ internal static class AuthData
 /// <summary>ITokenService giả — trả token cấu hình được + đếm số lần mint (để assert "không cấp token").</summary>
 internal sealed class FakeTokenService : ITokenService
 {
-    public string StaffToken { get; set; } = "staff-jwt";
-    public string CandidateToken { get; set; } = "cand-jwt";
+    public string StaffToken { get; set; } = "staff-access-token";
+    public string CandidateToken { get; set; } = "candidate-access-token";
     public int StaffCount { get; private set; }
     public int CandidateCount { get; private set; }
 
-    public string CreateStaffToken(User user) { StaffCount++; return StaffToken; }
-    public string CreateCandidateToken(CandidateAccount candidate) { CandidateCount++; return CandidateToken; }
+    /// <summary>Khi set: mint token tương ứng ném lỗi (case "token service throws" của test-plan).</summary>
+    public Exception? StaffThrows { get; set; }
+    public Exception? CandidateThrows { get; set; }
+
+    public string CreateStaffToken(User user) { StaffCount++; if (StaffThrows != null) throw StaffThrows; return StaffToken; }
+    public string CreateCandidateToken(CandidateAccount candidate) { CandidateCount++; if (CandidateThrows != null) throw CandidateThrows; return CandidateToken; }
     public string CreateKioskSessionToken(Guid sessionId, Guid applicationId, int ttlHours) => throw new NotImplementedException();
 }
 
@@ -57,14 +61,22 @@ internal sealed class FakePasswordHasher : IPasswordHasher
     public bool VerifyResult { get; set; } = true;
     public int VerifyCallCount { get; private set; }
 
-    public string Hash(string password) => $"hashed:{password}";
-    public bool Verify(string password, string hash) { VerifyCallCount++; return VerifyResult; }
+    /// <summary>Khi set: Hash/Verify ném lỗi (case "password hasher/verifier throws" của test-plan).</summary>
+    public Exception? HashThrows { get; set; }
+    public Exception? VerifyThrows { get; set; }
+
+    public string Hash(string password) { if (HashThrows != null) throw HashThrows; return $"hashed:{password}"; }
+    public bool Verify(string password, string hash) { VerifyCallCount++; if (VerifyThrows != null) throw VerifyThrows; return VerifyResult; }
 }
 
 /// <summary>IEmailQueue giả — ghi lại email đã enqueue.</summary>
 internal sealed class RecordingEmailQueue : IEmailQueue
 {
     public List<EmailQueueItem> Items { get; } = new();
-    public void Enqueue(EmailQueueItem item) => Items.Add(item);
+
+    /// <summary>Khi set: <see cref="Enqueue"/> ném lỗi (case "email queue throws" của test-plan).</summary>
+    public Exception? EnqueueThrows { get; set; }
+
+    public void Enqueue(EmailQueueItem item) { if (EnqueueThrows != null) throw EnqueueThrows; Items.Add(item); }
     public ValueTask<EmailQueueItem> DequeueAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
 }
