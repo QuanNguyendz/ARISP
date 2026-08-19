@@ -48,6 +48,9 @@ internal sealed class FakeJdGeminiProvider : IGeminiProvider
     public string? LastFallbackText { get; private set; }
     public int ExtractCallCount { get; private set; }
 
+    /// <summary>Khi set: <see cref="ExtractJobFromJdAsync"/> ném lỗi (case "Gemini throws" của test-plan).</summary>
+    public Exception? ExtractThrows { get; set; }
+
     public Task<Result<JdExtractionResultDto>> ExtractJobFromJdAsync(
         byte[]? jdFileBytes, string? jdMimeType, string? fallbackJdText, CancellationToken ct = default)
     {
@@ -55,6 +58,7 @@ internal sealed class FakeJdGeminiProvider : IGeminiProvider
         LastPdfBytes = jdFileBytes;
         LastMimeType = jdMimeType;
         LastFallbackText = fallbackJdText;
+        if (ExtractThrows != null) throw ExtractThrows;
         return Task.FromResult(ExtractResult);
     }
 

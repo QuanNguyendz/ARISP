@@ -11,128 +11,136 @@ using Xunit;
 namespace ARI.Application.UnitTests.CandidatePortal;
 
 /// <summary>
-/// Xem chi tiết đánh giá đã chia sẻ (<see cref="GetMyEvaluationQueryHandler"/>, test-plan B12): bảo vệ IDOR
-/// (chỉ chủ hồ sơ mới xem, không auto-link khi hồ sơ đã gắn tài khoản), cổng chia sẻ
-/// (<c>HrReview.ShareEvaluation</c>) tách biệt với NotFound, và các nhánh thiếu phiên/hồ sơ/đánh giá.
+/// Xem chi tiết đánh giá đã chia sẻ (<see cref="GetMyEvaluationQueryHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "GetMyEvaluation" (UTCID01–09): thiếu phiên/hồ sơ/đánh giá/review, IDOR (Forbidden) + auto-link theo email,
+/// cổng chia sẻ <c>HrReview.ShareEvaluation</c> tách khỏi NotFound, và lỗi query đánh giá.
 /// </summary>
 public class GetMyEvaluationQueryHandlerTests
 {
-    private static InterviewSession Session(Guid appId) =>
-        new() { ApplicationId = appId, RoundNumber = 1, SessionType = "real", Status = "completed" };
+    private static readonly Guid CandidateId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+    private const string Email = "candidate@example.com";
 
-    private static ARI.Domain.Entities.Application App(Guid? accId, string email = "owner@example.io") =>
-        new() { JobPostingId = Guid.NewGuid(), CandidateAccountId = accId, CandidateEmail = email, CandidateName = "A", Status = "interview" };
+    private static InterviewSession Session(Guid appId)
+        => new() { Id = Guid.NewGuid(), ApplicationId = appId, RoundNumber = 1, RoundType = "technical", InterviewLanguage = "vi", SessionType = "real", Status = "completed" };
+
+    private static ARI.Domain.Entities.Application App(Guid? owner, string email = Email)
+        => new() { Id = Guid.NewGuid(), JobPostingId = Guid.NewGuid(), CandidateAccountId = owner, CandidateEmail = email, CandidateName = "A", Status = "interview" };
 
     private static Evaluation Eval(Guid sessionId, Guid appId) => new()
     {
-        SessionId = sessionId,
-        ApplicationId = appId,
-        RoundNumber = 1,
-        SessionType = "real",
-        AiVerdict = "pass",
-        OverallScore = 82m,
-        CriterionScores = "{\"technical\":88}",
-        QuestionAnalyses = "[{\"sequence_number\":1}]",
-        LanguageAssessment = "{\"cefr_level\":\"B2\"}",
-        Reasoning = "Trả lời tốt",
-        RecommendedNextStep = "Mời vòng sau",
+        Id = Guid.NewGuid(), SessionId = sessionId, ApplicationId = appId, RoundNumber = 1, SessionType = "real",
+        AiVerdict = "pass", OverallScore = 82m, CriterionScores = "{\"technical\":88}",
+        QuestionAnalyses = "[{\"sequence_number\":1}]", LanguageAssessment = "{\"cefr_level\":\"B2\"}",
     };
 
-    private static ARI.Domain.Entities.HrReview Review(Guid evalId, bool share) =>
-        new() { EvaluationId = evalId, ShareEvaluation = share, FinalVerdict = "pass" };
+    private static ARI.Domain.Entities.HrReview Review(Guid evalId, bool share)
+        => new() { Id = Guid.NewGuid(), EvaluationId = evalId, ReviewedByUserId = Guid.NewGuid(), ShareEvaluation = share, FinalVerdict = "pass" };
 
-    private static Task<Result<object>> Run(InMemoryUnitOfWork uow, GetMyEvaluationQuery q) =>
-        new GetMyEvaluationQueryHandler(uow).Handle(q, CancellationToken.None);
+    private static Task<Result<object>> Run(InMemoryUnitOfWork uow, Guid sessionId, Guid candidate = default, string? email = Email)
+        => new GetMyEvaluationQueryHandler(uow).Handle(new GetMyEvaluationQuery(sessionId, candidate == default ? CandidateId : candidate, email), CancellationToken.None);
 
     [Fact]
-    public async Task Non_owner_is_forbidden_and_evaluation_is_not_leaked()
+    public async Task UTCID01_Missing_session()
     {
-        var ownerAcc = Guid.NewGuid();
-        var app = App(ownerAcc);
-        var session = Session(app.Id);
-        var eval = Eval(session.Id, app.Id);
-        var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval).Seed(Review(eval.Id, share: true));
-
-        // Kẻ khác: account + email đều lệch, hồ sơ đã gắn tài khoản nên KHÔNG auto-link.
-        var res = await Run(uow, new GetMyEvaluationQuery(session.Id, Guid.NewGuid(), "attacker@example.io"));
-
+        var res = await Run(new InMemoryUnitOfWork(), Guid.NewGuid());
         Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-        Assert.Equal("Forbidden", res.Error);
+        Assert.Equal("Không tìm thấy buổi phỏng vấn.", res.Error);
+        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Owner_with_unshared_evaluation_is_rejected_but_not_as_not_found()
+    public async Task UTCID02_Missing_application()
     {
-        var acc = Guid.NewGuid();
-        var app = App(acc);
+        var session = Session(Guid.NewGuid());   // ApplicationId trỏ hồ sơ không seed
+        var res = await Run(new InMemoryUnitOfWork().Seed(session), session.Id);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy hồ sơ ứng tuyển liên quan.", res.Error);
+        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID03_Other_candidate_is_forbidden()
+    {
+        var app = App(Guid.NewGuid());            // đã gắn tài khoản khác → không auto-link
+        var session = Session(app.Id);
+        var eval = Eval(session.Id, app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval).Seed(Review(eval.Id, true));
+        var res = await Run(uow, session.Id, candidate: Guid.NewGuid(), email: "attacker@example.io");
+        Assert.True(res.IsFailure);
+        Assert.Equal("Forbidden", res.Error);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID04_Owner_null_email_matches_links_and_continues()
+    {
+        var app = App(owner: null);               // trùng email trong token → auto-link
+        var session = Session(app.Id);
+        var eval = Eval(session.Id, app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval).Seed(Review(eval.Id, true));
+        var res = await Run(uow, session.Id);
+        Assert.True(res.IsSuccess);
+        Assert.Equal(CandidateId, app.CandidateAccountId);   // đã gắn tài khoản
+    }
+
+    [Fact]
+    public async Task UTCID05_Missing_evaluation()
+    {
+        var app = App(CandidateId);
+        var session = Session(app.Id);
+        var res = await Run(new InMemoryUnitOfWork().Seed(app).Seed(session), session.Id);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Báo cáo đánh giá chưa được khởi tạo.", res.Error);
+        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID06_Missing_review()
+    {
+        var app = App(CandidateId);
+        var session = Session(app.Id);
+        var eval = Eval(session.Id, app.Id);
+        var res = await Run(new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval), session.Id);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Kết quả đánh giá chi tiết chưa được chia sẻ cho vòng phỏng vấn này.", res.Error);
+    }
+
+    [Fact]
+    public async Task UTCID07_Review_not_shared()
+    {
+        var app = App(CandidateId);
         var session = Session(app.Id);
         var eval = Eval(session.Id, app.Id);
         var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval).Seed(Review(eval.Id, share: false));
-
-        var res = await Run(uow, new GetMyEvaluationQuery(session.Id, acc, "owner@example.io"));
-
+        var res = await Run(uow, session.Id);
         Assert.True(res.IsFailure);
         Assert.Contains("chưa được chia sẻ", res.Error);
-        Assert.NotEqual(CommonErrorCodes.NotFound, res.ErrorCode); // cổng chia sẻ ≠ không tồn tại
+        Assert.NotEqual(CommonErrorCodes.NotFound, res.ErrorCode);   // cổng chia sẻ ≠ không tồn tại
     }
 
     [Fact]
-    public async Task Owner_with_shared_evaluation_gets_the_full_report()
+    public async Task UTCID08_Shared_returns_full_report()
     {
-        var acc = Guid.NewGuid();
-        var app = App(acc);
+        var app = App(CandidateId);
         var session = Session(app.Id);
         var eval = Eval(session.Id, app.Id);
         var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).Seed(eval).Seed(Review(eval.Id, share: true));
-
-        var res = await Run(uow, new GetMyEvaluationQuery(session.Id, acc, "owner@example.io"));
-
+        var res = await Run(uow, session.Id);
         Assert.True(res.IsSuccess);
-        // Value là anonymous object → serialize theo kiểu runtime rồi soi các trường then chốt.
         var json = JsonSerializer.Serialize(res.Value, res.Value!.GetType());
         Assert.Contains("\"AiVerdict\":\"pass\"", json);
         Assert.Contains("\"OverallScore\":82", json);
-        Assert.Contains("technical", json);        // CriterionScores
-        Assert.Contains("sequence_number", json);  // QuestionAnalyses
-        Assert.Contains("cefr_level", json);        // LanguageAssessment
+        Assert.Contains("technical", json);
+        Assert.Contains("cefr_level", json);
     }
 
     [Fact]
-    public async Task Missing_session_returns_not_found()
+    public async Task UTCID09_Evaluation_lookup_error()
     {
-        var res = await Run(new InMemoryUnitOfWork(),
-            new GetMyEvaluationQuery(Guid.NewGuid(), Guid.NewGuid(), "owner@example.io"));
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
-        Assert.Contains("Không tìm thấy buổi phỏng vấn", res.Error);
-    }
-
-    [Fact]
-    public async Task Missing_application_returns_not_found()
-    {
-        var session = Session(Guid.NewGuid()); // ApplicationId trỏ hồ sơ không seed
-        var uow = new InMemoryUnitOfWork().Seed(session);
-
-        var res = await Run(uow, new GetMyEvaluationQuery(session.Id, Guid.NewGuid(), "owner@example.io"));
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
-    }
-
-    [Fact]
-    public async Task Owner_without_any_evaluation_returns_not_found()
-    {
-        var acc = Guid.NewGuid();
-        var app = App(acc);
+        var app = App(CandidateId);
         var session = Session(app.Id);
-        var uow = new InMemoryUnitOfWork().Seed(app).Seed(session); // chưa có Evaluation
-
-        var res = await Run(uow, new GetMyEvaluationQuery(session.Id, acc, "owner@example.io"));
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
-        Assert.Contains("chưa được khởi tạo", res.Error);
+        var uow = new InMemoryUnitOfWork().Seed(app).Seed(session).FailFindFor<Evaluation>("Evaluation DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, session.Id));
+        Assert.Equal("Evaluation DB Error", ex.Message);
     }
 }

@@ -20,10 +20,14 @@ internal sealed class FakeApplicationService : IApplicationService
     public Result<ApplicationResponse> SubmitResult { get; set; } =
         Result.Success(new ApplicationResponse { Id = Guid.NewGuid(), Status = "cv_submitted" });
 
+    /// <summary>Khi set: <see cref="SubmitApplicationAsync"/> ném lỗi (case "application service throws" của test-plan).</summary>
+    public Exception? SubmitThrows { get; set; }
+
     public Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
     {
         LastRequest = request;
         LastSource = source;
+        if (SubmitThrows != null) throw SubmitThrows;
         return Task.FromResult(SubmitResult);
     }
 

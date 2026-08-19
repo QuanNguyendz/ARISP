@@ -13,194 +13,151 @@ using Xunit;
 namespace ARI.Application.UnitTests.JobPostings;
 
 /// <summary>
-/// Sửa tin tuyển dụng (UC-50, <see cref="UpdateJobCommandHandler"/>): chỉ chủ tin hoặc HrAdmin/SuperAdmin,
-/// chặn khi đã archived, validate như tạo mới, chỉ tái tạo InterviewRoundConfig khi cấu hình vòng đổi,
-/// và phát broadcast công khai khi tin đang active.
+/// Cập nhật tin tuyển dụng (<see cref="UpdateJobCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "UpdateJob" (UTCID01–10): tồn tại, phân quyền, chặn archived, validate, happy path (round giữ nguyên/đổi),
+/// giữ metadata file khi không đổi JD, phát sự kiện khi active, và lỗi save.
 /// </summary>
+/// <remarks>
+/// Report input UTCID09 ghi Role=recruiter; nhưng handler chặn recruiter sửa tin đã active (chỉ sửa được draft/rejected).
+/// Test dùng hr_admin cho case tin active để đúng hành vi hiện tại.
+/// </remarks>
 public class UpdateJobCommandHandlerTests
 {
-    private static Task<Result<JobPostingResponse>> Run(
-        InMemoryUnitOfWork uow, RecordingNotificationService notif, Guid id, CreateJobPostingRequest req, Guid userId, string? role)
-        => new UpdateJobCommandHandler(uow, notif)
-            .Handle(new UpdateJobCommand(id, req, userId, role), CancellationToken.None);
+    private static readonly Guid OwnerA = Guid.Parse("86000000-0000-0000-0000-000000000001");
 
+    private static Task<Result<JobPostingResponse>> Run(InMemoryUnitOfWork uow, Guid id, CreateJobPostingRequest req, Guid userId, string role, RecordingNotificationService? notif = null)
+        => new UpdateJobCommandHandler(uow, notif ?? new RecordingNotificationService()).Handle(new UpdateJobCommand(id, req, userId, role), CancellationToken.None);
+
+    // UTCID01 — job không tồn tại → not_found
     [Fact]
-    public async Task Job_not_found_fails()
+    public async Task UTCID01_Job_not_found()
     {
-        var res = await Run(new InMemoryUnitOfWork(), new RecordingNotificationService(),
-            Guid.NewGuid(), JobPostingData.Request(), Guid.NewGuid(), AppRoles.HrAdmin);
-
+        var res = await Run(new InMemoryUnitOfWork(), Guid.NewGuid(), JobPostingData.Request(), OwnerA, AppRoles.Recruiter);
         Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
+    // UTCID02 — không có quyền → forbidden
     [Fact]
-    public async Task Non_owner_non_admin_is_forbidden()
+    public async Task UTCID02_Unauthorized()
     {
-        var job = JobPostingData.Job(owner: Guid.NewGuid());
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "draft");
         var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), Guid.NewGuid(), AppRoles.Recruiter);
-
+        var res = await Run(uow, job.Id, JobPostingData.Request(), OwnerA, AppRoles.Recruiter);
         Assert.True(res.IsFailure);
+        Assert.Equal("Bạn không có quyền cập nhật tin tuyển dụng này.", res.Error);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
+    // UTCID03 — tin đã archived → chặn
     [Fact]
-    public async Task Owner_can_update()
+    public async Task UTCID03_Archived_blocked()
     {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId);
+        var job = JobPostingData.Job(owner: OwnerA, status: "archived");
         var uow = new InMemoryUnitOfWork().Seed(job);
-        var req = JobPostingData.Request(title: "Senior Backend Developer");
+        var res = await Run(uow, job.Id, JobPostingData.Request(), OwnerA, AppRoles.Recruiter);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không thể cập nhật tin tuyển dụng đã lưu trữ (archived).", res.Error);
+    }
 
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, req, userId, AppRoles.Recruiter);
+    // UTCID04 — request không hợp lệ → "Title is required."
+    [Fact]
+    public async Task UTCID04_Invalid_request()
+    {
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        var uow = new InMemoryUnitOfWork().Seed(job);
+        var req = JobPostingData.Request(); req.Title = " ";
+        var res = await Run(uow, job.Id, req, OwnerA, AppRoles.Recruiter);
+        Assert.Equal("Title is required.", res.Error);
+    }
+
+    // UTCID05 — chủ tin cập nhật, round không đổi → Success, round giữ nguyên (không xoá/tạo lại), save 1 lần
+    [Fact]
+    public async Task UTCID05_Rounds_unchanged_reused()
+    {
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        var existingRound = JobPostingData.RoundEntity(job.Id, number: 1, type: "screening", language: "vi", codeTtl: 2, maxMinutes: 45);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(existingRound);
+        var req = JobPostingData.Request();   // 1 round screening, language null → kế thừa vi
+
+        var res = await Run(uow, job.Id, req, OwnerA, AppRoles.Recruiter);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal("Senior Backend Developer", job.Title);
+        Assert.Contains(uow.Repo<InterviewRoundConfig>().Items, r => r.Id == existingRound.Id);   // không bị xoá
+        Assert.Equal(1, uow.SaveChangesCount);                                                     // chỉ save job
+        Assert.NotNull(job.UpdatedAt);
     }
 
+    // UTCID06 — HrAdmin cập nhật, số round thay đổi → xoá round cũ + thêm round mới theo thứ tự
     [Fact]
-    public async Task Admin_can_update_others_job()
+    public async Task UTCID06_Round_count_changes()
     {
-        var job = JobPostingData.Job(owner: Guid.NewGuid());
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-    }
-
-    [Fact]
-    public async Task Archived_job_cannot_be_updated()
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "archived");
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("đã lưu trữ", res.Error);
-    }
-
-    [Fact]
-    public async Task Invalid_request_fails_validation()
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-        var req = JobPostingData.Request();
-        req.Title = "";
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, req, userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Contains("Title is required", res.Error);
-    }
-
-    [Fact]
-    public async Task Rounds_are_recreated_when_count_changes()
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId);
-        var oldRound = JobPostingData.RoundEntity(job.Id, number: 1);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(oldRound);
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "draft");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, number: 1, type: "screening"));
         var req = JobPostingData.Request();
         req.RoundConfigs = new() { JobPostingData.Round(1, "screening"), JobPostingData.Round(2, "technical") };
 
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, req, userId, AppRoles.Recruiter);
+        var res = await Run(uow, job.Id, req, Guid.NewGuid(), AppRoles.HrAdmin);
 
         Assert.True(res.IsSuccess);
-        var rounds = uow.Repo<InterviewRoundConfig>().Items;
+        var rounds = uow.Repo<InterviewRoundConfig>().Items.OrderBy(r => r.RoundNumber).ToList();
         Assert.Equal(2, rounds.Count);
-        Assert.DoesNotContain(rounds, r => r.Id == oldRound.Id); // vòng cũ bị xoá, tạo mới
+        Assert.Equal(1, rounds[0].RoundNumber);
+        Assert.Equal(2, rounds[1].RoundNumber);
     }
 
+    // UTCID07 — round cùng số nhưng khác giá trị → xoá + thêm lại
     [Fact]
-    public async Task Unchanged_rounds_are_preserved()
+    public async Task UTCID07_Round_values_differ()
     {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId);
-        var oldRound = JobPostingData.RoundEntity(job.Id, number: 1, type: "screening", language: "vi", codeTtl: 2, maxMinutes: 45);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(oldRound);
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, number: 1, type: "screening"));
         var req = JobPostingData.Request();
-        req.RoundConfigs = new() { JobPostingData.Round(1, "screening", language: "vi", codeTtl: 2, maxMinutes: 45) };
+        req.RoundConfigs = new() { JobPostingData.Round(1, "technical") };   // đổi type
 
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, req, userId, AppRoles.Recruiter);
+        var res = await Run(uow, job.Id, req, OwnerA, AppRoles.Recruiter);
 
         Assert.True(res.IsSuccess);
-        var round = Assert.Single(uow.Repo<InterviewRoundConfig>().Items);
-        Assert.Equal(oldRound.Id, round.Id); // giữ nguyên entity, không tái tạo
+        Assert.Equal("technical", Assert.Single(uow.Repo<InterviewRoundConfig>().Items).RoundType);
     }
 
+    // UTCID08 — request không có JdFileUrl mới → giữ nguyên metadata file cũ
     [Fact]
-    public async Task Active_job_update_broadcasts_public_update()
+    public async Task UTCID08_Keeps_existing_jd_file()
     {
-        // Recruiter không sửa được tin active nên kịch bản này thuộc HrAdmin (người duyệt).
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: "active");
-        var uow = new InMemoryUnitOfWork().Seed(job);
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft", jdFileUrl: "jd/old.pdf", jdFileFormat: "pdf");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, number: 1, type: "screening", language: "vi"));
+        var req = JobPostingData.Request();   // JdFileUrl null
+
+        var res = await Run(uow, job.Id, req, OwnerA, AppRoles.Recruiter);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("jd/old.pdf", job.JdFileUrl);
+    }
+
+    // UTCID09 — tin active (HrAdmin sửa) → phát cả user event lẫn public job update
+    [Fact]
+    public async Task UTCID09_Active_publishes_public_update()
+    {
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "active");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, number: 1, type: "screening", language: "vi"));
         var notif = new RecordingNotificationService();
 
-        var res = await Run(uow, notif, job.Id, JobPostingData.Request(), userId, AppRoles.HrAdmin);
+        var res = await Run(uow, job.Id, JobPostingData.Request(), Guid.NewGuid(), AppRoles.HrAdmin, notif);
 
         Assert.True(res.IsSuccess);
         Assert.Contains("ReceivePublicJobUpdate", notif.AllEvents);
     }
 
-    [Theory]
-    [InlineData("pending")]
-    [InlineData("active")]
-    [InlineData("closed")]
-    public async Task Recruiter_cannot_edit_after_submitted_or_approved(string status)
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: status);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-    }
-
-    [Theory]
-    [InlineData("draft")]
-    [InlineData("rejected")]
-    public async Task Recruiter_can_edit_draft_or_rejected(string status)
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId, status: status);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
-
-        Assert.True(res.IsSuccess);
-    }
-
+    // UTCID10 — SaveChangesAsync ném lỗi
     [Fact]
-    public async Task Admin_can_edit_pending_job()
+    public async Task UTCID10_Save_error()
     {
-        // SuperAdmin/HrAdmin không bị giới hạn theo trạng thái như Recruiter.
-        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
-        var uow = new InMemoryUnitOfWork().Seed(job);
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, number: 1, type: "screening", language: "vi")).FailSaveOn(1, "Save Error");
 
-        var res = await Run(uow, new RecordingNotificationService(), job.Id, JobPostingData.Request(), Guid.NewGuid(), AppRoles.HrAdmin);
-
-        Assert.True(res.IsSuccess);
-    }
-
-    [Fact]
-    public async Task Notifies_updater()
-    {
-        var userId = Guid.NewGuid();
-        var job = JobPostingData.Job(owner: userId);
-        var uow = new InMemoryUnitOfWork().Seed(job);
-        var notif = new RecordingNotificationService();
-
-        await Run(uow, notif, job.Id, JobPostingData.Request(), userId, AppRoles.Recruiter);
-
-        Assert.Contains(notif.UserEvents, e => e.UserId == userId && e.EventType == "ReceiveJobPostingUpdate");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, job.Id, JobPostingData.Request(), OwnerA, AppRoles.Recruiter));
+        Assert.Equal("Save Error", ex.Message);
     }
 }

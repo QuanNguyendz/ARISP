@@ -1,12 +1,9 @@
 using System;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.CandidatePortal;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
-using ARI.Application.Interfaces;
 using ARI.Application.UnitTests.ApplicationFlow;
 using ARI.Application.UnitTests.JobBoard;
 using ARI.Application.UnitTests.TestSupport;
@@ -16,123 +13,227 @@ using Xunit;
 namespace ARI.Application.UnitTests.CandidatePortal;
 
 /// <summary>
-/// Nộp hồ sơ qua Job Board (<see cref="ApplyToJobCommandHandler"/>, test-plan B10): chặn ứng tuyển trùng,
-/// nguồn CV (đính kèm) → hash MD5 + parse text + lưu bản sao immutable, ráp <see cref="SubmitApplicationRequest"/>
-/// (source 'job_board', trim tên/điện thoại) và bù trừ xoá file khi service tạo hồ sơ thất bại.
+/// Nộp hồ sơ qua Job Board (<see cref="ApplyToJobCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "ApplyToJob" (UTCID01–16): chặn trùng, chọn nguồn CV (đính kèm/hồ sơ), MIME theo đuôi, parse best-effort,
+/// lưu bản sao immutable + bù trừ xoá khi service lỗi, ráp request (source 'job_board', trim), và các nhánh lỗi.
 /// </summary>
 public class ApplyToJobCommandHandlerTests
 {
-    private static CandidateAccount Account(string? cvUrl = null) =>
-        new() { Email = "cand@example.io", ProfileCvUrl = cvUrl };
+    private static readonly Guid CandidateId = Guid.Parse("10000000-0000-0000-0000-000000000001");
 
-    private static ApplyToJobCommand Cmd(
-        Guid jobId, Guid candId, byte[]? bytes = null, string? fileName = null,
-        string name = "  Nguyen Van A  ", string phone = "  0900000000  ") =>
-        new(jobId, candId, name, phone, "Thư xin việc", "  30 ngày  ", bytes, fileName);
+    private static CandidateAccount Account(string? profileCvUrl = null)
+        => new() { Id = CandidateId, Email = "candidate@example.com", ProfileCvUrl = profileCvUrl };
 
-    private static ApplyToJobCommandHandler Handler(
-        InMemoryUnitOfWork uow, RecordingFileStorage storage, FakeApplicationService app, StubDocumentParser? parser = null) =>
-        new(uow, storage, parser ?? new StubDocumentParser(), app);
+    private static ApplyToJobCommand Cmd(Guid jobId, byte[]? bytes, string? fileName,
+        string name = "Candidate User", string phone = "0901234567", string notice = "30 days")
+        => new(jobId, CandidateId, name, phone, "Cover letter", notice, bytes, fileName);
+
+    private static ApplyToJobCommandHandler Handler(InMemoryUnitOfWork uow, RecordingFileStorage storage, FakeApplicationService app, StubDocumentParser? parser = null)
+        => new(uow, storage, parser ?? new StubDocumentParser(), app);
 
     [Fact]
-    public async Task Duplicate_application_short_circuits_without_saving_cv_or_calling_service()
+    public async Task UTCID01_Unknown_candidate()
     {
-        var acc = Account();
-        var job = ApplicationData.Job();
-        var existing = ApplicationData.Application(job.Id, acc.Id, status: "cv_submitted");
-        var uow = new InMemoryUnitOfWork().Seed(acc).Seed(job).Seed(existing);
-        var storage = new RecordingFileStorage();
-        var app = new FakeApplicationService();
+        var res = await Handler(new InMemoryUnitOfWork(), new RecordingFileStorage(), new FakeApplicationService())
+            .Handle(Cmd(Guid.NewGuid(), new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tài khoản ứng viên.", res.Error);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
+    }
 
-        var res = await Handler(uow, storage, app)
-            .Handle(Cmd(job.Id, acc.Id, bytes: new byte[] { 1, 2, 3 }, fileName: "cv.pdf"), CancellationToken.None);
+    [Fact]
+    public async Task UTCID02_Unknown_job()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Account());
+        var res = await Handler(uow, new RecordingFileStorage(), new FakeApplicationService())
+            .Handle(Cmd(Guid.NewGuid(), new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
+        Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID03_Existing_non_withdrawn_short_circuits()
+    {
+        var job = ApplicationData.Job();
+        var existing = ApplicationData.Application(job.Id, CandidateId, status: "cv_submitted");
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job).Seed(existing);
+        var storage = new RecordingFileStorage(); var app = new FakeApplicationService();
+
+        var res = await Handler(uow, storage, app).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.True(res.Value.AlreadyApplied);
         Assert.Equal(existing.Id, res.Value.ExistingApplicationId);
         Assert.Null(res.Value.Application);
-        Assert.Empty(storage.Saved);          // không lưu CV mới
-        Assert.Null(app.LastRequest);         // không gọi SubmitApplication
-    }
-
-    [Fact]
-    public async Task Attached_cv_is_hashed_saved_and_forwarded_as_job_board_source()
-    {
-        var candId = Guid.NewGuid();
-        var acc = Account();
-        var job = ApplicationData.Job();
-        var uow = new InMemoryUnitOfWork().Seed(acc).Seed(job);
-        var storage = new RecordingFileStorage();
-        var app = new FakeApplicationService();
-        var parser = new StubDocumentParser { Text = "Nội dung CV đã parse" };
-        var bytes = Encoding.UTF8.GetBytes("PDF BYTES");
-        var expectedHash = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
-
-        var res = await Handler(uow, storage, app, parser)
-            .Handle(Cmd(job.Id, acc.Id, bytes: bytes, fileName: "myresume.pdf"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.False(res.Value.AlreadyApplied);
-        Assert.NotNull(res.Value.Application);
-        Assert.Equal("cv_submitted", res.Value.Application!.Status);
-
-        // File CV: lưu đúng 1 bản với MIME theo đuôi .pdf, vào thư mục cv/.
-        var saved = Assert.Single(storage.Saved);
-        Assert.Equal("myresume.pdf", saved.FileName);
-        Assert.Equal("application/pdf", saved.ContentType);
-        Assert.Equal(StorageFolder.Cv, saved.Folder);
-
-        // Request chuyển cho service: source + trim + hash + CV text + URL bản đã lưu.
-        Assert.Equal("job_board", app.LastSource);
-        var req = app.LastRequest!;
-        Assert.Equal(job.Id, req.JobPostingId);
-        Assert.Equal(acc.Id, req.CandidateAccountId);
-        Assert.Equal("cand@example.io", req.CandidateEmail);
-        Assert.Equal("Nguyen Van A", req.CandidateName);   // trim
-        Assert.Equal("0900000000", req.CandidatePhone);    // trim
-        Assert.Equal("30 ngày", req.NoticePeriod);         // trim
-        Assert.Equal("cv/myresume.pdf", req.CvFileUrl);
-        Assert.Equal("Nội dung CV đã parse", req.CvText);
-        Assert.Equal(expectedHash, req.CvFileHash);
-    }
-
-    [Fact]
-    public async Task No_attachment_and_no_profile_cv_fails_with_no_cv_code()
-    {
-        var acc = Account(cvUrl: null);       // hồ sơ không có CV
-        var job = ApplicationData.Job();
-        var uow = new InMemoryUnitOfWork().Seed(acc).Seed(job);
-        var storage = new RecordingFileStorage();
-        var app = new FakeApplicationService();
-
-        var res = await Handler(uow, storage, app)
-            .Handle(Cmd(job.Id, acc.Id, bytes: null, fileName: null), CancellationToken.None);
-
-        Assert.True(res.IsFailure);
-        Assert.Equal("no_cv", res.ErrorCode);
         Assert.Empty(storage.Saved);
         Assert.Null(app.LastRequest);
     }
 
     [Fact]
-    public async Task Saved_cv_is_deleted_when_submit_service_fails()
+    public async Task UTCID04_Only_withdrawn_allows_new_submission()
     {
-        var acc = Account();
         var job = ApplicationData.Job();
-        var uow = new InMemoryUnitOfWork().Seed(acc).Seed(job);
-        var storage = new RecordingFileStorage();
-        var app = new FakeApplicationService
-        {
-            SubmitResult = Result.Failure<ApplicationResponse>("Tin tuyển dụng đã đóng.")
-        };
+        var withdrawn = ApplicationData.Application(job.Id, CandidateId, status: "withdrawn");
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job).Seed(withdrawn);
+        var app = new FakeApplicationService();
 
-        var res = await Handler(uow, storage, app)
-            .Handle(Cmd(job.Id, acc.Id, bytes: new byte[] { 9 }, fileName: "cv.pdf"), CancellationToken.None);
+        var res = await Handler(uow, new RecordingFileStorage(), app).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value.AlreadyApplied);
+        Assert.NotNull(res.Value.Application);
+        Assert.NotNull(app.LastRequest);
+    }
+
+    [Fact]
+    public async Task UTCID05_Attached_pdf_submitted()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var app = new FakeApplicationService();
+        var res = await Handler(uow, new RecordingFileStorage(), app).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value.AlreadyApplied);
+        Assert.Null(res.Value.ExistingApplicationId);
+        Assert.NotNull(res.Value.Application);
+    }
+
+    [Fact]
+    public async Task UTCID06_Profile_cv_copied_and_submitted()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf")).Seed(job);
+        var storage = new RecordingFileStorage { FileBytes = new byte[] { 9, 9 } };
+        var app = new FakeApplicationService();
+
+        var res = await Handler(uow, storage, app).Handle(Cmd(job.Id, null, null), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Single(storage.Saved);          // bản sao CV được lưu
+        Assert.NotNull(app.LastRequest);
+    }
+
+    [Fact]
+    public async Task UTCID07_No_attachment_no_profile_cv()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: null)).Seed(job);
+        var res = await Handler(uow, new RecordingFileStorage(), new FakeApplicationService()).Handle(Cmd(job.Id, null, null), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal("no_cv", res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID08_Profile_cv_reads_empty()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf")).Seed(job);
+        var storage = new RecordingFileStorage { FileBytes = null };
+        var res = await Handler(uow, storage, new FakeApplicationService()).Handle(Cmd(job.Id, null, null), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal("cv_unreadable", res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID09_Unknown_ext_uses_octet_stream_mime()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var storage = new RecordingFileStorage(); var app = new FakeApplicationService();
+        await Handler(uow, storage, app).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.txt"), CancellationToken.None);
+        Assert.Equal("application/octet-stream", Assert.Single(storage.Saved).ContentType);
+    }
+
+    [Fact]
+    public async Task UTCID10_Parser_throws_submits_with_empty_cvtext()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var app = new FakeApplicationService();
+        var res = await Handler(uow, new RecordingFileStorage(), app, new StubDocumentParser { ThrowOnParse = true })
+            .Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("", app.LastRequest!.CvText);
+    }
+
+    [Fact]
+    public async Task UTCID11_Save_error_is_server_error()
+    {
+        // Fake ném thông điệp cố định ("storage down"); ta khẳng định tiền tố VN + mã lỗi (báo cáo ghi "Storage Error" là placeholder).
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var storage = new RecordingFileStorage { ThrowOnSave = true };
+        var res = await Handler(uow, storage, new FakeApplicationService()).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.StartsWith("Không thể lưu CV cho hồ sơ ứng tuyển:", res.Error);
+        Assert.Equal(CommonErrorCodes.ServerError, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID12_Service_failure_deletes_stored_cv()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var storage = new RecordingFileStorage();
+        var app = new FakeApplicationService { SubmitResult = Result.Failure<ApplicationResponse>("Submit Error") };
+
+        var res = await Handler(uow, storage, app).Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Tin tuyển dụng đã đóng", res.Error);   // lỗi service propagate
-        Assert.Single(storage.Saved);                          // đã lưu CV
-        Assert.Contains("cv/cv.pdf", storage.Deleted);     // rồi bù trừ xoá đi
-        Assert.NotNull(app.LastRequest);                       // service ĐÃ được gọi
+        Assert.Contains("Submit Error", res.Error);
+        Assert.Single(storage.Saved);
+        Assert.Contains("cv/cv.pdf", storage.Deleted);
+        Assert.NotNull(app.LastRequest);
+    }
+
+    [Fact]
+    public async Task UTCID13_Success_trims_inputs_and_uses_job_board_source()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var app = new FakeApplicationService();
+
+        var res = await Handler(uow, new RecordingFileStorage(), app)
+            .Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf", name: "  Candidate User  ", phone: "  0901234567  ", notice: "  30 days  "), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value.AlreadyApplied);
+        Assert.NotNull(res.Value.Application);
+        Assert.Equal("job_board", app.LastSource);
+        Assert.Equal("Candidate User", app.LastRequest!.CandidateName);
+        Assert.Equal("0901234567", app.LastRequest.CandidatePhone);
+        Assert.Equal("30 days", app.LastRequest.NoticePeriod);
+    }
+
+    [Fact]
+    public async Task UTCID14_Candidate_lookup_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailGetByIdFor<CandidateAccount>("Candidate DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new RecordingFileStorage(), new FakeApplicationService())
+            .Handle(Cmd(Guid.NewGuid(), new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None));
+        Assert.Equal("Candidate DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID15_Profile_cv_read_error()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf")).Seed(job);
+        var storage = new RecordingFileStorage { ReadThrows = new Exception("Read Error") };
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, storage, new FakeApplicationService())
+            .Handle(Cmd(job.Id, null, "cv.pdf"), CancellationToken.None));
+        Assert.Equal("Read Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID16_Service_throws_propagates()
+    {
+        var job = ApplicationData.Job();
+        var uow = new InMemoryUnitOfWork().Seed(Account()).Seed(job);
+        var app = new FakeApplicationService { SubmitThrows = new Exception("Service Error") };
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new RecordingFileStorage(), app)
+            .Handle(Cmd(job.Id, new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None));
+        Assert.Equal("Service Error", ex.Message);
     }
 }

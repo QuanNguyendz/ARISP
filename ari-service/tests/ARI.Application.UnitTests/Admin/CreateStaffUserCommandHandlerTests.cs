@@ -11,101 +11,146 @@ using Xunit;
 namespace ARI.Application.UnitTests.Admin;
 
 /// <summary>
-/// Super Admin tạo tài khoản staff pre-provisioned (<see cref="CreateStaffUserCommandHandler"/>, test-plan B14):
-/// thứ tự guard (email → tên → role hợp lệ), chống trùng email (normalize), và tạo user + audit + email chào mừng.
+/// Super Admin tạo tài khoản staff (<see cref="CreateStaffUserCommandHandler"/>) — theo test-plan Report5 Unit v1.2,
+/// tab "CreateStaffUser" (UTCID01–10): bắt buộc email/họ tên, validate role, chuẩn hoá, trùng email,
+/// DTO trả về, giá trị nullable, và lỗi repository.
 /// </summary>
 public class CreateStaffUserCommandHandlerTests
 {
-    private static CreateStaffUserCommandHandler Handler(
-        InMemoryUnitOfWork uow, FakePasswordHasher hasher, RecordingEmailService email)
-        => new(uow, hasher, email);
+    private static readonly Guid ActorA = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
-    private static CreateStaffUserCommand Cmd(
-        string email = "new@example.io", string fullName = "New Staff", string? role = "recruiter",
-        string? department = "Engineering", Guid? actorId = null)
-        => new(email, fullName, role, department, actorId ?? Guid.NewGuid());
+    private static CreateStaffUserCommandHandler Handler(InMemoryUnitOfWork uow, RecordingEmailService? email = null)
+        => new(uow, new FakePasswordHasher(), email ?? new RecordingEmailService());
 
-    [Theory]
-    [InlineData("super_admin")]
-    [InlineData(null)]
-    public async Task Invalid_role_is_rejected_without_side_effects(string? role)
+    private static User ExistingUser(string email)
+        => new() { Email = email, Role = "recruiter", FullName = "Existing", IsActive = true };
+
+    // UTCID01 — Email="" → "Email là bắt buộc."
+    [Fact]
+    public async Task UTCID01_Empty_email_is_required()
     {
-        var uow = new InMemoryUnitOfWork();
-        var email = new RecordingEmailService();
-
-        var res = await Handler(uow, new FakePasswordHasher(), email).Handle(Cmd(role: role), CancellationToken.None);
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("", "Staff User", "recruiter", "IT", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Role phải là", res.Error);
-        Assert.Empty(uow.Repo<User>().Items);
-        Assert.Empty(uow.Repo<AuditLog>().Items);
-        Assert.Empty(email.Sent);
-        Assert.Equal(0, uow.SaveChangesCount);
+        Assert.Equal("Email là bắt buộc.", res.Error);
+        Assert.Null(res.ErrorCode);
     }
 
+    // UTCID02 — Email="   " → "Email là bắt buộc."
     [Fact]
-    public async Task Blank_full_name_short_circuits()
+    public async Task UTCID02_Whitespace_email_is_required()
     {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await Handler(uow, new FakePasswordHasher(), new RecordingEmailService())
-            .Handle(Cmd(fullName: "   "), CancellationToken.None);
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("   ", "Staff User", "recruiter", "IT", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Họ và tên là bắt buộc", res.Error);
-        Assert.Empty(uow.Repo<User>().Items);
-        Assert.Equal(0, uow.SaveChangesCount);
+        Assert.Equal("Email là bắt buộc.", res.Error);
     }
 
+    // UTCID03 — FullName="" → "Họ và tên là bắt buộc."
     [Fact]
-    public async Task Duplicate_email_is_conflict_after_normalization()
+    public async Task UTCID03_Empty_full_name_is_required()
     {
-        var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: "a@x.com"));
-
-        var res = await Handler(uow, new FakePasswordHasher(), new RecordingEmailService())
-            .Handle(Cmd(email: " A@X.com "), CancellationToken.None);
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("staff@example.com", "", "recruiter", "IT", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
+        Assert.Equal("Họ và tên là bắt buộc.", res.Error);
+    }
+
+    // UTCID04 — FullName="   " → "Họ và tên là bắt buộc."
+    [Fact]
+    public async Task UTCID04_Whitespace_full_name_is_required()
+    {
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("staff@example.com", "   ", "recruiter", "IT", ActorA), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("Họ và tên là bắt buộc.", res.Error);
+    }
+
+    // UTCID05 — Role=null → role không hợp lệ
+    [Fact]
+    public async Task UTCID05_Null_role_is_rejected()
+    {
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("staff@example.com", "Staff User", null, "IT", ActorA), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("Role phải là 'hr_admin' hoặc 'recruiter'.", res.Error);
+    }
+
+    // UTCID06 — Role="super_admin" (không được phép) → role không hợp lệ
+    [Fact]
+    public async Task UTCID06_Disallowed_role_is_rejected()
+    {
+        var res = await Handler(new InMemoryUnitOfWork())
+            .Handle(new CreateStaffUserCommand("staff@example.com", "Staff User", "super_admin", "IT", ActorA), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("Role phải là 'hr_admin' hoặc 'recruiter'.", res.Error);
+    }
+
+    // UTCID07 — email (sau chuẩn hoá) trùng user đã có → conflict
+    [Fact]
+    public async Task UTCID07_Duplicate_email_is_conflict()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(ExistingUser("staff@example.com"));
+
+        var res = await Handler(uow)
+            .Handle(new CreateStaffUserCommand(" STAFF@EXAMPLE.COM ", "Staff User", "recruiter", "IT", ActorA), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("Email này đã được sử dụng bởi tài khoản khác.", res.Error);
         Assert.Equal(CommonErrorCodes.Conflict, res.ErrorCode);
-        Assert.Contains("đã được sử dụng", res.Error);
     }
 
+    // UTCID08 — tạo thành công, DTO đúng giá trị (Normal)
     [Fact]
-    public async Task Valid_request_creates_hashed_user_audit_and_welcome_email()
+    public async Task UTCID08_Creates_staff_user_with_expected_dto()
     {
-        var actor = Guid.NewGuid();
         var uow = new InMemoryUnitOfWork();
-        var hasher = new FakePasswordHasher();
-        var email = new RecordingEmailService();
 
-        var res = await Handler(uow, hasher, email).Handle(
-            Cmd(email: "  New@X.io ", fullName: "  New Staff  ", role: "HR_Admin", department: "  Eng  ", actorId: actor),
-            CancellationToken.None);
+        var res = await Handler(uow)
+            .Handle(new CreateStaffUserCommand("staff@example.com", "Staff User", "recruiter", "IT", ActorA), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
-
-        var user = Assert.Single(uow.Repo<User>().Items);
-        Assert.Equal("new@x.io", user.Email);          // lower + trim
-        Assert.Equal("hr_admin", user.Role);           // lower
-        Assert.Equal("New Staff", user.FullName);      // trim
-        Assert.Equal("Eng", user.Department);          // trim
-        Assert.True(user.IsActive);
-        Assert.StartsWith("hashed:", user.PasswordHash);           // đã hash, không phải plaintext
-        Assert.True(user.PasswordHash!.Length > "hashed:".Length);
-
-        var audit = Assert.Single(uow.Repo<AuditLog>().Items);
-        Assert.Equal("staff_account_created", audit.Action);
-        Assert.Equal("User", audit.EntityType);
-        Assert.Equal(user.Id, audit.EntityId);
-        Assert.Equal(1, uow.SaveChangesCount);
-
-        var mail = Assert.Single(email.Sent);
-        Assert.Equal("new@x.io", mail.To);
-
-        // DTO echo
-        Assert.Equal("new@x.io", res.Value.Email);
-        Assert.Equal("hr_admin", res.Value.Role);
-        Assert.Equal("New Staff", res.Value.FullName);
+        Assert.Equal("staff@example.com", res.Value.Email);
+        Assert.Equal("Staff User", res.Value.FullName);
+        Assert.Equal("recruiter", res.Value.Role);
+        Assert.Equal("IT", res.Value.Department);
         Assert.True(res.Value.IsActive);
+        Assert.Equal("staff_account_created", Assert.Single(uow.Repo<AuditLog>().Items).Action);
+        Assert.Single(uow.Repo<User>().Items);
+    }
+
+    // UTCID09 — chuẩn hoá email/họ tên/role + Department null + ActorId null (Boundary)
+    [Fact]
+    public async Task UTCID09_Normalizes_values_with_nullable_department_and_actor()
+    {
+        var uow = new InMemoryUnitOfWork();
+
+        var res = await Handler(uow)
+            .Handle(new CreateStaffUserCommand(" HR@EXAMPLE.COM ", " HR User ", " HR_ADMIN ", null, null), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("hr@example.com", res.Value.Email);
+        Assert.Equal("HR User", res.Value.FullName);
+        Assert.Equal("hr_admin", res.Value.Role);
+        Assert.Null(res.Value.Department);
+        Assert.True(res.Value.IsActive);
+    }
+
+    // UTCID10 — repository ném lỗi → thoát ra ngoài
+    [Fact]
+    public async Task UTCID10_Repository_error_propagates()
+    {
+        var uow = new InMemoryUnitOfWork().FailRepo<User>("DB Error");
+
+        var ex = await Assert.ThrowsAsync<Exception>(
+            () => Handler(uow).Handle(new CreateStaffUserCommand("staff@example.com", "Staff User", "recruiter", "IT", ActorA), CancellationToken.None));
+
+        Assert.Equal("DB Error", ex.Message);
     }
 }

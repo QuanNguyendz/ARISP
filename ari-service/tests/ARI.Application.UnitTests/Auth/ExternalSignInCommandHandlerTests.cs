@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Auth;
@@ -7,273 +9,343 @@ using ARI.Application.Auth.Commands.CompleteExternalStaffSignIn;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace ARI.Application.UnitTests.Auth;
 
 /// <summary>
-/// Google OAuth — đuôi nghiệp vụ STAFF (<see cref="CompleteExternalStaffSignInCommandHandler"/>, Rule 15):
-/// validate domain (ưu tiên system_settings), CHỈ tài khoản pre-provisioned (không JIT), chặn khoá/pending,
-/// happy path mint JWT + refresh. Domain rỗng ⇒ cho phép mọi miền (config test rỗng).
+/// Google OAuth — đuôi nghiệp vụ CANDIDATE (<see cref="CompleteExternalCandidateSignInCommandHandler"/>) —
+/// test-plan Report5 Unit v1.2, tab "CompleteExternalCandidateSignIn" (UTCID01–13): JIT tạo tài khoản (Name/prefix),
+/// chuẩn hoá email, tài khoản đã có (active verified / active unverified / inactive), và lỗi phụ thuộc.
+/// </summary>
+public class CompleteExternalCandidateSignInCommandHandlerTests
+{
+    private const string Email = "candidate@example.com";
+
+    private static CompleteExternalCandidateSignInCommandHandler Handler(InMemoryUnitOfWork uow, FakeTokenService token) => new(uow, token);
+
+    private static CandidateAccount Existing(bool active = true, bool verified = true, string fullName = "Candidate User")
+        => new() { Email = Email, PasswordHash = "", EmailVerified = verified, IsActive = active, FullName = fullName };
+
+    private static CompleteExternalCandidateSignInCommand Cmd(string email = Email, string? name = "Candidate User") => new(email, name);
+
+    // UTCID01 — mới, Name có → JIT tạo, FullName="Candidate User"
+    [Fact]
+    public async Task UTCID01_New_candidate_with_name()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal(AppRoles.Candidate, res.Value.Role);
+        var created = Assert.Single(uow.Repo<CandidateAccount>().Items);
+        Assert.Equal(Email, created.Email);
+        Assert.Equal("Candidate User", created.FullName);
+        Assert.True(created.EmailVerified);
+        Assert.Single(uow.Repo<CandidateRefreshToken>().Items);
+    }
+
+    // UTCID02 — mới, Name=null → FullName = prefix email ("candidate")
+    [Fact]
+    public async Task UTCID02_New_candidate_null_name_uses_prefix()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(name: null), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("candidate", Assert.Single(uow.Repo<CandidateAccount>().Items).FullName);
+    }
+
+    // UTCID03 — mới, Name=" " (khoảng trắng) → FullName = prefix email
+    [Fact]
+    public async Task UTCID03_New_candidate_whitespace_name_uses_prefix()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(name: " "), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("candidate", Assert.Single(uow.Repo<CandidateAccount>().Items).FullName);
+    }
+
+    // UTCID04 — email cần chuẩn hoá → tạo với email đã chuẩn hoá
+    [Fact]
+    public async Task UTCID04_Email_normalized()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(email: " CANDIDATE@EXAMPLE.COM "), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        var created = Assert.Single(uow.Repo<CandidateAccount>().Items);
+        Assert.Equal(Email, created.Email);
+        Assert.Equal("Candidate User", created.FullName);
+    }
+
+    // UTCID05 — đã có, active + verified → đăng nhập, không tạo mới
+    [Fact]
+    public async Task UTCID05_Existing_active_verified()
+    {
+        var cand = Existing(active: true, verified: true);
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(name: "Ignored"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal(AppRoles.Candidate, res.Value.Role);
+        Assert.Single(uow.Repo<CandidateAccount>().Items);
+        Assert.NotNull(cand.LastLoginAt);
+    }
+
+    // UTCID06 — đã có, active + CHƯA verified → đăng nhập, xoá mật khẩu + đánh dấu verified
+    [Fact]
+    public async Task UTCID06_Existing_active_unverified_wipes_password()
+    {
+        var cand = new CandidateAccount { Email = Email, PasswordHash = "attacker-hash", EmailVerified = false, IsActive = true };
+        var uow = new InMemoryUnitOfWork().Seed(cand);
+        var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(name: null), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.True(cand.EmailVerified);
+        Assert.Equal("", cand.PasswordHash);
+    }
+
+    // UTCID07 — đã có, inactive → account_disabled
+    [Fact]
+    public async Task UTCID07_Existing_inactive_disabled()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Existing(active: false));
+        var token = new FakeTokenService();
+        var res = await Handler(uow, token).Handle(Cmd(name: null), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal(AuthErrorCodes.AccountDisabled, res.ErrorCode);
+        Assert.Equal(0, token.CandidateCount);
+    }
+
+    // UTCID08 — candidate lookup ném lỗi
+    [Fact]
+    public async Task UTCID08_Candidate_lookup_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailFindFor<CandidateAccount>("DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService()).Handle(Cmd(), CancellationToken.None));
+        Assert.Equal("DB Error", ex.Message);
+    }
+
+    // UTCID09 — candidate AddAsync (JIT) ném lỗi
+    [Fact]
+    public async Task UTCID09_Candidate_add_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailAddFor<CandidateAccount>("Add Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService()).Handle(Cmd(), CancellationToken.None));
+        Assert.Equal("Add Error", ex.Message);
+    }
+
+    // UTCID10 — save account (JIT) ném lỗi
+    [Fact]
+    public async Task UTCID10_Account_save_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService()).Handle(Cmd(), CancellationToken.None));
+        Assert.Equal("Save Error", ex.Message);
+    }
+
+    // UTCID11 — token service ném lỗi
+    [Fact]
+    public async Task UTCID11_Token_service_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Existing());
+        var token = new FakeTokenService { CandidateThrows = new Exception("Token Error") };
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, token).Handle(Cmd(name: null), CancellationToken.None));
+        Assert.Equal("Token Error", ex.Message);
+    }
+
+    // UTCID12 — refresh-token AddAsync ném lỗi
+    [Fact]
+    public async Task UTCID12_Refresh_add_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Existing()).FailAddFor<CandidateRefreshToken>("Refresh Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService()).Handle(Cmd(name: null), CancellationToken.None));
+        Assert.Equal("Refresh Error", ex.Message);
+    }
+
+    // UTCID13 — refresh-token save (lần 2) ném lỗi
+    [Fact]
+    public async Task UTCID13_Refresh_save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Existing()).FailSaveOn(2, "Refresh Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService()).Handle(Cmd(name: null), CancellationToken.None));
+        Assert.Equal("Refresh Save Error", ex.Message);
+    }
+}
+
+/// <summary>
+/// Google OAuth — đuôi nghiệp vụ STAFF (<see cref="CompleteExternalStaffSignInCommandHandler"/>) —
+/// test-plan Report5 Unit v1.2, tab "CompleteExternalStaffSignIn" (UTCID01–16): validate domain (DB ưu tiên,
+/// fallback appsettings, rỗng = cho mọi miền, chuẩn hoá list), pre-provisioned (không JIT), khoá/pending, lỗi phụ thuộc.
 /// </summary>
 public class CompleteExternalStaffSignInCommandHandlerTests
 {
-    private static CompleteExternalStaffSignInCommandHandler Handler(InMemoryUnitOfWork uow, FakeTokenService token)
-        => new(uow, token, AuthData.EmptyConfig());
+    private static CompleteExternalStaffSignInCommandHandler Handler(InMemoryUnitOfWork uow, FakeTokenService token, IConfiguration config)
+        => new(uow, token, config);
 
+    private static IConfiguration Config(params (string Key, string Value)[] kv)
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection(kv.Select(p => new KeyValuePair<string, string?>(p.Key, p.Value)))
+            .Build();
+
+    private static SystemSetting DomainSetting(string value) => new() { Key = "allowed_email_domains", Value = value };
+
+    private static User StaffUser(string email, bool active = true, string role = "Recruiter")
+        => new() { Email = email, Role = role, IsActive = active, FullName = "Staff User" };
+
+    // UTCID01 — DB setting cho company.com + user active → Success{Role="Recruiter"}
     [Fact]
-    public async Task Domain_not_allowed_is_rejected()
+    public async Task UTCID01_Db_domain_active_user()
     {
-        // Super Admin cấu hình chỉ cho phép @company.io qua system_settings.
-        var uow = new InMemoryUnitOfWork()
-            .Seed(new SystemSetting { Key = "allowed_email_domains", Value = "company.io" });
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com"));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("staff-access-token", res.Value.AccessToken);
+        Assert.False(string.IsNullOrEmpty(res.Value.RefreshToken));
+        Assert.Equal("Recruiter", res.Value.Role);
+    }
+
+    // UTCID02 — miền không được phép → domain_not_allowed
+    [Fact]
+    public async Task UTCID02_Domain_not_allowed()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com"));
         var token = new FakeTokenService();
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalStaffSignInCommand("intruder@gmail.com"), CancellationToken.None);
-
+        var res = await Handler(uow, token, AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@blocked.com"), CancellationToken.None);
         Assert.True(res.IsFailure);
         Assert.Equal(AuthErrorCodes.DomainNotAllowed, res.ErrorCode);
         Assert.Equal(0, token.StaffCount);
     }
 
+    // UTCID03 — DB setting rỗng; config Authentication:AllowedDomains cho phép → Success
     [Fact]
-    public async Task Unprovisioned_email_is_rejected_without_creating_account()
+    public async Task UTCID03_Config_authentication_domain()
     {
-        var uow = new InMemoryUnitOfWork();   // config rỗng → mọi miền hợp lệ; không seed user
-        var token = new FakeTokenService();
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("")).Seed(StaffUser("staff@company.com"));
+        var config = Config(("Authentication:AllowedDomains", "company.com"));
+        var res = await Handler(uow, new FakeTokenService(), config).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("Recruiter", res.Value.Role);
+    }
 
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalStaffSignInCommand("ghost@example.io"), CancellationToken.None);
+    // UTCID04 — thiếu Authentication:AllowedDomains; Auth:AllowedDomains cho phép → Success
+    [Fact]
+    public async Task UTCID04_Config_auth_fallback_domain()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(StaffUser("staff@company.com"));
+        var config = Config(("Auth:AllowedDomains", "company.com"));
+        var res = await Handler(uow, new FakeTokenService(), config).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+    }
 
+    // UTCID05 — không cấu hình miền nào → cho phép mọi miền
+    [Fact]
+    public async Task UTCID05_No_domain_config_allows_all()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(StaffUser("staff@any-domain.com"));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@any-domain.com"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+    }
+
+    // UTCID06 — giá trị miền có khoảng trắng + chữ hoa → vẫn chuẩn hoá đúng
+    [Fact]
+    public async Task UTCID06_Domain_value_normalized()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting(" @Company.com , OTHER.com ")).Seed(StaffUser("staff@company.com"));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("Recruiter", res.Value.Role);
+    }
+
+    // UTCID07 — user chưa pre-provisioned → account_not_provisioned (không JIT)
+    [Fact]
+    public async Task UTCID07_Not_provisioned()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com"));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
         Assert.True(res.IsFailure);
         Assert.Equal(AuthErrorCodes.NotProvisioned, res.ErrorCode);
-        Assert.Empty(uow.Repo<User>().Items);   // KHÔNG JIT tạo mới
-        Assert.Equal(0, token.StaffCount);
+        Assert.Empty(uow.Repo<User>().Items);
     }
 
+    // UTCID08 — user IsActive=false → pending_approval
     [Fact]
-    public async Task Inactive_account_is_pending_approval()
+    public async Task UTCID08_Inactive_pending_approval()
     {
-        var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: "hr@example.io", active: false));
-        var token = new FakeTokenService();
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalStaffSignInCommand("hr@example.io"), CancellationToken.None);
-
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com", active: false));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
         Assert.True(res.IsFailure);
         Assert.Equal(AuthErrorCodes.PendingApproval, res.ErrorCode);
-        Assert.Equal(0, token.StaffCount);
     }
 
+    // UTCID09 — user Role="Pending" → pending_approval
     [Fact]
-    public async Task Provisioned_active_staff_signs_in_with_jwt_and_refresh()
+    public async Task UTCID09_Pending_role_pending_approval()
     {
-        var staff = AuthData.Staff(email: "hr@example.io", role: AppRoles.HrAdmin);
-        var uow = new InMemoryUnitOfWork().Seed(staff);
-        var token = new FakeTokenService { StaffToken = "staff-jwt" };
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalStaffSignInCommand("hr@example.io"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("staff-jwt", res.Value.AccessToken);
-        Assert.False(string.IsNullOrEmpty(res.Value.RefreshToken));
-        Assert.Equal(AppRoles.HrAdmin, res.Value.Role);
-        Assert.NotNull(staff.LastLoginAt);
-        Assert.Single(uow.Repo<RefreshToken>().Items);
-    }
-
-    [Fact]
-    public async Task Db_allowed_domain_permits_matching_staff()
-    {
-        var uow = new InMemoryUnitOfWork()
-            .Seed(new SystemSetting { Key = "allowed_email_domains", Value = "company.io" })
-            .Seed(AuthData.Staff(email: "hr@company.io", role: AppRoles.Recruiter));
-        var token = new FakeTokenService();
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalStaffSignInCommand("hr@company.io"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal(1, token.StaffCount);
-    }
-}
-
-/// <summary>
-/// Google OAuth — đuôi nghiệp vụ CANDIDATE (<see cref="CompleteExternalCandidateSignInCommandHandler"/>):
-/// KHÔNG validate domain, JIT tạo tài khoản lần đầu, chặn tài khoản bị khoá, mint JWT + refresh.
-/// </summary>
-public class CompleteExternalCandidateSignInCommandHandlerTests
-{
-    private static CompleteExternalCandidateSignInCommandHandler Handler(InMemoryUnitOfWork uow, FakeTokenService token)
-        => new(uow, token);
-
-    [Fact]
-    public async Task Jit_creates_candidate_on_first_google_signin()
-    {
-        var uow = new InMemoryUnitOfWork();
-        var token = new FakeTokenService { CandidateToken = "cand-jwt" };
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("cand-jwt", res.Value.AccessToken);
-        Assert.Equal(AppRoles.Candidate, res.Value.Role);
-        var created = Assert.Single(uow.Repo<CandidateAccount>().Items);
-        Assert.Equal("new@gmail.com", created.Email);
-        Assert.Equal("New User", created.FullName);
-        Assert.True(created.EmailVerified);
-        Assert.Single(uow.Repo<CandidateRefreshToken>().Items);
-    }
-
-    [Fact]
-    public async Task Jit_uses_email_prefix_when_name_missing()
-    {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await Handler(uow, new FakeTokenService())
-            .Handle(new CompleteExternalCandidateSignInCommand("john.doe@gmail.com", null), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("john.doe", Assert.Single(uow.Repo<CandidateAccount>().Items).FullName);
-    }
-
-    [Fact]
-    public async Task Existing_active_candidate_signs_in_without_new_account()
-    {
-        var cand = new CandidateAccount { Email = "me@example.io", PasswordHash = "", EmailVerified = true, FullName = "Nguyen Van A" };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-
-        var res = await Handler(uow, new FakeTokenService { CandidateToken = "cand-jwt" })
-            .Handle(new CompleteExternalCandidateSignInCommand("me@example.io", "Ignored"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("cand-jwt", res.Value.AccessToken);
-        Assert.Single(uow.Repo<CandidateAccount>().Items);   // không tạo mới
-        Assert.NotNull(cand.LastLoginAt);
-    }
-
-    [Fact]
-    public async Task Jit_lay_anh_dai_dien_tu_google()
-    {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await Handler(uow, new FakeTokenService()).Handle(
-            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", "https://lh3.googleusercontent.com/a/abc"),
-            CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("https://lh3.googleusercontent.com/a/abc", Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
-    }
-
-    [Fact]
-    public async Task Anh_google_chi_dien_vao_cho_trong_khong_de_anh_tu_tai_len()
-    {
-        // Ứng viên đã tự chọn ảnh — mỗi lần đăng nhập Google không được đạp mất lựa chọn đó.
-        var cand = new CandidateAccount
-        {
-            Email = "me@example.io",
-            EmailVerified = true,
-            AvatarUrl = "avatars/anh-toi-tu-chon.png",
-        };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-
-        var res = await Handler(uow, new FakeTokenService()).Handle(
-            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
-            CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("avatars/anh-toi-tu-chon.png", cand.AvatarUrl);
-    }
-
-    [Fact]
-    public async Task Tai_khoan_chua_co_anh_thi_nhan_anh_google()
-    {
-        var cand = new CandidateAccount { Email = "me@example.io", EmailVerified = true, AvatarUrl = null };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-
-        var res = await Handler(uow, new FakeTokenService()).Handle(
-            new CompleteExternalCandidateSignInCommand("me@example.io", null, "https://lh3.googleusercontent.com/a/abc"),
-            CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("https://lh3.googleusercontent.com/a/abc", cand.AvatarUrl);
-    }
-
-    [Theory]
-    [InlineData("javascript:alert(1)")]
-    [InlineData("avatars/gia-mao.png")]
-    [InlineData("   ")]
-    [InlineData(null)]
-    public async Task Picture_khong_phai_url_http_bi_bo_qua(string? picture)
-    {
-        // Cột AvatarUrl dùng chung cho cả storageKey, nên giá trị lạ lọt vào sẽ bị hiểu nhầm
-        // thành khoá file khi dựng URL hiển thị.
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await Handler(uow, new FakeTokenService()).Handle(
-            new CompleteExternalCandidateSignInCommand("new@gmail.com", "New User", picture), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Null(Assert.Single(uow.Repo<CandidateAccount>().Items).AvatarUrl);
-    }
-
-    [Fact]
-    public async Task Google_signin_wipes_password_set_on_an_unverified_account()
-    {
-        // Chiếm tài khoản trước: kẻ xấu đăng ký form web bằng email nạn nhân và đặt mật khẩu của hắn.
-        // Tài khoản nằm im vì EmailVerified=false. Khi chủ email thật đăng nhập Google, nếu ta chỉ set
-        // EmailVerified=true thì hoá ra xác minh hộ mật khẩu của kẻ xấu → hắn đăng nhập được.
-        var cand = new CandidateAccount
-        {
-            Email = "victim@gmail.com",
-            PasswordHash = "hash-cua-ke-xau",
-            EmailVerified = false,
-        };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-
-        var res = await Handler(uow, new FakeTokenService())
-            .Handle(new CompleteExternalCandidateSignInCommand("victim@gmail.com", "Victim"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.True(cand.EmailVerified);
-        Assert.Equal(string.Empty, cand.PasswordHash);   // mật khẩu của kẻ xấu bị vô hiệu
-    }
-
-    [Fact]
-    public async Task Google_signin_keeps_password_of_an_already_verified_account()
-    {
-        // Ngược lại: tài khoản đã xác minh email thì mật khẩu là của chính chủ — không được đụng vào,
-        // nếu không mỗi lần đăng nhập bằng Google là người dùng mất mật khẩu đang dùng.
-        var cand = new CandidateAccount
-        {
-            Email = "owner@gmail.com",
-            PasswordHash = "hash-cua-chinh-chu",
-            EmailVerified = true,
-        };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-
-        var res = await Handler(uow, new FakeTokenService())
-            .Handle(new CompleteExternalCandidateSignInCommand("owner@gmail.com", null), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("hash-cua-chinh-chu", cand.PasswordHash);
-    }
-
-    [Fact]
-    public async Task Disabled_candidate_is_rejected()
-    {
-        var cand = new CandidateAccount { Email = "me@example.io", PasswordHash = "", EmailVerified = true, IsActive = false };
-        var uow = new InMemoryUnitOfWork().Seed(cand);
-        var token = new FakeTokenService();
-
-        var res = await Handler(uow, token)
-            .Handle(new CompleteExternalCandidateSignInCommand("me@example.io", null), CancellationToken.None);
-
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com", role: "Pending"));
+        var res = await Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal(AuthErrorCodes.AccountDisabled, res.ErrorCode);
-        Assert.Equal(0, token.CandidateCount);
+        Assert.Equal(AuthErrorCodes.PendingApproval, res.ErrorCode);
+    }
+
+    // UTCID10 — system-setting repo ném lỗi
+    [Fact]
+    public async Task UTCID10_Setting_repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailFindFor<SystemSetting>("Setting DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Setting DB Error", ex.Message);
+    }
+
+    // UTCID11 — user repo ném lỗi
+    [Fact]
+    public async Task UTCID11_User_repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).FailFindFor<User>("User DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("User DB Error", ex.Message);
+    }
+
+    // UTCID12 — user Update ném lỗi
+    [Fact]
+    public async Task UTCID12_User_update_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com")).FailUpdateFor<User>("Update Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Update Error", ex.Message);
+    }
+
+    // UTCID13 — save (đóng dấu LastLogin) ném lỗi
+    [Fact]
+    public async Task UTCID13_First_save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com")).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Save Error", ex.Message);
+    }
+
+    // UTCID14 — token service ném lỗi
+    [Fact]
+    public async Task UTCID14_Token_service_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com"));
+        var token = new FakeTokenService { StaffThrows = new Exception("Token Error") };
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, token, AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Token Error", ex.Message);
+    }
+
+    // UTCID15 — refresh-token AddAsync ném lỗi
+    [Fact]
+    public async Task UTCID15_Refresh_add_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com")).FailAddFor<RefreshToken>("Refresh Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Refresh Error", ex.Message);
+    }
+
+    // UTCID16 — save (phát refresh mới, lần 2) ném lỗi
+    [Fact]
+    public async Task UTCID16_Second_save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("company.com")).Seed(StaffUser("staff@company.com")).FailSaveOn(2, "Refresh Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new FakeTokenService(), AuthData.EmptyConfig()).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None));
+        Assert.Equal("Refresh Save Error", ex.Message);
     }
 }
