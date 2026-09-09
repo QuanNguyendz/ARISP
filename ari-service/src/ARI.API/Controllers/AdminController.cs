@@ -13,6 +13,7 @@ using ARI.Application.Admin.Commands.DeactivateUser;
 using ARI.Application.Admin.Commands.DeleteUser;
 using ARI.Application.Admin.Commands.RejectAccountRequest;
 using ARI.Application.Admin.Commands.UpdateSystemSettings;
+using ARI.Application.Admin.Commands.UpdateUserDepartment;
 using ARI.Application.Admin.Commands.UpdateUserRole;
 using ARI.Application.Admin.Queries.GetAccountRequests;
 using ARI.Application.Admin.Queries.GetAdminStats;
@@ -67,7 +68,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> CreateStaffUser([FromBody] CreateStaffUserRequest request)
         {
             var result = await _sender.Send(new CreateStaffUserCommand(
-                request.Email, request.FullName, request.Role, request.Department, GetActorId()));
+                request.Email, request.FullName, request.Role, request.DepartmentId, GetActorId()));
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.Conflict
@@ -105,6 +106,23 @@ namespace ARI.API.Controllers
                     : BadRequest(new { message = result.Error });
             }
             return Ok(new { message = "User role updated successfully." });
+        }
+
+        /// <summary>
+        /// Gán/đổi đội của một tài khoản (ADR-065). Đây là đường DUY NHẤT đổi được đội — nhân viên
+        /// không còn tự sửa được ở trang Cài đặt cá nhân.
+        /// </summary>
+        [HttpPut("users/{id}/department")]
+        public async Task<IActionResult> UpdateUserDepartment(Guid id, [FromBody] UpdateDepartmentRequest? request)
+        {
+            var result = await _sender.Send(new UpdateUserDepartmentCommand(id, request?.DepartmentId, GetActorId()));
+            if (result.IsFailure)
+            {
+                return result.ErrorCode == CommonErrorCodes.NotFound
+                    ? NotFound(new { message = result.Error })
+                    : BadRequest(new { message = result.Error });
+            }
+            return Ok(new { message = "User department updated successfully." });
         }
 
         [HttpPost("users/{id}/deactivate")]

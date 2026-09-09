@@ -69,7 +69,8 @@ export const profileService = {
     const res = await apiClient.get('/staff/profile')
     return res.data
   },
-  updateProfile: async (payload: { fullName: string; department?: string | null }): Promise<StaffProfile> => {
+  /** ADR-065: KHÔNG còn `department` — đội do Super Admin gán, nhân viên không tự đổi được. */
+  updateProfile: async (payload: { fullName: string }): Promise<StaffProfile> => {
     const res = await apiClient.put('/staff/profile', payload)
     return res.data
   },

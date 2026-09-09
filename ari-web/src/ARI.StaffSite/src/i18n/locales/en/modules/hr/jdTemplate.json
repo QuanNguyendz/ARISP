@@ -1,0 +1,47 @@
+{
+  "title": "Job description template",
+  "description": "Configured once for the whole company — every JD a recruiter writes follows it",
+  "loading": "Loading template...",
+  "save": "Save template",
+  "savedOk": "Saved",
+  "company": {
+    "title": "Company identity",
+    "logo": "Company logo",
+    "uploadLogo": "Upload logo",
+    "logoHint": "PNG or JPG, max 2MB. The logo appears at the top of every JD file.",
+    "name": "Company name",
+    "address": "Address",
+    "website": "Website",
+    "email": "Contact email",
+    "documentTitle": "Document title",
+    "documentTitleHint": "Printed centred above the info table — e.g. \"JOB OPENING\". This titles the document type, not the position."
+  },
+  "style": {
+    "title": "Presentation",
+    "accent": "Accent colour",
+    "font": "Font",
+    "fontHint": "The font must exist on the server; unknown fonts fall back to Arial.",
+    "footer": "Footer note"
+  },
+  "sections": {
+    "title": "JD sections",
+    "description": "Toggle, rename and reorder the sections printed in the file. Section keys are fixed — saved JD content is looked up by those keys.",
+    "enabled": "Enable this section",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
+  },
+  "preview": {
+    "label": "Preview",
+    "companyPlaceholder": "Company name",
+    "samplePosition": "Backend Developer",
+    "factDepartment": "Department",
+    "factSalary": "Salary",
+    "sampleLine": "A recruiter fills this section in when writing the JD.",
+    "note": "The preview is APPROXIMATE: browser fonts differ from the server’s, so page breaks may shift by a line or two."
+  },
+  "errors": {
+    "loadFailed": "Could not load the JD template.",
+    "saveFailed": "Could not save the JD template.",
+    "logoFailed": "Could not upload the logo."
+  }
+}

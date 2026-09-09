@@ -1,0 +1,94 @@
+{
+  "common": {
+    "close": "Đóng",
+    "loading": "Đang tải..."
+  },
+  "title": "Thư mời nhận việc",
+  "description": "Đoạn kết của phễu tuyển dụng: soạn thư, gửi Hiring Manager duyệt, rồi gửi ứng viên.",
+  "loadError": "Không tải được danh sách thư mời.",
+  "searchPlaceholder": "Tìm theo ứng viên hoặc vị trí...",
+  "emptyTitle": "Chưa có thư mời nào",
+  "emptyDescription": "Thư mời được soạn từ trang chi tiết ứng viên sau khi hồ sơ qua hết các vòng.",
+  "filters": {
+    "all": "Tất cả"
+  },
+  "status": {
+    "draft": "Bản nháp",
+    "pending_approval": "Chờ duyệt",
+    "approved": "Đã duyệt",
+    "sent": "Đã gửi ứng viên",
+    "accepted": "Ứng viên đã nhận",
+    "declined": "Ứng viên từ chối",
+    "withdrawn": "Đã thu hồi",
+    "expired": "Hết hạn"
+  },
+  "stats": {
+    "awaitingApproval": "Chờ duyệt",
+    "awaitingResponse": "Chờ ứng viên trả lời",
+    "accepted": "Đã nhận việc",
+    "declined": "Từ chối / hết hạn"
+  },
+  "list": {
+    "salary": "Lương:",
+    "startDate": "Ngày bắt đầu:",
+    "expiresAt": "Hạn trả lời:",
+    "viewCandidate": "Xem ứng viên",
+    "open": "Mở thư"
+  },
+  "panel": {
+    "title": "Thư mời nhận việc",
+    "description": "Ứng viên đã qua hết các vòng. Soạn thư mời để khép phễu ngay trong hệ thống.",
+    "create": "Soạn thư mời",
+    "createReplacement": "Soạn thư mời mới",
+    "open": "Mở thư mời"
+  },
+  "editor": {
+    "title": "Thư mời nhận việc",
+    "createTitle": "Soạn thư mời nhận việc",
+    "createHint": "Điền mức lương, ngày bắt đầu và hạn trả lời rồi gửi Hiring Manager duyệt.",
+    "returnedReason": "Hiring Manager trả về bản nháp: {{reason}}",
+    "candidateNote": "Ứng viên phản hồi: {{note}}"
+  },
+  "fields": {
+    "position": "Chức danh",
+    "positionPlaceholder": "Chức danh ghi trong thư — mặc định lấy theo tin tuyển dụng.",
+    "salary": "Mức lương",
+    "currency": "Tiền tệ",
+    "period": "Chu kỳ",
+    "periods": {
+      "month": "Tháng",
+      "year": "Năm",
+      "hour": "Giờ"
+    },
+    "startDate": "Ngày bắt đầu",
+    "expiresAt": "Hạn trả lời",
+    "employmentType": "Hình thức làm việc",
+    "workLocation": "Nơi làm việc",
+    "bonus": "Thưởng",
+    "benefits": "Phúc lợi",
+    "notes": "Ghi chú nội bộ",
+    "notesPlaceholder": "Ví dụ: còn dư ngân sách, nâng thêm được nếu ứng viên thương lượng.",
+    "notesHint": "Chỉ nhân sự đọc được. Ô này KHÔNG bao giờ xuất hiện trong thư gửi ứng viên hay trong Portal."
+  },
+  "actions": {
+    "save": "Lưu nháp",
+    "submit": "Gửi duyệt",
+    "submitBlocked": "Cần điền mức lương, ngày bắt đầu và hạn trả lời trước khi gửi duyệt.",
+    "approve": "Duyệt thư",
+    "returnToDraft": "Trả về bản nháp",
+    "rejectReasonLabel": "Cần sửa những gì?",
+    "confirmReturn": "Gửi lại cho người soạn",
+    "send": "Gửi ứng viên",
+    "composeTitle": "Soạn thư mời nhận việc",
+    "withdraw": "Thu hồi thư",
+    "withdrawReasonLabel": "Lý do thu hồi",
+    "confirmWithdraw": "Xác nhận thu hồi"
+  },
+  "errors": {
+    "save": "Không lưu được thư mời.",
+    "submit": "Không gửi duyệt được thư mời.",
+    "decide": "Không ghi nhận được quyết định.",
+    "send": "Không gửi được thư mời cho ứng viên.",
+    "withdraw": "Không thu hồi được thư mời."
+  }
+}

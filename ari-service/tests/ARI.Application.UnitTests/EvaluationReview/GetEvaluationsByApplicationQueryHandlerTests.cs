@@ -7,6 +7,7 @@ using ARI.Application.Common;
 using ARI.Application.Evaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluationsByApplication;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using Xunit;
 
 namespace ARI.Application.UnitTests.EvaluationReview;
@@ -17,8 +18,12 @@ namespace ARI.Application.UnitTests.EvaluationReview;
 /// </summary>
 public class GetEvaluationsByApplicationQueryHandlerTests
 {
-    private static Task<Result<List<EvaluationListItemResponse>>> Run(InMemoryUnitOfWork uow, Guid appId)
-        => new GetEvaluationsByApplicationQueryHandler(uow).Handle(new GetEvaluationsByApplicationQuery(appId), CancellationToken.None);
+    /// <summary>Mặc định chạy dưới quyền quản trị viên; phạm vi dữ liệu có test riêng ở cuối file.</summary>
+    private static Task<Result<List<EvaluationListItemResponse>>> Run(
+        InMemoryUnitOfWork uow, Guid appId, Guid? userId = null, string? role = null)
+        => new GetEvaluationsByApplicationQueryHandler(uow).Handle(
+            new GetEvaluationsByApplicationQuery(appId, userId ?? Guid.NewGuid(), role ?? AppRoles.HrAdmin),
+            CancellationToken.None);
 
     [Fact]
     public async Task Application_not_found_fails()

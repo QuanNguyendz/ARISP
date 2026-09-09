@@ -1,19 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@ari/shared/store/auth'
-
-// Chuẩn hoá role về định dạng backend (snake_case) — đồng bộ ProtectedRoute / GuestRoute.
-function normalizeRole(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_')
-  if (r === 'superadmin') return 'super_admin'
-  if (r === 'hradmin') return 'hr_admin'
-  return r
-}
-
-const STAFF_HOME: Record<string, string> = {
-  super_admin: '/super-admin/dashboard',
-  hr_admin: '/hr/dashboard',
-  recruiter: '/recruiter/dashboard',
-}
+import { STAFF_HOME, homePathForRole } from '@ari/shared/utils/roles'
 
 /**
  * Trang gốc `/` của Staff site: đã đăng nhập thì đưa về dashboard theo role,
@@ -27,7 +14,7 @@ export default function StaffHomeRedirect() {
   }
 
   if (isAuthenticated && user) {
-    const home = STAFF_HOME[normalizeRole(user.role || '')]
+    const home = homePathForRole(user.role, STAFF_HOME)
     if (home) {
       return <Navigate to={home} replace />
     }

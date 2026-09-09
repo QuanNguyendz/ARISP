@@ -57,5 +57,31 @@
   "aiReasoning": "Nhận định của AI",
   "integritySignals": "Tín hiệu tính toàn vẹn",
   "cheatScore": "Điểm nghi vấn",
-  "noCheatSignals": "Không ghi nhận dấu hiệu bất thường nào trong buổi phỏng vấn."
+  "noCheatSignals": "Không ghi nhận dấu hiệu bất thường nào trong buổi phỏng vấn.",
+  "hm": {
+    "theHiringManager": "Hiring Manager của tin",
+    "ownerHint": "Tin này do {{name}} quyết định. Bạn xem được toàn bộ báo cáo; chốt thay phải ghi lý do.",
+    "fallbackBanner": "Người chốt kết quả của tin này là {{name}}. Bạn đang chốt thay — hệ thống sẽ ghi nhật ký và báo cho họ.",
+    "fallbackReasonLabel": "Lý do chốt thay",
+    "fallbackReasonPlaceholder": "Ví dụ: Hiring Manager nghỉ phép tới 10/09, ứng viên cần phản hồi trong hôm nay.",
+    "fallbackRequired": "Vui lòng nhập lý do chốt thay Hiring Manager (tối thiểu 10 ký tự).",
+    "showSuggestions": "+ Thêm đề xuất cấp bậc & mức lương",
+    "hideSuggestions": "− Ẩn đề xuất cấp bậc & mức lương",
+    "suggestionsHint": "Không bắt buộc. Những gì ghi ở đây được điền sẵn vào thư mời nhận việc, để không phải gõ lại.",
+    "level": "Cấp bậc đề xuất",
+    "salaryMin": "Lương từ",
+    "salaryMax": "Lương đến",
+    "currency": "Tiền tệ",
+    "strengths": "Điểm mạnh",
+    "concerns": "Điểm cần lưu ý",
+    "decidedBy": "Người chốt: {{role}}",
+    "suggestionSummary": "Đề xuất",
+    "roles": {
+      "hiring_manager": "Hiring Manager",
+      "hr_admin": "HR Admin (chốt thay)",
+      "super_admin": "Super Admin (chốt thay)"
+    },
+    "awaitingDecision": "Đang chờ {{name}} chốt kết quả. Bạn xem được báo cáo nhưng không phải người quyết định.",
+    "awaitingAdminDecision": "Đang chờ HR Admin chốt kết quả. Bạn xem được báo cáo nhưng không phải người quyết định."
+  }
 }

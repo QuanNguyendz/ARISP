@@ -41,6 +41,15 @@ namespace ARI.Application.Interfaces
     public class SessionContext
     {
         public Guid SessionId { get; set; }
+
+        /// <summary>
+        /// Tin + vòng — để RAG service truy hồi playbook ĐÚNG PHẠM VI lúc chấm (ADR-025/062).
+        /// Thiếu hai trường này thì `/evaluate` không dựng được bộ lọc scope, nên tài liệu
+        /// `expected_answer` mà doanh nghiệp upload lên KHÔNG hề ảnh hưởng tới điểm số.
+        /// </summary>
+        public Guid JobPostingId { get; set; }
+        public int RoundNumber { get; set; } = 1;
+
         public string JobDescription { get; set; } = string.Empty;
         public string CandidateCv { get; set; } = string.Empty;
         public string SessionType { get; set; } = "real";

@@ -21,7 +21,10 @@
     "lockedTitle": "Awaiting CV approval",
     "lockedDetail": "Your application must pass the CV screening round before you can take the online test.",
     "antiCheatHint": "Please do not leave this page while taking the test. Every tab switch or window blur is recorded and shared with the recruiter.",
-    "tabSwitchWarning": "You have left the test {{count}} time(s). This has been recorded and will be visible to the recruiter."
+    "tabSwitchWarning": "You have left the test {{count}} time(s). This has been recorded and will be visible to the recruiter.",
+    "submittedTitle": "Submitted",
+    "submittedHint": "Your answers have been recorded. Recruiting will let you know the outcome once this round is decided.",
+    "submittedCount": "{{total}} questions submitted."
   },
   "entry": {
     "resultTitle": "Online test: {{result}}",

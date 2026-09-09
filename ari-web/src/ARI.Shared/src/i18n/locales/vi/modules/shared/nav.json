@@ -6,6 +6,7 @@
     "candidates": "Ứng viên",
     "interviews": "Phiên phỏng vấn",
     "evaluations": "Đánh giá",
+    "offers": "Thư mời nhận việc",
     "playbooks": "Playbook",
     "recruiters": "Phân công & tải",
     "team": "Nhóm HR",
@@ -13,7 +14,9 @@
     "help": "Trợ giúp & tài liệu",
     "searchPlaceholder": "Tìm ứng viên, tin tuyển dụng...",
     "createJob": "Tạo tin",
-    "roleLabel": "Quản trị HR"
+    "roleLabel": "Quản trị HR",
+    "recruitmentRequests": "Phiếu yêu cầu tuyển dụng",
+    "jdTemplate": "Mẫu JD"
   },
   "recruiter": {
     "workspace": "Không gian làm việc Recruiter",
@@ -22,11 +25,26 @@
     "candidates": "Ứng viên",
     "interviewCode": "Cấp mã phỏng vấn",
     "evaluations": "Đánh giá",
+    "offers": "Thư mời nhận việc",
     "interviews": "Phỏng vấn",
     "settings": "Cài đặt",
     "searchPlaceholder": "Tìm tin tuyển dụng, ứng viên...",
     "createJob": "Tạo tin",
-    "roleLabel": "Chuyên viên tuyển dụng"
+    "roleLabel": "Chuyên viên tuyển dụng",
+    "recruitmentRequests": "Phiếu yêu cầu tuyển dụng"
+  },
+  "hm": {
+    "workspace": "Không gian làm việc Hiring Manager",
+    "dashboard": "Tổng quan",
+    "jobs": "Tin tuyển dụng của tôi",
+    "evaluations": "Kết quả phỏng vấn",
+    "offers": "Thư mời nhận việc",
+    "settings": "Cài đặt",
+    "help": "Trợ giúp & tài liệu",
+    "searchPlaceholder": "Tìm tin tuyển dụng, ứng viên...",
+    "roleLabel": "Trưởng bộ phận tuyển dụng",
+    "recruitmentRequests": "Phiếu yêu cầu tuyển dụng",
+    "interviewRooms": "Phòng phỏng vấn"
   },
   "superAdmin": {
     "workspace": "Không gian làm việc Super Admin",
@@ -38,7 +56,8 @@
     "systemSettings": "Cài đặt hệ thống",
     "searchPlaceholder": "Tìm user, audit log...",
     "addStaff": "Thêm staff",
-    "roleLabel": "Super Admin"
+    "roleLabel": "Super Admin",
+    "departments": "Đội / Bộ phận"
   },
   "search": {
     "jobs": "Tin tuyển dụng",

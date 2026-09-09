@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Admin.Commands.CreateStaffUser;
@@ -6,6 +7,7 @@ using ARI.Application.Common;
 using ARI.Application.UnitTests.Auth;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Entities;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace ARI.Application.UnitTests.Admin;
@@ -18,12 +20,12 @@ public class CreateStaffUserCommandHandlerTests
 {
     private static CreateStaffUserCommandHandler Handler(
         InMemoryUnitOfWork uow, FakePasswordHasher hasher, RecordingEmailService email)
-        => new(uow, hasher, email);
+        => new(uow, hasher, email, AuthData.EmptyConfig());
 
     private static CreateStaffUserCommand Cmd(
         string email = "new@example.io", string fullName = "New Staff", string? role = "recruiter",
-        string? department = "Engineering", Guid? actorId = null)
-        => new(email, fullName, role, department, actorId ?? Guid.NewGuid());
+        Guid? departmentId = null, Guid? actorId = null)
+        => new(email, fullName, role, departmentId, actorId ?? Guid.NewGuid());
 
     [Theory]
     [InlineData("super_admin")]
@@ -79,7 +81,7 @@ public class CreateStaffUserCommandHandlerTests
         var email = new RecordingEmailService();
 
         var res = await Handler(uow, hasher, email).Handle(
-            Cmd(email: "  New@X.io ", fullName: "  New Staff  ", role: "HR_Admin", department: "  Eng  ", actorId: actor),
+            Cmd(email: "  New@X.io ", fullName: "  New Staff  ", role: "HR_Admin", actorId: actor),
             CancellationToken.None);
 
         Assert.True(res.IsSuccess);
@@ -88,7 +90,7 @@ public class CreateStaffUserCommandHandlerTests
         Assert.Equal("new@x.io", user.Email);          // lower + trim
         Assert.Equal("hr_admin", user.Role);           // lower
         Assert.Equal("New Staff", user.FullName);      // trim
-        Assert.Equal("Eng", user.Department);          // trim
+        Assert.Null(user.DepartmentId);                // ADR-065: đội gán riêng, không gõ tay
         Assert.True(user.IsActive);
         Assert.StartsWith("hashed:", user.PasswordHash);           // đã hash, không phải plaintext
         Assert.True(user.PasswordHash!.Length > "hashed:".Length);
@@ -107,5 +109,33 @@ public class CreateStaffUserCommandHandlerTests
         Assert.Equal("hr_admin", res.Value.Role);
         Assert.Equal("New Staff", res.Value.FullName);
         Assert.True(res.Value.IsActive);
+    }
+
+    /// <summary>
+    /// Thư chào mừng là nơi DUY NHẤT mật khẩu tạm xuất hiện, nên nút trong đó phải dẫn tới trang đăng
+    /// nhập thật. Trước đây ghi cứng "http://localhost:3001/login": sai route (route thật là
+    /// <c>/auth/login</c>, còn <c>/login</c> rơi vào catch-all rồi chuyển hướng <c>/404</c>) và sai cả
+    /// máy chủ trên bản deploy. Test khoá cả hai vế.
+    /// </summary>
+    [Fact]
+    public async Task Welcome_email_links_to_configured_staff_login_page()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var email = new RecordingEmailService();
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:AdminFrontendUrl"] = "https://staff.arisp.io.vn/",   // dấu / thừa phải bị cắt
+            })
+            .Build();
+
+        var res = await new CreateStaffUserCommandHandler(uow, new FakePasswordHasher(), email, config)
+            .Handle(Cmd(role: "hiring_manager"), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        var mail = Assert.Single(email.Sent);
+        Assert.Contains("https://staff.arisp.io.vn/auth/login", mail.Html);
+        Assert.DoesNotContain("localhost", mail.Html);
+        Assert.DoesNotContain("//staff.arisp.io.vn//auth", mail.Html);
     }
 }

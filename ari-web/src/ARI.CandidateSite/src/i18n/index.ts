@@ -20,6 +20,8 @@ import candidateVi from './locales/vi/modules/candidate/index.json'
 import candidateEn from './locales/en/modules/candidate/index.json'
 import candidateApplicationDetailVi from './locales/vi/modules/candidate/applicationDetail.json'
 import candidateApplicationDetailEn from './locales/en/modules/candidate/applicationDetail.json'
+import candidateOfferVi from './locales/vi/modules/candidate/offer.json'
+import candidateOfferEn from './locales/en/modules/candidate/offer.json'
 import candidateInterviewScheduleVi from './locales/vi/modules/candidate/interviewSchedule.json'
 import candidateInterviewScheduleEn from './locales/en/modules/candidate/interviewSchedule.json'
 import candidateNotificationsVi from './locales/vi/modules/candidate/notifications.json'
@@ -54,6 +56,7 @@ export const resources = {
     // Candidate module
     'modules/candidate': candidateVi,
     'modules/candidate/applicationDetail': candidateApplicationDetailVi,
+    'modules/candidate/offer': candidateOfferVi,
     'modules/candidate/interviewSchedule': candidateInterviewScheduleVi,
     'modules/candidate/notifications': candidateNotificationsVi,
     'modules/candidate/onlineTest': candidateOnlineTestVi,
@@ -75,6 +78,7 @@ export const resources = {
     // Candidate module
     'modules/candidate': candidateEn,
     'modules/candidate/applicationDetail': candidateApplicationDetailEn,
+    'modules/candidate/offer': candidateOfferEn,
     'modules/candidate/interviewSchedule': candidateInterviewScheduleEn,
     'modules/candidate/notifications': candidateNotificationsEn,
     'modules/candidate/onlineTest': candidateOnlineTestEn,
@@ -96,6 +100,7 @@ const siteNamespaces = [
   'modules/interview/practice',
   'modules/candidate',
   'modules/candidate/applicationDetail',
+  'modules/candidate/offer',
   'modules/candidate/interviewSchedule',
   'modules/candidate/notifications',
   'modules/candidate/onlineTest',

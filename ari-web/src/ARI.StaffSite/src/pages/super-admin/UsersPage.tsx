@@ -23,9 +23,31 @@ import {
   type CreateStaffPayload,
 } from '@/fservices/admin'
 import { roleLabel, roleBadgeClass } from '@/utils/adminLabels'
+import {
+  ASSIGNABLE_STAFF_ROLES,
+  ROLE,
+  type AssignableStaffRole,
+} from '@ari/shared/utils/roles'
+import { departmentService, type Department } from '@ari/shared/fservices/department'
 import { StatsGridSkeleton, TableSkeleton } from './_skeletons'
 
 const PAGE_SIZE = 10
+
+/**
+ * Nhãn i18n cho từng vai trò. Kiểu của bảng này ràng buộc theo chính `ASSIGNABLE_STAFF_ROLES`,
+ * nên thêm một vai trò vào hằng số dùng chung mà quên nhãn ở đây là **lỗi biên dịch** — thay vì
+ * một ô select trống lặng lẽ, đúng triệu chứng mà Hiring Manager vừa gây ra.
+ */
+const ROLE_I18N_KEY: Record<AssignableStaffRole | typeof ROLE.SuperAdmin, string> = {
+  [ROLE.HRAdmin]: 'filters.hrAdmin',
+  [ROLE.Recruiter]: 'filters.recruiter',
+  [ROLE.HiringManager]: 'filters.hiringManager',
+  [ROLE.SuperAdmin]: 'filters.superAdmin',
+}
+
+/** Các vai trò Super Admin cấp được — dùng chung cho ô lọc, ô đổi vai trò và form tạo tài khoản. */
+const assignableRoleOptions = (t: (key: string) => string) =>
+  ASSIGNABLE_STAFF_ROLES.map((role) => ({ value: role, label: t(ROLE_I18N_KEY[role]) }))
 
 const initials = (name?: string | null) =>
   (name || 'U')
@@ -53,6 +75,13 @@ export default function UsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [lockTarget, setLockTarget] = useState<AdminUser | null>(null)
+
+  // Chỉ đội đang hoạt động: đội đã tắt vẫn hiện được TÊN ở dòng cũ (server trả kèm), nhưng không
+  // gán mới vào được.
+  const [departments, setDepartments] = useState<Department[]>([])
+  useEffect(() => {
+    void departmentService.list(true).then(setDepartments).catch(() => setDepartments([]))
+  }, [])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -156,7 +185,20 @@ export default function UsersPage() {
     }
   }
 
-  const handleChangeRole = async (u: AdminUser, role: 'hr_admin' | 'recruiter') => {
+  const handleChangeDepartment = async (u: AdminUser, departmentId: string | null) => {
+    setBusyId(u.id)
+    setError('')
+    try {
+      await adminService.updateDepartment(u.id, departmentId)
+      await loadUsers()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || t('errors.departmentChangeFailed'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleChangeRole = async (u: AdminUser, role: AssignableStaffRole) => {
     setBusyId(u.id)
     setError('')
     try {
@@ -188,6 +230,11 @@ export default function UsersPage() {
       { label: t('statCards.totalUsers'), value: stats?.totalUsers ?? 0, color: 'text-brand-600' },
       { label: t('statCards.hrAdmin'), value: stats?.hrAdmins ?? 0, color: 'text-ai-600' },
       { label: t('statCards.recruiter'), value: stats?.recruiters ?? 0, color: 'text-amber-600' },
+      {
+        label: t('statCards.hiringManager'),
+        value: stats?.hiringManagers ?? 0,
+        color: 'text-sky-600',
+      },
       { label: t('statCards.lockedUsers'), value: stats?.lockedUsers ?? 0, color: 'text-red-600' },
     ],
     [stats, t]
@@ -236,9 +283,8 @@ export default function UsersPage() {
           buttonClassName="px-4 py-2.5 text-sm"
           options={[
             { value: 'all', label: t('filters.allRoles') },
-            { value: 'super_admin', label: t('filters.superAdmin') },
-            { value: 'hr_admin', label: t('filters.hrAdmin') },
-            { value: 'recruiter', label: t('filters.recruiter') },
+            { value: ROLE.SuperAdmin, label: t(ROLE_I18N_KEY[ROLE.SuperAdmin]) },
+            ...assignableRoleOptions(t),
           ]}
         />
       </div>
@@ -265,6 +311,7 @@ export default function UsersPage() {
                 <tr className="border-b border-ink-100 dark:border-white/10 text-xs uppercase tracking-wider text-ink-400">
                   <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.user')}</th>
                   <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.role')}</th>
+                  <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.department')}</th>
                   <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.status')}</th>
                   <th className="px-4 py-3 font-medium sm:px-6">{t('table.headers.createdAt')}</th>
                   <th className="px-4 py-3 text-right font-medium sm:px-6">
@@ -307,12 +354,30 @@ export default function UsersPage() {
                           <Select
                             value={u.role.toLowerCase().replace(/\s+/g, '_')}
                             disabled={busyId === u.id}
-                            onChange={(v) => handleChangeRole(u, v as 'hr_admin' | 'recruiter')}
-                            className="w-full max-w-[140px]"
+                            onChange={(v) => handleChangeRole(u, v as AssignableStaffRole)}
+                            className="w-full max-w-[160px]"
                             buttonClassName="rounded-lg px-2 py-1 text-xs"
+                            options={assignableRoleOptions(t)}
+                          />
+                        )}
+                      </td>
+                      <td className="px-4 py-4 sm:px-6">
+                        {/* Super Admin là người DUY NHẤT đặt được đội — nhân viên không còn tự sửa
+                            ở trang Cài đặt (ADR-065). Chính tài khoản Super Admin thì không cần đội. */}
+                        {superAdmin ? (
+                          <span className="text-xs text-ink-400">—</span>
+                        ) : (
+                          <Select
+                            value={u.departmentId ?? ''}
+                            disabled={busyId === u.id}
+                            onChange={(v) => handleChangeDepartment(u, v || null)}
+                            ariaLabel={t('table.headers.department')}
+                            className="w-full max-w-[180px]"
+                            buttonClassName="rounded-lg px-2 py-1 text-xs"
+                            placeholder={t('table.noDepartment')}
                             options={[
-                              { value: 'hr_admin', label: t('filters.hrAdmin') },
-                              { value: 'recruiter', label: t('filters.recruiter') },
+                              { value: '', label: t('table.noDepartment') },
+                              ...departments.map((d) => ({ value: d.id, label: d.name })),
                             ]}
                           />
                         )}
@@ -512,10 +577,17 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
     email: '',
     fullName: '',
     role: 'recruiter',
-    department: '',
+    departmentId: undefined,
   })
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
+
+  // Chỉ đội ĐANG HOẠT ĐỘNG: gán vào đội đã tắt thì tài khoản đó không lập được phiếu mà cũng không
+  // có lỗi nào chỉ ra vì sao (server cũng chặn lại).
+  const [departments, setDepartments] = useState<Department[]>([])
+  useEffect(() => {
+    void departmentService.list(true).then(setDepartments).catch(() => setDepartments([]))
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -526,7 +598,7 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
         email: form.email.trim(),
         fullName: form.fullName.trim(),
         role: form.role,
-        department: form.department?.trim() || undefined,
+        departmentId: form.departmentId,
       })
       onCreated()
     } catch (e: any) {
@@ -594,24 +666,24 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
               </label>
               <Select
                 value={form.role}
-                onChange={(v) => setForm({ ...form, role: v as 'hr_admin' | 'recruiter' })}
+                onChange={(v) => setForm({ ...form, role: v as AssignableStaffRole })}
                 className="w-full"
                 buttonClassName="px-3 py-2.5 text-sm"
-                options={[
-                  { value: 'recruiter', label: t('filters.recruiter') },
-                  { value: 'hr_admin', label: t('filters.hrAdmin') },
-                ]}
+                options={assignableRoleOptions(t)}
               />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
                 {t('createModal.department')}
               </label>
-              <input
-                value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
+              <Select
+                value={form.departmentId ?? ''}
+                onChange={(v) => setForm({ ...form, departmentId: v || undefined })}
+                ariaLabel={t('createModal.department')}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
                 placeholder={t('createModal.departmentPlaceholder')}
-                className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400"
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
               />
             </div>
           </div>

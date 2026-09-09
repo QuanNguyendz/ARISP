@@ -21,7 +21,14 @@ namespace ARI.Application.Interfaces
         Playbook,
 
         /// <summary>Ảnh đại diện ứng viên (ảnh tự tải lên; ảnh Google lưu thẳng URL, không qua đây).</summary>
-        Avatar
+        Avatar,
+
+        /// <summary>
+        /// Nhận diện công ty — hiện là logo trong mẫu JD (ADR-064). Tách riêng khỏi
+        /// <see cref="Avatar"/>: một file cấu hình dùng chung cho cả công ty, không phải ảnh cá nhân,
+        /// và vòng đời khác hẳn (không xoá theo tài khoản nào).
+        /// </summary>
+        Branding
     }
 
     public static class StorageFolderExtensions
@@ -34,6 +41,7 @@ namespace ARI.Application.Interfaces
             StorageFolder.Recording => "recordings",
             StorageFolder.Playbook => "playbooks",
             StorageFolder.Avatar => "avatars",
+            StorageFolder.Branding => "branding",
             _ => "misc"
         };
     }

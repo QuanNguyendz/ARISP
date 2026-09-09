@@ -36,7 +36,7 @@ export const WORKSPACES: Record<WorkspaceVariant, WorkspaceConfig> = {
     emptyTitleKey: 'workspace.hr.emptyTitle',
     emptyDescriptionKey: 'workspace.hr.emptyDescription',
     jobHref: (id) => `/hr/jobs/${id}`,
-    evaluationHref: (id) => `/hr/evaluations?evaluationId=${id}`,
+    evaluationHref: (id) => `/hr/evaluations?id=${id}`,
     candidateHref: (id) => `/hr/candidates/${id}`,
   },
   recruiter: {

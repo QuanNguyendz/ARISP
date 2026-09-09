@@ -19,7 +19,7 @@ public class ApproveAccountRequestCommandHandlerTests
 {
     private static ApproveAccountRequestCommandHandler Handler(
         InMemoryUnitOfWork uow, RecordingEmailService email, RecordingNotificationService notif)
-        => new(uow, new FakePasswordHasher(), email, notif);
+        => new(uow, new FakePasswordHasher(), email, notif, AuthData.EmptyConfig());
 
     private static AccountRequest Request(
         string status = "pending", string email = "hr@example.io", Guid? requestedBy = null) => new()

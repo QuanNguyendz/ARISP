@@ -40,7 +40,6 @@ export interface CandidateOnlineTest {
   jobPostingId: string
   jobTitle: string
   roundNumber: number
-  passScore: number
   durationMinutes: number
   totalQuestions: number
   questions: CandidateTestQuestion[]
@@ -52,7 +51,18 @@ export interface CandidateOnlineTest {
   cvPassed: boolean
 }
 
-/** Kết quả chấm bài trắc nghiệm. */
+/**
+ * Biên nhận nộp bài — thứ DUY NHẤT ứng viên nhận lại sau khi bấm nộp.
+ *
+ * Bài vẫn được chấm ngay và tự động (nhân sự xem được liền), nhưng điểm và kết quả không đi kèm
+ * phản hồi này: công bố tại chỗ là công bố trước khi vòng chốt.
+ */
+export interface OnlineTestSubmitAck {
+  submittedAt: string
+  totalQuestions: number
+}
+
+/** Kết quả chấm bài — chỉ dành cho PHÍA NHÂN SỰ (`getStaffResult`). */
 export interface OnlineTestResult {
   score: number
   isPassed: boolean

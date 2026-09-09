@@ -278,30 +278,45 @@ export default function KioskInterviewPage() {
 
       {header}
 
+      {/* PHÒNG CHỜ (ADR-067): buổi phỏng vấn thật chỉ bắt đầu khi Hiring Manager đã vào phòng cùng
+          AI và bấm cho ứng viên vào. Che kín màn thay vì chỉ đổi một dòng chữ nhỏ — ứng viên đang
+          ngồi trước máy Kiosk cần biết rõ mình phải chờ, không phải mình bấm sai chỗ. */}
+      {interview.admission !== 'admitted' && interview.status !== 'ended' && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-ink-950/95 px-6 backdrop-blur">
+          <div className="max-w-md text-center">
+            <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+            <h2 className="font-display text-2xl font-bold text-white">
+              {t('kioskInterview.waitingRoom.title')}
+            </h2>
+            <p className="mt-2 text-slate-400">
+              {interview.admission === 'hm_joined'
+                ? t('kioskInterview.waitingRoom.hmPresent')
+                : t('kioskInterview.waitingRoom.hmAbsent')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <main className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_380px]">
         <section className="relative min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-          <video
-            ref={interview.videoRef}
-            autoPlay
-            playsInline
-            className="h-full w-full object-cover"
-          />
-          {!interview.avatarReady && (
-            <div className="absolute inset-0 grid place-items-center">
-              <div className="text-center">
-                <div
-                  className={`mx-auto grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 ${
-                    interview.aiSpeaking ? 'animate-pulse' : ''
-                  }`}
-                >
-                  <Bot className="h-12 w-12 text-white" />
-                </div>
-                <p className="mt-4 text-sm text-slate-400">
-                  {starting ? t('kioskInterview.status.connecting') : t('kioskInterview.status.aiInterviewerIdle')}
-                </p>
+          {/* Avatar hình người đã gỡ (ADR-067) — buổi phỏng vấn thuần audio, khối này là chỉ báo
+              trạng thái của AI chứ không phải khung hình. */}
+          <div className="absolute inset-0 grid place-items-center">
+            <div className="text-center">
+              <div
+                className={`mx-auto grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 ${
+                  interview.aiSpeaking ? 'animate-pulse' : ''
+                }`}
+              >
+                <Bot className="h-12 w-12 text-white" />
               </div>
+              <p className="mt-4 text-sm text-slate-400">
+                {starting ? t('kioskInterview.status.connecting') : t('kioskInterview.status.aiInterviewerIdle')}
+              </p>
             </div>
-          )}
+          </div>
 
           <video
             ref={selfVideoRef}

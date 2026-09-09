@@ -64,13 +64,10 @@ namespace ARI.Application.OnlineTest
                 app.JobPostingId,
                 job.Title,
                 round,
-                job.OnlineTestPassScore,
                 job.OnlineTestDurationMinutes,
                 drawnQuestions.Count,   // tổng số câu của bài — luôn có để FE biết job có đề (kể cả khi chưa pass)
                 questions,              // rỗng khi chưa duyệt CV
                 submission != null,
-                submission?.Score,
-                submission?.IsPassed,
                 submission?.CreatedAt,
                 cvPassed);
 
@@ -83,9 +80,9 @@ namespace ARI.Application.OnlineTest
     // ============================================================
 
     public record SubmitOnlineTestCommand(Guid ApplicationId, Guid CandidateAccountId, string? Email, Dictionary<Guid, List<int>> Answers, int TabSwitchCount = 0)
-        : IRequest<Result<OnlineTestResultDto>>;
+        : IRequest<Result<OnlineTestSubmitAckDto>>;
 
-    public class SubmitOnlineTestCommandHandler : IRequestHandler<SubmitOnlineTestCommand, Result<OnlineTestResultDto>>
+    public class SubmitOnlineTestCommandHandler : IRequestHandler<SubmitOnlineTestCommand, Result<OnlineTestSubmitAckDto>>
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notificationService;
@@ -96,34 +93,34 @@ namespace ARI.Application.OnlineTest
             _notificationService = notificationService;
         }
 
-        public async Task<Result<OnlineTestResultDto>> Handle(SubmitOnlineTestCommand command, CancellationToken ct)
+        public async Task<Result<OnlineTestSubmitAckDto>> Handle(SubmitOnlineTestCommand command, CancellationToken ct)
         {
             var (ok, app) = await OnlineTestSupport.AuthorizeCandidateAsync(
                 _unitOfWork, command.ApplicationId, command.CandidateAccountId, command.Email, ct);
-            if (app == null) return Result.Failure<OnlineTestResultDto>("Không tìm thấy hồ sơ ứng tuyển.", CommonErrorCodes.NotFound);
-            if (!ok) return Result.Failure<OnlineTestResultDto>("Bạn không có quyền nộp bài của hồ sơ này.", CommonErrorCodes.Forbidden);
+            if (app == null) return Result.Failure<OnlineTestSubmitAckDto>("Không tìm thấy hồ sơ ứng tuyển.", CommonErrorCodes.NotFound);
+            if (!ok) return Result.Failure<OnlineTestSubmitAckDto>("Bạn không có quyền nộp bài của hồ sơ này.", CommonErrorCodes.Forbidden);
 
             if (string.Equals(app.Status, "withdrawn", StringComparison.OrdinalIgnoreCase))
-                return Result.Failure<OnlineTestResultDto>("Hồ sơ đã rút — không thể làm bài thi.");
+                return Result.Failure<OnlineTestSubmitAckDto>("Hồ sơ đã rút — không thể làm bài thi.");
 
             // Chỉ cho nộp bài khi hồ sơ đã qua vòng duyệt CV (chặn cv_submitted/cv_rejected).
             if (!OnlineTestSupport.IsCvPassed(app.Status))
-                return Result.Failure<OnlineTestResultDto>("Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm.");
+                return Result.Failure<OnlineTestSubmitAckDto>("Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm.");
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
-            if (job == null) return Result.Failure<OnlineTestResultDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
+            if (job == null) return Result.Failure<OnlineTestSubmitAckDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
             var round = await OnlineTestSupport.ResolveRoundAsync(_unitOfWork, app.JobPostingId, ct);
 
             var existing = await _unitOfWork.Repository<OnlineTestSubmission>()
                 .CountAsync(s => s.ApplicationId == app.Id && s.RoundNumber == round, ct);
             if (existing > 0)
-                return Result.Failure<OnlineTestResultDto>("Bạn đã nộp bài thi trắc nghiệm cho vòng này rồi.", CommonErrorCodes.Conflict);
+                return Result.Failure<OnlineTestSubmitAckDto>("Bạn đã nộp bài thi trắc nghiệm cho vòng này rồi.", CommonErrorCodes.Conflict);
 
             var bank = (await _unitOfWork.Repository<OnlineTestQuestion>()
                 .FindAsync(q => q.JobPostingId == app.JobPostingId, ct)).ToList();
             if (bank.Count == 0)
-                return Result.Failure<OnlineTestResultDto>("Bài thi chưa có câu hỏi. Vui lòng liên hệ nhân sự.");
+                return Result.Failure<OnlineTestSubmitAckDto>("Bài thi chưa có câu hỏi. Vui lòng liên hệ nhân sự.");
 
             // Chấm ĐÚNG bộ đề đã bốc (deterministic) — không tính câu ngoài bộ đề của ứng viên.
             var drawn = OnlineTestSupport.DrawQuestions(bank, app.Id, round, job.OnlineTestQuestionsPerTest);
@@ -167,7 +164,8 @@ namespace ARI.Application.OnlineTest
                     await _notificationService.PublishUserEventAsync(
                         app.CandidateAccountId.Value,
                         "ReceiveUserNotification",
-                        new { Type = "OnlineTestGraded", applicationId = app.Id, roundNumber = round, isPassed },
+                        // KHÔNG kèm `isPassed`: payload realtime cũng đi tới trình duyệt ứng viên.
+                        new { Type = "OnlineTestSubmitted", applicationId = app.Id, roundNumber = round },
                         ct);
                 }
                 catch { /* best-effort */ }
@@ -192,8 +190,9 @@ namespace ARI.Application.OnlineTest
             }
             catch { /* best-effort */ }
 
-            return Result.Success(new OnlineTestResultDto(
-                score, isPassed, job.OnlineTestPassScore, correct, total, submission.CreatedAt));
+            // Bài ĐÃ được chấm và lưu (nhân sự xem được ngay), nhưng phản hồi cho ứng viên chỉ là
+            // biên nhận — công bố điểm tại chỗ là công bố trước khi vòng chốt.
+            return Result.Success(new OnlineTestSubmitAckDto(submission.CreatedAt, total));
         }
     }
 }

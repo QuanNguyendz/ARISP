@@ -1,0 +1,94 @@
+{
+  "common": {
+    "close": "Close",
+    "loading": "Loading..."
+  },
+  "title": "Job offers",
+  "description": "The end of the pipeline: draft the offer, send it to the Hiring Manager, then send it to the candidate.",
+  "loadError": "Could not load the offer list.",
+  "searchPlaceholder": "Search by candidate or role...",
+  "emptyTitle": "No offers yet",
+  "emptyDescription": "Offers are drafted from the candidate page once someone has cleared every round.",
+  "filters": {
+    "all": "All"
+  },
+  "status": {
+    "draft": "Draft",
+    "pending_approval": "Awaiting approval",
+    "approved": "Approved",
+    "sent": "Sent to candidate",
+    "accepted": "Accepted",
+    "declined": "Declined",
+    "withdrawn": "Withdrawn",
+    "expired": "Expired"
+  },
+  "stats": {
+    "awaitingApproval": "Awaiting approval",
+    "awaitingResponse": "Awaiting response",
+    "accepted": "Accepted",
+    "declined": "Declined / expired"
+  },
+  "list": {
+    "salary": "Salary:",
+    "startDate": "Start date:",
+    "expiresAt": "Respond by:",
+    "viewCandidate": "View candidate",
+    "open": "Open offer"
+  },
+  "panel": {
+    "title": "Job offer",
+    "description": "This candidate cleared every round. Draft the offer to close the loop inside the system.",
+    "create": "Draft offer",
+    "createReplacement": "Draft a new offer",
+    "open": "Open offer"
+  },
+  "editor": {
+    "title": "Job offer",
+    "createTitle": "Draft job offer",
+    "createHint": "Fill in salary, start date and response deadline, then send it for approval.",
+    "returnedReason": "Returned to draft by the Hiring Manager: {{reason}}",
+    "candidateNote": "Candidate replied: {{note}}"
+  },
+  "fields": {
+    "position": "Job title",
+    "positionPlaceholder": "Title as it appears in the letter — defaults to the job posting.",
+    "salary": "Salary",
+    "currency": "Currency",
+    "period": "Period",
+    "periods": {
+      "month": "Month",
+      "year": "Year",
+      "hour": "Hour"
+    },
+    "startDate": "Start date",
+    "expiresAt": "Respond by",
+    "employmentType": "Employment type",
+    "workLocation": "Work location",
+    "bonus": "Bonus",
+    "benefits": "Benefits",
+    "notes": "Internal notes",
+    "notesPlaceholder": "e.g. budget left over, can go higher if they negotiate.",
+    "notesHint": "Staff only. This field NEVER appears in the candidate's letter or portal."
+  },
+  "actions": {
+    "save": "Save draft",
+    "submit": "Send for approval",
+    "submitBlocked": "Salary, start date and response deadline are required before sending for approval.",
+    "approve": "Approve offer",
+    "returnToDraft": "Return to draft",
+    "rejectReasonLabel": "What needs changing?",
+    "confirmReturn": "Send back to the author",
+    "send": "Send to candidate",
+    "composeTitle": "Compose the offer letter",
+    "withdraw": "Withdraw offer",
+    "withdrawReasonLabel": "Reason for withdrawal",
+    "confirmWithdraw": "Confirm withdrawal"
+  },
+  "errors": {
+    "save": "Could not save the offer.",
+    "submit": "Could not send the offer for approval.",
+    "decide": "Could not record the decision.",
+    "send": "Could not send the offer to the candidate.",
+    "withdraw": "Could not withdraw the offer."
+  }
+}

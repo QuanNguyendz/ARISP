@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -38,14 +39,15 @@ namespace ARI.Application.AccountRequests.Commands.CreateAccountRequests
             {
                 var email = item.Email?.Trim().ToLower() ?? string.Empty;
                 var fullName = item.FullName?.Trim() ?? string.Empty;
-                var role = item.Role?.Trim().ToLower() ?? string.Empty;
+                var role = RoleNames.NormalizeDbRole(item.Role);
 
                 if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
                     return Result.Failure<CreateAccountRequestsResultDto>($"Email không hợp lệ: '{item.Email}'.");
                 if (string.IsNullOrWhiteSpace(fullName))
                     return Result.Failure<CreateAccountRequestsResultDto>($"Thiếu họ tên cho '{email}'.");
-                if (role != "hr_admin" && role != "recruiter")
-                    return Result.Failure<CreateAccountRequestsResultDto>($"Vai trò phải là 'hr_admin' hoặc 'recruiter' (email {email}).");
+                if (role == null || !RoleNames.AssignableStaff.Contains(role))
+                    return Result.Failure<CreateAccountRequestsResultDto>(
+                        $"Vai trò phải là một trong: {string.Join(", ", RoleNames.AssignableStaff)} (email {email}).");
 
                 cleaned.Add(new AccountRequestItem { Email = email, FullName = fullName, Role = role, Department = item.Department?.Trim() });
             }

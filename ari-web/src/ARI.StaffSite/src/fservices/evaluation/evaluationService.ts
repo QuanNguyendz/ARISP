@@ -6,6 +6,21 @@ import type {
   SubmitEvaluationReviewPayload,
 } from '@ari/shared/types/evaluation'
 
+/**
+ * Phần bổ sung của ADR-061 khi chốt kết quả phỏng vấn: lý do chốt thay Hiring Manager, và các đề
+ * xuất lương/cấp bậc để điền sẵn thư mời nhận việc về sau.
+ */
+export type HiringDecisionExtras = Pick<
+  SubmitEvaluationReviewPayload,
+  | 'fallbackReason'
+  | 'suggestedLevel'
+  | 'suggestedSalaryMin'
+  | 'suggestedSalaryMax'
+  | 'suggestedSalaryCurrency'
+  | 'strengths'
+  | 'concerns'
+>
+
 interface PaginatedResponse<T> {
   items: T[]
   total: number
@@ -47,12 +62,18 @@ export const evaluationService = {
     return data
   },
 
+  /**
+   * `extras` mang phần ADR-061: lý do chốt thay Hiring Manager và các đề xuất lương/cấp bậc.
+   * Để trống thì payload y hệt trước đây — mọi nơi gọi cũ không phải đổi gì.
+   */
   async confirmEvaluation(
-    evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>
+    evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>,
+    extras?: HiringDecisionExtras
   ): Promise<{ success: boolean }> {
     return this.submitReview({
       evaluationId: evaluation.id,
       finalVerdict: evaluation.aiVerdict === 'not_pass' ? 'not_pass' : 'pass',
+      ...extras,
     })
   },
 
@@ -64,12 +85,14 @@ export const evaluationService = {
   async overrideEvaluation(
     evaluation: Pick<EvaluationReport, 'id' | 'aiVerdict'>,
     reason: string,
-    finalVerdict?: 'pass' | 'not_pass'
+    finalVerdict?: 'pass' | 'not_pass',
+    extras?: HiringDecisionExtras
   ): Promise<{ success: boolean }> {
     return this.submitReview({
       evaluationId: evaluation.id,
       finalVerdict: finalVerdict ?? (evaluation.aiVerdict === 'pass' ? 'not_pass' : 'pass'),
       overrideReason: reason,
+      ...extras,
     })
   },
 

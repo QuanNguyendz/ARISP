@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Application.Services;
@@ -37,12 +38,13 @@ namespace ARI.Application.Jobs.Queries.GetJobApplications
 
         public async Task<Result<List<ApplicationResponse>>> Handle(GetJobApplicationsQuery request, CancellationToken ct)
         {
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(request.JobId, ct);
+            // Đọc danh sách ứng viên của tin → ngưỡng TeamMember: Hiring Manager được gán vào tin
+            // phải xem được ứng viên của chính tin đó (ADR-061), nhưng không sửa được tin.
+            var (_, job, level) = await JobAccess.EvaluateAsync(
+                _unitOfWork, request.JobId, request.UserId, request.Role, ct);
             if (job == null)
                 return Result.Failure<List<ApplicationResponse>>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
-
-            var isAdmin = request.Role == AppRoles.SuperAdmin || request.Role == AppRoles.HrAdmin;
-            if (!isAdmin && job.CreatedByUserId != request.UserId)
+            if (level < JobAccessLevel.TeamMember)
                 return Result.Failure<List<ApplicationResponse>>(
                     "Bạn không có quyền xem ứng viên của tin tuyển dụng này.", CommonErrorCodes.Forbidden);
 

@@ -110,7 +110,7 @@
     "view": "View",
     "anonymous": "Anonymous",
     "notAnalyzed": "Not analyzed",
-    "matchScore": "Match {{score}}"
+    "matchScore": "Match {{score}}/100"
   },
 
   "prioritySection": {

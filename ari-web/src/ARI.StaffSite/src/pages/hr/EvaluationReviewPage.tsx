@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
+import { useAuthStore } from '@ari/shared/store/auth'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
@@ -87,8 +88,11 @@ function getScoreBgColor(score: number) {
 
 export default function EvaluationReviewPage() {
   const { t } = useTranslation('modules/hr/evaluations')
+  const currentUser = useAuthStore((state) => state.user)
   const [searchParams, setSearchParams] = useSearchParams()
-  const targetId = searchParams.get('id')
+  // Nhận CẢ HAI tên tham số: màn Phỏng vấn của HR sinh link `?evaluationId=` (ADR-058) trong khi
+  // trang này chỉ đọc `?id=`, nên bấm vào báo cáo từ đó mở ra danh sách trống không chọn gì.
+  const targetId = searchParams.get('id') ?? searchParams.get('evaluationId')
 
   const page = Number(searchParams.get('page')) || 1
   const searchQuery = searchParams.get('search') || ''
@@ -99,6 +103,17 @@ export default function EvaluationReviewPage() {
   const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
   const [isOverrideMode, setIsOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
+  // ADR-061: người chốt kết quả là Hiring Manager của tin; quản trị viên chốt thay phải ghi lý do.
+  const [fallbackReason, setFallbackReason] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestion, setSuggestion] = useState({
+    level: '',
+    salaryMin: '',
+    salaryMax: '',
+    currency: 'VND',
+    strengths: '',
+    concerns: '',
+  })
   /** Verdict nhân sự chọn khi ghi đè. null = chưa mở khối ghi đè (lúc mở sẽ đặt mặc định). */
   const [overrideVerdict, setOverrideVerdict] = useState<'pass' | 'not_pass' | null>(null)
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
@@ -273,12 +288,41 @@ export default function EvaluationReviewPage() {
     setSelectedEvaluation(detailResponse)
   }
 
+  /**
+   * Tin có Hiring Manager mà người đang xem KHÔNG phải người đó → đây là "chốt thay", lý do bắt
+   * buộc (server đòi tối thiểu 10 ký tự). Tin chưa gán Hiring Manager thì mọi thứ như trước
+   * ADR-061: quản trị viên chốt bình thường, không cần lý do gì.
+   */
+  const needsFallbackReason =
+    !!selectedEvaluation?.requiresHmApproval &&
+    selectedEvaluation.hiringManagerUserId !== currentUser?.id
+
+  const fallbackReasonReady = !needsFallbackReason || fallbackReason.trim().length >= 10
+
+  /** Phần ADR-061 gửi kèm mọi quyết định: lý do chốt thay + đề xuất lương để điền sẵn thư mời. */
+  function decisionExtras() {
+    const num = (v: string) => (v.trim() ? Number(v) : undefined)
+    return {
+      fallbackReason: needsFallbackReason ? fallbackReason.trim() : undefined,
+      suggestedLevel: suggestion.level.trim() || undefined,
+      suggestedSalaryMin: num(suggestion.salaryMin),
+      suggestedSalaryMax: num(suggestion.salaryMax),
+      suggestedSalaryCurrency: suggestion.currency.trim() || undefined,
+      strengths: suggestion.strengths.trim() || undefined,
+      concerns: suggestion.concerns.trim() || undefined,
+    }
+  }
+
   async function handleConfirm() {
     if (!selectedEvaluation) return
+    if (!fallbackReasonReady) {
+      setActionError(t('hm.fallbackRequired'))
+      return
+    }
     try {
       setSubmittingAction('confirm')
       setActionError(null)
-      await evaluationService.confirmEvaluation(selectedEvaluation)
+      await evaluationService.confirmEvaluation(selectedEvaluation, decisionExtras())
       await refreshListAndSelection(selectedEvaluation.id)
     } catch (submitError) {
       console.error(submitError)
@@ -295,13 +339,22 @@ export default function EvaluationReviewPage() {
       setActionError(t('overrideReasonRequired'))
       return
     }
+    if (!fallbackReasonReady) {
+      setActionError(t('hm.fallbackRequired'))
+      return
+    }
     try {
       setSubmittingAction('override')
       setActionError(null)
       // Gửi ĐÚNG verdict nhân sự chọn. Trước đây service tự lật ngược verdict của AI nên hai
       // nút chọn trên UI chỉ là trang trí — bấm gì cũng ra cùng một kết quả.
       const verdict = overrideVerdict ?? (aiPassed ? 'not_pass' : 'pass')
-      await evaluationService.overrideEvaluation(selectedEvaluation, trimmedReason, verdict)
+      await evaluationService.overrideEvaluation(
+        selectedEvaluation,
+        trimmedReason,
+        verdict,
+        decisionExtras()
+      )
       await refreshListAndSelection(selectedEvaluation.id)
     } catch (submitError) {
       console.error(submitError)
@@ -1009,7 +1062,40 @@ export default function EvaluationReviewPage() {
               <h3 className="font-display font-bold text-ink-900 dark:text-white">
                 {t('hrDecision')}
               </h3>
-              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('hrDecisionHint')}</p>
+              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                {selectedEvaluation.requiresHmApproval
+                  ? t('hm.ownerHint', {
+                      name: selectedEvaluation.hiringManagerName || t('hm.theHiringManager'),
+                    })
+                  : t('hrDecisionHint')}
+              </p>
+
+              {/* ADR-061: quyết định tuyển là của Hiring Manager. Quản trị viên vẫn chốt được —
+                  không thể để cả phễu đứng vì một người nghỉ phép — nhưng phải ghi lý do, và lý do
+                  đó vào nhật ký kiểm toán rồi báo cho chính người bị vượt. */}
+              {needsFallbackReason && (
+                <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                    {t('hm.fallbackBanner', {
+                      name: selectedEvaluation.hiringManagerName || t('hm.theHiringManager'),
+                    })}
+                  </p>
+                  <label
+                    htmlFor="hm-fallback-reason"
+                    className="mb-1.5 mt-3 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                  >
+                    {t('hm.fallbackReasonLabel')} <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="hm-fallback-reason"
+                    rows={2}
+                    value={fallbackReason}
+                    onChange={(e) => setFallbackReason(e.target.value)}
+                    placeholder={t('hm.fallbackReasonPlaceholder')}
+                    className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/30"
+                  />
+                </div>
+              )}
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
@@ -1085,6 +1171,119 @@ export default function EvaluationReviewPage() {
                 )}
               </AnimatePresence>
 
+              {/* Đề xuất lương/cấp bậc — chỉ có nghĩa khi kết luận là ĐẠT, vì đây là nguồn điền
+                  sẵn cho thư mời nhận việc (ADR-061 phase 5). Ghi ở đây để công sức của người chốt
+                  không phải gõ lại lúc soạn thư. */}
+              {(isOverrideMode ? overrideVerdict !== 'not_pass' : aiPassed) && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowSuggestions((v) => !v)}
+                    className="text-sm font-medium text-brand-700 dark:text-brand-400 hover:underline"
+                  >
+                    {showSuggestions ? t('hm.hideSuggestions') : t('hm.showSuggestions')}
+                  </button>
+
+                  {showSuggestions && (
+                    <div className="mt-3 space-y-3 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/60 dark:bg-white/5 p-3">
+                      <p className="text-xs text-ink-500 dark:text-ink-400">{t('hm.suggestionsHint')}</p>
+                      <div>
+                        <label
+                          htmlFor="sg-level"
+                          className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                        >
+                          {t('hm.level')}
+                        </label>
+                        <input
+                          id="sg-level"
+                          value={suggestion.level}
+                          onChange={(e) => setSuggestion((v) => ({ ...v, level: e.target.value }))}
+                          className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label
+                            htmlFor="sg-min"
+                            className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                          >
+                            {t('hm.salaryMin')}
+                          </label>
+                          <input
+                            id="sg-min"
+                            type="number"
+                            min={0}
+                            value={suggestion.salaryMin}
+                            onChange={(e) => setSuggestion((v) => ({ ...v, salaryMin: e.target.value }))}
+                            className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="sg-max"
+                            className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                          >
+                            {t('hm.salaryMax')}
+                          </label>
+                          <input
+                            id="sg-max"
+                            type="number"
+                            min={0}
+                            value={suggestion.salaryMax}
+                            onChange={(e) => setSuggestion((v) => ({ ...v, salaryMax: e.target.value }))}
+                            className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="sg-cur"
+                            className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                          >
+                            {t('hm.currency')}
+                          </label>
+                          <input
+                            id="sg-cur"
+                            value={suggestion.currency}
+                            onChange={(e) => setSuggestion((v) => ({ ...v, currency: e.target.value }))}
+                            className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="sg-strengths"
+                          className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                        >
+                          {t('hm.strengths')}
+                        </label>
+                        <textarea
+                          id="sg-strengths"
+                          rows={2}
+                          value={suggestion.strengths}
+                          onChange={(e) => setSuggestion((v) => ({ ...v, strengths: e.target.value }))}
+                          className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="sg-concerns"
+                          className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300"
+                        >
+                          {t('hm.concerns')}
+                        </label>
+                        <textarea
+                          id="sg-concerns"
+                          rows={2}
+                          value={suggestion.concerns}
+                          onChange={(e) => setSuggestion((v) => ({ ...v, concerns: e.target.value }))}
+                          className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {actionError && (
                 <div className="mt-4 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
                   {actionError}
@@ -1109,12 +1308,45 @@ export default function EvaluationReviewPage() {
               <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
                 {t('verdict')}: <b>{verdictLabel(selectedEvaluation.hrReview.finalVerdict)}</b>
               </p>
+              {selectedEvaluation.hrReview.reviewerRole && (
+                <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+                  {t('hm.decidedBy', {
+                    role: t(`hm.roles.${selectedEvaluation.hrReview.reviewerRole}`, {
+                      defaultValue: selectedEvaluation.hrReview.reviewerRole,
+                    }),
+                  })}
+                </p>
+              )}
               {selectedEvaluation.hrReview.isOverride &&
                 selectedEvaluation.hrReview.overrideReason && (
                   <div className="mt-3 p-3 rounded-lg bg-white dark:bg-white/10 text-sm text-ink-600 dark:text-ink-300">
                     <b>{t('overrideReason')}:</b> {selectedEvaluation.hrReview.overrideReason}
                   </div>
                 )}
+              {selectedEvaluation.hrReview.isHrFallback &&
+                selectedEvaluation.hrReview.fallbackReason && (
+                  <div className="mt-3 p-3 rounded-lg bg-white dark:bg-white/10 text-sm text-ink-600 dark:text-ink-300">
+                    <b>{t('hm.fallbackReasonLabel')}:</b> {selectedEvaluation.hrReview.fallbackReason}
+                  </div>
+                )}
+              {(selectedEvaluation.hrReview.suggestedLevel ||
+                selectedEvaluation.hrReview.suggestedSalaryMin != null) && (
+                <div className="mt-3 p-3 rounded-lg bg-white dark:bg-white/10 text-sm text-ink-600 dark:text-ink-300">
+                  <b>{t('hm.suggestionSummary')}:</b>{' '}
+                  {[
+                    selectedEvaluation.hrReview.suggestedLevel,
+                    selectedEvaluation.hrReview.suggestedSalaryMin != null
+                      ? `${selectedEvaluation.hrReview.suggestedSalaryMin.toLocaleString('vi-VN')}${
+                          selectedEvaluation.hrReview.suggestedSalaryMax != null
+                            ? ` - ${selectedEvaluation.hrReview.suggestedSalaryMax.toLocaleString('vi-VN')}`
+                            : ''
+                        } ${selectedEvaluation.hrReview.suggestedSalaryCurrency ?? 'VND'}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' - ')}
+                </div>
+              )}
             </div>
           )}
 

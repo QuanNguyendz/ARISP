@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
@@ -16,19 +18,41 @@ namespace ARI.Application.Interviews
     // GET /api/interview/sessions (HR)
     // ============================================================
 
-    public record GetHrInterviewSessionsQuery(Guid? ApplicationId = null) : IRequest<Result<List<HrInterviewSessionItem>>>;
+    /// <summary>
+    /// Danh sách phiên phỏng vấn cho nhân sự. Phạm vi theo vai trò — danh sách này kèm cả
+    /// <c>RecordingUrl</c> (video buổi phỏng vấn), trước đây trả về mọi phiên của cả công ty cho
+    /// bất kỳ ai qua được policy <c>InternalStaff</c>.
+    /// </summary>
+    public record GetHrInterviewSessionsQuery(Guid? ApplicationId, Guid? UserId, string? Role)
+        : IRequest<Result<List<HrInterviewSessionItem>>>;
 
     public class GetHrInterviewSessionsQueryHandler : IRequestHandler<GetHrInterviewSessionsQuery, Result<List<HrInterviewSessionItem>>>
     {
         private readonly IInterviewService _interviewService;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public GetHrInterviewSessionsQueryHandler(IInterviewService interviewService)
+        public GetHrInterviewSessionsQueryHandler(IInterviewService interviewService, IUnitOfWork unitOfWork)
         {
             _interviewService = interviewService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<List<HrInterviewSessionItem>>> Handle(GetHrInterviewSessionsQuery request, CancellationToken ct)
-            => Result.Success(await _interviewService.GetSessionsForHrAsync(request.ApplicationId, ct));
+        {
+            var sessions = await _interviewService.GetSessionsForHrAsync(request.ApplicationId, ct);
+
+            // Lọc ở ĐÂY chứ không ở service: service cache toàn bộ danh sách dùng chung cho mọi
+            // người gọi (AllSessionsCacheKey), nên lọc bên trong sẽ khiến người dùng đầu tiên
+            // "đóng băng" phạm vi của mình vào cache cho tất cả những người sau.
+            var scope = await JobAccess.ScopedJobIdsAsync(_unitOfWork, request.UserId, request.Role, ct);
+            if (scope == null) return Result.Success(sessions);
+
+            var visibleAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                    .QueryAsync(q => q.Where(a => scope.Contains(a.JobPostingId)).Select(a => a.Id), ct))
+                .ToHashSet();
+
+            return Result.Success(sessions.Where(s => visibleAppIds.Contains(s.ApplicationId)).ToList());
+        }
     }
 
     // ============================================================
@@ -272,9 +296,7 @@ namespace ARI.Application.Interviews
 
         public Task<Result<bool>> Handle(ConfirmHrReviewCommand request, CancellationToken ct)
         {
-            var candidateBaseUrl = _configuration["Frontend:CandidateBaseUrl"]
-                ?? _configuration["Authentication:AdminFrontendUrl"]
-                ?? "http://localhost:3000";
+            var candidateBaseUrl = FrontendUrls.Candidate(_configuration);
             return _interviewService.SubmitHrReviewAsync(request.HrUserId, request.Request, candidateBaseUrl, ct);
         }
     }

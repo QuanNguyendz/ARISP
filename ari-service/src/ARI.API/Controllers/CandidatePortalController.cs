@@ -8,6 +8,7 @@ using ARI.Application.Common;
 using ARI.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
@@ -551,5 +552,62 @@ namespace ARI.API.Controllers
                 hasPassword = true
             });
         }
+
+        // ============================================================
+        // THƯ MỜI NHẬN VIỆC (ADR-061, Phase 5)
+        // ============================================================
+
+        /// <summary>
+        /// Thư mời nhận việc của hồ sơ này. CHỈ trả về khi thư đã được GỬI trở đi — bản nháp và
+        /// bản đang duyệt là đàm phán nội bộ. DTO trả về không có trường ghi chú nội bộ.
+        /// </summary>
+        [HttpGet("applications/{applicationId:guid}/offer")]
+        public async Task<IActionResult> GetOffer(Guid applicationId, CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var result = await _sender.Send(
+                new GetCandidateOfferQuery(applicationId, candidateId, GetEmailClaim()), ct);
+
+            return result.IsFailure
+                ? NotFound(new { message = result.Error })
+                : Ok(result.Value);
+        }
+
+        /// <summary>Ứng viên nhận hoặc từ chối thư mời. Nhận → hồ sơ <c>hired</c>.</summary>
+        [HttpPost("offers/{offerId:guid}/respond")]
+        public async Task<IActionResult> RespondToOffer(
+            Guid offerId, [FromBody] RespondToOfferRequest request, CancellationToken ct)
+        {
+            if (!TryGetCandidateId(out var candidateId))
+                return Unauthorized(new { message = "Không xác định được danh tính ứng viên." });
+
+            var result = await _sender.Send(
+                new RespondToOfferCommand(offerId, request.Decision, request.Note, candidateId, GetEmailClaim()), ct);
+
+            if (result.IsFailure)
+            {
+                return result.ErrorCode switch
+                {
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
+                    CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error }),
+                };
+            }
+
+            return Ok(new { message = "Đã ghi nhận phản hồi của bạn." });
+        }
+    }
+
+    /// <summary>Body của POST /api/portal/offers/{id}/respond.</summary>
+    public class RespondToOfferRequest
+    {
+        /// <summary>accept | decline</summary>
+        public string Decision { get; set; } = string.Empty;
+
+        /// <summary>Lý do khi từ chối (tuỳ chọn nhưng rất hữu ích cho doanh nghiệp).</summary>
+        public string? Note { get; set; }
     }
 }

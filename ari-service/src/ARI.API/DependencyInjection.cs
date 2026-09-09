@@ -1,8 +1,10 @@
-using System;
+﻿using System;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using ARI.Application.Common;
+using ARI.Application.Common.Serialization;
 using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -31,7 +33,59 @@ namespace ARI.API
                 });
             }
 
-            builder.Services.AddControllers();
+            // ------------------------------------------------------------------------------------
+            //  Gốc URL của hai site frontend — quyết định mọi đường dẫn đặt vào EMAIL.
+            //
+            //  Đây là loại sai cấu hình **không bao giờ tự lộ ra**: thiếu biến thì thư vẫn gửi bình thường,
+            //  chỉ là nút bấm dẫn về máy của lập trình viên. Không lỗi, không log — tới khi ứng viên báo
+            //  link hỏng thì thiệt hại đã xảy ra rồi. Nên:
+            //    • Development: nạp sẵn localhost để chạy máy cá nhân không phải khai gì.
+            //    • Mọi môi trường khác: **chặn ngay ở boot** nếu thiếu — cùng cách đang làm với `JWT:Secret`
+            //      và Google OAuth. Container không lên là lỗi thấy ngay lúc triển khai, có người đang nhìn.
+            //
+            //  KHÔNG suy đoán URL từ request đang đến (`Host` header): thư còn được gửi từ hosted service
+            //  chạy nền (nhắc lịch, đóng offer quá hạn) — lúc đó không có request nào để mà đoán.
+            // ------------------------------------------------------------------------------------
+            if (builder.Environment.IsDevelopment())
+            {
+                var devDefaults = new Dictionary<string, string?>();
+                if (string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.CandidateKey]))
+                    devDefaults[FrontendUrls.CandidateKey] = FrontendUrls.DevCandidate;
+                if (string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.StaffKey])
+                    && string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.LegacyStaffKey]))
+                    devDefaults[FrontendUrls.StaffKey] = FrontendUrls.DevStaff;
+
+                if (devDefaults.Count > 0) builder.Configuration.AddInMemoryCollection(devDefaults);
+            }
+            else
+            {
+                var missing = new List<string>();
+                if (string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.CandidateKey]))
+                    missing.Add($"{FrontendUrls.CandidateKey} (env: Frontend__CandidateBaseUrl)");
+                if (string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.StaffKey])
+                    && string.IsNullOrWhiteSpace(builder.Configuration[FrontendUrls.LegacyStaffKey]))
+                    missing.Add($"{FrontendUrls.StaffKey} (env: Authentication__AdminFrontendUrl)");
+
+                if (missing.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        "Chưa cấu hình gốc URL frontend, mà mọi link trong email đều dựng từ đó:\n"
+                        + string.Join("\n", missing.Select(m => "  • " + m)) + "\n\n"
+                        + "Bắt buộc ở môi trường non-Development. Khai trong `docker/.env` (xem `.env.example`).\n"
+                        + "Cố tình để trống thì thư gửi đi sẽ mang link về localhost — và không có gì báo.");
+                }
+            }
+
+            // Mọi mốc thời gian nhận từ client được chuẩn hoá về UTC ngay tại ranh giới JSON.
+            // Npgsql chỉ ghi được offset 0 vào `timestamptz`, mà ô <input type="date"> gửi lên chuỗi
+            // trần "2026-09-19" nên ASP.NET hiểu theo giờ local của máy chủ → UTC+7 → 500 lúc lưu.
+            // Chốt ở đây thay vì bắt từng biểu mẫu nhớ gọi `toISOString()`.
+            builder.Services.AddControllers().AddJsonOptions(o =>
+            {
+                o.JsonSerializerOptions.Converters.Add(new UtcDateTimeOffsetConverter());
+                o.JsonSerializerOptions.Converters.Add(new NullableUtcDateTimeOffsetConverter());
+            });
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
             {
@@ -211,9 +265,13 @@ namespace ARI.API
                 options.AddPolicy("HrManagement", policy =>
                     policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin));
 
-                // 3. Chính sách dành cho toàn bộ nhân viên nội bộ có quyền vào hệ thống quản lý chuyên môn
+                // 3. Chính sách dành cho toàn bộ nhân viên nội bộ có quyền vào hệ thống quản lý chuyên môn.
+                //    Hiring Manager nằm ở đây, NHƯNG policy này chỉ mở CỬA: phạm vi dữ liệu thật do
+                //    JobAccess quyết định theo từng tin (Phase 1 của ADR-061). Một HM chưa được gán
+                //    tin nào sẽ nhận danh sách rỗng ở mọi endpoint — đó là lý do việc siết phạm vi
+                //    phải xong TRƯỚC khi thêm vai trò này vào đây.
                 options.AddPolicy("InternalStaff", policy =>
-                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.Recruiter));
+                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.Recruiter, AppRoles.HiringManager));
 
                 // 4. Chính sách biệt lập dành riêng cho Ứng viên
                 options.AddPolicy("CandidateOnly", policy =>
@@ -224,15 +282,72 @@ namespace ARI.API
                 //    được kiểm tra thêm ở controller/hub qua claim session_id.
                 options.AddPolicy("InterviewParticipant", policy =>
                     policy.RequireRole(AppRoles.Candidate, AppRoles.KioskSession));
+
+                // 6. Người có quyền RA QUYẾT ĐỊNH TUYỂN trên một tin: duyệt shortlist, ký duyệt JD,
+                //    chốt kết quả phỏng vấn, duyệt offer (ADR-061). Vẫn phải qua JobAccess để kiểm
+                //    người gọi có thuộc đội tuyển dụng của đúng tin đó không — policy chỉ lọc thô
+                //    theo vai trò, không biết gì về tài nguyên.
+                //
+                //    HrManagement KHÔNG đổi: Hiring Manager không tạo tài khoản, không duyệt tin
+                //    lên "active", không lưu trữ tin.
+                // Soạn/sửa tin tuyển dụng — CỐ Ý KHÔNG có Hiring Manager.
+                //
+                // ADR-061: HM quyết định chứ không vận hành. Nhưng khi thêm HM vào `InternalStaff`,
+                // `POST /api/jobs` mở luôn cho họ — mà người tạo tin trở thành `CreatedByUserId`,
+                // tức `JobAccessLevel.Owner` trên tin đó: từ đó họ xếp ca, duyệt/loại hồ sơ, gửi thư
+                // cho ứng viên, thêm bất kỳ ai vào đội, tạo và gửi thư mời nhận việc. Lập luận
+                // "phạm vi do JobAccess quyết định theo từng tin" chỉ đúng với endpoint thao tác
+                // trên tin CÓ SẴN — tạo tin thì chưa có tài nguyên nào để giới hạn.
+                options.AddPolicy("JobAuthoring", policy =>
+                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.Recruiter));
+
+                // Quyết định CHUYÊN MÔN về ứng viên: duyệt shortlist, ký duyệt JD, chốt Pass/Not Pass.
+                // Đây là việc của Hiring Manager — người hiểu công việc cần tuyển.
+                options.AddPolicy("HiringDecision", policy =>
+                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin, AppRoles.HiringManager));
+
+                // ADR-063: quyết định về THƯ MỜI NHẬN VIỆC tách hẳn khỏi `HiringDecision`.
+                //
+                // Trước đây một policy duy nhất gác cả bốn cổng, nên Hiring Manager vừa đề xuất mức
+                // lương vừa tự duyệt chính đề xuất đó. Quy trình nhân sự tách hai vai vì đúng lý do
+                // này: người có nhu cầu tuyển không phải người kiểm soát ngân sách lương. HM vẫn
+                // soạn và gửi duyệt thư mời (controller ở mức `InternalStaff`), chỉ nút CHỐT là của
+                // HR Leader.
+                options.AddPolicy("OfferApproval", policy =>
+                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin));
+
+                // Lập phiếu yêu cầu tuyển dụng: HM là người có nhu cầu. Admin lập được để vận hành
+                // hộ, nhưng khi đó cũng không tự duyệt phiếu của mình (chặn theo NGƯỜI trong handler).
+                // Recruiter cố ý KHÔNG có: họ thực thi phiếu, không phát sinh nhu cầu tuyển.
+                // CHỈ Hiring Manager. Quản trị viên không lập hộ: người lập phiếu trở thành HM của tin
+                // sinh ra từ phiếu (ADR-063), nên HR Leader lập phiếu là tự đặt mình vào cả hai đầu của
+                // các cổng mà ADR-061/063 dựng lên để tách nhau.
+                options.AddPolicy("RecruitmentRequestAuthoring", policy =>
+                    policy.RequireRole(AppRoles.HiringManager));
+
+                options.AddPolicy("RecruitmentRequestReview", policy =>
+                    policy.RequireRole(AppRoles.SuperAdmin, AppRoles.HrAdmin));
             });
 
             // Hai origin FE tách biệt (ADR-046): StaffSite = AdminFrontendUrl, CandidateSite = Frontend:CandidateBaseUrl.
             // AllowCredentials() nên không dùng wildcard — phải liệt kê đủ mọi origin.
-            var allowedOrigins = (builder.Configuration["Authentication:AdminFrontendUrl"] ?? "https://localhost:3000")
+            //
+            // Danh sách localhost chỉ mở Ở DEVELOPMENT. Trước đây nó được nối vào ở MỌI môi trường,
+            // nghĩa là production chấp nhận request kèm cookie/token từ một trang chạy trên máy bất
+            // kỳ — `AllowCredentials()` khiến điều đó thành một lỗ thật, không chỉ là rác cấu hình.
+            var localDevOrigins = builder.Environment.IsDevelopment()
+                ? new[]
+                  {
+                      "http://127.0.0.1:5500", "http://localhost:5500", "https://localhost:5001",
+                      "https://localhost:3000", "http://localhost:3000", "http://localhost:3001",
+                  }
+                : Array.Empty<string>();
+
+            var allowedOrigins = FrontendUrls.Staff(builder.Configuration)
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Concat((builder.Configuration["Frontend:CandidateBaseUrl"] ?? string.Empty)
+                .Concat(FrontendUrls.Candidate(builder.Configuration)
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                .Concat(new[] { "http://127.0.0.1:5500", "http://localhost:5500", "https://localhost:5001", "https://localhost:3000", "http://localhost:3000", "http://localhost:3001" })
+                .Concat(localDevOrigins)
                 .Distinct()
                 .ToArray();
 

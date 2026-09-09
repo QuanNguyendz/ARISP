@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
+using ARI.Application.HiringTeam;
 using ARI.Application.Interfaces;
 using ARI.Application.Jobs.Commands.AnalyzeJd;
 using ARI.Application.Jobs.Commands.CreateJob;
@@ -27,6 +28,28 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
+    /// <summary>Body của POST /jobs/{id}/hiring-team — gán một người vào đội tuyển dụng của tin.</summary>
+    public class AddHiringTeamMemberRequest
+    {
+        public Guid UserId { get; set; }
+
+        /// <summary>hiring_manager | interviewer | observer — bỏ trống thì mặc định hiring_manager.</summary>
+        public string? RoleOnJob { get; set; }
+
+        /// <summary>Đặt làm Hiring Manager CHÍNH của tin (người mà chữ ký duyệt chặn phễu).</summary>
+        public bool IsPrimary { get; set; }
+    }
+
+    /// <summary>Body của POST /jobs/{id}/hm-signoff.</summary>
+    public class HmSignOffRequest
+    {
+        /// <summary>approved | rejected</summary>
+        public string Decision { get; set; } = string.Empty;
+
+        /// <summary>Bắt buộc khi từ chối — nêu rõ cần sửa gì trong mô tả công việc.</summary>
+        public string? Reason { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     public class JobsController : ControllerBase
@@ -55,7 +78,7 @@ namespace ARI.API.Controllers
 
         /// <summary>HR tạo job posting kèm cấu hình vòng phỏng vấn.</summary>
         [HttpPost]
-        [Authorize(Policy = "InternalStaff")]
+        [Authorize(Policy = "JobAuthoring")]
         public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request, CancellationToken ct)
         {
             if (_currentUserService.UserId is not { } userId || userId == Guid.Empty)
@@ -115,8 +138,13 @@ namespace ARI.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetJobById(Guid id, CancellationToken ct)
         {
+            // Hiring Manager cũng là nhân sự nội bộ (ADR-061). Thiếu vai này thì họ nhận view CÔNG KHAI
+            // của tin: `hmSignOffStatus`/`requiresHmApproval` về null, nên nút ký duyệt mô tả công việc
+            // và cổng duyệt shortlist không bao giờ hiện — cả luồng ADR-061 chết ở giao diện.
+            // Phạm vi vẫn bị siết theo từng tin ở GetJobByIdQuery (JobAccess >= TeamMember).
             var isStaff = User.Identity?.IsAuthenticated == true &&
-                          (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.HrAdmin) || User.IsInRole(AppRoles.Recruiter));
+                          (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.HrAdmin)
+                           || User.IsInRole(AppRoles.Recruiter) || User.IsInRole(AppRoles.HiringManager));
 
             var currentUserId = _currentUserService.UserId;
             var role = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
@@ -127,23 +155,83 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// Danh sách job dành cho HR (bao gồm cả draft, closed...).
-        /// <paramref name="mine"/>=true: chỉ trả về tin do người đang đăng nhập tạo (dùng cho Recruiter workspace).
+        /// Danh sách job dành cho nhân sự nội bộ (bao gồm cả draft, closed...) — phạm vi do SERVER
+        /// quyết định theo vai trò và quyền trên từng tin.
+        ///
+        /// <paramref name="mine"/> nay chỉ là BỘ LỌC GIAO DIỆN ("chỉ hiện tin tôi tạo"). Trước đây
+        /// nó là cổng phạm vi duy nhất và do client tự khai, nên bỏ tham số đi là thấy mọi tin.
         /// </summary>
         [HttpGet("admin")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetAdminJobs(CancellationToken ct, [FromQuery] bool mine = false)
         {
-            Guid? mineUid = null;
-            if (mine)
-            {
-                if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
-                    return Unauthorized(new { message = "Không xác định được người dùng." });
-                mineUid = uid;
-            }
+            if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            var result = await _sender.Send(new GetAdminJobsQuery(mineUid), ct);
+            var result = await _sender.Send(new GetAdminJobsQuery(uid, _currentUserService.Role, mine), ct);
             return Ok(result.Value);
+        }
+
+        // ─────────── Đội tuyển dụng của tin (ADR-061) ───────────
+
+        /// <summary>
+        /// Đội tuyển dụng của tin. Đọc cần là thành viên đội trở lên (Hiring Manager phải thấy
+        /// được đội của chính mình); ghi cần quyền quản lý tin.
+        /// </summary>
+        [HttpGet("{id:guid}/hiring-team")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetHiringTeam(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new GetHiringTeamQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result) : Ok(result.Value);
+        }
+
+        [HttpPost("{id:guid}/hiring-team")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> AddHiringTeamMember(
+            Guid id, [FromBody] AddHiringTeamMemberRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new AddHiringTeamMemberCommand(
+                id, request.UserId, request.RoleOnJob, request.IsPrimary,
+                _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result) : Ok(result.Value);
+        }
+
+        [HttpDelete("{id:guid}/hiring-team/{memberId:guid}")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> RemoveHiringTeamMember(Guid id, Guid memberId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new RemoveHiringTeamMemberCommand(
+                id, memberId, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result) : Ok(new { message = "Đã gỡ khỏi đội tuyển dụng." });
+        }
+
+        /// <summary>
+        /// Hiring Manager ký duyệt (hoặc yêu cầu sửa) mô tả công việc trước khi tin được đăng.
+        /// Từ chối KHÔNG đổi trạng thái tin — chủ tin sửa rồi gửi duyệt lại như bình thường.
+        /// </summary>
+        [HttpPost("{id:guid}/hm-signoff")]
+        [Authorize(Policy = "HiringDecision")]
+        public async Task<IActionResult> HmSignOff(Guid id, [FromBody] HmSignOffRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new JobHmSignOffCommand(
+                id, request.Decision, request.Reason, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure
+                ? MapFailure(result)
+                : Ok(new { message = "Đã ghi nhận chữ ký duyệt của Hiring Manager." });
+        }
+
+        /// <summary>
+        /// Danh sách tài khoản Hiring Manager để chọn khi gán vào tin. Truyền <c>jobPostingId</c>
+        /// thì người cùng phòng ban với tin được xếp lên đầu — chỉ là gợi ý, không phải phân quyền.
+        /// </summary>
+        [HttpGet("/api/staff/hiring-managers")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetHiringManagerOptions([FromQuery] Guid? jobPostingId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetHiringManagerOptionsQuery(jobPostingId), ct);
+            return result.IsFailure ? MapFailure(result) : Ok(result.Value);
         }
 
         [HttpPost("{id:guid}/slots")]
@@ -230,8 +318,10 @@ namespace ARI.API.Controllers
         /// Upload file JD (PDF/DOCX), phân tích bằng Gemini để trích xuất các trường auto-fill cho form tạo tin.
         /// File JD được lưu trữ; storageKey + metadata trả về để đính kèm khi submit job. (ADR-042)
         /// </summary>
+        // Cùng policy với tạo tin: đây là bước phụ trợ CỦA việc soạn tin, và mỗi lần gọi là một
+        // lượt Gemini có tính phí — không có lý do gì để mở cho vai không soạn tin.
         [HttpPost("analyze-jd")]
-        [Authorize(Policy = "InternalStaff")]
+        [Authorize(Policy = "JobAuthoring")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> AnalyzeJd(IFormFile file, CancellationToken ct)
         {

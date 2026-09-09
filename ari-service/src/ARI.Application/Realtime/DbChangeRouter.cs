@@ -21,6 +21,14 @@ namespace ARI.Application.Realtime
         public Guid? UserId { get; init; }
         public Guid? CreatedByUserId { get; init; }
         public Guid? RequestedByUserId { get; init; }
+
+        /// <summary>
+        /// Recruiter được phân công trên <c>recruitment_requests</c> (ADR-063). Thiếu khoá này thì
+        /// người vừa được giao việc là người DUY NHẤT không được báo — đúng lỗi ADR-061 đã gặp khi
+        /// realtime hẹp hơn quyền đọc và màn của Hiring Manager đứng im.
+        /// </summary>
+        public Guid? AssignedRecruiterId { get; init; }
+
         public string? Status { get; init; }
     }
 
@@ -35,6 +43,14 @@ namespace ARI.Application.Realtime
         public Guid? CandidateAccountId { get; init; }
         public Guid? JobPostingId { get; init; }
         public Guid? JobOwnerUserId { get; init; }
+
+        /// <summary>
+        /// Thành viên đội tuyển dụng của tin (ADR-061) — Hiring Manager và những người được mời vào
+        /// đội. Họ ĐỌC được hồ sơ, báo cáo AI và thư mời của tin qua API, nên kênh realtime phải phủ
+        /// đúng bấy nhiêu: thiếu danh sách này thì màn của Hiring Manager không bao giờ tự cập nhật
+        /// và họ phải F5 tay để biết có việc mới — đúng thứ ADR-057 sinh ra để xoá bỏ.
+        /// </summary>
+        public IReadOnlyList<Guid> HiringTeamUserIds { get; init; } = Array.Empty<Guid>();
     }
 
     /// <summary>Kết quả định tuyến: gửi cho ai, kèm payload đã lọc.</summary>
@@ -88,6 +104,8 @@ namespace ARI.Application.Realtime
             "evaluations",
             "interview_codes",
             "interview_sessions",
+            "email_logs",
+            "offers",
         };
 
         /// <summary>
@@ -97,6 +115,8 @@ namespace ARI.Application.Realtime
         private static readonly HashSet<string> JobScopedTables = new(StringComparer.Ordinal)
         {
             "availability_slots",
+            "hiring_manager_availabilities",
+            "job_hiring_team_members",
         };
 
         public static bool NeedsApplicationLookup(string? table) =>
@@ -137,6 +157,7 @@ namespace ARI.Application.Realtime
                     UserId = GetGuid(routing, "user_id"),
                     CreatedByUserId = GetGuid(routing, "created_by_user_id"),
                     RequestedByUserId = GetGuid(routing, "requested_by_user_id"),
+                    AssignedRecruiterId = GetGuid(routing, "assigned_recruiter_id"),
                     Status = GetString(routing, "status"),
                 };
             }
@@ -172,6 +193,7 @@ namespace ARI.Application.Realtime
                 case "applications":
                     Add(users, change.CandidateAccountId ?? lookup.CandidateAccountId);
                     Add(users, lookup.JobOwnerUserId);
+                    AddRange(users, lookup.HiringTeamUserIds);
                     groups.Add(HrAdminGroup);
                     break;
 
@@ -191,6 +213,27 @@ namespace ARI.Application.Realtime
                 case "interview_sessions":
                     Add(users, lookup.CandidateAccountId);
                     Add(users, lookup.JobOwnerUserId);
+                    AddRange(users, lookup.HiringTeamUserIds);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Nhật ký thư (ADR-061): tab "Lịch sử email" của nhân sự cập nhật ngay khi thư rời
+                // hệ thống. CỐ Ý không gửi ứng viên — họ nhận chính bức thư đó trong hộp thư rồi,
+                // còn việc hệ thống ghi log là chuyện nội bộ.
+                case "email_logs":
+                    Add(users, lookup.JobOwnerUserId);
+                    AddRange(users, lookup.HiringTeamUserIds);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Thư mời nhận việc (ADR-061): ứng viên CÓ nhận — họ cần thấy ngay khi thư được
+                // gửi hoặc bị thu hồi. Payload chỉ mang khoá, KHÔNG có mức lương.
+                case "offers":
+                    Add(users, lookup.CandidateAccountId);
+                    Add(users, lookup.JobOwnerUserId);
+                    // Hiring Manager là NGƯỜI DUYỆT thư mời — thiếu họ ở đây thì hàng chờ duyệt
+                    // trên màn của họ đứng im cho tới khi tự tải lại trang.
+                    AddRange(users, lookup.HiringTeamUserIds);
                     groups.Add(HrAdminGroup);
                     break;
 
@@ -200,12 +243,66 @@ namespace ARI.Application.Realtime
                 // đúng phạm vi tối thiểu.
                 case "availability_slots":
                     Add(users, lookup.JobOwnerUserId);
+                    AddRange(users, lookup.HiringTeamUserIds);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Khung giờ rảnh của Hiring Manager (ADR-067). Người PHẢI biết ngay là Recruiter:
+                // họ đang đợi lịch này để xếp ca cho ứng viên, còn màn xếp lịch thì lọc theo nó.
+                case "hiring_manager_availabilities":
+                    Add(users, lookup.JobOwnerUserId);
+                    AddRange(users, lookup.HiringTeamUserIds);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Đội tuyển dụng của tin (ADR-061). Người vừa được thêm/gỡ phải thấy ngay danh
+                // sách tin của mình đổi — đó là toàn bộ phạm vi dữ liệu của một Hiring Manager.
+                // CỐ Ý không gửi cho ứng viên: ai duyệt hồ sơ của họ là thông tin nội bộ.
+                case "job_hiring_team_members":
+                    Add(users, change.UserId);
+                    Add(users, lookup.JobOwnerUserId);
                     groups.Add(HrAdminGroup);
                     break;
 
                 case "account_requests":
                     Add(users, change.RequestedByUserId);
                     groups.Add(SuperAdminGroup);
+                    break;
+
+                // Phiếu yêu cầu tuyển dụng (ADR-063). Ba bên cùng theo dõi một dòng: HM lập phiếu
+                // chờ kết quả duyệt, HR Leader ôm hàng chờ, và Recruiter vừa được phân công cần
+                // thấy việc mới xuất hiện ngay. CỐ Ý không có ứng viên — phiếu tồn tại trước khi
+                // có tin, chưa gì công khai.
+                case "recruitment_requests":
+                    Add(users, change.RequestedByUserId);
+                    Add(users, change.AssignedRecruiterId);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Mẫu JD của công ty (ADR-064): cấu hình dùng chung, HR Leader sở hữu. Đổi mẫu thì
+                // trình soạn JD đang mở phải thấy ngay — nếu không, Recruiter soạn theo bố cục cũ
+                // rồi xuất ra file theo bố cục mới.
+                case "jd_templates":
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Bản JD đã soạn cho một phiếu (ADR-064). Chỉ người SOẠN và nhóm HR Leader —
+                // `created_by_user_id` vốn đã nằm trong payload nên không phải tra thêm bảng nào.
+                //
+                // CỐ Ý không gửi cho Hiring Manager dù họ sở hữu phiếu: HM không thao tác gì trên
+                // bản nháp JD. Thứ HM cần thấy là file JD đã gắn vào TIN, lúc ký duyệt — sự kiện đó
+                // đến từ `job_postings`, không phải bảng này. Gửi rộng hơn phạm vi hành động chỉ tạo
+                // ra thông báo không dẫn tới việc gì.
+                case "jd_documents":
+                    Add(users, change.CreatedByUserId);
+                    groups.Add(HrAdminGroup);
+                    break;
+
+                // Danh sách đội (ADR-065): Super Admin quản lý, nhưng HR Leader cũng cần thấy ngay —
+                // họ chọn đội khi lập phiếu hộ, mà danh sách cũ thì chọn phải một đội vừa bị tắt.
+                case "departments":
+                    groups.Add(SuperAdminGroup);
+                    groups.Add(HrAdminGroup);
                     break;
 
                 case "users":
@@ -252,6 +349,13 @@ namespace ARI.Application.Realtime
         private static void Add(List<Guid> target, Guid? value)
         {
             if (value is { } id && id != Guid.Empty && !target.Contains(id)) target.Add(id);
+        }
+
+        /// <summary>Thêm cả danh sách, bỏ trùng — chủ tin cũng có thể nằm trong đội tuyển dụng.</summary>
+        private static void AddRange(List<Guid> target, IReadOnlyList<Guid>? values)
+        {
+            if (values is null) return;
+            foreach (var value in values) Add(target, value);
         }
 
         private static string? GetString(JsonElement parent, string name) =>

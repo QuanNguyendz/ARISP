@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
@@ -11,11 +12,19 @@ using MediatR;
 
 namespace ARI.Application.Evaluations.Queries.GetEvaluations
 {
+    /// <summary>
+    /// Danh sách báo cáo đánh giá AI. <paramref name="UserId"/>/<paramref name="Role"/> KHÔNG phải
+    /// tham số phụ: trước đây query này không nhận danh tính nào cả, nên bất kỳ ai qua được policy
+    /// <c>InternalStaff</c> đều phân trang được TOÀN BỘ báo cáo phỏng vấn của công ty — kèm tên,
+    /// email ứng viên và điểm số. Đây là lỗ rò dữ liệu lớn nhất trước ADR-061.
+    /// </summary>
     public record GetEvaluationsQuery(
         Guid? JobPostingId,
         string? Status,
         int Page,
-        int PageSize) : IRequest<Result<PaginatedResponse<EvaluationListItemResponse>>>;
+        int PageSize,
+        Guid? UserId,
+        string? Role) : IRequest<Result<PaginatedResponse<EvaluationListItemResponse>>>;
 
     public class GetEvaluationsQueryHandler
         : IRequestHandler<GetEvaluationsQuery, Result<PaginatedResponse<EvaluationListItemResponse>>>
@@ -54,10 +63,24 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluations
             public string CandidateEmail { get; set; } = string.Empty;
         }
 
+        private static PaginatedResponse<EvaluationListItemResponse> EmptyPage(int page, int pageSize, int total = 0) => new()
+        {
+            Items = new List<EvaluationListItemResponse>(),
+            Total = total,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling((double)total / pageSize),
+        };
+
         public async Task<Result<PaginatedResponse<EvaluationListItemResponse>>> Handle(
             GetEvaluationsQuery request, CancellationToken ct)
         {
             var (jobPostingId, status, page, pageSize) = (request.JobPostingId, request.Status, request.Page, request.PageSize);
+
+            // Phạm vi do server tính: null = quản trị viên (không giới hạn), tập rỗng = không thấy gì.
+            var scope = await JobAccess.ScopedJobIdsAsync(_unitOfWork, request.UserId, request.Role, ct);
+            if (scope != null && jobPostingId.HasValue && !scope.Contains(jobPostingId.Value))
+                return Result.Success(EmptyPage(page, pageSize));
 
             // Đánh giá buổi thử là riêng tư của ứng viên — không vào danh sách của nhân sự nội bộ (ADR-051).
             List<EvalLite> evaluations = await _unitOfWork.Repository<Evaluation>()
@@ -67,6 +90,16 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluations
                     SessionType = e.SessionType, AiVerdict = e.AiVerdict, OverallScore = e.OverallScore,
                     CheatScore = e.CheatScore, CreatedAt = e.CreatedAt,
                 }), ct);
+
+            // Lọc theo phạm vi TRƯỚC khi phân trang: lọc sau sẽ ra những trang trống lỗ chỗ và
+            // tổng số đếm được vẫn là tổng của cả công ty.
+            if (scope != null)
+            {
+                var visibleAppIds = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                        .QueryAsync(q => q.Where(a => scope.Contains(a.JobPostingId)).Select(a => a.Id), ct))
+                    .ToHashSet();
+                evaluations = evaluations.Where(e => visibleAppIds.Contains(e.ApplicationId)).ToList();
+            }
             var hrReviews = await _unitOfWork.Repository<HrReview>()
                 .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct);
             var reviewedEvalIds = hrReviews.Select(r => r.EvaluationId).ToHashSet();
@@ -110,14 +143,7 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluations
 
             if (!paginatedEvals.Any())
             {
-                return Result.Success(new PaginatedResponse<EvaluationListItemResponse>
-                {
-                    Items = new List<EvaluationListItemResponse>(),
-                    Total = totalItems,
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalItems / pageSize)
-                });
+                return Result.Success(EmptyPage(page, pageSize, totalItems));
             }
 
             var appIdsInEvals = paginatedEvals.Select(e => e.ApplicationId).Distinct().ToList();

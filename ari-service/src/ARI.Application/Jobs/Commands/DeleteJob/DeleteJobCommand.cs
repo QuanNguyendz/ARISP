@@ -33,16 +33,16 @@ namespace ARI.Application.Jobs.Commands.DeleteJob
             if (job == null)
                 return Result.Failure("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
-            // 1. Validate ownership & roles
-            var isAuthorized = command.Role == AppRoles.SuperAdmin ||
-                               command.Role == AppRoles.HrAdmin ||
-                               job.CreatedByUserId == command.UserId;
+            // 1. Validate ownership & roles — xoá tin cần quyền QUẢN LÝ (chủ tin hoặc quản trị viên).
+            var isAuthorized = RoleNames.IsAdmin(command.Role) || job.CreatedByUserId == command.UserId;
             if (!isAuthorized)
                 return Result.Failure("Bạn không có quyền xóa tin tuyển dụng này.", CommonErrorCodes.Forbidden);
 
-            // 2. Validate theo Spec: Loại trừ hồ sơ đã fail ("not_pass"), đã rút ("withdrawn") và đã pass hoàn toàn ("pass")
+            // 2. Chỉ hồ sơ CÒN ĐANG XỬ LÝ mới chặn việc xoá. Danh sách "đã đóng" lấy từ
+            //    ApplicationStatuses.Terminal — bản liệt kê tại chỗ trước đây bỏ sót cv_rejected,
+            //    nên một tin chỉ toàn hồ sơ bị loại ở vòng CV vẫn không xoá được.
             var activeApps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().FindAsync(
-                a => a.JobPostingId == command.Id && a.Status != "not_pass" && a.Status != "withdrawn" && a.Status != "pass",
+                a => a.JobPostingId == command.Id && !ApplicationStatuses.Terminal.Contains(a.Status),
                 ct);
 
             if (activeApps.Any())

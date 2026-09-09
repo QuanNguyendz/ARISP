@@ -11,6 +11,15 @@ namespace ARI.Application.DTOs
     /// </summary>
     public class CreateJobPostingRequest
     {
+        /// <summary>
+        /// Phiếu yêu cầu tuyển dụng đã được HR Leader duyệt (ADR-063). <b>Bắt buộc.</b>
+        ///
+        /// Mọi tin đều bắt đầu từ một nhu cầu tuyển đã được duyệt — không có đường tạo tin "trần".
+        /// Handler kiểm phiếu tồn tại, ở trạng thái <c>approved</c>, chưa dựng tin nào, và người
+        /// tạo đúng là Recruiter được phân công (hoặc quản trị viên).
+        /// </summary>
+        public Guid? RecruitmentRequestId { get; set; }
+
         public string Title { get; set; } = string.Empty;
         public string? Department { get; set; }
         public string JobDescription { get; set; } = string.Empty;
@@ -55,6 +64,13 @@ namespace ARI.Application.DTOs
         public string Status { get; set; } = string.Empty;
 
         public string? RejectionReason { get; set; } // Chỉ bắt buộc khi đổi status sang 'rejected'
+
+        /// <summary>
+        /// Lý do duyệt đăng tin khi Hiring Manager CHƯA ký duyệt (ADR-061). Chỉ dùng cho
+        /// <c>status = "active"</c> trên tin có gán Hiring Manager; tối thiểu 10 ký tự,
+        /// được ghi vào audit log và báo cho chính người bị vượt.
+        /// </summary>
+        public string? HmBypassReason { get; set; }
     }
 
     public class UpdateJobDisplayRequest
@@ -135,6 +151,24 @@ namespace ARI.Application.DTOs
         /// <summary>URL file JD đã đóng dấu duyệt (đã resolve cho staff). Null nếu chưa duyệt/không phải PDF.</summary>
         public string? SignedJdFileUrl { get; set; }
 
+        // ===== Cổng của Hiring Manager (ADR-061) — CHỈ điền cho nhân sự nội bộ =====
+        // Cố ý KHÔNG gán trong FromEntity: cùng lớp DTO này phục vụ cả Job Board công khai, mà
+        // HmSignOffReason là góp ý nội bộ về chính tin đó ("mức lương thấp hơn thị trường", "JD
+        // viết chưa rõ") — thứ không bao giờ được nằm trong phản hồi gửi cho ứng viên. Handler nào
+        // xác định được người gọi là staff thì tự điền; quên điền chỉ mất tính năng, không rò dữ liệu.
+
+        /// <summary>pending | approved | rejected. Null = tin không có Hiring Manager, không có cổng nào.</summary>
+        public string? HmSignOffStatus { get; set; }
+
+        /// <summary>Góp ý của Hiring Manager khi yêu cầu sửa mô tả công việc — nội bộ.</summary>
+        public string? HmSignOffReason { get; set; }
+
+        /// <summary>Tin có cổng duyệt của Hiring Manager không — suy ra từ đội tuyển dụng, không phải cột bật/tắt.</summary>
+        public bool RequiresHmApproval { get; set; }
+
+        public Guid? HiringManagerUserId { get; set; }
+        public string? HiringManagerName { get; set; }
+
         public static JobPostingResponse FromEntity(JobPosting job, List<RoundConfigDto> roundConfigs) =>
             new()
             {
@@ -214,6 +248,16 @@ namespace ARI.Application.DTOs
 
         /// <summary>Số lượng ứng viên đã ứng tuyển vào tin này (dùng cho dashboard HR).</summary>
         public int ApplicantCount { get; set; }
+
+        // ===== Cổng của Hiring Manager (ADR-061) — như JobPostingResponse, chỉ điền cho nhân sự =====
+        // Không có HmSignOffReason ở đây: danh sách không phải chỗ đọc góp ý, và bớt một đường
+        // để lộ ra ngoài là bớt một chỗ phải nhớ.
+
+        /// <summary>pending | approved | rejected. Null = tin không có Hiring Manager.</summary>
+        public string? HmSignOffStatus { get; set; }
+
+        public bool RequiresHmApproval { get; set; }
+        public string? HiringManagerName { get; set; }
 
         public static JobPostingListItemResponse FromEntity(JobPosting job) =>
             new()

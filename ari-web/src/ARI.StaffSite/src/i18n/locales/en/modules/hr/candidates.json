@@ -59,7 +59,12 @@
     "withdrawn": "Withdrawn",
     "notPass": "Not Passed",
     "pass": "Passed",
-    "completed": "Completed"
+    "completed": "Completed",
+    "hmReview": "Awaiting Hiring Manager",
+    "cvRejected": "Rejected at CV stage",
+    "offerSent": "Offer sent",
+    "hired": "Hired",
+    "offerDeclined": "Offer declined"
   },
   "inviteSuccess": "Magic link invitation sent to {{email}}.",
   "inviteError": "Failed to send invitation.",

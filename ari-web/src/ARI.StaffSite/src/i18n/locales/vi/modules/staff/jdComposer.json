@@ -1,0 +1,54 @@
+{
+  "title": "Soạn bản mô tả công việc",
+  "description": "Theo mẫu công ty, điền sẵn từ phiếu yêu cầu tuyển dụng. File xuất ra sẽ đi kèm sang bước tạo tin và là thứ Hiring Manager mở ra để ký duyệt.",
+  "back": "Phiếu yêu cầu tuyển dụng",
+  "loading": "Đang tải...",
+  "sectionPlaceholder": "Mỗi ý một dòng...",
+  "sectionLineHint": "Mỗi dòng thành một gạch đầu dòng trong file JD.",
+  "basics": {
+    "title": "Thông tin chung",
+    "position": "Vị trí",
+    "department": "Bộ phận",
+    "location": "Nơi làm việc",
+    "vacancies": "Số lượng",
+    "salaryMin": "Lương tối thiểu",
+    "salaryMax": "Lương tối đa",
+    "currency": "Đơn vị",
+    "employmentType": "Thời gian làm việc",
+    "experienceLevel": "Cấp bậc",
+    "workMode": "Hình thức làm việc",
+    "deadline": "Hạn nộp hồ sơ"
+  },
+  "actions": {
+    "buildJob": "Dựng tin từ JD này",
+    "buildJobHint": "Xuất file PDF rồi mở màn tạo tin với file đã gắn sẵn — không phải tải xuống rồi tải lên lại.",
+    "saveDraft": "Lưu nháp",
+    "savedOk": "Đã lưu nháp",
+    "preview": "Xem trước",
+    "closePreview": "Đóng xem trước",
+    "fileStale": "Bản JD đã sửa sau lần xuất file này. Bấm Xem trước hoặc PDF/DOCX để xuất lại.",
+    "previewNote": "Mở chính file PDF sẽ được đính kèm — không phải bản vẽ lại, nên nhìn đúng như lúc tải về.",
+    "saveDraftHint": "Lưu nội dung và dựng lại file đính kèm — bản cũ bị thay thế."
+  },
+  "errors": {
+    "loadFailed": "Không tải được bản JD.",
+    "saveFailed": "Không lưu được bản JD.",
+    "generateFailed": "Không xuất được file JD."
+  },
+  "preview": {
+    "label": "Xem trước",
+    "pageOf": "Trang {{page}}/{{total}}",
+    "prevPage": "Trang trước",
+    "nextPage": "Trang sau",
+    "companyPlaceholder": "Tên công ty",
+    "samplePosition": "Fresher ReactJS/NodeJS",
+    "factPosition": "Vị trí",
+    "factVacancies": "Số lượng",
+    "factTime": "Thời gian",
+    "factLocation": "Địa chỉ",
+    "factDepartment": "Bộ phận",
+    "factLevel": "Cấp bậc",
+    "factWorkMode": "Hình thức làm việc",
+    "factSalary": "Mức lương"
+  }
+}

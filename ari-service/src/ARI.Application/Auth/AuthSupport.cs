@@ -7,6 +7,7 @@ using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Configuration;
+using ARI.Application.Common;
 
 namespace ARI.Application.Auth
 {
@@ -131,7 +132,7 @@ namespace ARI.Application.Auth
             await unitOfWork.SaveChangesAsync();
 
             // ADR-046: trang verify-email nằm ở Candidate site → ưu tiên CandidateBaseUrl.
-            var frontendUrl = configuration["Frontend:CandidateBaseUrl"] ?? configuration["Authentication:AdminFrontendUrl"] ?? configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+            var frontendUrl = FrontendUrls.Candidate(configuration);
             var verifyLink = $"{frontendUrl}/auth/verify-email?token={verifyToken}&email={Uri.EscapeDataString(candidate.Email)}";
 
             var emailBody = $@"

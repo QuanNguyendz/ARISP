@@ -260,32 +260,21 @@ export default function PracticeSessionPage() {
 
       {/* Main — min-h-0 để grid con không đẩy chiều cao vượt viewport */}
       <main className="grid min-h-0 flex-1 grid-rows-[minmax(45vh,1fr)_minmax(0,1fr)] lg:grid-cols-[1fr_380px] lg:grid-rows-none">
-        {/* Avatar — video phủ kín toàn khung (object-cover), không còn ô nhỏ giữa màn */}
+        {/* Khối AI — bot tĩnh phát sáng theo lượt nói. Avatar hình người đã gỡ khỏi dự án
+            (ADR-067): buổi phỏng vấn nay thuần audio, hình ảnh chỉ là chỉ báo trạng thái. */}
         <section className="relative min-h-0 overflow-hidden bg-black">
-          <video
-            ref={practice.videoRef}
-            autoPlay
-            playsInline
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-              practice.avatarReady ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-
-          {/* Chưa có avatar (đang kết nối / thiếu cấu hình) → nền gradient + bot tĩnh */}
-          {!practice.avatarReady && (
-            <div className="absolute inset-0 grid place-items-center bg-gradient-to-b from-brand-600/15 via-ink-950 to-ai-600/15">
-              <div className="relative">
-                <div
-                  className={`absolute -inset-8 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 blur-2xl transition-opacity ${
-                    practice.aiSpeaking ? 'opacity-60' : 'opacity-25'
-                  }`}
-                />
-                <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
-                  <Bot className="h-20 w-20 text-white" />
-                </div>
+          <div className="absolute inset-0 grid place-items-center bg-gradient-to-b from-brand-600/15 via-ink-950 to-ai-600/15">
+            <div className="relative">
+              <div
+                className={`absolute -inset-8 rounded-full bg-gradient-to-r from-brand-500 to-ai-500 blur-2xl transition-opacity ${
+                  practice.aiSpeaking ? 'opacity-60' : 'opacity-25'
+                }`}
+              />
+              <div className="relative grid h-44 w-44 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-ai-600 shadow-2xl">
+                <Bot className="h-20 w-20 text-white" />
               </div>
             </div>
-          )}
+          </div>
 
           {/* Trạng thái nổi trên video */}
           <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">

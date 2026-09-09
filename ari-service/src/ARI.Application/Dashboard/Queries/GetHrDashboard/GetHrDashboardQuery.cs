@@ -4,16 +4,24 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ARI.Application.Dashboard.Queries.GetHrDashboard
 {
-    /// <summary>Tổng quan tuyển dụng cho HR: KPI, phễu tuyển dụng, ứng viên gần đây, analytics.</summary>
-    public record GetHrDashboardQuery : IRequest<Result<HrDashboardResponse>>;
+    /// <summary>
+    /// Tổng quan tuyển dụng: KPI, phễu tuyển dụng, ứng viên gần đây, analytics.
+    ///
+    /// Phạm vi theo vai trò (<see cref="JobAccess.ScopedJobIdsAsync"/>). Trước đây màn này gom
+    /// TOÀN BỘ tin và hồ sơ của công ty cho mọi <c>InternalStaff</c> — kèm tên ứng viên gần đây,
+    /// bảng hiệu suất từng recruiter và danh sách tin chờ duyệt của người khác.
+    /// </summary>
+    public record GetHrDashboardQuery(Guid? UserId, string? Role) : IRequest<Result<HrDashboardResponse>>;
 
     public class GetHrDashboardQueryHandler : IRequestHandler<GetHrDashboardQuery, Result<HrDashboardResponse>>
     {
@@ -63,32 +71,44 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
 
         public async Task<Result<HrDashboardResponse>> Handle(GetHrDashboardQuery request, CancellationToken ct)
         {
+            // Lọc phạm vi ngay tại HAI nguồn (tin + hồ sơ): mọi con số phía dưới đều dẫn xuất từ
+            // hai tập này, nên lọc ở đây là toàn bộ dashboard tự khớp phạm vi — không phải rải
+            // điều kiện vào từng phép đếm và bỏ sót một cái.
+            var scope = await JobAccess.ScopedJobIdsAsync(_unitOfWork, request.UserId, request.Role, ct);
+
             // Projection ở tầng SQL — chỉ kéo đúng cột cần.
             var jobs = await _unitOfWork.Repository<JobPosting>()
-                .QueryAsync(q => q.Select(j => new JobLite
+                .QueryAsync(q => (scope == null ? q : q.Where(j => scope.Contains(j.Id))).Select(j => new JobLite
                 {
                     Id = j.Id, Title = j.Title, Department = j.Department, Status = j.Status,
                     CreatedByUserId = j.CreatedByUserId, Vacancies = j.Vacancies, CreatedAt = j.CreatedAt, ApplicationDeadline = j.ApplicationDeadline,
                 }), ct);
 
             var apps = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
-                .QueryAsync(q => q.Select(a => new AppLite
+                .QueryAsync(q => (scope == null ? q : q.Where(a => scope.Contains(a.JobPostingId))).Select(a => new AppLite
                 {
                     Id = a.Id, JobPostingId = a.JobPostingId, Status = a.Status,
                     CvJdAnalysisId = a.CvJdAnalysisId, CandidateName = a.CandidateName, CreatedAt = a.CreatedAt,
                 }), ct);
 
-            var sessionAppIds = await _unitOfWork.Repository<InterviewSession>()
-                .QueryAsync(q => q.Select(s => s.ApplicationId), ct);
+            // Phiên/đánh giá/duyệt bám theo hồ sơ đã lọc ở trên.
+            var visibleAppIds = apps.Select(a => a.Id).ToHashSet();
 
-            var evaluations = await _unitOfWork.Repository<Evaluation>()
+            var sessionAppIds = (await _unitOfWork.Repository<InterviewSession>()
+                .QueryAsync(q => q.Select(s => s.ApplicationId), ct))
+                .Where(id => scope == null || visibleAppIds.Contains(id)).ToList();
+
+            var evaluations = (await _unitOfWork.Repository<Evaluation>()
                 .QueryAsync(q => q.Select(e => new EvalLite
                 {
                     Id = e.Id, ApplicationId = e.ApplicationId, RoundNumber = e.RoundNumber, AiVerdict = e.AiVerdict,
-                }), ct);
+                }), ct))
+                .Where(e => scope == null || visibleAppIds.Contains(e.ApplicationId)).ToList();
 
-            var reviews = await _unitOfWork.Repository<HrReview>()
-                .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct);
+            var visibleEvalIds = evaluations.Select(e => e.Id).ToHashSet();
+            var reviews = (await _unitOfWork.Repository<HrReview>()
+                .QueryAsync(q => q.Select(r => new ReviewLite { EvaluationId = r.EvaluationId, FinalVerdict = r.FinalVerdict }), ct))
+                .Where(r => scope == null || visibleEvalIds.Contains(r.EvaluationId)).ToList();
 
             var reviewedEvalIds = reviews.Select(r => r.EvaluationId).ToHashSet();
             var pendingReviews = evaluations.Count(e => !reviewedEvalIds.Contains(e.Id));
@@ -167,8 +187,12 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
                 a.CvJdAnalysisId.HasValue && scoreByAnalysisId.TryGetValue(a.CvJdAnalysisId.Value, out var s) ? s : (int?)null;
 
             var applicantsByJob = apps.GroupBy(a => a.JobPostingId).ToDictionary(g => g.Key, g => g.Count());
+            // Đếm CẢ `pass` LẪN `hired`: ứng viên nhận việc rời khỏi `pass` sang `hired` (ADR-061),
+            // nên chỉ đếm `pass` sẽ làm chỉ số của một tin tuyển thành công **tụt về 0** đúng lúc nó
+            // thành công. Màn "Phân công & tải tuyển dụng" đã sửa cùng lỗi này, chỗ đó sót lại.
             var passByJob = apps
-                .Where(a => string.Equals(a.Status, "pass", StringComparison.OrdinalIgnoreCase))
+                .Where(a => ApplicationStatuses.Is(a.Status, ApplicationStatuses.Pass)
+                            || ApplicationStatuses.Is(a.Status, ApplicationStatuses.Hired))
                 .GroupBy(a => a.JobPostingId)
                 .ToDictionary(g => g.Key, g => g.Count());
             int PassOf(Guid jobId) => passByJob.TryGetValue(jobId, out var c) ? c : 0;

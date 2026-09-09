@@ -139,16 +139,21 @@ public class StaffSlotTests
         Assert.Contains("tương lai", res.Error);
     }
 
-    [Fact]
-    public async Task Create_capacity_below_one_fails()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public async Task Create_capacity_khac_mot_deu_bi_chan(int capacity)
     {
+        // ADR-067: một ca = một ứng viên (buổi thật có Hiring Manager ngồi cùng AI). Chặn ở CỔNG
+        // TẠO chứ không âm thầm ghi đè về 1 — một ô "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn
+        // như đang có tác dụng.
         var job = SchedulingData.Job(owner: _ownerId);
         var uow = new InMemoryUnitOfWork().Seed(job);
 
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, capacity: 0));
+        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, capacity: capacity));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Sức chứa", res.Error);
+        Assert.Contains("MỘT ứng viên", res.Error);
     }
 
     [Fact]
@@ -191,11 +196,11 @@ public class StaffSlotTests
         var job = SchedulingData.Job(owner: _ownerId);
         var uow = new InMemoryUnitOfWork().Seed(job);
 
-        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, round: 2, capacity: 3));
+        var res = await RunCreate(uow, SchedulingData.SlotRequest(job.Id, round: 2, capacity: 1));
 
         Assert.True(res.IsSuccess);
         Assert.Equal(0, res.Value!.BookedCount);
-        Assert.Equal(3, res.Value.Capacity);
+        Assert.Equal(1, res.Value.Capacity);
         Assert.Equal(2, res.Value.RoundNumber);
         var stored = Assert.Single(uow.Repo<AvailabilitySlot>().Items);
         Assert.Equal(0, stored.BookedCount);
@@ -299,45 +304,50 @@ public class StaffSlotTests
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
-    [Fact]
-    public async Task UpdateCapacity_below_one_fails()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public async Task UpdateCapacity_khac_mot_deu_bi_chan(int capacity)
     {
         var job = SchedulingData.Job(owner: _ownerId);
         var slot = SchedulingData.Slot(job.Id, capacity: 2);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
 
-        var res = await RunCapacity(uow, slot.Id, 0);
+        var res = await RunCapacity(uow, slot.Id, capacity);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Sức chứa tối thiểu", res.Error);
+        Assert.Contains("MỘT ứng viên", res.Error);
+        Assert.Equal(2, slot.Capacity); // giữ nguyên
     }
 
     [Fact]
-    public async Task UpdateCapacity_below_booked_count_fails()
+    public async Task UpdateCapacity_ha_ve_mot_thi_khong_duoc_nho_hon_so_da_dat()
     {
+        // Ca dữ liệu cũ có 3 người đã đặt: hạ về 1 sẽ đuổi hai người ra khỏi chỗ họ đã giữ mà
+        // không ai báo — phải dời họ sang ca khác trước.
         var job = SchedulingData.Job(owner: _ownerId);
         var slot = SchedulingData.Slot(job.Id, capacity: 5, booked: 3);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
 
-        var res = await RunCapacity(uow, slot.Id, 2); // < số đã đặt (3)
+        var res = await RunCapacity(uow, slot.Id, 1);
 
         Assert.True(res.IsFailure);
         Assert.Contains("không được nhỏ hơn số đã đặt", res.Error);
-        Assert.Equal(5, slot.Capacity); // giữ nguyên
+        Assert.Equal(5, slot.Capacity);
     }
 
     [Fact]
-    public async Task UpdateCapacity_succeeds_and_persists()
+    public async Task UpdateCapacity_ha_ca_cu_ve_mot_thanh_cong()
     {
         var job = SchedulingData.Job(owner: _ownerId);
         var slot = SchedulingData.Slot(job.Id, capacity: 2, booked: 1);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot);
 
-        var res = await RunCapacity(uow, slot.Id, 4);
+        var res = await RunCapacity(uow, slot.Id, 1);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(4, res.Value!.Capacity);
-        Assert.Equal(4, slot.Capacity);
+        Assert.Equal(1, res.Value!.Capacity);
+        Assert.Equal(1, slot.Capacity);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 }

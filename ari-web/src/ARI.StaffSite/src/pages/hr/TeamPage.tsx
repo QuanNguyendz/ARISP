@@ -23,11 +23,26 @@ import {
   type NewAccountRequestItem,
 } from '@/fservices/accountRequest/accountRequestService'
 
+/**
+ * Vai trò nhân sự mà HR xin cấp tài khoản — khớp `RoleNames.AssignableStaff` phía backend.
+ * Ở phạm vi module vì cả trang lẫn modal "Yêu cầu tài khoản" đều dùng.
+ */
+const STAFF_ROLES = ['recruiter', 'hr_admin', 'hiring_manager'] as const
+
+function staffRoleLabel(role: string, t: (key: string) => string): string {
+  return role === 'hr_admin'
+    ? t('roles.hrAdmin')
+    : role === 'recruiter'
+      ? t('roles.recruiter')
+      : role === 'hiring_manager'
+        ? t('roles.hiringManager')
+        : role
+}
+
 export default function HrTeamPage() {
   const { t } = useTranslation('modules/hr/team')
 
-  const roleLabel = (r: string) =>
-    r === 'hr_admin' ? t('roles.hrAdmin') : r === 'recruiter' ? t('roles.recruiter') : r
+  const roleLabel = (r: string) => staffRoleLabel(r, t)
 
   const statusMeta = (s: string): { label: string; cls: string; Icon: typeof Clock } =>
     s === 'approved'
@@ -234,7 +249,9 @@ function RequestModal({
 
   const downloadTemplate = () => {
     const csv =
-      'email,fullName,role,department\nvidu@congty.com,Nguyen Van A,recruiter,Tuyen dung\n'
+      'email,fullName,role,department\n' +
+        'vidu@congty.com,Nguyen Van A,recruiter,Tuyen dung\n' +
+        'truongphong@congty.com,Tran Thi B,hiring_manager,Ky thuat\n'
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -263,10 +280,14 @@ function RequestModal({
         const [email = '', fullName = '', role = 'recruiter', department = ''] = l
           .split(',')
           .map((c) => c.trim())
+        // Câu tam phân cũ biến MỌI vai trò không phải `hr_admin` thành `recruiter` — nhập một
+        // file có cột `hiring_manager` thì cả danh sách được xin cấp sai vai, im lặng, không lỗi.
+        // Vai lạ nay giữ nguyên để server từ chối rõ ràng thay vì tạo nhầm.
+        const normalized = role.toLowerCase().trim()
         return {
           email,
           fullName,
-          role: role.toLowerCase() === 'hr_admin' ? 'hr_admin' : 'recruiter',
+          role: (STAFF_ROLES as readonly string[]).includes(normalized) ? normalized : 'recruiter',
           department,
         }
       })
@@ -395,10 +416,10 @@ function RequestModal({
               <Select
                 value={r.role}
                 onChange={(v) => update(i, 'role', v)}
-                options={[
-                  { value: 'recruiter', label: t('roles.recruiter') },
-                  { value: 'hr_admin', label: t('roles.hrAdmin') },
-                ]}
+                options={STAFF_ROLES.map((value) => ({
+                  value,
+                  label: staffRoleLabel(value, t),
+                }))}
                 className="w-full"
                 buttonClassName="rounded-lg px-2.5 py-2 text-sm"
               />

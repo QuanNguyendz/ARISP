@@ -1,7 +1,7 @@
 {
   "title": "Tạo tin tuyển dụng mới",
   "editTitle": "Chỉnh sửa tin tuyển dụng",
-  "description": "Upload JD để AI tự điền các trường · tin sẽ được HR Leader duyệt trước khi đăng",
+  "description": "Tin phải dựng từ phiếu yêu cầu tuyển dụng đã duyệt · Hiring Manager ký duyệt mô tả công việc là tin được đăng",
   "back": "Quay lại",
   "loading": "Đang tải dữ liệu tin tuyển dụng...",
   "jdUpload": {
@@ -20,7 +20,8 @@
     "removeFile": "Gỡ file JD",
     "failed": "File đã được lưu nhưng AI không phân tích xong (lỗi dịch vụ hoặc quá thời gian). Bạn nhập tay các trường bên dưới, hoặc thử lại với file nhẹ hơn.",
     "failedScanned": "File PDF này chỉ chứa ảnh (bản scan hoặc xuất từ slide) nên AI không đọc được chữ trong thời gian cho phép. File vẫn được lưu — hãy nhập tay, hoặc dùng file JD dạng văn bản (không phải ảnh) để AI tự điền.",
-    "scannedHint": "Lưu ý: file PDF này không có chữ (toàn ảnh) nên kết quả tự điền có thể thiếu — hãy kiểm tra lại các trường."
+    "scannedHint": "Lưu ý: file PDF này không có chữ (toàn ảnh) nên kết quả tự điền có thể thiếu — hãy kiểm tra lại các trường.",
+    "fromComposer": "File JD này lấy từ bản soạn theo mẫu công ty. Tải file khác lên sẽ thay thế nó."
   },
   "form": {
     "generalInfo": "Thông tin chung",
@@ -71,7 +72,16 @@
     "save": "Lưu",
     "createJob": "Tạo tin",
     "interviewPassScore": "Điểm sàn phỏng vấn",
-    "interviewPassScoreHint": "Từ điểm này trở lên AI kết luận \"đạt\" (0–100). Chỉ áp dụng khi đã khai bộ tiêu chí chấm phỏng vấn trong Playbook."
+    "interviewPassScoreHint": "Từ điểm này trở lên AI kết luận \"đạt\" (0–100). Chỉ áp dụng khi đã khai bộ tiêu chí chấm phỏng vấn trong Playbook.",
+    "hiringManager": "Hiring Manager phụ trách",
+    "hiringManagerNone": "— Chưa gán (có thể gán sau) —",
+    "hiringManagerHint": "Trưởng bộ phận duyệt hồ sơ, ký duyệt mô tả công việc và chốt kết quả phỏng vấn. Bỏ trống thì tin chạy như trước, không có cổng duyệt nào.",
+    "hmAssignFailed": "Đã tạo tin nhưng chưa gán được Hiring Manager. Bạn gán lại ở trang chi tiết tin.",
+    "goToJobToAssign": "Mở trang tin để gán Hiring Manager",
+    "jdDraft": {
+      "description": "Mô tả công việc",
+      "requirements": "Yêu cầu ứng viên"
+    }
   },
   "validation": {
     "requiredFields": "Tiêu đề và Mô tả công việc là bắt buộc.",
@@ -79,7 +89,8 @@
     "locationRequired": "Địa điểm làm việc là bắt buộc khi chế độ phỏng vấn không phải Remote.",
     "loadError": "Không thể tải dữ liệu tin tuyển dụng.",
     "analyzeError": "Không thể phân tích file JD.",
-    "saveError": "Có lỗi xảy ra khi lưu tin tuyển dụng."
+    "saveError": "Có lỗi xảy ra khi lưu tin tuyển dụng.",
+    "recruitmentRequestRequired": "Tin tuyển dụng phải được dựng từ một phiếu yêu cầu tuyển dụng đã duyệt. Hãy mở phiếu được phân công rồi bấm \"Dựng tin tuyển dụng từ phiếu này\"."
   },
   "options": {
     "selectCategory": "— Chọn —",
@@ -89,5 +100,15 @@
     "remote": "Remote",
     "onsiteInterview": "On-site",
     "hybridInterview": "Hybrid"
+  },
+  "recruitmentRequest": {
+    "title": "Phiếu yêu cầu tuyển dụng",
+    "description": "Mọi tin tuyển dụng đều phải dựng từ một phiếu do Hiring Manager lập và HR Leader đã duyệt. Chọn phiếu trước — các trường bên dưới sẽ được điền sẵn theo phiếu.",
+    "placeholder": "— Chọn phiếu yêu cầu tuyển dụng —",
+    "loading": "Đang tải danh sách phiếu...",
+    "headcount": "{{count}} người",
+    "prefillHint": "Tiêu đề, phòng ban, dải lương, số lượng và bản nháp mô tả công việc đã được điền theo phiếu. Bạn vẫn sửa lại được bên dưới.",
+    "none": "Không có phiếu nào đủ điều kiện dựng tin. Phiếu phải ở trạng thái \"Đã duyệt\", được phân công cho bạn, và chưa dựng tin nào.",
+    "goToRequests": "Mở màn Phiếu yêu cầu tuyển dụng"
   }
 }

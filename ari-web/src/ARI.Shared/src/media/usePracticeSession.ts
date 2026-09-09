@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as signalR from '@microsoft/signalr'
-import { LiveAvatarSession, SessionEvent, AgentEventsEnum } from '@heygen/liveavatar-web-sdk'
 import { interviewService } from '@ari/shared/fservices/interview'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { getInterviewSessionToken } from '@ari/shared/api/apiClient'
@@ -30,23 +29,21 @@ type SessionStatusPayload = string | { status?: string }
 const DEEPGRAM_WS_URL = 'wss://api.deepgram.com/v1/listen'
 /** Số lần tự nối lại STT khi WebSocket rớt giữa phiên (mint token mới mỗi lần). */
 const MAX_STT_RECONNECT = 3
-/** Số lần tự dựng lại LiveAvatar khi session rớt giữa buổi (LITE hay idle-timeout). */
-const MAX_AVATAR_RECONNECT = 2
 /** Quá hạn chờ ReceiveQuestionAudio (BE TTS đẩy qua SignalR) → tự fetch /tts rồi browser TTS. */
 const QUESTION_AUDIO_TIMEOUT_MS = 6000
 
 /**
  * Điều phối toàn bộ luồng phỏng vấn thử:
- * startSession(practice) → media-config (token Deepgram/LiveAvatar) → khởi tạo song song
- * LiveAvatar + SignalR + Deepgram STT → StartInterview → nhận ReceiveQuestion (text)
- * + ReceiveQuestionAudio (PCM 24k từ ElevenLabs, BE đẩy sẵn — không round-trip /tts)
- * → avatar.repeatAudio lip-sync → Deepgram bắt câu trả lời → SubmitAnswerText → lặp.
+ * startSession → media-config (token Deepgram) → khởi tạo song song SignalR + Deepgram STT
+ * → StartInterview → nhận ReceiveQuestion (text) + ReceiveQuestionAudio (PCM 24k từ ElevenLabs,
+ * BE đẩy sẵn — không round-trip /tts) → phát qua WebAudio → Deepgram bắt câu trả lời
+ * → SubmitAnswerText → lặp.
  *
  * STT dùng WebSocket Deepgram trực tiếp với subprotocol ['bearer', token] — SDK v3 KHÔNG
  * hỗ trợ access token ngắn hạn (chỉ nhận API key) nên trước đây STT chết ngay khi khởi tạo.
  * Chống echo: bỏ mọi transcript khi AI đang nói (aiSpeakingRef) + xóa buffer khi AI nói xong.
- * Watchdog speaking: HeyGen đôi khi KHÔNG bắn AVATAR_SPEAK_ENDED → cờ aiSpeaking kẹt true
- * và nuốt toàn bộ transcript ứng viên; đặt timer theo độ dài audio để tự nhả cờ.
+ * Watchdog speaking: sự kiện "nói xong" không phải lúc nào cũng bắn (browser TTS nuốt `onend`)
+ * → cờ aiSpeaking kẹt true và nuốt toàn bộ transcript ứng viên; đặt timer theo độ dài audio để tự nhả.
  *
  * Gửi trả lời THỦ CÔNG (ADR-050 nhập kép): transcript Deepgram append vào answerText hiển thị
  * trong <textarea> ứng viên SỬA/GÕ TAY được (mic tắt = gõ tự do); bấm "Gửi trả lời" mới submit —
@@ -55,8 +52,8 @@ const QUESTION_AUDIO_TIMEOUT_MS = 6000
  * Trần thời lượng (ADR-050): media-config trả maxDurationSeconds → đếm ngược; hết giờ khoá mic +
  * NotifyTimeout → server cho AI nói câu kết rồi đóng phiên.
  *
- * Practice AUDIO-ONLY (ADR-050): media-config trả heyGen=null → không avatar; audio ElevenLabs
- * phát qua WebAudio (playPcmViaWebAudio). Thiếu Deepgram → nhập tay + nút "Gửi trả lời".
+ * AUDIO-ONLY cho CẢ buổi thử lẫn buổi thật (ADR-050 mở rộng ở ADR-067 — avatar đã gỡ khỏi dự án):
+ * audio ElevenLabs phát qua WebAudio (playPcmViaWebAudio). Thiếu Deepgram → nhập tay + "Gửi trả lời".
  */
 export interface InterviewSessionOptions {
   /** Bắt buộc khi tự tạo phiên (phỏng vấn thử). Kiosk truyền `existingSessionId` thay cho cặp này. */
@@ -94,18 +91,19 @@ export function useInterviewSession(options: InterviewSessionOptions) {
   const [answerText, setAnswerState] = useState('')
   const [aiSpeaking, setAiSpeaking] = useState(false)
   const [listening, setListening] = useState(false)
-  const [avatarReady, setAvatarReady] = useState(false)
   const [sttEnabled, setSttEnabled] = useState(false)
   const [micEnabled, setMicEnabled] = useState(true) // tắt mic = chuyển sang gõ phím tự do (ADR-050)
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null) // đếm ngược trần thời lượng
   const [timeUp, setTimeUp] = useState(false) // hết giờ — đang chờ AI nói câu kết thúc
+  /**
+   * Phòng chờ buổi THẬT (ADR-067): `waiting` = chưa ai vào phòng · `hm_joined` = Hiring Manager đã
+   * có mặt · `admitted` = đã được cho vào, AI đang hỏi. Buổi thử và tin chưa gán HM luôn `admitted`.
+   */
+  const [admission, setAdmission] = useState<'waiting' | 'hm_joined' | 'admitted'>('admitted')
   // Id phiên đã tạo — page dùng để mở trang xem lại transcript sau khi kết thúc (ADR-051).
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  const videoRef = useRef<HTMLVideoElement | null>(null)
   const connRef = useRef<signalR.HubConnection | null>(null)
-  const avatarRef = useRef<LiveAvatarSession | null>(null)
-  const avatarReadyRef = useRef(false)
   const dgSocketRef = useRef<WebSocket | null>(null)
   const dgRetryRef = useRef(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -125,7 +123,6 @@ export function useInterviewSession(options: InterviewSessionOptions) {
   const audioSrcRef = useRef<AudioBufferSourceNode | null>(null)
   const questionAudioTimerRef = useRef<number | null>(null)
   const audioPlayedForRef = useRef<string | null>(null)
-  const keepAliveTimerRef = useRef<number | null>(null)
   const speakWatchdogRef = useRef<number | null>(null)
   const closingRef = useRef(false) // đã nhận lời cảm ơn kết thúc từ AI (ReceiveClosing)
   const pendingEndRef = useRef(false) // server báo completed nhưng chờ AI nói xong lời cảm ơn
@@ -173,7 +170,7 @@ export function useInterviewSession(options: InterviewSessionOptions) {
   }, [setSpeaking, updateInterim, setAnswer])
 
   /**
-   * Chốt chặn cờ aiSpeaking: nếu sự kiện "nói xong" (HeyGen AVATAR_SPEAK_ENDED / onended)
+   * Chốt chặn cờ aiSpeaking: nếu sự kiện "nói xong" (`onended` của WebAudio / browser TTS)
    * không bắn, cờ kẹt true sẽ nuốt mọi transcript của ứng viên → tự nhả sau thời lượng dự kiến.
    * speakUntilRef ghi "hạn sử dụng" của lượt nói hiện tại — mọi đường set cờ đều phải qua đây
    * (KHÔNG bao giờ setSpeaking(true) mà không kèm watchdog, tránh kẹt vĩnh viễn).
@@ -235,7 +232,7 @@ export function useInterviewSession(options: InterviewSessionOptions) {
     setSttEnabled(false)
   }, [])
 
-  /** Fallback không avatar: phát PCM 16-bit mono 24kHz (base64 từ ElevenLabs) qua WebAudio. */
+  /** Phát PCM 16-bit mono 24kHz (base64 từ ElevenLabs) qua WebAudio. */
   const playPcmViaWebAudio = useCallback(
     async (base64: string) => {
       const AC =
@@ -287,111 +284,14 @@ export function useInterviewSession(options: InterviewSessionOptions) {
     [armSpeakWatchdog, handleSpeakEnded, setSpeaking]
   )
 
-  /** Phát audio câu hỏi: avatar lip-sync (repeatAudio) nếu sẵn sàng, không thì WebAudio. */
+  /** Phát audio câu hỏi qua WebAudio. */
   const playQuestionAudio = useCallback(
     (questionId: string, base64: string) => {
       if (audioPlayedForRef.current === questionId) return // đã phát (chống phát đôi khi audio đến trễ)
       audioPlayedForRef.current = questionId
-      const session = avatarRef.current
-      if (session && avatarReadyRef.current) {
-        try {
-          session.repeatAudio(base64)
-          // HeyGen có khi không bắn AVATAR_SPEAK_STARTED/ENDED → tự set cờ + watchdog
-          // theo thời lượng PCM 16-bit mono 24kHz (base64 → bytes ≈ len * 3/4)
-          // + đệm rộng 6s vì avatar bắt đầu phát TRỄ (network/xử lý phía HeyGen).
-          const pcmBytes = Math.floor(base64.length * 0.75)
-          const durationMs = (pcmBytes / 2 / 24000) * 1000
-          setSpeaking(true)
-          armSpeakWatchdog(durationMs + 6000)
-          return
-        } catch {
-          /* rơi xuống WebAudio */
-        }
-      }
       void playPcmViaWebAudio(base64)
     },
-    [armSpeakWatchdog, playPcmViaWebAudio, setSpeaking]
-  )
-
-  const avatarRetryRef = useRef(0)
-
-  const initAvatar = useCallback(
-    async (
-      cfg: NonNullable<Awaited<ReturnType<typeof interviewService.getMediaConfig>>['heyGen']>
-    ) => {
-      if (!cfg?.token) return // chưa cấu hình avatar → fallback WebAudio/browser TTS
-      // LiveAvatar LITE: BE đã mint session token; KHÔNG dùng voiceChat của SDK (STT tự làm bằng Deepgram).
-      const session = new LiveAvatarSession(cfg.token, {
-        voiceChat: false,
-        apiUrl: cfg.serverUrl,
-      })
-      avatarRef.current = session
-      session.on(SessionEvent.SESSION_STREAM_READY, () => {
-        if (videoRef.current) {
-          try {
-            session.attach(videoRef.current) // gắn cả video + audio track vào <video>
-          } catch {
-            /* ignore */
-          }
-          avatarReadyRef.current = true
-          setAvatarReady(true)
-          avatarRetryRef.current = 0 // stream sống lại → reset quota reconnect
-        }
-      })
-      session.on(SessionEvent.SESSION_DISCONNECTED, () => {
-        avatarReadyRef.current = false
-        setAvatarReady(false) // trong lúc chờ reconnect, câu hỏi tự rơi xuống WebAudio
-        // Avatar chết GIỮA câu nói (gói free LiveAvatar cắt phiên sau 2 phút!) →
-        // SPEAK_ENDED không bao giờ bắn → nhả cờ ngay để STT tiếp tục nhận giọng ứng viên.
-        if (aiSpeakingRef.current) {
-          console.warn('[avatar] disconnected giữa lượt nói — nhả cờ aiSpeaking')
-          handleSpeakEnded()
-        }
-        if (endedRef.current) return
-        // Session LITE rớt giữa buổi (idle-timeout/mạng) → token cũ đã vô hiệu:
-        // mint token MỚI qua media-config rồi dựng lại session, tối đa MAX_AVATAR_RECONNECT lần.
-        if (avatarRetryRef.current >= MAX_AVATAR_RECONNECT) {
-          console.warn('[avatar] hết quota reconnect — dùng WebAudio đến hết buổi')
-          return
-        }
-        avatarRetryRef.current += 1
-        console.warn(
-          `[avatar] DISCONNECTED — thử dựng lại (${avatarRetryRef.current}/${MAX_AVATAR_RECONNECT})`
-        )
-        window.setTimeout(async () => {
-          if (endedRef.current) return
-          try {
-            const media = await interviewService.getMediaConfig(sessionIdRef.current!)
-            if (media.heyGen?.token) await initAvatar(media.heyGen)
-          } catch (e) {
-            console.warn('[avatar] reconnect thất bại', e)
-          }
-        }, 1000 * avatarRetryRef.current)
-      })
-      // SPEAK_STARTED có thể bắn TRỄ (sau khi watchdog đã nhả cờ) — chỉ chấp nhận khi vẫn
-      // trong cửa sổ lượt nói dự kiến (+10s grace); quá hạn = sự kiện lạc → bỏ, nếu không cờ
-      // sẽ kẹt true (SPEAK_ENDED không đáng tin) và nuốt toàn bộ transcript của ứng viên.
-      session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
-        if (Date.now() > speakUntilRef.current + 10_000) {
-          console.warn('[avatar] SPEAK_STARTED lạc ngoài cửa sổ lượt nói — bỏ qua')
-          return
-        }
-        setSpeaking(true)
-        // Gia hạn watchdog theo thời gian dự kiến còn lại (avatar phát trễ nên cần thêm).
-        armSpeakWatchdog(Math.max(speakUntilRef.current - Date.now(), 3000) + 3000)
-      })
-      // SPEAK_ENDED lạc (đến khi ứng viên đang trả lời) sẽ xóa oan buffer → chỉ xử lý khi đang nói.
-      session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
-        if (aiSpeakingRef.current) handleSpeakEnded()
-      })
-      await session.start()
-      // LITE session có thể bị idle-timeout khi AI im lâu (ứng viên suy nghĩ) → giữ sống định kỳ.
-      if (keepAliveTimerRef.current) window.clearInterval(keepAliveTimerRef.current)
-      keepAliveTimerRef.current = window.setInterval(() => {
-        avatarRef.current?.keepAlive().catch(() => {})
-      }, 60_000)
-    },
-    [armSpeakWatchdog, handleSpeakEnded, setSpeaking]
+    [playPcmViaWebAudio]
   )
 
   /**
@@ -478,7 +378,7 @@ export function useInterviewSession(options: InterviewSessionOptions) {
         if (data.type === 'Results') {
           const text: string = data.channel?.alternatives?.[0]?.transcript ?? ''
           if (!text) return
-          if (aiSpeakingRef.current) return // echo giọng avatar lọt vào mic → bỏ
+          if (aiSpeakingRef.current) return // echo giọng AI lọt vào mic → bỏ
           if (!micEnabledRef.current) return // đang gõ phím (mic tắt) → không append transcript
           if (data.is_final) {
             // Append vào cuối answerText (giữ nguyên phần ứng viên đã sửa tay trước đó).
@@ -586,6 +486,21 @@ export function useInterviewSession(options: InterviewSessionOptions) {
 
     conn.on('ReceiveSessionStatus', (p: SessionStatusPayload) => {
       const st = typeof p === 'string' ? p : p?.status
+
+      // PHÒNG CHỜ buổi thật (ADR-067). Hai mốc, hai nghĩa khác nhau với người đang ngồi ở Kiosk:
+      // "hm_joined" = người phỏng vấn đã có mặt (sắp tới lượt), "admitted" = mời vào, AI bắt đầu hỏi.
+      if (st === 'hm_joined') {
+        setAdmission('hm_joined')
+        return
+      }
+      if (st === 'admitted') {
+        setAdmission('admitted')
+        // Server vừa mở cổng — giờ lệnh này mới sinh được câu hỏi. Trước khi được cho vào thì nó bị
+        // từ chối im lặng (phiên chưa `active`), nên phải gọi LẠI ở đúng thời điểm này.
+        void connRef.current?.invoke('StartInterview', sessionIdRef.current).catch(() => {})
+        return
+      }
+
       if (st !== 'completed') return
       // Đang phát lời cảm ơn → chờ nói xong (handleSpeakEnded) mới chuyển màn; kèm chốt chặn 20s.
       if (closingRef.current && aiSpeakingRef.current) {
@@ -670,17 +585,19 @@ export function useInterviewSession(options: InterviewSessionOptions) {
 
         const media = await interviewService.getMediaConfig(sessionId)
         languageRef.current = media.language || 'vi'
-        console.info(
-          '[media-config] deepgram:',
-          !!media.deepgram?.token,
-          '| heyGen:',
-          !!media.heyGen?.token,
-          '| lang:',
-          media.language
+        console.info('[media-config] deepgram:', !!media.deepgram?.token, '| lang:', media.language)
+
+        // Phòng chờ (ADR-067): phiên chưa được cho vào thì màn hình phải nói rõ đang chờ ai, thay vì
+        // hiện phòng phỏng vấn im lặng không có câu hỏi nào.
+        setAdmission(
+          media.status === 'waiting'
+            ? media.hiringManagerPresent
+              ? 'hm_joined'
+              : 'waiting'
+            : 'admitted'
         )
 
-        // STT không phụ thuộc avatar/hub → mở ngay; avatar + hub khởi tạo song song
-        // (trước đây tuần tự: avatar chậm làm token Deepgram hết hạn trước khi STT kịp nối).
+        // STT không phụ thuộc hub → mở ngay, hub nối song song.
         if (media.deepgram?.token) {
           try {
             initDeepgram(media.deepgram, micStream, languageRef.current)
@@ -693,15 +610,7 @@ export function useInterviewSession(options: InterviewSessionOptions) {
           setSttEnabled(false)
         }
 
-        const boot: Promise<unknown>[] = [connectHub()]
-        if (media.heyGen?.token) {
-          boot.push(
-            initAvatar(media.heyGen).catch(() => {
-              /* avatar lỗi → fallback WebAudio/browser TTS */
-            })
-          )
-        }
-        await Promise.all(boot)
+        await connectHub()
 
         setStatus('live')
 
@@ -729,13 +638,12 @@ export function useInterviewSession(options: InterviewSessionOptions) {
         setStatus('error')
       }
     },
-    [applicationId, roundNumber, initAvatar, connectHub, initDeepgram, onTimeUp]
+    [applicationId, roundNumber, connectHub, initDeepgram, onTimeUp]
   )
 
   const cleanup = useCallback(() => {
     endedRef.current = true
     if (questionAudioTimerRef.current) window.clearTimeout(questionAudioTimerRef.current)
-    if (keepAliveTimerRef.current) window.clearInterval(keepAliveTimerRef.current)
     if (clockTimerRef.current) window.clearInterval(clockTimerRef.current)
     if (speakWatchdogRef.current) window.clearTimeout(speakWatchdogRef.current)
     if (closingAudioTimerRef.current) window.clearTimeout(closingAudioTimerRef.current)
@@ -760,11 +668,6 @@ export function useInterviewSession(options: InterviewSessionOptions) {
       /* noop */
     }
     audioCtxRef.current = null
-    try {
-      avatarRef.current?.stop()
-    } catch {
-      /* noop */
-    }
     try {
       connRef.current?.stop()
     } catch {
@@ -850,13 +753,12 @@ export function useInterviewSession(options: InterviewSessionOptions) {
     setAnswerText: setAnswer, // page bind <textarea> onChange để sửa/gõ tay
     aiSpeaking,
     listening,
-    avatarReady,
     sttEnabled,
     micEnabled,
     toggleMic,
     remainingSeconds, // number | null (null = không giới hạn)
     timeUp,
-    videoRef,
+    admission, // 'waiting' | 'hm_joined' | 'admitted' — phòng chờ buổi thật (ADR-067)
     start,
     end,
     submitAnswer,

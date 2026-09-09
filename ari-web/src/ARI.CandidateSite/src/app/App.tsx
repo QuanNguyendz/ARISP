@@ -29,6 +29,8 @@ const PrivacyPolicyPage = lazy(() => import('@pages/legal/PrivacyPolicyPage'))
 // Candidate
 const CandidateApplicationsPage = lazy(() => import('@pages/candidate/ApplicationsPage'))
 const CandidateApplicationDetailPage = lazy(() => import('@pages/candidate/ApplicationDetailPage'))
+// Thư mời nhận việc (ADR-061, Phase 5) — đoạn kết của phễu tuyển dụng.
+const CandidateOfferPage = lazy(() => import('@pages/candidate/OfferPage'))
 const CandidateProfilePage = lazy(() => import('@pages/candidate/ProfilePage'))
 const SavedJobsPage = lazy(() => import('@pages/candidate/SavedJobsPage'))
 const CandidateNotificationsPage = lazy(() => import('@pages/candidate/NotificationsPage'))
@@ -130,6 +132,7 @@ function App() {
               path="/candidate/applications/:id"
               element={<CandidateApplicationDetailPage />}
             />
+            <Route path="/candidate/applications/:id/offer" element={<CandidateOfferPage />} />
             <Route path="/candidate/profile" element={<CandidateProfilePage />} />
             <Route path="/candidate/schedule" element={<CandidateSchedulePage />} />
             <Route path="/candidate/saved-jobs" element={<SavedJobsPage />} />

@@ -20,26 +20,13 @@ namespace ARI.Infrastructure.Documents
     /// </summary>
     public class JdStampService : IJdStampService
     {
-        private static readonly object _fontLock = new();
-        private static bool _fontReady;
-
-        private static void EnsureFontResolver()
-        {
-            if (_fontReady) return;
-            lock (_fontLock)
-            {
-                if (_fontReady) return;
-                GlobalFontSettings.FontResolver ??= new FontResolver();
-                _fontReady = true;
-            }
-        }
 
         public Task<byte[]> StampApprovalAsync(byte[] pdfBytes, string approverName, DateTimeOffset approvedAt, CancellationToken ct = default)
         {
             if (pdfBytes == null || pdfBytes.Length == 0)
                 throw new ArgumentException("PDF rỗng, không thể đóng dấu.", nameof(pdfBytes));
 
-            EnsureFontResolver();
+            PdfText.EnsureFontResolver();
 
             using var input = new MemoryStream(pdfBytes);
             using var doc = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
@@ -60,7 +47,7 @@ namespace ARI.Infrastructure.Documents
 
         public Task<byte[]> StampApprovalFromTextAsync(string title, string bodyText, string approverName, DateTimeOffset approvedAt, CancellationToken ct = default)
         {
-            EnsureFontResolver();
+            PdfText.EnsureFontResolver();
 
             using var doc = new PdfDocument();
             var titleFont = new XFont("Arial", 15, XFontStyle.Bold);
@@ -102,7 +89,7 @@ namespace ARI.Infrastructure.Documents
             foreach (var paragraph in raw.Split('\n'))
             {
                 ct.ThrowIfCancellationRequested();
-                var lines = WrapParagraph(gfx, bodyFont, paragraph, contentW);
+                var lines = PdfText.WrapParagraph(gfx, bodyFont, paragraph, contentW);
                 foreach (var line in lines)
                 {
                     if (y + lineH > pageH - margin)
@@ -156,53 +143,5 @@ namespace ARI.Infrastructure.Documents
             gfx.DrawString($"Chữ ký: {approverName}", sFont, new XSolidBrush(red), tx, ty);
         }
 
-        /// <summary>Tự xuống dòng một đoạn theo bề rộng tối đa; tách từ quá dài theo ký tự.</summary>
-        private static List<string> WrapParagraph(XGraphics gfx, XFont font, string text, double maxW)
-        {
-            var result = new List<string>();
-            if (string.IsNullOrEmpty(text)) { result.Add(string.Empty); return result; }
-
-            var line = new StringBuilder();
-            foreach (var word in text.Split(' '))
-            {
-                var candidate = line.Length == 0 ? word : line + " " + word;
-                if (gfx.MeasureString(candidate, font).Width <= maxW)
-                {
-                    if (line.Length > 0) line.Append(' ');
-                    line.Append(word);
-                    continue;
-                }
-
-                if (line.Length > 0) { result.Add(line.ToString()); line.Clear(); }
-
-                if (gfx.MeasureString(word, font).Width <= maxW)
-                {
-                    line.Append(word);
-                }
-                else
-                {
-                    // Từ dài hơn cả dòng → tách theo ký tự.
-                    var chunk = new StringBuilder();
-                    foreach (var ch in word)
-                    {
-                        if (gfx.MeasureString(chunk.ToString() + ch, font).Width <= maxW)
-                        {
-                            chunk.Append(ch);
-                        }
-                        else
-                        {
-                            if (chunk.Length > 0) result.Add(chunk.ToString());
-                            chunk.Clear();
-                            chunk.Append(ch);
-                        }
-                    }
-                    if (chunk.Length > 0) line.Append(chunk.ToString());
-                }
-            }
-
-            if (line.Length > 0) result.Add(line.ToString());
-            if (result.Count == 0) result.Add(string.Empty);
-            return result;
-        }
     }
 }

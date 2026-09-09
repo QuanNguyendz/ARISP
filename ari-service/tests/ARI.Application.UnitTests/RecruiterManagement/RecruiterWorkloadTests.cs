@@ -17,12 +17,18 @@ namespace ARI.Application.UnitTests.RecruiterManagement;
 /// </summary>
 public class RecruiterWorkloadTests
 {
+    /// <summary>
+    /// Vai trò gieo bằng giá trị LƯU DB (<see cref="RoleNames"/>), không phải giá trị claim JWT.
+    /// Bài test trước đây gieo <c>AppRoles.Recruiter</c> ("Recruiter") và vẫn xanh, vì bộ giả
+    /// trong bộ nhớ so chuỗi bằng C# <c>==</c> nên hai vế khớp nhau — che mất đúng cái lỗi
+    /// production: trên Postgres, <c>=</c> phân biệt hoa thường nên truy vấn trả về rỗng.
+    /// </summary>
     private static User Recruiter(string name = "Recruiter A", bool active = true) => new()
     {
         Id = Guid.NewGuid(),
         FullName = name,
         Email = $"{Guid.NewGuid():N}@corp.io",
-        Role = AppRoles.Recruiter,
+        Role = RoleNames.Recruiter,
         IsActive = active,
     };
 
@@ -65,9 +71,12 @@ public class RecruiterWorkloadTests
         var draft = Job(user.Id, "draft", ageDays: 9);
 
         var uow = new InMemoryUnitOfWork().Seed(user).Seed(activeJob).Seed(draft)
-            .Seed(App(activeJob.Id, "applied", ageDays: 4))     // chưa sàng
-            .Seed(App(activeJob.Id, "screening", ageDays: 2))   // đã sàng, chưa có lịch
-            .Seed(App(activeJob.Id, "pass"));                   // đã đóng
+            // "cv_submitted" là trạng thái THẬT sau khi ứng viên nộp CV. Bài test trước đây gieo
+            // "applied" — giá trị không có nơi nào trong hệ thống ghi ra — nên nó xác nhận đúng
+            // cái lỗi khiến ô "Hồ sơ chưa sàng" luôn hiện 0 trên môi trường thật.
+            .Seed(App(activeJob.Id, ApplicationStatuses.CvSubmitted, ageDays: 4)) // chưa sàng
+            .Seed(App(activeJob.Id, ApplicationStatuses.Screening, ageDays: 2))   // đã sàng, chưa có lịch
+            .Seed(App(activeJob.Id, ApplicationStatuses.Pass));                   // đã đóng
 
         var res = await new GetRecruitersQueryHandler(uow).Handle(new GetRecruitersQuery(), CancellationToken.None);
         var row = Assert.Single(res.Value!);
@@ -206,7 +215,7 @@ public class RecruiterWorkloadTests
         var hrLead = new User
         {
             Id = Guid.NewGuid(), FullName = "HR Lead", Email = "lead@corp.io",
-            Role = AppRoles.HrAdmin, IsActive = true,
+            Role = RoleNames.HrAdmin, IsActive = true,
         };
         var job = Job(from.Id);
         var uow = new InMemoryUnitOfWork().Seed(from).Seed(hrLead).Seed(job);

@@ -18,17 +18,10 @@ namespace ARI.Application.Options
         public int PracticeMaxDurationMinutes { get; set; } = 20;
 
         /// <summary>
-        /// ADR-050: Practice mặc định KHÔNG dùng avatar (audio-only) để tránh cạnh tranh
-        /// concurrency LiveAvatar với buổi thật + đốt credit không dự đoán được. Đặt true để
-        /// bật lại avatar cho practice khi tài khoản LiveAvatar đủ quota. Real luôn có avatar.
-        /// </summary>
-        public bool PracticeUseAvatar { get; set; } = false;
-
-        /// <summary>
         /// Trần thời lượng phỏng vấn THẬT (phút) — ADR-052. Hết giờ xử lý y hệt practice:
         /// khoá mic → AI nói câu kết → đóng phiên. &lt;= 0 = không giới hạn.
-        /// Giữ &lt;= trần mỗi phiên của gói LiveAvatar đang dùng (Essential = 20'), nếu không
-        /// avatar bị nhà cung cấp cắt giữa chừng còn buổi phỏng vấn vẫn chạy tiếp câm lặng.
+        /// Con số 20' vốn bằng trần mỗi phiên của gói avatar; avatar đã gỡ (ADR-067) nên nay nó
+        /// thuần là quyết định nghiệp vụ về độ dài buổi phỏng vấn, đổi được tự do.
         /// </summary>
         public int RealMaxDurationMinutes { get; set; } = 20;
 

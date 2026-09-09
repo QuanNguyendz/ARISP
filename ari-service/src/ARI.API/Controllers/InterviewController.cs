@@ -135,7 +135,8 @@ namespace ARI.API.Controllers
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetSessions([FromQuery] Guid? applicationId, CancellationToken ct)
         {
-            var result = await _sender.Send(new GetHrInterviewSessionsQuery(applicationId), ct);
+            var result = await _sender.Send(
+                new GetHrInterviewSessionsQuery(applicationId, _currentUser.UserId, _currentUser.Role), ct);
             return Ok(result.Value);
         }
 
@@ -218,6 +219,49 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(
                 new RescheduleBookingsCommand(request.BookingIds, request.TargetSlotId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
+        }
+
+        // ─────────── Phòng chờ buổi phỏng vấn thật (ADR-067) ───────────
+
+        /// <summary>
+        /// GET /api/interview/waiting-rooms
+        /// Buổi phỏng vấn thật đang mở trong phạm vi người gọi — Hiring Manager mở màn này để vào phòng.
+        /// </summary>
+        [HttpGet("waiting-rooms")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetWaitingRooms(CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetWaitingRoomsQuery(_currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// POST /api/interview/session/{id}/hm-join
+        /// Hiring Manager vào phòng cùng AI — điều kiện để buổi phỏng vấn bắt đầu được.
+        /// </summary>
+        [HttpPost("session/{id:guid}/hm-join")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> JoinInterviewRoom(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new JoinInterviewRoomCommand(id, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// POST /api/interview/session/{id}/admit
+        /// Cho ứng viên vào phòng — phiên chuyển sang đang diễn ra và AI bắt đầu hỏi.
+        /// </summary>
+        [HttpPost("session/{id:guid}/admit")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> AdmitCandidate(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new AdmitCandidateCommand(id, _currentUser.UserId, _currentUser.Role), ct);
             if (result.IsFailure) return MapFailure(result);
             return Ok(result.Value);
         }
@@ -325,14 +369,22 @@ namespace ARI.API.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Chốt kết quả phỏng vấn (xác nhận hoặc ghi đè verdict của AI).
+        ///
+        /// Danh tính người duyệt lấy từ TOKEN, không phải từ header do client gửi. Trước đây tham số
+        /// này là <c>[FromHeader("X-User-Id")]</c> kèm GUID dự phòng viết cứng — nghĩa là bất kỳ ai
+        /// qua được policy đều gán được quyết định của mình cho người khác, và request không kèm
+        /// header thì quyết định bị ghi cho một tài khoản không tồn tại. <c>HrReview.ReviewedByUserId</c>
+        /// là dấu vết DUY NHẤT trả lời "ai đã chốt tuyển người này".
+        /// </summary>
         [HttpPost("review/confirm")]
-        [Authorize(Policy = "HrManagement")]
-        public async Task<IActionResult> ConfirmReview([FromHeader(Name = "X-User-Id")] string userIdStr, [FromBody] ConfirmReviewRequest request)
+        [Authorize(Policy = "HiringDecision")] // ADR-061: người chốt là Hiring Manager, HR Admin dự phòng
+        public async Task<IActionResult> ConfirmReview([FromBody] ConfirmReviewRequest request)
         {
-            if (!Guid.TryParse(userIdStr, out var userId))
-            {
-                userId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-            }
+            if (_currentUser.UserId is not { } userId || userId == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
             var result = await _sender.Send(new ConfirmHrReviewCommand(userId, request));
             if (result.IsFailure) return BadRequest(new { message = result.Error });
             return Ok(new { success = true });

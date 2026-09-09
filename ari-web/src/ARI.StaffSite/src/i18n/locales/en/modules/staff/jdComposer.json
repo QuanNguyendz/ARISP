@@ -1,0 +1,54 @@
+{
+  "title": "Write the job description",
+  "description": "Follows the company template and is pre-filled from the recruitment request. The exported file is attached to the job posting and is what the Hiring Manager reviews before signing off.",
+  "back": "Recruitment requests",
+  "loading": "Loading...",
+  "sectionPlaceholder": "One point per line...",
+  "sectionLineHint": "Each line becomes a bullet in the JD file.",
+  "basics": {
+    "title": "Basics",
+    "position": "Position",
+    "department": "Department",
+    "location": "Location",
+    "vacancies": "Headcount",
+    "salaryMin": "Minimum salary",
+    "salaryMax": "Maximum salary",
+    "currency": "Currency",
+    "employmentType": "Employment type",
+    "experienceLevel": "Level",
+    "workMode": "Work mode",
+    "deadline": "Application deadline"
+  },
+  "actions": {
+    "buildJob": "Build job posting from this JD",
+    "buildJobHint": "Exports a PDF and opens the job form with the file already attached — no download-and-reupload round trip.",
+    "saveDraft": "Save draft",
+    "savedOk": "Draft saved",
+    "preview": "Preview",
+    "closePreview": "Close preview",
+    "fileStale": "The JD has changed since this file was exported. Press Preview or PDF/DOCX to export again.",
+    "previewNote": "Opens the actual PDF that will be attached — not a redraw, so it looks exactly like the downloaded file.",
+    "saveDraftHint": "Saves the content and rebuilds the attached file — the old one is replaced."
+  },
+  "errors": {
+    "loadFailed": "Could not load the JD.",
+    "saveFailed": "Could not save the JD.",
+    "generateFailed": "Could not export the JD file."
+  },
+  "preview": {
+    "label": "Preview",
+    "pageOf": "Page {{page}}/{{total}}",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "companyPlaceholder": "Company name",
+    "samplePosition": "Fresher ReactJS/NodeJS",
+    "factPosition": "Position",
+    "factVacancies": "Headcount",
+    "factTime": "Type",
+    "factLocation": "Location",
+    "factDepartment": "Department",
+    "factLevel": "Level",
+    "factWorkMode": "Work mode",
+    "factSalary": "Salary"
+  }
+}

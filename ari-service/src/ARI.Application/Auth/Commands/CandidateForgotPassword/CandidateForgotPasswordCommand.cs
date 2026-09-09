@@ -66,7 +66,7 @@ namespace ARI.Application.Auth.Commands.CandidateForgotPassword
             await _unitOfWork.SaveChangesAsync();
 
             // ADR-046: link reset của candidate phải về Candidate site → ưu tiên CandidateBaseUrl.
-            var frontendUrl = _configuration["Frontend:CandidateBaseUrl"] ?? _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+            var frontendUrl = FrontendUrls.Candidate(_configuration);
             var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(candidate.Email)}&audience={MagicLinkAudience.Candidate}";
 
             var emailBody = $@"

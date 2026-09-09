@@ -1,0 +1,55 @@
+{
+  "title": "Hello {{name}}",
+  "description": "Overview of the job postings you own as Hiring Manager.",
+  "loading": "Loading overview...",
+  "loadError": "Could not load the overview. Please try again.",
+  "stats": {
+    "assignedJobs": "Assigned jobs",
+    "activeJobs": "Currently hiring",
+    "awaitingSignOff": "Awaiting your sign-off",
+    "awaitingDecision": "Awaiting your decision",
+    "awaitingShortlist": "Candidates awaiting you",
+    "awaitingOfferApproval": "Offers to approve"
+  },
+  "jobs": {
+    "title": "Your job postings",
+    "description": "Jobs whose hiring team you belong to.",
+    "emptyTitle": "No jobs assigned to you yet",
+    "emptyDescription": "Once recruiting adds you to a job's hiring team, it will appear here.",
+    "noDepartment": "No department",
+    "applicantCount_one": "{{count}} applicant",
+    "applicantCount_other": "{{count}} applicants",
+    "needsSignOff": "Needs sign-off",
+    "viewAll": "View all"
+  },
+  "waitingRooms": {
+    "title_one": "{{count}} candidate is waiting for you to open the interview room",
+    "title_other": "{{count}} candidates are waiting for you to open the interview room",
+    "unknownCandidate": "Candidate",
+    "round": "Round {{number}}",
+    "action": "Open room"
+  },
+  "shortlist": {
+    "title": "Applications waiting for you",
+    "count_one": "{{count}} application",
+    "count_other": "{{count}} applications",
+    "emptyTitle": "Nothing waiting on you",
+    "emptyDescription": "Once recruiting approves an application it moves here for your decision."
+  },
+  "quickActions": {
+    "title": "Shortcuts",
+    "newRequest": "Recruitment requests",
+    "interviewRooms": "Interview rooms",
+    "evaluations": "Interview results",
+    "offers": "Job offers"
+  },
+  "signOff": {
+    "title": "Jobs waiting for your sign-off",
+    "hint": "Your signature is what lets a job go live — open the JD file and read it before signing."
+  },
+  "offers": {
+    "title": "Offers awaiting approval",
+    "count_one": "{{count}} offer is waiting for your input",
+    "count_other": "{{count}} offers are waiting for your input"
+  }
+}

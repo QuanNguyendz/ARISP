@@ -10,12 +10,15 @@ using Xunit;
 namespace ARI.Application.UnitTests.Scheduling;
 
 /// <summary>
-/// Dời NHIỀU ứng viên trong một lần (<c>RescheduleBookingsAsync</c>) — thay cho việc giao diện gửi N
+/// Dời ứng viên sang ca khác (<c>RescheduleBookingsAsync</c>) — thay cho việc giao diện gửi N
 /// request tuần tự.
 ///
 /// Tính chất phải giữ: ĐƯỢC ĂN CẢ NGÃ VỀ KHÔNG. Cách cũ với ca còn 1 chỗ và 3 người thì người đầu
 /// lọt, hai người sau thất bại lần lượt, không có gì hoàn tác — nhân sự nhìn vào không biết ai đã
 /// chuyển ai chưa.
+///
+/// Từ ADR-067 mỗi ca chỉ nhận MỘT ứng viên, nên dồn nhiều người vào cùng một ca bị từ chối CẢ
+/// LỆNH — đúng tinh thần được-ăn-cả-ngã-về-không ở trên, chỉ đổi lý do từ "hết chỗ" sang "luật".
 /// </summary>
 public class RescheduleBookingsBatchTests
 {
@@ -23,11 +26,13 @@ public class RescheduleBookingsBatchTests
         => InterviewServiceFactory.Create(uow, new RecordingNotificationService());
 
     [Fact]
-    public async Task Khong_du_cho_thi_khong_doi_ai_ca()
+    public async Task Don_nhieu_nguoi_vao_mot_ca_thi_khong_doi_ai_ca()
     {
+        // Mỗi ca chỉ nhận MỘT ứng viên (ADR-067) — buổi thật có Hiring Manager ngồi cùng AI.
+        // Từ chối cả lệnh thay vì lặng lẽ dời một người rồi báo hai người kia hỏng.
         var job = SchedulingData.Job(out var owner);
         var oldSlot = SchedulingData.Slot(job.Id, round: 1, capacity: 3, booked: 3);
-        var target = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 0); // chỉ 2 chỗ
+        var target = SchedulingData.Slot(job.Id, round: 1, capacity: 1, booked: 0);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(oldSlot).Seed(target);
 
         var bookings = Enumerable.Range(0, 3).Select(_ =>
@@ -45,48 +50,36 @@ public class RescheduleBookingsBatchTests
 
         Assert.True(res.IsFailure);
         Assert.Equal(CommonErrorCodes.Conflict, res.ErrorCode);
-        Assert.Contains("không còn đủ 3 chỗ", res.Error);
+        Assert.Contains("MỘT ứng viên", res.Error);
         Assert.Equal(0, sql.BookedCountOf(target.Id));
         Assert.Equal(3, sql.BookedCountOf(oldSlot.Id));
         Assert.All(bookings, b => Assert.Equal(oldSlot.Id, b.AvailabilitySlotId)); // không ai bị chuyển
     }
 
     [Fact]
-    public async Task Du_cho_thi_doi_het_va_tra_dung_tung_ca_cu()
+    public async Task Doi_mot_nguoi_thi_chiem_cho_ca_moi_va_khong_tru_lai_ca_cu()
     {
+        // Ứng viên đã báo bận nên ca cũ đã ở trạng thái trả chỗ (booked = 0) — không trừ thêm lần nữa.
         var job = SchedulingData.Job(out var owner);
-        // Ba ứng viên đều đã báo bận nên hai ca cũ đã ở trạng thái trả chỗ (booked = 0).
-        var slotA = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 0);
-        var slotB = SchedulingData.Slot(job.Id, round: 1, capacity: 2, booked: 0);
-        var target = SchedulingData.Slot(job.Id, round: 1, capacity: 5, booked: 0);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slotA).Seed(slotB).Seed(target);
+        var slotA = SchedulingData.Slot(job.Id, round: 1, capacity: 1, booked: 0);
+        var target = SchedulingData.Slot(job.Id, round: 1, capacity: 1, booked: 0);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slotA).Seed(target);
 
-        var fromA = Enumerable.Range(0, 2).Select(_ =>
-        {
-            var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
-            uow.Seed(app);
-            var b = SchedulingData.DeclinedBooking(app.Id, slotA.Id, round: 1);
-            uow.Seed(b);
-            return b;
-        }).ToList();
-
-        var appB = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
-        uow.Seed(appB);
-        var fromB = SchedulingData.DeclinedBooking(appB.Id, slotB.Id, round: 1);
-        uow.Seed(fromB);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
+        uow.Seed(app);
+        var booking = SchedulingData.DeclinedBooking(app.Id, slotA.Id, round: 1);
+        uow.Seed(booking);
 
         var sql = new SlotSqlEmulator(uow);
-        var ids = fromA.Select(b => b.Id).Append(fromB.Id).ToList();
 
-        var res = await Svc(uow).RescheduleBookingsAsync(ids, target.Id, owner, AppRoles.Recruiter, CancellationToken.None);
+        var res = await Svc(uow).RescheduleBookingsAsync(
+            new[] { booking.Id }, target.Id, owner, AppRoles.Recruiter, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(3, res.Value.MovedCount);
+        Assert.Equal(1, res.Value.MovedCount);
         Assert.Empty(res.Value.Failed);
-        Assert.Equal(3, sql.BookedCountOf(target.Id));
-        // Cả ba đều là người đã báo bận → chỗ ở ca cũ đã trả lúc từ chối, không trừ thêm lần nữa.
+        Assert.Equal(1, sql.BookedCountOf(target.Id));
         Assert.Equal(0, sql.BookedCountOf(slotA.Id));
-        Assert.Equal(0, sql.BookedCountOf(slotB.Id));
     }
 
     /// <summary>Booking hỏng phải rơi ra TRƯỚC khi tính số chỗ, nếu không sẽ chiếm dư chỗ của ca đích.</summary>

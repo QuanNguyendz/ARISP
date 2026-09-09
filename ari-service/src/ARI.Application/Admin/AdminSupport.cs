@@ -4,7 +4,10 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
+using Microsoft.Extensions.Configuration;
+using ARI.Application.Common;
 
 namespace ARI.Application.Admin
 {
@@ -59,9 +62,20 @@ namespace ARI.Application.Admin
         }
 
         /// <summary>Gửi email chào mừng kèm thông tin đăng nhập cho staff mới (best-effort, không fail request).</summary>
-        public static async Task SendStaffWelcomeEmailAsync(IEmailService emailService, User newUser, string pw)
+        public static async Task SendStaffWelcomeEmailAsync(
+            IEmailService emailService, IConfiguration configuration, User newUser, string pw)
         {
-            var roleName = (newUser.Role ?? string.Empty).ToLower() == "hr_admin" ? "HR Admin" : "Recruiter";
+            // Đường về cổng nhân sự. Trước đây ghi cứng "http://localhost:3001/login" — SAI cả hai vế:
+            // (1) route thật là `/auth/login`, còn `/login` rơi vào catch-all `*` → chuyển hướng `/404`,
+            // nên nút trong chính lá thư mang mật khẩu dẫn tới trang không tồn tại; (2) ghi cứng
+            // localhost thì trên bản deploy nhân viên mới nhận link trỏ về máy của chính họ. ADR-059 đã
+            // đi vá 4 lá thư hardcode `localhost:3000` nhưng bỏ sót lá này vì nó dùng cổng 3001.
+            var staffBaseUrl = FrontendUrls.Staff(configuration);
+            var loginUrl = $"{staffBaseUrl}/auth/login";
+
+            // Câu tam phân cũ (hr_admin ? "HR Admin" : "Recruiter") gán nhãn SAI cho mọi vai trò
+            // ngoài hai cái đó — tài khoản Hiring Manager sẽ nhận thư chào mừng ghi "Recruiter".
+            var roleName = RoleNames.DisplayLabel(newUser.Role);
             var emailBody = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;'>
                     <div style='text-align: center; margin-bottom: 24px;'>
@@ -90,7 +104,7 @@ namespace ARI.Application.Admin
                         <p style='margin: 0; color: #92400e; font-size: 14px;'>⚠️ Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên để đảm bảo an toàn tài khoản.</p>
                     </div>
                     <div style='text-align: center; margin: 28px 0;'>
-                        <a href='http://localhost:3001/login' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Đăng nhập cổng nhân sự</a>
+                        <a href='{loginUrl}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Đăng nhập cổng nhân sự</a>
                     </div>
                     <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;'/>
                     <p style='font-size: 12px; color: #94a3b8; text-align: center;'>Email này được gửi tự động từ hệ thống ARISP. Vui lòng không trả lời.</p>

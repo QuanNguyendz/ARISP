@@ -1,16 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useParams, useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
-  AlertTriangle, Eye,
+  AlertTriangle, Eye, ClipboardList,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import {
+  recruitmentRequestService,
+  type RecruitmentRequestListItem,
+} from '@ari/shared/fservices/recruitmentRequest'
+import { jdDocumentService, type JdDocument } from '@ari/shared/fservices/jdDocument'
+import { jdTemplateService, type JdTemplate } from '@ari/shared/fservices/jdTemplate'
 import jobService from '@ari/shared/fservices/job'
+import {
+  hiringTeamService,
+  type HiringManagerOption,
+} from '@ari/shared/fservices/hiringTeam'
 import { ErrorAlert, Select } from '@ari/shared/ui'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
@@ -29,11 +40,115 @@ const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white da
 // Dấu * bắt buộc — luôn hiển thị màu đỏ.
 const RequiredStar = () => <span className="text-red-500 ml-0.5">*</span>
 
+/** Thoát HTML — nội dung phiếu là văn bản người dùng gõ, mà ô JD là trình soạn rich-text. */
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * Dựng bản nháp JD từ phiếu yêu cầu tuyển dụng (ADR-063).
+ *
+ * Ghép **mô tả công việc** và **yêu cầu ứng viên** thành hai mục có tiêu đề, mỗi dòng thành một
+ * gạch đầu dòng. Mục đích là Recruiter mở ra đã có khung để sửa, thay vì một ô trắng — đó chính là
+ * lý do ô "yêu cầu" tồn tại trên phiếu. Xuống dòng đôi trở thành đoạn mới để giữ nguyên bố cục HM gõ.
+ */
+function jdDraftFromRequest(
+  description: string | null | undefined,
+  requirements: string | null | undefined,
+  t: (key: string) => string
+): string {
+  const block = (heading: string, body: string | null | undefined) => {
+    const lines = (body || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    if (lines.length === 0) return ''
+    // Một dòng duy nhất thì để nguyên đoạn văn; nhiều dòng thì hiểu là danh sách.
+    const content =
+      lines.length === 1
+        ? `<p>${escapeHtml(lines[0])}</p>`
+        : `<ul>${lines.map((l) => `<li>${escapeHtml(l.replace(/^[-•*]\s*/, ''))}</li>`).join('')}</ul>`
+    return `<p><strong>${escapeHtml(heading)}</strong></p>${content}`
+  }
+
+  return (
+    block(t('form.jdDraft.description'), description) +
+    block(t('form.jdDraft.requirements'), requirements)
+  )
+}
+
+/**
+ * Dựng phần "mô tả công việc" của tin từ bản JD đã soạn (ADR-064).
+ *
+ * Nội dung ở đây đã đầy đủ và CÓ CẤU TRÚC theo từng mục, nên ghép thẳng — KHÔNG cần AI đoán lại
+ * từ file. Đó là toàn bộ lợi ích của việc soạn JD trước khi tạo tin.
+ *
+ * **Phải in TIÊU ĐỀ từng mục.** Bản đầu bỏ khoá mục (`.map(([, value]) => …)`) nên mô tả, yêu cầu,
+ * quyền lợi, hồ sơ cần nộp… dồn hết thành MỘT danh sách gạch đầu dòng không đầu không cuối — đúng thứ
+ * mà cấu trúc theo mục sinh ra để tránh.
+ *
+ * Tên và thứ tự mục lấy từ **mẫu công ty** chứ không tự đặt: HR Leader sở hữu danh sách mục (ADR-064),
+ * và `key` bất biến nên tra theo khoá luôn đúng. Không nạp được mẫu thì rơi về thứ tự có sẵn trong bản
+ * JD và VẪN có tiêu đề — mất mẫu thì xấu một chút, không phải mất cấu trúc.
+ */
+function jdHtmlFromDocument(doc: JdDocument, template?: JdTemplate | null): string {
+  // Khoá mục là tập đóng trong kiểu của `JdDocument`, nên lấy thẳng từ đó thay vì `string`:
+  // thêm một mục mới vào mẫu mà quên khai kiểu thì hỏng ở đây, không phải lúc chạy.
+  type SectionKey = keyof JdDocument['sections']
+  const ordered: Array<readonly [SectionKey, string]> = template?.sections?.length
+    ? template.sections
+        .filter((s) => s.enabled)
+        .map((s) => [s.key as SectionKey, s.title] as const)
+    : (Object.keys(doc.sections) as SectionKey[]).map((k) => [k, k] as const)
+
+  return ordered
+    .map(([key, title]) => {
+      const value = (doc.sections[key] || '').trim()
+      if (!value) return ''
+
+      const lines = value
+        .split('\n')
+        .map((l) => l.trim().replace(/^[-•*]\s*/, ''))
+        .filter(Boolean)
+      if (lines.length === 0) return ''
+
+      const body =
+        lines.length === 1
+          ? `<p>${escapeHtml(lines[0])}</p>`
+          : `<ul>${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>`
+
+      return `<h3>${escapeHtml(title)}</h3>${body}`
+    })
+    .join('')
+}
+
 export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps) {
   const { t } = useTranslation('modules/recruiter/createJob')
   const { id: jobId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const routerLocation = useLocation()
+  const [searchParams] = useSearchParams()
+
+  // ADR-063: tin mới BẮT BUỘC bắt nguồn từ một phiếu yêu cầu tuyển dụng đã duyệt.
+  //
+  // Id phiếu đến qua query khi người dùng bấm "Dựng tin" ngay trên phiếu, nhưng đó chỉ là lối tắt —
+  // nó vẫn phải HIỆN RA và ĐỔI ĐƯỢC trên biểu mẫu: vào thẳng `/jobs/create` thì không có tham số
+  // nào, và một ràng buộc bắt buộc mà người dùng không nhìn thấy là ràng buộc chỉ lộ ra lúc bấm Lưu.
+  const [recruitmentRequestId, setRecruitmentRequestId] = useState<string | undefined>(
+    () => searchParams.get('requestId') || undefined
+  )
+
+  /** Phiếu đã duyệt, chưa dựng tin, trong phạm vi người đang đăng nhập (server tự lọc theo vai trò). */
+  const [openRequests, setOpenRequests] = useState<RecruitmentRequestListItem[]>([])
+
+  // Màn phiếu nằm ở khu vực nào thì suy từ chính route đang đứng — StaffSite khoá route theo
+  // vai trò, nên `/hr/jobs/create` phải trỏ về `/hr/...` chứ không phải `/recruiter/...`.
+  const requestsHref = routerLocation.pathname.startsWith('/hr/')
+    ? '/hr/recruitment-requests'
+    : '/recruiter/recruitment-requests'
+  const [requestsLoading, setRequestsLoading] = useState(mode === 'create')
+
+  /** Tin này dựng từ bản JD soạn theo mẫu công ty (ADR-064) — dùng để nói rõ trên giao diện. */
+  const [fromJdComposer, setFromJdComposer] = useState(false)
   const user = useAuthStore((state) => state.user)
   const { openDocument } = useDocumentViewer()
   const [submitting, setSubmitting] = useState(false)
@@ -205,8 +320,137 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     setRounds(u)
   }
 
+  // Hiring Manager của tin (ADR-061). Chỉ dùng khi TẠO MỚI: sửa tin thì đội tuyển dụng đã có
+  // panel riêng trên trang chi tiết, và gán lại ở đây sẽ đá nhau với panel đó.
+  const [hiringManagerId, setHiringManagerId] = useState('')
+  const [hmWarning, setHmWarning] = useState('')
+  /** Tin đã tạo xong nhưng gán Hiring Manager hỏng — giữ đường dẫn để người dùng tự sang gán lại. */
+  const [createdJobHref, setCreatedJobHref] = useState('')
+
+  const { data: hiringManagerOptions = [] } = useQuery({
+    queryKey: ['hiring-manager-options'],
+    queryFn: () => hiringTeamService.getHiringManagerOptions(),
+    enabled: mode !== 'edit',
+  })
+
+  // Danh sách phiếu chọn được: đã duyệt VÀ chưa dựng tin. Server đã lọc phạm vi theo vai trò
+  // (Recruiter thấy phiếu được giao, HR Leader thấy tất cả) nên ở đây chỉ cần bỏ những phiếu đã
+  // có tin — chọn trúng một phiếu như thế thì lúc lưu bị trả 409.
+  useEffect(() => {
+    if (mode !== 'create') return
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await recruitmentRequestService.list({ status: 'approved' })
+        if (!cancelled) setOpenRequests(list.filter((r) => !r.jobPostingId))
+      } catch {
+        // Không chặn: server vẫn kiểm lại phiếu lúc lưu, và ô chọn sẽ báo "chưa có phiếu nào".
+      } finally {
+        if (!cancelled) setRequestsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mode])
+
+  // Điền sẵn từ phiếu: vị trí, bộ phận, dải lương, địa điểm... là những thứ HM đã nêu và HR Leader
+  // đã duyệt. Bắt Recruiter gõ lại là mời sai lệch giữa tin đăng và phiếu được duyệt.
+  //
+  // GHI ĐÈ khi đổi phiếu, không phải "chỉ điền khi trống": đổi phiếu nghĩa là người dùng vừa nhận
+  // ra chọn nhầm, mà giữ lại nội dung của phiếu cũ thì tin sẽ mang nửa nọ nửa kia. Ô nào không do
+  // phiếu sinh ra (kỹ năng, vòng phỏng vấn, hạn nộp…) vẫn giữ nguyên.
+  useEffect(() => {
+    if (mode !== 'create' || !recruitmentRequestId) return
+    let cancelled = false
+    void (async () => {
+      // ADR-064: nếu phiếu đã có bản JD soạn theo mẫu công ty VÀ đã xuất file thì dùng bản đó —
+      // nó đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ HM sẽ mở ra để
+      // ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
+      try {
+        // Nạp kèm MẪU để biết tên và thứ tự từng mục. Mẫu hỏng thì vẫn dựng được mô tả (rơi về thứ
+        // tự có sẵn trong bản JD), nên không để nó làm hỏng cả luồng.
+        const [jd, tpl] = await Promise.all([
+          jdDocumentService.get(recruitmentRequestId),
+          jdTemplateService.get().catch(() => null),
+        ])
+        if (cancelled) return
+        if (jd.generatedFileStorageKey) {
+          setTitle(jd.title)
+          setDepartment(jd.department || '')
+          setJobDescription(jdHtmlFromDocument(jd, tpl))
+          if (jd.employmentType) setEmploymentType(jd.employmentType)
+          if (jd.workMode) setWorkMode(jd.workMode)
+          if (jd.experienceLevel) setExperienceLevel(jd.experienceLevel)
+          if (jd.location) setLocation(jd.location)
+          if (jd.vacancies) setVacancies(jd.vacancies)
+          if (jd.salaryMin != null || jd.salaryMax != null) {
+            setSalaryIsNegotiable(false)
+            setSalaryMin(jd.salaryMin ?? '')
+            setSalaryMax(jd.salaryMax ?? '')
+            if (jd.salaryCurrency) setSalaryCurrency(jd.salaryCurrency)
+          }
+          setJdFileUrl(jd.generatedFileStorageKey)
+          setJdFileViewUrl(jd.generatedFileViewUrl ?? undefined)
+          setJdFileName(jd.generatedFileName ?? undefined)
+          setJdFileFormat(jd.generatedFormat ?? undefined)
+          setFromJdComposer(true)
+
+          // Kỹ năng là những thẻ ngắn nằm rải trong văn xuôi của mục Yêu cầu — chỗ duy nhất ở bước này
+          // thực sự cần suy luận, nên mới gọi AI. Best-effort: hỏng thì người dùng gõ tay như trước,
+          // không chặn việc tạo tin. Chỉ điền vào ô CÒN TRỐNG — không đè lên thứ người dùng đã gõ.
+          void jdDocumentService
+            .suggestSkills(recruitmentRequestId)
+            .then((s) => {
+              if (cancelled) return
+              if (s.skills?.length) setSkills((prev) => (prev.length ? prev : s.skills))
+              if (s.jobCategory) setJobCategory((prev) => prev || s.jobCategory!)
+            })
+            .catch(() => {})
+
+          return
+        }
+      } catch {
+        // Chưa soạn JD, hoặc không có quyền đọc — rơi về điền sẵn từ phiếu ngay dưới.
+      }
+
+      try {
+        const rr = await recruitmentRequestService.getById(recruitmentRequestId)
+        if (cancelled) return
+        setTitle(rr.title)
+        setDepartment(rr.department || '')
+        setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
+        if (rr.employmentType) setEmploymentType(rr.employmentType)
+        if (rr.workMode) setWorkMode(rr.workMode)
+        if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
+        if (rr.location) setLocation(rr.location)
+        if (rr.headcount) setVacancies(rr.headcount)
+        if (rr.salaryMin != null || rr.salaryMax != null) {
+          setSalaryIsNegotiable(false)
+          setSalaryMin(rr.salaryMin ?? '')
+          setSalaryMax(rr.salaryMax ?? '')
+          if (rr.salaryCurrency) setSalaryCurrency(rr.salaryCurrency)
+        }
+      } catch {
+        // Không chặn việc dựng tin: phiếu tải hỏng thì Recruiter vẫn gõ tay được, và server vẫn
+        // kiểm lại phiếu lúc lưu.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mode, recruitmentRequestId])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Chặn ngay, trước cả kiểm nội dung: thiếu phiếu thì server chắc chắn từ chối, để người dùng
+    // điền xong cả biểu mẫu rồi mới báo là lãng phí công của họ.
+    if (mode === 'create' && !recruitmentRequestId) {
+      setError(t('validation.recruitmentRequestRequired'))
+      return
+    }
+
     const cleanDesc = jobDescription.replace(/<[^>]*>/g, '').trim()
     if (!title.trim() || !cleanDesc) {
       setError(t('validation.requiredFields'))
@@ -225,6 +469,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       setSubmitting(true)
       setError(null)
       const payload: CreateJobPostingRequest = {
+        recruitmentRequestId: mode === 'create' ? recruitmentRequestId : undefined,
         title: title.trim(),
         department: department.trim() || undefined,
         jobDescription: jobDescription.trim(),
@@ -258,12 +503,29 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       let saved: JobPosting
       if (mode === 'edit' && jobId) saved = await jobService.updateJob(jobId, payload)
       else saved = await jobService.createJobPosting(payload)
-      
-      if (routerLocation.pathname.startsWith('/hr')) {
-        navigate(`/hr/jobs/${saved.id}`)
-      } else {
-        navigate(`/recruiter/my-jobs/${saved.id}`)
+
+      // Đội tuyển dụng chỉ gán được SAU khi tin có id, nên đây là bước thứ hai chứ không nằm
+      // trong cùng một lệnh. Gán hỏng thì tin VẪN được tạo — huỷ tin vừa tạo chỉ vì gán người thất
+      // bại là mất trắng công nhập cả biểu mẫu.
+      //
+      // NHƯNG KHÔNG được điều hướng ngay sau khi đặt cảnh báo: trang unmount trước khi kịp render,
+      // nên người dùng tưởng đã gán xong trong khi tin chạy KHÔNG có cổng duyệt nào — đúng cái kết
+      // cục im lặng mà cảnh báo này sinh ra để chặn. Dừng lại, báo rõ, và đưa sẵn lối đi tiếp.
+      const jobHref = routerLocation.pathname.startsWith('/hr')
+        ? `/hr/jobs/${saved.id}`
+        : `/recruiter/my-jobs/${saved.id}`
+
+      if (mode !== 'edit' && hiringManagerId) {
+        try {
+          await hiringTeamService.addMember(saved.id, { userId: hiringManagerId, isPrimary: true })
+        } catch {
+          setHmWarning(t('form.hmAssignFailed'))
+          setCreatedJobHref(jobHref)
+          return
+        }
       }
+
+      navigate(jobHref)
     } catch (err: any) {
       setError(err?.response?.data?.message || err.message || t('validation.saveError'))
     } finally {
@@ -315,12 +577,74 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         </div>
       )}
 
+      {/* Phiếu yêu cầu tuyển dụng — BẮT BUỘC, và phải đứng trước mọi thứ khác (ADR-063).
+          Đặt trên cùng vì nó quyết định nội dung điền sẵn của cả biểu mẫu bên dưới: chọn phiếu
+          trước rồi mới sửa, chứ không phải nhập xong mới phát hiện thiếu phiếu lúc bấm Tạo tin. */}
+      {mode === 'create' && (
+        <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-6 shadow-card dark:border-white/10 dark:bg-white/5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+            <ClipboardList className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            {t('recruitmentRequest.title')}
+            <RequiredStar />
+          </div>
+          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{t('recruitmentRequest.description')}</p>
+
+          {requestsLoading ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-ink-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> {t('recruitmentRequest.loading')}
+            </div>
+          ) : openRequests.length === 0 ? (
+            /* Không còn phiếu nào dựng được thì nói thẳng phải làm gì — để trống một ô select rỗng
+               là bắt người dùng tự đoán vì sao không tạo được tin. */
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              <p>{t('recruitmentRequest.none')}</p>
+              <Link
+                to={`${requestsHref}`}
+                className="mt-2 inline-flex items-center gap-1.5 font-medium underline underline-offset-2"
+              >
+                <ClipboardList className="h-3.5 w-3.5" /> {t('recruitmentRequest.goToRequests')}
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="mt-4 max-w-xl">
+                <Select
+                  value={recruitmentRequestId ?? ''}
+                  onChange={(v) => setRecruitmentRequestId(v || undefined)}
+                  ariaLabel={t('recruitmentRequest.title')}
+                  className="w-full"
+                  buttonClassName="px-3 py-2.5 text-sm"
+                  placeholder={t('recruitmentRequest.placeholder')}
+                  options={openRequests.map((r) => ({
+                    value: r.id,
+                    label: `${r.title}${r.department ? ` · ${r.department}` : ''} · ${t('recruitmentRequest.headcount', { count: r.headcount })} · ${r.requestedByName}`,
+                  }))}
+                />
+              </div>
+
+              {recruitmentRequestId && (
+                <p className="mt-2 text-xs text-ink-400">{t('recruitmentRequest.prefillHint')}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* JD upload */}
       <div className="mb-6 rounded-2xl border border-brand-200 dark:border-brand-500/30 bg-gradient-to-b from-brand-50/60 dark:from-brand-500/10 to-white dark:to-white/5 p-6 shadow-card">
         <div className="flex items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-300">
           <Sparkles className="h-4 w-4" /> {mode === 'create' ? t('jdUpload.titleWithCreate') : t('jdUpload.title')}
         </div>
         <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{t('jdUpload.description')}</p>
+
+        {/* JD đến từ trình soạn theo mẫu công ty (ADR-064): nói rõ ra, nếu không người dùng sẽ
+            tưởng file này do mình tải lên và có thể tải đè mất bản đã soạn mà không biết. */}
+        {fromJdComposer && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800 dark:bg-brand-500/10 dark:text-brand-300">
+            <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{t('jdUpload.fromComposer')}</span>
+          </div>
+        )}
 
         <input ref={fileRef} type="file" accept=".pdf,.docx" onChange={onPickFile} className="hidden" />
 
@@ -715,6 +1039,42 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
               <label className={label}>{t('form.languageRequirement')}</label>
               <input value={languageRequirement} onChange={(e) => setLanguageRequirement(e.target.value)} placeholder={t('form.languageRequirementPlaceholder')} className={input} />
             </div>
+            {mode !== 'edit' && (
+              <div>
+                <label className={label}>{t('form.hiringManager')}</label>
+                <select
+                  value={hiringManagerId}
+                  onChange={(e) => setHiringManagerId(e.target.value)}
+                  className={input}
+                >
+                  <option value="">{t('form.hiringManagerNone')}</option>
+                  {hiringManagerOptions.map((o: HiringManagerOption) => (
+                    <option key={o.id} value={o.id}>
+                      {o.fullName?.trim() || o.email}
+                      {o.department ? ` — ${o.department}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">
+                  {t('form.hiringManagerHint')}
+                </p>
+                {hmWarning && (
+                  <div className="mt-1.5 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">{hmWarning}</p>
+                    {createdJobHref && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(createdJobHref)}
+                        className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300 underline"
+                      >
+                        {t('form.goToJobToAssign')}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <label className={label}>{t('form.applicationDeadline')}</label>
               <input

@@ -1,0 +1,17 @@
+{
+  "title": "Interview rooms",
+  "description": "A real interview only starts once you are in the room with the AI and let the candidate in.",
+  "loading": "Loading rooms...",
+  "loadError": "Could not load the interview rooms.",
+  "emptyTitle": "No interview is open right now",
+  "emptyDescription": "When a candidate enters their code at the front desk, they appear here for you to let in.",
+  "unknownCandidate": "Candidate",
+  "round": "Round {{number}}",
+  "arrivedAt": "Arrived at {{time}}",
+  "statusWaiting": "Waiting to be let in",
+  "statusLive": "Interview in progress",
+  "joinRoom": "Join room",
+  "inRoom": "In the room",
+  "admit": "Let the candidate in",
+  "joinFirstHint": "Join the room first — the interview does not start until someone is in the room with the AI."
+}

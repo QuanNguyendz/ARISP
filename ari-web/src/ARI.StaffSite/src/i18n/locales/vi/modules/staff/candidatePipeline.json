@@ -1,0 +1,59 @@
+{
+  "candidate": "Ứng viên",
+  "actions": {
+    "approve": "Duyệt hồ sơ",
+    "reject": "Loại",
+    "invite": "Mời phỏng vấn",
+    "viewApplication": "Xem hồ sơ đầy đủ",
+    "schedule": "Xếp lịch",
+    "hmApprove": "Duyệt & gửi lịch rảnh",
+    "hmReject": "Từ chối"
+  },
+  "pipeline": {
+    "rejected": "Không phù hợp",
+    "newApplicants": "Mới ứng tuyển",
+    "hmReview": "Chờ HM duyệt",
+    "scheduling": "Chờ xếp lịch",
+    "passed": "Đạt phỏng vấn",
+    "offer": "Đã gửi thư mời",
+    "hired": "Nhận việc",
+    "resultCount": "({{count}} hồ sơ)",
+    "emptyStage": "Chưa có hồ sơ nào ở bước này.",
+    "loading": "Đang tải danh sách ứng viên...",
+    "backToList": "Quay lại danh sách",
+    "colCandidate": "Ứng viên",
+    "colContact": "Liên hệ",
+    "colArea": "Khu vực",
+    "colAge": "Độ tuổi",
+    "colMatch": "Điểm CV",
+    "colStatus": "Trạng thái",
+    "ageValue": "{{count}} tuổi",
+    "appliedAt": "Ngày ứng tuyển",
+    "cv": "Hồ sơ CV",
+    "noCv": "Ứng viên chưa nộp CV.",
+    "selectPage": "Chọn cả trang",
+    "selectedCount": "Đã chọn {{count}} hồ sơ",
+    "awaitingHm": "Đang chờ Hiring Manager duyệt",
+    "round": "Vòng {{number}}",
+    "roundTypes": {
+      "screening": "Sơ loại",
+      "technical": "Chuyên môn",
+      "onlineTest": "Trắc nghiệm"
+    }
+  },
+  "stage": {
+    "cv_pending": "Chờ sàng CV",
+    "hm_review": "Chờ HM duyệt",
+    "awaiting_schedule": "Chờ xếp lịch",
+    "schedule_pending": "Chờ xác nhận lịch",
+    "schedule_confirmed": "Đã xác nhận lịch",
+    "schedule_declined": "Báo bận — cần xếp lại",
+    "test_open": "Chưa nộp bài thi",
+    "test_submitted": "Đã nộp bài thi",
+    "interview_waiting": "Đang chờ vào phòng",
+    "interview_active": "Đang phỏng vấn",
+    "interview_done": "Đã phỏng vấn xong",
+    "pending_result": "Chờ chốt kết quả",
+    "missed": "Không dự buổi đã hẹn"
+  }
+}

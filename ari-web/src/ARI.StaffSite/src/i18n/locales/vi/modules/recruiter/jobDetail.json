@@ -119,7 +119,10 @@
     "singleInviteSent": "Đã gửi lời mời (magic link) cho ứng viên.",
     "approveError": "Lỗi khi duyệt hồ sơ.",
     "rejectError": "Lỗi khi từ chối hồ sơ.",
-    "inviteError": "Lỗi khi gửi lời mời."
+    "inviteError": "Lỗi khi gửi lời mời.",
+    "sentToHiringManager": "Đã gửi hồ sơ cho Hiring Manager duyệt. Ứng viên chưa được báo — thư qua vòng chỉ gửi khi đã xếp được lịch.",
+    "sentToHiringManagerBatch": "Đã gửi {{count}} hồ sơ cho Hiring Manager duyệt.",
+    "acceptError": "Không gửi được hồ sơ cho Hiring Manager."
   },
   "statusError": "Không thể cập nhật trạng thái tin."
 }

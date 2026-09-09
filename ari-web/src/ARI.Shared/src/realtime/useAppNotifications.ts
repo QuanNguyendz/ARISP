@@ -95,6 +95,17 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
 
     // Sức chứa / khung giờ đổi ở màn cấu hình lịch → màn Phỏng vấn và modal "Dời lịch" phải thấy
     // ngay. Đây chính là lỗi người dùng báo: tăng sức chứa xong mà modal vẫn hiện số cũ.
+    // Đội tuyển dụng của tin (ADR-061): người vừa được thêm/gỡ phải thấy danh sách tin của mình
+    // đổi ngay — với Hiring Manager thì đó là TOÀN BỘ phạm vi dữ liệu của họ.
+    case 'job_hiring_team_members':
+      queryClient.invalidateQueries({
+        queryKey: jobPostingId ? ['hiring-team', jobPostingId] : ['hiring-team'],
+      })
+      queryClient.invalidateQueries({ queryKey: ['hm-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
+      break
+
     case 'availability_slots':
       queryClient.invalidateQueries({ queryKey: ['interview-jobs'] })
       queryClient.invalidateQueries({
@@ -130,6 +141,24 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] })
       queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
       refreshCandidateData()
+      break
+
+    // Thư mời nhận việc (ADR-061). Ứng viên cũng nằm trong nhóm nhận sự kiện này, nên trang
+    // "Thư mời" của họ tự cập nhật khi nhân sự gửi hoặc thu hồi — payload chỉ có khoá, KHÔNG có
+    // mức lương, nên việc làm mới vẫn phải đi qua endpoint đã kiểm quyền.
+    case 'offers':
+      queryClient.invalidateQueries({ queryKey: ['offers'] })
+      queryClient.invalidateQueries({ queryKey: ['candidate-offer'] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      refreshCandidateData()
+      refreshStaffBell()
+      break
+
+    // Lịch sử email của một hồ sơ. Cố ý KHÔNG gửi cho ứng viên (họ nhận thư thật rồi).
+    case 'email_logs':
+      queryClient.invalidateQueries({
+        queryKey: applicationId ? ['application-emails', applicationId] : ['application-emails'],
+      })
       break
 
     case 'account_requests':

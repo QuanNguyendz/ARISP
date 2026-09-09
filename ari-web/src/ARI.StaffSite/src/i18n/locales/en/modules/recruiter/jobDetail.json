@@ -119,7 +119,10 @@
     "singleInviteSent": "Invitation (magic link) sent to candidate.",
     "approveError": "Error approving application.",
     "rejectError": "Error rejecting application.",
-    "inviteError": "Error sending invitation."
+    "inviteError": "Error sending invitation.",
+    "sentToHiringManager": "Sent to the hiring manager for approval. The candidate is not notified yet — the pass email goes out once a slot is booked.",
+    "sentToHiringManagerBatch": "Sent {{count}} applications to the hiring manager.",
+    "acceptError": "Could not send the application to the hiring manager."
   },
   "statusError": "Cannot update job status."
 }

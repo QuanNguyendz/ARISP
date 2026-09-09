@@ -38,6 +38,7 @@ namespace ARI.Application.Admin.Queries.GetAdminStats
                 SuperAdmins: userRoles.Count(u => Role(u.Role) == "super_admin"),
                 HrAdmins: userRoles.Count(u => Role(u.Role) == "hr_admin"),
                 Recruiters: userRoles.Count(u => Role(u.Role) == "recruiter"),
+                HiringManagers: userRoles.Count(u => Role(u.Role) == "hiring_manager"),
                 Candidates: candidateCount));
         }
     }

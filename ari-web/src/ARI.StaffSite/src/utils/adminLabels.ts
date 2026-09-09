@@ -1,36 +1,9 @@
-// Nhãn hiển thị tiếng Việt cho role nội bộ + hành động audit log.
-
-export function roleLabel(role?: string | null): string {
-  const r = (role || '').toLowerCase().replace(/\s+/g, '_')
-  switch (r) {
-    case 'super_admin':
-      return 'Super Admin'
-    case 'hr_admin':
-      return 'HR Admin'
-    case 'recruiter':
-      return 'Recruiter'
-    case 'candidate':
-      return 'Ứng viên'
-    default:
-      return role || '—'
-  }
-}
-
-export function roleBadgeClass(role?: string | null): string {
-  const r = (role || '').toLowerCase().replace(/\s+/g, '_')
-  switch (r) {
-    case 'super_admin':
-      return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
-    case 'hr_admin':
-      return 'bg-ai-100 text-ai-700 dark:bg-ai-500/20 dark:text-ai-400'
-    case 'recruiter':
-      return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-    case 'candidate':
-      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-    default:
-      return 'bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-300'
-  }
-}
+// Nhãn hiển thị tiếng Việt cho hành động audit log.
+//
+// Nhãn và badge của VAI TRÒ đã chuyển sang `@ari/shared/utils/roles` cùng với `normalizeRole`
+// và bảng đường dẫn nhà: cả năm thứ đó phải biết cùng một tập vai trò, để rải chúng ra nhiều
+// file là bảo đảm sẽ sót một chỗ khi thêm vai trò mới. Re-export để chỗ gọi cũ không phải đổi.
+export { roleLabel, roleBadgeClass } from '@ari/shared/utils/roles'
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
   user_approved: 'Duyệt tài khoản',
