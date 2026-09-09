@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.CandidatePortal;
 using ARI.Application.Common;
-using ARI.Application.DTOs;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Entities;
 using Xunit;
@@ -11,132 +10,135 @@ using Xunit;
 namespace ARI.Application.UnitTests.CandidatePortal;
 
 /// <summary>
-/// So khớp thông tin liên hệ với CV bằng CODE (<see cref="VerifyCvInfoCommandHandler"/>, test-plan B11,
-/// Flow 3) — 0 token AI. Chốt: khớp tên bỏ dấu/thường theo từng token (bỏ token 1 ký tự), khớp 9 số
-/// cuối điện thoại (điện thoại &lt;8 số bị bỏ qua), CV rỗng/không đọc được → coi là hợp lệ (guard),
-/// và các nhánh lỗi tài khoản/CV.
+/// So khớp thông tin liên hệ với CV (<see cref="VerifyCvInfoCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "VerifyCvInfo" (UTCID01–12). Lưu ý: handler dùng SO KHỚP BẰNG CODE (0 token AI, ADR) — các dòng
+/// confirm ghi "Gemini"/"MIME" trong báo cáo là dấu vết copy-paste từ ApplyToJob; VerifyCvInfo không tính MIME,
+/// luôn trả <see cref="Result"/> Success với IsMatch true/false. Ta khẳng định HÀNH VI THỰC của handler.
 /// </summary>
 public class VerifyCvInfoCommandHandlerTests
 {
-    private static VerifyCvInfoCommandHandler Handler(
-        InMemoryUnitOfWork uow, RecordingFileStorage storage, StubDocumentParser parser) =>
-        new(uow, storage, parser);
+    private static readonly Guid CandidateId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+    private const string MatchingCv = "Candidate User — phone 0901234567 — backend engineer .NET";
 
-    /// <summary>Dựng handler + tài khoản đã seed; CV đọc từ file đính kèm (parser trả <paramref name="cvText"/>).</summary>
-    private static (VerifyCvInfoCommandHandler handler, Guid accId) Setup(string cvText)
-    {
-        var acc = new CandidateAccount { Email = "cand@example.io" };
-        var uow = new InMemoryUnitOfWork().Seed(acc);
-        var parser = new StubDocumentParser { Text = cvText };
-        return (Handler(uow, new RecordingFileStorage(), parser), acc.Id);
-    }
+    private static VerifyCvInfoCommandHandler Handler(InMemoryUnitOfWork uow, RecordingFileStorage storage, StubDocumentParser parser)
+        => new(uow, storage, parser);
 
-    private static VerifyCvInfoCommand Cmd(Guid accId, string name, string phone) =>
-        new(accId, name, phone, new byte[] { 1 }, "cv.pdf"); // đính kèm → đọc qua parser
+    private static VerifyCvInfoCommand Cmd(byte[]? bytes, string? fileName)
+        => new(CandidateId, "Candidate User", "0901234567", bytes, fileName);
+
+    private static CandidateAccount Account(string? profileCvUrl = null)
+        => new() { Id = CandidateId, Email = "candidate@example.com", ProfileCvUrl = profileCvUrl };
 
     [Fact]
-    public async Task Name_and_phone_present_in_cv_match()
+    public async Task UTCID01_Unknown_candidate()
     {
-        var (handler, accId) = Setup("Nguyễn Văn A — SĐT 0900000000, 5 năm kinh nghiệm C#.");
-
-        var res = await handler.Handle(Cmd(accId, "Nguyen Van A", "0900000000"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.True(res.Value.IsMatch);          // bỏ dấu + 9 số cuối đều khớp
-        Assert.Null(res.Value.MismatchDetails);
+        var res = await Handler(new InMemoryUnitOfWork(), new RecordingFileStorage(), new StubDocumentParser())
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tài khoản ứng viên.", res.Error);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
     }
 
-    [Fact]
-    public async Task Missing_name_reports_only_name_mismatch()
+    [Theory]
+    [InlineData("cv.pdf")]    // UTCID02 — PDF đính kèm
+    [InlineData("cv.docx")]   // UTCID03 — DOCX đính kèm
+    [InlineData("cv.txt")]    // UTCID04 — đuôi lạ (parser vẫn parse được)
+    public async Task UTCID02_to_04_attached_cv_verified(string fileName)
     {
-        var (handler, accId) = Setup("Ứng viên có số điện thoại 0900000000, thành thạo .NET.");
-
-        var res = await handler.Handle(Cmd(accId, "Tran Thi B", "0900000000"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.False(res.Value.IsMatch);
-        Assert.Contains("Họ và tên", res.Value.MismatchDetails);
-        Assert.DoesNotContain("Số điện thoại", res.Value.MismatchDetails); // điện thoại vẫn khớp
-    }
-
-    [Fact]
-    public async Task Different_phone_reports_only_phone_mismatch()
-    {
-        var (handler, accId) = Setup("Nguyễn Văn A — SĐT 0900000000.");
-
-        var res = await handler.Handle(Cmd(accId, "Nguyen Van A", "0912345678"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.False(res.Value.IsMatch);
-        Assert.Contains("Số điện thoại", res.Value.MismatchDetails);
-        Assert.DoesNotContain("Họ và tên", res.Value.MismatchDetails);     // tên vẫn khớp
-    }
-
-    [Fact]
-    public async Task Short_phone_is_ignored_and_only_name_is_checked()
-    {
-        var (handler, accId) = Setup("Nguyễn Văn A, kỹ sư backend.");
-
-        // Điện thoại 5 số (< 8) → bỏ qua hẳn; tên khớp → hợp lệ.
-        var res = await handler.Handle(Cmd(accId, "Nguyen Van A", "12345"), CancellationToken.None);
-
+        var uow = new InMemoryUnitOfWork().Seed(Account());
+        var parser = new StubDocumentParser { Text = MatchingCv };
+        var res = await Handler(uow, new RecordingFileStorage(), parser)
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, fileName), CancellationToken.None);
         Assert.True(res.IsSuccess);
         Assert.True(res.Value.IsMatch);
         Assert.Null(res.Value.MismatchDetails);
     }
 
     [Fact]
-    public async Task Unreadable_cv_text_is_treated_as_matching()
+    public async Task UTCID05_No_attachment_no_profile_cv()
     {
-        var (handler, accId) = Setup(cvText: ""); // CV scan/ảnh → parser trả rỗng
-
-        var res = await handler.Handle(Cmd(accId, "Bất Kỳ Ai", "0999999999"), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.True(res.Value.IsMatch);            // guard: không so được thì coi là hợp lệ
-        Assert.Null(res.Value.MismatchDetails);
-    }
-
-    // ---------- Nhánh lỗi tài khoản / CV ----------
-
-    [Fact]
-    public async Task Missing_account_is_unauthorized()
-    {
-        var uow = new InMemoryUnitOfWork(); // không seed tài khoản
-        var handler = Handler(uow, new RecordingFileStorage(), new StubDocumentParser());
-
-        var res = await handler.Handle(Cmd(Guid.NewGuid(), "A", "0900000000"), CancellationToken.None);
-
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: null));
+        var res = await Handler(uow, new RecordingFileStorage(), new StubDocumentParser())
+            .Handle(Cmd(null, null), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
-    }
-
-    [Fact]
-    public async Task No_attachment_and_no_profile_cv_fails_with_no_cv()
-    {
-        var acc = new CandidateAccount { Email = "cand@example.io", ProfileCvUrl = null };
-        var uow = new InMemoryUnitOfWork().Seed(acc);
-        var handler = Handler(uow, new RecordingFileStorage(), new StubDocumentParser());
-
-        var res = await handler.Handle(
-            new VerifyCvInfoCommand(acc.Id, "A", "0900000000", null, null), CancellationToken.None);
-
-        Assert.True(res.IsFailure);
+        Assert.Equal("Bạn cần tải CV lên hồ sơ hoặc đính kèm CV.", res.Error);
         Assert.Equal("no_cv", res.ErrorCode);
     }
 
     [Fact]
-    public async Task Profile_cv_that_reads_empty_fails_with_cv_unreadable()
+    public async Task UTCID06_Profile_cv_reads_empty()
     {
-        var acc = new CandidateAccount { Email = "cand@example.io", ProfileCvUrl = "stored/cv.pdf" };
-        var uow = new InMemoryUnitOfWork().Seed(acc);
-        var storage = new RecordingFileStorage { FileBytes = null }; // ReadAllBytes trả null
-        var handler = Handler(uow, storage, new StubDocumentParser());
-
-        var res = await handler.Handle(
-            new VerifyCvInfoCommand(acc.Id, "A", "0900000000", null, null), CancellationToken.None);
-
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf"));
+        var storage = new RecordingFileStorage { FileBytes = null };   // ReadAllBytes → null
+        var res = await Handler(uow, storage, new StubDocumentParser())
+            .Handle(Cmd(null, null), CancellationToken.None);
         Assert.True(res.IsFailure);
+        Assert.Equal("Không đọc được file CV trong hồ sơ. Vui lòng tải lại CV.", res.Error);
         Assert.Equal("cv_unreadable", res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID07_Valid_profile_cv_parsed_and_verified()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf"));
+        var storage = new RecordingFileStorage { FileBytes = new byte[] { 9, 9, 9 } };
+        var parser = new StubDocumentParser { Text = MatchingCv };
+        var res = await Handler(uow, storage, parser).Handle(Cmd(null, null), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value.IsMatch);
+    }
+
+    [Fact]
+    public async Task UTCID08_Parser_returns_null_treated_as_matching()
+    {
+        // cvText rỗng → không so được text → guard coi là hợp lệ (IsMatch true).
+        var uow = new InMemoryUnitOfWork().Seed(Account());
+        var res = await Handler(uow, new RecordingFileStorage(), new StubDocumentParser { Text = null! })
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value.IsMatch);
+    }
+
+    [Fact]
+    public async Task UTCID09_Parser_throws_treated_as_matching()
+    {
+        // Handler nuốt lỗi parse (best-effort) → cvText="" → guard hợp lệ. (Stub ném thông điệp cố định.)
+        var uow = new InMemoryUnitOfWork().Seed(Account());
+        var res = await Handler(uow, new RecordingFileStorage(), new StubDocumentParser { ThrowOnParse = true })
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.True(res.Value.IsMatch);
+    }
+
+    [Fact]
+    public async Task UTCID10_Mismatch_returns_not_match()
+    {
+        // Báo cáo ghi "Gemini failure"; thực tế handler chỉ trả IsMatch=false + chi tiết lệch (không có Result.Failure).
+        var uow = new InMemoryUnitOfWork().Seed(Account());
+        var parser = new StubDocumentParser { Text = "Hoàn toàn khác — 0000, nội dung không liên quan." };
+        var res = await Handler(uow, new RecordingFileStorage(), parser)
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None);
+        Assert.True(res.IsSuccess);
+        Assert.False(res.Value.IsMatch);
+        Assert.NotNull(res.Value.MismatchDetails);
+    }
+
+    [Fact]
+    public async Task UTCID11_Candidate_lookup_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailGetByIdFor<CandidateAccount>("Candidate DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, new RecordingFileStorage(), new StubDocumentParser())
+            .Handle(Cmd(new byte[] { 1, 2, 3 }, "cv.pdf"), CancellationToken.None));
+        Assert.Equal("Candidate DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID12_Profile_cv_read_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Account(profileCvUrl: "stored/cv.pdf"));
+        var storage = new RecordingFileStorage { ReadThrows = new Exception("Read Error") };
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow, storage, new StubDocumentParser())
+            .Handle(Cmd(null, "cv.pdf"), CancellationToken.None));
+        Assert.Equal("Read Error", ex.Message);
     }
 }
