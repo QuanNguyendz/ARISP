@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -19,31 +19,26 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Check,
   X,
-  Send,
   ScrollText,
 } from 'lucide-react'
 import jobService from '@ari/shared/fservices/job'
 import { applicationService } from '@ari/shared/fservices/application'
+import { hiringTeamService } from '@ari/shared/fservices/hiringTeam'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import InviteAndScheduleModal from '../../components/InviteAndScheduleModal'
-import { Pagination, Select } from '@ari/shared/ui'
+import CandidatePipeline from '@/components/jobCandidates/CandidatePipeline'
 import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
-import { resolveAssetUrl } from '@ari/shared/config/constants'
-import { appStatusBadge, appStatusLabel, initials, scoreColor } from '../recruiter/_jobUi'
+import { appStatusLabel } from '../recruiter/_jobUi'
+import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 
-function toLocalDateStr(d: string | Date | number | undefined | null): string {
-  if (!d) return ''
-  const dt = new Date(d)
-  if (isNaN(dt.getTime())) return ''
-  const yyyy = dt.getFullYear()
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
+/**
+ * Trạng thái mà nút Duyệt / Loại ở vòng CV còn thao tác được — giống hệt màn Recruiter.
+ * `hm_review` bắt buộc có: cổng duyệt của Hiring Manager (ADR-061) không đổi trạng thái hồ sơ,
+ * nên thiếu nó là hồ sơ kẹt ở cổng đã mở, không còn nút nào gọi được `AcceptApplicationCommand`.
+ */
 
 export default function JobPostingDetailPage() {
   const { t } = useTranslation('modules/hr/jobPostingDetail')
@@ -56,8 +51,6 @@ export default function JobPostingDetailPage() {
   const [apps, setApps] = useState<HrApplicationItem[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
   const [processingAppId, setProcessingAppId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('cv_review')
-  const [page, setPage] = useState<number>(1)
   const [selectedCoverLetter, setSelectedCoverLetter] = useState<{
     candidateName: string
     text: string
@@ -69,26 +62,15 @@ export default function JobPostingDetailPage() {
     cvFileUrl?: string | null
   } | null>(null)
 
-  const [cvDateFilter, setCvDateFilter] = useState<string>('')
-  const [cvStatusFilter, setCvStatusFilter] = useState<string>('all')
-  const [cvSortOrder, setCvSortOrder] = useState<string>('desc')
 
-  const [interviewDateFilter, setInterviewDateFilter] = useState<string>('')
-  const [interviewStatusFilter, setInterviewStatusFilter] = useState<string>('all')
-  const [interviewSortOrder, setInterviewSortOrder] = useState<string>('desc')
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchProcessing, setBatchProcessing] = useState<boolean>(false)
-  // Modal chọn ca dùng chung cho DUYỆT CV (mode 'accept') lẫn xếp lịch vòng sau (mode 'assign').
+  // Modal chọn ca — nay chỉ còn MỘT việc: xếp lịch (ADR-067 tách duyệt CV khỏi xếp lịch).
   const [inviteModalTarget, setInviteModalTarget] = useState<{
     applications: { id: string; name: string }[]
-    mode: 'accept' | 'assign'
     targetRound: number
   } | null>(null)
-
-  const activeRoundNumber = useMemo(() => {
-    return activeTab.startsWith('round_') ? parseInt(activeTab.replace('round_', ''), 10) : 0
-  }, [activeTab])
 
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -136,31 +118,32 @@ export default function JobPostingDetailPage() {
     }
   }, [load])
 
-  useEffect(() => {
-    setSelectedIds([])
-  }, [
-    activeTab,
-    cvDateFilter,
-    cvStatusFilter,
-    cvSortOrder,
-    interviewDateFilter,
-    interviewStatusFilter,
-    interviewSortOrder,
-  ])
-
-  // Duyệt hàng loạt cũng phải kèm lịch: mở modal chọn MỘT ca cho cả nhóm đã chọn.
-  const handleBatchAccept = () => {
+  // Duyệt hàng loạt = gửi cả nhóm sang bàn của Hiring Manager (ADR-067). Tuần tự để một hồ sơ
+  // hỏng không kéo đổ cả lô, và đếm riêng số thành công / thất bại.
+  const handleBatchAccept = async () => {
     if (selectedIds.length === 0) return
+    setBatchProcessing(true)
     setActionError(null)
     setNotice(null)
-    setInviteModalTarget({
-      applications: selectedIds.map((appId) => ({
-        id: appId,
-        name: apps.find((a) => a.id === appId)?.candidateName || t('candidate'),
-      })),
-      mode: 'accept',
-      targetRound: 1,
-    })
+    try {
+      let successCount = 0
+      let failCount = 0
+      for (const appId of selectedIds) {
+        try {
+          await hiringTeamService.requestHmApproval(appId)
+          successCount++
+        } catch {
+          failCount++
+        }
+      }
+      setNotice(t('notices.sentToHiringManagerBatch', { success: successCount, failed: failCount }))
+      setSelectedIds([])
+      await loadApps()
+    } catch {
+      setActionError(t('errors.acceptApplication'))
+    } finally {
+      setBatchProcessing(false)
+    }
   }
 
   const handleBatchReject = async () => {
@@ -190,7 +173,7 @@ export default function JobPostingDetailPage() {
   }
 
   // "Mời" hàng loạt = xếp lịch hàng loạt: thư mời chỉ có nghĩa khi kèm giờ hẹn (ADR-059).
-  const handleBatchInvite = () => {
+  const handleBatchInvite = (roundNumber: number) => {
     if (selectedIds.length === 0) return
     setActionError(null)
     setNotice(null)
@@ -199,22 +182,30 @@ export default function JobPostingDetailPage() {
         id: appId,
         name: apps.find((a) => a.id === appId)?.candidateName || t('candidate'),
       })),
-      mode: 'assign',
-      targetRound: activeRoundNumber > 0 ? activeRoundNumber : 1,
+      targetRound: roundNumber > 0 ? roundNumber : 1,
     })
   }
 
-  // Duyệt CV không còn gọi thẳng API: phải chọn khung giờ vòng 1 để ứng viên nhận được thư mời.
-  const handleAccept = (appId: string) => {
+  /**
+   * "Duyệt hồ sơ" ở bước sàng CV = đẩy hồ sơ sang bàn của Hiring Manager (ADR-067).
+   *
+   * KHÔNG kèm chọn ca nữa, và KHÔNG báo gì cho ứng viên: giờ hẹn chỉ xếp được sau khi HM duyệt và
+   * gửi khung giờ họ có mặt được. Tin chưa gán HM thì server tự đẩy thẳng sang bước chờ xếp lịch.
+   */
+  const handleAccept = async (appId: string) => {
+    setProcessingAppId(appId)
     setActionError(null)
     setNotice(null)
-    setInviteModalTarget({
-      applications: [
-        { id: appId, name: apps.find((a) => a.id === appId)?.candidateName || t('candidate') },
-      ],
-      mode: 'accept',
-      targetRound: 1,
-    })
+    try {
+      await hiringTeamService.requestHmApproval(appId)
+      setNotice(t('notices.sentToHiringManager'))
+      await loadApps()
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } }
+      setActionError(e?.response?.data?.message || t('errors.acceptApplication'))
+    } finally {
+      setProcessingAppId(null)
+    }
   }
 
   const handleReject = async (appId: string) => {
@@ -233,164 +224,16 @@ export default function JobPostingDetailPage() {
     }
   }
 
-  interface FunnelColumn {
-    id: string
-    title: string
-    subtitle?: string
-    candidates: HrApplicationItem[]
-  }
-
-  const columns = useMemo<FunnelColumn[]>(() => {
-    if (!job) return []
-
-    const cvReviewCandidates = apps.filter((a) => !a.currentRound || a.currentRound === 0)
-
-    const roundCols: FunnelColumn[] = (job.roundConfigs || [])
-      .slice()
-      .sort((a, b) => a.roundNumber - b.roundNumber)
-      .map((rc) => {
-        const candidates = apps.filter((a) => a.currentRound === rc.roundNumber)
-        const roundTypeStr = rc.roundType
-          ? rc.roundType.toLowerCase() === 'screening'
-            ? t('rounds.types.screening')
-            : rc.roundType.toLowerCase() === 'technical'
-              ? t('rounds.types.technical')
-              : rc.roundType.toLowerCase() === 'online_test'
-                ? t('rounds.types.onlineTest')
-                : rc.roundType
-          : ''
-        const typeText = roundTypeStr ? ` (${roundTypeStr})` : ''
-        return {
-          id: `round_${rc.roundNumber}`,
-          title: `${t('rounds.round', { number: rc.roundNumber })}${typeText}`,
-          subtitle:
-            rc.roundType === 'technical'
-              ? t('rounds.types.technical')
-              : rc.roundType === 'online_test'
-                ? t('rounds.types.onlineTest')
-                : t('rounds.types.screening'),
-          candidates,
-        }
-      })
-
-    return [
-      {
-        id: 'cv_review',
-        title: t('funnel.cvReview'),
-        subtitle: t('funnel.cvReviewSubtitle'),
-        candidates: cvReviewCandidates,
-      },
-      ...roundCols,
-    ]
-  }, [job, apps, t])
-
-  const tabs = useMemo(() => {
-    return columns.map((col) => ({
-      id: col.id,
-      label: col.title,
-      count: col.candidates.length,
-    }))
-  }, [columns])
-
-  const activeCandidates = useMemo(() => {
-    const col = columns.find((c) => c.id === activeTab)
-    return col ? col.candidates : []
-  }, [columns, activeTab])
-
-  const processedCandidates = useMemo(() => {
-    let result = [...activeCandidates]
-
-    if (activeTab === 'cv_review') {
-      if (cvDateFilter) {
-        result = result.filter((a) => toLocalDateStr(a.createdAt) === cvDateFilter)
-      }
-      if (cvStatusFilter && cvStatusFilter !== 'all') {
-        result = result.filter((a) => a.status === cvStatusFilter)
-      }
-      if (cvSortOrder === 'desc') {
-        result.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-      } else if (cvSortOrder === 'asc') {
-        result.sort((a, b) => (a.matchScore ?? 0) - (b.matchScore ?? 0))
-      }
-    } else {
-      if (interviewDateFilter) {
-        result = result.filter((a) => toLocalDateStr(a.interviewDate) === interviewDateFilter)
-      }
-      if (interviewStatusFilter && interviewStatusFilter !== 'all') {
-        result = result.filter((a) => a.status === interviewStatusFilter)
-      }
-      if (interviewSortOrder === 'desc') {
-        result.sort((a, b) => (b.interviewScore ?? 0) - (a.interviewScore ?? 0))
-      } else if (interviewSortOrder === 'asc') {
-        result.sort((a, b) => (a.interviewScore ?? 0) - (b.interviewScore ?? 0))
-      }
-    }
-
-    return result
-  }, [
-    activeCandidates,
-    activeTab,
-    cvDateFilter,
-    cvStatusFilter,
-    cvSortOrder,
-    interviewDateFilter,
-    interviewStatusFilter,
-    interviewSortOrder,
-  ])
-
-  const isSelectable = useCallback(
-    (a: HrApplicationItem) => {
-      if (activeTab === 'cv_review') {
-        return a.status === 'cv_submitted' || a.status === 'invited'
-      } else {
-        return !(
-          a.status === 'rejected' ||
-          a.status === 'failed' ||
-          a.status === 'not_pass' ||
-          a.status === 'cv_rejected' ||
-          a.status === 'pass' ||
-          (a.currentRound != null && activeRoundNumber > 0 && a.currentRound > activeRoundNumber)
-        )
-      }
-    },
-    [activeTab, activeRoundNumber]
-  )
-
-  const PAGE_SIZE = 12
-  const totalPages = Math.max(1, Math.ceil(processedCandidates.length / PAGE_SIZE))
-  const pagedCandidates = useMemo(() => {
-    return processedCandidates.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  }, [processedCandidates, page])
-
-  const pageSelectableCandidates = useMemo(() => {
-    return pagedCandidates.filter(isSelectable)
-  }, [pagedCandidates, isSelectable])
-
-  const isAllSelected = useMemo(() => {
-    if (pageSelectableCandidates.length === 0) return false
-    return pageSelectableCandidates.every((c) => selectedIds.includes(c.id))
-  }, [pageSelectableCandidates, selectedIds])
-
-  const handleSelectAll = useCallback(() => {
-    if (isAllSelected) {
-      setSelectedIds((prev) =>
-        prev.filter((id) => !pageSelectableCandidates.some((c) => c.id === id))
-      )
-    } else {
-      setSelectedIds((prev) => {
-        const newIds = pageSelectableCandidates.map((c) => c.id).filter((id) => !prev.includes(id))
-        return [...prev, ...newIds]
-      })
-    }
-  }, [isAllSelected, pageSelectableCandidates])
-
+  /**
+   * Bỏ chọn khi danh sách hồ sơ đổi (vừa duyệt/loại xong). Trả lại CHÍNH `prev` khi không bỏ ai —
+   * `filter` luôn sinh mảng mới, mà mảng mới là một lần render nữa: đủ để thành vòng lặp vô hạn.
+   */
   useEffect(() => {
-    setPage(1)
-  }, [activeTab])
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
+    setSelectedIds((prev) => {
+      const next = prev.filter((cid) => apps.some((a) => a.id === cid))
+      return next.length === prev.length ? prev : next
+    })
+  }, [apps])
 
   const approve = async () => {
     if (!id) return
@@ -959,435 +802,76 @@ export default function JobPostingDetailPage() {
                 <p className="text-sm text-ink-500 dark:text-ink-400">{t('rounds.noConfig')}</p>
               )}
             </motion.div>
+
+            {/* Đội tuyển dụng + ký duyệt mô tả công việc (ADR-061). HR Admin quản lý được đội của
+                mọi tin, nên canManage cố định true ở khu vực này. */}
+            <HiringTeamPanel
+              jobPostingId={job.id}
+              hmSignOffStatus={job.hmSignOffStatus}
+              hmSignOffReason={job.hmSignOffReason}
+              canManage
+              onChanged={() => void load()}
+            />
           </div>
         </div>
 
         <div className="mt-12 space-y-6">
-          <div className="flex items-center justify-between border-b border-ink-200 dark:border-white/10 pb-4">
+          <div className="flex items-center justify-between border-b border-ink-200 pb-4 dark:border-white/10">
             <div>
-              <h2 className="text-2xl font-bold text-ink-900 dark:text-white flex items-center gap-2">
-                <Target className="w-6 h-6 text-brand-600 dark:text-brand-400" />{' '}
-                {t('funnel.title')}
+              <h2 className="flex items-center gap-2 text-2xl font-bold text-ink-900 dark:text-white">
+                <Target className="h-6 w-6 text-brand-600 dark:text-brand-400" /> {t('funnel.title')}
               </h2>
-              <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">
-                {t('funnel.description')}
-              </p>
+              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('funnel.description')}</p>
             </div>
-            <span className="px-3 py-1 bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 rounded-full text-xs font-semibold">
+            <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
               {t('funnel.total', { count: apps.length })}
             </span>
           </div>
 
-          {loadingApps ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-brand-600 dark:text-brand-400" />
-              <span className="ml-2 text-sm text-ink-600 dark:text-ink-400">{t('loading')}</span>
-            </div>
-          ) : apps.length === 0 ? (
-            <div className="text-center py-12 rounded-2xl border border-dashed border-ink-300 dark:border-white/10 bg-white dark:bg-white/5">
-              <p className="text-ink-500 dark:text-ink-400">{t('noCandidates')}</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === tab.id ? 'bg-brand-600 text-white shadow-sm' : 'border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/10'}`}
-                  >
-                    {tab.label} ({tab.count})
-                  </button>
-                ))}
-              </div>
+          {/*
+            Cùng khối quy trình với màn tin của Recruiter và Hiring Manager. Ba màn nhìn cùng một
+            phễu là điều kiện để ba vai trò bàn về cùng một bức tranh — và là một chỗ để sửa thay vì
+            ba (bài học gộp hai màn Phỏng vấn ở ADR-058).
 
-              <div className="flex flex-wrap items-end justify-between gap-4 mb-6 p-4 rounded-2xl border border-ink-200 dark:border-white/10 bg-ink-50/50 dark:bg-white/5">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                      {activeTab === 'cv_review'
-                        ? t('filters.byDate')
-                        : t('filters.byInterviewDate')}
-                    </span>
-                    <input
-                      type="date"
-                      value={activeTab === 'cv_review' ? cvDateFilter : interviewDateFilter}
-                      onChange={(e) => {
-                        if (activeTab === 'cv_review') setCvDateFilter(e.target.value)
-                        else setInterviewDateFilter(e.target.value)
-                      }}
-                      className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:border-brand-500"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                      {t('filters.byStatus')}
-                    </span>
-                    <Select
-                      value={activeTab === 'cv_review' ? cvStatusFilter : interviewStatusFilter}
-                      onChange={(v) => {
-                        if (activeTab === 'cv_review') setCvStatusFilter(v)
-                        else setInterviewStatusFilter(v)
-                      }}
-                      ariaLabel={t('filters.byStatus')}
-                      className="min-w-[11rem]"
-                      buttonClassName="rounded-lg px-3 py-1.5 text-xs"
-                      options={[
-                        { value: 'all', label: t('filters.allStatus') },
-                        ...(activeTab === 'cv_review'
-                          ? [
-                              { value: 'cv_submitted', label: t('funnel.cvSubmitted') },
-                              { value: 'invited', label: t('funnel.invited') },
-                              { value: 'cv_rejected', label: t('funnel.cvRejected') },
-                            ]
-                          : [
-                              { value: 'invited', label: t('funnel.waiting') },
-                              { value: 'screening', label: t('funnel.waitingSchedule') },
-                              { value: 'interview', label: t('funnel.interview') },
-                              { value: 'pass', label: t('funnel.pass') },
-                              { value: 'not_pass', label: t('funnel.notPass') },
-                              { value: 'withdrawn', label: t('funnel.withdrawn') },
-                            ]),
-                      ]}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">
-                      {activeTab === 'cv_review'
-                        ? t('filters.sortByMatch')
-                        : t('filters.sortByScore')}
-                    </span>
-                    <Select
-                      value={activeTab === 'cv_review' ? cvSortOrder : interviewSortOrder}
-                      onChange={(v) => {
-                        if (activeTab === 'cv_review') setCvSortOrder(v)
-                        else setInterviewSortOrder(v)
-                      }}
-                      className="min-w-[10rem]"
-                      buttonClassName="rounded-lg px-3 py-1.5 text-xs"
-                      options={[
-                        { value: 'desc', label: t('filters.sortOptions.desc') },
-                        { value: 'asc', label: t('filters.sortOptions.asc') },
-                        { value: 'default', label: t('filters.sortOptions.default') },
-                      ]}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {selectedIds.length > 0 && (
-                <div className="flex items-center justify-between p-4 mb-4 rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 dark:bg-brand-500/10 backdrop-blur-sm animate-fade-in">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-brand-900 dark:text-brand-400">
-                      {t('batchActions.selected', { count: selectedIds.length })}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {activeTab === 'cv_review' ? (
-                      <>
-                        <button
-                          disabled={batchProcessing}
-                          onClick={handleBatchAccept}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
-                        >
-                          {batchProcessing ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
-                          )}{' '}
-                          {t('batchActions.acceptBatch')}
-                        </button>
-                        <button
-                          disabled={batchProcessing}
-                          onClick={handleBatchReject}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-all disabled:opacity-50"
-                        >
-                          <X className="w-3.5 h-3.5" /> {t('batchActions.rejectBatch')}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        disabled={batchProcessing}
-                        onClick={handleBatchInvite}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
-                      >
-                        {batchProcessing ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5" />
-                        )}{' '}
-                        {t('batchActions.inviteBatch')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {processedCandidates.length === 0 ? (
-                <div className="text-center py-12 rounded-2xl border border-dashed border-ink-300 dark:border-white/10 bg-white dark:bg-white/5">
-                  <p className="text-ink-500 dark:text-ink-400">{t('noFilterResults')}</p>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-card">
-                  <div
-                    className={`grid gap-4 px-5 py-3 border-b border-ink-200 dark:border-white/10 bg-ink-50/80 dark:bg-white/5 text-xs font-semibold text-ink-500 dark:text-ink-400 items-center ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
-                  >
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        disabled={pageSelectableCandidates.length === 0}
-                        onChange={handleSelectAll}
-                        className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
-                      />
-                    </div>
-                    <div>{t('table.candidate')}</div>
-                    {activeTab === 'cv_review' ? (
-                      <div className="text-center">{t('table.appliedDate')}</div>
-                    ) : (
-                      <div className="text-center">{t('table.interviewSchedule')}</div>
-                    )}
-                    {activeTab === 'cv_review' ? (
-                      <div className="text-center">{t('table.noticePeriod')}</div>
-                    ) : (
-                      <div className="text-center">{t('table.interviewScore')}</div>
-                    )}
-                    {activeTab === 'cv_review' ? (
-                      <div className="text-center">{t('table.matchScore')}</div>
-                    ) : null}
-                    <div className="text-center">{t('table.status')}</div>
-                    <div className="text-center">{t('table.actions')}</div>
-                  </div>
-
-                  <div className="divide-y divide-ink-100 dark:divide-white/10">
-                    {pagedCandidates.map((a: HrApplicationItem) => (
-                      <div
-                        key={a.id}
-                        className={`grid items-center gap-4 px-5 py-3 hover:bg-ink-50/50 dark:hover:bg-white-[0.02] transition-colors ${activeTab === 'cv_review' ? 'grid-cols-[40px_minmax(180px,1.5fr)_110px_110px_100px_120px_230px]' : 'grid-cols-[40px_minmax(180px,1.5fr)_180px_110px_120px_230px]'}`}
-                      >
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(a.id)}
-                            disabled={!isSelectable(a) || batchProcessing}
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedIds((prev) => [...prev, a.id])
-                              else setSelectedIds((prev) => prev.filter((id) => id !== a.id))
-                            }}
-                            className="rounded border-ink-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                          />
-                        </div>
-                        <div
-                          onClick={() => navigate(`/hr/candidates/${a.id}`)}
-                          className="flex items-center gap-3 min-w-0 cursor-pointer group"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 flex items-center justify-center text-sm font-bold shrink-0">
-                            {initials(a.candidateName)}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-semibold text-sm text-ink-900 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                              {a.candidateName}
-                            </h4>
-                            <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">
-                              {a.candidateEmail}
-                            </p>
-                          </div>
-                        </div>
-                        {activeTab === 'cv_review' ? (
-                          <>
-                            <div className="text-center text-xs text-ink-600 dark:text-ink-300">
-                              {new Date(a.createdAt).toLocaleDateString()}
-                            </div>
-                            <div
-                              className="text-center text-xs text-ink-600 dark:text-ink-300 truncate"
-                              title={a.noticePeriod || undefined}
-                            >
-                              {a.noticePeriod || t('table.notProvided')}
-                            </div>
-                            <div className="text-center">
-                              {a.matchScore != null ? (
-                                <span className={`text-sm font-bold ${scoreColor(a.matchScore)}`}>
-                                  {a.matchScore}%
-                                </span>
-                              ) : (
-                                <span className="text-ink-400 text-sm font-medium">
-                                  {t('table.notProvided')}
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-center text-xs text-ink-600 dark:text-ink-300">
-                              {a.interviewDate ? (
-                                new Date(a.interviewDate).toLocaleString(undefined, {
-                                  dateStyle: 'short',
-                                  timeStyle: 'short',
-                                })
-                              ) : (
-                                <span className="text-ink-400 italic">
-                                  {t('table.notScheduled')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-center">
-                              {a.interviewScore != null ? (
-                                <span className="text-sm font-bold text-brand-600 dark:text-brand-400">
-                                  {a.interviewScore}
-                                </span>
-                              ) : (
-                                <span className="text-ink-400 text-sm font-medium">
-                                  {t('table.notProvided')}
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        )}
-                        <div className="text-center flex flex-col items-center justify-center gap-1">
-                          <span
-                            className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${appStatusBadge(a.status)} whitespace-nowrap`}
-                          >
-                            {appStatusLabel(a.status)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-center gap-1 shrink-0">
-                          <div className="w-36 flex gap-2 shrink-0 justify-center">
-                            {!a.currentRound || a.currentRound === 0 ? (
-                              <>
-                                <button
-                                  disabled={
-                                    processingAppId != null ||
-                                    (a.status !== 'cv_submitted' && a.status !== 'invited') ||
-                                    batchProcessing
-                                  }
-                                  onClick={() => handleAccept(a.id)}
-                                  title={t('actions.accept')}
-                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
-                                >
-                                  {processingAppId === a.id ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Check className="w-3 h-3" />
-                                  )}{' '}
-                                  {t('actions.accept')}
-                                </button>
-                                <button
-                                  disabled={
-                                    processingAppId != null ||
-                                    (a.status !== 'cv_submitted' && a.status !== 'invited') ||
-                                    batchProcessing
-                                  }
-                                  onClick={() => handleReject(a.id)}
-                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                >
-                                  <X className="w-3 h-3" /> {t('actions.reject')}
-                                </button>
-                              </>
-                            ) : a.status === 'not_pass' || a.status === 'cv_rejected' || a.status === 'failed' || a.status === 'rejected' ? (
-                              <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 font-medium text-xs rounded-lg whitespace-nowrap">
-                                Đã loại (Không đạt)
-                              </span>
-                            ) : a.status === 'pass' ? (
-                              <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium text-xs rounded-lg whitespace-nowrap">
-                                Trúng tuyển
-                              </span>
-                            ) : (
-                              <div className="flex gap-2 w-full">
-                                <button
-                                  onClick={() => {
-                                    const targetRound = activeRoundNumber > 0 ? activeRoundNumber : (a.currentRound && a.currentRound > 0 ? a.currentRound : 1)
-                                    setInviteModalTarget({
-                                      applications: [
-                                        { id: a.id, name: a.candidateName || t('candidate') },
-                                      ],
-                                      mode: 'assign',
-                                      targetRound,
-                                    })
-                                  }}
-                                  disabled={
-                                    inviteModalTarget?.applications.some((x) => x.id === a.id) ||
-                                    (a.currentRound != null &&
-                                      activeRoundNumber > 0 &&
-                                      a.currentRound > activeRoundNumber) ||
-                                    batchProcessing
-                                  }
-                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 text-xs bg-brand-600 text-white hover:bg-brand-700 rounded-lg transition-colors font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                >
-                                  {inviteModalTarget?.applications.some((x) => x.id === a.id) ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Send className="w-3 h-3" />
-                                  )}{' '}
-                                  {t('actions.invite')}
-                                </button>
-                                <button
-                                  disabled={
-                                    processingAppId != null ||
-                                    batchProcessing
-                                  }
-                                  onClick={() => handleReject(a.id)}
-                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                  title="Loại ứng viên khỏi quy trình tuyển dụng"
-                                >
-                                  <X className="w-3 h-3" /> {t('actions.reject')}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          {a.cvFileUrl ? (
-                            <button
-                              onClick={() =>
-                                openDocument(
-                                  resolveAssetUrl(a.cvFileUrl!),
-                                  `${a.candidateName} - CV`
-                                )
-                              }
-                              title={t('actions.viewCv')}
-                              className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <div className="w-8 h-8 shrink-0" />
-                          )}
-                          <button
-                            onClick={() =>
-                              setSelectedCoverLetter({
-                                candidateName: a.candidateName,
-                                text: a.coverLetter || '',
-                                email: a.candidateEmail,
-                                phone: a.candidatePhone,
-                                noticePeriod: a.noticePeriod,
-                                cvJdSummary: a.cvJdSummary,
-                                matchScore: a.matchScore,
-                                cvFileUrl: a.cvFileUrl,
-                              })
-                            }
-                            title={t('actions.viewCoverLetter')}
-                            className="p-2 text-ink-400 hover:text-brand-600 hover:bg-ink-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                          >
-                            <ScrollText className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {processedCandidates.length > 0 && (
-                <div className="mt-6">
-                  <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    total={activeCandidates.length}
-                    label={t('paginationLabel')}
-                    onPageChange={setPage}
-                  />
-                </div>
-              )}
-            </>
-          )}
+            HR Leader có đủ thao tác vận hành ở đây vì họ là người chốt dự phòng khi tin chưa gán
+            Hiring Manager (ADR-061); server vẫn kiểm lại từng lệnh.
+          */}
+          <CandidatePipeline
+            apps={apps}
+            rounds={job.roundConfigs || []}
+            loading={loadingApps}
+            processingAppId={processingAppId}
+            onApprove={(a) => handleAccept(a.id)}
+            onReject={(a) => void handleReject(a.id)}
+            onInvite={(a) =>
+              setInviteModalTarget({
+                applications: [{ id: a.id, name: a.candidateName || t('candidate') }],
+                          targetRound: a.currentRound && a.currentRound > 0 ? a.currentRound : 1,
+              })
+            }
+            isInvitePending={(a) =>
+              inviteModalTarget?.applications.some((x) => x.id === a.id) ?? false
+            }
+            candidateHref={(a) => `/hr/candidates/${a.id}`}
+            statusLabel={appStatusLabel}
+            selectedIds={selectedIds}
+            onToggleSelect={(cid) =>
+              setSelectedIds((prev) =>
+                prev.includes(cid) ? prev.filter((x) => x !== cid) : [...prev, cid]
+              )
+            }
+            onToggleSelectAll={(idsOnScreen, allSelected) =>
+              setSelectedIds((prev) =>
+                allSelected
+                  ? prev.filter((cid) => !idsOnScreen.includes(cid))
+                  : [...prev, ...idsOnScreen.filter((cid) => !prev.includes(cid))]
+              )
+            }
+            onBatchApprove={handleBatchAccept}
+            onBatchReject={() => void handleBatchReject()}
+            onBatchInvite={handleBatchInvite}
+            batchBusy={batchProcessing}
+          />
         </div>
       </motion.div>
 
@@ -1551,7 +1035,6 @@ export default function JobPostingDetailPage() {
       {inviteModalTarget && id && (
         <InviteAndScheduleModal
           applications={inviteModalTarget.applications}
-          mode={inviteModalTarget.mode}
           jobPostingId={id}
           targetRoundNumber={inviteModalTarget.targetRound}
           onClose={() => setInviteModalTarget(null)}

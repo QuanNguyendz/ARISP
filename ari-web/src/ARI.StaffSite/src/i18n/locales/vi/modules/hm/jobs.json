@@ -1,0 +1,61 @@
+{
+  "title": "Tin tuyển dụng của tôi",
+  "description": "Các tin bạn được thêm vào đội tuyển dụng với vai trò Hiring Manager.",
+  "loading": "Đang tải danh sách tin...",
+  "loadError": "Không tải được danh sách tin tuyển dụng. Vui lòng thử lại.",
+  "emptyTitle": "Bạn chưa được giao tin nào",
+  "emptyDescription": "Khi bộ phận tuyển dụng thêm bạn vào đội của một tin, tin đó sẽ hiện ở đây.",
+  "noDepartment": "Chưa có phòng ban",
+  "applicantCount_one": "{{count}} ứng viên",
+  "applicantCount_other": "{{count}} ứng viên",
+  "status": {
+    "draft": "Bản nháp",
+    "pending": "Chờ duyệt",
+    "active": "Đang tuyển",
+    "rejected": "Bị từ chối",
+    "closed": "Đã đóng",
+    "archived": "Đã lưu trữ"
+  },
+  "detail": {
+    "back": "Quay lại danh sách tin",
+    "salaryNegotiable": "Lương thoả thuận",
+    "jdTitle": "Mô tả công việc",
+    "candidatesTitle": "Ứng viên của tin",
+    "candidatesDescription": "Bấm vào một ứng viên để duyệt hồ sơ, xem kết quả phỏng vấn hoặc soạn thư mời.",
+    "noCandidates": "Chưa có ứng viên",
+    "noCandidatesDescription": "Ứng viên nộp hồ sơ vào tin này sẽ hiện ở đây.",
+    "jdFileTitle": "Bản mô tả công việc",
+    "jdFileFallbackName": "File JD",
+    "jdFileHint": "Xem kỹ file này trước khi ký duyệt — ký duyệt xong là tin được đăng.",
+    "approveTitle": "Duyệt hồ sơ và gửi lịch rảnh",
+    "rejectTitle": "Từ chối hồ sơ",
+    "availabilityLabel": "Khung giờ bạn có thể tham gia phỏng vấn (vòng 1)",
+    "availabilityHint": "Recruiter sẽ xếp ca cho ứng viên nằm trọn trong những khung này. Việc chốt giờ cụ thể với ứng viên (SMS, Zalo…) diễn ra ngoài hệ thống.",
+    "rejectReasonLabel": "Lý do từ chối",
+    "rejectReasonPlaceholder": "Ví dụ: chưa đủ kinh nghiệm mảng thanh toán.",
+    "confirmApprove": "Duyệt và gửi lịch",
+    "confirmReject": "Xác nhận từ chối",
+    "cancel": "Huỷ",
+    "decisionError": "Không ghi được quyết định. Vui lòng thử lại.",
+    "runningWindows": "Khung giờ đã khai và đang diễn ra (không sửa ở đây, vẫn còn hiệu lực):"
+  },
+  "applicationStatus": {
+    "invited": "Đã mời",
+    "cv_submitted": "Chờ sàng lọc",
+    "hm_review": "Chờ bạn duyệt",
+    "screening": "Vòng sơ loại",
+    "interview": "Đang phỏng vấn",
+    "pass": "Đạt",
+    "not_pass": "Không đạt",
+    "cv_rejected": "Loại từ vòng CV",
+    "offer": "Đã gửi thư mời",
+    "hired": "Đã nhận việc",
+    "offer_declined": "Từ chối thư mời",
+    "withdrawn": "Đã rút hồ sơ"
+  },
+  "signOffBadge": {
+    "pending": "Chờ bạn ký duyệt",
+    "rejected": "Bạn đã yêu cầu sửa"
+  },
+  "needsSignOff": "Chờ bạn ký duyệt"
+}

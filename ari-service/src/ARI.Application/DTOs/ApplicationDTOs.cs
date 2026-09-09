@@ -45,6 +45,18 @@ namespace ARI.Application.DTOs
         public DateTimeOffset CreatedAt { get; set; }
         public Guid? CvJdAnalysisId { get; set; }
 
+        /// <summary>
+        /// Cổng duyệt của Hiring Manager (ADR-061): pending | approved | rejected | bypassed.
+        /// Null = chưa gửi duyệt. Giao diện dùng cột này để biết bật/tắt nút xếp lịch — trạng thái
+        /// <c>hm_review</c> một mình KHÔNG nói được cổng đã mở hay chưa.
+        /// </summary>
+        public string? HmDecision { get; set; }
+
+        /// <summary>Ghi chú của người quyết định: lý do từ chối, hoặc lý do vượt cổng.</summary>
+        public string? HmDecisionNote { get; set; }
+
+        public DateTimeOffset? HmDecidedAt { get; set; }
+
         /// <summary>Điểm phù hợp CV–JD (0–100) lấy từ cv_jd_analyses nếu có. Null nếu chưa phân tích.</summary>
         public int? MatchScore { get; set; }
 
@@ -66,6 +78,15 @@ namespace ARI.Application.DTOs
 
         /// <summary>Vòng hiện tại của ứng viên (null nếu ở giai đoạn CV ứng tuyển)</summary>
         public int? CurrentRound { get; set; }
+
+        /// <summary>
+        /// Việc đang thật sự diễn ra ở vòng hiện tại — xem <c>ApplicationStageStatus</c>.
+        ///
+        /// <see cref="Status"/> chỉ nói hồ sơ ở KHÚC nào của phễu, nên suốt cả một vòng nó đứng yên
+        /// ở "interview" trong khi thực tế đã đi qua xếp lịch → xác nhận → làm bài/vào phòng → chờ
+        /// chốt. Cột này SUY RA từ dữ liệu, không lưu thêm ở DB.
+        /// </summary>
+        public string? StageStatus { get; set; }
 
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }

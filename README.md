@@ -51,7 +51,6 @@ Nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Job Board IT
 | **CV Analysis** | Google Gemini 2.5 Flash (CV-JD Match Score) |
 | **STT** | Google Speech-to-Text (streaming real-time) |
 | **TTS** | ElevenLabs Flash v2.5 (streaming) |
-| **Avatar** | HeyGen Streaming Avatar – Hybrid Idle Strategy |
 | **Realtime** | WebRTC (media stream), SignalR (session events) |
 | **Cache** | Redis |
 | **Containers** | Docker, Docker Compose |
@@ -167,7 +166,7 @@ Chi tiết ADR và quyết định kiến trúc: xem [`.ai/architecture.md`](.ai
 
 **Latency target (Streaming-First):**
 ```
-Candidate nói xong → VAD → STT (300ms) → RAG (parallel) → GPT-4o stream (400–800ms) → ElevenLabs TTS (150–300ms) → HeyGen Avatar
+Candidate nói xong → VAD → STT (300ms) → RAG (parallel) → GPT-4o stream (400–800ms) → ElevenLabs TTS (150–300ms) → WebAudio
 Tổng: ~1–1.8 giây
 ```
 
@@ -246,7 +245,7 @@ Type: `feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `setup`
 ### Phase 3 – Interview Code & Kiosk
 - [x] Tạo & quản lý Interview Code (6 ký tự, one-time-use, TTL 2h) – backend
 - [ ] Đặt lịch phỏng vấn thử (Availability Slots)
-- [ ] Frontend On-site Kiosk Mode
+- [x] Frontend máy trạm phỏng vấn On-site (*Kiosk*) – nhập mã, kiểm tra thiết bị, ghi hình, chế độ khoá màn hình (ADR-052/054/062)
 
 ### Phase 4 – AI Interview Core
 - [x] Domain entities (22 entities), IAIProvider + IEmbeddingProvider, pgvector
@@ -271,7 +270,6 @@ Type: `feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `setup`
 ### Phase 7 – Media & Realtime
 - [ ] VAD + Google STT streaming
 - [ ] ElevenLabs TTS streaming
-- [ ] HeyGen Streaming Avatar + Hybrid Idle Strategy
 - [ ] Recording lưu trữ
 
 ### Phase 8 – Cheat Detection

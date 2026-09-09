@@ -232,7 +232,26 @@ namespace ARI.Infrastructure.Services
                 CandidateAccountId = row.CandidateAccountId,
                 JobPostingId = row.JobPostingId,
                 JobOwnerUserId = row.OwnerUserId,
+                HiringTeamUserIds = await HiringTeamUserIdsAsync(db, row.JobPostingId, ct),
             };
+        }
+
+        /// <summary>
+        /// Thành viên đội tuyển dụng của tin (ADR-061) — Hiring Manager và người được mời vào đội.
+        /// KHÔNG dùng IgnoreQueryFilters: người đã bị gỡ khỏi đội (soft delete) mất quyền đọc ngay
+        /// ở API, nên họ cũng phải ngừng nhận sự kiện realtime ngay — nếu không, kênh realtime sẽ
+        /// rộng hơn quyền thật, tức là một đường rò song song với API.
+        /// </summary>
+        private static async Task<IReadOnlyList<Guid>> HiringTeamUserIdsAsync(
+            AriDbContext db, Guid? jobPostingId, CancellationToken ct)
+        {
+            if (jobPostingId is not { } jobId) return Array.Empty<Guid>();
+
+            return await db.Set<JobHiringTeamMember>()
+                .Where(m => m.JobPostingId == jobId)
+                .Select(m => m.UserId)
+                .Distinct()
+                .ToListAsync(ct);
         }
 
         /// <summary>
@@ -259,6 +278,7 @@ namespace ARI.Infrastructure.Services
             {
                 JobPostingId = row.Id,
                 JobOwnerUserId = row.CreatedByUserId,
+                HiringTeamUserIds = await HiringTeamUserIdsAsync(db, row.Id, ct),
             };
         }
 

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Departments;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
@@ -88,7 +89,7 @@ namespace ARI.Application.Auth
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role,
-                Department = user.Department,
+                Department = await DepartmentLookup.NameForUserAsync(_unitOfWork, user.DepartmentId, ct),
                 LastLoginAt = user.LastLoginAt,
                 CreatedAt = user.CreatedAt,
                 // Tài khoản đăng nhập bằng Google chưa từng đặt mật khẩu — FE dựa vào cờ này để
@@ -99,11 +100,17 @@ namespace ARI.Application.Auth
     }
 
     /// <summary>
-    /// Sửa hồ sơ cá nhân. CỐ Ý chỉ cho đổi họ tên và phòng ban: email là danh tính đăng nhập
-    /// (khớp `allowed_email_domains` + tài khoản Google), còn vai trò do Super Admin cấp —
-    /// cho nhân sự tự đổi hai thứ đó là mở đường nâng quyền.
+    /// Sửa hồ sơ cá nhân. CỐ Ý chỉ cho đổi HỌ TÊN.
+    ///
+    /// Email là danh tính đăng nhập (khớp `allowed_email_domains` + tài khoản Google) và vai trò do
+    /// Super Admin cấp — cho nhân sự tự đổi hai thứ đó là mở đường nâng quyền.
+    ///
+    /// <b>Phòng ban đã bị GỠ khỏi đây (ADR-065).</b> Trước đây nhân viên tự sửa được, nên ô "đội"
+    /// khoá cứng trên phiếu yêu cầu tuyển dụng chỉ là hình thức: Hiring Manager của đội A chỉ cần
+    /// vào Cài đặt đổi sang đội B rồi quay ra lập phiếu. Gỡ ở giao diện thôi là chưa đủ — lệnh này
+    /// không được NHẬN tham số đó, nếu không một request tự dựng vẫn đổi được.
     /// </summary>
-    public record UpdateStaffProfileCommand(Guid UserId, string FullName, string? Department)
+    public record UpdateStaffProfileCommand(Guid UserId, string FullName)
         : IRequest<Result<StaffProfileDto>>;
 
     public class UpdateStaffProfileCommandHandler : IRequestHandler<UpdateStaffProfileCommand, Result<StaffProfileDto>>
@@ -127,7 +134,6 @@ namespace ARI.Application.Auth
             if (user == null) return Result.Failure<StaffProfileDto>("Không tìm thấy tài khoản", CommonErrorCodes.NotFound);
 
             user.FullName = fullName;
-            user.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
             user.UpdatedAt = DateTimeOffset.UtcNow;
 
             _unitOfWork.Repository<User>().Update(user);
@@ -139,7 +145,7 @@ namespace ARI.Application.Auth
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role,
-                Department = user.Department,
+                Department = await DepartmentLookup.NameForUserAsync(_unitOfWork, user.DepartmentId, ct),
                 LastLoginAt = user.LastLoginAt,
                 CreatedAt = user.CreatedAt,
                 HasPassword = !string.IsNullOrEmpty(user.PasswordHash)

@@ -1,0 +1,61 @@
+{
+  "title": "My job postings",
+  "description": "Jobs whose hiring team you belong to as Hiring Manager.",
+  "loading": "Loading job postings...",
+  "loadError": "Could not load job postings. Please try again.",
+  "emptyTitle": "No jobs assigned to you yet",
+  "emptyDescription": "Once recruiting adds you to a job's hiring team, it will appear here.",
+  "noDepartment": "No department",
+  "applicantCount_one": "{{count}} applicant",
+  "applicantCount_other": "{{count}} applicants",
+  "status": {
+    "draft": "Draft",
+    "pending": "Pending approval",
+    "active": "Hiring",
+    "rejected": "Rejected",
+    "closed": "Closed",
+    "archived": "Archived"
+  },
+  "detail": {
+    "back": "Back to my jobs",
+    "salaryNegotiable": "Negotiable",
+    "jdTitle": "Job description",
+    "candidatesTitle": "Candidates",
+    "candidatesDescription": "Open a candidate to approve them, read the interview report, or draft an offer.",
+    "noCandidates": "No candidates yet",
+    "noCandidatesDescription": "People who apply to this job will appear here.",
+    "jdFileTitle": "Job description file",
+    "jdFileFallbackName": "JD file",
+    "jdFileHint": "Review this file before signing off — your sign-off publishes the posting.",
+    "approveTitle": "Approve and send your availability",
+    "rejectTitle": "Reject this application",
+    "availabilityLabel": "Times you can attend the interview (round 1)",
+    "availabilityHint": "The recruiter will only book slots that fall entirely inside these windows. Agreeing on an exact time with the candidate (SMS, Zalo…) happens outside the system.",
+    "rejectReasonLabel": "Reason for rejecting",
+    "rejectReasonPlaceholder": "e.g. not enough experience with payments.",
+    "confirmApprove": "Approve and send availability",
+    "confirmReject": "Confirm rejection",
+    "cancel": "Cancel",
+    "decisionError": "Could not record the decision. Please try again.",
+    "runningWindows": "Windows already declared and currently running (not editable here, still in effect):"
+  },
+  "applicationStatus": {
+    "invited": "Invited",
+    "cv_submitted": "Awaiting screening",
+    "hm_review": "Awaiting your approval",
+    "screening": "Screening round",
+    "interview": "Interviewing",
+    "pass": "Passed",
+    "not_pass": "Not passed",
+    "cv_rejected": "Rejected at CV stage",
+    "offer": "Offer sent",
+    "hired": "Hired",
+    "offer_declined": "Offer declined",
+    "withdrawn": "Withdrawn"
+  },
+  "signOffBadge": {
+    "pending": "Awaiting your sign-off",
+    "rejected": "You requested changes"
+  },
+  "needsSignOff": "Waiting for your sign-off"
+}

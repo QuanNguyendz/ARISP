@@ -78,6 +78,56 @@ public class AssignSlotCommandHandlerTests
         Assert.Contains(notif.UserEvents, e => e.UserId == _accountId && e.EventType == "ReceiveUserNotification");
     }
 
+    /// <summary>
+    /// Cổng duyệt shortlist của Hiring Manager (ADR-061) phải chặn được việc xếp lịch.
+    ///
+    /// Bản cũ liệt kê TAY 5 chuỗi trạng thái nên `hm_review` lọt qua: chủ tin gửi hồ sơ cho HM duyệt
+    /// rồi vẫn xếp được ca và gửi thư mời trong khi HM chưa quyết định gì — đúng thứ mà cổng sinh ra
+    /// để chặn. Tệ hơn: vì trạng thái không phải `screening` nên handler cũng không nhấc nó lên,
+    /// hồ sơ nằm lại `hm_review` vĩnh viễn kể cả sau khi phỏng vấn xong.
+    /// </summary>
+    [Fact]
+    public async Task Khong_xep_lich_duoc_khi_dang_cho_hiring_manager_duyet()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var job = SchedulingData.Job(owner: _staffId);
+        var app = SchedulingData.Application(job.Id, _accountId, status: ApplicationStatuses.HmReview);
+        var slot = SchedulingData.Slot(job.Id, round: 1);
+        uow.Seed(job).Seed(app).Seed(slot);
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, slot.Id));
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(ApplicationStatuses.HmReview, app.Status);
+        Assert.Empty(uow.Repo<InterviewBooking>().Items);
+    }
+
+    /// <summary>
+    /// Hồ sơ đã đóng không được xếp vào ca phỏng vấn nữa. `hired` và `offer_declined` là hai trạng
+    /// thái kết thúc mới của ADR-061 và cũng từng lọt qua danh sách chuỗi viết tay — ứng viên đã
+    /// nhận việc vẫn bị xếp lịch phỏng vấn được.
+    /// </summary>
+    [Theory]
+    [InlineData(ApplicationStatuses.Hired)]
+    [InlineData(ApplicationStatuses.OfferDeclined)]
+    [InlineData(ApplicationStatuses.Withdrawn)]
+    [InlineData(ApplicationStatuses.CvRejected)]
+    public async Task Khong_xep_lich_duoc_cho_ho_so_da_dong(string status)
+    {
+        var uow = new InMemoryUnitOfWork();
+        var job = SchedulingData.Job(owner: _staffId);
+        var app = SchedulingData.Application(job.Id, _accountId, status: status);
+        var slot = SchedulingData.Slot(job.Id, round: 1);
+        uow.Seed(job).Seed(app).Seed(slot);
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, slot.Id));
+
+        Assert.True(res.IsFailure);
+        Assert.Empty(uow.Repo<InterviewBooking>().Items);
+    }
+
     [Fact]
     public async Task Assign_marks_pending_invite_scheduled()
     {

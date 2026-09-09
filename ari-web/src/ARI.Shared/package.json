@@ -8,7 +8,6 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
-    "@heygen/liveavatar-web-sdk": "^0.0.18",
     "@microsoft/signalr": "^10.0.0",
     "axios": "^1.7.2",
     "clsx": "^2.1.1",

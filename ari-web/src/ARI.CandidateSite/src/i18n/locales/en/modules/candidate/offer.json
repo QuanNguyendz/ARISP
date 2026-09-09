@@ -1,0 +1,41 @@
+{
+  "title": "Job offer",
+  "description": "Congratulations! Here is our offer for the {{position}} role.",
+  "backToApplication": "Back to application",
+  "loading": "Loading your offer...",
+  "actionError": "Could not record your response. Please try again.",
+  "emptyTitle": "No offer yet",
+  "emptyDescription": "Once the company sends an offer, all the details will appear here.",
+  "details": "Offer details",
+  "stats": {
+    "salary": "Salary",
+    "startDate": "Expected start date",
+    "deadline": "Respond by",
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left"
+  },
+  "fields": {
+    "position": "Position",
+    "employmentType": "Employment type",
+    "workLocation": "Work location",
+    "bonus": "Bonus",
+    "benefits": "Benefits"
+  },
+  "respond": {
+    "title": "Your response",
+    "description": "Let us know your decision. If you'd like to discuss the terms, just reply to the offer email.",
+    "accept": "Accept offer",
+    "decline": "Decline",
+    "cancel": "Back",
+    "confirmDecline": "Confirm decline",
+    "reasonLabel": "Reason for declining (optional)",
+    "reasonPlaceholder": "Sharing your reasoning helps us improve offers for future candidates."
+  },
+  "status": {
+    "accepted": "You accepted this offer. HR will be in touch with next steps.",
+    "declined": "You declined this offer. Thank you for your time.",
+    "expired": "This offer has expired. Please contact HR if you are still interested.",
+    "closed": "This offer is closed.",
+    "yourNote": "Your note: {{note}}"
+  }
+}

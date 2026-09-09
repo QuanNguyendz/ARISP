@@ -78,17 +78,56 @@ export interface PracticeMediaConfig {
   /** Mốc bắt đầu phiên (ISO UTC) để tính thời gian còn lại khớp giờ server. */
   startedAtUtc?: string | null;
   deepgram?: { token: string; expiresInSeconds: number; model: string } | null;
-  heyGen?: { token: string; serverUrl: string; avatarId?: string | null; voiceId?: string | null } | null;
+  /** waiting | active | completed | … — phòng chờ buổi thật (ADR-067). */
+  status?: string;
+  /** Hiring Manager đã vào phòng chưa — màn chờ đổi chữ theo mốc này. */
+  hiringManagerPresent?: boolean;
+}
+
+/** Một phòng phỏng vấn thật đang mở (ADR-067). */
+export interface WaitingRoom {
+  sessionId: string;
+  applicationId: string;
+  jobPostingId: string;
+  candidateName?: string | null;
+  jobTitle?: string | null;
+  roundNumber: number;
+  roundType?: string | null;
+  /** waiting = ứng viên đang chờ được cho vào · active = đang phỏng vấn. */
+  status: string;
+  createdAt: string;
+  hmJoinedAt?: string | null;
+  admittedAt?: string | null;
 }
 
 export const interviewService = {
-  // Token Deepgram (STT) + LiveAvatar (avatar) cho FE vào phòng phỏng vấn.
+  // ===== Phòng chờ buổi phỏng vấn thật (ADR-067) =====
+
+  /** Buổi phỏng vấn thật đang mở trong phạm vi người gọi (đang chờ, hoặc đang diễn ra). */
+  async getWaitingRooms(): Promise<WaitingRoom[]> {
+    const { data } = await apiClient.get<WaitingRoom[]>('/interview/waiting-rooms');
+    return data;
+  },
+
+  /** Hiring Manager vào phòng cùng AI — điều kiện để buổi phỏng vấn bắt đầu được. */
+  async joinInterviewRoom(sessionId: string): Promise<WaitingRoom> {
+    const { data } = await apiClient.post<WaitingRoom>(`/interview/session/${sessionId}/hm-join`);
+    return data;
+  },
+
+  /** Cho ứng viên vào phòng — phiên chuyển sang đang diễn ra và AI bắt đầu hỏi. */
+  async admitCandidate(sessionId: string): Promise<WaitingRoom> {
+    const { data } = await apiClient.post<WaitingRoom>(`/interview/session/${sessionId}/admit`);
+    return data;
+  },
+
+  // Token Deepgram (STT) + trần thời lượng cho FE vào phòng phỏng vấn.
   async getMediaConfig(sessionId: string): Promise<PracticeMediaConfig> {
     const { data } = await apiClient.get<PracticeMediaConfig>(`/interview/session/${sessionId}/media-config`);
     return data;
   },
 
-  // TTS câu hỏi → base64 PCM 24k (LiveAvatar repeatAudio / WebAudio). Chỉ là FALLBACK —
+  // TTS câu hỏi → base64 PCM 24k (phát qua WebAudio). Chỉ là FALLBACK —
   // đường chính là BE tự đẩy ReceiveQuestionAudio qua SignalR ngay sau ReceiveQuestion.
   async getTtsAudio(sessionId: string, text: string): Promise<string> {
     const { data } = await apiClient.post<{ audio: string }>(`/interview/session/${sessionId}/tts`, { text });

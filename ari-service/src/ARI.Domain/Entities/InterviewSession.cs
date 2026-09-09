@@ -15,7 +15,27 @@ namespace ARI.Domain.Entities
         /// trên web lúc bắt đầu phiên, để màn xem lại không trộn Việt–Anh (ADR-051).
         /// </summary>
         public string? ReportLanguage { get; set; }
-        public string Status { get; set; } = "pending"; // pending | active | completed | aborted | error
+        /// <summary>Xem <see cref="ARI.Domain.Constants.InterviewSessionStatuses"/>.</summary>
+        public string Status { get; set; } = "pending";
+
+        /// <summary>
+        /// Hiring Manager đã vào phòng phỏng vấn cùng AI (ADR-067). Buổi THẬT không bắt đầu được
+        /// khi cột này còn rỗng — đây là điều kiện, không phải dấu vết.
+        /// </summary>
+        public DateTimeOffset? HmJoinedAt { get; set; }
+
+        /// <summary>Ai đang ngồi trong phòng — HM của tin, hoặc quản trị viên vào thay.</summary>
+        public Guid? HmJoinedByUserId { get; set; }
+
+        /// <summary>
+        /// Thời điểm ứng viên được cho vào phòng. Tách khỏi <see cref="StartedAt"/> vì hai mốc trả
+        /// lời hai câu khác nhau: "được duyệt vào lúc nào" và "phiên chạy từ lúc nào" — mốc sau là
+        /// gốc tính trần thời lượng, gộp lại thì thời gian ngồi chờ bị trừ vào giờ phỏng vấn.
+        /// </summary>
+        public DateTimeOffset? AdmittedAt { get; set; }
+
+        public Guid? AdmittedByUserId { get; set; }
+
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? EndedAt { get; set; }
         public int? DurationSeconds { get; set; }

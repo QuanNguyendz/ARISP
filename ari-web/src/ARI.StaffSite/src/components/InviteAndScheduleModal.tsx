@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Calendar, Send, CheckCircle2, Users, AlertCircle, Loader2 } from 'lucide-react'
-import { scheduleService } from '@ari/shared/fservices/schedule'
-import { applicationService } from '@ari/shared/fservices/application'
+import { scheduleService, type HmAvailabilityWindow } from '@ari/shared/fservices/schedule'
+import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
+import { EMAIL_TEMPLATES } from '@ari/shared/fservices/email'
 import type { AvailabilitySlot } from '@ari/shared/types/job'
 
 export interface InviteTargetApplication {
@@ -14,11 +15,6 @@ interface InviteAndScheduleModalProps {
   /** Một hoặc nhiều hồ sơ cùng nhận một khung giờ (duyệt hàng loạt dùng chung 1 ca). */
   applications: InviteTargetApplication[]
   jobPostingId: string
-  /**
-   * `accept` = hồ sơ chưa qua vòng CV: duyệt + xếp lịch vòng 1 trong một lần gọi.
-   * `assign` = hồ sơ đã qua CV: chỉ xếp lịch cho vòng đang tới.
-   */
-  mode: 'accept' | 'assign'
   targetRoundNumber?: number
   onClose: () => void
   onSuccess: (message: string) => void
@@ -37,48 +33,91 @@ function fmtSlotTime(iso: string | Date) {
 }
 
 /**
- * Duyệt CV / xếp lịch — LUÔN kèm một khung giờ cụ thể.
+ * Xếp lịch phỏng vấn — LUÔN kèm một khung giờ cụ thể, và ĐÂY là nơi thư báo "qua vòng" đi.
  *
  * Trước đây modal có thêm lựa chọn "gửi lời mời chung (xếp sau)": ứng viên được duyệt nhưng
- * không có giờ hẹn nên **không nhận được email nào**, chỉ có chuông trong Portal. Bỏ hẳn lựa chọn
- * đó — duyệt là phải có lịch, và thư mời kèm giờ hẹn do backend gửi trong cùng thao tác.
+ * không có giờ hẹn nên **không nhận được email nào**, chỉ có chuông trong Portal.
+ *
+ * ADR-067 bỏ nốt chế độ "duyệt CV kèm xếp lịch": duyệt hồ sơ nay là gửi cho Hiring Manager, và
+ * xếp lịch là việc riêng sau khi HM duyệt và gửi khung giờ họ có mặt được. Modal chỉ hiện những
+ * ca NẰM TRỌN trong khung đó — chọn ca ngoài thì server chặn, mà để người dùng chọn rồi mới báo
+ * hỏng là bắt họ đoán.
  */
 export default function InviteAndScheduleModal({
   applications,
   jobPostingId,
-  mode,
   targetRoundNumber = 1,
   onClose,
   onSuccess,
 }: InviteAndScheduleModalProps) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([])
+  const [windows, setWindows] = useState<HmAvailabilityWindow[]>([])
   const [loadingSlots, setLoadingSlots] = useState(true)
   const [selectedSlotId, setSelectedSlotId] = useState<string>('')
+  // Trình soạn thư (ADR-061): mở SAU khi đã chọn ca (nội dung thư có giờ hẹn), gửi thì mới chốt chỗ.
+  const [composing, setComposing] = useState(false)
+
+  /**
+   * Trình soạn thư CHỈ dùng được khi gửi cho ĐÚNG MỘT ứng viên.
+   *
+   * Thư mời là thư cá nhân hoá: tên người nhận, giờ hẹn, địa điểm, hai nút xác nhận gắn với đúng
+   * hồ sơ đó. Chế độ hàng loạt trước đây xem trước thư của `applications[0]` rồi gửi CÙNG MỘT khối
+   * HTML cho tất cả — ứng viên thứ 2 trở đi nhận thư ghi TÊN VÀ GIỜ HẸN CỦA NGƯỜI KHÁC. Đó vừa là
+   * rò rỉ thông tin cá nhân, vừa là bốn người bị báo sai giờ.
+   *
+   * Không có cách nào sửa một khối HTML cho đúng với N người, nên gửi hàng loạt đi thẳng bằng mẫu —
+   * server dựng riêng cho từng hồ sơ với dữ liệu đúng của họ. Đúng tinh thần "what-you-see-is-
+   * what-is-sent" của ADR-061: xem được một thứ thì mới sửa được thứ đó.
+   */
+  const canCompose = applications.length === 1
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Duyệt CV luôn gắn với vòng 1; xếp lịch vòng sau mới dùng targetRoundNumber.
-  const effectiveRound = mode === 'accept' ? 1 : targetRoundNumber > 0 ? targetRoundNumber : 1
+  const effectiveRound = targetRoundNumber > 0 ? targetRoundNumber : 1
   const isBatch = applications.length > 1
   const selectedSlot = slots.find((s) => s.id === selectedSlotId)
-  const remainingSeats = selectedSlot ? selectedSlot.capacity - selectedSlot.bookedCount : 0
-  const notEnoughSeats = !!selectedSlot && applications.length > remainingSeats
+
+  // Một ca chỉ nhận MỘT ứng viên (ADR-067) — chọn nhiều người rồi dồn vào một ca là không thể.
+  const tooManyCandidates = applications.length > 1
 
   useEffect(() => {
     let isMounted = true
     async function load() {
       try {
         setLoadingSlots(true)
-        const data = await scheduleService.getSlots(jobPostingId, effectiveRound)
+        // Hai lời gọi song song: danh sách ca, và khung giờ Hiring Manager có mặt được.
+        const [data, hmWindows] = await Promise.all([
+          scheduleService.getSlots(jobPostingId, effectiveRound),
+          scheduleService.getHmAvailability(jobPostingId, effectiveRound).catch(() => []),
+        ])
+
         // Chỉ ca của đúng vòng, chưa trôi qua và còn chỗ.
         const now = new Date()
-        const valid = data.filter(
+        const open = data.filter(
           (s) =>
             (s.roundNumber == null || s.roundNumber === effectiveRound) &&
             new Date(s.startTime) > now &&
             s.bookedCount < s.capacity
         )
+
+        // Lọc theo lịch rảnh của HM — cùng vị từ với server (nằm TRỌN trong một khung), để danh sách
+        // trên màn không bao giờ chứa một lựa chọn mà bấm vào sẽ bị từ chối.
+        //
+        // Chưa khai khung nào thì KHÔNG lọc: lúc đó không có gì để đối chiếu, và thông báo bên dưới
+        // nói rõ đang thiếu gì thay vì hiện một danh sách trống không giải thích.
+        const valid =
+          hmWindows.length === 0
+            ? open
+            : open.filter((s) =>
+                hmWindows.some(
+                  (w) =>
+                    new Date(w.startTime) <= new Date(s.startTime) &&
+                    new Date(w.endTime) >= new Date(s.endTime)
+                )
+              )
+
         if (isMounted) {
+          setWindows(hmWindows)
           setSlots(valid)
           if (valid.length > 0) setSelectedSlotId(valid[0].id)
         }
@@ -94,7 +133,7 @@ export default function InviteAndScheduleModal({
     }
   }, [jobPostingId, effectiveRound])
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (emailOverride?: { subject: string; bodyHtml: string }) => {
     if (!selectedSlot) {
       setError('Vui lòng chọn ca phỏng vấn.')
       return
@@ -108,15 +147,12 @@ export default function InviteAndScheduleModal({
       let success = 0
       for (const app of applications) {
         try {
-          if (mode === 'accept') {
-            await applicationService.acceptApplication(app.id, selectedSlot.id)
-          } else {
-            await scheduleService.assign({
-              applicationId: app.id,
-              slotId: selectedSlot.id,
-              round: selectedSlot.roundNumber ?? effectiveRound,
-            })
-          }
+          await scheduleService.assign({
+            applicationId: app.id,
+            slotId: selectedSlot.id,
+            round: selectedSlot.roundNumber ?? effectiveRound,
+            emailOverride,
+          })
           success++
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } } }
@@ -129,11 +165,10 @@ export default function InviteAndScheduleModal({
         return
       }
 
-      const verb = mode === 'accept' ? 'Đã duyệt CV và xếp lịch' : 'Đã xếp lịch'
       onSuccess(
         failures.length === 0
-          ? `${verb} cho ${success} ứng viên. Thư mời kèm giờ hẹn đã được gửi.`
-          : `${verb} cho ${success} ứng viên; ${failures.length} hồ sơ chưa xong (${failures.join(' | ')}).`
+          ? `Đã xếp lịch cho ${success} ứng viên. Thư báo qua vòng kèm giờ hẹn đã được gửi.`
+          : `Đã xếp lịch cho ${success} ứng viên; ${failures.length} hồ sơ chưa xong (${failures.join(' | ')}).`
       )
       onClose()
     } finally {
@@ -157,7 +192,7 @@ export default function InviteAndScheduleModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-ink-900 dark:text-white">
-                {mode === 'accept' ? 'Duyệt CV & xếp lịch phỏng vấn' : 'Xếp lịch phỏng vấn'}
+                Xếp lịch phỏng vấn
               </h3>
               <p className="text-xs text-ink-500 dark:text-ink-400">
                 {isBatch ? (
@@ -185,10 +220,48 @@ export default function InviteAndScheduleModal({
 
         <div className="p-5 space-y-4">
           <p className="text-xs text-ink-600 dark:text-ink-300 bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/5 rounded-xl p-3">
-            {mode === 'accept'
-              ? 'Chọn khung giờ vòng 1 cho ứng viên. Hệ thống sẽ duyệt hồ sơ, giữ chỗ và gửi thư mời phỏng vấn kèm giờ hẹn + địa điểm để ứng viên xác nhận hoặc báo bận.'
-              : 'Chọn khung giờ cho vòng phỏng vấn tiếp theo. Ứng viên sẽ nhận thư mời kèm giờ hẹn để xác nhận hoặc báo bận.'}
+            Chọn ca phỏng vấn cho ứng viên. Đây là lúc thư báo <strong>qua vòng</strong> kèm giờ hẹn
+            và địa điểm được gửi đi — trước bước này ứng viên chưa nhận thông báo nào.
           </p>
+
+          {/* Lịch rảnh của Hiring Manager: hiện NGUYÊN VĂN thay vì chỉ lặng lẽ lọc bớt ca, để
+              Recruiter biết cần chốt giờ nào với ứng viên (việc chốt đó diễn ra ngoài hệ thống —
+              SMS, Zalo, gọi điện). */}
+          {windows.length > 0 && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+              <p className="font-semibold">Hiring Manager có mặt được:</p>
+              <ul className="mt-1 space-y-0.5">
+                {windows.map((w) => {
+                  const from = fmtSlotTime(w.startTime)
+                  const to = fmtSlotTime(w.endTime)
+                  return (
+                    <li key={w.id}>
+                      {from.dateStr} · {from.timeStr} – {to.timeStr}
+                      {w.note ? ` (${w.note})` : ''}
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="mt-1.5 opacity-80">
+                Chỉ những ca nằm trọn trong các khung trên mới xếp được.
+              </p>
+            </div>
+          )}
+
+          {!loadingSlots && windows.length === 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+              Hiring Manager chưa gửi khung giờ có mặt được cho vòng {effectiveRound}. Nếu tin này có
+              Hiring Manager, hãy đề nghị họ gửi lịch rảnh trước — nếu không, thao tác xếp lịch sẽ bị
+              server từ chối.
+            </div>
+          )}
+
+          {tooManyCandidates && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+              Mỗi ca phỏng vấn chỉ nhận <strong>một</strong> ứng viên (Hiring Manager ngồi cùng AI
+              trong suốt buổi). Hãy xếp lịch cho từng người, mỗi người một ca.
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 text-xs flex items-start gap-2 border border-red-200 dark:border-red-500/20">
@@ -269,13 +342,6 @@ export default function InviteAndScheduleModal({
               </div>
             )}
 
-            {notEnoughSeats && (
-              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs border border-amber-200 dark:border-amber-500/20">
-                Ca này chỉ còn <strong>{remainingSeats}</strong> chỗ cho{' '}
-                <strong>{applications.length}</strong> ứng viên đã chọn. Những hồ sơ vượt sức chứa sẽ
-                báo lỗi — hãy tăng sức chứa ca hoặc duyệt làm nhiều đợt.
-              </div>
-            )}
           </div>
         </div>
 
@@ -290,8 +356,8 @@ export default function InviteAndScheduleModal({
           </button>
           <button
             type="button"
-            disabled={submitting || !selectedSlotId || slots.length === 0}
-            onClick={handleConfirm}
+            disabled={submitting || !selectedSlotId || slots.length === 0 || tooManyCandidates}
+            onClick={() => (canCompose ? setComposing(true) : void handleConfirm())}
             className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-600/20 transition-colors disabled:opacity-50"
           >
             {submitting ? (
@@ -302,12 +368,28 @@ export default function InviteAndScheduleModal({
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
-                <span>{mode === 'accept' ? 'Duyệt & gửi thư mời' : 'Xếp lịch & gửi thư mời'}</span>
+                <span>Xếp lịch &amp; gửi thư mời</span>
               </>
             )}
           </button>
         </div>
       </motion.div>
+
+      {/* Soạn thư trước, chốt chỗ sau: huỷ ở đây = không ca nào bị chiếm, không thư nào gửi đi. */}
+      {composing && canCompose && (
+        <EmailComposerModal
+          open={composing}
+          templateKey={EMAIL_TEMPLATES.InterviewInvite}
+          contextId={applications[0].id}
+          secondaryId={selectedSlotId}
+          sending={submitting}
+          onCancel={() => setComposing(false)}
+          onSend={async (override) => {
+            setComposing(false)
+            await handleConfirm(override)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -37,6 +37,7 @@
     "superAdmin": "Super Admin",
     "hrAdmin": "HR Admin",
     "recruiter": "Recruiter",
+    "hiringManager": "Hiring Manager",
     "candidate": "Candidates"
   },
   "errors": {

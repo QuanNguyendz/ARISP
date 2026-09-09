@@ -34,7 +34,10 @@ namespace ARI.Application.DTOs
     public class UpdateStaffProfileRequest
     {
         public string FullName { get; set; } = string.Empty;
-        public string? Department { get; set; }
+
+        // ADR-065: CỐ Ý không còn `Department`. Nhân viên tự sửa được phòng ban của mình thì ô "đội"
+        // khoá cứng trên phiếu yêu cầu tuyển dụng chỉ là hình thức — chỉ cần đổi hồ sơ rồi lập phiếu.
+        // Bỏ khỏi DTO chứ không chỉ khỏi giao diện: còn nhận thì một request tự dựng vẫn đổi được.
     }
 
     public class ChangeStaffPasswordRequest

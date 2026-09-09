@@ -18,6 +18,24 @@ namespace ARI.Application.Evaluations
         public bool ShareEvaluation { get; set; } = false;
         public bool ShareFeedback { get; set; } = false;
         public string? CandidateFeedback { get; set; }
+
+        // ===== ADR-061 =====
+
+        /// <summary>
+        /// Lý do quản trị viên chốt THAY Hiring Manager (tin có HM mà người chốt không phải HM đó).
+        /// Bắt buộc tối thiểu 10 ký tự trong trường hợp đó; bỏ qua ở mọi trường hợp khác.
+        /// </summary>
+        public string? FallbackReason { get; set; }
+
+        /// <summary>Đề xuất cấp bậc + dải lương của người chốt — dùng để điền sẵn thư mời nhận việc.</summary>
+        public string? SuggestedLevel { get; set; }
+        public decimal? SuggestedSalaryMin { get; set; }
+        public decimal? SuggestedSalaryMax { get; set; }
+        public string? SuggestedSalaryCurrency { get; set; }
+
+        /// <summary>Điểm mạnh / điểm cần lưu ý về ứng viên.</summary>
+        public string? Strengths { get; set; }
+        public string? Concerns { get; set; }
     }
 
 
@@ -100,6 +118,28 @@ namespace ARI.Application.Evaluations
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
 
+        // ===== ADR-061 =====
+
+        /// <summary>
+        /// Ảnh chụp vai trò người chốt tại thời điểm chốt (<c>hiring_manager|hr_admin|super_admin</c>).
+        /// Ảnh chụp chứ không join ngược <c>users.role</c>: vai trò của một người đổi được về sau,
+        /// còn câu hỏi "ai đã chốt tuyển người này, với tư cách gì" thì phải trả lời được mãi mãi.
+        /// </summary>
+        public string? ReviewerRole { get; set; }
+
+        /// <summary>Quản trị viên đã chốt THAY Hiring Manager của tin.</summary>
+        public bool IsHrFallback { get; set; }
+        public string? FallbackReason { get; set; }
+
+        /// <summary>Đề xuất cấp bậc + dải lương — nguồn điền sẵn cho thư mời nhận việc.</summary>
+        public string? SuggestedLevel { get; set; }
+        public decimal? SuggestedSalaryMin { get; set; }
+        public decimal? SuggestedSalaryMax { get; set; }
+        public string? SuggestedSalaryCurrency { get; set; }
+
+        public string? Strengths { get; set; }
+        public string? Concerns { get; set; }
+
         public static HrReviewDto FromEntity(HrReview review) =>
             new()
             {
@@ -115,7 +155,16 @@ namespace ARI.Application.Evaluations
                 ShareFeedback = review.ShareFeedback,
                 CandidateFeedback = review.CandidateFeedback,
                 CreatedAt = review.CreatedAt,
-                UpdatedAt = review.UpdatedAt
+                UpdatedAt = review.UpdatedAt,
+                ReviewerRole = review.ReviewerRole,
+                IsHrFallback = review.IsHrFallback,
+                FallbackReason = review.FallbackReason,
+                SuggestedLevel = review.SuggestedLevel,
+                SuggestedSalaryMin = review.SuggestedSalaryMin,
+                SuggestedSalaryMax = review.SuggestedSalaryMax,
+                SuggestedSalaryCurrency = review.SuggestedSalaryCurrency,
+                Strengths = review.Strengths,
+                Concerns = review.Concerns
             };
     }
 
@@ -135,6 +184,7 @@ namespace ARI.Application.Evaluations
         public Guid Id { get; set; }
         public Guid SessionId { get; set; }
         public Guid ApplicationId { get; set; }
+        public Guid JobPostingId { get; set; }
         public int RoundNumber { get; set; }
         public string SessionType { get; set; } = string.Empty;
         public string AiVerdict { get; set; } = string.Empty;
@@ -180,6 +230,15 @@ namespace ARI.Application.Evaluations
         public int? CvMatchScore { get; set; }
         /// <summary>Tóm tắt của cùng bản phân tích CV-JD — hiện kèm điểm để biết điểm đó từ đâu ra.</summary>
         public string? CvMatchSummary { get; set; }
+
+        // ===== Ai là người được chốt kết quả này (ADR-061) =====
+        // Handler điền, không phải FromEntity: cần đọc bảng đội tuyển dụng. Giao diện dùng để
+        // quyết định hiện nút "Chốt kết quả" hay banner "đang chờ Hiring Manager chốt".
+
+        /// <summary>Tin có Hiring Manager chính không. False = mọi thứ như trước ADR-061.</summary>
+        public bool RequiresHmApproval { get; set; }
+        public Guid? HiringManagerUserId { get; set; }
+        public string? HiringManagerName { get; set; }
 
         public static EvaluationDetailResponse FromEntity(
             Evaluation eval, 
@@ -260,6 +319,7 @@ namespace ARI.Application.Evaluations
                 CandidateName = app.CandidateName,
                 CandidateEmail = app.CandidateEmail,
                 JobTitle = job.Title,
+                JobPostingId = job.Id,
                 HrReview = hrReview != null ? HrReviewDto.FromEntity(hrReview) : null
             };
         }

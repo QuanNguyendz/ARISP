@@ -85,7 +85,7 @@ dotnet user-secrets set "Media:HeyGen:DefaultAvatarId" "dd73ea75-1218-4ef3-92ce-
 > - `Media:HeyGen:IsSandbox=false` (mặc định — production). Đặt `true` nếu chỉ muốn test không tốn phí (có watermark/giới hạn).
 > - Thiếu LiveAvatar key/avatar (hoặc API lỗi) → media-config trả `heyGen=null`, FE **fallback WebAudio/browser TTS + bot tĩnh**; STT/LLM vẫn chạy. Không làm sập phòng phỏng vấn.
 
-> **LLM qua RAG service (tuỳ chọn):** mặc định `AI:Provider=openai` chạy in-process, **không cần** chạy Python. Nếu muốn dùng Hybrid RAG (ADR-039): đặt `AI:Provider=rag`, chạy `rag-service` và set `OPENAI_API_KEY` trong `rag-service/.env`.
+> **RAG service là BẮT BUỘC** (ADR-062): nhánh in-process `AI:Provider=openai` đã bị gỡ vì nó không truy hồi gì — chỉ nhồi ngữ cảnh vào prompt rồi tự nhận là RAG. Phải chạy `rag-service` kèm `rag-service/.env`; hướng dẫn ở [rag-service-local-setup.md](rag-service-local-setup.md).
 
 ## Điều kiện nghiệp vụ để vào được phòng thử
 

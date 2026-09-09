@@ -6,14 +6,16 @@
     "totalUsers": "Tổng người dùng",
     "hrAdmin": "HR Admin",
     "recruiter": "Recruiter",
-    "lockedUsers": "Bị khóa"
+    "lockedUsers": "Bị khóa",
+    "hiringManager": "Hiring Manager"
   },
   "searchPlaceholder": "Tìm theo tên hoặc email...",
   "filters": {
     "allRoles": "Tất cả vai trò",
     "superAdmin": "Super Admin",
     "hrAdmin": "HR Admin",
-    "recruiter": "Recruiter"
+    "recruiter": "Recruiter",
+    "hiringManager": "Hiring Manager"
   },
   "table": {
     "headers": {
@@ -21,7 +23,8 @@
       "role": "Vai trò",
       "status": "Trạng thái",
       "createdAt": "Ngày tạo",
-      "actions": "Thao tác"
+      "actions": "Thao tác",
+      "department": "Đội / Bộ phận"
     },
     "you": "(bạn)",
     "emptyName": "—",
@@ -34,7 +37,8 @@
     "status": {
       "active": "Hoạt động",
       "locked": "Bị khóa"
-    }
+    },
+    "noDepartment": "Chưa gán đội"
   },
   "empty": {
     "title": "Không tìm thấy người dùng",
@@ -60,8 +64,8 @@
     "email": "Email công ty",
     "emailPlaceholder": "ban@congty.com",
     "role": "Vai trò",
-    "department": "Phòng ban",
-    "departmentPlaceholder": "Tùy chọn",
+    "department": "Đội / Bộ phận",
+    "departmentPlaceholder": "Chọn đội",
     "cancel": "Hủy",
     "submit": "Tạo tài khoản"
   },
@@ -71,6 +75,7 @@
     "unlockFailed": "Không thể mở khóa.",
     "roleChangeFailed": "Không thể đổi vai trò.",
     "deleteFailed": "Không thể xóa tài khoản.",
-    "createFailed": "Không thể tạo tài khoản."
+    "createFailed": "Không thể tạo tài khoản.",
+    "departmentChangeFailed": "Không đổi được đội của tài khoản."
   }
 }

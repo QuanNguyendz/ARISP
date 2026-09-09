@@ -4,13 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
 
 namespace ARI.Application.Evaluations.Queries.GetEvaluationsByApplication
 {
-    public record GetEvaluationsByApplicationQuery(Guid ApplicationId) : IRequest<Result<List<EvaluationListItemResponse>>>;
+    public record GetEvaluationsByApplicationQuery(Guid ApplicationId, Guid? UserId, string? Role)
+        : IRequest<Result<List<EvaluationListItemResponse>>>;
 
     public class GetEvaluationsByApplicationQueryHandler
         : IRequestHandler<GetEvaluationsByApplicationQuery, Result<List<EvaluationListItemResponse>>>
@@ -24,13 +26,14 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationsByApplication
 
         public async Task<Result<List<EvaluationListItemResponse>>> Handle(GetEvaluationsByApplicationQuery request, CancellationToken ct)
         {
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);
+            var (application, job, level) = await JobAccess.EvaluateApplicationAsync(
+                _unitOfWork, request.ApplicationId, request.UserId, request.Role, ct);
             if (application == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Application not found.");
-
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             if (job == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Job posting associated with this application was not found.");
+            if (level < JobAccessLevel.TeamMember)
+                return Result.Failure<List<EvaluationListItemResponse>>(JobAccessErrors.EvaluationForbidden, CommonErrorCodes.Forbidden);
 
             // Bỏ đánh giá buổi thử — chỉ ứng viên xem qua Portal (ADR-051).
             var evaluations = (await _unitOfWork.Repository<Evaluation>()

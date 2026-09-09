@@ -22,8 +22,6 @@ internal static class InterviewServiceFactory
     public static InterviewService Create(IUnitOfWork uow, INotificationService notif) => new(
         uow,
         new ThrowingAIProvider(),
-        new ThrowingEmbeddingProvider(),
-        new ThrowingAvatarService(),
         notif,
         new ThrowingDeepgramTokenService(),
         new ThrowingRagIngestionService(),
@@ -40,8 +38,6 @@ internal static class InterviewServiceFactory
         IUnitOfWork uow, INotificationService notif, IAIProvider ai, ITTSService tts, InterviewOptions? options = null) => new(
         uow,
         ai,
-        new ThrowingEmbeddingProvider(),
-        new ThrowingAvatarService(),
         notif,
         new ThrowingDeepgramTokenService(),
         new ThrowingRagIngestionService(),
@@ -60,8 +56,6 @@ internal static class InterviewServiceFactory
         IUnitOfWork uow, INotificationService notif, IFileStorageService storage, InterviewOptions? options = null) => new(
         uow,
         new ThrowingAIProvider(),
-        new ThrowingEmbeddingProvider(),
-        new ThrowingAvatarService(),
         notif,
         new ThrowingDeepgramTokenService(),
         new ThrowingRagIngestionService(),
@@ -95,21 +89,6 @@ internal static class InterviewServiceFactory
         public Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
-    private sealed class ThrowingEmbeddingProvider : IEmbeddingProvider
-    {
-        public Task<float[]> EmbedAsync(string text, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<IEnumerable<DocumentChunk>> RetrieveAsync(Guid? sourceId, float[] queryVector, int topK = 5, CancellationToken ct = default) => throw new NotImplementedException();
-    }
-
-    private sealed class ThrowingAvatarService : IAvatarService
-    {
-        public Task<SdpMessage> StartSessionAsync(string voiceId, string style, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> SubmitSdpAnswerAsync(string sessionId, SdpMessage sdpAnswer, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> SendIceCandidateAsync(string sessionId, IceCandidateMessage candidate, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> SpeakTextAsync(string sessionId, string text, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> StopSessionAsync(string sessionId, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<AvatarStreamingToken?> CreateStreamingTokenAsync(string? avatarId, string? voiceId, CancellationToken ct = default) => throw new NotImplementedException();
-    }
 
     private sealed class ThrowingDeepgramTokenService : IDeepgramTokenService
     {

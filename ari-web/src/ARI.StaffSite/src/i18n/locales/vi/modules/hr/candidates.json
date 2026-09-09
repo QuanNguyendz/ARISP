@@ -59,7 +59,12 @@
     "withdrawn": "Đã rút",
     "notPass": "Không đạt",
     "pass": "Đạt",
-    "completed": "Hoàn thành"
+    "completed": "Hoàn thành",
+    "hmReview": "Chờ Hiring Manager",
+    "cvRejected": "Loại từ vòng CV",
+    "offerSent": "Đã gửi thư mời",
+    "hired": "Đã nhận việc",
+    "offerDeclined": "Từ chối thư mời"
   },
   "inviteSuccess": "Đã gửi magic link mời phỏng vấn tới {{email}}.",
   "inviteError": "Gửi lời mời thất bại.",

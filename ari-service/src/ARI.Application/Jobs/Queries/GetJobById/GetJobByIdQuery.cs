@@ -3,8 +3,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -32,13 +34,15 @@ namespace ARI.Application.Jobs.Queries.GetJobById
 
             var isStaff = request.IsStaff;
 
-            // Nếu là Recruiter thì chỉ được tính là Staff đối với tin do CHÍNH HỌ tạo ra.
-            if (isStaff && string.Equals(request.Role, "recruiter", StringComparison.OrdinalIgnoreCase))
+            // Nhân sự KHÔNG phải quản trị viên chỉ được tính là staff với tin thuộc phạm vi của mình:
+            // chủ tin, hoặc thành viên đội tuyển dụng (ADR-061). Trước đây chỗ này chỉ kiểm riêng
+            // Recruiter bằng một câu so chuỗi, nên thêm vai trò mới là phải nhớ sửa tay ở đây —
+            // Hiring Manager đã lọt đúng vào khe đó.
+            if (isStaff && !RoleNames.IsAdmin(request.Role))
             {
-                if (job.CreatedByUserId != request.CurrentUserId)
-                {
-                    isStaff = false;
-                }
+                var (_, _, level) = await JobAccess.EvaluateAsync(
+                    _unitOfWork, request.Id, request.CurrentUserId, request.Role, ct);
+                if (level < JobAccessLevel.TeamMember) isStaff = false;
             }
 
             if (!isStaff && (job.Status != "active" || !job.IsPublicListing))
@@ -64,6 +68,22 @@ namespace ARI.Application.Jobs.Queries.GetJobById
                     jobResponse.JdFileUrl = await _fileStorage.GetUrlAsync(jobResponse.JdFileUrl, ct);
                 if (!string.IsNullOrEmpty(jobResponse.SignedJdFileUrl))
                     jobResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(jobResponse.SignedJdFileUrl, ct);
+
+                // Cổng Hiring Manager (ADR-061). Nằm TRONG nhánh staff vì HmSignOffReason là góp ý
+                // nội bộ về tin; ứng viên xem tin trên Job Board đi qua đúng handler này với
+                // isStaff = false.
+                var primaryHm = await Common.Security.JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+                jobResponse.HmSignOffStatus = job.HmSignOffStatus;
+                jobResponse.HmSignOffReason = job.HmSignOffReason;
+                jobResponse.RequiresHmApproval = primaryHm != null;
+                if (primaryHm != null)
+                {
+                    jobResponse.HiringManagerUserId = primaryHm.UserId;
+                    var hmUser = await _unitOfWork.Repository<User>().GetByIdAsync(primaryHm.UserId, ct);
+                    if (hmUser != null)
+                        jobResponse.HiringManagerName =
+                            string.IsNullOrWhiteSpace(hmUser.FullName) ? hmUser.Email : hmUser.FullName;
+                }
             }
 
             return Result.Success(jobResponse);

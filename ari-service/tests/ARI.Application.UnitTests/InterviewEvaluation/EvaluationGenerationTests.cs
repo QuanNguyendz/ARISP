@@ -32,9 +32,10 @@ public class EvaluationGenerationTests
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, round: 1, type: "real");
         var ai = new StubAiProvider();
-        ai.Evaluation.Verdict = "not_pass";
-        ai.Evaluation.Score = 40m;
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        // Verdict và điểm tổng do BACKEND tính từ điểm tiêu chí (ADR-062) — đặt điểm tiêu chí
+        // thấp, không đặt `Verdict`/`Score` nữa vì hai trường đó của model không còn được dùng.
+        ai.Evaluation.CriterionScoresJson = "{\"technical\":40,\"communication\":40}";
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
 
         var res = await Svc(uow, new(), ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
@@ -59,7 +60,7 @@ public class EvaluationGenerationTests
         var session = PracticeData.Session(app.Id, type: "real");
         var q = PracticeData.Question(session.Id, 1);
         var a = PracticeData.Answer(session.Id, q.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(q).Seed(a);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session).Seed(q).Seed(a);
         var notif = new RecordingNotificationService();
 
         await Svc(uow, notif, new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
@@ -76,7 +77,7 @@ public class EvaluationGenerationTests
         var session = PracticeData.Session(app.Id, type: "practice");
         var q = PracticeData.Question(session.Id, 1);
         var a = PracticeData.Answer(session.Id, q.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(q).Seed(a);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session).Seed(q).Seed(a);
         var notif = new RecordingNotificationService();
 
         await Svc(uow, notif, new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
@@ -94,7 +95,7 @@ public class EvaluationGenerationTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real");
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session)
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session)
             .Seed(Signal(session.Id, "fullscreen_exit"),      // 8
                   Signal(session.Id, "tab_hidden"),           // 12
                   Signal(session.Id, "tab_hidden"),           // 12
@@ -119,7 +120,7 @@ public class EvaluationGenerationTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real");
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session)
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session)
             .Seed(Signal(session.Id, "page_unload"), Signal(session.Id, "page_unload"),   // 15 * 2
                   Signal(session.Id, "page_unload"), Signal(session.Id, "page_unload"),   // 15 * 2
                   Signal(session.Id, "page_unload"), Signal(session.Id, "page_unload"),   // 15 * 2 → 90
@@ -140,7 +141,7 @@ public class EvaluationGenerationTests
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real");
         var q = PracticeData.Question(session.Id, 1);                     // có câu hỏi nhưng KHÔNG có câu trả lời
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(q);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session).Seed(q);
 
         await Svc(uow, new(), new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
@@ -156,7 +157,7 @@ public class EvaluationGenerationTests
         var session = PracticeData.Session(app.Id, type: "real");
         var q = PracticeData.Question(session.Id, 1);
         var a = PracticeData.Answer(session.Id, q.Id, "Tôi có 3 năm kinh nghiệm C#.");
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(q).Seed(a);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session).Seed(q).Seed(a);
 
         await Svc(uow, new(), new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
@@ -174,7 +175,7 @@ public class EvaluationGenerationTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real", status: "completed");
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
         var notif = new RecordingNotificationService();
 
         var res = await Svc(uow, notif, new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
@@ -190,7 +191,7 @@ public class EvaluationGenerationTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real");
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
 
         var res = await Svc(uow, new(), new()).EndSessionAsync(session.Id, "abandoned", CancellationToken.None);
 

@@ -1,7 +1,7 @@
 {
   "title": "Create Job Posting",
   "editTitle": "Edit Job Posting",
-  "description": "Upload JD for AI to auto-fill fields · job will be reviewed by HR Leader before publishing",
+  "description": "A posting must be built from an approved recruitment request - the Hiring Manager's sign-off publishes it",
   "back": "Back",
   "loading": "Loading job posting data...",
   "jdUpload": {
@@ -20,7 +20,8 @@
     "removeFile": "Remove JD file",
     "failed": "The file was saved but AI did not finish the analysis (service error or timeout). Fill the fields manually, or retry with a smaller file.",
     "failedScanned": "This PDF contains only images (a scan or slide export), so AI could not read its text in time. The file is still saved — fill the fields manually, or use a text-based JD file so AI can auto-fill.",
-    "scannedHint": "Note: this PDF has no text layer (images only), so the auto-filled values may be incomplete — please double-check them."
+    "scannedHint": "Note: this PDF has no text layer (images only), so the auto-filled values may be incomplete — please double-check them.",
+    "fromComposer": "This JD file came from the company-template composer. Uploading another file replaces it."
   },
   "form": {
     "generalInfo": "General Information",
@@ -71,7 +72,16 @@
     "save": "Save",
     "createJob": "Create Job",
     "interviewPassScore": "Interview pass score",
-    "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook."
+    "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook.",
+    "hiringManager": "Hiring Manager",
+    "hiringManagerNone": "— Not assigned (you can add one later) —",
+    "hiringManagerHint": "The department lead who approves candidates, signs off the job description and makes the final interview call. Leave empty and the job runs with no approval gates, exactly as before.",
+    "hmAssignFailed": "The job was created but the Hiring Manager could not be assigned. You can assign one from the job page.",
+    "goToJobToAssign": "Open the job page to assign a Hiring Manager",
+    "jdDraft": {
+      "description": "Job description",
+      "requirements": "Candidate requirements"
+    }
   },
   "validation": {
     "requiredFields": "Title and Job Description are required.",
@@ -79,7 +89,8 @@
     "locationRequired": "Work location is required when interview mode is not Remote.",
     "loadError": "Unable to load job posting data.",
     "analyzeError": "Unable to analyze JD file.",
-    "saveError": "An error occurred while saving the job posting."
+    "saveError": "An error occurred while saving the job posting.",
+    "recruitmentRequestRequired": "A job posting must be built from an approved recruitment request. Open your assigned request and click \"Build job posting from this request\"."
   },
   "options": {
     "selectCategory": "— Select —",
@@ -89,5 +100,15 @@
     "remote": "Remote",
     "onsiteInterview": "On-site",
     "hybridInterview": "Hybrid"
+  },
+  "recruitmentRequest": {
+    "title": "Recruitment request",
+    "description": "Every job posting must be built from a request raised by a Hiring Manager and approved by the HR Leader. Pick the request first — the fields below are pre-filled from it.",
+    "placeholder": "— Select a recruitment request —",
+    "loading": "Loading requests...",
+    "headcount": "{{count}} position(s)",
+    "prefillHint": "Title, department, salary range, headcount and the job description draft were filled in from the request. You can still edit them below.",
+    "none": "No request is eligible. A request must be approved, assigned to you, and not yet turned into a posting.",
+    "goToRequests": "Open Recruitment requests"
   }
 }

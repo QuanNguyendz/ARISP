@@ -16,6 +16,21 @@ public sealed class RecordingFileStorage : IFileStorageService
     public List<string> Deleted { get; } = new();
     public bool ThrowOnSave { get; set; }
 
+    /// <summary>Khi set: <see cref="DeleteAsync"/> ném lỗi (case "cleanup DeleteAsync throws" của test-plan).</summary>
+    public Exception? DeleteThrows { get; set; }
+
+    /// <summary>Khi set: <see cref="GetUrlAsync"/> ném lỗi (case "file storage throws URL error").</summary>
+    public Exception? GetUrlThrows { get; set; }
+
+    /// <summary>Khi set: <see cref="GetDownloadUrlAsync"/> ném lỗi (case "GetDownloadUrlAsync throws Download Error").</summary>
+    public Exception? GetDownloadUrlThrows { get; set; }
+
+    /// <summary>Khi set: <see cref="ReadAllBytesAsync"/> ném lỗi (case "profile CV read throws Read Error").</summary>
+    public Exception? ReadThrows { get; set; }
+
+    /// <summary>Giá trị URL trả về từ <see cref="GetUrlAsync"/> (mặc định "/files/{key}").</summary>
+    public string? GetUrlResult { get; set; }
+
     /// <summary>Bytes trả về khi <see cref="ReadAllBytesAsync"/> được gọi (null = không tìm thấy file).</summary>
     public byte[]? FileBytes { get; set; }
 
@@ -26,14 +41,27 @@ public sealed class RecordingFileStorage : IFileStorageService
         return Task.FromResult($"{folder.ToSegment()}/{originalFileName}");
     }
 
-    public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
-    public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => Task.FromResult($"/files/{storageKey}");
+    public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default)
+    {
+        if (GetUrlThrows != null) throw GetUrlThrows;
+        return Task.FromResult(GetUrlResult ?? $"/files/{storageKey}");
+    }
+    public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default)
+    {
+        if (GetDownloadUrlThrows != null) throw GetDownloadUrlThrows;
+        return Task.FromResult($"/files/{storageKey}");
+    }
     public Task DeleteAsync(string storageKey, CancellationToken ct = default)
     {
+        if (DeleteThrows != null) throw DeleteThrows;
         Deleted.Add(storageKey);
         return Task.CompletedTask;
     }
-    public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default) => Task.FromResult(FileBytes);
+    public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default)
+    {
+        if (ReadThrows != null) throw ReadThrows;
+        return Task.FromResult(FileBytes);
+    }
 }
 
 /// <summary>Parser tài liệu giả (dùng chung) — trả text cố định; công tắc ném lỗi để test đường parse fail.</summary>

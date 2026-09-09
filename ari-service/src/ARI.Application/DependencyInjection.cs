@@ -50,6 +50,10 @@ namespace ARI.Application
             services.AddScoped<InterviewCodeService>();
             services.AddScoped<Interfaces.IInterviewCodeService>(sp => sp.GetRequiredService<InterviewCodeService>());
 
+            // Trình soạn thảo thư gửi ứng viên (ADR-061) — dựng bản xem trước bằng CHÍNH builder
+            // mà lệnh gửi thật dùng, nên xem trước không thể lệch khỏi thư nhận được.
+            services.AddScoped<Emails.IEmailTemplateRenderer, Emails.EmailTemplateRenderer>();
+
             return services;
         }
     }

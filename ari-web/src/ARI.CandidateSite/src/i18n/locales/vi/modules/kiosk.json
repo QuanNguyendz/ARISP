@@ -66,6 +66,11 @@
     "deviceCheck": {
       "title": "Kiểm tra thiết bị trước khi vào phòng",
       "startLabel": "Vào phòng phỏng vấn"
+    },
+    "waitingRoom": {
+      "title": "Vui lòng chờ trong giây lát",
+      "hmPresent": "Người phỏng vấn đã có mặt trong phòng. Buổi phỏng vấn sẽ bắt đầu ngay khi họ mời bạn vào.",
+      "hmAbsent": "Hệ thống đã nhận mã của bạn. Buổi phỏng vấn bắt đầu khi người phỏng vấn vào phòng và mời bạn vào."
     }
   }
 }

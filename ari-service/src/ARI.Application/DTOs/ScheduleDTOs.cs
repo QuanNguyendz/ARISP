@@ -17,6 +17,15 @@ namespace ARI.Application.DTOs
         /// <summary>Còn chỗ trống để ứng viên đặt không.</summary>
         public bool IsAvailable => BookedCount < Capacity;
 
+        /// <summary>
+        /// Ứng viên đang giữ chỗ ở ca này. Rỗng khi chưa ai đặt.
+        ///
+        /// Vì sao trả kèm chứ không để giao diện tự tra: màn cấu hình lịch trước đây chỉ hiện
+        /// "Đã đặt 0/1" — một con số không nói được ca đó đang giữ chỗ cho AI, và người vận hành
+        /// phải sang màn khác mới biết có được đụng vào ca này không.
+        /// </summary>
+        public List<SlotBookingBriefDto> Bookings { get; set; } = new();
+
         public static AvailabilitySlotResponse FromEntity(AvailabilitySlot s) => new()
         {
             Id = s.Id,
@@ -28,6 +37,17 @@ namespace ARI.Application.DTOs
             Capacity = s.Capacity,
             BookedCount = s.BookedCount,
         };
+    }
+
+    /// <summary>Ứng viên đang giữ một chỗ trong ca — vừa đủ để nhận ra người đó trên màn lịch.</summary>
+    public class SlotBookingBriefDto
+    {
+        public Guid BookingId { get; set; }
+        public Guid ApplicationId { get; set; }
+        public string? CandidateName { get; set; }
+        public string? CandidateEmail { get; set; }
+        /// <summary>pending | confirmed | declined — ứng viên đã xác nhận giờ hẹn chưa (ADR-048).</summary>
+        public string ConfirmationStatus { get; set; } = "pending";
     }
 
     /// <summary>Tạo một khung giờ phỏng vấn cho job + vòng.</summary>

@@ -1,0 +1,14 @@
+{
+  "loading": "Đang tải hồ sơ ứng viên...",
+  "loadError": "Không tải được hồ sơ ứng viên. Có thể hồ sơ này không thuộc tin bạn phụ trách.",
+  "back": "Quay lại tin tuyển dụng",
+  "contact": "Thông tin liên hệ",
+  "matchScore": "Điểm khớp CV – JD: {{score}}/100",
+  "viewCv": "Xem CV",
+  "evaluations": {
+    "title": "Kết quả phỏng vấn",
+    "description": "Báo cáo AI của từng vòng. Bạn là người chốt đạt hay không đạt.",
+    "empty": "Ứng viên chưa hoàn thành vòng phỏng vấn nào.",
+    "round": "Vòng {{number}}"
+  }
+}

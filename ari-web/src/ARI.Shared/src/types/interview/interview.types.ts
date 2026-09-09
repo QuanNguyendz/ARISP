@@ -102,6 +102,4 @@ export interface StartSessionResponse {
   sessionId: string;
   status: string;
   language: string;
-  heyGenSdpOffer?: string;
-  heyGenSessionId?: string;
 }

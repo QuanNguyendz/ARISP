@@ -27,6 +27,7 @@ namespace ARI.Infrastructure.Data
         public DbSet<InterviewRoundConfig> InterviewRoundConfigs => Set<InterviewRoundConfig>();
         public DbSet<ARI.Domain.Entities.Application> Applications => Set<ARI.Domain.Entities.Application>();
         public DbSet<AvailabilitySlot> AvailabilitySlots => Set<AvailabilitySlot>();
+        public DbSet<HiringManagerAvailability> HiringManagerAvailabilities => Set<HiringManagerAvailability>();
         public DbSet<InterviewBooking> InterviewBookings => Set<InterviewBooking>();
         public DbSet<InterviewInvite> InterviewInvites => Set<InterviewInvite>();
         public DbSet<InterviewCode> InterviewCodes => Set<InterviewCode>();
@@ -48,6 +49,13 @@ namespace ARI.Infrastructure.Data
         public DbSet<SavedJob> SavedJobs => Set<SavedJob>();
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<AccountRequest> AccountRequests => Set<AccountRequest>();
+        public DbSet<RecruitmentRequest> RecruitmentRequests => Set<RecruitmentRequest>();
+        public DbSet<Department> Departments => Set<Department>();
+        public DbSet<JdTemplate> JdTemplates => Set<JdTemplate>();
+        public DbSet<JdDocument> JdDocuments => Set<JdDocument>();
+        public DbSet<JobHiringTeamMember> JobHiringTeamMembers => Set<JobHiringTeamMember>();
+        public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+        public DbSet<Offer> Offers => Set<Offer>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -341,9 +349,95 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<AccountRequest>()
                 .HasOne<User>().WithMany().HasForeignKey(r => r.CreatedUserId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            // recruitment_requests (ADR-063) cũng là hồ sơ kiểm toán "ai xin tuyển, ai duyệt, giao
+            // cho ai" — cùng lý do với account_requests, cả 3 tham chiếu người dùng để NoAction.
+            // Chiều phiếu → tin nằm ở `JobPosting.RecruitmentRequestId`, NoAction: xoá phiếu không
+            // được kéo theo tin đang tuyển.
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.RequestedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasOne<User>().WithMany().HasForeignKey(r => r.AssignedRecruiterId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JobPosting>()
+                .HasOne<RecruitmentRequest>().WithMany().HasForeignKey(j => j.RecruitmentRequestId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Mẫu JD + bản JD đã soạn (ADR-064). Bản JD gắn chặt vào phiếu: xoá phiếu thì bản soạn
+            // cho phiếu đó không còn nghĩa (Cascade). Người soạn và người sửa mẫu thì NoAction —
+            // đây là dấu vết "ai viết JD này", không được biến mất theo tài khoản.
+            modelBuilder.Entity<JdDocument>()
+                .HasOne<RecruitmentRequest>().WithMany().HasForeignKey(d => d.RecruitmentRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<JdDocument>()
+                .HasOne<User>().WithMany().HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JdTemplate>()
+                .HasOne<User>().WithMany().HasForeignKey(t => t.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Đội/bộ phận (ADR-065). NoAction ở cả hai: xoá một đội không được kéo theo tài khoản
+            // nhân viên hay phiếu đã lập — đội giải thể thì TẮT (`IsActive`), không xoá.
+            modelBuilder.Entity<User>()
+                .HasOne<Department>().WithMany().HasForeignKey(u => u.DepartmentId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasOne<Department>().WithMany().HasForeignKey(r => r.DepartmentId)
+                .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<Notification>()
                 .HasOne<User>().WithMany().HasForeignKey(n => n.RecipientUserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Thư mời nhận việc (ADR-061): xoá hồ sơ thì offer không còn nghĩa (Cascade); giữ
+            // dòng khi người dùng bị xoá (NoAction) — đây là dấu vết ai duyệt, ai gửi, ai thu hồi.
+            modelBuilder.Entity<Offer>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(o => o.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Offer>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(o => o.JobPostingId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Offer>()
+                .HasOne<User>().WithMany().HasForeignKey(o => o.CreatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Offer>()
+                .HasOne<User>().WithMany().HasForeignKey(o => o.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Offer>()
+                .HasOne<User>().WithMany().HasForeignKey(o => o.WithdrawnByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Nhật ký thư: NoAction ở mọi tham chiếu — nhật ký phải sống lâu hơn thứ nó nói về.
+            modelBuilder.Entity<EmailLog>()
+                .HasOne<ARI.Domain.Entities.Application>().WithMany().HasForeignKey(e => e.ApplicationId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<EmailLog>()
+                .HasOne<User>().WithMany().HasForeignKey(e => e.SentByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Người quyết định tại các cổng duyệt của ADR-061 — NoAction ở cả ba: đây là dấu vết
+            // ai đã duyệt shortlist / ký JD, không được biến mất theo tài khoản.
+            modelBuilder.Entity<ARI.Domain.Entities.Application>()
+                .HasOne<User>().WithMany().HasForeignKey(a => a.HmDecisionByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JobPosting>()
+                .HasOne<User>().WithMany().HasForeignKey(j => j.HmSignOffByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Đội tuyển dụng của tin (ADR-061): xoá tin thì đội không còn nghĩa (Cascade), nhưng
+            // GIỮ dòng khi người dùng bị xoá (NoAction) — đây là dấu vết ai đã duyệt/quyết định.
+            modelBuilder.Entity<JobHiringTeamMember>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(m => m.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<JobHiringTeamMember>()
+                .HasOne<User>().WithMany().HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<JobHiringTeamMember>()
+                .HasOne<User>().WithMany().HasForeignKey(m => m.AddedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
 
             // ===== candidate_accounts =====
             modelBuilder.Entity<CandidateRefreshToken>()
@@ -366,6 +460,15 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<AvailabilitySlot>()
                 .HasOne<JobPosting>().WithMany().HasForeignKey(s => s.JobPostingId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // Khung giờ rảnh của Hiring Manager (ADR-067): xoá tin thì cuốn theo, vì ngoài tin đó
+            // ra chúng không còn nghĩa gì. Người khai thì KHÔNG cascade — xoá tài khoản không được
+            // âm thầm xoá ràng buộc lịch của những buổi đã xếp theo nó.
+            modelBuilder.Entity<HiringManagerAvailability>()
+                .HasOne<JobPosting>().WithMany().HasForeignKey(a => a.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<HiringManagerAvailability>()
+                .HasOne<User>().WithMany().HasForeignKey(a => a.HiringManagerUserId)
+                .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<InterviewRoundConfig>()
                 .HasOne<JobPosting>().WithMany().HasForeignKey(r => r.JobPostingId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -470,6 +573,56 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<PlaybookDocument>()
                 .HasIndex(p => p.DeletedAt).HasDatabaseName("idx_playbook_docs_active_deleted");
 
+            // === Phiếu yêu cầu tuyển dụng (ADR-063) ===
+            // Ba màn đọc bảng này theo ba trục khác nhau: HM lọc phiếu của mình, Recruiter lọc phiếu
+            // được giao, HR Leader lọc hàng chờ `pending`.
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasIndex(r => r.RequestedByUserId).HasDatabaseName("idx_recruitment_requests_requested_by");
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasIndex(r => r.AssignedRecruiterId).HasDatabaseName("idx_recruitment_requests_assigned_recruiter");
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasIndex(r => r.Status).HasDatabaseName("idx_recruitment_requests_status");
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasIndex(r => r.DeletedAt).HasDatabaseName("idx_recruitment_requests_active_deleted");
+
+            // MỘT phiếu chỉ sinh MỘT tin — chặn ở DB chứ không chỉ ở handler, cùng lý lẽ với
+            // "một thư mời sống trên mỗi hồ sơ" (ADR-061): hai request đồng thời cùng dựng tin từ
+            // một phiếu thì kiểm tra ở tầng ứng dụng đều đọc thấy "chưa có tin" rồi cùng ghi.
+            // Lọc bỏ tin đã xoá mềm để dựng lại được sau khi lỡ xoá.
+            modelBuilder.Entity<JobPosting>()
+                .HasIndex(j => j.RecruitmentRequestId)
+                .IsUnique()
+                .HasFilter("recruitment_request_id IS NOT NULL AND deleted_at IS NULL")
+                .HasDatabaseName("ux_job_postings_recruitment_request_id");
+
+            // MỘT phiếu chỉ một bản JD đã soạn (ADR-064) — cùng lý lẽ với unique index ngay trên:
+            // hai request đồng thời cùng mở trình soạn đều đọc thấy "chưa có bản nào" rồi cùng ghi.
+            // Tên đội là DUY NHẤT — hai đội cùng tên thì mọi thống kê theo đội đều vô nghĩa.
+            // Postgres so sánh phân biệt hoa thường, nên handler tự chuẩn hoá trước khi kiểm trùng;
+            // index này là chốt chặn cuối cho hai request đồng thời.
+            modelBuilder.Entity<Department>()
+                .HasIndex(d => d.Name)
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL")
+                .HasDatabaseName("ux_departments_name");
+
+            // Recruiter mở màn xếp lịch là hỏi đúng một câu: "vòng này HM rảnh giờ nào" → tra theo
+            // (tin, vòng). Khai index vì câu đó chạy mỗi lần mở modal chọn ca, không phải thỉnh thoảng.
+            modelBuilder.Entity<HiringManagerAvailability>()
+                .HasIndex(a => new { a.JobPostingId, a.RoundNumber })
+                .HasDatabaseName("idx_hm_availabilities_job_round");
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.DepartmentId).HasDatabaseName("idx_users_department_id");
+            modelBuilder.Entity<RecruitmentRequest>()
+                .HasIndex(r => r.DepartmentId).HasDatabaseName("idx_recruitment_requests_department_id");
+
+            modelBuilder.Entity<JdDocument>()
+                .HasIndex(d => d.RecruitmentRequestId)
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL")
+                .HasDatabaseName("ux_jd_documents_recruitment_request_id");
+
             // === RÀNG BUỘC DUY NHẤT — cũng thuộc lớp áp tay đã mất ở ADR-055 ===
             // Không có chúng, DB cho phép trùng email tài khoản, trùng mã phỏng vấn 6 ký tự,
             // trùng khoá cấu hình hệ thống và trùng token đăng nhập. Khôi phục ĐÚNG như Supabase
@@ -489,6 +642,42 @@ namespace ARI.Infrastructure.Data
                 .HasIndex(t => t.TokenHash).IsUnique().HasDatabaseName("ux_candidate_refresh_tokens_token_hash");
             modelBuilder.Entity<MagicLink>()
                 .HasIndex(m => m.TokenHash).IsUnique().HasDatabaseName("ux_magic_links_token_hash");
+
+            // --- Thư mời nhận việc (ADR-061).
+            // MỘT offer sống cho mỗi hồ sơ. Đây là ràng buộc chịu tải nhất của tính năng: "hai
+            // offer, hai mức lương, gửi cả hai" không thể chặn đáng tin bằng một câu if trong lệnh.
+            // Offer đã khép (thu hồi/từ chối/hết hạn) KHÔNG chiếm chỗ — vẫn ra được offer mới.
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.ApplicationId)
+                .IsUnique()
+                .HasFilter("deleted_at IS NULL AND status NOT IN ('withdrawn', 'declined', 'expired')")
+                .HasDatabaseName("ux_offers_application_live");
+            // Tác vụ nền quét offer quá hạn mỗi 30 phút.
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => new { o.Status, o.ExpiresAt })
+                .HasFilter("deleted_at IS NULL")
+                .HasDatabaseName("idx_offers_expiry_sweep");
+
+            // --- Nhật ký thư đã gửi (ADR-061): truy vấn chính là "mọi thư của hồ sơ này, mới nhất trước".
+            modelBuilder.Entity<EmailLog>()
+                .HasIndex(e => new { e.ApplicationId, e.CreatedAt })
+                .HasDatabaseName("idx_email_logs_application_created");
+
+            // --- Đội tuyển dụng của tin (ADR-061).
+            // Một người chỉ có MỘT dòng trên một tin. Cố ý KHÔNG lọc deleted_at: gán lại người đã
+            // gỡ thì phải hồi sinh dòng cũ (giữ nguyên lịch sử), không chèn dòng thứ hai.
+            modelBuilder.Entity<JobHiringTeamMember>()
+                .HasIndex(m => new { m.JobPostingId, m.UserId })
+                .IsUnique()
+                .HasDatabaseName("ux_job_hiring_team_members_job_user");
+            // Mỗi tin nhiều nhất MỘT Hiring Manager chính. Chặn ở tầng DB vì đây là người mà chữ
+            // ký duyệt chặn phễu và là người chốt kết quả — hai người cùng tưởng mình giữ cổng thì
+            // không có câu trả lời đúng nào cho "ai phải duyệt".
+            modelBuilder.Entity<JobHiringTeamMember>()
+                .HasIndex(m => m.JobPostingId)
+                .IsUnique()
+                .HasFilter("is_primary = true AND deleted_at IS NULL")
+                .HasDatabaseName("ux_job_hiring_team_members_primary");
 
             // --- Job Board: bộ lọc công khai + tìm theo kỹ năng.
             modelBuilder.Entity<JobPosting>()

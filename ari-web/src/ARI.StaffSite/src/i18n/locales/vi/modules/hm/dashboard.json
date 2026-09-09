@@ -1,0 +1,55 @@
+{
+  "title": "Xin chào {{name}}",
+  "description": "Tổng quan các tin tuyển dụng bạn phụ trách với vai trò Hiring Manager.",
+  "loading": "Đang tải dữ liệu...",
+  "loadError": "Không tải được dữ liệu tổng quan. Vui lòng thử lại.",
+  "stats": {
+    "assignedJobs": "Tin được giao",
+    "activeJobs": "Đang tuyển",
+    "awaitingSignOff": "Chờ bạn ký duyệt",
+    "awaitingDecision": "Chờ bạn quyết định",
+    "awaitingShortlist": "Hồ sơ chờ bạn duyệt",
+    "awaitingOfferApproval": "Thư mời chờ duyệt"
+  },
+  "jobs": {
+    "title": "Tin tuyển dụng của bạn",
+    "description": "Các tin bạn được thêm vào đội tuyển dụng.",
+    "emptyTitle": "Bạn chưa được giao tin nào",
+    "emptyDescription": "Khi bộ phận tuyển dụng thêm bạn vào đội của một tin, tin đó sẽ hiện ở đây.",
+    "noDepartment": "Chưa có phòng ban",
+    "applicantCount_one": "{{count}} ứng viên",
+    "applicantCount_other": "{{count}} ứng viên",
+    "needsSignOff": "Chờ ký duyệt",
+    "viewAll": "Xem tất cả"
+  },
+  "waitingRooms": {
+    "title_one": "{{count}} ứng viên đang chờ bạn cho vào phòng phỏng vấn",
+    "title_other": "{{count}} ứng viên đang chờ bạn cho vào phòng phỏng vấn",
+    "unknownCandidate": "Ứng viên",
+    "round": "Vòng {{number}}",
+    "action": "Mở phòng"
+  },
+  "shortlist": {
+    "title": "Hồ sơ chờ bạn duyệt",
+    "count_one": "{{count}} hồ sơ",
+    "count_other": "{{count}} hồ sơ",
+    "emptyTitle": "Không có hồ sơ nào chờ bạn",
+    "emptyDescription": "Bộ phận tuyển dụng duyệt hồ sơ xong sẽ chuyển sang cho bạn quyết định."
+  },
+  "quickActions": {
+    "title": "Lối tắt",
+    "newRequest": "Phiếu yêu cầu tuyển dụng",
+    "interviewRooms": "Phòng phỏng vấn",
+    "evaluations": "Kết quả phỏng vấn",
+    "offers": "Thư mời nhận việc"
+  },
+  "signOff": {
+    "title": "Tin chờ bạn ký duyệt",
+    "hint": "Chữ ký của bạn là điều kiện để tin được đăng — hãy mở file JD ra đọc trước khi ký."
+  },
+  "offers": {
+    "title": "Thư mời chờ duyệt",
+    "count_one": "{{count}} thư đang chờ ý kiến của bạn",
+    "count_other": "{{count}} thư đang chờ ý kiến của bạn"
+  }
+}

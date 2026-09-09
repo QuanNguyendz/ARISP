@@ -153,10 +153,9 @@ public class RubricScoringTests
 
     /// <summary>Chưa khai rubric: hệ thống chạy y như trước ADR-060 (điểm + verdict của AI).</summary>
     [Fact]
-    public async Task Without_a_rubric_the_ai_score_and_verdict_are_kept()
+    public async Task Chua_khai_rubric_thi_KHONG_cham()
     {
         var job = PracticeData.Job();
-        job.InterviewPassScore = 90;                              // ngưỡng cao, nhưng không có rubric thì không áp
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id, type: "real");
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
@@ -164,18 +163,23 @@ public class RubricScoringTests
 
         await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
-        var eval = Assert.Single(uow.Repo<Evaluation>().Items);
-        Assert.Equal(82m, eval.OverallScore!.Value);
-        Assert.Equal("pass", eval.AiVerdict);
-        Assert.Empty(ai.LastEvaluationContext!.Criteria);
+        // KHÔNG sinh báo cáo. Trước đây chỗ này lấy thẳng điểm 82 và verdict "pass" do model tự
+        // đưa ra — hai con số không phải trung bình có trọng số của gì cả, mà lại quyết định
+        // đậu/trượt của người thật (ADR-062).
+        Assert.Empty(uow.Repo<Evaluation>().Items);
+        // Trạng thái hồ sơ không bị đụng tới, phiên vẫn đóng bình thường.
+        Assert.Equal("interview", app.Status);
     }
 
     /// <summary>
-    /// Có rubric mà AI không chấm nổi tiêu chí nào → giữ điểm AI, KHÔNG âm thầm cho 0.
-    /// Cho 0 ở đây là đánh trượt ứng viên vì lỗi của model.
+    /// Có rubric mà model không chấm nổi tiêu chí nào → KHÔNG sinh báo cáo.
+    ///
+    /// Hai lối thoát đều sai nên không chọn cái nào: cho 0 điểm là đánh trượt ứng viên vì lỗi của
+    /// model; lấy điểm tổng model tự đưa ra là quay lại đúng thứ ADR-060/062 đã loại bỏ. Dừng lại
+    /// và chấm lại sau khi xử lý là lựa chọn duy nhất trung thực (ADR-062).
     /// </summary>
     [Fact]
-    public async Task Rubric_present_but_no_criterion_scored_falls_back_to_ai_score()
+    public async Task Co_rubric_ma_model_khong_cham_tieu_chi_nao_thi_KHONG_cham()
     {
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id, status: "interview");
@@ -185,9 +189,9 @@ public class RubricScoringTests
 
         await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
-        var eval = Assert.Single(uow.Repo<Evaluation>().Items);
-        Assert.Equal(66m, eval.OverallScore!.Value);
-        Assert.Equal("not_pass", eval.AiVerdict);
+        // Không có gì hợp lệ để ghi: không cho 0 (đánh trượt oan vì lỗi model), cũng không lấy
+        // điểm 66 do model tự đưa ra.
+        Assert.Empty(uow.Repo<Evaluation>().Items);
     }
 
     /// <summary>Buổi THỬ cũng chấm theo đúng rubric — ứng viên luyện tập trên cùng thước đo.</summary>
@@ -219,9 +223,10 @@ public class RubricScoringTests
 
         await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
-        var eval = Assert.Single(uow.Repo<Evaluation>().Items);
-        Assert.Equal(95m, eval.OverallScore!.Value);              // giữ điểm AI vì không có rubric áp dụng
-        Assert.Empty(ai.LastEvaluationContext!.Criteria);
+        // Rubric của tin khác KHÔNG áp dụng → coi như tin này chưa khai rubric → KHÔNG chấm.
+        Assert.Empty(uow.Repo<Evaluation>().Items);
+        // Và dừng TRƯỚC khi gọi model: không tiêu token cho một bản đánh giá chắc chắn bị bỏ.
+        Assert.Null(ai.LastEvaluationContext);
     }
 
     /// <summary>Rubric đã xoá mềm phải hết tác dụng ngay (ADR-025).</summary>
@@ -238,7 +243,7 @@ public class RubricScoringTests
 
         await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
 
-        var eval = Assert.Single(uow.Repo<Evaluation>().Items);
-        Assert.Equal(95m, eval.OverallScore!.Value);
+        // Rubric đã xoá mềm KHÔNG áp dụng → coi như chưa khai rubric → KHÔNG chấm.
+        Assert.Empty(uow.Repo<Evaluation>().Items);
     }
 }

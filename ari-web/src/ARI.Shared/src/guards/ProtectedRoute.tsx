@@ -1,28 +1,11 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { ROLE, ROLE_HOME, normalizeRole } from '@ari/shared/utils/roles'
 
 interface ProtectedRouteProps {
   allowedRoles: string[]
   children: ReactNode
-}
-
-// Normalize role to match backend format (with underscore)
-function normalizeRole(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_')
-  // Handle common variations
-  if (r === 'superadmin') return 'super_admin'
-  if (r === 'hradmin') return 'hr_admin'
-  if (r === 'recruiter') return 'recruiter'
-  if (r === 'candidate') return 'candidate'
-  return r
-}
-
-const ROLE_DASHBOARD_MAP: Record<string, string> = {
-  super_admin: '/super-admin/dashboard',
-  hr_admin: '/hr/dashboard',
-  recruiter: '/recruiter/dashboard',
-  candidate: '/',
 }
 
 export default function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
@@ -37,7 +20,7 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
   const userRole = normalizeRole(user?.role || '')
 
   // Get appropriate login path based on route type
-  const isCandidateRoute = normalizedAllowedRoles.includes('candidate')
+  const isCandidateRoute = normalizedAllowedRoles.includes(ROLE.Candidate)
   const loginPath = isCandidateRoute ? '/auth/candidate-login' : '/auth/login'
 
   // Not authenticated
@@ -49,7 +32,7 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
   const isAllowed = normalizedAllowedRoles.includes(userRole)
   if (!isAllowed) {
     // Redirect to user's own dashboard based on their role
-    const userDashboard = ROLE_DASHBOARD_MAP[userRole] || '/auth/login'
+    const userDashboard = ROLE_HOME[userRole] || '/auth/login'
     return <Navigate to="/403" replace state={{ from: location, redirectTo: userDashboard }} />
   }
 

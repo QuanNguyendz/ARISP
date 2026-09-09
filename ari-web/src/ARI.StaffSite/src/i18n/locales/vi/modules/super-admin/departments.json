@@ -1,0 +1,29 @@
+{
+  "title": "Đội / Bộ phận",
+  "description": "Danh sách đội của công ty. Mỗi tài khoản nhân sự thuộc đúng một đội — đội này quyết định phiếu yêu cầu tuyển dụng ghi tên bộ phận nào.",
+  "create": "Thêm đội",
+  "loading": "Đang tải...",
+  "inactive": "Ngừng hoạt động",
+  "memberCount": "{{count}} người",
+  "empty": {
+    "title": "Chưa có đội nào",
+    "description": "Thêm các đội của công ty để gán cho tài khoản nhân sự. Hiring Manager chưa được gán đội thì chưa lập được phiếu yêu cầu tuyển dụng."
+  },
+  "modal": {
+    "createTitle": "Thêm đội",
+    "editTitle": "Sửa đội",
+    "name": "Tên đội",
+    "namePlaceholder": "VD: Backend Team",
+    "code": "Mã đội",
+    "codePlaceholder": "VD: BE",
+    "description": "Mô tả",
+    "active": "Đang hoạt động",
+    "activeHint": "Đội giải thể thì bỏ tích ở đây thay vì xoá — phiếu và tài khoản cũ vẫn phải tra được tên đội.",
+    "cancel": "Huỷ",
+    "submit": "Lưu"
+  },
+  "errors": {
+    "loadFailed": "Không tải được danh sách đội.",
+    "saveFailed": "Không lưu được đội."
+  }
+}

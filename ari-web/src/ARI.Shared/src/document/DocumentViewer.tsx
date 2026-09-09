@@ -100,13 +100,55 @@ function DocxRender({
   )
 }
 
+/**
+ * Khung xem tài liệu **không kèm hộp thoại** — dùng được cả trong lớp phủ lẫn nhúng thẳng vào trang.
+ *
+ * Tách ra vì màn chi tiết tin cần đọc CV **ngay tại chỗ** (không bắt mở lớp phủ rồi đóng lại cho mỗi
+ * ứng viên). Chép phần dựng sang đó là có hai bộ hiển thị tài liệu, và lần sửa sau chỉ một bộ được
+ * sửa — đúng kiểu trôi lệch mà bản xem trước JD vừa phải đi chữa.
+ *
+ * Tự lấp đầy khối cha, nên nơi dùng chỉ cần cho nó một chiều cao.
+ */
+export function DocumentPreview({ url, fileName }: { url: string; fileName?: string }) {
+  const { t } = useTranslation('modules/shared/documentViewer')
+  const name = fileName || ''
+  const kind = useMemo(() => {
+    const byName = detectKind(name)
+    return byName !== 'other' ? byName : detectKind(url)
+  }, [name, url])
+
+  if (kind === 'pdf')
+    return <iframe src={url} title={name} className="h-full w-full border-0" />
+
+  if (kind === 'docx') return <DocxRender url={url} t={t} />
+
+  if (kind === 'image')
+    return (
+      <div className="flex h-full w-full items-center justify-center overflow-auto bg-ink-100 dark:bg-ink-800 p-4">
+        <img src={url} alt={name} className="max-h-full max-w-full object-contain" />
+      </div>
+    )
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-10 text-center">
+      <FileText className="h-10 w-10 text-ink-400" />
+      <p className="max-w-sm text-sm text-ink-600 dark:text-ink-300">
+        {t('documentViewer.unsupportedFormat')}
+      </p>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+      >
+        <Download className="h-4 w-4" /> {t('documentViewer.download')}
+      </a>
+    </div>
+  )
+}
+
 function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) {
   const { t } = useTranslation('modules/shared/documentViewer')
-  const kind = useMemo(() => {
-    const byName = detectKind(doc.fileName)
-    return byName !== 'other' ? byName : detectKind(doc.url)
-  }, [doc])
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -152,31 +194,7 @@ function ViewerModal({ doc, onClose }: { doc: OpenedDoc; onClose: () => void }) 
 
         {/* Body */}
         <div className="flex-1 overflow-hidden">
-          {kind === 'pdf' && (
-            <iframe src={doc.url} title={doc.fileName} className="h-full w-full border-0" />
-          )}
-          {kind === 'docx' && <DocxRender url={doc.url} t={t} />}
-          {kind === 'image' && (
-            <div className="flex h-full w-full items-center justify-center overflow-auto bg-ink-100 dark:bg-ink-800 p-4">
-              <img src={doc.url} alt={doc.fileName} className="max-h-full max-w-full object-contain" />
-            </div>
-          )}
-          {kind === 'other' && (
-            <div className="flex h-full flex-col items-center justify-center gap-3 p-10 text-center">
-              <FileText className="h-10 w-10 text-ink-400" />
-              <p className="max-w-sm text-sm text-ink-600 dark:text-ink-300">
-                {t('documentViewer.unsupportedFormat')}
-              </p>
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-              >
-                <Download className="h-4 w-4" /> {t('documentViewer.download')}
-              </a>
-            </div>
-          )}
+          <DocumentPreview url={doc.url} fileName={doc.fileName} />
         </div>
       </div>
     </div>,

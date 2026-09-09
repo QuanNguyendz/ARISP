@@ -1,24 +1,10 @@
 import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { homePathForRole } from '@ari/shared/utils/roles'
 
 interface GuestRouteProps {
   children: ReactNode
-}
-
-// Chuẩn hoá role về định dạng backend (snake_case) — đồng bộ với ProtectedRoute
-function normalizeRole(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_')
-  if (r === 'superadmin') return 'super_admin'
-  if (r === 'hradmin') return 'hr_admin'
-  return r
-}
-
-const ROLE_HOME: Record<string, string> = {
-  super_admin: '/super-admin/dashboard',
-  hr_admin: '/hr/dashboard',
-  recruiter: '/recruiter/dashboard',
-  candidate: '/',
 }
 
 /**
@@ -34,8 +20,7 @@ export default function GuestRoute({ children }: GuestRouteProps) {
   }
 
   if (isAuthenticated && user) {
-    const home = ROLE_HOME[normalizeRole(user.role || '')] || '/'
-    return <Navigate to={home} replace />
+    return <Navigate to={homePathForRole(user.role) || '/'} replace />
   }
 
   return <>{children}</>

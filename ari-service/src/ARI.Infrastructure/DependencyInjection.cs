@@ -56,38 +56,30 @@ namespace ARI.Infrastructure
             services.AddScoped<ITokenService, Identity.JwtTokenService>();
             services.AddSingleton<IPasswordHasher, Identity.BcryptPasswordHasher>();
 
-            // AI provider switch (ADR-039): "rag" -> microservice Python (RagServiceProvider);
-            // "openai" | "local" -> OpenAIProvider in-process (fallback, không khoá cứng vào Python).
-            var aiProvider = configuration["AI:Provider"]
-                ?? Environment.GetEnvironmentVariable("AI_PROVIDER")
-                ?? "openai";
+            // RAG service (ADR-039/062) là đường DUY NHẤT cho AI — không còn cờ `AI:Provider`.
+            //
+            // Trước đây có nhánh dự phòng `openai` chạy in-process. Nhánh đó KHÔNG truy hồi gì: nó
+            // nhồi toàn bộ chunk cv/jd/playbook vào prompt (không vector, không xếp hạng, không giới
+            // hạn) rồi tự nhận là RAG — `document_type` không được tôn trọng nên `compliance` (chủ đề
+            // CẤM hỏi) nằm cùng rổ với tài liệu tham khảo. Giữ một nhánh giả RAG có thể âm thầm thay
+            // nhánh thật là rủi ro lớn hơn hẳn giá trị "không khoá cứng vào Python".
+            //
+            // Bỏ luôn cờ chứ không chỉ bỏ nhánh: còn cờ là còn cấu hình sai được, mà lần này sai thì
+            // hỏng im lặng chứ không báo gì.
+            var ragServiceUrl = configuration["RagService:Url"]
+                ?? Environment.GetEnvironmentVariable("RAG_SERVICE_URL")
+                ?? "http://rag-service:8000";
 
-            if (string.Equals(aiProvider, "rag", StringComparison.OrdinalIgnoreCase))
+            // Typed HttpClient tới RAG service nội bộ (không qua Nginx).
+            services.AddHttpClient<RagServiceProvider>(c =>
             {
-                var ragServiceUrl = configuration["RagService:Url"]
-                    ?? Environment.GetEnvironmentVariable("RAG_SERVICE_URL")
-                    ?? "http://rag-service:8000";
+                c.BaseAddress = new Uri(ragServiceUrl);
+                c.Timeout = TimeSpan.FromSeconds(120); // sinh câu hỏi/đánh giá có thể lâu
+            });
 
-                // Typed HttpClient tới RAG service nội bộ (không qua Nginx).
-                services.AddHttpClient<RagServiceProvider>(c =>
-                {
-                    c.BaseAddress = new Uri(ragServiceUrl);
-                    c.Timeout = TimeSpan.FromSeconds(120); // sinh câu hỏi/đánh giá có thể lâu
-                });
-
-                services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<RagServiceProvider>());
-                services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<RagServiceProvider>());
-                services.AddScoped<IRagIngestionService>(sp => sp.GetRequiredService<RagServiceProvider>());
-            }
-            else
-            {
-                // OpenAIProvider implements cả IAIProvider lẫn IEmbeddingProvider.
-                services.AddScoped<OpenAIProvider>();
-                services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
-                services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<OpenAIProvider>());
-                // Ingestion chạy trong tiến trình (chunk+embed+INSERT) khi không dùng RAG service.
-                services.AddScoped<IRagIngestionService, LocalRagIngestionService>();
-            }
+            services.AddScoped<IAIProvider>(sp => sp.GetRequiredService<RagServiceProvider>());
+            services.AddScoped<IEmbeddingProvider>(sp => sp.GetRequiredService<RagServiceProvider>());
+            services.AddScoped<IRagIngestionService>(sp => sp.GetRequiredService<RagServiceProvider>());
 
             services.AddScoped<IGeminiProvider, GeminiProvider>();
 
@@ -169,14 +161,10 @@ namespace ARI.Infrastructure
             else
                 services.AddScoped<ITTSService, MockTTSService>();
 
-            // Avatar (HeyGen Streaming): BE mint session token; FE chạy @heygen/streaming-avatar.
-            if (!string.IsNullOrWhiteSpace(mediaOptions.HeyGen.ApiKey))
-                services.AddHttpClient<IAvatarService, Media.HeyGenAvatarService>();
-            else
-                services.AddScoped<IAvatarService, MockAvatarService>();
 
             services.AddScoped<IDocumentParserService, DocumentParserService>();
             services.AddScoped<IJdStampService, Documents.JdStampService>();
+            services.AddScoped<IJdDocumentRenderer, Documents.JdDocumentRenderer>();
 
             services.AddTransient<IEmailService, EmailService>();
 

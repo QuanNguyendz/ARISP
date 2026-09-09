@@ -7,6 +7,8 @@ using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluations;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
+using ARI.Domain.Entities;
 using Xunit;
 
 namespace ARI.Application.UnitTests.EvaluationReview;
@@ -17,9 +19,15 @@ namespace ARI.Application.UnitTests.EvaluationReview;
 /// </summary>
 public class GetEvaluationsQueryHandlerTests
 {
+    /// <summary>Mặc định chạy dưới quyền quản trị viên để các bài test dưới đây kiểm ĐÚNG logic
+    /// truy vấn (lọc, phân trang, join) chứ không bị phạm vi dữ liệu che mất. Phần phạm vi có
+    /// nhóm test riêng ở cuối file.</summary>
     private static Task<Result<PaginatedResponse<EvaluationListItemResponse>>> Run(
-        InMemoryUnitOfWork uow, Guid? jobId = null, string? status = null, int page = 1, int pageSize = 20)
-        => new GetEvaluationsQueryHandler(uow).Handle(new GetEvaluationsQuery(jobId, status, page, pageSize), CancellationToken.None);
+        InMemoryUnitOfWork uow, Guid? jobId = null, string? status = null, int page = 1, int pageSize = 20,
+        Guid? userId = null, string? role = null)
+        => new GetEvaluationsQueryHandler(uow).Handle(
+            new GetEvaluationsQuery(jobId, status, page, pageSize, userId ?? Guid.NewGuid(), role ?? AppRoles.HrAdmin),
+            CancellationToken.None);
 
     [Fact]
     public async Task Excludes_practice_evaluations()
@@ -143,5 +151,83 @@ public class GetEvaluationsQueryHandlerTests
         Assert.True(res.IsSuccess);
         Assert.Equal(0, res.Value!.Total);
         Assert.Empty(res.Value.Items);
+    }
+
+    // ===== Phạm vi dữ liệu (Phase 1 của ADR-061) =====
+    //
+    // Trước đây query này KHÔNG nhận danh tính nào: bất kỳ ai qua được policy InternalStaff đều
+    // phân trang được toàn bộ báo cáo phỏng vấn của công ty, kèm tên, email ứng viên và điểm số.
+
+    private static (InMemoryUnitOfWork uow, Guid ownerA, Guid ownerB) TwoRecruitersWithOneEvalEach()
+    {
+        var ownerA = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        var jobA = EvaluationData.Job("Tin của A", ownerA);
+        var jobB = EvaluationData.Job("Tin của B", ownerB);
+        var appA = EvaluationData.App(jobA.Id, name: "Ứng viên của A");
+        var appB = EvaluationData.App(jobB.Id, name: "Ứng viên của B");
+
+        var uow = new InMemoryUnitOfWork()
+            .Seed(jobA).Seed(jobB).Seed(appA).Seed(appB)
+            .Seed(EvaluationData.Eval(appA.Id)).Seed(EvaluationData.Eval(appB.Id));
+
+        return (uow, ownerA, ownerB);
+    }
+
+    [Fact]
+    public async Task Recruiter_only_sees_evaluations_of_their_own_jobs()
+    {
+        var (uow, ownerA, _) = TwoRecruitersWithOneEvalEach();
+
+        var res = await Run(uow, userId: ownerA, role: AppRoles.Recruiter);
+
+        Assert.Equal(1, res.Value!.Total);
+        Assert.Equal("Ứng viên của A", Assert.Single(res.Value.Items).CandidateName);
+    }
+
+    [Fact]
+    public async Task Total_count_is_scoped_too_not_just_the_page()
+    {
+        // Lọc sau khi phân trang sẽ cho ra những trang trống lỗ chỗ và một con số tổng vẫn là
+        // tổng của cả công ty — tự nó đã là rò rỉ thông tin.
+        var (uow, ownerA, _) = TwoRecruitersWithOneEvalEach();
+
+        var res = await Run(uow, userId: ownerA, role: AppRoles.Recruiter);
+
+        Assert.Equal(1, res.Value!.Total);
+    }
+
+    [Fact]
+    public async Task Admin_still_sees_every_evaluation()
+    {
+        var (uow, _, _) = TwoRecruitersWithOneEvalEach();
+
+        var res = await Run(uow, role: AppRoles.HrAdmin);
+
+        Assert.Equal(2, res.Value!.Total);
+    }
+
+    [Fact]
+    public async Task Filtering_by_a_job_outside_your_scope_returns_nothing()
+    {
+        // Không đủ nếu chỉ lọc theo phạm vi rồi để nguyên bộ lọc jobPostingId: người dùng đưa
+        // thẳng id tin của người khác vào query string vẫn phải ra rỗng.
+        var (uow, ownerA, ownerB) = TwoRecruitersWithOneEvalEach();
+        var jobOfB = uow.Repo<JobPosting>().Items.Single(j => j.CreatedByUserId == ownerB);
+
+        var res = await Run(uow, jobId: jobOfB.Id, userId: ownerA, role: AppRoles.Recruiter);
+
+        Assert.Equal(0, res.Value!.Total);
+        Assert.Empty(res.Value.Items);
+    }
+
+    [Fact]
+    public async Task Hiring_manager_with_no_assigned_jobs_sees_nothing()
+    {
+        var (uow, _, _) = TwoRecruitersWithOneEvalEach();
+
+        var res = await Run(uow, userId: Guid.NewGuid(), role: AppRoles.HiringManager);
+
+        Assert.Equal(0, res.Value!.Total);
     }
 }

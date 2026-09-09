@@ -6,14 +6,16 @@
     "totalUsers": "Total Users",
     "hrAdmin": "HR Admin",
     "recruiter": "Recruiter",
-    "lockedUsers": "Locked"
+    "lockedUsers": "Locked",
+    "hiringManager": "Hiring Manager"
   },
   "searchPlaceholder": "Search by name or email...",
   "filters": {
     "allRoles": "All Roles",
     "superAdmin": "Super Admin",
     "hrAdmin": "HR Admin",
-    "recruiter": "Recruiter"
+    "recruiter": "Recruiter",
+    "hiringManager": "Hiring Manager"
   },
   "table": {
     "headers": {
@@ -21,7 +23,8 @@
       "role": "Role",
       "status": "Status",
       "createdAt": "Created At",
-      "actions": "Actions"
+      "actions": "Actions",
+      "department": "Department"
     },
     "you": "(you)",
     "emptyName": "—",
@@ -34,7 +37,8 @@
     "status": {
       "active": "Active",
       "locked": "Locked"
-    }
+    },
+    "noDepartment": "No department"
   },
   "empty": {
     "title": "No users found",
@@ -61,7 +65,7 @@
     "emailPlaceholder": "you@company.com",
     "role": "Role",
     "department": "Department",
-    "departmentPlaceholder": "Optional",
+    "departmentPlaceholder": "Pick a department",
     "cancel": "Cancel",
     "submit": "Create Account"
   },
@@ -71,6 +75,7 @@
     "unlockFailed": "Failed to unlock.",
     "roleChangeFailed": "Failed to change role.",
     "deleteFailed": "Failed to delete account.",
-    "createFailed": "Failed to create account."
+    "createFailed": "Failed to create account.",
+    "departmentChangeFailed": "Could not change the account department."
   }
 }

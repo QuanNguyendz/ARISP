@@ -31,6 +31,9 @@
     "description": "Lịch hẹn đã qua nhưng chưa ghi nhận buổi phỏng vấn nào. Vui lòng liên hệ bộ phận tuyển dụng để được xếp lịch lại."
   },
   "badge": {
+    "scheduled": "Đã xếp lịch",
+    "invited": "Được mời",
+    "notStarted": "Chưa phỏng vấn",
     "missed": "Quá hạn",
     "practice": "Thử",
     "pass": "Pass",
@@ -39,7 +42,8 @@
     "inProgress": "Đang diễn ra",
     "noResult": "Chưa có kết quả",
     "practiceInterview": "Phỏng vấn thử",
-    "realInterview": "Phỏng vấn thật"
+    "realInterview": "Phỏng vấn thật",
+    "onlineTest": "Làm bài trực tuyến"
   },
   "criteria": {
     "byCriteria": "Theo tiêu chí",
@@ -111,18 +115,14 @@
     "title": "Vòng {{round}}: Chưa diễn ra",
     "description": "Vòng phỏng vấn này chưa bắt đầu. Bạn sẽ nhận được thông báo khi kết quả vòng trước được phê duyệt."
   },
-  "badge": {
-    "scheduled": "Đã xếp lịch",
-    "invited": "Được mời",
-    "notStarted": "Chưa phỏng vấn",
-    "missed": "Quá hạn",
-    "practice": "Thử",
-    "pass": "Pass",
-    "notPass": "Not Pass",
-    "pendingHr": "Chờ HR",
-    "inProgress": "Đang diễn ra",
-    "noResult": "Chưa có kết quả",
-    "practiceInterview": "Phỏng vấn thử",
-    "realInterview": "Phỏng vấn thật"
+  "onlineTest": {
+    "title": "Bài thi trắc nghiệm",
+    "locked": "Hồ sơ cần qua vòng duyệt CV trước khi làm bài.",
+    "readyTitle": "Bài thi trắc nghiệm đã sẵn sàng",
+    "readyDescription": "{{count}} câu · {{minutes}} phút. Bạn chỉ có MỘT lượt làm bài.",
+    "remoteHint": "Làm trực tuyến ngay tại đây — không cần tới văn phòng, không cần mã phỏng vấn.",
+    "start": "Bắt đầu làm bài",
+    "submittedTitle": "Đã nộp bài trắc nghiệm",
+    "submittedHint": "Bộ phận tuyển dụng sẽ thông báo kết quả khi chốt vòng này."
   }
 }

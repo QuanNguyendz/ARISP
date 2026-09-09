@@ -6,6 +6,7 @@ using ARI.Application.Common;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 
 namespace ARI.Application.Admin.Commands.ApproveAccountRequest
 {
@@ -18,17 +19,20 @@ namespace ARI.Application.Admin.Commands.ApproveAccountRequest
         private readonly IPasswordHasher _passwordHasher;
         private readonly IEmailService _emailService;
         private readonly INotificationService _notificationService;
+        private readonly IConfiguration _configuration;
 
         public ApproveAccountRequestCommandHandler(
             IUnitOfWork unitOfWork,
             IPasswordHasher passwordHasher,
             IEmailService emailService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _passwordHasher = passwordHasher;
             _emailService = emailService;
             _notificationService = notificationService;
+            _configuration = configuration;
         }
 
         public async Task<Result> Handle(ApproveAccountRequestCommand request, CancellationToken ct)
@@ -54,7 +58,10 @@ namespace ARI.Application.Admin.Commands.ApproveAccountRequest
                 PasswordHash = _passwordHasher.Hash(tempPw),
                 Role = req.Role,
                 FullName = req.FullName.Trim(),
-                Department = req.Department?.Trim(),
+                // ADR-065: phòng ban trên phiếu XIN TÀI KHOẢN chỉ là ĐỀ XUẤT dạng text, không
+                // phải khoá đội. Super Admin gán đội thật ở màn Users sau khi duyệt — gán mù theo
+                // một chuỗi gõ tay sẽ tạo ra liên kết sai mà không ai kiểm.
+                DepartmentId = null,
                 IsActive = true
             };
             await _unitOfWork.Repository<User>().AddAsync(newUser, ct);
@@ -70,7 +77,7 @@ namespace ARI.Application.Admin.Commands.ApproveAccountRequest
                 $"{{\"email\":\"{newUser.Email}\",\"role\":\"{newUser.Role}\"}}", ct);
             await _unitOfWork.SaveChangesAsync();
 
-            await AdminSupport.SendStaffWelcomeEmailAsync(_emailService, newUser, tempPw);
+            await AdminSupport.SendStaffWelcomeEmailAsync(_emailService, _configuration, newUser, tempPw);
 
             // Notify HR Leader (requester)
             await _notificationService.PublishUserEventAsync(req.RequestedByUserId, "ReceiveAccountRequestUpdate",

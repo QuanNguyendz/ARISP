@@ -20,21 +20,26 @@ internal sealed class FakeApplicationService : IApplicationService
     public Result<ApplicationResponse> SubmitResult { get; set; } =
         Result.Success(new ApplicationResponse { Id = Guid.NewGuid(), Status = "cv_submitted" });
 
+    /// <summary>Khi set: <see cref="SubmitApplicationAsync"/> ném lỗi (case "application service throws" của test-plan).</summary>
+    public Exception? SubmitThrows { get; set; }
+
     public Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
     {
         LastRequest = request;
         LastSource = source;
+        if (SubmitThrows != null) throw SubmitThrows;
         return Task.FromResult(SubmitResult);
     }
 
     public Task<Result<List<ApplicationResponse>>> GetAllApplicationsAsync(CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<List<ApplicationResponse>>> GetApplicationsByJobAsync(Guid jobPostingId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<List<ApplicationResponse>>> GetApplicationsForCreatorAsync(Guid creatorUserId, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<List<ApplicationResponse>>> GetApplicationsForJobsAsync(IReadOnlyCollection<Guid> jobPostingIds, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<ApplicationResponse>> GetApplicationByIdAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<ApplicationResponse>> UpdateApplicationStatusAsync(Guid id, string newStatus, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> OpenRoundForSchedulingAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, CancellationToken ct = default) => throw new NotImplementedException();
-    public Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default, ARI.Application.Emails.EmailOverride? emailOverride = null, Guid? actorUserId = null) => throw new NotImplementedException();
     public Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default) => throw new NotImplementedException();
 }
 

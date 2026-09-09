@@ -32,6 +32,26 @@ namespace ARI.Application.Options
                 .ToArray();
 
         /// <summary>
+        /// Các mốc NHẮC ứng viên chưa phản hồi thư mời nhận việc, tính bằng số GIỜ trước hạn
+        /// (mặc định "48,12" — tức trước 2 ngày và trước nửa ngày).
+        ///
+        /// Trước đây không có nhánh nhắc nào: `OfferEmail.BuildReminder` được viết ra rồi **không nơi
+        /// nào gọi**, nên ứng viên quá hạn bị âm thầm đánh dấu từ chối mà chưa từng được cảnh báo —
+        /// trong khi luồng phỏng vấn ngay bên cạnh vẫn nhắc ở 24h/3h. Để rỗng = tắt nhắc.
+        /// </summary>
+        public string OfferReminderHoursBeforeExpiry { get; set; } = "48,12";
+
+        /// <summary>Mốc nhắc thư mời đã chuẩn hoá: số nguyên dương, giảm dần, không trùng.</summary>
+        public int[] OfferReminderMarks() =>
+            (OfferReminderHoursBeforeExpiry ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(part => int.TryParse(part, out var hours) ? hours : 0)
+                .Where(hours => hours > 0)
+                .Distinct()
+                .OrderByDescending(hours => hours)
+                .ToArray();
+
+        /// <summary>
         /// Tự đánh trượt hồ sơ khi ứng viên KHÔNG tham dự buổi phỏng vấn đã hẹn (qua giờ mà không có
         /// phiên phỏng vấn thật nào). Tắt đi thì lịch quá giờ nằm im chờ nhân sự xử lý tay.
         /// </summary>

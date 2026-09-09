@@ -66,18 +66,17 @@ public class GetMediaConfigTests
         var session = Session(app.Id, "real");
         var uow = new InMemoryUnitOfWork().Seed(app).Seed(session);
 
-        // Kiosk bypass IDOR; provider ném lỗi → Deepgram/HeyGen null (nuốt lỗi, không sập phòng).
+        // Kiosk bypass IDOR; provider ném lỗi → Deepgram null (nuốt lỗi, không sập phòng).
         var res = await Svc(uow).GetMediaConfigAsync(session.Id, null, null, kioskAuthorized: true, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("real", res.Value.SessionType);
-        Assert.Equal(1200, res.Value.MaxDurationSeconds);   // 20' × 60 — trần mỗi phiên gói LiveAvatar Essential
+        Assert.Equal(1200, res.Value.MaxDurationSeconds);   // 20' × 60 — trần buổi phỏng vấn thật
         Assert.Null(res.Value.Deepgram);
-        Assert.Null(res.Value.HeyGen);
     }
 
     [Fact]
-    public async Task Practice_session_has_no_avatar_and_20min_cap()
+    public async Task Practice_session_has_20min_cap()
     {
         var owner = Guid.NewGuid();
         var app = SchedulingData.Application(Guid.NewGuid(), owner);
@@ -87,7 +86,6 @@ public class GetMediaConfigTests
         var res = await Svc(uow).GetMediaConfigAsync(session.Id, owner, null, kioskAuthorized: false, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
-        Assert.Null(res.Value.HeyGen);                      // ADR-050: practice audio-only (không mint avatar)
         Assert.Equal(1200, res.Value.MaxDurationSeconds);   // 20' × 60
     }
 }

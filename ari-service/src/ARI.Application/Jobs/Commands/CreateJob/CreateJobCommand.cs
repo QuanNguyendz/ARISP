@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.RecruitmentRequests;
 using ARI.Application.Services;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -47,6 +49,36 @@ namespace ARI.Application.Jobs.Commands.CreateJob
             if (creator == null)
                 return Result.Failure<JobPostingResponse>("User not found for the current token.", CommonErrorCodes.Unauthorized);
 
+            // === ADR-063: mọi tin phải bắt nguồn từ một phiếu yêu cầu tuyển dụng đã duyệt ===
+            //
+            // Cưỡng chế ở ĐÂY chứ không bằng ràng buộc NOT NULL trên cột: cột phải để null được cho
+            // những tin có trước ADR-063 (xem chú thích ở entity). Handler là nơi duy nhất phân biệt
+            // được "tin mới" với "dữ liệu lịch sử".
+            if (request.RecruitmentRequestId is not { } requestId)
+                return Result.Failure<JobPostingResponse>(
+                    "Tin tuyển dụng phải được tạo từ một phiếu yêu cầu tuyển dụng đã duyệt.");
+
+            // Phiếu phải đã duyệt VÀ người dựng tin phải là Recruiter được phân công (hoặc admin).
+            // Dùng chung `RecruitmentRequestAccess` với trình soạn JD của ADR-064 — hai chỗ trả lời
+            // cùng một câu hỏi, để mỗi bên tự viết lại thì chỉ cần một bên được nới là quyền rò qua
+            // đường đó.
+            var (recruitmentRequest, accessError, accessCode) =
+                await RecruitmentRequestAccess.LoadExecutableAsync(
+                    _unitOfWork, requestId, command.UserId, creator.Role, ct);
+
+            if (recruitmentRequest == null)
+                return accessCode == null
+                    ? Result.Failure<JobPostingResponse>(accessError!)
+                    : Result.Failure<JobPostingResponse>(accessError!, accessCode);
+
+            // Một phiếu chỉ sinh một tin. DB cũng có unique index chặn hai request đồng thời; kiểm
+            // ở đây để trả về câu tiếng Việt thay vì lỗi ràng buộc thô.
+            var existing = await _unitOfWork.Repository<JobPosting>().CountAsync(
+                j => j.RecruitmentRequestId == requestId && j.DeletedAt == null, ct);
+            if (existing > 0)
+                return Result.Failure<JobPostingResponse>(
+                    "Phiếu này đã có tin tuyển dụng rồi.", CommonErrorCodes.Conflict);
+
             var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
 
             var job = new JobPosting
@@ -84,10 +116,27 @@ namespace ARI.Application.Jobs.Commands.CreateJob
                 JobCategory = request.JobCategory?.ToLower(),
                 ApplicationDeadline = request.ApplicationDeadline,
                 IsUrgent = request.IsUrgent,
-                Vacancies = request.Vacancies.HasValue && request.Vacancies.Value > 0 ? request.Vacancies : null
+                Vacancies = request.Vacancies.HasValue && request.Vacancies.Value > 0 ? request.Vacancies : null,
+                RecruitmentRequestId = requestId
             };
 
             await _unitOfWork.Repository<JobPosting>().AddAsync(job, ct);
+
+            // Người lập phiếu TRỞ THÀNH Hiring Manager của tin, tự động.
+            //
+            // Đây là mắt xích không được để hở: ADR-061 quy định cổng ký duyệt JD chỉ tồn tại khi
+            // tin CÓ người được gán làm HM ("cờ bật cổng suy ra từ việc có ai được gán"). Nếu
+            // Recruiter phải nhớ gán tay thì quên một lần là tin đi thẳng ra job board mà không ai
+            // ký duyệt — mà bản thân phiếu đã nói rõ ai là người có nhu cầu tuyển.
+            await _unitOfWork.Repository<JobHiringTeamMember>().AddAsync(new JobHiringTeamMember
+            {
+                JobPostingId = job.Id,
+                UserId = recruitmentRequest.RequestedByUserId,
+                RoleOnJob = JobTeamRoles.HiringManager,
+                IsPrimary = true,
+                AddedByUserId = command.UserId,
+            }, ct);
+
             await _unitOfWork.SaveChangesAsync(ct);
 
             // Ingest JD vào RAG (chunk+embed+pgvector) để retrieve khi phỏng vấn. Không chặn

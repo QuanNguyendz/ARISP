@@ -155,7 +155,7 @@ namespace ARI.Infrastructure.AI
             using var resp = await _http.PostAsJsonAsync("/complete-json",
                 new { systemInstruction, userContent }, JsonOpts, ct);
             resp.EnsureSuccessStatusCode();
-            // Service trả về JSON object thô — trả nguyên chuỗi (giống OpenAIProvider.CompleteJsonAsync).
+            // Service trả về JSON object thô — trả nguyên chuỗi cho người gọi tự parse.
             return await resp.Content.ReadAsStringAsync(ct);
         }
     }

@@ -21,6 +21,8 @@ import sharedNavVi from './locales/vi/modules/shared/nav.json'
 import sharedNavEn from './locales/en/modules/shared/nav.json'
 import sharedDeviceCheckVi from './locales/vi/modules/shared/deviceCheck.json'
 import sharedDeviceCheckEn from './locales/en/modules/shared/deviceCheck.json'
+import sharedEmailComposerVi from './locales/vi/modules/shared/emailComposer.json'
+import sharedEmailComposerEn from './locales/en/modules/shared/emailComposer.json'
 import sharedAssignSchedulePanelVi from './locales/vi/modules/shared/assignSchedulePanel.json'
 import sharedAssignSchedulePanelEn from './locales/en/modules/shared/assignSchedulePanel.json'
 import sharedDesignSystemVi from './locales/vi/modules/shared/designSystem.json'
@@ -42,6 +44,7 @@ export const sharedNamespaces = [
   'modules/shared/nav',
   'modules/shared/deviceCheck',
   'modules/shared/assignSchedulePanel',
+  'modules/shared/emailComposer',
   'modules/shared/designSystem',
   'modules/shared/documentViewer',
   'modules/shared/imageCrop',
@@ -60,6 +63,7 @@ export const sharedResources = {
     'modules/shared/nav': sharedNavVi,
     'modules/shared/deviceCheck': sharedDeviceCheckVi,
     'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelVi,
+    'modules/shared/emailComposer': sharedEmailComposerVi,
     'modules/shared/designSystem': sharedDesignSystemVi,
     'modules/shared/documentViewer': sharedDocumentViewerVi,
     'modules/shared/imageCrop': sharedImageCropVi,
@@ -76,6 +80,7 @@ export const sharedResources = {
     'modules/shared/nav': sharedNavEn,
     'modules/shared/deviceCheck': sharedDeviceCheckEn,
     'modules/shared/assignSchedulePanel': sharedAssignSchedulePanelEn,
+    'modules/shared/emailComposer': sharedEmailComposerEn,
     'modules/shared/designSystem': sharedDesignSystemEn,
     'modules/shared/documentViewer': sharedDocumentViewerEn,
     'modules/shared/imageCrop': sharedImageCropEn,

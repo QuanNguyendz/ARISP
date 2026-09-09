@@ -24,9 +24,19 @@ public class SubmitOnlineTestCommandHandlerTests
     private SubmitOnlineTestCommand Cmd(Guid appId, Dictionary<Guid, List<int>> answers)
         => new(appId, _accountId, Email, answers);
 
-    private static Task<Result<ARI.Application.DTOs.OnlineTestResultDto>> Run(
+    private static Task<Result<ARI.Application.DTOs.OnlineTestSubmitAckDto>> Run(
         InMemoryUnitOfWork uow, RecordingNotificationService notif, SubmitOnlineTestCommand cmd)
         => new SubmitOnlineTestCommandHandler(uow, notif).Handle(cmd, CancellationToken.None);
+
+    /// <summary>
+    /// Bản ghi bài thi đã lưu — nguồn sự thật của việc chấm điểm.
+    ///
+    /// Vì sao test đọc ở đây thay vì đọc phản hồi: từ nay phản hồi trả cho ỨNG VIÊN chỉ là biên
+    /// nhận, không mang điểm hay kết quả (điểm sàn và verdict là thông tin nội bộ). Bài vẫn được
+    /// chấm ngay — chỉ là chấm xong thì cất vào bảng cho nhân sự, không đưa ra màn hình ứng viên.
+    /// </summary>
+    private static OnlineTestSubmission Graded(InMemoryUnitOfWork uow)
+        => Assert.Single(uow.Repo<OnlineTestSubmission>().Items);
 
     // ---------- Công thức chấm ----------
 
@@ -48,11 +58,10 @@ public class SubmitOnlineTestCommandHandlerTests
         }));
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(100m, res.Value.Score);
-        Assert.True(res.Value.IsPassed);
-        Assert.Equal(2, res.Value.CorrectCount);
-        Assert.Equal(2, res.Value.TotalQuestions);
-        Assert.Equal(70, res.Value.PassScore);
+        Assert.Equal(100m, Graded(uow).Score);
+        Assert.True(Graded(uow).IsPassed);
+        Assert.Equal(2, Graded(uow).CorrectCount);
+        Assert.Equal(2, Graded(uow).TotalQuestions);
         Assert.Single(uow.Repo<OnlineTestSubmission>().Items);
     }
 
@@ -76,10 +85,10 @@ public class SubmitOnlineTestCommandHandlerTests
         }));
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(66.67m, res.Value.Score);
-        Assert.False(res.Value.IsPassed);
-        Assert.Equal(2, res.Value.CorrectCount);
-        Assert.Equal(3, res.Value.TotalQuestions);
+        Assert.Equal(66.67m, Graded(uow).Score);
+        Assert.False(Graded(uow).IsPassed);
+        Assert.Equal(2, Graded(uow).CorrectCount);
+        Assert.Equal(3, Graded(uow).TotalQuestions);
     }
 
     [Fact]
@@ -99,8 +108,8 @@ public class SubmitOnlineTestCommandHandlerTests
             [q2.Id] = new() { 3 },
         }));
 
-        Assert.Equal(50m, res.Value.Score);
-        Assert.True(res.Value.IsPassed);
+        Assert.Equal(50m, Graded(uow).Score);
+        Assert.True(Graded(uow).IsPassed);
     }
 
     [Theory]
@@ -120,8 +129,8 @@ public class SubmitOnlineTestCommandHandlerTests
             Cmd(app.Id, new() { [q.Id] = picked.ToList() }));
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(expectCorrect ? 1 : 0, res.Value.CorrectCount);
-        Assert.Equal(expectCorrect ? 100m : 0m, res.Value.Score);
+        Assert.Equal(expectCorrect ? 1 : 0, Graded(uow).CorrectCount);
+        Assert.Equal(expectCorrect ? 100m : 0m, Graded(uow).Score);
     }
 
     [Fact]
@@ -138,10 +147,10 @@ public class SubmitOnlineTestCommandHandlerTests
         var res = await Run(uow, new RecordingNotificationService(),
             Cmd(app.Id, new() { [q1.Id] = new() { 0 } }));
 
-        Assert.Equal(1, res.Value.CorrectCount);
-        Assert.Equal(2, res.Value.TotalQuestions);
-        Assert.Equal(50m, res.Value.Score);
-        Assert.False(res.Value.IsPassed);
+        Assert.Equal(1, Graded(uow).CorrectCount);
+        Assert.Equal(2, Graded(uow).TotalQuestions);
+        Assert.Equal(50m, Graded(uow).Score);
+        Assert.False(Graded(uow).IsPassed);
     }
 
     [Fact]
@@ -157,9 +166,9 @@ public class SubmitOnlineTestCommandHandlerTests
         var answers = bank.ToDictionary(q => q.Id, _ => new List<int> { 0 });
         var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, answers));
 
-        Assert.Equal(2, res.Value.TotalQuestions); // = perTest, không phải 5
-        Assert.Equal(2, res.Value.CorrectCount);
-        Assert.Equal(100m, res.Value.Score);
+        Assert.Equal(2, Graded(uow).TotalQuestions); // = perTest, không phải 5
+        Assert.Equal(2, Graded(uow).CorrectCount);
+        Assert.Equal(100m, Graded(uow).Score);
     }
 
     // ---------- Cổng chặn ----------

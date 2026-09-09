@@ -8,7 +8,6 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
-  XCircle,
   ArrowLeft,
   Send,
   Clock,
@@ -16,7 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
-import type { OnlineTestResult } from '@ari/shared/types/onlineTest'
+import type { OnlineTestSubmitAck } from '@ari/shared/types/onlineTest'
 
 function errMsg(e: unknown, fallback: string, unauthorized: string): string {
   const x = e as { response?: { data?: { message?: string }; status?: number } }
@@ -31,35 +30,20 @@ function fmtTime(totalSeconds: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-/** Thẻ hiển thị kết quả đạt/không đạt. */
-function ResultCard({
-  score,
-  isPassed,
-  passScore,
-  detail,
-}: {
-  score: number
-  isPassed: boolean
-  passScore: number
-  detail?: string
-}) {
+/**
+ * Thẻ báo ĐÃ NỘP BÀI — cố ý không có điểm, điểm sàn hay kết quả đạt/trượt.
+ *
+ * Điểm sàn là thông tin nội bộ của bộ phận tuyển dụng, và kết quả chỉ công bố khi cả vòng đã chốt.
+ * Server cũng không gửi các số đó xuống nữa (`CandidateOnlineTestDto`), nên đây không phải một lớp
+ * che mắt — không còn gì để che.
+ */
+function SubmittedCard({ detail }: { detail?: string }) {
   const { t } = useTranslation('modules/candidate/onlineTest')
   return (
-    <div
-      className={`rounded-2xl border p-6 text-center shadow-sm ${
-        isPassed ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'
-      }`}
-    >
-      {isPassed ? (
-        <CheckCircle2 className="mx-auto mb-2 h-12 w-12 text-emerald-600" />
-      ) : (
-        <XCircle className="mx-auto mb-2 h-12 w-12 text-red-500" />
-      )}
-      <h2 className={`text-lg font-bold ${isPassed ? 'text-emerald-700' : 'text-red-600'}`}>
-        {isPassed ? t('passed') : t('notPassed')}
-      </h2>
-      <p className="mt-1 text-3xl font-extrabold text-ink-900">{Math.round(score)}/100</p>
-      <p className="mt-1 text-sm text-ink-500">{t('page.passScoreLine', { score: passScore })}</p>
+    <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6 text-center shadow-sm">
+      <CheckCircle2 className="mx-auto mb-2 h-12 w-12 text-brand-600" />
+      <h2 className="text-lg font-bold text-brand-800">{t('page.submittedTitle')}</h2>
+      <p className="mt-1 text-sm text-ink-600">{t('page.submittedHint')}</p>
       {detail && <p className="mt-1 text-sm text-ink-500">{detail}</p>}
       <Link
         to="/candidate/applications"
@@ -77,7 +61,7 @@ export default function CandidateOnlineTestPage() {
   const [answers, setAnswers] = useState<Record<string, number[]>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [result, setResult] = useState<OnlineTestResult | null>(null)
+  const [result, setResult] = useState<OnlineTestSubmitAck | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   // Chống gian lận nhẹ: đếm số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus cửa sổ).
   // Giá trị "sống" giữ ở ref (gửi khi nộp, kể cả tự nộp lúc hết giờ); state chỉ để hiện cảnh báo.
@@ -210,19 +194,11 @@ export default function CandidateOnlineTestPage() {
             </Link>
           </div>
         ) : result ? (
-          <ResultCard
-            score={result.score}
-            isPassed={result.isPassed}
-            passScore={result.passScore}
-            detail={t('page.resultDetail', { correct: result.correctCount, total: result.totalQuestions })}
+          <SubmittedCard
+            detail={t('page.submittedCount', { total: result.totalQuestions })}
           />
         ) : data?.alreadySubmitted ? (
-          <ResultCard
-            score={data.score ?? 0}
-            isPassed={!!data.isPassed}
-            passScore={data.passScore}
-            detail={t('page.alreadyDone')}
-          />
+          <SubmittedCard detail={t('page.alreadyDone')} />
         ) : questions.length === 0 ? (
           <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
             <AlertCircle className="mx-auto mb-3 h-12 w-12 text-ink-300" />
@@ -241,7 +217,6 @@ export default function CandidateOnlineTestPage() {
                 {t('page.progress', {
                   answered: answeredCount,
                   total: questions.length,
-                  pass: data?.passScore,
                 })}
               </span>
               {timeLeft !== null && (

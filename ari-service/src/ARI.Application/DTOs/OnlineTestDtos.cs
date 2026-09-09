@@ -29,22 +29,40 @@ namespace ARI.Application.DTOs
     public record CandidateTestQuestionDto(Guid Id, string QuestionText, List<string> Options, string QuestionType);
 
     /// <summary>Đề thi cho ứng viên (đã bốc ngẫu nhiên) + trạng thái đã nộp (nếu có).</summary>
+    /// <summary>
+    /// Bài trắc nghiệm dưới góc nhìn ỨNG VIÊN.
+    ///
+    /// <b>KHÔNG mang điểm, điểm sàn hay kết quả đạt/trượt.</b> Điểm sàn là thông tin nội bộ của bộ
+    /// phận tuyển dụng, và kết quả chỉ được công bố khi cả vòng đã chốt — ứng viên chỉ biết "đã nộp
+    /// bài, chờ kết quả". Cùng mô hình bảo mật với báo cáo phỏng vấn (ADR-051/053): điểm và verdict
+    /// chỉ ra khỏi server khi nhân sự chủ động chia sẻ.
+    ///
+    /// Ẩn ở tầng DTO chứ không ở giao diện: giấu trên màn hình mà vẫn gửi số xuống trình duyệt thì
+    /// mở tab mạng ra là đọc được.
+    /// </summary>
     public record CandidateOnlineTestDto(
         Guid ApplicationId,
         Guid JobPostingId,
         string JobTitle,
         int RoundNumber,
-        int PassScore,
         int DurationMinutes,
         int TotalQuestions,
         List<CandidateTestQuestionDto> Questions,
         bool AlreadySubmitted,
-        decimal? Score,
-        bool? IsPassed,
         DateTimeOffset? SubmittedAt,
         bool CvPassed);
 
-    /// <summary>Kết quả chấm bài trắc nghiệm.</summary>
+    /// <summary>
+    /// Biên nhận nộp bài — thứ DUY NHẤT ứng viên nhận lại sau khi bấm nộp.
+    ///
+    /// Bài vẫn được chấm ngay và tự động (số liệu nằm ở <c>online_test_submissions</c> cho nhân sự),
+    /// nhưng điểm không đi kèm phản hồi này: công bố ngay tại chỗ là công bố trước khi vòng chốt.
+    /// </summary>
+    public record OnlineTestSubmitAckDto(
+        DateTimeOffset SubmittedAt,
+        int TotalQuestions);
+
+    /// <summary>Kết quả chấm bài trắc nghiệm — dùng ở phía NHÂN SỰ.</summary>
     public record OnlineTestResultDto(
         decimal Score,
         bool IsPassed,

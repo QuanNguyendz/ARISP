@@ -33,6 +33,13 @@ export interface EvaluationReport {
   /** Điểm khớp CV-JD do Gemini chấm lúc ứng tuyển (ADR-030). Null = hồ sơ chưa có phân tích. */
   cvMatchScore?: number | null;
   cvMatchSummary?: string | null;
+
+  /** ===== Người có thẩm quyền chốt kết quả này (ADR-061) ===== */
+  jobPostingId?: string;
+  /** Tin có Hiring Manager chính không. False = mọi thứ như trước ADR-061. */
+  requiresHmApproval?: boolean;
+  hiringManagerUserId?: string | null;
+  hiringManagerName?: string | null;
 }
 
 export interface CriterionScore {
@@ -91,6 +98,20 @@ export interface HRReview {
   candidateFeedback?: string;
   createdAt: string;
   updatedAt: string;
+
+  /** ===== ADR-061 ===== */
+  /** Ảnh chụp vai trò người chốt lúc chốt: hiring_manager | hr_admin | super_admin. */
+  reviewerRole?: string | null;
+  /** Quản trị viên đã chốt THAY Hiring Manager của tin. */
+  isHrFallback?: boolean;
+  fallbackReason?: string | null;
+  /** Đề xuất cấp bậc + dải lương — nguồn điền sẵn cho thư mời nhận việc. */
+  suggestedLevel?: string | null;
+  suggestedSalaryMin?: number | null;
+  suggestedSalaryMax?: number | null;
+  suggestedSalaryCurrency?: string | null;
+  strengths?: string | null;
+  concerns?: string | null;
 }
 
 export interface EvaluationFilter {
@@ -109,4 +130,18 @@ export interface SubmitEvaluationReviewPayload {
   shareEvaluation?: boolean;
   shareFeedback?: boolean;
   candidateFeedback?: string;
+
+  /** ===== ADR-061 ===== */
+  /**
+   * Lý do quản trị viên chốt THAY Hiring Manager. Server bắt buộc tối thiểu 10 ký tự khi tin có
+   * Hiring Manager mà người chốt không phải người đó; bỏ qua ở mọi trường hợp khác.
+   */
+  fallbackReason?: string;
+  /** Đề xuất của người chốt, dùng để điền sẵn thư mời nhận việc. */
+  suggestedLevel?: string;
+  suggestedSalaryMin?: number;
+  suggestedSalaryMax?: number;
+  suggestedSalaryCurrency?: string;
+  strengths?: string;
+  concerns?: string;
 }

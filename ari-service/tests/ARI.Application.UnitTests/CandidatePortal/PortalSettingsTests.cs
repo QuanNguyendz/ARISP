@@ -1,181 +1,347 @@
 using System;
-using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.CandidatePortal;
+using ARI.Application.Common;
 using ARI.Application.DTOs;
-using ARI.Application.UnitTests.JobBoard;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Entities;
 using Xunit;
 
 namespace ARI.Application.UnitTests.CandidatePortal;
 
-/// <summary>Cài đặt portal (<see cref="GetPortalSettingsQueryHandler"/> / <see cref="UpdatePortalSettingsCommandHandler"/>): IDOR + chuẩn hóa ngôn ngữ.</summary>
-public class PortalSettingsQueryTests
+internal static class PortalSettingsData
 {
-    private static CandidateAccount Account(Guid id, string? settingsJson = null)
-        => new() { Id = id, Email = "cand@example.io", FullName = "Nguyen Van A", SettingsJson = settingsJson };
+    public static readonly Guid CandidateA = Guid.Parse("10000000-0000-0000-0000-000000000001");
+    public static CandidateAccount Account(string? settingsJson = null)
+        => new() { Id = CandidateA, Email = "candidate@example.com", FullName = "Candidate User", SettingsJson = settingsJson };
+}
+
+/// <summary>
+/// Đọc cài đặt portal (<see cref="GetPortalSettingsQueryHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "GetPortalSettings" (UTCID01–08): không có tài khoản → unauthorized; JSON hợp lệ → map; null/rỗng/khoảng trắng/
+/// JSON hỏng/"null" → default; và lỗi repo.
+/// </summary>
+public class GetPortalSettingsQueryHandlerTests
+{
+    private static Task<Result<CandidateSettingsDto>> Run(InMemoryUnitOfWork uow)
+        => new GetPortalSettingsQueryHandler(uow).Handle(new GetPortalSettingsQuery(PortalSettingsData.CandidateA), CancellationToken.None);
 
     [Fact]
-    public async Task Get_unknown_candidate_is_unauthorized()
+    public async Task UTCID01_Unknown_candidate()
     {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await new GetPortalSettingsQueryHandler(uow)
-            .Handle(new GetPortalSettingsQuery(Guid.NewGuid()), CancellationToken.None);
-
-        Assert.False(res.IsSuccess);
-        Assert.Contains("Không tìm thấy tài khoản", res.Error);
+        var res = await Run(new InMemoryUnitOfWork());
+        Assert.True(res.IsFailure);
+        Assert.Equal("Không tìm thấy tài khoản ứng viên.", res.Error);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Get_returns_saved_settings()
+    public async Task UTCID02_Customized_settings()
     {
-        var id = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(Account(id, "{\"language\":\"en\"}"));
-
-        var res = await new GetPortalSettingsQueryHandler(uow)
-            .Handle(new GetPortalSettingsQuery(id), CancellationToken.None);
-
+        var json = "{\"language\":\"en\",\"allowHrViewProfile\":false,\"allowRecording\":false,\"marketingEmail\":true}";
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account(json)));
         Assert.True(res.IsSuccess);
         Assert.Equal("en", res.Value.Language);
+        Assert.False(res.Value.AllowHrViewProfile);
+        Assert.False(res.Value.AllowRecording);
+        Assert.True(res.Value.MarketingEmail);
     }
 
-    [Fact]
-    public async Task Get_defaults_when_no_settings_stored()
+    [Theory]
+    [InlineData(null)]           // UTCID03
+    [InlineData("")]             // UTCID04
+    [InlineData("   ")]          // UTCID05
+    [InlineData("{not json}")]   // UTCID06
+    [InlineData("null")]         // UTCID07
+    public async Task UTCID03_to_07_default_settings(string? settingsJson)
     {
-        var id = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(Account(id, settingsJson: null));
-
-        var res = await new GetPortalSettingsQueryHandler(uow)
-            .Handle(new GetPortalSettingsQuery(id), CancellationToken.None);
-
-        Assert.Equal("vi", res.Value.Language);   // default DTO
-    }
-
-    [Fact]
-    public async Task Update_unknown_candidate_is_unauthorized()
-    {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await new UpdatePortalSettingsCommandHandler(uow)
-            .Handle(new UpdatePortalSettingsCommand(Guid.NewGuid(), new CandidateSettingsDto()), CancellationToken.None);
-
-        Assert.False(res.IsSuccess);
-        Assert.Equal(0, uow.SaveChangesCount);
-    }
-
-    [Fact]
-    public async Task Update_normalizes_unknown_language_to_vi_and_persists()
-    {
-        var id = Guid.NewGuid();
-        var acc = Account(id);
-        var uow = new InMemoryUnitOfWork().Seed(acc);
-
-        var res = await new UpdatePortalSettingsCommandHandler(uow)
-            .Handle(new UpdatePortalSettingsCommand(id, new CandidateSettingsDto { Language = "fr" }), CancellationToken.None);
-
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account(settingsJson)));
         Assert.True(res.IsSuccess);
-        Assert.Equal("vi", res.Value.Language);            // ngôn ngữ lạ → vi
+        Assert.Equal("vi", res.Value.Language);              // default DTO
+        Assert.True(res.Value.AllowHrViewProfile);
+    }
+
+    [Fact]
+    public async Task UTCID08_Repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailGetByIdFor<CandidateAccount>("Candidate DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Candidate DB Error", ex.Message);
+    }
+}
+
+/// <summary>
+/// Cập nhật cài đặt portal (<see cref="UpdatePortalSettingsCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "UpdatePortalSettings" (UTCID01–09): unauthorized; Settings null → default vi; chuẩn hoá ngôn ngữ (fr→vi);
+/// lưu tuỳ chỉnh; và lỗi phụ thuộc (lookup/update/save).
+/// </summary>
+public class UpdatePortalSettingsCommandHandlerTests
+{
+    private static Task<Result<CandidateSettingsDto>> Run(InMemoryUnitOfWork uow, CandidateSettingsDto? settings)
+        => new UpdatePortalSettingsCommandHandler(uow).Handle(new UpdatePortalSettingsCommand(PortalSettingsData.CandidateA, settings), CancellationToken.None);
+
+    [Fact]
+    public async Task UTCID01_Unknown_candidate()
+    {
+        var res = await Run(new InMemoryUnitOfWork(), new CandidateSettingsDto());
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UTCID02_Null_settings_defaults_vi()
+    {
+        var acc = PortalSettingsData.Account();
+        var uow = new InMemoryUnitOfWork().Seed(acc);
+        var res = await Run(uow, null);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("vi", res.Value.Language);
         Assert.False(string.IsNullOrEmpty(acc.SettingsJson));
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
     [Fact]
-    public async Task Update_keeps_english_language()
+    public async Task UTCID03_Language_en()
     {
-        var id = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(Account(id));
-
-        var res = await new UpdatePortalSettingsCommandHandler(uow)
-            .Handle(new UpdatePortalSettingsCommand(id, new CandidateSettingsDto { Language = "en" }), CancellationToken.None);
-
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()), new CandidateSettingsDto { Language = "en" });
         Assert.Equal("en", res.Value.Language);
+    }
+
+    [Fact]
+    public async Task UTCID04_Language_vi()
+    {
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()), new CandidateSettingsDto { Language = "vi" });
+        Assert.Equal("vi", res.Value.Language);
+    }
+
+    [Fact]
+    public async Task UTCID05_Unsupported_language_coerced_vi()
+    {
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()), new CandidateSettingsDto { Language = "fr" });
+        Assert.Equal("vi", res.Value.Language);
+    }
+
+    [Fact]
+    public async Task UTCID06_Customized_preferences()
+    {
+        var acc = PortalSettingsData.Account();
+        var settings = new CandidateSettingsDto
+        {
+            Language = "en",
+            InterviewInvite = new NotificationChannelPref { Email = false, Push = true },
+            AllowRecording = false,
+            MarketingEmail = true,
+        };
+        var res = await Run(new InMemoryUnitOfWork().Seed(acc), settings);
+        Assert.True(res.IsSuccess);
+        Assert.Equal("en", res.Value.Language);
+        Assert.False(res.Value.InterviewInvite.Email);
+        Assert.True(res.Value.InterviewInvite.Push);
+        Assert.False(res.Value.AllowRecording);
+        Assert.True(res.Value.MarketingEmail);
+        Assert.Contains("marketingEmail", acc.SettingsJson!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UTCID07_Lookup_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailGetByIdFor<CandidateAccount>("Candidate DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, new CandidateSettingsDto()));
+        Assert.Equal("Candidate DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID08_Update_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()).FailUpdateFor<CandidateAccount>("Update Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, new CandidateSettingsDto()));
+        Assert.Equal("Update Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID09_Save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, new CandidateSettingsDto()));
+        Assert.Equal("Save Error", ex.Message);
     }
 }
 
-/// <summary>Xuất dữ liệu cá nhân (<see cref="ExportMyDataQueryHandler"/>): file JSON gồm hồ sơ + đơn ứng tuyển.</summary>
+/// <summary>
+/// Xuất dữ liệu cá nhân (<see cref="ExportMyDataQueryHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "ExportMyData" (UTCID01–09): unauthorized; JSON file (application/json, tên arisp-data-yyyyMMdd.json);
+/// apps sắp CreatedAt desc + JobTitle map (null khi thiếu job); JSON hồ sơ hỏng → mảng rỗng; null fields OK; lỗi repo.
+/// </summary>
 public class ExportMyDataQueryHandlerTests
 {
+    private static Task<Result<ExportFileDto>> Run(InMemoryUnitOfWork uow)
+        => new ExportMyDataQueryHandler(uow).Handle(new ExportMyDataQuery(PortalSettingsData.CandidateA), CancellationToken.None);
+
+    private static ARI.Domain.Entities.Application App(Guid job, DateTimeOffset createdAt, string status = "cv_submitted")
+        => new() { CandidateAccountId = PortalSettingsData.CandidateA, JobPostingId = job, CandidateName = "N", CandidateEmail = "c@x.io", Status = status, CreatedAt = createdAt };
+
+    private static JsonElement Json(ExportFileDto file) => JsonDocument.Parse(file.Bytes).RootElement;
+
     [Fact]
-    public async Task Unknown_candidate_is_unauthorized()
+    public async Task UTCID01_Unknown_candidate()
     {
-        var uow = new InMemoryUnitOfWork();
-
-        var res = await new ExportMyDataQueryHandler(uow)
-            .Handle(new ExportMyDataQuery(Guid.NewGuid()), CancellationToken.None);
-
-        Assert.False(res.IsSuccess);
+        var res = await Run(new InMemoryUnitOfWork());
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
     }
 
     [Fact]
-    public async Task Exports_profile_and_applications_as_json()
+    public async Task UTCID02_No_applications()
     {
-        var id = Guid.NewGuid();
-        var acc = new CandidateAccount { Id = id, Email = "me@example.io", FullName = "Nguyen Van A" };
-        var job = JobBoardData.PublicJob(title: "Backend Developer");
-        var app = new ARI.Domain.Entities.Application
-        {
-            CandidateAccountId = id,
-            JobPostingId = job.Id,
-            CandidateName = "Nguyen Van A",
-            CandidateEmail = "me@example.io",
-            Status = "cv_submitted",
-        };
-        var uow = new InMemoryUnitOfWork().Seed(acc).Seed(job).Seed(app);
-
-        var res = await new ExportMyDataQueryHandler(uow)
-            .Handle(new ExportMyDataQuery(id), CancellationToken.None);
-
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()));
         Assert.True(res.IsSuccess);
         Assert.Equal("application/json", res.Value.ContentType);
         Assert.StartsWith("arisp-data-", res.Value.FileName);
-        Assert.EndsWith(".json", res.Value.FileName);
-        var json = Encoding.UTF8.GetString(res.Value.Bytes);
-        Assert.Contains("me@example.io", json);
-        Assert.Contains("Backend Developer", json);   // job title được resolve vào đơn
+        Assert.Equal(0, Json(res.Value).GetProperty("applications").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task UTCID03_Applications_ordered_with_job_title()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var jobA = Guid.NewGuid(); var jobB = Guid.NewGuid();
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account())
+            .Seed(new JobPosting { Id = jobA, Title = "Older Job", CreatedByUserId = Guid.NewGuid() },
+                  new JobPosting { Id = jobB, Title = "Newer Job", CreatedByUserId = Guid.NewGuid() })
+            .Seed(App(jobA, now.AddDays(-1)), App(jobB, now));
+
+        var res = await Run(uow);
+
+        var apps = Json(res.Value).GetProperty("applications");
+        Assert.Equal(2, apps.GetArrayLength());
+        Assert.Equal("Newer Job", apps[0].GetProperty("JobTitle").GetString());   // mới nhất trước
+    }
+
+    [Fact]
+    public async Task UTCID04_Missing_job_title_null()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()).Seed(App(Guid.NewGuid(), DateTimeOffset.UtcNow));
+        var res = await Run(uow);
+        var app = Json(res.Value).GetProperty("applications")[0];
+        Assert.Equal(JsonValueKind.Null, app.GetProperty("JobTitle").ValueKind);
+    }
+
+    [Fact]
+    public async Task UTCID05_Invalid_profile_json_empty_collections()
+    {
+        var acc = PortalSettingsData.Account();
+        acc.SkillsJson = "{bad"; acc.ExperienceJson = "{bad"; acc.EducationJson = "{bad";
+        var res = await Run(new InMemoryUnitOfWork().Seed(acc));
+        var profile = Json(res.Value).GetProperty("profile");
+        Assert.Equal(0, profile.GetProperty("Skills").GetArrayLength());
+        Assert.Equal(0, profile.GetProperty("Experience").GetArrayLength());
+        Assert.Equal(0, profile.GetProperty("Education").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task UTCID06_Null_optional_fields_ok()
+    {
+        var res = await Run(new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()));   // optional fields null
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task UTCID07_Candidate_repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailGetByIdFor<CandidateAccount>("Candidate DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Candidate DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID08_Application_repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()).FailFindFor<ARI.Domain.Entities.Application>("Application DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Application DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID09_Job_repo_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(PortalSettingsData.Account()).Seed(App(Guid.NewGuid(), DateTimeOffset.UtcNow)).FailFindFor<JobPosting>("Job DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Job DB Error", ex.Message);
     }
 }
 
-/// <summary>Đăng xuất mọi thiết bị (<see cref="LogoutAllDevicesCommandHandler"/>): thu hồi mọi refresh token còn hiệu lực của đúng ứng viên.</summary>
+/// <summary>
+/// Đăng xuất mọi thiết bị (<see cref="LogoutAllDevicesCommandHandler"/>) — test-plan Report5 Unit v1.2,
+/// tab "LogoutAllDevices" (UTCID01–07): revoke mọi refresh token active của ứng viên, trả số lượng; và lỗi phụ thuộc.
+/// </summary>
 public class LogoutAllDevicesCommandHandlerTests
 {
-    private static CandidateRefreshToken Token(Guid cand, DateTimeOffset? revokedAt = null)
-        => new() { CandidateAccountId = cand, TokenHash = "h", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), RevokedAt = revokedAt };
+    private static Task<Result<int>> Run(InMemoryUnitOfWork uow)
+        => new LogoutAllDevicesCommandHandler(uow).Handle(new LogoutAllDevicesCommand(PortalSettingsData.CandidateA), CancellationToken.None);
+
+    private static CandidateRefreshToken Token(DateTimeOffset? revokedAt = null)
+        => new() { CandidateAccountId = PortalSettingsData.CandidateA, TokenHash = Guid.NewGuid().ToString("N"), ExpiresAt = DateTimeOffset.UtcNow.AddDays(10), RevokedAt = revokedAt };
 
     [Fact]
-    public async Task Revokes_all_active_tokens_of_candidate_and_returns_count()
+    public async Task UTCID01_No_tokens()
     {
-        var me = Guid.NewGuid();
-        var other = Guid.NewGuid();
-        var active1 = Token(me);
-        var active2 = Token(me);
-        var alreadyRevoked = Token(me, revokedAt: DateTimeOffset.UtcNow.AddMinutes(-5));
-        var otherActive = Token(other);
-        var uow = new InMemoryUnitOfWork().Seed(active1, active2, alreadyRevoked, otherActive);
+        var uow = new InMemoryUnitOfWork();
+        var res = await Run(uow);
+        Assert.Equal(0, res.Value);
+        Assert.Equal(0, uow.SaveChangesCount);
+    }
 
-        var res = await new LogoutAllDevicesCommandHandler(uow)
-            .Handle(new LogoutAllDevicesCommand(me), CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal(2, res.Value);
-        Assert.NotNull(active1.RevokedAt);
-        Assert.NotNull(active2.RevokedAt);
-        Assert.Null(otherActive.RevokedAt);         // không đụng người khác
+    [Fact]
+    public async Task UTCID02_One_token_revoked()
+    {
+        var token = Token();
+        var uow = new InMemoryUnitOfWork().Seed(token);
+        var res = await Run(uow);
+        Assert.Equal(1, res.Value);
+        Assert.NotNull(token.RevokedAt);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
     [Fact]
-    public async Task No_active_tokens_returns_zero_without_saving()
+    public async Task UTCID03_Three_tokens_revoked()
     {
-        var me = Guid.NewGuid();
-        var uow = new InMemoryUnitOfWork().Seed(Token(me, revokedAt: DateTimeOffset.UtcNow));
+        var uow = new InMemoryUnitOfWork().Seed(Token(), Token(), Token());
+        var res = await Run(uow);
+        Assert.Equal(3, res.Value);
+    }
 
-        var res = await new LogoutAllDevicesCommandHandler(uow)
-            .Handle(new LogoutAllDevicesCommand(me), CancellationToken.None);
-
+    [Fact]
+    public async Task UTCID04_Only_revoked_tokens()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Token(revokedAt: DateTimeOffset.UtcNow.AddMinutes(-1)));
+        var res = await Run(uow);
         Assert.Equal(0, res.Value);
         Assert.Equal(0, uow.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UTCID05_Find_error()
+    {
+        var uow = new InMemoryUnitOfWork().FailFindFor<CandidateRefreshToken>("Token DB Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Token DB Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID06_Update_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Token()).FailUpdateFor<CandidateRefreshToken>("Update Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Update Error", ex.Message);
+    }
+
+    [Fact]
+    public async Task UTCID07_Save_error()
+    {
+        var uow = new InMemoryUnitOfWork().Seed(Token()).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow));
+        Assert.Equal("Save Error", ex.Message);
     }
 }

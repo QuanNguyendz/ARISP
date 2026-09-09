@@ -96,7 +96,6 @@ export default function StaffSettingsView() {
     try {
       const saved = await profileService.updateProfile({
         fullName: fullName.trim(),
-        department: department.trim() || null,
       })
       setProfile(saved)
       setFullName(saved.fullName)
@@ -205,14 +204,11 @@ export default function StaffSettingsView() {
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">
                       {t('profile.department')}
                     </label>
-                    <input
-                      type="text"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      disabled={!profile}
-                      placeholder={t('profile.departmentPlaceholder')}
-                      className={inputClass}
-                    />
+                    {/* CHỈ ĐỌC (ADR-065). Trước đây ô này sửa được, nên ô "đội" khoá cứng trên phiếu
+                        yêu cầu tuyển dụng chỉ là hình thức: Hiring Manager của đội A vào đây đổi
+                        sang đội B rồi quay ra lập phiếu. Đội nay do Super Admin gán. */}
+                    <input type="text" value={department || '—'} disabled className={inputClass} />
+                    <p className="mt-1.5 text-xs text-ink-400">{t('profile.departmentLocked')}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink-600 dark:text-ink-400 mb-2">

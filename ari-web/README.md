@@ -46,8 +46,9 @@
 | Role            | Path                     | Mô tả                                    |
 | --------------- | ------------------------ | ---------------------------------------- |
 | **Super Admin** | `/super-admin/*`         | System config, HR account management     |
-| **HR Leader**   | `/hr/*`                  | Dashboard, jobs, candidates, evaluations |
-| **Recruiter**   | `/recruiter/*`           | Create jobs, manage candidates           |
+| **HR Leader**   | `/hr/*`                  | Dashboard, jobs, candidates, evaluations, offers |
+| **Hiring Manager** | `/hm/*`               | Duyệt shortlist, ký duyệt JD, chốt kết quả phỏng vấn, duyệt thư mời (ADR-061) |
+| **Recruiter**   | `/recruiter/*`           | Create jobs, manage candidates, offers   |
 | **Candidate**   | `/candidate/*`           | Applications, portal                     |
 | **Public**      | `/`, `/jobs/*`           | Job board, job detail                    |
 | **Interview**   | `/interview/*`, `/kiosk` | AI interview room (always dark)          |
@@ -414,6 +415,7 @@ const { isDark, toggleTheme } = useThemeStore()
 /super-admin/*              → SuperAdminLayout
 /hr/*                        → HrLayout (dark toggle)
 /recruiter/*                 → RecruiterLayout
+/hm/*                        → HmLayout   (Hiring Manager — ADR-061)
 
 /candidate/*                 → CandidateLayout
 /portal/*                   → Magic link auth
@@ -443,13 +445,14 @@ const { isDark, toggleTheme } = useThemeStore()
 | `SuperAdminLayout` | `/super-admin/*`         | ❌               |
 | `HrLayout`         | `/hr/*`                  | ✅               |
 | `RecruiterLayout`  | `/recruiter/*`           | ❌               |
+| `HmLayout`         | `/hm/*`                  | ✅               |
 | `CandidateLayout`  | `/candidate/*`           | ❌               |
 | `InterviewLayout`  | `/interview/*`, `/kiosk` | ❌ (always dark) |
 
 ### Shared Components
 
 ```tsx
-// Import từ @components/shared
+// Import từ @ari/shared/ui
 import {
   PageHeader, // Tiêu đề + description
   StatsGrid, // Grid cho stats
@@ -457,7 +460,7 @@ import {
   EmptyState, // Empty state
   LoadingSpinner, // Loading
   ErrorAlert, // Error alert
-} from '@components/shared'
+} from '@ari/shared/ui'
 ```
 
 ---
@@ -469,7 +472,7 @@ import {
 ```tsx
 // src/pages/hr/NewPage.tsx
 import { Link } from 'react-router-dom'
-import { PageHeader } from '@components/shared'
+import { PageHeader } from '@ari/shared/ui'
 
 export default function NewPage() {
   return (

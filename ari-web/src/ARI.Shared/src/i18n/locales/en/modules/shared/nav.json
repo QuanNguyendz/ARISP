@@ -6,6 +6,7 @@
     "candidates": "Candidates",
     "interviews": "Interview Sessions",
     "evaluations": "Evaluations",
+    "offers": "Offers",
     "playbooks": "Playbook",
     "recruiters": "Assignment & load",
     "team": "HR Team",
@@ -13,7 +14,9 @@
     "help": "Help & Documentation",
     "searchPlaceholder": "Search candidates, job postings...",
     "createJob": "Create Job",
-    "roleLabel": "HR Admin"
+    "roleLabel": "HR Admin",
+    "recruitmentRequests": "Recruitment Requests",
+    "jdTemplate": "JD template"
   },
   "recruiter": {
     "workspace": "Recruiter Workspace",
@@ -22,11 +25,26 @@
     "candidates": "Candidates",
     "interviewCode": "Interview Code",
     "evaluations": "Evaluations",
+    "offers": "Offers",
     "interviews": "Interviews",
     "settings": "Settings",
     "searchPlaceholder": "Search job postings, candidates...",
     "createJob": "Create Job",
-    "roleLabel": "Recruiter"
+    "roleLabel": "Recruiter",
+    "recruitmentRequests": "Recruitment Requests"
+  },
+  "hm": {
+    "workspace": "Hiring Manager Workspace",
+    "dashboard": "Overview",
+    "jobs": "My Job Postings",
+    "evaluations": "Interview Results",
+    "offers": "Offers",
+    "settings": "Settings",
+    "help": "Help & Documentation",
+    "searchPlaceholder": "Search job postings, candidates...",
+    "roleLabel": "Hiring Manager",
+    "recruitmentRequests": "Recruitment Requests",
+    "interviewRooms": "Interview rooms"
   },
   "superAdmin": {
     "workspace": "Super Admin Workspace",
@@ -38,7 +56,8 @@
     "systemSettings": "System Settings",
     "searchPlaceholder": "Search users, audit logs...",
     "addStaff": "Add Staff",
-    "roleLabel": "Super Admin"
+    "roleLabel": "Super Admin",
+    "departments": "Departments"
   },
   "search": {
     "jobs": "Job Postings",

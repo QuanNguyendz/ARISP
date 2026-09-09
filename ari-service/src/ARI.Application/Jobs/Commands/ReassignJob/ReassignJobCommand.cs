@@ -59,7 +59,7 @@ namespace ARI.Application.Jobs.Commands.ReassignJob
             // Chỉ chuyển cho Recruiter: chuyển cho HR Lead hay Super Admin là làm sai mô hình
             // phân công (họ vốn đã thấy mọi tin), còn chuyển cho tài khoản đang khoá thì tin sẽ
             // rơi vào trạng thái không ai xử lý được.
-            if (!string.Equals(target.Role, AppRoles.Recruiter, StringComparison.OrdinalIgnoreCase))
+            if (!RoleNames.Is(target.Role, RoleNames.Recruiter))
                 return Result.Failure<string>("Chỉ chuyển giao được cho Chuyên viên tuyển dụng.");
             if (!target.IsActive)
                 return Result.Failure<string>("Tài khoản nhận đang bị khoá, không thể nhận tin mới.");
@@ -99,9 +99,12 @@ namespace ARI.Application.Jobs.Commands.ReassignJob
 
             // Hồ sơ đang chạy theo tin này chuyển sang người mới cùng lúc — báo cho họ biết đang
             // nhận thêm bao nhiêu việc chứ không chỉ nhận một cái tên tin.
+            // "Đang xử lý" = chưa đóng. Bản liệt kê tại chỗ trước đây loại trừ "rejected" — một giá
+            // trị chưa bao giờ là trạng thái hồ sơ (đó là trạng thái TIN tuyển dụng) — nên hồ sơ
+            // cv_rejected và withdrawn vẫn bị đếm là đang xử lý, thổi phồng con số báo cho người nhận.
             var openApplications = (await _unitOfWork.Repository<Domain.Entities.Application>()
                 .FindAsync(a => a.DeletedAt == null && a.JobPostingId == job.Id, ct))
-                .Count(a => a.Status != "pass" && a.Status != "not_pass" && a.Status != "rejected");
+                .Count(a => !ApplicationStatuses.IsTerminal(a.Status));
 
             var toBody = openApplications > 0
                 ? $"Bạn được giao phụ trách tin \"{job.Title}\" với {openApplications} hồ sơ đang xử lý."

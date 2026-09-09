@@ -16,7 +16,6 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
-    "@heygen/liveavatar-web-sdk": "^0.0.18",
     "@hookform/resolvers": "^3.9.0",
     "@microsoft/signalr": "^10.0.0",
     "@stomp/stompjs": "^7.0.0",

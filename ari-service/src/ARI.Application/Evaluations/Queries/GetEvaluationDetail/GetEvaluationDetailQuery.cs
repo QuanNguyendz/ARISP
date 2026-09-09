@@ -3,14 +3,20 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
 
 namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
 {
-    /// <summary>Tra cứu chi tiết đánh giá theo EvaluationId, fallback theo SessionId (dùng chung cho 2 endpoint).</summary>
-    public record GetEvaluationDetailQuery(Guid Id) : IRequest<Result<EvaluationDetailResponse>>;
+    /// <summary>
+    /// Tra cứu chi tiết đánh giá theo EvaluationId, fallback theo SessionId (dùng chung cho 2 endpoint).
+    /// Trả về transcript, bảng điểm từng tiêu chí và <b>link video buổi phỏng vấn</b>, nên bắt buộc
+    /// kiểm quyền trên tin mà hồ sơ thuộc về.
+    /// </summary>
+    public record GetEvaluationDetailQuery(Guid Id, Guid? UserId, string? Role)
+        : IRequest<Result<EvaluationDetailResponse>>;
 
     public class GetEvaluationDetailQueryHandler
         : IRequestHandler<GetEvaluationDetailQuery, Result<EvaluationDetailResponse>>
@@ -43,13 +49,14 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             if (evaluation.SessionType == "practice")
                 return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
 
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
+            var (application, job, level) = await JobAccess.EvaluateApplicationAsync(
+                _unitOfWork, evaluation.ApplicationId, request.UserId, request.Role, ct);
             if (application == null)
                 return Result.Failure<EvaluationDetailResponse>("Application associated with this evaluation was not found.");
-
-            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             if (job == null)
                 return Result.Failure<EvaluationDetailResponse>("Job posting associated with this evaluation was not found.");
+            if (level < JobAccessLevel.TeamMember)
+                return Result.Failure<EvaluationDetailResponse>(JobAccessErrors.EvaluationForbidden, CommonErrorCodes.Forbidden);
 
             var hrReviews = await _unitOfWork.Repository<HrReview>().FindAsync(r => r.EvaluationId == evaluation.Id, ct);
             var hrReview = hrReviews.FirstOrDefault();
@@ -64,6 +71,19 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
                 response.RecordingDeletedAt = session.RecordingDeletedAt;
                 if (!string.IsNullOrEmpty(session.RecordingUrl))
                     response.RecordingUrl = await _fileStorage.GetUrlAsync(session.RecordingUrl, ct);
+            }
+
+            // Ai là người có thẩm quyền chốt kết quả này (ADR-061). Giao diện cần biết để hiện đúng
+            // một trong hai thứ: nút chốt, hay banner "đang chờ Hiring Manager" kèm nút chốt thay.
+            var primaryHm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+            if (primaryHm != null)
+            {
+                response.RequiresHmApproval = true;
+                response.HiringManagerUserId = primaryHm.UserId;
+                var hmUser = await _unitOfWork.Repository<User>().GetByIdAsync(primaryHm.UserId, ct);
+                if (hmUser != null)
+                    response.HiringManagerName =
+                        string.IsNullOrWhiteSpace(hmUser.FullName) ? hmUser.Email : hmUser.FullName;
             }
 
             // Điểm khớp CV-JD đã chấm sẵn lúc ứng tuyển (ADR-030) — chỉ đọc lại, KHÔNG gọi Gemini.

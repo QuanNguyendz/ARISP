@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
@@ -15,16 +16,13 @@ namespace ARI.Application.OnlineTest
     {
         private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-        /// <summary>Kiểm tra staff có quyền quản lý câu hỏi của job này không (chủ tin hoặc admin).</summary>
-        public static async Task<(bool ok, JobPosting? job)> CanManageAsync(
+        /// <summary>
+        /// Kiểm tra staff có quyền quản lý câu hỏi của job này không (chủ tin hoặc admin).
+        /// Vị từ thật nằm ở <see cref="JobAccess"/> — xem ghi chú ở <c>SchedulingSupport</c>.
+        /// </summary>
+        public static Task<(bool ok, JobPosting? job)> CanManageAsync(
             IUnitOfWork uow, Guid jobPostingId, Guid? userId, string? role, CancellationToken ct)
-        {
-            var job = await uow.Repository<JobPosting>().GetByIdAsync(jobPostingId, ct);
-            if (job == null) return (false, null);
-            if (userId is not { } uid || uid == Guid.Empty) return (false, job);
-            var isAdmin = role == AppRoles.SuperAdmin || role == AppRoles.HrAdmin;
-            return (isAdmin || job.CreatedByUserId == uid, job);
-        }
+            => JobAccess.CanManageAsync(uow, jobPostingId, userId, role, ct);
 
         /// <summary>
         /// Ngôn ngữ đã cấu hình cho vòng trắc nghiệm của job ("vi"/"en"), null nếu tin không có vòng
@@ -68,15 +66,12 @@ namespace ARI.Application.OnlineTest
         }
 
         /// <summary>
-        /// Các trạng thái hồ sơ được coi là "CV đã pass" (đã qua vòng duyệt CV) — điều kiện để làm bài thi trắc nghiệm.
-        /// Chặn: cv_submitted (chưa duyệt), cv_rejected (bị loại CV), withdrawn (đã rút) và mọi trạng thái lạ khác.
+        /// Hồ sơ đã qua vòng duyệt CV chưa (đủ điều kiện làm bài thi trắc nghiệm).
+        /// Chặn: cv_submitted (chưa duyệt), hm_review (chờ Hiring Manager duyệt), cv_rejected
+        /// (bị loại CV), withdrawn (đã rút) và mọi trạng thái lạ khác — xem
+        /// <see cref="ApplicationStatuses.CvPassed"/>.
         /// </summary>
-        private static readonly HashSet<string> CvPassedStatuses =
-            new(StringComparer.OrdinalIgnoreCase) { "invited", "screening", "interview", "pass", "not_pass" };
-
-        /// <summary>Hồ sơ đã qua vòng duyệt CV chưa (đủ điều kiện làm bài thi trắc nghiệm).</summary>
-        public static bool IsCvPassed(string? status) =>
-            !string.IsNullOrWhiteSpace(status) && CvPassedStatuses.Contains(status);
+        public static bool IsCvPassed(string? status) => ApplicationStatuses.IsCvPassed(status);
 
         /// <summary>Vòng (RoundNumber) được cấu hình là online_test cho job — mặc định 1 nếu không có.</summary>
         public static async Task<int> ResolveRoundAsync(IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)

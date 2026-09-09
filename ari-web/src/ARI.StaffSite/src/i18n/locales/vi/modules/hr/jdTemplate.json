@@ -1,0 +1,47 @@
+{
+  "title": "Mẫu bản mô tả công việc",
+  "description": "Cấu hình một lần cho cả công ty — mọi JD Recruiter soạn đều theo mẫu này",
+  "loading": "Đang tải mẫu...",
+  "save": "Lưu mẫu",
+  "savedOk": "Đã lưu",
+  "company": {
+    "title": "Nhận diện công ty",
+    "logo": "Logo công ty",
+    "uploadLogo": "Tải logo lên",
+    "logoHint": "PNG hoặc JPG, tối đa 2MB. Logo in ở đầu mọi file JD.",
+    "name": "Tên công ty",
+    "address": "Địa chỉ",
+    "website": "Website",
+    "email": "Email liên hệ",
+    "documentTitle": "Tiêu đề văn bản",
+    "documentTitleHint": "In ở giữa, phía trên bảng thông tin — vd \"THÔNG TIN TUYỂN DỤNG\". Đây là tiêu đề của loại văn bản, không phải tên vị trí."
+  },
+  "style": {
+    "title": "Trình bày",
+    "accent": "Màu nhấn",
+    "font": "Phông chữ",
+    "fontHint": "Phông phải có trên máy chủ; không nhận diện được sẽ tự dùng Arial.",
+    "footer": "Dòng chân trang"
+  },
+  "sections": {
+    "title": "Các mục của JD",
+    "description": "Bật/tắt, đổi tiêu đề và thứ tự in ra file. Khoá của mục là cố định — nội dung JD đã soạn tra theo đúng khoá đó.",
+    "enabled": "Bật mục này",
+    "moveUp": "Đưa lên trên",
+    "moveDown": "Đưa xuống dưới"
+  },
+  "preview": {
+    "label": "Xem trước",
+    "companyPlaceholder": "Tên công ty",
+    "samplePosition": "Backend Developer",
+    "factDepartment": "Bộ phận",
+    "factSalary": "Mức lương",
+    "sampleLine": "Nội dung mục này do Recruiter điền khi soạn JD.",
+    "note": "Bản xem trước là XẤP XỈ: phông của trình duyệt khác phông máy chủ nên chỗ ngắt trang có thể lệch một hai dòng."
+  },
+  "errors": {
+    "loadFailed": "Không tải được mẫu JD.",
+    "saveFailed": "Không lưu được mẫu JD.",
+    "logoFailed": "Không tải được logo lên."
+  }
+}

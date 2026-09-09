@@ -16,108 +16,11 @@ import { StatsGridSkeleton, ApplicantsSkeleton } from './_skeletons'
 import { applicationService } from '@ari/shared/fservices/application'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { formatScore } from '@ari/shared/utils/format'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 
-type Group = 'pending' | 'interviewing' | 'passed' | 'rejected' | 'other'
+import { statusMeta, type Group } from '../_candidateStatus'
 
-interface StatusMeta {
-  label: string
-  group: Group
-  badge: string
-}
-
-function statusMeta(status: string, t: (key: string) => string): StatusMeta {
-  const s = (status || '').toLowerCase()
-  const map: Record<string, StatusMeta> = {
-    invited: {
-      label: t('status.invited'),
-      group: 'pending',
-      badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300',
-    },
-    cv_submitted: {
-      label: t('status.cvSubmitted'),
-      group: 'pending',
-      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-    },
-    pending: {
-      label: t('status.pending'),
-      group: 'pending',
-      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-    },
-    pending_review: {
-      label: t('status.pending'),
-      group: 'pending',
-      badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-    },
-    screening: {
-      label: t('status.screening'),
-      group: 'interviewing',
-      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
-    },
-    interview: {
-      label: t('status.screening'),
-      group: 'interviewing',
-      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
-    },
-    interview_code_generated: {
-      label: t('status.codeGenerated'),
-      group: 'interviewing',
-      badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
-    },
-    interview_code_used: {
-      label: t('status.screening'),
-      group: 'interviewing',
-      badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
-    },
-    practice: {
-      label: t('status.practice'),
-      group: 'interviewing',
-      badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
-    },
-    pass: {
-      label: t('status.pass'),
-      group: 'passed',
-      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-    },
-    approved: {
-      label: t('status.pass'),
-      group: 'passed',
-      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-    },
-    completed: {
-      label: t('status.completed'),
-      group: 'passed',
-      badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-    },
-    not_pass: {
-      label: t('status.notPass'),
-      group: 'rejected',
-      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-    },
-    rejected: {
-      label: t('status.notPass'),
-      group: 'rejected',
-      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-    },
-    failed: {
-      label: t('status.notPass'),
-      group: 'rejected',
-      badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-    },
-    withdrawn: {
-      label: t('status.withdrawn'),
-      group: 'rejected',
-      badge: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400',
-    },
-  }
-  return (
-    map[s] ?? {
-      label: status || '—',
-      group: 'other',
-      badge: 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300',
-    }
-  )
-}
 
 function initials(name: string): string {
   return (name || '?')
@@ -588,7 +491,7 @@ export default function RecruiterCandidatesPage() {
                                                   <td className="py-2.5 px-3 text-sm">
                                                     {typeof app.matchScore === 'number' ? (
                                                       <span className={`font-semibold text-xs ${scoreColor(app.matchScore)}`}>
-                                                        Điểm CV: {app.matchScore}
+                                                        Điểm CV: {formatScore(app.matchScore)}
                                                       </span>
                                                     ) : (
                                                       <span className="text-ink-400 text-xs">—</span>

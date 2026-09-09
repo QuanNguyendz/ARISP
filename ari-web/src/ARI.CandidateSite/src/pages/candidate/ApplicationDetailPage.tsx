@@ -19,11 +19,14 @@ import {
   MessageSquareText,
   User,
   Globe,
+  Lock,
+  ClipboardList,
 } from 'lucide-react'
 import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
-import OnlineTestEntry from '@components/OnlineTestEntry'
+import { onlineTestService } from '@ari/shared/fservices/onlineTest'
+import type { CandidateOnlineTest } from '@ari/shared/types/onlineTest'
 import CriterionBar from '@components/CriterionBar'
 import { formatDate, formatDuration, langLevel } from './_reportUi'
 import type { MyApplicationDetail, MyApplicationSession } from '@ari/shared/types/application'
@@ -273,10 +276,74 @@ function ReportPanel({
 function RoundPlaceholder({
   s,
   t,
+  onlineTest,
+  applicationId,
 }: {
   s: MyApplicationSession
   t: (key: string, opts?: any) => string
+  /** Bài trắc nghiệm của hồ sơ này — chỉ dựng cho ĐÚNG vòng mà nó thuộc về. */
+  onlineTest?: CandidateOnlineTest | null
+  applicationId: string
 }) {
+  /*
+    Vòng TRẮC NGHIỆM có mặt bằng riêng, không dùng chung với vòng hội thoại (ADR-049/059).
+    Nó làm trực tuyến tại nhà: không cần tới văn phòng, không cần Kiosk, không có Mã phỏng vấn,
+    và không có buổi thử (cho thử là lộ đề). Trước đây panel này dùng chung một bản cho mọi vòng
+    nên vòng trắc nghiệm hiện đúng câu "chuẩn bị thiết bị, microphone/camera và mã phỏng vấn" —
+    sai hoàn toàn với thứ ứng viên sắp làm, và không có chỗ nào bấm để bắt đầu.
+  */
+  const isTestRound = !!onlineTest && onlineTest.roundNumber === s.roundNumber
+  if (isTestRound && onlineTest) {
+    if (!onlineTest.cvPassed) {
+      return (
+        <div className="rounded-2xl border border-ink-200 bg-ink-50 p-10 text-center shadow-card">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-200 text-ink-500">
+            <Lock className="h-6 w-6" />
+          </div>
+          <p className="mt-3 font-semibold text-ink-700">{t('onlineTest.title')}</p>
+          <p className="mt-1 text-sm text-ink-500">{t('onlineTest.locked')}</p>
+        </div>
+      )
+    }
+
+    if (onlineTest.alreadySubmitted) {
+      // Đã nộp = xong phần việc của ứng viên. KHÔNG hiện điểm, điểm sàn hay đạt/trượt: kết quả chỉ
+      // được công bố khi bộ phận tuyển dụng chốt cả vòng.
+      return (
+        <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-10 text-center shadow-card">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-100 text-brand-600">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <p className="mt-3 font-semibold text-ink-800">{t('onlineTest.submittedTitle')}</p>
+          <p className="mt-1 text-sm text-ink-500">{t('onlineTest.submittedHint')}</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-10 text-center shadow-card">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-100 text-brand-600">
+          <ClipboardList className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-800">{t('onlineTest.readyTitle')}</p>
+        <p className="mt-1 text-sm text-ink-500">
+          {t('onlineTest.readyDescription', {
+            count: onlineTest.totalQuestions,
+            minutes: onlineTest.durationMinutes,
+          })}
+        </p>
+        {/* Làm tại nhà — nói rõ để ứng viên không chờ một buổi hẹn không tồn tại. */}
+        <p className="mt-1 text-xs text-ink-400">{t('onlineTest.remoteHint')}</p>
+        <Link
+          to={`/candidate/online-test/${applicationId}`}
+          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <ClipboardList className="h-4 w-4" /> {t('onlineTest.start')}
+        </Link>
+      </div>
+    )
+  }
+
   if (s.pendingHrReview) {
     return (
       <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
@@ -373,6 +440,7 @@ function RoundPlaceholder({
 }
 
 function RoundButton({
+  onlineTest,
   s,
   active,
   onClick,
@@ -382,8 +450,14 @@ function RoundButton({
   active: boolean
   onClick: () => void
   t: (key: string, opts?: any) => string
+  onlineTest?: CandidateOnlineTest | null
 }) {
-  const score = s.evaluation?.overallScore
+  // Vòng trắc nghiệm lấy điểm từ BÀI THI, không phải từ phiên phỏng vấn — hai nguồn khác nhau cho
+  // hai loại vòng khác nhau. Trước đây thẻ vòng này luôn hiện "—" vì nó chỉ biết `s.evaluation`.
+  const isTestRound = !!onlineTest && onlineTest.roundNumber === s.roundNumber
+  // Vòng trắc nghiệm KHÔNG hiện điểm cho ứng viên (kết quả công bố khi chốt vòng), nên cột điểm để
+  // trống — không phải vì thiếu dữ liệu mà vì cố ý không đưa ra.
+  const shownScore = isTestRound ? undefined : s.evaluation?.overallScore
 
   const getBadge = () => {
     const verdict = s.hrFinalVerdict || s.evaluation?.aiVerdict
@@ -441,9 +515,11 @@ function RoundButton({
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-ink-500">
-        <span>{t('badge.realInterview')}</span>
+        {/* Vòng trắc nghiệm KHÔNG phải "phỏng vấn thật": nó làm trực tuyến, và điểm của nó nằm ở
+            bài thi chứ không ở phiên phỏng vấn. */}
+        <span>{isTestRound ? t('badge.onlineTest') : t('badge.realInterview')}</span>
         <span className="font-semibold text-ink-700">
-          {typeof score === 'number' ? `${Math.round(score)}/100` : '—'}
+          {typeof shownScore === 'number' ? `${Math.round(shownScore)}/100` : '—'}
         </span>
       </div>
       {displayDate && (
@@ -484,6 +560,12 @@ export default function ApplicationDetailPage() {
   const { t } = useTranslation('modules/candidate/applicationDetail')
   const { id } = useParams<{ id: string }>()
   const [detail, setDetail] = useState<MyApplicationDetail | null>(null)
+  /**
+   * Bài trắc nghiệm của hồ sơ (nếu vị trí có đề). Nạp ở CẤP TRANG chứ không ở một ô riêng: nó thuộc
+   * về một VÒNG cụ thể (`roundNumber`), nên phải dựng ngay trong vòng đó — ô tách rời trước đây
+   * hiện kết quả ở đầu trang mà không nói nó là vòng nào.
+   */
+  const [onlineTest, setOnlineTest] = useState<CandidateOnlineTest | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -510,6 +592,14 @@ export default function ApplicationDetailPage() {
           active && setError(err?.response?.data?.message || err?.message || t('loadError'))
       )
       .finally(() => active && setLoading(false))
+
+    // Vị trí không có đề thi thì endpoint trả lỗi/rỗng — nuốt lặng và để `onlineTest` là null,
+    // vòng nào cũng dựng như cũ. Đây là tính năng TUỲ CHỌN của tin, không phải lỗi.
+    onlineTestService
+      .getTest(id)
+      .then((d) => active && setOnlineTest(d && d.totalQuestions > 0 ? d : null))
+      .catch(() => active && setOnlineTest(null))
+
     return () => {
       active = false
     }
@@ -549,7 +639,6 @@ export default function ApplicationDetailPage() {
       ) : !detail ? null : (
         <main className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
           <div className="space-y-5">
-            {id && <OnlineTestEntry applicationId={id} />}
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -608,6 +697,7 @@ export default function ApplicationDetailPage() {
                           active={s.id === selectedId}
                           onClick={() => setSelectedId(s.id)}
                           t={t}
+                          onlineTest={onlineTest}
                         />
                       </div>
                     ))}
@@ -620,6 +710,7 @@ export default function ApplicationDetailPage() {
                         active={s.id === selectedId}
                         onClick={() => setSelectedId(s.id)}
                         t={t}
+                        onlineTest={onlineTest}
                       />
                     ))}
                   </div>
@@ -685,7 +776,12 @@ export default function ApplicationDetailPage() {
             ) : selected.evaluation ? (
               <ReportPanel s={selected} jobTitle={jobTitle} t={t} />
             ) : (
-              <RoundPlaceholder s={selected} t={t} />
+              <RoundPlaceholder
+                s={selected}
+                t={t}
+                onlineTest={onlineTest}
+                applicationId={id ?? ''}
+              />
             )}
           </div>
         </main>

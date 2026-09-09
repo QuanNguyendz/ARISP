@@ -21,7 +21,10 @@
     "lockedTitle": "Chờ duyệt CV",
     "lockedDetail": "Hồ sơ của bạn cần được duyệt qua vòng CV trước khi làm bài thi trắc nghiệm.",
     "antiCheatHint": "Vui lòng không rời khỏi trang trong lúc làm bài. Mọi lần chuyển tab hoặc thoát cửa sổ đều được ghi lại và gửi cho nhà tuyển dụng.",
-    "tabSwitchWarning": "Bạn đã rời khỏi bài thi {{count}} lần. Hành vi này đã được ghi nhận và sẽ hiển thị cho nhà tuyển dụng."
+    "tabSwitchWarning": "Bạn đã rời khỏi bài thi {{count}} lần. Hành vi này đã được ghi nhận và sẽ hiển thị cho nhà tuyển dụng.",
+    "submittedTitle": "Đã nộp bài",
+    "submittedHint": "Bài của bạn đã được ghi nhận. Bộ phận tuyển dụng sẽ thông báo kết quả khi chốt vòng này.",
+    "submittedCount": "Đã nộp {{total}} câu."
   },
   "entry": {
     "resultTitle": "Bài thi trắc nghiệm: {{result}}",

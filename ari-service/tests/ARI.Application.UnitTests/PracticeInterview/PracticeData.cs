@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Application.Playbooks;
 using ARI.Domain.Entities;
 
 namespace ARI.Application.UnitTests.PracticeInterview;
@@ -15,6 +16,24 @@ namespace ARI.Application.UnitTests.PracticeInterview;
 /// </summary>
 internal static class PracticeData
 {
+    /// <summary>
+    /// Bộ tiêu chí chấm tối thiểu. BẮT BUỘC gieo cho mọi test có sinh báo cáo đánh giá: từ ADR-062,
+    /// tin chưa khai rubric thì hệ thống KHÔNG chấm (không còn nhánh lấy điểm tổng model tự đưa ra).
+    /// </summary>
+    public static PlaybookDocument Rubric(Guid jobId) => new()
+    {
+        Scope = PlaybookScope.ScopeJobPosting,
+        ScopeRefId = jobId,
+        DocumentType = ScoringRubric.TypeInterviewRubric,
+        FileName = "rubric.xlsx",
+        UploadedByUserId = Guid.NewGuid(),
+        RubricJson = ScoringRubric.Serialize(new List<RubricCriterion>
+        {
+            new() { Key = "technical", Name = "Chuyên môn", Weight = 60 },
+            new() { Key = "communication", Name = "Giao tiếp", Weight = 40 },
+        }),
+    };
+
     /// <summary>Job KHÔNG set persona → StartSessionAsync bỏ qua nhánh avatar (không chạm stub media).</summary>
     public static JobPosting Job(string language = "vi", string title = "Backend Developer") => new()
     {
@@ -98,7 +117,19 @@ internal static class PracticeData
 internal sealed class StubAiProvider : IAIProvider
 {
     public string QuestionText { get; set; } = "Câu hỏi tiếp theo là gì?";
-    public EvaluationReport Evaluation { get; set; } = new() { Verdict = "pass", Score = 80m, Reasoning = "Ổn", RecommendedNextStep = "next" };
+    /// <summary>
+    /// Mặc định trả ĐIỂM TỪNG TIÊU CHÍ khớp <see cref="PracticeData.Rubric"/> (60/40 → 80).
+    /// Từ ADR-062 backend luôn tự cộng điểm; model không trả tiêu chí nào thì KHÔNG sinh báo cáo,
+    /// nên một stub không có `CriterionScoresJson` sẽ đại diện cho model hỏng, không phải model bình thường.
+    /// </summary>
+    public EvaluationReport Evaluation { get; set; } = new()
+    {
+        Verdict = "pass",
+        Score = 80m,
+        Reasoning = "Ổn",
+        RecommendedNextStep = "next",
+        CriterionScoresJson = "{\"technical\":80,\"communication\":80}",
+    };
     public AnswerAnalysis Analysis { get; set; } = new() { DifficultyLevel = 4, Feedback = "Tốt" };
     public LanguageAssessment Language { get; set; } = new() { OverallScore = 75m, CefrLevel = "B2" };
     public int EvaluationCallCount { get; private set; }

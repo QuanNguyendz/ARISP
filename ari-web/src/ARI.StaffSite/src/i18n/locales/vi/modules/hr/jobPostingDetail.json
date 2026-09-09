@@ -162,7 +162,7 @@
     "coverLetter": "Thư giới thiệu",
     "noCoverLetter": "Ứng viên không gửi thư giới thiệu.",
     "close": "Đóng",
-    "matchScore": "Độ phù hợp: {{score}}%"
+    "matchScore": "Điểm CV: {{score}}/100"
   },
   "notices": {
     "acceptSuccess": "Đã duyệt CV ứng viên (Vòng 1). Hãy xếp lịch để hệ thống gửi email mời phỏng vấn kèm lịch hẹn.",
@@ -173,7 +173,9 @@
     "batchAcceptSuccess": "Đã duyệt thành công {{success}} hồ sơ.",
     "batchRejectSuccess": "Đã từ chối thành công {{success}} hồ sơ.",
     "batchInviteSuccess": "Đã gửi lời mời thành công cho {{success}} ứng viên.",
-    "close": "Đóng"
+    "close": "Đóng",
+    "sentToHiringManager": "Đã gửi hồ sơ cho Hiring Manager duyệt. Ứng viên chưa được báo — thư qua vòng chỉ gửi khi đã xếp được lịch.",
+    "sentToHiringManagerBatch": "Đã gửi {{success}} hồ sơ cho Hiring Manager duyệt; {{failed}} hồ sơ chưa gửi được."
   },
   "errors": {
     "loadJob": "Không thể tải chi tiết tin tuyển dụng. Tin có thể không tồn tại hoặc bạn không có quyền xem.",

@@ -106,6 +106,10 @@ class RubricCriterion(CamelModel):
 
 class SessionContext(CamelModel):
     session_id: str
+    # Tin + vòng — để truy hồi playbook ĐÚNG PHẠM VI lúc chấm (ADR-025/062). Thiếu hai
+    # trường này thì tài liệu `expected_answer` không bao giờ ảnh hưởng tới điểm số.
+    job_posting_id: str = ""
+    round_number: int = 1
     job_description: str = ""
     candidate_cv: str = ""
     session_type: str = "real"

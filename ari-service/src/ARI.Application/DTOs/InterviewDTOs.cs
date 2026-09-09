@@ -20,8 +20,6 @@ namespace ARI.Application.DTOs
         public Guid SessionId { get; set; }
         public string Status { get; set; } = "active";
         public string Language { get; set; } = "vi";
-        public string? HeyGenSdpOffer { get; set; }
-        public string? HeyGenSessionId { get; set; }
     }
 
     /// <summary>
@@ -52,12 +50,21 @@ namespace ARI.Application.DTOs
         public DateTimeOffset? ExpiresAt { get; set; }
     }
 
-    /// <summary>Cấu hình media trả cho FE khi vào phòng phỏng vấn (token Deepgram + HeyGen).</summary>
+    /// <summary>Cấu hình media trả cho FE khi vào phòng phỏng vấn (token Deepgram + trần thời lượng).</summary>
     public class PracticeMediaConfigResponse
     {
         public Guid SessionId { get; set; }
         public string Language { get; set; } = "vi";
         public string SessionType { get; set; } = "practice";
+
+        /// <summary>
+        /// Trạng thái phiên (<c>waiting</c> | <c>active</c> | …) — FE cần biết để vẽ màn PHÒNG CHỜ
+        /// thay vì màn phỏng vấn khi Hiring Manager chưa cho vào (ADR-067).
+        /// </summary>
+        public string Status { get; set; } = "active";
+
+        /// <summary>Hiring Manager đã vào phòng chưa — màn chờ đổi chữ theo mốc này.</summary>
+        public bool HiringManagerPresent { get; set; }
 
         /// <summary>Trần thời lượng phiên (giây) để FE vẽ đếm ngược; 0 = không giới hạn (ADR-050).</summary>
         public int MaxDurationSeconds { get; set; }
@@ -66,7 +73,6 @@ namespace ARI.Application.DTOs
         public DateTimeOffset? StartedAtUtc { get; set; }
 
         public DeepgramConfigDto? Deepgram { get; set; }
-        public HeyGenConfigDto? HeyGen { get; set; }
     }
 
     public class DeepgramConfigDto
@@ -74,14 +80,6 @@ namespace ARI.Application.DTOs
         public string Token { get; set; } = string.Empty;
         public int ExpiresInSeconds { get; set; }
         public string Model { get; set; } = "nova-3";
-    }
-
-    public class HeyGenConfigDto
-    {
-        public string Token { get; set; } = string.Empty;
-        public string ServerUrl { get; set; } = string.Empty;
-        public string? AvatarId { get; set; }
-        public string? VoiceId { get; set; }
     }
 
     public class TtsRequest

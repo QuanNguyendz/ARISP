@@ -30,7 +30,42 @@ export interface CandidateSchedule {
   awaitingReschedule: CandidateScheduleItem[]
 }
 
+/**
+ * Khung giờ Hiring Manager có mặt được cho một vòng (ADR-067).
+ * Recruiter chỉ xếp được ca nằm TRỌN trong một khung như thế này.
+ */
+export interface HmAvailabilityWindow {
+  id: string
+  roundNumber: number
+  startTime: string
+  endTime: string
+  note?: string | null
+  hiringManagerUserId: string
+  hiringManagerName?: string | null
+}
+
 export const scheduleService = {
+  // ===== Lịch rảnh của Hiring Manager (ADR-067) =====
+  async getHmAvailability(jobPostingId: string, round?: number): Promise<HmAvailabilityWindow[]> {
+    const { data } = await apiClient.get<HmAvailabilityWindow[]>('/schedules/hm-availability', {
+      params: { jobPostingId, round },
+    })
+    return data
+  },
+
+  async setHmAvailability(
+    jobPostingId: string,
+    roundNumber: number,
+    windows: { startTime: string; endTime: string; note?: string | null }[]
+  ): Promise<number> {
+    const { data } = await apiClient.put<{ windowCount: number }>('/schedules/hm-availability', {
+      jobPostingId,
+      roundNumber,
+      windows,
+    })
+    return data?.windowCount ?? 0
+  },
+
   // ===== Recruiter/HR: quản lý khung giờ phỏng vấn của job =====
   async getSlots(jobPostingId: string, round?: number): Promise<AvailabilitySlot[]> {
     const { data } = await apiClient.get<AvailabilitySlot[]>('/schedules/slots', {
@@ -48,6 +83,22 @@ export const scheduleService = {
     await apiClient.delete(`/schedules/slots/${slotId}`)
   },
 
+  /**
+   * Sửa giờ một ca CHƯA ai đặt (ADR-067). Ca đã có người giữ chỗ thì server từ chối — đổi giờ một
+   * ca đã hẹn là đổi lịch hẹn của người khác mà không báo họ; đường đúng là "dời lịch".
+   */
+  async updateSlotTime(
+    slotId: string,
+    startTime: string,
+    endTime: string
+  ): Promise<AvailabilitySlot> {
+    const { data } = await apiClient.patch<AvailabilitySlot>(`/schedules/slots/${slotId}/time`, {
+      startTime,
+      endTime,
+    })
+    return data
+  },
+
   async updateSlotCapacity(slotId: string, capacity: number): Promise<AvailabilitySlot> {
     const { data } = await apiClient.patch<AvailabilitySlot>(
       `/schedules/slots/${slotId}/capacity`,
@@ -63,6 +114,8 @@ export const scheduleService = {
     applicationId: string
     slotId: string
     round: number
+    /** Thư mời do nhân sự sửa ở trình soạn thảo (ADR-061). Bỏ trống → dùng mẫu. */
+    emailOverride?: { subject: string; bodyHtml: string }
   }): Promise<void> {
     await apiClient.post('/schedules/assign', payload)
   },

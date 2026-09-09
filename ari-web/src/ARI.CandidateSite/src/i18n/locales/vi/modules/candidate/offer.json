@@ -1,0 +1,41 @@
+{
+  "title": "Thư mời nhận việc",
+  "description": "Chúc mừng bạn! Dưới đây là đề nghị của chúng tôi cho vị trí {{position}}.",
+  "backToApplication": "Quay lại hồ sơ ứng tuyển",
+  "loading": "Đang tải thư mời...",
+  "actionError": "Không ghi nhận được phản hồi. Vui lòng thử lại.",
+  "emptyTitle": "Chưa có thư mời nhận việc",
+  "emptyDescription": "Khi doanh nghiệp gửi thư mời, bạn sẽ thấy đầy đủ thông tin tại đây.",
+  "details": "Chi tiết đề nghị",
+  "stats": {
+    "salary": "Mức lương",
+    "startDate": "Ngày dự kiến đi làm",
+    "deadline": "Hạn phản hồi",
+    "daysLeft_one": "Còn {{count}} ngày",
+    "daysLeft_other": "Còn {{count}} ngày"
+  },
+  "fields": {
+    "position": "Vị trí",
+    "employmentType": "Loại hợp đồng",
+    "workLocation": "Nơi làm việc",
+    "bonus": "Thưởng",
+    "benefits": "Phúc lợi"
+  },
+  "respond": {
+    "title": "Phản hồi của bạn",
+    "description": "Hãy cho chúng tôi biết quyết định của bạn. Nếu cần trao đổi thêm về điều kiện, bạn có thể trả lời trực tiếp email thư mời.",
+    "accept": "Nhận việc",
+    "decline": "Từ chối",
+    "cancel": "Quay lại",
+    "confirmDecline": "Xác nhận từ chối",
+    "reasonLabel": "Lý do từ chối (không bắt buộc)",
+    "reasonPlaceholder": "Chia sẻ lý do giúp chúng tôi cải thiện đề nghị cho những ứng viên sau."
+  },
+  "status": {
+    "accepted": "Bạn đã nhận lời mời này. Bộ phận nhân sự sẽ liên hệ để hướng dẫn các bước tiếp theo.",
+    "declined": "Bạn đã từ chối lời mời này. Cảm ơn bạn đã dành thời gian cho chúng tôi.",
+    "expired": "Thư mời đã quá hạn phản hồi. Vui lòng liên hệ bộ phận nhân sự nếu bạn vẫn quan tâm.",
+    "closed": "Thư mời này đã khép lại.",
+    "yourNote": "Ghi chú của bạn: {{note}}"
+  }
+}

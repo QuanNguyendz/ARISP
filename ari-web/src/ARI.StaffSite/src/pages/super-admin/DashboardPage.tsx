@@ -314,6 +314,10 @@ export default function SuperAdminDashboardPage() {
                 { label: t('accountDistribution.superAdmin'), value: stats?.superAdmins ?? 0 },
                 { label: t('accountDistribution.hrAdmin'), value: stats?.hrAdmins ?? 0 },
                 { label: t('accountDistribution.recruiter'), value: stats?.recruiters ?? 0 },
+                {
+                  label: t('accountDistribution.hiringManager'),
+                  value: stats?.hiringManagers ?? 0,
+                },
                 { label: t('accountDistribution.candidate'), value: stats?.candidates ?? 0 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between">

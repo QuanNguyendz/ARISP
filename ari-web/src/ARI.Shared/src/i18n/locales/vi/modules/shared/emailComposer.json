@@ -1,0 +1,20 @@
+{
+  "title": "Soạn thư gửi ứng viên",
+  "recipient": "Gửi tới: {{name}} <{{email}}>",
+  "loading": "Đang dựng nội dung thư...",
+  "loadError": "Không dựng được nội dung thư. Vui lòng thử lại.",
+  "subject": "Tiêu đề",
+  "body": "Nội dung",
+  "bold": "In đậm",
+  "italic": "In nghiêng",
+  "bulletList": "Danh sách",
+  "link": "Chèn liên kết",
+  "linkPrompt": "Nhập địa chỉ liên kết:",
+  "preview": "Xem trước",
+  "edit": "Quay lại sửa",
+  "restoreTemplate": "Khôi phục mẫu gốc",
+  "hint": "Nội dung đã điền sẵn theo mẫu. Bạn có thể sửa câu chữ hoặc thêm thông tin trước khi gửi.",
+  "cancel": "Huỷ",
+  "send": "Gửi",
+  "sending": "Đang gửi..."
+}

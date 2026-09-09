@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Configuration;
+using ARI.Application.Common;
 
 namespace ARI.Application.Scheduling
 {
@@ -70,9 +71,7 @@ namespace ARI.Application.Scheduling
             var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
             var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
 
-            var baseUrl = (configuration["Frontend:CandidateBaseUrl"]
-                           ?? configuration["Authentication:AdminFrontendUrl"]
-                           ?? "http://localhost:3000").TrimEnd('/');
+            var baseUrl = FrontendUrls.Candidate(configuration);
             var confirmLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=confirm";
             var declineLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=decline";
             var deadlineHours = int.TryParse(configuration["Scheduling:ConfirmDeadlineHours"], out var dh) && dh > 0 ? dh : 48;
@@ -188,9 +187,7 @@ namespace ARI.Application.Scheduling
             var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
             var hoursLeft = Math.Max(1, (int)Math.Round((startTimeUtc - DateTimeOffset.UtcNow).TotalHours));
 
-            var baseUrl = (configuration["Frontend:CandidateBaseUrl"]
-                           ?? configuration["Authentication:AdminFrontendUrl"]
-                           ?? "http://localhost:3000").TrimEnd('/');
+            var baseUrl = FrontendUrls.Candidate(configuration);
             var confirmLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=confirm";
             var declineLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=decline";
 

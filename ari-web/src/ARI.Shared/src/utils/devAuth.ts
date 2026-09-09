@@ -28,6 +28,15 @@ export const DEV_RECRUITER_USER: User = {
   organizationId: 'dev-org-001',
 };
 
+export const DEV_HIRING_MANAGER_USER: User = {
+  id: 'dev-hiring-manager-001',
+  email: 'hm@dev.com',
+  name: 'Hiring Manager Dev',
+  role: 'Hiring_manager',
+  avatarUrl: undefined,
+  organizationId: 'dev-org-001',
+};
+
 export const DEV_SUPER_ADMIN_USER: User = {
   id: 'dev-super-admin-001',
   email: 'admin@dev.com',
@@ -62,6 +71,9 @@ export function getDevAuth(): { user: User; tokens: AuthTokens } | null {
   }
   if (devRole === 'recruiter') {
     return { user: DEV_RECRUITER_USER, tokens: DEV_TOKENS };
+  }
+  if (devRole === 'hm') {
+    return { user: DEV_HIRING_MANAGER_USER, tokens: DEV_TOKENS };
   }
   if (devRole === 'super-admin') {
     return { user: DEV_SUPER_ADMIN_USER, tokens: DEV_TOKENS };

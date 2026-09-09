@@ -1,4 +1,5 @@
 import { apiClient } from '@ari/shared/api/apiClient'
+import type { AssignableStaffRole } from '@ari/shared/utils/roles'
 
 // ===== Types =====
 export interface AdminStats {
@@ -9,6 +10,7 @@ export interface AdminStats {
   superAdmins: number
   hrAdmins: number
   recruiters: number
+  hiringManagers: number
   candidates: number
 }
 
@@ -20,6 +22,10 @@ export interface AdminUser {
   isActive: boolean
   lockReason?: string | null
   createdAt: string
+
+  /** ADR-065 — `departmentId` cho ô chọn, `department` là tên để hiển thị. */
+  departmentId?: string | null
+  department?: string | null
 }
 
 export interface AccountRequest {
@@ -64,8 +70,10 @@ export interface SystemSettingItem {
 export interface CreateStaffPayload {
   email: string
   fullName: string
-  role: 'hr_admin' | 'recruiter'
-  department?: string
+  role: AssignableStaffRole
+
+  /** ADR-065: khoá đội, không còn chuỗi gõ tay. */
+  departmentId?: string | null
 }
 
 export interface ListUsersParams {
@@ -93,8 +101,13 @@ export const adminService = {
     await apiClient.post('/admin/users', payload)
   },
 
-  async updateRole(id: string, role: 'hr_admin' | 'recruiter'): Promise<void> {
+  async updateRole(id: string, role: AssignableStaffRole): Promise<void> {
     await apiClient.put(`/admin/users/${id}/role`, { role })
+  },
+
+  /** Gán/đổi đội (ADR-065). `null` = gỡ khỏi đội. */
+  async updateDepartment(id: string, departmentId: string | null): Promise<void> {
+    await apiClient.put(`/admin/users/${id}/department`, { departmentId })
   },
 
   /** Mở khóa tài khoản đã bị khóa. */

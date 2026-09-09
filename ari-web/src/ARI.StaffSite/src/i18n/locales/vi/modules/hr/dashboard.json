@@ -110,7 +110,7 @@
     "view": "Xem",
     "anonymous": "Ẩn danh",
     "notAnalyzed": "Chưa phân tích",
-    "matchScore": "Match {{score}}"
+    "matchScore": "Điểm CV {{score}}/100"
   },
 
   "prioritySection": {
