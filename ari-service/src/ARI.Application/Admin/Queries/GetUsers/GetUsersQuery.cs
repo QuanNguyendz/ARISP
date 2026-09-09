@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Departments;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
@@ -40,11 +41,21 @@ namespace ARI.Application.Admin.Queries.GetUsers
             var filteredUsers = users.ToList();
             var totalCount = filteredUsers.Count;
 
-            var items = filteredUsers
+            var pageUsers = filteredUsers
                 .OrderByDescending(u => u.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(u => new StaffUserListItemDto(u.Id, u.Email, u.FullName, u.Role, u.IsActive, u.LockReason, u.CreatedAt))
+                .ToList();
+
+            // Chỉ tra tên đội của ĐÚNG trang đang xem, một truy vấn cho cả trang.
+            var departmentNames = await DepartmentLookup.NamesAsync(
+                _unitOfWork, pageUsers.Where(u => u.DepartmentId.HasValue).Select(u => u.DepartmentId!.Value), ct);
+
+            var items = pageUsers
+                .Select(u => new StaffUserListItemDto(
+                    u.Id, u.Email, u.FullName, u.Role, u.IsActive, u.LockReason, u.CreatedAt,
+                    u.DepartmentId,
+                    u.DepartmentId is { } d && departmentNames.TryGetValue(d, out var name) ? name : null))
                 .ToList();
 
             return Result.Success(new PagedListDto<StaffUserListItemDto>(

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
+using ARI.Application.Emails;
 using ARI.Application.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,16 +30,34 @@ namespace ARI.Application.Services
         // Cache key cho danh sách toàn bộ ứng tuyển (HR view).
         private const string AllApplicationsCacheKey = "applications:all";
 
-        // Define valid status transitions in a static dictionary
+        /// <summary>
+        /// Máy trạng thái của hồ sơ ứng tuyển — dùng cho <c>PATCH /api/applications/{id}/status</c>.
+        ///
+        /// MỌI trạng thái được ghi ở bất kỳ đâu đều phải có mặt làm KHOÁ ở đây, kể cả trạng thái
+        /// kết thúc: bảng này vừa là "đi từ đâu tới đâu được" vừa là danh sách trạng thái hợp lệ
+        /// (xem <see cref="UpdateApplicationStatusAsync"/>). Trước đây <c>cv_rejected</c> được
+        /// <see cref="RejectApplicationAsync"/> ghi nhưng KHÔNG phải khoá, nên mọi hồ sơ bị loại ở
+        /// vòng CV rơi vào nhánh "Transition mapping … is not configured" — không thao tác lại
+        /// được và thông báo lỗi thì không nói được vì sao.
+        /// </summary>
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
-            { "invited", new(StringComparer.OrdinalIgnoreCase) { "cv_submitted", "withdrawn" } },
-            { "cv_submitted", new(StringComparer.OrdinalIgnoreCase) { "screening", "withdrawn" } },
-            { "screening", new(StringComparer.OrdinalIgnoreCase) { "interview", "not_pass", "withdrawn" } },
-            { "interview", new(StringComparer.OrdinalIgnoreCase) { "pass", "not_pass", "withdrawn" } },
-            { "pass", new(StringComparer.OrdinalIgnoreCase) { "withdrawn" } },
-            { "not_pass", new(StringComparer.OrdinalIgnoreCase) { "screening", "interview" } },
-            { "withdrawn", new(StringComparer.OrdinalIgnoreCase) } // terminal state
+            { ApplicationStatuses.Invited, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvSubmitted, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.CvSubmitted, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.HmReview, ApplicationStatuses.Screening, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
+            // Cổng duyệt của Hiring Manager (ADR-061). Thiếu KHOÁ này là mọi hồ sơ đang chờ HM rơi
+            // đúng vào nhánh "Transition mapping … is not configured" mà chú thích trên đã đi chữa
+            // cho cv_rejected — kẹt vĩnh viễn, không rút được, không mở lại được.
+            // `→ cv_submitted` là đường rút lại việc gửi duyệt (gửi nhầm người, gửi nhầm hồ sơ).
+            { ApplicationStatuses.HmReview, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Screening, ApplicationStatuses.CvSubmitted, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.CvRejected, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvSubmitted } }, // mở lại hồ sơ bị loại nhầm
+            { ApplicationStatuses.Screening, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Interview, ApplicationStatuses.NotPass, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.Interview, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Pass, ApplicationStatuses.NotPass, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.Pass, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Offer, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.Offer, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Hired, ApplicationStatuses.OfferDeclined, ApplicationStatuses.NotPass, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.Hired, new(StringComparer.OrdinalIgnoreCase) },          // điểm kết thúc thành công
+            { ApplicationStatuses.OfferDeclined, new(StringComparer.OrdinalIgnoreCase) },  // ứng viên từ chối / hết hạn
+            { ApplicationStatuses.NotPass, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Screening, ApplicationStatuses.Interview } },
+            { ApplicationStatuses.Withdrawn, new(StringComparer.OrdinalIgnoreCase) } // terminal state
         };
 
         public ApplicationService(
@@ -60,10 +79,7 @@ namespace ARI.Application.Services
         }
 
         /// <summary>Gốc Candidate Portal cho link trong email — không hardcode localhost vào thư gửi đi.</summary>
-        private string PortalBaseUrl =>
-            (_configuration["Frontend:CandidateBaseUrl"]
-             ?? _configuration["Authentication:AdminFrontendUrl"]
-             ?? "http://localhost:3000").TrimEnd('/');
+        private string PortalBaseUrl => FrontendUrls.Candidate(_configuration);
 
         /// <summary>
         /// Hàm tiện ích dùng chung để Map Entity sang Response (Tránh lặp code)
@@ -85,6 +101,9 @@ namespace ARI.Application.Services
                 PracticeSessionUsed = application.PracticeSessionUsed,
                 CreatedAt = application.CreatedAt,
                 CvJdAnalysisId = application.CvJdAnalysisId,
+                HmDecision = application.HmDecision,
+                HmDecisionNote = application.HmDecisionNote,
+                HmDecidedAt = application.HmDecidedAt,
                 CurrentRound = currentRound,
                 CoverLetter = application.CoverLetter,
                 NoticePeriod = application.NoticePeriod,
@@ -355,7 +374,10 @@ namespace ARI.Application.Services
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
-                        NoticePeriod = a.NoticePeriod
+                        NoticePeriod = a.NoticePeriod,
+                        HmDecision = a.HmDecision,
+                        HmDecisionNote = a.HmDecisionNote,
+                        HmDecidedAt = a.HmDecidedAt
                     }), ct);
 
             var result = await MapApplicationsAsync(applications, null, ct);
@@ -385,6 +407,9 @@ namespace ARI.Application.Services
             public Guid? CvJdAnalysisId { get; set; }
             public string? CoverLetter { get; set; }
             public string? NoticePeriod { get; set; }
+            public string? HmDecision { get; set; }
+            public string? HmDecisionNote { get; set; }
+            public DateTimeOffset? HmDecidedAt { get; set; }
         }
 
         private sealed class BookingProjection
@@ -586,7 +611,7 @@ namespace ARI.Application.Services
                 catch { }
             }
 
-            return apps.Select(app =>
+            var mapped = apps.Select(app =>
             {
                 int? currentRound = null;
                 if (app.Status != "cv_submitted" && app.Status != "invited" && app.Status != "cv_rejected")
@@ -639,6 +664,9 @@ namespace ARI.Application.Services
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
                     NoticePeriod = app.NoticePeriod,
+                    HmDecision = app.HmDecision,
+                    HmDecisionNote = app.HmDecisionNote,
+                    HmDecidedAt = app.HmDecidedAt,
                     InterviewScore = currentRound.HasValue && evalDict.TryGetValue((app.Id, currentRound.Value), out var iscr) ? iscr : null,
                     InterviewDate = interviewDate
                 };
@@ -651,6 +679,25 @@ namespace ARI.Application.Services
 
                 return resp;
             }).ToList();
+
+            // Trạng thái CHI TIẾT của vòng đang diễn ra (ADR-067). Tính sau khi đã có `CurrentRound`
+            // vì nó là đầu vào; gom một lượt cho cả danh sách chứ không hỏi từng dòng.
+            try
+            {
+                var stages = await ARI.Application.Applications.ApplicationStageStatus.ComputeAsync(
+                    _unitOfWork,
+                    mapped.Select(m => (m.Id, m.JobPostingId, m.Status, m.CurrentRound)).ToList(),
+                    ct);
+                foreach (var m in mapped)
+                    if (stages.TryGetValue(m.Id, out var stage)) m.StageStatus = stage;
+            }
+            catch
+            {
+                // Không có trạng thái chi tiết thì bảng vẫn dùng được (giao diện rơi về `Status`).
+                // Một cột phụ hỏng không được làm hỏng cả danh sách ứng viên.
+            }
+
+            return mapped;
         }
 
         private static void PopulateCandidateProfileFields(ApplicationResponse response, CandidateAccount c)
@@ -723,7 +770,10 @@ namespace ARI.Application.Services
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
-                        NoticePeriod = a.NoticePeriod
+                        NoticePeriod = a.NoticePeriod,
+                        HmDecision = a.HmDecision,
+                        HmDecisionNote = a.HmDecisionNote,
+                        HmDecidedAt = a.HmDecidedAt
                     }), ct);
 
             return Result.Success(await MapApplicationsAsync(applications, jobPosting.Title, ct));
@@ -738,6 +788,20 @@ namespace ARI.Application.Services
             var jobIds = (await _unitOfWork.Repository<JobPosting>()
                     .QueryAsync(q => q.Where(j => j.CreatedByUserId == creatorUserId).Select(j => j.Id), ct))
                 .ToHashSet();
+
+            return await GetApplicationsForJobsAsync(jobIds, ct);
+        }
+
+        /// <summary>
+        /// Danh sách ứng viên thuộc một tập tin tuyển dụng CHO TRƯỚC — phạm vi do
+        /// <see cref="JobAccess.ScopedJobIdsAsync"/> tính ở tầng gọi, không phải do client khai.
+        /// Tập rỗng trả về danh sách rỗng (khác với "không giới hạn", vốn đi đường
+        /// <see cref="GetAllApplicationsAsync"/>).
+        /// </summary>
+        public async Task<Result<List<ApplicationResponse>>> GetApplicationsForJobsAsync(
+            IReadOnlyCollection<Guid> jobPostingIds, CancellationToken ct = default)
+        {
+            var jobIds = jobPostingIds as HashSet<Guid> ?? jobPostingIds.ToHashSet();
 
             if (jobIds.Count == 0)
                 return Result.Success(new List<ApplicationResponse>());
@@ -760,7 +824,10 @@ namespace ARI.Application.Services
                         CreatedAt = a.CreatedAt,
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
-                        NoticePeriod = a.NoticePeriod
+                        NoticePeriod = a.NoticePeriod,
+                        HmDecision = a.HmDecision,
+                        HmDecisionNote = a.HmDecisionNote,
+                        HmDecidedAt = a.HmDecidedAt
                     }), ct);
 
             return Result.Success(await MapApplicationsAsync(applications, null, ct));
@@ -952,9 +1019,10 @@ namespace ARI.Application.Services
             await _unitOfWork.Repository<InterviewInvite>().AddAsync(invite, ct);
 
             // Qua vòng CV → mở giai đoạn sơ loại/phỏng vấn (và bật phỏng vấn thử).
-            if (string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
-                application.Status = "screening";
+            // `hm_review` cũng thuộc giai đoạn CV (ApplicationStatuses.CvPhase) nên được nhấc lên
+            // cùng — nếu không, hồ sơ đã qua cổng HM sẽ mắc lại ở trạng thái chờ duyệt vĩnh viễn.
+            if (ApplicationStatuses.IsCvPhase(application.Status))
+                application.Status = ApplicationStatuses.Screening;
             application.UpdatedAt = DateTimeOffset.UtcNow;
             await _unitOfWork.SaveChangesAsync(ct);
 
@@ -972,10 +1040,20 @@ namespace ARI.Application.Services
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
-            if (!string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase))
+            // Hồ sơ ở giai đoạn CV thì duyệt thẳng như cũ. Hồ sơ đang nằm ở cổng Hiring Manager thì
+            // CHỈ đi tiếp được khi cổng đã mở (HM duyệt, hoặc quản trị viên vượt cổng có lý do) —
+            // ADR-061. Cổng mở nằm ở cột HmDecision chứ không phải ở Status: Status nói hồ sơ đang
+            // ở đâu, HmDecision nói đã được phép đi tiếp chưa.
+            var inCvPhase = ApplicationStatuses.Is(application.Status, ApplicationStatuses.CvSubmitted)
+                            || ApplicationStatuses.Is(application.Status, ApplicationStatuses.Invited);
+            var gateOpen = ApplicationStatuses.Is(application.Status, ApplicationStatuses.HmReview)
+                           && HmDecision.IsOpen(application.HmDecision);
+
+            if (!inCvPhase && !gateOpen)
             {
-                return Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
+                return ApplicationStatuses.Is(application.Status, ApplicationStatuses.HmReview)
+                    ? Result<bool>.Failure("Hồ sơ đang chờ Hiring Manager duyệt. Chưa xếp lịch được.")
+                    : Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
             }
 
             // Nâng trạng thái + tạo token đánh dấu vòng, NHƯNG không gửi email ở đây (sendEmail: false) —
@@ -989,39 +1067,16 @@ namespace ARI.Application.Services
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             var jobTitle = job?.Title ?? "Vị trí tuyển dụng";
 
-            var pushCandidateAccount = application.CandidateAccountId.HasValue 
-                ? await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(application.CandidateAccountId.Value, ct)
-                : null;
-            var pushSettings = pushCandidateAccount != null && !string.IsNullOrEmpty(pushCandidateAccount.SettingsJson)
-                ? System.Text.Json.JsonSerializer.Deserialize<ARI.Application.DTOs.CandidateSettingsDto>(pushCandidateAccount.SettingsJson) ?? new ARI.Application.DTOs.CandidateSettingsDto()
-                : new ARI.Application.DTOs.CandidateSettingsDto();
-
-            // Tạo Notification trong database cho ứng viên
-            var response = MapToResponse(application, job, 1);
-            if (application.CandidateAccountId.HasValue && pushSettings.InterviewInvite.Push)
-            {
-                var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
-                var dedupKey = $"cv_accepted:{application.Id}";
-                var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == application.CandidateAccountId.Value && n.DedupKey == dedupKey, ct);
-                if (!existingNotifs.Any())
-                {
-                    var newNotif = new ARI.Domain.Entities.Notification
-                    {
-                        CandidateAccountId = application.CandidateAccountId.Value,
-                        DedupKey = dedupKey,
-                        Type = "result",
-                        Title = "Hồ sơ ứng tuyển được chấp nhận",
-                        Body = $"Chúc mừng! Hồ sơ vị trí {jobTitle} đã qua vòng duyệt CV. Nhân sự sẽ xếp lịch và gửi email mời phỏng vấn kèm lịch hẹn cho bạn.",
-                        Link = $"/candidate/applications/{application.Id}",
-                        IsRead = false
-                    };
-                    await notifRepo.AddAsync(newNotif, ct);
-                    await _unitOfWork.SaveChangesAsync(ct);
-                }
-
-                // Trigger bell update
-                await _notificationService.PublishUserEventAsync(application.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "CvAccepted" }, ct);
-            }
+            // CỐ Ý KHÔNG báo gì cho ứng viên ở bước này (ADR-067).
+            //
+            // Việc mở vòng để xếp lịch là chuyển động NỘI BỘ: Recruiter duyệt hồ sơ → Hiring Manager
+            // duyệt → hồ sơ quay về hàng chờ xếp lịch. Ứng viên chỉ được báo MỘT lần, khi đã có giờ
+            // hẹn cụ thể (`AssignSlotCommand` gửi chuông + thư mời). Trước đây bước này bắn chuông
+            // "hồ sơ đã qua vòng duyệt CV" ngay lúc duyệt, nên ứng viên nhận tin vui rồi ngồi im
+            // không biết bao lâu — và nếu Hiring Manager từ chối sau đó thì tin vui ấy thành sai.
+            //
+            // `jobTitle` vẫn tra ở trên vì thông báo lỗi và audit dùng tới.
+            _ = jobTitle;
 
             return Result<bool>.Success(true);
         }
@@ -1029,25 +1084,22 @@ namespace ARI.Application.Services
         /// <summary>
         /// Từ từ chối hồ sơ ứng tuyển ở vòng duyệt CV: chuyển trạng thái sang not_pass và gửi email cảm ơn.
         /// </summary>
-        public async Task<Result<bool>> RejectApplicationAsync(Guid applicationId, CancellationToken ct = default)
+        public async Task<Result<bool>> RejectApplicationAsync(
+            Guid applicationId, CancellationToken ct = default,
+            EmailOverride? emailOverride = null, Guid? actorUserId = null)
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
-            if (string.Equals(application.Status, "cv_rejected", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(application.Status, "not_pass", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(application.Status, "failed", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(application.Status, "withdrawn", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(application.Status, "pass", StringComparison.OrdinalIgnoreCase))
+            if (ApplicationStatuses.IsTerminal(application.Status))
             {
                 return Result<bool>.Failure("Hồ sơ này đã ở trạng thái kết thúc (đã từ chối / loại / hoàn thành).");
             }
 
-            bool isCvPhase = string.Equals(application.Status, "cv_submitted", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(application.Status, "invited", StringComparison.OrdinalIgnoreCase);
-
-            application.Status = isCvPhase ? "cv_rejected" : "not_pass";
+            application.Status = ApplicationStatuses.IsCvPhase(application.Status)
+                ? ApplicationStatuses.CvRejected
+                : ApplicationStatuses.NotPass;
             application.UpdatedAt = DateTimeOffset.UtcNow;
 
             _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
@@ -1106,22 +1158,16 @@ namespace ARI.Application.Services
 
             if (settings.ApplicationUpdate.Email)
             {
-                var subject = $"[ARISP] - Thư cảm ơn ứng tuyển vị trí {jobTitle}";
-                var htmlMessage = $@"
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
-            <h3 style='color: #333;'>Chào {application.CandidateName},</h3>
-            <p>Cảm ơn bạn đã quan tâm đến cơ hội nghề nghiệp tại ARISP và dành thời gian nộp hồ sơ ứng tuyển cho vị trí <strong>{jobTitle}</strong>.</p>
-            <p>Chúng tôi rất ấn tượng với hồ sơ và kinh nghiệm của bạn. Tuy nhiên, sau khi xem xét kỹ lưỡng các yêu cầu hiện tại của công việc, chúng tôi rất tiếc chưa thể tiến xa hơn với bạn trong đợt tuyển dụng này.</p>
-            <p>Thông tin của bạn sẽ được lưu giữ trong hệ thống cơ sở dữ liệu tài năng của chúng tôi. Nếu có các cơ hội phù hợp hơn trong tương lai, chúng tôi sẽ chủ động liên hệ lại.</p>
-            <div style='text-align: center; margin: 28px 0;'>
-                <a href='{PortalBaseUrl}/candidate/applications/{application.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem hồ sơ của bạn</a>
-            </div>
-            <p>Chúc bạn luôn nhiều sức khỏe và may mắn trên con đường sự nghiệp của mình.</p>
-            <br/>
-            <p>Trân trọng,</p>
-            <p><strong>Đội ngũ nhân sự ARISP</strong></p>
-        </div>";
-                try { await _emailService.SendEmailAsync(application.CandidateEmail, subject, htmlMessage); } catch { }
+                // Nội dung dựng ở ApplicationRejectedEmail — CÙNG builder mà trình soạn thảo dùng
+                // để xem trước, nên bản nhân sự nhìn thấy và bản ứng viên nhận là một (ADR-061).
+                var mail = ApplicationRejectedEmail.Build(application, job, PortalBaseUrl);
+                await CandidateEmailSender.SendAsync(
+                    _unitOfWork, _notificationService,
+                    EmailTemplateKeys.ApplicationRejected,
+                    new RenderedEmail(mail.Subject, mail.Html, application.CandidateEmail, application.CandidateName),
+                    emailOverride,
+                    applicationId: application.Id, jobPostingId: application.JobPostingId,
+                    sentByUserId: actorUserId, ct);
             }
 
             // Gửi SignalR thông báo và tạo Notification trong database cho ứng viên

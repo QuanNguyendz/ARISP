@@ -317,6 +317,15 @@ export interface HrApplicationItem {
   currentRound?: number | null
   coverLetter?: string
   noticePeriod?: string
+  /** Cổng duyệt của Hiring Manager (ADR-061): pending | approved | rejected | bypassed. */
+  hmDecision?: string | null
+  hmDecisionNote?: string | null
+  /**
+   * Việc đang thật sự diễn ra ở vòng hiện tại (ADR-067) — `status` chỉ nói hồ sơ ở KHÚC nào của
+   * phễu, nên nó đứng yên ở "interview" suốt cả một vòng. Rỗng = dùng lại `status` như trước.
+   */
+  stageStatus?: string | null
+  hmDecidedAt?: string | null
   interviewScore?: number | null
   interviewDate?: string
   /** Phản hồi của ứng viên với lịch vòng hiện tại: pending | confirmed (null nếu chưa có lịch). */

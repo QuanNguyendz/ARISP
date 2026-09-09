@@ -162,7 +162,7 @@
     "coverLetter": "Cover Letter",
     "noCoverLetter": "Candidate did not submit a cover letter.",
     "close": "Close",
-    "matchScore": "Match Score: {{score}}%"
+    "matchScore": "Match Score: {{score}}/100"
   },
   "notices": {
     "acceptSuccess": "CV approved (Round 1). Assign a schedule to send the interview invitation email with the appointment.",
@@ -173,7 +173,9 @@
     "batchAcceptSuccess": "Successfully approved {{success}} applications.",
     "batchRejectSuccess": "Successfully rejected {{success}} applications.",
     "batchInviteSuccess": "Successfully sent invitations to {{success}} candidates.",
-    "close": "Close"
+    "close": "Close",
+    "sentToHiringManager": "Sent to the hiring manager for approval. The candidate is not notified yet — the pass email goes out once a slot is booked.",
+    "sentToHiringManagerBatch": "Sent {{success}} applications to the hiring manager; {{failed}} could not be sent."
   },
   "errors": {
     "loadJob": "Unable to load job posting details. The posting may not exist or you don't have permission to view.",

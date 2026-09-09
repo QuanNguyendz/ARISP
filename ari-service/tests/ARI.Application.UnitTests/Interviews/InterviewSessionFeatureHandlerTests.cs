@@ -8,20 +8,34 @@ using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interviews;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace ARI.Application.UnitTests.Interviews;
 
-/// <summary>Danh sách phiên phỏng vấn cho HR (<see cref="GetHrInterviewSessionsQueryHandler"/>) — Report5 tab "GetHrInterviewSessions" (UTCID01–03).</summary>
+/// <summary>
+/// Danh sách phiên phỏng vấn cho HR (<see cref="GetHrInterviewSessionsQueryHandler"/>) — Report5 tab
+/// "GetHrInterviewSessions" (UTCID01–03).
+///
+/// <b>ADR-061:</b> endpoint này từng trả MỌI phiên phỏng vấn của công ty kèm <c>RecordingUrl</c> cho
+/// bất kỳ nhân sự nào. Nay handler lọc theo phạm vi do SERVER tính; quản trị viên vẫn thấy tất cả,
+/// nên ba ca dưới đây chạy dưới danh nghĩa quản trị viên và giữ nguyên kỳ vọng cũ.
+/// </summary>
 public class GetHrInterviewSessionsQueryHandlerTests
 {
+    private static readonly Guid AdminA = Guid.Parse("42000000-0000-0000-0000-000000000001");
+
+    private static Task<Result<List<HrInterviewSessionItem>>> Run(FakeInterviewService svc)
+        => new GetHrInterviewSessionsQueryHandler(svc, new InMemoryUnitOfWork())
+            .Handle(new GetHrInterviewSessionsQuery(null, AdminA, AppRoles.HrAdmin), CancellationToken.None);
+
     [Fact]
     public async Task UTCID01_Returns_sessions()
     {
         var svc = new FakeInterviewService { HrSessions = new() { new(), new() } };
-        var res = await new GetHrInterviewSessionsQueryHandler(svc).Handle(new GetHrInterviewSessionsQuery(), CancellationToken.None);
+        var res = await Run(svc);
         Assert.True(res.IsSuccess);
         Assert.Same(svc.HrSessions, res.Value);
     }
@@ -30,7 +44,7 @@ public class GetHrInterviewSessionsQueryHandlerTests
     public async Task UTCID02_Empty()
     {
         var svc = new FakeInterviewService();
-        var res = await new GetHrInterviewSessionsQueryHandler(svc).Handle(new GetHrInterviewSessionsQuery(), CancellationToken.None);
+        var res = await Run(svc);
         Assert.True(res.IsSuccess);
         Assert.Empty(res.Value);
     }
@@ -39,7 +53,7 @@ public class GetHrInterviewSessionsQueryHandlerTests
     public async Task UTCID03_Exception_propagates()
     {
         var svc = new FakeInterviewService { HrSessionsThrows = new Exception("Session DB Error") };
-        var ex = await Assert.ThrowsAsync<Exception>(() => new GetHrInterviewSessionsQueryHandler(svc).Handle(new GetHrInterviewSessionsQuery(), CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(svc));
         Assert.Equal("Session DB Error", ex.Message);
     }
 }
@@ -286,13 +300,21 @@ public class ConfirmHrReviewCommandHandlerTests
         Assert.Equal("https://admin.example.com", svc.LastHrReview!.Value.BaseUrl);
     }
 
+    /// <summary>
+    /// Chưa cấu hình gốc URL nào → chuỗi RỖNG, cố ý không còn mặc định <c>http://localhost:3000</c>.
+    /// Mặc định đó khiến thư gửi từ server thật mang nút bấm dẫn về máy lập trình viên: không lỗi,
+    /// không log, chỉ phát hiện khi ứng viên báo link hỏng. Nay thiếu cấu hình bị chặn ngay lúc boot
+    /// ở môi trường non-Development (<see cref="FrontendUrls"/>), nên trạng thái này không tồn tại
+    /// trên môi trường thật — và ở đây không ném lỗi để một lá thư thiếu link không kéo đổ cả thao
+    /// tác nghiệp vụ đang chạy.
+    /// </summary>
     [Fact]
-    public async Task UTCID03_Falls_back_to_localhost()
+    public async Task UTCID03_No_configured_url_yields_empty()
     {
         var svc = new FakeInterviewService();
         var res = await new ConfirmHrReviewCommandHandler(svc, Config()).Handle(new ConfirmHrReviewCommand(HrA, Req()), CancellationToken.None);
         Assert.True(res.IsSuccess);
-        Assert.Equal("http://localhost:3000", svc.LastHrReview!.Value.BaseUrl);
+        Assert.Equal("", svc.LastHrReview!.Value.BaseUrl);
     }
 
     [Fact]

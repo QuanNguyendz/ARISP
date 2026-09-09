@@ -147,9 +147,11 @@ namespace ARI.Application.CandidatePortal
             foreach (var s in submissions)
             {
                 var app = apps.FirstOrDefault(a => a.Id == s.ApplicationId);
+                // CỐ Ý không nói đạt/trượt và không kèm điểm: kết quả chỉ công bố khi cả vòng
+                // đã chốt. Chuông này chỉ xác nhận bài đã vào hệ thống.
                 Add($"online_test:{s.Id}", "result",
-                    $"Kết quả bài trắc nghiệm: {(s.IsPassed ? "Đạt" : "Chưa đạt")}",
-                    $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Điểm {Math.Round(s.Score)}/100.",
+                    "Đã nhận bài trắc nghiệm của bạn",
+                    $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Bộ phận tuyển dụng sẽ thông báo kết quả sau.",
                     $"/candidate/applications/{s.ApplicationId}", s.CreatedAt);
             }
 

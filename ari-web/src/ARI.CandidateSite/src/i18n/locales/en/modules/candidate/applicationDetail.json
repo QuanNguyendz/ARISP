@@ -31,6 +31,9 @@
     "description": "The appointment has passed with no interview recorded. Please contact the recruitment team to be rescheduled."
   },
   "badge": {
+    "scheduled": "Scheduled",
+    "invited": "Invited",
+    "notStarted": "Not Interviewed",
     "missed": "Missed",
     "practice": "Practice",
     "pass": "Pass",
@@ -39,7 +42,8 @@
     "inProgress": "In Progress",
     "noResult": "No result yet",
     "practiceInterview": "Practice Interview",
-    "realInterview": "Real Interview"
+    "realInterview": "Real Interview",
+    "onlineTest": "Taken online"
   },
   "criteria": {
     "byCriteria": "By Criteria",
@@ -111,18 +115,14 @@
     "title": "Round {{round}}: Not yet held",
     "description": "This interview round has not started yet. You will be notified when the previous round's results are approved."
   },
-  "badge": {
-    "scheduled": "Scheduled",
-    "invited": "Invited",
-    "notStarted": "Not Interviewed",
-    "missed": "Missed",
-    "practice": "Practice",
-    "pass": "Pass",
-    "notPass": "Not Pass",
-    "pendingHr": "Pending HR",
-    "inProgress": "In Progress",
-    "noResult": "No result yet",
-    "practiceInterview": "Practice Interview",
-    "realInterview": "Real Interview"
+  "onlineTest": {
+    "title": "Online test",
+    "locked": "Your application must pass the CV round before you can take the test.",
+    "readyTitle": "Your online test is ready",
+    "readyDescription": "{{count}} questions · {{minutes}} minutes. You get ONE attempt.",
+    "remoteHint": "Taken online right here — no office visit and no interview code needed.",
+    "start": "Start the test",
+    "submittedTitle": "Online test submitted",
+    "submittedHint": "Recruiting will let you know the outcome once this round is decided."
   }
 }

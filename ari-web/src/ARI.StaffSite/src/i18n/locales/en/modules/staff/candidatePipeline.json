@@ -1,0 +1,59 @@
+{
+  "candidate": "Candidate",
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "invite": "Invite to interview",
+    "viewApplication": "Open full profile",
+    "schedule": "Schedule",
+    "hmApprove": "Approve & send availability",
+    "hmReject": "Reject"
+  },
+  "pipeline": {
+    "rejected": "Not a fit",
+    "newApplicants": "New applicants",
+    "hmReview": "Awaiting HM",
+    "scheduling": "To be scheduled",
+    "passed": "Passed interviews",
+    "offer": "Offer sent",
+    "hired": "Hired",
+    "resultCount": "({{count}} applications)",
+    "emptyStage": "No applications at this stage yet.",
+    "loading": "Loading candidates...",
+    "backToList": "Back to list",
+    "colCandidate": "Candidate",
+    "colContact": "Contact",
+    "colArea": "Area",
+    "colAge": "Age",
+    "colMatch": "CV score",
+    "colStatus": "Status",
+    "ageValue": "{{count}} yrs",
+    "appliedAt": "Applied on",
+    "cv": "CV",
+    "noCv": "This candidate has not submitted a CV.",
+    "selectPage": "Select all on page",
+    "selectedCount": "{{count}} selected",
+    "awaitingHm": "Waiting for the hiring manager",
+    "round": "Round {{number}}",
+    "roundTypes": {
+      "screening": "Screening",
+      "technical": "Technical",
+      "onlineTest": "Online test"
+    }
+  },
+  "stage": {
+    "cv_pending": "Awaiting CV screening",
+    "hm_review": "Awaiting hiring manager",
+    "awaiting_schedule": "Awaiting scheduling",
+    "schedule_pending": "Awaiting confirmation",
+    "schedule_confirmed": "Slot confirmed",
+    "schedule_declined": "Declined — needs rescheduling",
+    "test_open": "Test not submitted",
+    "test_submitted": "Test submitted",
+    "interview_waiting": "Waiting to be let in",
+    "interview_active": "Interview in progress",
+    "interview_done": "Interview finished",
+    "pending_result": "Awaiting decision",
+    "missed": "Did not attend"
+  }
+}

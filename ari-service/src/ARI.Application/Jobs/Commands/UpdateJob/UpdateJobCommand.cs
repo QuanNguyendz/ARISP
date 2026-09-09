@@ -41,10 +41,9 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             if (job == null)
                 return Result.Failure<JobPostingResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
-            // 1. Validate ownership & roles
-            var isAuthorized = command.Role == AppRoles.SuperAdmin ||
-                               command.Role == AppRoles.HrAdmin ||
-                               job.CreatedByUserId == command.UserId;
+            // 1. Validate ownership & roles — sửa tin cần quyền QUẢN LÝ (chủ tin hoặc quản trị
+            //    viên); thành viên đội tuyển dụng chỉ đọc được tin, không sửa.
+            var isAuthorized = RoleNames.IsAdmin(command.Role) || job.CreatedByUserId == command.UserId;
             if (!isAuthorized)
                 return Result.Failure<JobPostingResponse>("Bạn không có quyền cập nhật tin tuyển dụng này.", CommonErrorCodes.Forbidden);
 
@@ -54,7 +53,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
 
             // 2b. Recruiter chỉ được sửa tin khi còn nháp hoặc bị từ chối — đã gửi HR duyệt (pending)
             //     hoặc đã duyệt (active...) thì khoá. SuperAdmin/HrAdmin không bị giới hạn này.
-            var isPrivileged = command.Role == AppRoles.SuperAdmin || command.Role == AppRoles.HrAdmin;
+            var isPrivileged = RoleNames.IsAdmin(command.Role);
             if (!isPrivileged &&
                 !string.Equals(job.Status, "draft", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(job.Status, "rejected", StringComparison.OrdinalIgnoreCase))

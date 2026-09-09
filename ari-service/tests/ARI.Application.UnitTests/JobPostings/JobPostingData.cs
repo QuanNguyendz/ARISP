@@ -40,6 +40,21 @@ internal static class JobPostingData
         FullName = "Nguoi Tao Tin",
     };
 
+    /// <summary>
+    /// Phiếu yêu cầu tuyển dụng đã được HR Leader duyệt và phân công (ADR-063). Từ ADR-063 mọi tin
+    /// đều phải bắt nguồn từ một phiếu như thế này — không còn đường tạo tin "trần".
+    /// </summary>
+    public static RecruitmentRequest ApprovedRecruitmentRequest(Guid hiringManagerId, Guid assignedRecruiterId) => new()
+    {
+        RequestedByUserId = hiringManagerId,
+        Title = "Backend Developer",
+        Headcount = 1,
+        Status = ARI.Domain.Constants.RecruitmentRequestStatus.Approved,
+        AssignedRecruiterId = assignedRecruiterId,
+        ReviewedByUserId = Guid.NewGuid(),
+        ReviewedAt = DateTimeOffset.UtcNow,
+    };
+
     public static JobPosting Job(
         Guid owner, string status = "draft",
         string? jdFileUrl = null, string? jdFileFormat = null, DateTimeOffset? deadline = null) => new()

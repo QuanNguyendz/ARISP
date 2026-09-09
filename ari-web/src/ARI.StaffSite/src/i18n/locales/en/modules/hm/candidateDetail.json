@@ -1,0 +1,14 @@
+{
+  "loading": "Loading candidate...",
+  "loadError": "Could not load this candidate. They may not belong to a job you are on.",
+  "back": "Back to the job",
+  "contact": "Contact details",
+  "matchScore": "CV–JD match: {{score}}/100",
+  "viewCv": "View CV",
+  "evaluations": {
+    "title": "Interview results",
+    "description": "The AI report for each round. You are the one who decides pass or fail.",
+    "empty": "This candidate has not completed any interview round yet.",
+    "round": "Round {{number}}"
+  }
+}

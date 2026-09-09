@@ -1,0 +1,30 @@
+{
+  "title": "Departments",
+  "description": "The company's departments. Every staff account belongs to exactly one — that department is what a recruitment request is filed under.",
+  "create": "Add department",
+  "loading": "Loading...",
+  "inactive": "Inactive",
+  "memberCount": "{{count}} member",
+  "memberCount_other": "{{count}} members",
+  "empty": {
+    "title": "No departments yet",
+    "description": "Add the company's departments so staff accounts can be assigned to one. A Hiring Manager with no department cannot file a recruitment request."
+  },
+  "modal": {
+    "createTitle": "Add department",
+    "editTitle": "Edit department",
+    "name": "Department name",
+    "namePlaceholder": "e.g. Backend Team",
+    "code": "Code",
+    "codePlaceholder": "e.g. BE",
+    "description": "Description",
+    "active": "Active",
+    "activeHint": "When a department is dissolved, untick this instead of deleting it — old requests and accounts still need to resolve its name.",
+    "cancel": "Cancel",
+    "submit": "Save"
+  },
+  "errors": {
+    "loadFailed": "Could not load departments.",
+    "saveFailed": "Could not save the department."
+  }
+}

@@ -54,7 +54,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<SessionHub>("/hubs/session");
-app.MapHub<WebRTCSignalingHub>("/hubs/webrtc");
 app.MapHub<AppNotificationHub>("/hubs/app-notifications");
 
 await app.InitialiseDatabaseAsync();

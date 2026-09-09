@@ -53,6 +53,7 @@ _ReSharper*/
 # Claude Code (local settings chứa secrets – không commit)
 # -----------------------------------------------------------------------
 .claude/settings.local.json
+.claude/settings.local.json.bak*
 
 # -----------------------------------------------------------------------
 # Environment Files & Secrets (MUST NEVER BE COMMITTED)

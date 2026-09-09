@@ -103,7 +103,9 @@ public class CreateSlotCommandHandlerTests
     private static Task<Result<AvailabilitySlotResponse>> Run(InMemoryUnitOfWork uow, CreateSlotRequest req)
         => new CreateSlotCommandHandler(uow).Handle(new CreateSlotCommand(req, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
-    private static CreateSlotRequest Req(Guid? jobId = null, int round = 1, int capacity = 2, DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh")
+    // capacity mặc định là 1: từ ADR-067 mọi giá trị khác đều bị chặn ngay đầu handler, nên để 2 làm
+    // mặc định thì mọi ca khác lại dừng ở đúng câu lỗi đó thay vì ở điều kiện nó định kiểm.
+    private static CreateSlotRequest Req(Guid? jobId = null, int round = 1, int capacity = 1, DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh")
         => new()
         {
             JobPostingId = jobId ?? SlotIds.JobId, RoundNumber = round, Capacity = capacity,
@@ -131,11 +133,16 @@ public class CreateSlotCommandHandlerTests
         Assert.Equal("Khung giờ phải nằm trong tương lai.", res.Error);
     }
 
-    [Fact]
-    public async Task UTCID04_Capacity_zero()
+    // ADR-067: một ca = một ứng viên. Chặn ở CỔNG TẠO chứ không âm thầm ghi đè về 1 — một ô
+    // "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn như đang có tác dụng.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public async Task UTCID04_Capacity_must_be_exactly_one(int capacity)
     {
-        var res = await Run(new InMemoryUnitOfWork(), Req(capacity: 0));
-        Assert.Equal("Sức chứa (capacity) tối thiểu là 1.", res.Error);
+        var res = await Run(new InMemoryUnitOfWork(), Req(capacity: capacity));
+        Assert.True(res.IsFailure);
+        Assert.Equal("Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.", res.Error);
     }
 
     [Fact]
@@ -168,11 +175,15 @@ public class CreateSlotCommandHandlerTests
     public async Task UTCID08_Valid_creates_slot()
     {
         var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job());
-        var res = await Run(uow, Req(capacity: 2));
+
+        var res = await Run(uow, Req(round: 2, capacity: 1));
+
         Assert.True(res.IsSuccess);
         Assert.Equal(0, res.Value.BookedCount);
-        Assert.Equal(2, res.Value.Capacity);
-        Assert.Single(uow.Repo<AvailabilitySlot>().Items);
+        Assert.Equal(1, res.Value.Capacity);
+        Assert.Equal(2, res.Value.RoundNumber);
+        var stored = Assert.Single(uow.Repo<AvailabilitySlot>().Items);
+        Assert.Equal(0, stored.BookedCount);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
@@ -270,41 +281,58 @@ public class UpdateSlotCapacityCommandHandlerTests
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 
-    [Fact]
-    public async Task UTCID03_Capacity_below_one()
+    // ADR-067 áp cùng luật với lúc tạo: endpoint này còn lại để HẠ ca dữ liệu cũ (sức chứa > 1)
+    // về 1, chứ không phải để nâng lên.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public async Task UTCID03_Capacity_must_be_exactly_one(int capacity)
     {
-        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 2));
-        var res = await Run(uow, 0);
-        Assert.Equal("Sức chứa tối thiểu là 1.", res.Error);
+        var slot = SlotIds.Slot(capacity: 2);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot);
+
+        var res = await Run(uow, capacity);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.", res.Error);
+        Assert.Equal(2, slot.Capacity);   // giữ nguyên
     }
 
     [Fact]
     public async Task UTCID04_Capacity_below_booked()
     {
-        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 5, booked: 2));
+        // Ca dữ liệu cũ có 2 người đã đặt: hạ về 1 sẽ đuổi một người ra khỏi chỗ họ đã giữ mà
+        // không ai báo — phải dời họ sang ca khác trước.
+        var slot = SlotIds.Slot(capacity: 5, booked: 2);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot);
+
         var res = await Run(uow, 1);
+
         Assert.True(res.IsFailure);
         Assert.Equal("Sức chứa không được nhỏ hơn số đã đặt (2).", res.Error);
+        Assert.Equal(5, slot.Capacity);
     }
 
     [Fact]
     public async Task UTCID05_Valid_update()
     {
-        var slot = SlotIds.Slot(capacity: 2, booked: 2);
+        var slot = SlotIds.Slot(capacity: 2, booked: 1);
         var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot);
-        var res = await Run(uow, 3);
+
+        var res = await Run(uow, 1);
+
         Assert.True(res.IsSuccess);
-        Assert.Equal(3, res.Value.Capacity);
-        Assert.Equal(2, res.Value.BookedCount);
-        Assert.Equal(3, slot.Capacity);
+        Assert.Equal(1, res.Value.Capacity);
+        Assert.Equal(1, res.Value.BookedCount);
+        Assert.Equal(1, slot.Capacity);
         Assert.Equal(1, uow.SaveChangesCount);
     }
 
     [Fact]
     public async Task UTCID06_Save_error()
     {
-        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 2, booked: 2)).FailSaveOn(1, "Save Error");
-        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, 3));
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(capacity: 2, booked: 1)).FailSaveOn(1, "Save Error");
+        var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, 1));
         Assert.Equal("Save Error", ex.Message);
     }
 }

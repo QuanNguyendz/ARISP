@@ -25,7 +25,8 @@
     "saved": "Profile saved.",
     "nameRequired": "Please enter your full name.",
     "loadError": "Could not load your profile.",
-    "saveError": "Could not save your profile."
+    "saveError": "Could not save your profile.",
+    "departmentLocked": "Your team is assigned by the Super Admin. Contact them to change it."
   },
   "notifications": {
     "title": "Notifications",

@@ -17,6 +17,18 @@ export interface AvailabilitySlot {
   bookedCount: number
   /** Còn chỗ trống để ứng viên đặt (BookedCount < Capacity) */
   isAvailable?: boolean
+  /** Ứng viên đang giữ chỗ ở ca này — rỗng khi chưa ai đặt (ADR-067). */
+  bookings?: SlotBookingBrief[]
+}
+
+/** Ứng viên đang giữ một chỗ trong ca — vừa đủ để nhận ra người đó trên màn lịch. */
+export interface SlotBookingBrief {
+  bookingId: string
+  applicationId: string
+  candidateName?: string | null
+  candidateEmail?: string | null
+  /** pending | confirmed | declined — ứng viên đã xác nhận giờ hẹn chưa (ADR-048). */
+  confirmationStatus: string
 }
 
 export interface JobPosting {
@@ -72,9 +84,29 @@ export interface JobPosting {
   approverName?: string
   /** URL file JD đã đóng dấu duyệt (đã resolve) — chỉ có khi đã duyệt & JD là PDF */
   signedJdFileUrl?: string
+
+  /**
+   * ===== Cổng của Hiring Manager (ADR-061) =====
+   * Server CHỈ điền các trường này cho nhân sự nội bộ. Ứng viên xem cùng một tin trên Job Board
+   * nhận về `undefined` — nên đừng dựa vào chúng để dựng gì ở CandidateSite.
+   */
+  /** pending | approved | rejected. Không có = tin chưa gán Hiring Manager, không có cổng nào. */
+  hmSignOffStatus?: string | null
+  /** Góp ý của Hiring Manager khi yêu cầu sửa mô tả công việc — nội bộ, không cho ứng viên xem. */
+  hmSignOffReason?: string | null
+  /** Tin có cổng duyệt của Hiring Manager không (suy ra từ đội tuyển dụng, không phải cột bật/tắt). */
+  requiresHmApproval?: boolean
+  hiringManagerUserId?: string | null
+  hiringManagerName?: string | null
 }
 
 export interface CreateJobPostingRequest {
+  /**
+   * Phiếu yêu cầu tuyển dụng đã được HR Leader duyệt (ADR-063). BẮT BUỘC khi tạo tin mới —
+   * server từ chối tin không gắn phiếu. Bỏ trống khi sửa tin đã có.
+   */
+  recruitmentRequestId?: string
+
   title: string
   department?: string
   jobDescription: string

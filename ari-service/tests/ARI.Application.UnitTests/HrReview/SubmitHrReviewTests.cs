@@ -74,15 +74,21 @@ public class SubmitHrReviewTests
     }
 
     [Fact]
-    public async Task Recruiter_can_confirm_matching_verdict()
+    public async Task Recruiter_cannot_confirm_at_all()
     {
-        // Confirm KHÔNG phải override → không giới hạn vai trò (Recruiter được phép).
+        // ADR-061: chủ tin VẬN HÀNH phễu (xếp lịch, cấp mã, gửi thư), KHÔNG quyết định tuyển.
+        //
+        // Trước đây service cho phép Recruiter "confirm" khi trùng verdict của AI, nhưng đường đó
+        // CHƯA BAO GIỜ đi tới được qua HTTP: endpoint gác bằng policy HrManagement vốn đã loại
+        // Recruiter. Bài test cũ vì thế chốt một hành vi chỉ tồn tại ở tầng service. Nay tầng
+        // service từ chối luôn — trùng khớp với cổng thật, và là lớp phòng thủ thứ hai.
         var (uow, _, app, eval) = Seed(aiVerdict: "pass", reviewerRole: AppRoles.Recruiter);
 
         var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"));
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal("pass", app.Status);
+        Assert.True(res.IsFailure);
+        Assert.Empty(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.Equal("interview", app.Status); // không đụng tới trạng thái hồ sơ
     }
 
     // ---------- Override (đổi verdict của AI) ----------
@@ -137,7 +143,6 @@ public class SubmitHrReviewTests
             HrReviewData.Request(eval.Id, "pass", overrideReason: "Tôi thấy ổn"));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("HR Admin or Super Admin", res.Error);
         Assert.Empty(uow.Repo<Domain.Entities.HrReview>().Items);
     }
 
@@ -275,5 +280,138 @@ public class SubmitHrReviewTests
         Assert.Empty(uow.Repo<Domain.Entities.Notification>().Items);
         Assert.Equal("pass", app.Status);
         Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items); // luồng chính vẫn hoàn tất
+    }
+
+    // ---------- Người chốt là Hiring Manager (ADR-061) ----------
+
+    /// <summary>Gắn một Hiring Manager chính vào tin và trả về id của người đó.</summary>
+    private static Guid AssignHm(InMemoryUnitOfWork uow, Guid jobId)
+    {
+        var hmId = Guid.NewGuid();
+        uow.Seed(new User { Id = hmId, Email = "hm@corp.io", Role = RoleNames.HiringManager, IsActive = true });
+        uow.Seed(new JobHiringTeamMember
+        {
+            JobPostingId = jobId,
+            UserId = hmId,
+            RoleOnJob = JobTeamRoles.HiringManager,
+            IsPrimary = true,
+            AddedByUserId = Guid.NewGuid(),
+        });
+        return hmId;
+    }
+
+    [Fact]
+    public async Task Hiring_manager_of_the_job_confirms_the_verdict()
+    {
+        var (uow, job, app, eval) = Seed(aiVerdict: "pass");
+        var hmId = AssignHm(uow, job.Id);
+
+        var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"), hrUserId: hmId);
+
+        Assert.True(res.IsSuccess);
+        var review = Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.Equal(hmId, review.ReviewedByUserId);
+        Assert.Equal(RoleNames.HiringManager, review.ReviewerRole); // ảnh chụp vai trò lúc chốt
+        Assert.False(review.IsHrFallback);
+        Assert.Equal("pass", app.Status);
+    }
+
+    [Fact]
+    public async Task Hiring_manager_may_override_the_ai_verdict()
+    {
+        // Trước ADR-061 chỉ quản trị viên được ghi đè, nên người hiểu công việc nhất lại không
+        // sửa được kết luận sai của mô hình.
+        var (uow, job, app, eval) = Seed(aiVerdict: "not_pass");
+        var hmId = AssignHm(uow, job.Id);
+
+        var res = await Run(uow, new RecordingNotificationService(),
+            HrReviewData.Request(eval.Id, "pass", overrideReason: "Ứng viên làm đúng bài thực tế của nhóm"),
+            hrUserId: hmId);
+
+        Assert.True(res.IsSuccess);
+        Assert.True(Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items).IsOverride);
+        Assert.Equal("pass", app.Status);
+    }
+
+    [Fact]
+    public async Task Admin_confirming_on_a_job_that_has_an_hm_requires_a_reason()
+    {
+        var (uow, job, app, eval) = Seed(aiVerdict: "pass", reviewerRole: AppRoles.HrAdmin);
+        AssignHm(uow, job.Id);
+
+        var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"));
+
+        Assert.True(res.IsFailure);
+        Assert.Empty(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.Equal("interview", app.Status);
+    }
+
+    [Fact]
+    public async Task Admin_fallback_with_reason_is_recorded_and_notifies_the_bypassed_hm()
+    {
+        // Một quyết định tuyển đi qua đầu người phụ trách mà họ không biết là thất bại quản trị,
+        // dù lý do có chính đáng.
+        var (uow, job, app, eval) = Seed(aiVerdict: "pass", reviewerRole: AppRoles.HrAdmin);
+        var hmId = AssignHm(uow, job.Id);
+        var request = HrReviewData.Request(eval.Id, "pass");
+        request.FallbackReason = "Hiring Manager nghỉ phép dài ngày, ứng viên cần trả lời gấp";
+
+        var res = await Run(uow, new RecordingNotificationService(), request);
+
+        Assert.True(res.IsSuccess);
+        var review = Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.True(review.IsHrFallback);
+        Assert.Equal(RoleNames.HrAdmin, review.ReviewerRole);
+        Assert.Contains(uow.Repo<AuditLog>().Items, a => a.Action == "hr_review_fallback");
+        Assert.Contains(uow.Repo<Domain.Entities.Notification>().Items, n => n.RecipientUserId == hmId);
+        Assert.Equal("pass", app.Status);
+    }
+
+    [Fact]
+    public async Task Another_jobs_hiring_manager_cannot_confirm_here()
+    {
+        var (uow, job, _, eval) = Seed(aiVerdict: "pass");
+        AssignHm(uow, job.Id);
+        var outsiderHm = Guid.NewGuid();
+        uow.Seed(new User { Id = outsiderHm, Email = "other-hm@corp.io", Role = RoleNames.HiringManager, IsActive = true });
+
+        var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"), hrUserId: outsiderHm);
+
+        Assert.True(res.IsFailure);
+        Assert.Empty(uow.Repo<Domain.Entities.HrReview>().Items);
+    }
+
+    [Fact]
+    public async Task Admin_still_confirms_freely_when_the_job_has_no_hiring_manager()
+    {
+        // Đây là đường MẶC ĐỊNH cho toàn bộ dữ liệu cũ, không phải ngoại lệ: tin chưa gán Hiring
+        // Manager thì quy trình chạy y hệt trước ADR-061.
+        var (uow, _, app, eval) = Seed(aiVerdict: "pass", reviewerRole: AppRoles.HrAdmin);
+
+        var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"));
+
+        Assert.True(res.IsSuccess);
+        Assert.False(Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items).IsHrFallback);
+        Assert.Equal("pass", app.Status);
+    }
+
+    [Fact]
+    public async Task Suggested_salary_is_carried_onto_the_review_for_the_offer_stage()
+    {
+        var (uow, job, _, eval) = Seed(aiVerdict: "pass");
+        var hmId = AssignHm(uow, job.Id);
+        var request = HrReviewData.Request(eval.Id, "pass");
+        request.SuggestedLevel = "Middle";
+        request.SuggestedSalaryMin = 25_000_000m;
+        request.SuggestedSalaryMax = 32_000_000m;
+        request.Strengths = "Nền tảng .NET vững";
+
+        var res = await Run(uow, new RecordingNotificationService(), request, hrUserId: hmId);
+
+        Assert.True(res.IsSuccess);
+        var review = Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.Equal("Middle", review.SuggestedLevel);
+        Assert.Equal(25_000_000m, review.SuggestedSalaryMin);
+        Assert.Equal("Nền tảng .NET vững", review.Strengths);
     }
 }

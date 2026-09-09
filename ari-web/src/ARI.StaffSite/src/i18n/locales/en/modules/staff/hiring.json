@@ -1,0 +1,81 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading..."
+  },
+  "team": {
+    "title": "Hiring team",
+    "description": "The job's Hiring Manager — approves candidates, signs off the job description, and makes the final interview decision.",
+    "add": "Assign Hiring Manager",
+    "empty": "No Hiring Manager assigned. Every approval gate stays open and the pipeline runs as before.",
+    "primary": "Decision maker",
+    "primaryHint": "The person whose sign-off gates this job's pipeline.",
+    "remove": "Remove from team",
+    "selectLabel": "Choose a Hiring Manager",
+    "selectPlaceholder": "— Select a person —",
+    "selectHint": "People in the job's department are listed first. This is only a hint — department never decides access.",
+    "sameDepartment": "(same department)",
+    "confirmAdd": "Assign to job",
+    "addError": "Could not assign a Hiring Manager to this job.",
+    "removeError": "Could not remove this member from the hiring team."
+  },
+  "signOff": {
+    "prompt": "This job description is waiting for your sign-off before the posting goes live.",
+    "approve": "Sign off",
+    "requestChanges": "Request changes",
+    "reasonLabel": "What needs changing?",
+    "reasonPlaceholder": "e.g. salary below market, missing distributed-systems experience requirement...",
+    "confirmRequestChanges": "Send change request",
+    "reason": "Feedback: {{reason}}",
+    "error": "Could not record the sign-off decision.",
+    "status": {
+      "pending": "Waiting for {{name}} to sign off the job description.",
+      "approved": "{{name}} signed off the job description.",
+      "rejected": "{{name}} requested changes to the job description."
+    }
+  },
+  "gate": {
+    "title": "Hiring Manager approval",
+    "description": "This candidate needs {{name}}'s approval before an interview can be scheduled.",
+    "theHiringManager": "the Hiring Manager",
+    "request": "Send to Hiring Manager",
+    "approve": "Approve candidate",
+    "reject": "Reject candidate",
+    "rejectReasonLabel": "Reason for rejection",
+    "rejectReasonPlaceholder": "Be specific so the recruiter and later rounds can refer back to it.",
+    "confirmReject": "Confirm rejection",
+    "bypass": "Bypass approval",
+    "bypassReasonLabel": "Bypass reason (required)",
+    "bypassReasonPlaceholder": "e.g. Hiring Manager on leave until Sep 10, role is urgent.",
+    "bypassHint": "The reason is written to the audit log and the bypassed Hiring Manager is notified. Minimum 10 characters.",
+    "confirmBypass": "Confirm bypass",
+    "waiting": "Waiting for {{name}} to review this candidate.",
+    "decision": {
+      "pending": "Awaiting approval",
+      "approved": "Approved by Hiring Manager",
+      "rejected": "Rejected by Hiring Manager",
+      "bypassed": "Approval bypassed"
+    },
+    "requestError": "Could not send this candidate to the Hiring Manager.",
+    "decideError": "Could not record the decision.",
+    "bypassError": "Could not bypass the approval gate.",
+    "availabilityLabel": "Times you can attend the interview (round 1)",
+    "availabilityHint": "The recruiter will only book slots that fall entirely inside these windows. Agreeing on an exact time with the candidate (SMS, Zalo…) happens outside the system.",
+    "confirmApprove": "Approve and send availability"
+  },
+  "emails": {
+    "title": "Email history",
+    "description": "Exactly what left the system for this candidate, including automatic emails.",
+    "empty": "No emails have been sent to this candidate yet.",
+    "loadError": "Could not load the email history.",
+    "edited": "Edited",
+    "editedHint": "Staff changed the content from the template before sending.",
+    "failed": "Send failed",
+    "sentBySystem": "System",
+    "templates": {
+      "interview_invite": "Interview invitation",
+      "application_rejected": "Rejection letter",
+      "offer_sent": "Job offer"
+    }
+  }
+}

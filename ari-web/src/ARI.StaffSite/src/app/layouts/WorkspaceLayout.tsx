@@ -360,7 +360,17 @@ export default function WorkspaceLayout({
   )
 
   return (
-    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
+    /*
+      `--sticky-top`: khoảng chừa cho mọi phần tử `sticky` bên trong trang.
+
+      Ở đây BODY cuộn, mà thanh tiêu đề là `sticky top-0 h-16` — tức nó ĐỈ LÊN nội dung. Sticky nào
+      để `top` nhỏ hơn 4rem sẽ chui xuống dưới thanh đó. `HrLayout` khai giá trị khác vì bên đó
+      phần cuộn là `<main>`, nằm sẵn DƯỚI thanh tiêu đề nên không cần chừa gì.
+
+      Dùng biến thay vì ghi số vào từng màn: `JdComposerView` và `RecruitmentRequestsView` chạy ở
+      CẢ HAI layout, nên một con số cứng chắc chắn sai ở một bên.
+    */
+    <div className="[--sticky-top:5rem] flex min-h-screen bg-ink-50 dark:bg-ink-950">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 sticky top-0 h-screen">
         <Link
@@ -702,7 +712,22 @@ export default function WorkspaceLayout({
         </AnimatePresence>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        {/*
+          CỐ Ý KHÔNG có `overflow-auto` ở đây — và đây là một cái bẫy đã ăn mất hai vòng gỡ lỗi.
+
+          Vỏ ngoài là `min-h-screen` (không phải `h-screen`) và không chặn tràn, nên **BODY mới là
+          phần cuộn**; `<main>` cao đúng bằng nội dung và không bao giờ tự cuộn. Nhưng `overflow: auto`
+          vẫn biến nó thành một **scrollport**, mà `position: sticky` thì bám vào scrollport GẦN NHẤT —
+          tức là bám vào một hộp đứng yên. Kết quả: mọi phần tử sticky bên trong trang (cột thao tác
+          của trình soạn JD, cột chi tiết của màn phiếu…) trôi đi theo trang thay vì bám lại, mà
+          computed style vẫn hiện `position: sticky` nên nhìn qua tưởng đúng.
+
+          Thanh bên và thanh tiêu đề không dính lỗi này vì chúng nằm NGOÀI `<main>`, bám thẳng vào body.
+
+          `HrLayout` giữ `overflow-auto` là đúng: ở đó vỏ ngoài `h-screen overflow-hidden` nên `<main>`
+          là phần cuộn thật.
+        */}
+        <main className="flex-1">
           <Outlet />
         </main>
       </div>

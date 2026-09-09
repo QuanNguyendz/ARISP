@@ -25,7 +25,8 @@
     "saved": "Đã lưu hồ sơ.",
     "nameRequired": "Vui lòng nhập họ tên.",
     "loadError": "Không tải được hồ sơ.",
-    "saveError": "Không lưu được hồ sơ."
+    "saveError": "Không lưu được hồ sơ.",
+    "departmentLocked": "Đội do Super Admin gán. Cần đổi thì liên hệ quản trị viên."
   },
   "notifications": {
     "title": "Thông báo",

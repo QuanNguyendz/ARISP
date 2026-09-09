@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
   Code2,
@@ -89,7 +89,9 @@ function getScoreBgColor(score: number) {
 export default function RecruiterEvaluationReviewPage() {
   const { t } = useTranslation('modules/hr/evaluations')
   const [searchParams, setSearchParams] = useSearchParams()
-  const targetId = searchParams.get('id')
+  // Nhận CẢ HAI tên tham số: màn Phỏng vấn của HR sinh link `?evaluationId=` (ADR-058) trong khi
+  // trang này chỉ đọc `?id=`, nên bấm vào báo cáo từ đó mở ra danh sách trống không chọn gì.
+  const targetId = searchParams.get('id') ?? searchParams.get('evaluationId')
 
   const page = Number(searchParams.get('page')) || 1
   const searchQuery = searchParams.get('search') || ''
@@ -98,12 +100,8 @@ export default function RecruiterEvaluationReviewPage() {
 
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationReport | null>(null)
   const [loadingDetail, setLoadingDetail] = useState<boolean>(Boolean(targetId))
-  const [isOverrideMode, setIsOverrideMode] = useState(false)
-  const [overrideReason, setOverrideReason] = useState('')
-  /** Verdict nhân sự chọn khi ghi đè. null = chưa mở khối ghi đè (lúc mở sẽ đặt mặc định). */
-  const [overrideVerdict, setOverrideVerdict] = useState<'pass' | 'not_pass' | null>(null)
-  const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
+  // Khu vực Recruiter KHÔNG có thao tác chốt kết quả (ADR-061) — không giữ state cho thứ
+  // không tồn tại trên màn này.
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   const updateParam = (key: string, value: string) => {
@@ -141,7 +139,6 @@ export default function RecruiterEvaluationReviewPage() {
     data: evaluationsResponse,
     isLoading: loading,
     error,
-    refetch,
   } = useQuery({
     queryKey: ['evaluations-all'],
     queryFn: () => evaluationService.getEvaluations({ page: 1, pageSize: 100 }),
@@ -256,9 +253,6 @@ export default function RecruiterEvaluationReviewPage() {
   async function handleOpenDetail(evaluationId: string) {
     try {
       setLoadingDetail(true)
-      setActionError(null)
-      setIsOverrideMode(false)
-      setOverrideReason('')
       const detail = await evaluationService.getEvaluationById(evaluationId)
       setSelectedEvaluation(detail)
     } catch (fetchError) {
@@ -272,56 +266,8 @@ export default function RecruiterEvaluationReviewPage() {
   function closeDetail() {
     setSelectedEvaluation(null)
     setLoadingDetail(false)
-    setActionError(null)
-    setIsOverrideMode(false)
-    setOverrideReason('')
-    setSubmittingAction(null)
     if (targetId) {
       setSearchParams({})
-    }
-  }
-
-  async function refreshListAndSelection(evaluationId: string) {
-    await refetch()
-    const detailResponse = await evaluationService.getEvaluationById(evaluationId)
-    setSelectedEvaluation(detailResponse)
-  }
-
-  async function handleConfirm() {
-    if (!selectedEvaluation) return
-    try {
-      setSubmittingAction('confirm')
-      setActionError(null)
-      await evaluationService.confirmEvaluation(selectedEvaluation)
-      await refreshListAndSelection(selectedEvaluation.id)
-    } catch (submitError) {
-      console.error(submitError)
-      setActionError(t('confirmError'))
-    } finally {
-      setSubmittingAction(null)
-    }
-  }
-
-  async function handleOverride() {
-    if (!selectedEvaluation) return
-    const trimmedReason = overrideReason.trim()
-    if (!trimmedReason) {
-      setActionError(t('overrideReasonRequired'))
-      return
-    }
-    try {
-      setSubmittingAction('override')
-      setActionError(null)
-      // Gửi ĐÚNG verdict nhân sự chọn. Trước đây service tự lật ngược verdict của AI nên hai
-      // nút chọn trên UI chỉ là trang trí — bấm gì cũng ra cùng một kết quả.
-      const verdict = overrideVerdict ?? (aiPassed ? 'not_pass' : 'pass')
-      await evaluationService.overrideEvaluation(selectedEvaluation, trimmedReason, verdict)
-      await refreshListAndSelection(selectedEvaluation.id)
-    } catch (submitError) {
-      console.error(submitError)
-      setActionError(t('overrideError'))
-    } finally {
-      setSubmittingAction(null)
     }
   }
 
@@ -374,14 +320,6 @@ export default function RecruiterEvaluationReviewPage() {
   /** Nhãn verdict qua i18n — trước đây hàm này ghi cứng "Đạt"/"Không đạt" giữa một màn đã i18n. */
   const verdictLabel = (verdict?: string | null) =>
     verdict ? (isPassVerdict(verdict) ? t('verdictPass') : t('verdictNotPass')) : '—'
-
-  /** Mở khối ghi đè thì đặt sẵn verdict ở phía NGƯỢC với AI — đó là lý do người ta bấm Ghi đè. */
-  const toggleOverrideMode = () => {
-    setIsOverrideMode((open) => {
-      if (!open) setOverrideVerdict(aiPassed ? 'not_pass' : 'pass')
-      return !open
-    })
-  }
 
   if (loadingDetail) {
     return (
@@ -1017,103 +955,24 @@ export default function RecruiterEvaluationReviewPage() {
             )}
           </div>
 
-          {/* Quyết định của nhân sự */}
+          {/* Kết quả chốt — CHỈ ĐỌC ở khu vực Recruiter.
+
+              Chủ tin vận hành phễu chứ không quyết định tuyển: quyền chốt thuộc Hiring Manager của
+              tin, HR Admin là dự phòng (ADR-061). Trước đây khối này bày ra nút "Xác nhận" và "Ghi
+              đè" cho Recruiter, nhưng chính sách phía server chưa bao giờ cho họ qua — bấm vào chỉ
+              nhận 403, tức là ba nút chết trình bày như thao tác hợp lệ. */}
           {!selectedEvaluation.hrReview ? (
             <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
               <h3 className="font-display font-bold text-ink-900 dark:text-white">
                 {t('hrDecision')}
               </h3>
-              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('hrDecisionHint')}</p>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleConfirm}
-                  disabled={submittingAction !== null}
-                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${submittingAction === 'confirm' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400' : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'} disabled:opacity-50`}
-                >
-                  {submittingAction === 'confirm' ? t('confirming') : t('confirmAi')}
-                </button>
-                <button
-                  onClick={toggleOverrideMode}
-                  disabled={submittingAction !== null}
-                  className={`rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition ${isOverrideMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-ink-300'} disabled:opacity-50`}
-                >
-                  {t('override')}
-                </button>
-              </div>
-
-              <AnimatePresence>
-                {isOverrideMode && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-4 space-y-3 overflow-hidden"
-                  >
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
-                        {t('overrideVerdict')}
-                      </label>
-                      {/* Hai nút này trước đây KHÔNG có onClick và "Đạt" luôn tô như đang chọn,
-                          trong khi service tự lật ngược verdict của AI — nhân sự bấm "Đạt" nhưng
-                          thứ gửi đi lại là kết quả ngược với AI. Nay là lựa chọn thật, mặc định
-                          đặt sẵn ở phía ngược với AI (vì đó mới là lý do người ta bấm Ghi đè). */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setOverrideVerdict('pass')}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                            overrideVerdict === 'pass'
-                              ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                              : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-emerald-300'
-                          }`}
-                        >
-                          {t('verdictPass')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOverrideVerdict('not_pass')}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                            overrideVerdict === 'not_pass'
-                              ? 'border-red-300 bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'
-                              : 'border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:border-red-300'
-                          }`}
-                        >
-                          {t('verdictNotPass')}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
-                        {t('overrideReason')} <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={overrideReason}
-                        onChange={(e) => setOverrideReason(e.target.value)}
-                        placeholder={t('overrideReasonPlaceholder')}
-                        className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:focus:ring-brand-500/30"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {actionError && (
-                <div className="mt-4 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
-                  {actionError}
-                </div>
-              )}
-
-              {isOverrideMode && (
-                <button
-                  onClick={handleOverride}
-                  disabled={submittingAction !== null || !overrideReason.trim()}
-                  className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {submittingAction === 'override' ? t('confirming') : t('saveAndSendResult')}
-                </button>
-              )}
+              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                {selectedEvaluation.requiresHmApproval
+                  ? t('hm.awaitingDecision', {
+                      name: selectedEvaluation.hiringManagerName || t('hm.theHiringManager'),
+                    })
+                  : t('hm.awaitingAdminDecision')}
+              </p>
             </div>
           ) : (
             <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-4 sm:p-6 shadow-card">
@@ -1123,6 +982,15 @@ export default function RecruiterEvaluationReviewPage() {
               <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
                 {t('verdict')}: <b>{verdictLabel(selectedEvaluation.hrReview.finalVerdict)}</b>
               </p>
+              {selectedEvaluation.hrReview.reviewerRole && (
+                <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+                  {t('hm.decidedBy', {
+                    role: t(`hm.roles.${selectedEvaluation.hrReview.reviewerRole}`, {
+                      defaultValue: selectedEvaluation.hrReview.reviewerRole,
+                    }),
+                  })}
+                </p>
+              )}
               {selectedEvaluation.hrReview.isOverride &&
                 selectedEvaluation.hrReview.overrideReason && (
                   <div className="mt-3 p-3 rounded-lg bg-white dark:bg-white/10 text-sm text-ink-600 dark:text-ink-300">

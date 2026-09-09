@@ -42,6 +42,10 @@ import {
 } from '../recruiter/_jobUi'
 import { JobDetailSkeleton } from '../recruiter/_skeletons'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { formatScore } from '@ari/shared/utils/format'
+import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
+import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
+import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
 
 function apiErr(e: unknown, fallback: string): string {
   return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
@@ -197,7 +201,7 @@ export default function HrCandidateDetailPage() {
         {app.matchScore != null && (
           <div className="text-center">
             <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
-              {app.matchScore}%
+              {formatScore(app.matchScore)}
             </div>
             <div className="text-xs text-ink-400">{t('matchCVJD')}</div>
           </div>
@@ -398,6 +402,19 @@ export default function HrCandidateDetailPage() {
             </div>
           </div>
 
+          {/* Cổng duyệt của Hiring Manager (ADR-061) — đứng TRƯỚC panel xếp lịch vì đó đúng
+              là thứ tự thao tác: cổng mở rồi mới xếp được lịch. */}
+          <ShortlistGatePanel
+            applicationId={app.id}
+            jobPostingId={app.jobPostingId}
+            status={app.status}
+            hmDecision={app.hmDecision}
+            hmDecisionNote={app.hmDecisionNote}
+            onChanged={refreshApp}
+          />
+
+          <CandidateOfferPanel applicationId={app.id} status={app.status} onChanged={refreshApp} />
+
           {/* Xếp lịch phỏng vấn (HR gán cứng 1 giờ cho ứng viên — ADR-048) */}
           <AssignSchedulePanel
             applicationId={app.id}
@@ -434,6 +451,8 @@ export default function HrCandidateDetailPage() {
               </div>
             </dl>
           </div>
+
+          <EmailHistoryPanel applicationId={app.id} />
         </div>
       </div>
 

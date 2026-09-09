@@ -202,6 +202,22 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("desired_location");
 
+                    b.Property<DateTimeOffset?>("HmDecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hm_decided_at");
+
+                    b.Property<string>("HmDecision")
+                        .HasColumnType("text")
+                        .HasColumnName("hm_decision");
+
+                    b.Property<Guid?>("HmDecisionByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hm_decision_by_user_id");
+
+                    b.Property<string>("HmDecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("hm_decision_note");
+
                     b.Property<DateTimeOffset?>("InviteExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("invite_expires_at");
@@ -249,6 +265,8 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasIndex("DeletedAt")
                         .HasDatabaseName("idx_applications_active_deleted");
+
+                    b.HasIndex("HmDecisionByUserId");
 
                     b.HasIndex("JobPostingId")
                         .HasDatabaseName("ix_applications_job_posting_id");
@@ -660,6 +678,52 @@ namespace ARI.Infrastructure.Migrations
                     b.ToTable("cv_jd_analyses", (string)null);
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.Department", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_departments_name")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("departments", (string)null);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.DocumentChunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -709,6 +773,84 @@ namespace ARI.Infrastructure.Migrations
                         .HasDatabaseName("idx_document_chunks_source");
 
                     b.ToTable("document_chunks", (string)null);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.EmailLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body_html");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("InReplyTo")
+                        .HasColumnType("text")
+                        .HasColumnName("in_reply_to");
+
+                    b.Property<Guid?>("JobPostingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_posting_id");
+
+                    b.Property<string>("MessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid?>("SentByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sent_by_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("TemplateKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("template_key");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("to_email");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool>("WasEdited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("was_edited");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentByUserId");
+
+                    b.HasIndex("ApplicationId", "CreatedAt")
+                        .HasDatabaseName("idx_email_logs_application_created");
+
+                    b.ToTable("email_logs", (string)null);
                 });
 
             modelBuilder.Entity("ARI.Domain.Entities.Evaluation", b =>
@@ -795,6 +937,55 @@ namespace ARI.Infrastructure.Migrations
                     b.ToTable("evaluations", (string)null);
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.HiringManagerAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("EndTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<Guid>("HiringManagerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hiring_manager_user_id");
+
+                    b.Property<Guid>("JobPostingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_posting_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_number");
+
+                    b.Property<DateTimeOffset>("StartTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_time");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HiringManagerUserId");
+
+                    b.HasIndex("JobPostingId", "RoundNumber")
+                        .HasDatabaseName("idx_hm_availabilities_job_round");
+
+                    b.ToTable("hiring_manager_availabilities", (string)null);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.HrReview", b =>
                 {
                     b.Property<Guid>("Id")
@@ -806,6 +997,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("candidate_feedback");
 
+                    b.Property<string>("Concerns")
+                        .HasColumnType("text")
+                        .HasColumnName("concerns");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -814,10 +1009,18 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("evaluation_id");
 
+                    b.Property<string>("FallbackReason")
+                        .HasColumnType("text")
+                        .HasColumnName("fallback_reason");
+
                     b.Property<string>("FinalVerdict")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("final_verdict");
+
+                    b.Property<bool>("IsHrFallback")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_hr_fallback");
 
                     b.Property<bool>("IsOverride")
                         .HasColumnType("boolean")
@@ -830,6 +1033,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<Guid>("ReviewedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<string>("ReviewerRole")
+                        .HasColumnType("text")
+                        .HasColumnName("reviewer_role");
 
                     b.Property<bool>("ShareEvaluation")
                         .HasColumnType("boolean")
@@ -846,6 +1053,26 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<bool>("ShareTranscript")
                         .HasColumnType("boolean")
                         .HasColumnName("share_transcript");
+
+                    b.Property<string>("Strengths")
+                        .HasColumnType("text")
+                        .HasColumnName("strengths");
+
+                    b.Property<string>("SuggestedLevel")
+                        .HasColumnType("text")
+                        .HasColumnName("suggested_level");
+
+                    b.Property<string>("SuggestedSalaryCurrency")
+                        .HasColumnType("text")
+                        .HasColumnName("suggested_salary_currency");
+
+                    b.Property<decimal?>("SuggestedSalaryMax")
+                        .HasColumnType("numeric")
+                        .HasColumnName("suggested_salary_max");
+
+                    b.Property<decimal?>("SuggestedSalaryMin")
+                        .HasColumnType("numeric")
+                        .HasColumnName("suggested_salary_min");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1099,6 +1326,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AdmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("admitted_at");
+
+                    b.Property<Guid?>("AdmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admitted_by_user_id");
+
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
@@ -1118,6 +1353,14 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("EndedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
+
+                    b.Property<DateTimeOffset?>("HmJoinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hm_joined_at");
+
+                    b.Property<Guid?>("HmJoinedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hm_joined_by_user_id");
 
                     b.Property<string>("InterviewLanguage")
                         .IsRequired()
@@ -1186,6 +1429,240 @@ namespace ARI.Infrastructure.Migrations
                     b.ToTable("interview_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.JdDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApplicationDeadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("application_deadline");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Department")
+                        .HasColumnType("text")
+                        .HasColumnName("department");
+
+                    b.Property<string>("EmploymentType")
+                        .HasColumnType("text")
+                        .HasColumnName("employment_type");
+
+                    b.Property<string>("ExperienceLevel")
+                        .HasColumnType("text")
+                        .HasColumnName("experience_level");
+
+                    b.Property<DateTimeOffset?>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("generated_at");
+
+                    b.Property<string>("GeneratedFileName")
+                        .HasColumnType("text")
+                        .HasColumnName("generated_file_name");
+
+                    b.Property<string>("GeneratedFileStorageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("generated_file_storage_key");
+
+                    b.Property<string>("GeneratedFormat")
+                        .HasColumnType("text")
+                        .HasColumnName("generated_format");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<Guid>("RecruitmentRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recruitment_request_id");
+
+                    b.Property<string>("SalaryCurrency")
+                        .HasColumnType("text")
+                        .HasColumnName("salary_currency");
+
+                    b.Property<decimal?>("SalaryMax")
+                        .HasColumnType("numeric")
+                        .HasColumnName("salary_max");
+
+                    b.Property<decimal?>("SalaryMin")
+                        .HasColumnType("numeric")
+                        .HasColumnName("salary_min");
+
+                    b.Property<string>("SectionsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sections_json");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("Vacancies")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacancies");
+
+                    b.Property<string>("WorkMode")
+                        .HasColumnType("text")
+                        .HasColumnName("work_mode");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("RecruitmentRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_jd_documents_recruitment_request_id")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("jd_documents", (string)null);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.JdTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccentColor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("accent_color");
+
+                    b.Property<string>("CompanyAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("company_address");
+
+                    b.Property<string>("CompanyEmail")
+                        .HasColumnType("text")
+                        .HasColumnName("company_email");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("company_name");
+
+                    b.Property<string>("CompanyWebsite")
+                        .HasColumnType("text")
+                        .HasColumnName("company_website");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DocumentTitle")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("document_title");
+
+                    b.Property<string>("FontFamily")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("font_family");
+
+                    b.Property<string>("FooterNote")
+                        .HasColumnType("text")
+                        .HasColumnName("footer_note");
+
+                    b.Property<string>("LogoStorageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("logo_storage_key");
+
+                    b.Property<string>("SectionsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sections_json");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("jd_templates", (string)null);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.JobHiringTeamMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_primary");
+
+                    b.Property<Guid>("JobPostingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_posting_id");
+
+                    b.Property<string>("RoleOnJob")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role_on_job");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("JobPostingId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_job_hiring_team_members_primary")
+                        .HasFilter("is_primary = true AND deleted_at IS NULL");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("JobPostingId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_job_hiring_team_members_job_user");
+
+                    b.ToTable("job_hiring_team_members", (string)null);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.JobPosting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1236,6 +1713,22 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<string>("ExperienceLevel")
                         .HasColumnType("text")
                         .HasColumnName("experience_level");
+
+                    b.Property<DateTimeOffset?>("HmSignOffAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hm_sign_off_at");
+
+                    b.Property<Guid?>("HmSignOffByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hm_sign_off_by_user_id");
+
+                    b.Property<string>("HmSignOffReason")
+                        .HasColumnType("text")
+                        .HasColumnName("hm_sign_off_reason");
+
+                    b.Property<string>("HmSignOffStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("hm_sign_off_status");
 
                     b.Property<string>("InterviewMode")
                         .IsRequired()
@@ -1319,6 +1812,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
 
+                    b.Property<Guid?>("RecruitmentRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recruitment_request_id");
+
                     b.Property<string>("RejectionReason")
                         .HasColumnType("text")
                         .HasColumnName("rejection_reason");
@@ -1386,6 +1883,13 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasIndex("DeletedAt")
                         .HasDatabaseName("idx_job_postings_active_deleted");
+
+                    b.HasIndex("HmSignOffByUserId");
+
+                    b.HasIndex("RecruitmentRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_job_postings_recruitment_request_id")
+                        .HasFilter("recruitment_request_id IS NOT NULL AND deleted_at IS NULL");
 
                     b.HasIndex("Skills")
                         .HasDatabaseName("idx_job_postings_skills");
@@ -1559,6 +2063,148 @@ namespace ARI.Infrastructure.Migrations
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.Offer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("ApprovalNote")
+                        .HasColumnType("text")
+                        .HasColumnName("approval_note");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<string>("Benefits")
+                        .HasColumnType("text")
+                        .HasColumnName("benefits");
+
+                    b.Property<string>("Bonus")
+                        .HasColumnType("text")
+                        .HasColumnName("bonus");
+
+                    b.Property<string>("CandidateResponseNote")
+                        .HasColumnType("text")
+                        .HasColumnName("candidate_response_note");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("EmploymentType")
+                        .HasColumnType("text")
+                        .HasColumnName("employment_type");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("JobPostingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_posting_id");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("OfferLetterFileUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("offer_letter_file_url");
+
+                    b.Property<string>("Position")
+                        .HasColumnType("text")
+                        .HasColumnName("position");
+
+                    b.Property<string>("RejectedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("rejected_reason");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<decimal?>("SalaryAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("salary_amount");
+
+                    b.Property<string>("SalaryCurrency")
+                        .HasColumnType("text")
+                        .HasColumnName("salary_currency");
+
+                    b.Property<string>("SalaryPeriod")
+                        .HasColumnType("text")
+                        .HasColumnName("salary_period");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<DateTimeOffset?>("StartDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WithdrawnByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("withdrawn_by_user_id");
+
+                    b.Property<string>("WithdrawnReason")
+                        .HasColumnType("text")
+                        .HasColumnName("withdrawn_reason");
+
+                    b.Property<string>("WorkLocation")
+                        .HasColumnType("text")
+                        .HasColumnName("work_location");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_offers_application_live")
+                        .HasFilter("deleted_at IS NULL AND status NOT IN ('withdrawn', 'declined', 'expired')");
+
+                    b.HasIndex("ApprovedByUserId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("JobPostingId");
+
+                    b.HasIndex("WithdrawnByUserId");
+
+                    b.HasIndex("Status", "ExpiresAt")
+                        .HasDatabaseName("idx_offers_expiry_sweep")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("offers", (string)null);
                 });
 
             modelBuilder.Entity("ARI.Domain.Entities.OnlineTestQuestion", b =>
@@ -1798,6 +2444,146 @@ namespace ARI.Infrastructure.Migrations
                     b.ToTable("questions", (string)null);
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.RecruitmentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedRecruiterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_recruiter_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EmploymentType")
+                        .HasColumnType("text")
+                        .HasColumnName("employment_type");
+
+                    b.Property<DateTimeOffset?>("ExpectedStartDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expected_start_date");
+
+                    b.Property<string>("ExperienceLevel")
+                        .HasColumnType("text")
+                        .HasColumnName("experience_level");
+
+                    b.Property<int>("Headcount")
+                        .HasColumnType("integer")
+                        .HasColumnName("headcount");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<string>("Requirements")
+                        .HasColumnType("text")
+                        .HasColumnName("requirements");
+
+                    b.Property<string>("ReviewReason")
+                        .HasColumnType("text")
+                        .HasColumnName("review_reason");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_user_id");
+
+                    b.Property<string>("RevokedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("revoked_reason");
+
+                    b.Property<string>("SalaryCurrency")
+                        .HasColumnType("text")
+                        .HasColumnName("salary_currency");
+
+                    b.Property<decimal?>("SalaryMax")
+                        .HasColumnType("numeric")
+                        .HasColumnName("salary_max");
+
+                    b.Property<decimal?>("SalaryMin")
+                        .HasColumnType("numeric")
+                        .HasColumnName("salary_min");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<int>("SubmissionCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("submission_count");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("WorkMode")
+                        .HasColumnType("text")
+                        .HasColumnName("work_mode");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedRecruiterId")
+                        .HasDatabaseName("idx_recruitment_requests_assigned_recruiter");
+
+                    b.HasIndex("DeletedAt")
+                        .HasDatabaseName("idx_recruitment_requests_active_deleted");
+
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("idx_recruitment_requests_department_id");
+
+                    b.HasIndex("RequestedByUserId")
+                        .HasDatabaseName("idx_recruitment_requests_requested_by");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_recruitment_requests_status");
+
+                    b.ToTable("recruitment_requests", (string)null);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1927,9 +2713,9 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<string>("Department")
-                        .HasColumnType("text")
-                        .HasColumnName("department");
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1973,6 +2759,9 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasIndex("DeletedAt")
                         .HasDatabaseName("idx_users_active_deleted");
+
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("idx_users_department_id");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -2077,6 +2866,11 @@ namespace ARI.Infrastructure.Migrations
                         .HasForeignKey("CvJdAnalysisId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("HmDecisionByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("ARI.Domain.Entities.JobPosting", null)
                         .WithMany()
                         .HasForeignKey("JobPostingId")
@@ -2130,6 +2924,19 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.EmailLog", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.Application", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SentByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.Evaluation", b =>
                 {
                     b.HasOne("ARI.Domain.Entities.Application", null)
@@ -2142,6 +2949,21 @@ namespace ARI.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.HiringManagerAvailability", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("HiringManagerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.JobPosting", null)
+                        .WithMany()
+                        .HasForeignKey("JobPostingId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -2222,6 +3044,50 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.JdDocument", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.RecruitmentRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RecruitmentRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.JdTemplate", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.JobHiringTeamMember", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.JobPosting", null)
+                        .WithMany()
+                        .HasForeignKey("JobPostingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.JobPosting", b =>
                 {
                     b.HasOne("ARI.Domain.Entities.User", null)
@@ -2234,6 +3100,16 @@ namespace ARI.Infrastructure.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("HmSignOffByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ARI.Domain.Entities.RecruitmentRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RecruitmentRequestId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("ARI.Domain.Entities.MustAskTracking", b =>
@@ -2267,6 +3143,37 @@ namespace ARI.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("RecipientUserId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.Offer", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.Application", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.JobPosting", null)
+                        .WithMany()
+                        .HasForeignKey("JobPostingId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("ARI.Domain.Entities.OnlineTestQuestion", b =>
@@ -2305,6 +3212,30 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ARI.Domain.Entities.RecruitmentRequest", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedRecruiterId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ARI.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
             modelBuilder.Entity("ARI.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("ARI.Domain.Entities.User", null)
@@ -2327,6 +3258,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasForeignKey("JobPostingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ARI.Domain.Entities.User", b =>
+                {
+                    b.HasOne("ARI.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 #pragma warning restore 612, 618
         }

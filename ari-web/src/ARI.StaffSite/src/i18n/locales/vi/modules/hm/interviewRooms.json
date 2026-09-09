@@ -1,0 +1,17 @@
+{
+  "title": "Phòng phỏng vấn",
+  "description": "Buổi phỏng vấn thật chỉ bắt đầu khi bạn đã vào phòng cùng AI và cho ứng viên vào.",
+  "loading": "Đang tải danh sách phòng...",
+  "loadError": "Không tải được danh sách phòng phỏng vấn.",
+  "emptyTitle": "Không có buổi phỏng vấn nào đang mở",
+  "emptyDescription": "Khi ứng viên nhập mã tại quầy, họ sẽ hiện ở đây để bạn cho vào phòng.",
+  "unknownCandidate": "Ứng viên",
+  "round": "Vòng {{number}}",
+  "arrivedAt": "Có mặt lúc {{time}}",
+  "statusWaiting": "Đang chờ vào phòng",
+  "statusLive": "Đang phỏng vấn",
+  "joinRoom": "Vào phòng",
+  "inRoom": "Đã ở trong phòng",
+  "admit": "Cho ứng viên vào",
+  "joinFirstHint": "Bạn cần vào phòng trước — buổi phỏng vấn không bắt đầu khi chưa có ai cùng AI trong phòng."
+}

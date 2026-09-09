@@ -7,6 +7,7 @@ import type {
   OnlineTestImportResult,
   CandidateOnlineTest,
   OnlineTestResult,
+  OnlineTestSubmitAck,
   UpsertOnlineTestQuestion,
 } from '@ari/shared/types/onlineTest'
 
@@ -97,8 +98,8 @@ export const onlineTestService = {
     applicationId: string,
     answers: Record<string, number[]>,
     tabSwitchCount = 0
-  ): Promise<OnlineTestResult> {
-    const { data } = await apiClient.post<OnlineTestResult>(
+  ): Promise<OnlineTestSubmitAck> {
+    const { data } = await apiClient.post<OnlineTestSubmitAck>(
       `/portal/online-test/${applicationId}/submit`,
       { answers, tabSwitchCount }
     )

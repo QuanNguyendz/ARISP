@@ -23,8 +23,6 @@ namespace ARI.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAIProvider _aiProvider;
-        private readonly IEmbeddingProvider _embeddingProvider;
-        private readonly IAvatarService _avatarService;
         private readonly INotificationService _notificationService;
         private readonly IDeepgramTokenService _deepgramTokenService;
         private readonly IRagIngestionService _ragIngestion;
@@ -41,8 +39,6 @@ namespace ARI.Application.Services
         public InterviewService(
             IUnitOfWork unitOfWork,
             IAIProvider aiProvider,
-            IEmbeddingProvider embeddingProvider,
-            IAvatarService avatarService,
             INotificationService notificationService,
             IDeepgramTokenService deepgramTokenService,
             IRagIngestionService ragIngestion,
@@ -57,8 +53,6 @@ namespace ARI.Application.Services
             _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
-            _embeddingProvider = embeddingProvider;
-            _avatarService = avatarService;
             _notificationService = notificationService;
             _deepgramTokenService = deepgramTokenService;
             _ragIngestion = ragIngestion;
@@ -69,7 +63,7 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// TTS cho 1 câu hỏi (base64 PCM 24k) để FE đẩy vào LiveAvatar repeatAudio (ADR-044).
+        /// TTS cho 1 câu hỏi (base64 PCM 24k) để FE phát thẳng qua WebAudio.
         /// Xác thực ứng viên sở hữu phiên. Rỗng nếu chưa cấu hình ElevenLabs → FE fallback browser TTS.
         /// </summary>
         public async Task<Result<string>> GetSpeechAudioAsync(
@@ -131,9 +125,8 @@ namespace ARI.Application.Services
         }
 
         /// <summary>
-        /// Cấu hình media cho FE vào phòng phỏng vấn: mint token Deepgram (STT) + HeyGen (avatar),
-        /// kèm ngôn ngữ + voice. Xác thực ứng viên sở hữu phiên. Token nào chưa cấu hình key → null
-        /// (FE tự fallback).
+        /// Cấu hình media cho FE vào phòng phỏng vấn: mint token Deepgram (STT) kèm ngôn ngữ +
+        /// trần thời lượng. Xác thực ứng viên sở hữu phiên. Chưa cấu hình key → null (FE tự fallback).
         /// </summary>
         public async Task<Result<PracticeMediaConfigResponse>> GetMediaConfigAsync(
             Guid sessionId, Guid? candidateAccountId, string? candidateEmail, bool kioskAuthorized = false, CancellationToken ct = default)
@@ -162,17 +155,6 @@ namespace ARI.Application.Services
             try { deepgram = await _deepgramTokenService.CreateTemporaryTokenAsync(ct); }
             catch { /* STT tuỳ chọn */ }
 
-            // ADR-050: Practice audio-only — KHÔNG mint avatar (giữ đủ STT/RAG/LLM/ElevenLabs).
-            // Tránh cạnh tranh concurrency LiveAvatar với buổi thật + đốt credit không dự đoán.
-            // Real luôn có avatar. Cờ PracticeUseAvatar cho phép bật lại khi cần.
-            AvatarStreamingToken? avatar = null;
-            var useAvatar = session.SessionType != "practice" || _interviewOptions.PracticeUseAvatar;
-            if (useAvatar)
-            {
-                try { avatar = await _avatarService.CreateStreamingTokenAsync(null, jobPosting?.PersonaVoiceId, ct); }
-                catch { /* avatar tuỳ chọn — FE fallback WebAudio (ElevenLabs) + bot tĩnh */ }
-            }
-
             // Trần thời lượng để FE vẽ đếm ngược khớp giờ server: practice 20' (ADR-050),
             // real 45' (ADR-052) — cùng cơ chế hết giờ AI nói câu kết rồi đóng phiên.
             var maxMinutes = session.SessionType == "practice"
@@ -185,6 +167,8 @@ namespace ARI.Application.Services
                 SessionId = session.Id,
                 Language = session.InterviewLanguage,
                 SessionType = session.SessionType,
+                Status = session.Status,
+                HiringManagerPresent = session.HmJoinedAt != null,
                 MaxDurationSeconds = maxDurationSeconds,
                 StartedAtUtc = session.StartedAt,
                 Deepgram = deepgram == null ? null : new DeepgramConfigDto
@@ -192,13 +176,6 @@ namespace ARI.Application.Services
                     Token = deepgram.AccessToken,
                     ExpiresInSeconds = deepgram.ExpiresInSeconds,
                     Model = deepgram.Model
-                },
-                HeyGen = avatar == null ? null : new HeyGenConfigDto
-                {
-                    Token = avatar.Token,
-                    ServerUrl = avatar.ServerUrl,
-                    AvatarId = avatar.AvatarId,
-                    VoiceId = avatar.VoiceId
                 }
             });
         }
@@ -519,9 +496,11 @@ namespace ARI.Application.Services
                 .FindAsync(b => ids.Contains(b.Id), ct)).ToList();
 
             var appIds = bookings.Select(b => b.ApplicationId).Distinct().ToList();
-            var appJobById = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
-                    .QueryAsync(q => q.Where(a => appIds.Contains(a.Id)).Select(a => new { a.Id, a.JobPostingId }), ct))
-                .ToDictionary(a => a.Id, a => a.JobPostingId);
+            // Lấy nguyên thực thể chứ không chỉ cặp (id, jobId): luật chống trùng ca của ADR-067 cần
+            // danh tính ứng viên (tài khoản hoặc email) để đối chiếu lịch chéo giữa các tin.
+            var apps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                .FindAsync(a => appIds.Contains(a.Id), ct)).ToList();
+            var appJobById = apps.ToDictionary(a => a.Id, a => a.JobPostingId);
 
             // Lọc sạch trước khi chiếm chỗ — số chỗ cần chiếm phải là số người THẬT SỰ dời được.
             var failed = new List<RescheduleFailureDto>();
@@ -553,9 +532,22 @@ namespace ARI.Application.Services
                 else if (!string.Equals(booking.DeclinedBy, BookingDeclinedBy.Candidate, StringComparison.OrdinalIgnoreCase))
                     error = "Chỉ dời lịch được cho ứng viên đã báo bận (từ chối lịch kèm lý do).";
 
+                if (error == null && apps.FirstOrDefault(a => a.Id == booking.ApplicationId) is { } app)
+                    error = await SchedulingSupport.ValidateAssignmentAsync(
+                        _unitOfWork, app, targetSlot, booking.RoundNumber, excludeBookingId: booking.Id, ct);
+
                 if (error != null) failed.Add(new RescheduleFailureDto { BookingId = id, Message = error });
                 else valid.Add(booking);
             }
+
+            // Một ca chỉ nhận MỘT ứng viên (ADR-067) → dồn cả nhóm vào cùng một ca là mâu thuẫn với
+            // chính luật đó. Từ chối CẢ LỆNH thay vì lặng lẽ dời một người rồi báo hai người kia hỏng:
+            // tính "được ăn cả ngã về không" của lệnh này sinh ra chính để nhân sự không phải đoán ai
+            // đã chuyển ai chưa.
+            if (valid.Count > 1)
+                return Result.Failure<RescheduleResultDto>(
+                    "Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Hãy chọn ca riêng cho từng người.",
+                    CommonErrorCodes.Conflict);
 
             if (valid.Count == 0)
                 return Result.Success(new RescheduleResultDto { MovedCount = 0, Failed = failed });
@@ -939,6 +931,17 @@ namespace ARI.Application.Services
             var uiLanguage = (request.UiLanguage ?? string.Empty).Trim().ToLowerInvariant();
             if (uiLanguage != "vi" && uiLanguage != "en") uiLanguage = string.Empty;
 
+            // PHÒNG CHỜ cho buổi THẬT (ADR-067): ứng viên nhập mã xong chưa vào phòng ngay — Hiring
+            // Manager phải có mặt và bấm cho vào. Chốt chặn duy nhất nằm ở đây và ở
+            // `GenerateAndSendNextQuestionAsync` (chỉ chạy khi phiên `active`), nên gọi thẳng SignalR
+            // cũng không moi được câu hỏi nào ra trước khi được duyệt.
+            //
+            // Tin CHƯA gán Hiring Manager thì không có cổng nào để chờ — vào thẳng như trước, cùng
+            // lý lẽ "cổng suy ra từ việc có người được gán" của ADR-061. Nếu không, một tin cũ sẽ có
+            // ứng viên ngồi chờ vĩnh viễn một người không tồn tại.
+            var needsHmAdmission = request.SessionType == "real"
+                && await JobAccess.RequiresHiringManagerApprovalAsync(_unitOfWork, jobPosting.Id, ct);
+
             var session = new InterviewSession
             {
                 ApplicationId = application.Id,
@@ -947,8 +950,10 @@ namespace ARI.Application.Services
                 SessionType = request.SessionType,
                 InterviewLanguage = jobPosting.DetectedLanguage ?? "vi",
                 ReportLanguage = string.IsNullOrEmpty(uiLanguage) ? null : uiLanguage,
-                Status = "active",
-                StartedAt = DateTimeOffset.UtcNow
+                Status = needsHmAdmission ? InterviewSessionStatuses.Waiting : InterviewSessionStatuses.Active,
+                // StartedAt là gốc tính trần thời lượng — chỉ đặt khi phiên THẬT SỰ chạy, nếu không
+                // thời gian ngồi chờ Hiring Manager bị trừ vào giờ phỏng vấn của ứng viên.
+                StartedAt = needsHmAdmission ? null : DateTimeOffset.UtcNow,
             };
 
             await _unitOfWork.Repository<InterviewSession>().AddAsync(session, ct);
@@ -983,31 +988,11 @@ namespace ARI.Application.Services
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
-            // HeyGen avatar integration (Hybrid Idle Strategy)
-            string? heyGenSdp = null;
-            string? heyGenSessionId = null;
-
-            if (!string.IsNullOrEmpty(jobPosting.PersonaVoiceId) && !string.IsNullOrEmpty(jobPosting.PersonaStyle))
-            {
-                try
-                {
-                    var sdpMessage = await _avatarService.StartSessionAsync(jobPosting.PersonaVoiceId, jobPosting.PersonaStyle, ct);
-                    heyGenSdp = sdpMessage.Sdp;
-                    heyGenSessionId = "heygen_" + Guid.NewGuid().ToString("N");
-                }
-                catch
-                {
-                    // Fail silently, fall back to simple non-avatar
-                }
-            }
-
             var response = new StartSessionResponse
             {
                 SessionId = session.Id,
                 Status = session.Status,
-                Language = session.InterviewLanguage,
-                HeyGenSdpOffer = heyGenSdp,
-                HeyGenSessionId = heyGenSessionId
+                Language = session.InterviewLanguage
             };
 
             return Result.Success(response);
@@ -1037,49 +1022,24 @@ namespace ARI.Application.Services
             var timeExceeded = maxMinutes > 0 && elapsedMinutes >= maxMinutes;
             var forceClosing = sequenceNumber > 12 || timeExceeded;
 
-            // 1. Gather Weighted RAG Context.
-            // CHỈ project ChunkText — KHÔNG load full entity (cột `embedding` kiểu pgvector không
-            // materialize được qua Npgsql/EF khi chưa bật UseVector → InvalidCastException).
-            var ragContext = new List<string>();
-            var cvChunks = await _unitOfWork.Repository<DocumentChunk>()
-                .QueryAsync(q => q.Where(c => c.SourceType == "cv" && c.SourceId == application.Id).Select(c => c.ChunkText), ct);
-            ragContext.AddRange(cvChunks.Select(t => $"[CV Chunk] {t}"));
-
-            var jdChunks = await _unitOfWork.Repository<DocumentChunk>()
-                .QueryAsync(q => q.Where(c => c.SourceType == "jd" && c.SourceId == jobPosting!.Id).Select(c => c.ChunkText), ct);
-            ragContext.AddRange(jdChunks.Select(t => $"[JD Chunk] {t}"));
-
-            // Chủ đề CẤM hỏi (playbook loại compliance) — tách riêng khỏi ngữ cảnh tham khảo.
-            var prohibitedTopics = new List<string>();
-
-            if (session.SessionType == "real")
-            {
-                // CHỈ playbook thuộc phạm vi của tin + vòng này (ADR-025). Bản cũ lấy MỌI chunk
-                // playbook của hệ thống nên ngân hàng câu hỏi của vị trí khác lọt vào buổi phỏng vấn
-                // này, và tài liệu đã xoá vẫn tiếp tục có tiếng nói.
-                var eligibleIds = await PlaybookScope.EligibleDocumentIdsAsync(
-                    _unitOfWork, jobPosting!.Id, session.RoundNumber, ct);
-
-                if (eligibleIds.Count > 0)
-                {
-                    var playbookChunks = await _unitOfWork.Repository<DocumentChunk>()
-                        .QueryAsync(q => q.Where(c => c.SourceType == "playbook" && eligibleIds.Contains(c.SourceId))
-                            .Select(c => new { c.SourceId, c.ChunkText }), ct);
-
-                    // Loại tài liệu quyết định CÁCH dùng: compliance là ràng buộc cấm, không phải
-                    // tài liệu tham khảo — đưa nó vào ngữ cảnh chung là mời AI hỏi đúng câu bị cấm.
-                    var complianceIds = (await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(
-                            q => q.Where(p => eligibleIds.Contains(p.Id) && p.DocumentType == PlaybookScope.TypeCompliance)
-                                  .Select(p => p.Id), ct))
-                        .ToHashSet();
-
-                    foreach (var chunk in playbookChunks)
-                    {
-                        if (complianceIds.Contains(chunk.SourceId)) prohibitedTopics.Add(chunk.ChunkText);
-                        else ragContext.Add($"[Org Playbook] {chunk.ChunkText}");
-                    }
-                }
-            }
+            // 1. Truy hồi ngữ cảnh: KHÔNG làm ở đây.
+            //
+            // Truy hồi thuộc về RAG service (ADR-039): nó chạy hybrid retrieval (dense pgvector +
+            // sparse FTS → hợp nhất RRF → trọng số theo scope) rồi tự phân loại chunk theo
+            // document_type (compliance = cấm hỏi, red_flag, expected_answer — ADR-025).
+            //
+            // Trước đây .NET tự đọc TOÀN BỘ chunk cv/jd/playbook bằng câu SQL lọc theo id — không
+            // vector, không xếp hạng, không giới hạn — rồi nhồi hết sang. Hậu quả:
+            //   1. Phần lớn bị VỨT: `QuestionContext` phía Python không có trường `rag_context`,
+            //      nên đống chunk đó rơi mất lúc deserialize. Đọc DB xong ném đi.
+            //   2. Phần sống sót còn tệ hơn: `PlaybookStyleGuides` thực chất là TOÀN BỘ playbook
+            //      đủ điều kiện, gửi nguyên khối. Playbook vào prompt hai lần — một lần nguyên khối
+            //      không xếp hạng, một lần đã truy hồi — khiến việc truy hồi thành trang trí.
+            //   3. `ProhibitedTopics` bị tính ở CẢ hai phía rồi hợp lại, mà bản .NET tính trên tập
+            //      rộng hơn (mọi chunk) thay vì tập đã truy hồi.
+            //
+            // Phạm vi playbook theo tin + vòng do `_build_filters` phía Python bảo đảm, và buổi thử
+            // không nạp playbook — đúng như `PlaybookScope.EligibleDocumentIdsAsync` từng làm.
 
             // 2. Select Next Question Strategy
             string? mustAskQuestionText = null;
@@ -1122,8 +1082,6 @@ namespace ARI.Application.Services
                 SessionType = session.SessionType,
                 ChatHistory = chatHistory,
                 RoundNumber = session.RoundNumber,
-                PlaybookStyleGuides = ragContext.Where(r => r.StartsWith("[Org")).ToList(),
-                ProhibitedTopics = prohibitedTopics,
                 Language = session.InterviewLanguage,
                 ForceClosing = forceClosing
             };
@@ -1551,9 +1509,31 @@ namespace ARI.Application.Services
             var rubricCriteria = await PlaybookScope.ResolveRubricAsync(
                 _unitOfWork, jobPosting!.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric, ct);
 
+            // BẮT BUỘC có bộ tiêu chí thì mới chấm (ADR-062).
+            //
+            // Trước đây thiếu rubric thì lấy thẳng `evalReport.Score` và `evalReport.Verdict` — tức
+            // hai con số do model tự nghĩ ra, không phải trung bình có trọng số của gì cả, đúng thứ
+            // ADR-060 sinh ra để loại bỏ. Một điểm số không giải thích được ra từ đâu mà lại quyết
+            // định đậu/trượt của người thật là thứ không được phép tồn tại âm thầm.
+            //
+            // Dừng ở đây KHÔNG làm hỏng phiên: transcript, câu hỏi, câu trả lời và bản ghi hình đã
+            // lưu xong từ trước. Nhân sự khai rubric rồi chấm lại qua /api/dev/regrade-session.
+            if (rubricCriteria.Count == 0)
+            {
+                _logger?.LogError(
+                    "Phiên {SessionId} (tin {JobPostingId}, vòng {Round}): CHƯA khai bộ tiêu chí chấm " +
+                    "phỏng vấn (playbook loại '{Type}'). Không sinh báo cáo — điểm do model tự đưa ra " +
+                    "không giải thích được và không được phép quyết định kết quả tuyển dụng.",
+                    sessionId, jobPosting.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric);
+                return;
+            }
+
             var evalCtx = new SessionContext
             {
                 SessionId = sessionId,
+                // RAG service cần hai trường này để truy hồi playbook đúng tin + vòng lúc chấm.
+                JobPostingId = jobPosting!.Id,
+                RoundNumber = session.RoundNumber,
                 JobDescription = jobPosting!.JobDescription,
                 CandidateCv = application.CvText ?? "",
                 SessionType = session.SessionType,
@@ -1572,30 +1552,26 @@ namespace ARI.Application.Services
             // vừa tự chọn tiêu chí trong một danh sách viết cứng, vừa tự cho điểm tổng — con số ấy
             // không phải trung bình có trọng số của gì cả, nên "chấm theo tiêu chí" chỉ là hình thức.
             var aiScores = ScoringRubricSupport.ParseScores(evalReport.CriterionScoresJson);
-            var overallScore = evalReport.Score;
-            var criterionScoresJson = evalReport.CriterionScoresJson;
-            var verdict = evalReport.Verdict;
 
-            if (rubricCriteria.Count > 0)
+            // ĐIỂM VÀ VERDICT LUÔN DO BACKEND TÍNH — không có nhánh nào lấy số của model nữa.
+            var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
+            if (!computed.HasValue)
             {
-                var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
-                if (computed.HasValue)
-                {
-                    overallScore = computed.Value;
-                    // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm
-                    // báo cáo cũ mất khả năng giải thích điểm của nó ra từ đâu.
-                    criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
-                    verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
-                }
-                else
-                {
-                    // Có rubric mà AI không chấm nổi tiêu chí nào → giữ nguyên kết quả của AI và ghi log,
-                    // KHÔNG âm thầm cho 0 điểm (thiếu dữ liệu không phải là điểm kém).
-                    _logger?.LogWarning(
-                        "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng AI không trả điểm tiêu chí nào — giữ điểm của AI.",
-                        sessionId, rubricCriteria.Count);
-                }
+                // Có rubric mà model không chấm nổi tiêu chí nào: đây là lỗi của model, và cũng
+                // KHÔNG được cho 0 điểm (thiếu dữ liệu không phải là điểm kém). Không có gì hợp lệ
+                // để ghi nên dừng lại — chấm lại được sau khi sửa prompt.
+                _logger?.LogError(
+                    "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng model không trả điểm tiêu chí nào — " +
+                    "không sinh báo cáo. Chấm lại bằng /api/dev/regrade-session sau khi xử lý.",
+                    sessionId, rubricCriteria.Count);
+                return;
             }
+
+            var overallScore = computed.Value;
+            // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm báo cáo
+            // cũ mất khả năng giải thích điểm của nó ra từ đâu.
+            var criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
+            var verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
             
             // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
             // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
@@ -1684,21 +1660,60 @@ namespace ARI.Application.Services
             if (evaluation == null)
                 return Result.Failure<bool>("Evaluation report not found.");
 
-            // Validate User & Role for Override actions
             var hrUser = await _unitOfWork.Repository<User>().GetByIdAsync(hrUserId, ct);
             if (hrUser == null)
                 return Result.Failure<bool>("HR User not found.");
 
+            // ===== AI ĐÃ PHỎNG VẤN — NGƯỜI CHỐT LÀ HIRING MANAGER (ADR-061) =====
+            //
+            // Trong ATS, HR sở hữu quy trình và tuân thủ; quyết định tuyển hay không thuộc về
+            // trưởng bộ phận sẽ làm việc cùng ứng viên. Quản trị viên giữ vai DỰ PHÒNG:
+            //   • tin CHƯA gán Hiring Manager  → quản trị viên chốt như trước, không cần gì thêm
+            //     (đây là đường MẶC ĐỊNH cho toàn bộ dữ liệu cũ, không phải ngoại lệ);
+            //   • tin CÓ Hiring Manager        → chỉ HM đó chốt; quản trị viên chốt thay phải nhập
+            //     lý do, bị ghi IsHrFallback + audit, và HM được báo.
+            // Chủ tin (Recruiter) KHÔNG bao giờ chốt: họ vận hành phễu, không quyết định tuyển.
+            var applicationForGate = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                .GetByIdAsync(evaluation.ApplicationId, ct);
+            if (applicationForGate == null)
+                return Result.Failure<bool>("Application associated with this evaluation was not found.");
+
+            var primaryHm = await JobAccess.PrimaryHiringManagerAsync(
+                _unitOfWork, applicationForGate.JobPostingId, ct);
+            var isAdminActor = RoleNames.IsAdmin(hrUser.Role);
+            var isTheHiringManager = primaryHm != null && primaryHm.UserId == hrUserId;
+
+            var fallbackReason = string.IsNullOrWhiteSpace(request.FallbackReason)
+                ? null
+                : request.FallbackReason.Trim();
+            var isHrFallback = false;
+
+            if (primaryHm != null && !isTheHiringManager)
+            {
+                if (!isAdminActor)
+                    return Result.Failure<bool>(
+                        "Chỉ Hiring Manager phụ trách tin này mới chốt được kết quả phỏng vấn.");
+
+                if (fallbackReason == null || fallbackReason.Length < 10)
+                    return Result.Failure<bool>(
+                        "Tin này có Hiring Manager phụ trách. Nhập lý do nếu bạn cần chốt thay (tối thiểu 10 ký tự).");
+
+                isHrFallback = true;
+            }
+            else if (primaryHm == null && !isAdminActor)
+            {
+                return Result.Failure<bool>(
+                    "Chỉ HR Admin hoặc Super Admin mới chốt được kết quả của tin chưa có Hiring Manager.");
+            }
+
             bool isOverride = evaluation.AiVerdict != request.FinalVerdict;
             if (isOverride)
             {
-                bool isAuthorized = string.Equals(hrUser.Role, AppRoles.HrAdmin, StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(hrUser.Role, AppRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(hrUser.Role, "hr_admin", StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(hrUser.Role, "super_admin", StringComparison.OrdinalIgnoreCase);
-
-                if (!isAuthorized)
-                    return Result.Failure<bool>("Only HR Admin or Super Admin can override AI verdict.");
+                // Ghi đè verdict của AI nay là quyền của CHÍNH Hiring Manager — đó là vai trò của
+                // họ. Trước ADR-061 chỉ quản trị viên được ghi đè, nên người hiểu công việc nhất
+                // lại không sửa được kết luận sai của mô hình.
+                if (!isAdminActor && !isTheHiringManager)
+                    return Result.Failure<bool>("Only the Hiring Manager, HR Admin or Super Admin can override AI verdict.");
 
                 if (string.IsNullOrEmpty(request.OverrideReason))
                     return Result.Failure<bool>("Override reason is mandatory when changing the AI verdict.");
@@ -1711,6 +1726,17 @@ namespace ARI.Application.Services
                 FinalVerdict = request.FinalVerdict,
                 IsOverride = isOverride,
                 OverrideReason = request.OverrideReason,
+                // Ảnh chụp vai trò lúc chốt: vai trò của một người có thể đổi về sau, còn câu hỏi
+                // "ai đã quyết định tuyển người này, với tư cách gì" phải trả lời được mãi.
+                ReviewerRole = RoleNames.NormalizeDbRole(hrUser.Role),
+                IsHrFallback = isHrFallback,
+                FallbackReason = isHrFallback ? fallbackReason : null,
+                SuggestedLevel = request.SuggestedLevel,
+                SuggestedSalaryMin = request.SuggestedSalaryMin,
+                SuggestedSalaryMax = request.SuggestedSalaryMax,
+                SuggestedSalaryCurrency = request.SuggestedSalaryCurrency,
+                Strengths = request.Strengths,
+                Concerns = request.Concerns,
                 ShareRecording = request.ShareRecording,
                 ShareTranscript = request.ShareTranscript,
                 ShareEvaluation = request.ShareEvaluation,
@@ -1753,7 +1779,10 @@ namespace ARI.Application.Services
                 if (!hasProgressed)
                 {
                     // Link trong thư phải trỏ về portal thật của môi trường đang chạy, không phải máy dev.
-                    var portalBase = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
+                    // KHÔNG đặt mặc định localhost ở đây: `frontendBaseUrl` đến từ `FrontendUrls`,
+                    // mà giá trị đó đã được chặn ở bước boot. Bịa thêm một máy chủ nữa chỉ tạo chỗ
+                    // để link sai lọt ra ngoài mà không ai biết.
+                    var portalBase = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
                     string emailBody;
                     string subject;
                     if (request.FinalVerdict == "pass")
@@ -1768,7 +1797,7 @@ namespace ARI.Application.Services
                                     <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
                                     <p>Chúng tôi vô cùng vui mừng thông báo rằng Anh/Chị đã chính thức vượt qua các vòng đánh giá năng lực của vị trí tuyển dụng <strong>{{jobTitle}}</strong> tại ARISP.</p>
                                     <p>Đội ngũ tuyển dụng đánh giá rất cao năng lực chuyên môn, phong cách làm việc cũng như sự phù hợp của Anh/Chị với định hướng phát triển của chúng tôi.</p>
-                                    <p>Đại diện bộ phận Nhân sự (HR) sẽ liên hệ trực tiếp với Anh/Chị trong vòng 1-2 ngày làm việc tới để trao đổi chi tiết về kế hoạch công việc, mức đãi ngộ và gửi Thư mời nhận việc chính thức (Offer Letter).</p>
+                                    <p>Thư mời nhận việc chính thức (Offer Letter) sẽ được gửi tới Anh/Chị qua email và hiển thị ngay trong hồ sơ ứng tuyển trên hệ thống, kèm nút xác nhận. Bộ phận Nhân sự cũng sẽ liên hệ trực tiếp để trao đổi thêm nếu Anh/Chị cần.</p>
                                     <p>Cảm ơn Anh/Chị đã luôn dành sự quan tâm và nỗ lực trong suốt hành trình tuyển dụng cùng ARISP.</p>
                                     <div style="text-align: center; margin: 30px 0;">
                                         <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
@@ -1853,11 +1882,57 @@ namespace ARI.Application.Services
                 Action = isOverride ? "hr_override" : "hr_confirm",
                 EntityType = "evaluation",
                 EntityId = evaluation.Id,
-                Metadata = $"{{\"evaluation_id\":\"{evaluation.Id}\",\"final_verdict\":\"{request.FinalVerdict}\",\"is_override\":{isOverride.ToString().ToLower()}}}"
+                Metadata = AuditMetadata.Serialize(new
+                {
+                    evaluation_id = evaluation.Id,
+                    final_verdict = request.FinalVerdict,
+                    is_override = isOverride,
+                    reviewer_role = review.ReviewerRole,
+                    is_hr_fallback = isHrFallback,
+                }),
             };
             await _unitOfWork.Repository<AuditLog>().AddAsync(auditLog, ct);
 
+            // Chốt THAY Hiring Manager là hành vi cần dấu vết riêng + phải báo cho chính người bị
+            // vượt: một quyết định tuyển đi qua đầu người phụ trách mà họ không biết là thất bại
+            // quản trị, dù lý do có chính đáng.
+            if (isHrFallback && primaryHm != null)
+            {
+                await _unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+                {
+                    ActorUserId = hrUserId,
+                    Action = "hr_review_fallback",
+                    EntityType = "evaluation",
+                    EntityId = evaluation.Id,
+                    Metadata = AuditMetadata.Serialize(new
+                    {
+                        hiringManagerUserId = primaryHm.UserId,
+                        applicationId = evaluation.ApplicationId,
+                        finalVerdict = request.FinalVerdict,
+                        reason = fallbackReason,
+                    }),
+                }, ct);
+
+                await _unitOfWork.Repository<Notification>().AddAsync(new Notification
+                {
+                    RecipientUserId = primaryHm.UserId,
+                    Type = "system",
+                    Title = "Kết quả phỏng vấn đã được chốt thay bạn",
+                    Body = $"Ứng viên {applicationForGate.CandidateName}: kết quả \"{request.FinalVerdict}\". Lý do: {fallbackReason}",
+                    Link = "/hm/evaluations",
+                    DedupKey = $"hr_review_fallback:{evaluation.Id}",
+                    IsRead = false,
+                }, ct);
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
+
+            if (isHrFallback && primaryHm != null)
+            {
+                await _notificationService.PublishUserEventAsync(primaryHm.UserId, "ReceiveUserNotification",
+                    new { Type = "HrReviewFallback", EvaluationId = evaluation.Id }, ct);
+            }
+
             return Result.Success(true);
         }
 
@@ -1879,7 +1954,7 @@ namespace ARI.Application.Services
                 // Tạo lời mời CHỌN LỊCH cho vòng kế (mỗi vòng cần duyệt → chỉ tạo sau khi confirm Pass).
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
-                var baseUrl = (string.IsNullOrWhiteSpace(frontendBaseUrl) ? "http://localhost:3000" : frontendBaseUrl).TrimEnd('/');
+                var baseUrl = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
                 // Chỉ để thoả cột TokenHash (NOT NULL) — không dòng nào còn đối chiếu giá trị này.
                 var rawToken = Guid.NewGuid().ToString("N");
 

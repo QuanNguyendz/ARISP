@@ -11,7 +11,4 @@ namespace ARI.Application.Interfaces
         /// <summary>Mint ephemeral token (TTL ngắn) cho phiên STT của ứng viên. Null nếu chưa cấu hình key.</summary>
         Task<DeepgramToken?> CreateTemporaryTokenAsync(CancellationToken ct = default);
     }
-
-    /// <summary>Cấu hình để FE khởi tạo HeyGen Streaming Avatar SDK (token do BE mint).</summary>
-    public record AvatarStreamingToken(string Token, string ServerUrl, string? AvatarId, string? VoiceId);
 }

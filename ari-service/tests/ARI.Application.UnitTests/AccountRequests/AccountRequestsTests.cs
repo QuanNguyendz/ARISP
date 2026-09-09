@@ -10,6 +10,7 @@ using ARI.Application.Admin.Queries.GetAccountRequests;
 using ARI.Application.Common;
 using ARI.Application.UnitTests.Auth;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -105,7 +106,7 @@ public class CreateAccountRequestsCommandHandlerTests
         Assert.Equal($"Thiếu họ tên cho '{EmailA}'.", res.Error);
     }
 
-    // UTCID06 — role không hợp lệ → "Vai trò phải là 'hr_admin' hoặc 'recruiter' (email <email>)."
+    // UTCID06 — role không hợp lệ → "Vai trò phải là một trong: ... (email <email>)."
     [Fact]
     public async Task UTCID06_Invalid_role()
     {
@@ -114,7 +115,10 @@ public class CreateAccountRequestsCommandHandlerTests
         var res = await h.Handle(Cmd(Item(email: EmailA, role: "super_admin")), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal($"Vai trò phải là 'hr_admin' hoặc 'recruiter' (email {EmailA}).", res.Error);
+        // Danh sách dựng từ RoleNames.AssignableStaff — ADR-061 thêm hiring_manager vào đó.
+        Assert.Equal(
+            $"Vai trò phải là một trong: {string.Join(", ", RoleNames.AssignableStaff)} (email {EmailA}).",
+            res.Error);
     }
 
     // UTCID07 — trùng email trong cùng request (sau chuẩn hoá) → "Email bị lặp trong yêu cầu: <email>."

@@ -1,6 +1,6 @@
 {
   "title": "Cấu hình lịch phỏng vấn",
-  "description": "{{jobTitle}} — mỗi khung giờ mặc định dành cho 1 ứng viên. Ứng viên sẽ tự chọn khung giờ trống sau khi nhận lời mời.",
+  "description": "{{jobTitle}} — mỗi ca chỉ nhận một ứng viên, và ca phải nằm trọn trong khung giờ Hiring Manager có mặt được. Nhân sự gán ca cho ứng viên, ứng viên không tự chọn.",
   "back": "Quay lại chi tiết tin",
   "loadError": "Không tải được tin tuyển dụng.",
   "slotsLoadError": "Không tải được danh sách khung giờ.",
@@ -13,11 +13,13 @@
     "startTime": "Bắt đầu",
     "endTime": "Kết thúc",
     "capacity": "Sức chứa (số ứng viên / khung)",
-    "add": "Thêm khung giờ"
+    "add": "Thêm khung giờ",
+    "oneCandidatePerSlot": "Mỗi ca chỉ nhận một ứng viên — Hiring Manager ngồi cùng AI suốt buổi. Cần thêm chỗ thì tạo thêm ca."
   },
   "validation": {
     "fillAllFields": "Vui lòng nhập ngày, giờ bắt đầu và giờ kết thúc.",
-    "endAfterStart": "Giờ kết thúc phải sau giờ bắt đầu."
+    "endAfterStart": "Giờ kết thúc phải sau giờ bắt đầu.",
+    "overlapsExisting": "Khung giờ này chồng lên một ca đã tạo. Hiring Manager dự cùng ứng viên nên hai ca không được trùng giờ."
   },
   "slotList": {
     "title": "Khung giờ vòng {{round}} ({{count}})",
@@ -27,11 +29,32 @@
     "decreaseCapacity": "Giảm sức chứa",
     "increaseCapacity": "Tăng sức chứa",
     "delete": "Xoá khung giờ",
-    "cannotDelete": "Đã có người đặt, không thể xoá"
+    "cannotDelete": "Đã có người đặt, không thể xoá",
+    "normalizeCapacity": "Hạ về 1 chỗ",
+    "outsideHm": "Ngoài lịch HM",
+    "editTime": "Sửa giờ",
+    "cannotEdit": "Đã có ứng viên giữ chỗ — dùng chức năng dời lịch ở màn Phỏng vấn",
+    "saveTime": "Lưu",
+    "cancelEdit": "Huỷ",
+    "unknownCandidate": "Ứng viên",
+    "confirmation": {
+      "pending": "Chờ xác nhận",
+      "confirmed": "Đã xác nhận",
+      "declined": "Báo bận"
+    },
+    "overlapping": "Trùng giờ"
   },
   "actions": {
     "capacityError": "Không thể đổi sức chứa.",
     "createError": "Không thể tạo khung giờ.",
-    "deleteError": "Không thể xoá khung giờ."
+    "deleteError": "Không thể xoá khung giờ.",
+    "updateTimeError": "Không sửa được giờ của ca này."
+  },
+  "hmAvailability": {
+    "title": "Lịch rảnh của Hiring Manager",
+    "hint": "Ca bạn tạo chỉ gán được cho ứng viên nếu nằm TRỌN trong một khung dưới đây.",
+    "empty": "Hiring Manager chưa gửi khung giờ cho vòng {{round}}. Bạn vẫn tạo ca được, nhưng chưa gán được cho ai cho tới khi họ gửi lịch.",
+    "use": "Dùng khung này",
+    "outsideWarning": "Ca đang nhập nằm ngoài mọi khung giờ rảnh của Hiring Manager — tạo thì được, nhưng sẽ không gán được cho ứng viên nào."
   }
 }

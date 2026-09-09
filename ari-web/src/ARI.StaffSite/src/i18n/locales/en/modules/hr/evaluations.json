@@ -57,5 +57,31 @@
   "aiReasoning": "AI reasoning",
   "integritySignals": "Integrity signals",
   "cheatScore": "Suspicion score",
-  "noCheatSignals": "No unusual behaviour was recorded during the interview."
+  "noCheatSignals": "No unusual behaviour was recorded during the interview.",
+  "hm": {
+    "theHiringManager": "the Hiring Manager",
+    "ownerHint": "{{name}} owns this decision. You can read the full report; deciding on their behalf requires a reason.",
+    "fallbackBanner": "{{name}} is the decision maker for this job. You are deciding on their behalf — this is audited and they will be notified.",
+    "fallbackReasonLabel": "Reason for deciding on their behalf",
+    "fallbackReasonPlaceholder": "e.g. Hiring Manager on leave until Sep 10, the candidate needs an answer today.",
+    "fallbackRequired": "Please give a reason for deciding on the Hiring Manager's behalf (at least 10 characters).",
+    "showSuggestions": "+ Add level & salary suggestion",
+    "hideSuggestions": "− Hide level & salary suggestion",
+    "suggestionsHint": "Optional. Whatever you put here pre-fills the job offer, so nobody has to retype it.",
+    "level": "Suggested level",
+    "salaryMin": "Salary from",
+    "salaryMax": "Salary to",
+    "currency": "Currency",
+    "strengths": "Strengths",
+    "concerns": "Concerns",
+    "decidedBy": "Decided by: {{role}}",
+    "suggestionSummary": "Suggestion",
+    "roles": {
+      "hiring_manager": "Hiring Manager",
+      "hr_admin": "HR Admin (on their behalf)",
+      "super_admin": "Super Admin (on their behalf)"
+    },
+    "awaitingDecision": "Waiting for {{name}} to make the call. You can read the report but you are not the decision maker.",
+    "awaitingAdminDecision": "Waiting for an HR Admin to make the call. You can read the report but you are not the decision maker."
+  }
 }

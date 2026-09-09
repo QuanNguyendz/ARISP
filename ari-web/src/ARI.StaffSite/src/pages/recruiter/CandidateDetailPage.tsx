@@ -39,6 +39,10 @@ import {
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { formatScore } from '@ari/shared/utils/format'
+import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
+import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
+import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
 
 function apiErr(e: unknown, fallback: string): string {
   return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
@@ -195,7 +199,7 @@ export default function RecruiterCandidateDetailPage() {
           <div className="flex items-center justify-between gap-2 self-stretch rounded-xl bg-ink-50 px-3 py-2 dark:bg-white/[0.03] sm:flex-col sm:items-center sm:justify-center sm:bg-transparent sm:px-0 sm:py-0 sm:dark:bg-transparent">
             <span className="text-xs text-ink-400 sm:hidden">{t('matchCVJD')}</span>
             <div className={`text-2xl font-bold sm:text-3xl ${scoreColor(app.matchScore)}`}>
-              {app.matchScore}%
+              {formatScore(app.matchScore)}
             </div>
             <div className="hidden text-xs text-ink-400 sm:block">{t('matchCVJD')}</div>
           </div>
@@ -358,6 +362,19 @@ export default function RecruiterCandidateDetailPage() {
             </div>
           </div>
 
+          {/* Cổng duyệt của Hiring Manager (ADR-061) — đứng TRƯỚC panel xếp lịch vì đó đúng
+              là thứ tự thao tác: cổng mở rồi mới xếp được lịch. */}
+          <ShortlistGatePanel
+            applicationId={app.id}
+            jobPostingId={app.jobPostingId}
+            status={app.status}
+            hmDecision={app.hmDecision}
+            hmDecisionNote={app.hmDecisionNote}
+            onChanged={refreshApp}
+          />
+
+          <CandidateOfferPanel applicationId={app.id} status={app.status} onChanged={refreshApp} />
+
           {/* Xếp lịch phỏng vấn (HR gán cứng 1 giờ cho ứng viên — ADR-048) */}
           <AssignSchedulePanel
             applicationId={app.id}
@@ -395,6 +412,8 @@ export default function RecruiterCandidateDetailPage() {
               </div>
             </dl>
           </div>
+
+          <EmailHistoryPanel applicationId={app.id} />
         </div>
       </div>
     </div>

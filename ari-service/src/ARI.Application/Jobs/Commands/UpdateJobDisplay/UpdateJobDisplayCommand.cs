@@ -36,7 +36,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobDisplay
             if (job == null)
                 return Result.Failure<JobPostingResponse>("Job posting not found.", CommonErrorCodes.NotFound);
 
-            var isSuperOrHrAdmin = command.Role == AppRoles.SuperAdmin || command.Role == AppRoles.HrAdmin;
+            var isSuperOrHrAdmin = RoleNames.IsAdmin(command.Role);
             var isOwner = job.CreatedByUserId == command.UserId;
 
             if (!isSuperOrHrAdmin && !isOwner)

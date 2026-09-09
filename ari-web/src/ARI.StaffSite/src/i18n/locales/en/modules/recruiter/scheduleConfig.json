@@ -1,6 +1,6 @@
 {
   "title": "Interview Schedule Configuration",
-  "description": "{{jobTitle}} — each time slot defaults to 1 candidate. Candidates will select available slots after receiving the invitation.",
+  "description": "{{jobTitle}} — each slot takes a single candidate, and a slot must fall entirely inside a window the hiring manager can attend. Staff assign slots; candidates do not pick their own.",
   "back": "Back to job detail",
   "loadError": "Unable to load job posting.",
   "slotsLoadError": "Unable to load time slots.",
@@ -13,11 +13,13 @@
     "startTime": "Start",
     "endTime": "End",
     "capacity": "Capacity (candidates / slot)",
-    "add": "Add Time Slot"
+    "add": "Add Time Slot",
+    "oneCandidatePerSlot": "Each slot takes a single candidate — the hiring manager sits in with the AI for the whole session. Need more room? Create another slot."
   },
   "validation": {
     "fillAllFields": "Please fill in date, start time and end time.",
-    "endAfterStart": "End time must be after start time."
+    "endAfterStart": "End time must be after start time.",
+    "overlapsExisting": "This time overlaps a slot you already created. The hiring manager attends with the candidate, so two slots cannot overlap."
   },
   "slotList": {
     "title": "Time Slots for Round {{round}} ({{count}})",
@@ -27,11 +29,32 @@
     "decreaseCapacity": "Decrease capacity",
     "increaseCapacity": "Increase capacity",
     "delete": "Delete time slot",
-    "cannotDelete": "Has bookings, cannot delete"
+    "cannotDelete": "Has bookings, cannot delete",
+    "normalizeCapacity": "Reduce to 1 seat",
+    "outsideHm": "Outside HM hours",
+    "editTime": "Edit time",
+    "cannotEdit": "A candidate is holding this slot — use reschedule on the Interviews screen",
+    "saveTime": "Save",
+    "cancelEdit": "Cancel",
+    "unknownCandidate": "Candidate",
+    "confirmation": {
+      "pending": "Awaiting confirmation",
+      "confirmed": "Confirmed",
+      "declined": "Declined"
+    },
+    "overlapping": "Overlapping"
   },
   "actions": {
     "capacityError": "Unable to change capacity.",
     "createError": "Unable to create time slot.",
-    "deleteError": "Unable to delete time slot."
+    "deleteError": "Unable to delete time slot.",
+    "updateTimeError": "Could not change this slot’s time."
+  },
+  "hmAvailability": {
+    "title": "Hiring manager's availability",
+    "hint": "A slot can only be assigned to a candidate if it falls ENTIRELY inside one of the windows below.",
+    "empty": "The hiring manager has not sent availability for round {{round}} yet. You can still create slots, but none can be assigned until they do.",
+    "use": "Use this window",
+    "outsideWarning": "The slot you are entering falls outside every window the hiring manager can attend — you can create it, but it cannot be assigned to anyone."
   }
 }

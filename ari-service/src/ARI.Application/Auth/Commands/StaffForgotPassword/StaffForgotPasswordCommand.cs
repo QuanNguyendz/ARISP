@@ -64,7 +64,7 @@ namespace ARI.Application.Auth.Commands.StaffForgotPassword
                 await _unitOfWork.Repository<MagicLink>().AddAsync(magicLinkRecord, ct);
                 await _unitOfWork.SaveChangesAsync();
 
-                var frontendUrl = _configuration["Authentication:AdminFrontendUrl"] ?? _configuration["Auth:AdminFrontendUrl"] ?? "https://localhost:3000";
+                var frontendUrl = FrontendUrls.Staff(_configuration);
                 var resetLink = $"{frontendUrl}/auth/reset-password?token={resetToken}&email={Uri.EscapeDataString(user.Email)}&audience={MagicLinkAudience.Staff}";
 
                 var emailBody = $@"

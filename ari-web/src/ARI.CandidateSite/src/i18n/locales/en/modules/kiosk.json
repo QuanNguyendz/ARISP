@@ -66,6 +66,11 @@
     "deviceCheck": {
       "title": "Check Devices Before Entering Room",
       "startLabel": "Enter Interview Room"
+    },
+    "waitingRoom": {
+      "title": "Please wait a moment",
+      "hmPresent": "The interviewer is in the room. The interview starts as soon as they let you in.",
+      "hmAbsent": "Your code has been accepted. The interview starts once the interviewer joins the room and lets you in."
     }
   }
 }

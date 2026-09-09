@@ -4,7 +4,8 @@
   "sendRequest": "Send Account Request",
   "roles": {
     "hrAdmin": "HR Admin",
-    "recruiter": "Recruiter"
+    "recruiter": "Recruiter",
+    "hiringManager": "Hiring Manager"
   },
   "status": {
     "approved": "Approved",

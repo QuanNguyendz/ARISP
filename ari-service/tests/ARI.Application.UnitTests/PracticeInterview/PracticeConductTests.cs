@@ -54,7 +54,7 @@ public class PracticeConductTests
     {
         var job = PracticeData.Job(language: "en");
         var app = PracticeData.App(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app);
 
         var res = await Svc(uow, new(), new(), new()).StartSessionAsync(Start(app.Id, uiLang: "vi"), CancellationToken.None);
 
@@ -72,7 +72,7 @@ public class PracticeConductTests
     {
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app)
             .Seed(PracticeData.Session(app.Id, round: 1)); // đã có 1 phiên thử vòng 1
 
         var res = await Svc(uow, new(), new(), new()).StartSessionAsync(Start(app.Id, round: 1), CancellationToken.None);
@@ -86,7 +86,7 @@ public class PracticeConductTests
     {
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(PracticeData.Session(app.Id, round: 1));
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(PracticeData.Session(app.Id, round: 1));
 
         var res = await Svc(uow, new(), new(), new(), new InterviewOptions { PracticeAttemptsPerRound = 0 })
             .StartSessionAsync(Start(app.Id, round: 1), CancellationToken.None);
@@ -99,7 +99,7 @@ public class PracticeConductTests
     {
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(PracticeData.Session(app.Id, round: 1));
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(PracticeData.Session(app.Id, round: 1));
 
         var res = await Svc(uow, new(), new(), new()).StartSessionAsync(Start(app.Id, round: 2), CancellationToken.None);
 
@@ -111,7 +111,7 @@ public class PracticeConductTests
     {
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(PracticeData.MustAsk(job.Id));
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(PracticeData.MustAsk(job.Id));
 
         await Svc(uow, new(), new(), new()).StartSessionAsync(Start(app.Id), CancellationToken.None);
 
@@ -165,7 +165,7 @@ public class PracticeConductTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
         var session = PracticeData.Session(app.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
         var notif = new RecordingNotificationService();
         var ai = new StubAiProvider { QuestionText = "Giới thiệu bản thân?" };
         var tts = new RecordingTtsService();
@@ -200,7 +200,7 @@ public class PracticeConductTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
         var session = PracticeData.Session(app.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
         for (var i = 1; i <= 12; i++) uow.Seed(PracticeData.Question(session.Id, i)); // đã đủ 12 câu
         var ai = new StubAiProvider { QuestionText = "Cảm ơn bạn đã tham gia." };
 
@@ -219,7 +219,7 @@ public class PracticeConductTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
         var session = PracticeData.Session(app.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
         var ai = new StubAiProvider { QuestionText = "Buổi phỏng vấn kết thúc tại đây. [END_INTERVIEW]" };
 
         var res = await Svc(uow, new(), ai, new()).GenerateAndSendNextQuestionAsync(session.Id, CancellationToken.None);
@@ -239,7 +239,7 @@ public class PracticeConductTests
         var app = PracticeData.App(job.Id, status: "interview");
         var session = PracticeData.Session(app.Id);
         var q = PracticeData.Question(session.Id, 1);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(q).Seed(PracticeData.Answer(session.Id, q.Id));
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session).Seed(q).Seed(PracticeData.Answer(session.Id, q.Id));
         var notif = new RecordingNotificationService();
         var ai = new StubAiProvider();
 
@@ -303,7 +303,7 @@ public class PracticeConductTests
         var job = PracticeData.Job();
         var app = PracticeData.App(job.Id);
         var session = PracticeData.Session(app.Id, startedAt: DateTimeOffset.UtcNow.AddMinutes(-21)); // quá trần 20'
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app).Seed(session);
         var ai = new StubAiProvider();
 
         var res = await Svc(uow, new(), ai, new()).PracticeTimeoutCloseAsync(session.Id, CancellationToken.None);

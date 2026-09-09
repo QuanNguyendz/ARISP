@@ -67,5 +67,38 @@ namespace ARI.Domain.Entities
         public string? ApproverName { get; set; }
         /// <summary>storageKey của file JD đã đóng dấu duyệt (visual stamp). Chỉ tạo khi JD là PDF.</summary>
         public string? SignedJdFileUrl { get; set; }
+
+        // ===== Chữ ký duyệt JD của Hiring Manager (ADR-061 — duyệt tin hai bước) =====
+        //
+        // Khai bằng CỘT chứ không thêm trạng thái vào vòng đời tin. Hai lý do: (1) ký duyệt và
+        // vòng đời là hai trục vuông góc — tin có thể đã ký mà vẫn ở `draft`, `pending` hoặc
+        // `rejected`; (2) `UpdateJobStatusCommand` là chuỗi if 459 dòng, `GetAdminJobsQuery` còn
+        // viết lại status khi hiển thị, và FE mirror cả tập giá trị — mọi trạng thái mới phải
+        // luồn qua từng chỗ đó. Đúng khuôn khối `ApprovedByUserId` ngay phía trên.
+
+        /// <summary>
+        /// pending | approved | rejected — xem <see cref="Constants.HmSignOffStatus"/>.
+        /// <b>Null = tin không có Hiring Manager</b> → không có cổng nào, hành vi y hệt trước ADR-061.
+        /// </summary>
+        public string? HmSignOffStatus { get; set; }
+
+        public Guid? HmSignOffByUserId { get; set; }
+        public DateTimeOffset? HmSignOffAt { get; set; }
+
+        /// <summary>Lý do từ chối JD (bắt buộc khi từ chối) — Recruiter sửa rồi gửi duyệt lại.</summary>
+        public string? HmSignOffReason { get; set; }
+
+        // ===== Phiếu yêu cầu tuyển dụng sinh ra tin này (ADR-063) =====
+
+        /// <summary>
+        /// Phiếu <see cref="RecruitmentRequest"/> đã được HR Leader duyệt và là nguồn gốc của tin.
+        ///
+        /// <b>Nullable trong lược đồ nhưng BẮT BUỘC với tin mới.</b> Cột để null được là để những
+        /// tin có trước ADR-063 không bị migration làm hỏng — gán một phiếu giả cho dữ liệu cũ thì
+        /// bịa ra một phiếu chưa ai từng duyệt, tệ hơn hẳn việc thừa nhận nó không có. Ràng buộc
+        /// "mọi tin phải từ phiếu đã duyệt" cưỡng chế ở <c>CreateJobCommand</c>, nơi phân biệt được
+        /// tin mới với dữ liệu lịch sử.
+        /// </summary>
+        public Guid? RecruitmentRequestId { get; set; }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "title": "Compose email to candidate",
+  "recipient": "To: {{name}} <{{email}}>",
+  "loading": "Building the email...",
+  "loadError": "Could not build the email. Please try again.",
+  "subject": "Subject",
+  "body": "Body",
+  "bold": "Bold",
+  "italic": "Italic",
+  "bulletList": "Bullet list",
+  "link": "Insert link",
+  "linkPrompt": "Enter the link address:",
+  "preview": "Preview",
+  "edit": "Back to editing",
+  "restoreTemplate": "Restore original template",
+  "hint": "Prefilled from the template. Edit the wording or add details before sending.",
+  "cancel": "Cancel",
+  "send": "Send",
+  "sending": "Sending..."
+}

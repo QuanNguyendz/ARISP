@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Departments;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
@@ -30,12 +31,6 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
     {
         private readonly IUnitOfWork _unitOfWork;
 
-        /// <summary>Trạng thái hồ sơ coi như đã đóng — không còn tốn công của recruiter nữa.</summary>
-        private static readonly HashSet<string> ClosedStatuses = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "pass", "not_pass", "rejected", "withdrawn"
-        };
-
         public GetRecruitersQueryHandler(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
@@ -43,8 +38,12 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
 
         public async Task<Result<List<RecruiterOverviewDto>>> Handle(GetRecruitersQuery request, CancellationToken ct)
         {
+            // RoleNames.Recruiter là giá trị LƯU TRONG DB ("recruiter"). Trước đây chỗ này so với
+            // AppRoles.Recruiter ("Recruiter") — giá trị của claim JWT — ngay trong biểu thức EF,
+            // dịch ra SQL "=" phân biệt hoa thường nên truy vấn luôn trả về rỗng và cả màn hình
+            // "Phân công & tải tuyển dụng" trống trơn trên môi trường thật.
             var recruiters = (await _unitOfWork.Repository<User>()
-                .FindAsync(u => u.Role == AppRoles.Recruiter && u.DeletedAt == null, ct)).ToList();
+                .FindAsync(u => u.Role == RoleNames.Recruiter && u.DeletedAt == null, ct)).ToList();
 
             if (recruiters.Count == 0)
                 return Result.Success(new List<RecruiterOverviewDto>());
@@ -100,6 +99,10 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
 
             var result = new List<RecruiterOverviewDto>(recruiters.Count);
 
+            // Tra tên đội MỘT lượt cho cả danh sách — mỗi người một truy vấn là N+1.
+            var departmentNames = await DepartmentLookup.NamesAsync(
+                _unitOfWork, recruiters.Where(u => u.DepartmentId.HasValue).Select(u => u.DepartmentId!.Value), ct);
+
             foreach (var user in recruiters)
             {
                 var ownJobs = jobs.Where(j => j.CreatedByUserId == user.Id).ToList();
@@ -111,16 +114,18 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
 
                 // Chưa sàng = vẫn ở trạng thái vừa nộp. Sau khi sàng, hồ sơ chuyển sang
                 // "screening"/"interview" nên rơi khỏi nhóm này.
+                //
+                // Trước đây nhóm này lọc theo "applied"/"new" — hai giá trị KHÔNG bao giờ được ghi
+                // vào applications.status (trạng thái thật sau khi nộp CV là "cv_submitted"), nên ô
+                // "Hồ sơ chưa sàng" luôn hiện 0 dù tồn đọng bao nhiêu.
                 var unscreened = ownApps
-                    .Where(a => string.Equals(a.Status, "applied", StringComparison.OrdinalIgnoreCase)
-                                || string.Equals(a.Status, "new", StringComparison.OrdinalIgnoreCase)
+                    .Where(a => ApplicationStatuses.Is(a.Status, ApplicationStatuses.CvSubmitted)
                                 || string.IsNullOrWhiteSpace(a.Status))
                     .ToList();
 
                 // Đã qua sàng nhưng chưa có lịch nào → đang chờ recruiter gán khung giờ.
                 var awaitingScheduling = ownApps
-                    .Where(a => !ClosedStatuses.Contains(a.Status ?? string.Empty)
-                                && string.Equals(a.Status, "screening", StringComparison.OrdinalIgnoreCase)
+                    .Where(a => ApplicationStatuses.Is(a.Status, ApplicationStatuses.Screening)
                                 && !scheduledAppIds.Contains(a.Id))
                     .ToList();
 
@@ -146,7 +151,7 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
                     Id = user.Id,
                     FullName = user.FullName,
                     Email = user.Email,
-                    Department = user.Department,
+                    Department = user.DepartmentId is { } dId && departmentNames.TryGetValue(dId, out var dName) ? dName : null,
                     IsActive = user.IsActive,
                     LockReason = user.LockReason,
                     LastLoginAt = user.LastLoginAt,
@@ -168,8 +173,13 @@ namespace ARI.Application.Auth.Queries.GetRecruiters
                     PendingReviews = pendingEvals.Count,
                     PendingReviewsOldestDays = pendingOldest,
 
-                    ActivePipeline = ownApps.Count(a => !ClosedStatuses.Contains(a.Status ?? string.Empty)),
-                    Hired = ownApps.Count(a => string.Equals(a.Status, "pass", StringComparison.OrdinalIgnoreCase)),
+                    ActivePipeline = ownApps.Count(a => !ApplicationStatuses.IsTerminal(a.Status)),
+
+                    // Đếm cả "pass" lẫn "hired": trước khi có giai đoạn Offer, "pass" (đạt hết các
+                    // vòng — ADR-053) là điểm kết thúc thành công duy nhất; sau đó "hired" mới là
+                    // đích thật. Đếm cả hai để con số không tụt về 0 với dữ liệu cũ.
+                    Hired = ownApps.Count(a => ApplicationStatuses.Is(a.Status, ApplicationStatuses.Pass)
+                                               || ApplicationStatuses.Is(a.Status, ApplicationStatuses.Hired)),
 
                     OldestBottleneckDays = new[] { draftsOldest, unscreenedOldest, awaitingOldest, pendingOldest }.Max(),
                 });

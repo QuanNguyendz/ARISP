@@ -7,6 +7,7 @@ using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Jobs.Queries.GetAdminJobs;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -19,8 +20,16 @@ namespace ARI.Application.UnitTests.JobPostings;
 /// </summary>
 public class GetAdminJobsQueryHandlerTests
 {
+    /// <summary>
+    /// <paramref name="mine"/> != null: chạy dưới danh tính người đó (Recruiter) kèm bộ lọc
+    /// "chỉ tin của tôi"; null: chạy dưới quyền quản trị viên (thấy mọi tin).
+    /// </summary>
     private static Task<Result<List<JobPostingListItemResponse>>> Run(InMemoryUnitOfWork uow, Guid? mine)
-        => new GetAdminJobsQueryHandler(uow).Handle(new GetAdminJobsQuery(mine), CancellationToken.None);
+        => new GetAdminJobsQueryHandler(uow).Handle(
+            mine.HasValue
+                ? new GetAdminJobsQuery(mine.Value, AppRoles.Recruiter, MineOnly: true)
+                : new GetAdminJobsQuery(Guid.NewGuid(), AppRoles.HrAdmin, MineOnly: false),
+            CancellationToken.None);
 
     // UTCID01 — MineUserId=null, nhiều người tạo → trả tất cả, sắp mới nhất
     [Fact]

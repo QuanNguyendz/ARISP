@@ -92,7 +92,9 @@ namespace ARI.Application.Dev.SeedInterviewJob
                 {
                     Email = StaffEmail,
                     PasswordHash = _passwordHasher.Hash(StaffPassword),
-                    Role = AppRoles.HrAdmin,
+                    // Giá trị DB, không phải giá trị claim: gieo "Hr_admin" như trước sẽ tạo ra
+                    // đúng loại dữ liệu lệch mà ràng buộc CHECK trên users.role nay chặn lại.
+                    Role = RoleNames.HrAdmin,
                     FullName = "HR Dev",
                     IsActive = true
                 };

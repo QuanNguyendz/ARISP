@@ -199,7 +199,9 @@ export default function HrLayout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ink-50 dark:bg-ink-950">
+    /* `--sticky-top` nhỏ vì ở layout này `<main>` mới là phần cuộn, và nó nằm sẵn dưới thanh
+         tiêu đề — không có gì để chừa. Xem chú thích đầy đủ ở `WorkspaceLayout`. */
+    <div className="[--sticky-top:1.5rem] flex h-screen overflow-hidden bg-ink-50 dark:bg-ink-950">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 h-screen">
         <div className="flex items-center gap-2.5 px-5 h-16 border-b border-ink-200 dark:border-white/10">

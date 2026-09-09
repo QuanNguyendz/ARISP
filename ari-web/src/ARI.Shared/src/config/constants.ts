@@ -11,12 +11,11 @@ export function resolveAssetUrl(path?: string | null): string {
   return `${ASSET_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`
 }
 
-export const ROLES = {
-  SuperAdmin: 'Super_admin',
-  HRAdmin: 'Hr_admin',
-  Recruiter: 'Recruiter',
-  Candidate: 'Candidate',
-} as const
+/**
+ * Vai trò ở dạng claim JWT. Từ vựng đầy đủ (chuẩn hoá, đường dẫn nhà, nhãn, badge) nằm ở
+ * `@ari/shared/utils/roles` — đây chỉ là bí danh giữ lại cho các chỗ gọi cũ.
+ */
+export { ROLE_CLAIMS as ROLES } from '@ari/shared/utils/roles'
 
 export const INTERVIEW_MODES = {
   Remote: 'Remote',

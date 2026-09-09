@@ -16,7 +16,10 @@ namespace ARI.API.Controllers
 {
     [ApiController]
     [Route("api/staff/profile")]
-    [Authorize]
+    // InternalStaff chứ không phải [Authorize] trần: các endpoint ở đây thao tác trên bảng `users`
+    // (hồ sơ, mật khẩu, cài đặt nhân sự). Token Ứng viên hoặc Kiosk trước đây gọi được — chúng chỉ
+    // rơi vào 404 vì id không có trong bảng, nghĩa là an toàn do tình cờ chứ không do thiết kế.
+    [Authorize(Policy = "InternalStaff")]
     public class StaffProfileController : ControllerBase
     {
         private readonly ISender _sender;
@@ -46,7 +49,7 @@ namespace ARI.API.Controllers
             var userId = GetActorId();
             if (userId == null) return Unauthorized();
 
-            var result = await _sender.Send(new UpdateStaffProfileCommand(userId.Value, request.FullName, request.Department));
+            var result = await _sender.Send(new UpdateStaffProfileCommand(userId.Value, request.FullName));
             if (result.IsFailure)
                 return result.ErrorCode == CommonErrorCodes.NotFound
                     ? NotFound(new { message = result.Error })

@@ -5,6 +5,7 @@ using ARI.Application.Admin.Commands.UpdateUserRole;
 using ARI.Application.Common;
 using ARI.Application.UnitTests.Auth;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -61,7 +62,11 @@ public class UpdateUserRoleCommandHandlerTests
         var res = await Handler(uow).Handle(new UpdateUserRoleCommand(UserId, "super_admin", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid role. Role must be 'hr_admin' or 'recruiter'.", res.Error);
+        // Danh sách dựng từ RoleNames.AssignableStaff — ADR-061 thêm hiring_manager vào đó, nên viết
+        // cứng câu thông báo ở đây là phải sửa test mỗi lần bảng vai trò đổi.
+        Assert.Equal(
+            $"Invalid role. Role must be one of: {string.Join(", ", RoleNames.AssignableStaff)}.",
+            res.Error);
         Assert.Null(res.ErrorCode);
     }
 

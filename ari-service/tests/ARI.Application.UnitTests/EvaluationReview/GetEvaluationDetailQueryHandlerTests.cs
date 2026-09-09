@@ -5,6 +5,7 @@ using ARI.Application.Common;
 using ARI.Application.Evaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluationDetail;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -16,9 +17,14 @@ namespace ARI.Application.UnitTests.EvaluationReview;
 /// </summary>
 public class GetEvaluationDetailQueryHandlerTests
 {
-    private static Task<Result<EvaluationDetailResponse>> Run(InMemoryUnitOfWork uow, Guid id, RecordingFileStorage? storage = null)
+    /// <summary>Mặc định chạy dưới quyền quản trị viên: các bài dưới đây kiểm logic tra cứu, phần
+    /// phạm vi dữ liệu có test riêng ở cuối file.</summary>
+    private static Task<Result<EvaluationDetailResponse>> Run(
+        InMemoryUnitOfWork uow, Guid id, RecordingFileStorage? storage = null,
+        Guid? userId = null, string? role = null)
         => new GetEvaluationDetailQueryHandler(uow, storage ?? new RecordingFileStorage())
-            .Handle(new GetEvaluationDetailQuery(id), CancellationToken.None);
+            .Handle(new GetEvaluationDetailQuery(id, userId ?? Guid.NewGuid(), role ?? AppRoles.HrAdmin),
+                CancellationToken.None);
 
     [Fact]
     public async Task Not_found_fails()
@@ -158,5 +164,52 @@ public class GetEvaluationDetailQueryHandlerTests
         // Null để FE ẩn hẳn thẻ, thay vì bịa ra một con số.
         Assert.Null(res.Value!.CvMatchScore);
         Assert.Null(res.Value.CvMatchSummary);
+    }
+
+    // ===== Phạm vi dữ liệu (Phase 1 của ADR-061) =====
+
+    [Fact]
+    public async Task Refuses_an_evaluation_belonging_to_someone_elses_job()
+    {
+        // Endpoint này trả transcript, bảng điểm từng tiêu chí và LINK VIDEO buổi phỏng vấn.
+        // Trước đây nó không kiểm tra danh tính nào ngoài policy InternalStaff.
+        var job = EvaluationData.Job(owner: Guid.NewGuid());
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.Id, userId: Guid.NewGuid(), role: AppRoles.Recruiter);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Allows_the_owner_of_the_job()
+    {
+        var owner = Guid.NewGuid();
+        var job = EvaluationData.Job(owner: owner);
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.Id, userId: owner, role: AppRoles.Recruiter);
+
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Lookup_by_session_id_is_scoped_the_same_way()
+    {
+        // Endpoint /session/{id} đi qua cùng handler — không được để hở một lối vào thứ hai.
+        var job = EvaluationData.Job(owner: Guid.NewGuid());
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval);
+
+        var res = await Run(uow, eval.SessionId, userId: Guid.NewGuid(), role: AppRoles.Recruiter);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
 }

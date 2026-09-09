@@ -9,6 +9,7 @@ import json
 
 from app.config import get_settings
 from app.core.llm import complete_json
+from app.rag.retriever import ScopeFilter, hybrid_retrieve
 from app.prompts import (
     analyze_prompt,
     assess_language_prompt,
@@ -111,6 +112,43 @@ def normalize_question_analyses(raw, fallback_sequences: list[int] | None = None
     return items
 
 
+async def _expected_answers(ctx: SessionContext) -> list[str]:
+    """Đáp án mong đợi (playbook `expected_answer`) thuộc phạm vi tin + vòng của phiên này.
+
+    Truy hồi bằng chính nội dung hỏi–đáp của buổi phỏng vấn, nên chỉ lấy về những đáp án liên quan
+    tới thứ đã thực sự được hỏi — không nhồi cả ngân hàng đáp án vào prompt chấm.
+
+    Buổi THỬ không nạp playbook (ADR-015/038), và tin chưa khai `job_posting_id` thì bỏ qua.
+    """
+    if ctx.session_type != "real" or not ctx.job_posting_id:
+        return []
+
+    query = " ".join(
+        f"{qa.question_text} {qa.answer_text or ''}".strip() for qa in ctx.chat_history
+    ).strip()
+    if not query:
+        return []
+
+    candidates = await hybrid_retrieve(
+        query[:2000],
+        [
+            ScopeFilter(
+                "playbook",
+                None,
+                job_posting_id=ctx.job_posting_id,
+                round_number=ctx.round_number,
+            )
+        ],
+        top_k=None,
+    )
+    return [
+        c.chunk_text
+        for c in candidates
+        if c.source_type == "playbook"
+        and (c.metadata or {}).get("document_type") == "expected_answer"
+    ]
+
+
 async def generate_evaluation(ctx: SessionContext) -> EvaluationReport:
     if get_settings().use_mock:
         return EvaluationReport(
@@ -135,7 +173,7 @@ async def generate_evaluation(ctx: SessionContext) -> EvaluationReport:
                 ensure_ascii=False,
             ),
         )
-    system, user = evaluate_prompt(ctx)
+    system, user = evaluate_prompt(ctx, await _expected_answers(ctx))
     data = await complete_json(system, user)
     answered_sequences = [
         qa.sequence_number for qa in ctx.chat_history if (qa.answer_text or "").strip()

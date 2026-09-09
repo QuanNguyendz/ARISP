@@ -1,0 +1,81 @@
+{
+  "common": {
+    "cancel": "Huỷ",
+    "loading": "Đang tải..."
+  },
+  "team": {
+    "title": "Đội tuyển dụng",
+    "description": "Hiring Manager của tin — người duyệt hồ sơ, ký duyệt mô tả công việc và chốt kết quả phỏng vấn.",
+    "add": "Gán Hiring Manager",
+    "empty": "Tin này chưa gán Hiring Manager. Mọi cổng duyệt đều mở, phễu chạy như trước.",
+    "primary": "Người quyết định",
+    "primaryHint": "Người mà chữ ký duyệt chặn phễu của tin này.",
+    "remove": "Gỡ khỏi đội",
+    "selectLabel": "Chọn Hiring Manager",
+    "selectPlaceholder": "— Chọn người phụ trách —",
+    "selectHint": "Người cùng phòng ban với tin được xếp lên đầu. Đây chỉ là gợi ý — phòng ban không quyết định quyền truy cập.",
+    "sameDepartment": "(cùng phòng ban)",
+    "confirmAdd": "Gán vào tin",
+    "addError": "Không gán được Hiring Manager cho tin này.",
+    "removeError": "Không gỡ được thành viên khỏi đội tuyển dụng."
+  },
+  "signOff": {
+    "prompt": "Mô tả công việc này đang chờ bạn ký duyệt trước khi tin được đăng.",
+    "approve": "Ký duyệt",
+    "requestChanges": "Yêu cầu sửa",
+    "reasonLabel": "Cần sửa những gì?",
+    "reasonPlaceholder": "Ví dụ: mức lương thấp hơn mặt bằng, thiếu yêu cầu về kinh nghiệm hệ thống phân tán...",
+    "confirmRequestChanges": "Gửi yêu cầu sửa",
+    "reason": "Góp ý: {{reason}}",
+    "error": "Không ghi nhận được quyết định ký duyệt.",
+    "status": {
+      "pending": "Đang chờ {{name}} ký duyệt mô tả công việc.",
+      "approved": "{{name}} đã ký duyệt mô tả công việc.",
+      "rejected": "{{name}} yêu cầu sửa mô tả công việc."
+    }
+  },
+  "gate": {
+    "title": "Cổng duyệt Hiring Manager",
+    "description": "Hồ sơ cần {{name}} duyệt trước khi xếp lịch phỏng vấn.",
+    "theHiringManager": "Hiring Manager",
+    "request": "Gửi Hiring Manager duyệt",
+    "approve": "Duyệt hồ sơ",
+    "reject": "Loại hồ sơ",
+    "rejectReasonLabel": "Lý do loại hồ sơ",
+    "rejectReasonPlaceholder": "Ghi rõ để chủ tin và các vòng sau đối chiếu được.",
+    "confirmReject": "Xác nhận loại",
+    "bypass": "Vượt cổng duyệt",
+    "bypassReasonLabel": "Lý do vượt cổng (bắt buộc)",
+    "bypassReasonPlaceholder": "Ví dụ: Hiring Manager nghỉ phép tới 10/09, vị trí cần tuyển gấp.",
+    "bypassHint": "Lý do được ghi vào nhật ký kiểm toán và gửi thông báo cho chính Hiring Manager bị vượt. Tối thiểu 10 ký tự.",
+    "confirmBypass": "Xác nhận vượt cổng",
+    "waiting": "Đang chờ {{name}} duyệt hồ sơ này.",
+    "decision": {
+      "pending": "Chờ duyệt",
+      "approved": "Hiring Manager đã duyệt",
+      "rejected": "Hiring Manager đã loại",
+      "bypassed": "Đã vượt cổng duyệt"
+    },
+    "requestError": "Không gửi được hồ sơ cho Hiring Manager.",
+    "decideError": "Không ghi nhận được quyết định.",
+    "bypassError": "Không vượt được cổng duyệt.",
+    "availabilityLabel": "Khung giờ bạn có thể tham gia phỏng vấn (vòng 1)",
+    "availabilityHint": "Recruiter sẽ xếp ca cho ứng viên nằm trọn trong những khung này. Việc chốt giờ cụ thể với ứng viên (SMS, Zalo…) diễn ra ngoài hệ thống.",
+    "confirmApprove": "Duyệt và gửi lịch"
+  },
+  "emails": {
+    "title": "Lịch sử email",
+    "description": "Đúng nội dung đã rời hệ thống tới ứng viên, kể cả thư do hệ thống tự gửi.",
+    "empty": "Chưa có thư nào gửi cho ứng viên này.",
+    "loadError": "Không tải được lịch sử email.",
+    "edited": "Đã sửa",
+    "editedHint": "Nhân sự đã sửa nội dung khác với mẫu trước khi gửi.",
+    "failed": "Gửi lỗi",
+    "sentBySystem": "Hệ thống",
+    "templates": {
+      "interview_invite": "Thư mời phỏng vấn",
+      "application_rejected": "Thư cảm ơn / từ chối",
+      "offer_sent": "Thư mời nhận việc"
+    }
+  }
+}

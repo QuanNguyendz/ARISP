@@ -217,6 +217,72 @@ public class DbChangeRouterTests
         Assert.Contains(ownerId, dispatch.UserIds);
     }
 
+    /// <summary>
+    /// Đội tuyển dụng (ADR-061) đọc được hồ sơ, báo cáo AI và thư mời của tin qua API, nên kênh
+    /// realtime phải phủ đúng bấy nhiêu. Thiếu họ ở đây thì màn của Hiring Manager đứng im và họ
+    /// phải F5 tay để biết có việc mới — đúng thứ ADR-057 sinh ra để xoá bỏ.
+    /// </summary>
+    [Theory]
+    [InlineData("applications")]
+    [InlineData("evaluations")]
+    [InlineData("offers")]
+    [InlineData("email_logs")]
+    [InlineData("availability_slots")]
+    public void Doi_tuyen_dung_nhan_su_kien_cua_tin_minh_phu_trach(string table)
+    {
+        var hiringManagerId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload(table)),
+            new DbChangeLookup
+            {
+                JobOwnerUserId = ownerId,
+                HiringTeamUserIds = new[] { hiringManagerId },
+            });
+
+        Assert.Contains(hiringManagerId, dispatch.UserIds);
+        Assert.Contains(ownerId, dispatch.UserIds);
+    }
+
+    /// <summary>
+    /// Chủ tin cũng có thể là thành viên đội của chính tin mình. Gửi hai lần cho cùng một người là
+    /// hai thông báo trùng trên chuông.
+    /// </summary>
+    [Fact]
+    public void Nguoi_vua_la_chu_tin_vua_trong_doi_chi_nhan_mot_lan()
+    {
+        var sameId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("offers")),
+            new DbChangeLookup { JobOwnerUserId = sameId, HiringTeamUserIds = new[] { sameId, sameId } });
+
+        Assert.Single(dispatch.UserIds, id => id == sameId);
+    }
+
+    /// <summary>
+    /// Nhật ký thư là chuyện nội bộ: ứng viên đã nhận chính bức thư đó trong hộp thư của họ. Kể cả
+    /// khi lookup mang theo id ứng viên thì router cũng không được gửi.
+    /// </summary>
+    [Fact]
+    public void Email_logs_khong_gui_cho_ung_vien()
+    {
+        var candidateId = Guid.NewGuid();
+        var hiringManagerId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("email_logs")),
+            new DbChangeLookup
+            {
+                CandidateAccountId = candidateId,
+                HiringTeamUserIds = new[] { hiringManagerId },
+            });
+
+        Assert.DoesNotContain(candidateId, dispatch.UserIds);
+        Assert.Contains(hiringManagerId, dispatch.UserIds);
+    }
+
     [Fact]
     public void Availability_slots_can_tra_cuu_chu_tin_chu_khong_tra_ho_so()
     {
@@ -317,5 +383,127 @@ public class DbChangeRouterTests
             routing: $$"""{"recipient_user_id":"{{Guid.NewGuid()}}","status":"unread"}""")));
 
         Assert.Equal(new[] { "t", "op", "id", "jobPostingId", "applicationId" }, dispatch.Payload.Keys.ToArray());
+    }
+
+    // ---------- Đội tuyển dụng của tin (ADR-061) ----------
+
+    [Fact]
+    public void Job_hiring_team_members_gui_nguoi_duoc_gan_chu_tin_va_nhom_hr()
+    {
+        var assignedUserId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+
+        var change = DbChangeRouter.Parse(Payload("job_hiring_team_members", "I",
+            routing: $$"""{"user_id":"{{assignedUserId}}","job_posting_id":"{{Guid.NewGuid()}}"}"""));
+        var dispatch = DbChangeRouter.Resolve(change, new DbChangeLookup { JobOwnerUserId = ownerId });
+
+        Assert.Contains(assignedUserId, dispatch.UserIds);   // danh sách tin của HM vừa đổi
+        Assert.Contains(ownerId, dispatch.UserIds);
+        Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
+    }
+
+    [Fact]
+    public void Recruitment_request_bao_cho_hm_recruiter_duoc_giao_va_hr_leader()
+    {
+        var hm = Guid.NewGuid();
+        var recruiter = Guid.NewGuid();
+
+        // Đi qua Parse để khoá luôn việc payload chở được `assigned_recruiter_id` — khoá này do
+        // migration thêm vào `arisp_notify_change()`, quên thì Recruiter được giao việc không nhận
+        // được gì mà không có lỗi nào.
+        var change = DbChangeRouter.Parse(Payload("recruitment_requests", "U",
+            routing: $$"""{"requested_by_user_id":"{{hm}}","assigned_recruiter_id":"{{recruiter}}","status":"approved"}"""));
+
+        var dispatch = DbChangeRouter.Resolve(change, DbChangeLookup.Empty);
+
+        Assert.Contains(hm, dispatch.UserIds);           // người lập phiếu chờ kết quả duyệt
+        Assert.Contains(recruiter, dispatch.UserIds);    // người vừa được giao việc
+        Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);             // phiếu là việc nội bộ, chưa có gì công khai
+        Assert.Equal(2, dispatch.UserIds.Count);         // đúng hai người, không rộng hơn
+    }
+
+    [Fact]
+    public void Ban_jd_da_soan_chi_gui_nguoi_soan_va_nhom_hr()
+    {
+        // ADR-064: HM sở hữu phiếu nhưng KHÔNG thao tác gì trên bản nháp JD — thứ họ cần thấy là
+        // file JD đã gắn vào tin, lúc ký duyệt, và sự kiện đó đến từ `job_postings`.
+        var author = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("jd_documents", "U",
+                routing: $$"""{"created_by_user_id":"{{author}}"}""")),
+            DbChangeLookup.Empty);
+
+        Assert.Equal(new[] { author }, dispatch.UserIds.ToArray());
+        Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);
+    }
+
+    [Fact]
+    public void Mau_jd_chi_gui_nhom_hr()
+    {
+        var dispatch = DbChangeRouter.Resolve(
+            DbChangeRouter.Parse(Payload("jd_templates")), DbChangeLookup.Empty);
+
+        Assert.Empty(dispatch.UserIds);
+        Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
+    }
+
+    [Fact]
+    public void Job_hiring_team_members_can_tra_chu_tin()
+    {
+        // Bảng này chỉ mang job_posting_id, không mang created_by_user_id — phải nằm trong nhóm
+        // cần tra tin, nếu không chủ tin sẽ không bao giờ nhận được sự kiện.
+        Assert.True(DbChangeRouter.NeedsJobLookup("job_hiring_team_members"));
+    }
+
+    // ---------- Chốt chặn: bảng mới không được lọt qua mà không ai quyết định ----------
+
+    /// <summary>
+    /// Mọi entity trong Domain phải được xếp DỨT KHOÁT vào một trong hai nhóm dưới đây.
+    /// Thêm entity mới sẽ làm test này đỏ — buộc người thêm phải trả lời "ai được nhận realtime
+    /// của bảng này", thay vì để nó rơi vào nhánh mặc định im lặng và phát hiện ra sau nhiều tháng.
+    /// </summary>
+    private static readonly string[] EntitiesWithRealtimeRouting =
+    {
+        "Notification", "Application", "JobPosting", "InterviewBooking", "OnlineTestSubmission",
+        "Evaluation", "InterviewCode", "InterviewSession", "AvailabilitySlot", "AccountRequest",
+        "User", "SystemSetting", "CandidateAccount", "JobHiringTeamMember", "EmailLog", "Offer",
+        "RecruitmentRequest", "JdTemplate", "JdDocument", "Department",
+        "HiringManagerAvailability",
+    };
+
+    /// <summary>
+    /// CỐ Ý không định tuyến — không ai cần biết realtime, hoặc là dữ liệu nhạy cảm/nội bộ:
+    /// token đăng nhập, nhật ký kiểm toán, chunk vector do rag-service ghi hàng loạt, nội dung
+    /// hỏi–đáp của buổi phỏng vấn (đi qua SessionHub riêng, không qua kênh này).
+    /// </summary>
+    private static readonly string[] EntitiesIntentionallyUnrouted =
+    {
+        "RefreshToken", "CandidateRefreshToken", "MagicLink", "AuditLog", "DocumentChunk",
+        "Question", "Answer", "PlaybookDocument", "MustAskTracking", "CheatDetectionSignal",
+        "WebhookDelivery", "OnlineTestQuestion", "CvJdAnalysis", "SavedJob", "HrReview",
+        "InterviewInvite", "InterviewRoundConfig",
+    };
+
+    [Fact]
+    public void Moi_entity_deu_phai_duoc_quyet_dinh_dinh_tuyen()
+    {
+        var entityTypes = typeof(ARI.Domain.Entities.JobPosting).Assembly
+            .GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Namespace == "ARI.Domain.Entities")
+            .Select(t => t.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var decided = EntitiesWithRealtimeRouting.Concat(EntitiesIntentionallyUnrouted)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var undecided = entityTypes.Except(decided).OrderBy(n => n, StringComparer.Ordinal).ToList();
+
+        Assert.True(undecided.Count == 0,
+            "Entity chưa được quyết định định tuyến realtime: " + string.Join(", ", undecided) +
+            ". Thêm vào EntitiesWithRealtimeRouting (kèm case trong DbChangeRouter) hoặc " +
+            "EntitiesIntentionallyUnrouted (kèm lý do).");
     }
 }

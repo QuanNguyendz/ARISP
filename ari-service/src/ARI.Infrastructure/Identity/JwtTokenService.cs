@@ -25,14 +25,9 @@ namespace ARI.Infrastructure.Identity
 
         public string CreateStaffToken(User user)
         {
-            // Map giá trị role legacy trong DB về AppRoles chuẩn trước khi phát hành claim.
-            var roleClaimValue = user.Role switch
-            {
-                "super_admin" => AppRoles.SuperAdmin,
-                "hr_admin" => AppRoles.HrAdmin,
-                "recruiter" => AppRoles.Recruiter,
-                _ => user.Role
-            };
+            // Giá trị DB (snake_case) → giá trị claim. Bảng ánh xạ nằm ở RoleNames.ToClaim để
+            // thêm vai trò mới chỉ phải sửa một chỗ; switch viết tay ở đây từng là bản sao thứ hai.
+            var roleClaimValue = RoleNames.ToClaim(user.Role);
 
             var claims = new[]
             {

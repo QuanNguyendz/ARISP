@@ -78,8 +78,22 @@ public class GetCandidateOnlineTestQueryHandlerTests
         var res = await Run(uow, new GetCandidateOnlineTestQuery(app.Id, _accountId, Email));
 
         Assert.True(res.Value.AlreadySubmitted);
-        Assert.Equal(80m, res.Value.Score);
-        Assert.True(res.Value.IsPassed);
+    }
+
+    [Fact]
+    public async Task Khong_lo_diem_diem_san_hay_ket_qua_cho_ung_vien()
+    {
+        // Điểm sàn là thông tin nội bộ, và kết quả chỉ công bố khi cả vòng đã chốt — ứng viên chỉ
+        // biết "đã nộp bài". Khoá bằng phản chiếu để không ai vô tình thêm lại các trường đó:
+        // giấu trên giao diện mà vẫn gửi số xuống trình duyệt thì mở tab mạng ra là đọc được.
+        var names = typeof(ARI.Application.DTOs.CandidateOnlineTestDto)
+            .GetProperties()
+            .Select(x => x.Name)
+            .ToList();
+
+        Assert.DoesNotContain("Score", names);
+        Assert.DoesNotContain("IsPassed", names);
+        Assert.DoesNotContain("PassScore", names);
     }
 
     [Fact]

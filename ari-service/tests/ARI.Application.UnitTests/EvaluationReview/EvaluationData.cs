@@ -9,11 +9,12 @@ namespace ARI.Application.UnitTests.EvaluationReview;
 /// </summary>
 internal static class EvaluationData
 {
-    public static JobPosting Job(string title = "Backend Developer") => new()
+    public static JobPosting Job(string title = "Backend Developer", Guid? owner = null) => new()
     {
         Title = title,
         JobDescription = "Mô tả",
         Status = "active",
+        CreatedByUserId = owner ?? Guid.NewGuid(),
     };
 
     public static ARI.Domain.Entities.Application App(

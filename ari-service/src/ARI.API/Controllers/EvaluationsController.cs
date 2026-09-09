@@ -6,7 +6,10 @@ using Microsoft.AspNetCore.Authorization;
 using ARI.Application.Evaluations.Queries.GetEvaluationDetail;
 using ARI.Application.Evaluations.Queries.GetEvaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluationsByApplication;
+using ARI.Application.Common;
+using ARI.Application.Interfaces;
 using MediatR;
+using Microsoft.AspNetCore.Http;
 
 namespace ARI.API.Controllers
 {
@@ -16,11 +19,21 @@ namespace ARI.API.Controllers
     public class EvaluationsController : ControllerBase
     {
         private readonly ISender _sender;
+        private readonly ICurrentUserService _currentUserService;
 
-        public EvaluationsController(ISender sender)
+        public EvaluationsController(ISender sender, ICurrentUserService currentUserService)
         {
             _sender = sender;
+            _currentUserService = currentUserService;
         }
+
+        /// <summary>403 (không có quyền) khác 404 (không tồn tại) — không gộp làm một.</summary>
+        private IActionResult MapFailure(string? errorCode, string? message) => errorCode switch
+        {
+            CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message }),
+            CommonErrorCodes.NotFound => NotFound(new { message }),
+            _ => BadRequest(new { message }),
+        };
 
         [HttpGet]
         public async Task<IActionResult> GetEvaluations(
@@ -55,7 +68,8 @@ namespace ARI.API.Controllers
                 }
             }
 
-            var result = await _sender.Send(new GetEvaluationsQuery(jobPostingId, status, page, pageSize), ct);
+            var result = await _sender.Send(new GetEvaluationsQuery(
+                jobPostingId, status, page, pageSize, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
                 return BadRequest($"Đã xảy ra lỗi hệ thống khi tải danh sách đánh giá: {result.Error}");
@@ -72,10 +86,13 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã ID báo cáo đánh giá hoặc mã phiên phỏng vấn không được phép là Guid rỗng.");
             }
 
-            var result = await _sender.Send(new GetEvaluationDetailQuery(id), ct);
+            var result = await _sender.Send(
+                new GetEvaluationDetailQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return NotFound($"Không tìm thấy báo cáo đánh giá hoặc phiên phỏng vấn có mã ID tương ứng: {id}");
+                return result.ErrorCode == CommonErrorCodes.Forbidden
+                    ? MapFailure(result.ErrorCode, result.Error)
+                    : NotFound($"Không tìm thấy báo cáo đánh giá hoặc phiên phỏng vấn có mã ID tương ứng: {id}");
             }
 
             return Ok(result.Value);
@@ -89,10 +106,13 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã phiên phỏng vấn (sessionId) không được phép là Guid rỗng.");
             }
 
-            var result = await _sender.Send(new GetEvaluationDetailQuery(sessionId), ct);
+            var result = await _sender.Send(
+                new GetEvaluationDetailQuery(sessionId, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return NotFound($"Không tìm thấy báo cáo đánh giá nào thuộc về phiên phỏng vấn (sessionId): {sessionId}");
+                return result.ErrorCode == CommonErrorCodes.Forbidden
+                    ? MapFailure(result.ErrorCode, result.Error)
+                    : NotFound($"Không tìm thấy báo cáo đánh giá nào thuộc về phiên phỏng vấn (sessionId): {sessionId}");
             }
 
             return Ok(result.Value);
@@ -106,10 +126,13 @@ namespace ARI.API.Controllers
                 return BadRequest("Mã hồ sơ ứng tuyển (applicationId) không được phép là Guid rỗng.");
             }
 
-            var result = await _sender.Send(new GetEvaluationsByApplicationQuery(applicationId), ct);
+            var result = await _sender.Send(new GetEvaluationsByApplicationQuery(
+                applicationId, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return BadRequest($"Không thể tải danh sách đánh giá cho hồ sơ ứng tuyển (applicationId): {result.Error}");
+                return result.ErrorCode != null
+                    ? MapFailure(result.ErrorCode, result.Error)
+                    : BadRequest($"Không thể tải danh sách đánh giá cho hồ sơ ứng tuyển (applicationId): {result.Error}");
             }
 
             return Ok(result.Value);

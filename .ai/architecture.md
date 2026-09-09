@@ -73,6 +73,7 @@
 - **MVP:** OpenAI API + RAG (pgvector + `text-embedding-3-small` + GPT-4o).
 - **RAG Flow:** JD + CV → chunk → embed → pgvector → retrieve khi sinh câu hỏi → GPT-4o.
 - **Ràng buộc:** abstract qua `IAIProvider` + `IEmbeddingProvider`. Swap qua `AI_PROVIDER=openai|local`.
+  > ⚠️ **ADR-062 (phần 3) đã thay thế phần này:** cờ `AI:Provider` bị bỏ hẳn, `OpenAIProvider` bị xoá — `IAIProvider` nay luôn là `RagServiceProvider`.
 
 ### ADR-005: STT, TTS & Avatar
 - **Quyết định:** **Deepgram Nova-3** (STT streaming) + **ElevenLabs Flash v2.5** (TTS, ~75ms realtime) + **HeyGen Streaming Avatar** với Hybrid Idle Strategy.
@@ -520,7 +521,7 @@ Chỉ phiên `real`. Nạp tài liệu `must_ask` của **cả** scope `job_post
 ### ADR-039: RAG tách thành microservice Python riêng (đã MỞ RỘNG ranh giới)
 - **Quyết định:** Pipeline RAG tách khỏi backend .NET thành **service Python độc lập** (FastAPI + LangChain + LangGraph), ở thư mục `rag-service/`. Backend .NET gọi qua HTTP/REST nội bộ.
 - **Lý do:** Hệ sinh thái RAG/embedding/LLM-tooling phong phú hơn ở Python; tách service để scale & deploy độc lập, không nặng backend chính.
-- **Ranh giới (MỞ RỘNG 2026-06-26):** Python sở hữu **TOÀN BỘ** pipeline: chunk + embed + **hybrid retrieve** + **sinh câu hỏi/đánh giá/đánh giá ngôn ngữ** (không chỉ retrieval/embedding như bản gốc). .NET chỉ orchestrate session/SignalR/persistence. Giữ nguyên abstraction `IAIProvider` + `IEmbeddingProvider` (ADR-004, rule #8): thêm impl `RagServiceProvider` (HTTP/SSE client → Python) + interface mới `IRagIngestionService`. `OpenAIProvider` giữ làm fallback in-process qua cờ `AI:Provider` (`rag` | `openai` | `local`); khi không dùng rag, ingestion chạy in-process qua `LocalRagIngestionService`. Gemini (CV-JD/JD-extract, ADR-030/042) **không đổi**, vẫn ở .NET.
+- **Ranh giới (MỞ RỘNG 2026-06-26):** Python sở hữu **TOÀN BỘ** pipeline: chunk + embed + **hybrid retrieve** + **sinh câu hỏi/đánh giá/đánh giá ngôn ngữ** (không chỉ retrieval/embedding như bản gốc). .NET chỉ orchestrate session/SignalR/persistence. Giữ nguyên abstraction `IAIProvider` + `IEmbeddingProvider` (ADR-004, rule #8): thêm impl `RagServiceProvider` (HTTP/SSE client → Python) + interface mới `IRagIngestionService`. ~~`OpenAIProvider` giữ làm fallback in-process qua cờ `AI:Provider`; khi không dùng rag, ingestion chạy in-process qua `LocalRagIngestionService`.~~ → **ADR-062 (phần 3) đã gỡ hẳn nhánh này** vì nó không truy hồi gì mà lại tự nhận là RAG. Gemini (CV-JD/JD-extract, ADR-030/042) **không đổi**, vẫn ở .NET.
 - **Lộ trình (3 giai đoạn, cùng 1 LangGraph StateGraph):**
   - **Giai đoạn 1 (đã làm):** Hybrid RAG = dense (pgvector cosine `<=>`) + sparse (Postgres full-text `ts_rank`) → hợp nhất Reciprocal Rank Fusion + weighting theo scope (ADR-025).
   - **Giai đoạn 2:** CRAG — chèn node `grade_documents` + corrective (rewrite query / re-retrieve).
@@ -997,3 +998,512 @@ Chỉ phiên `real`. Nạp tài liệu `must_ask` của **cả** scope `job_post
 **Kiểm chứng.** 47 test .NET mới + 6 test Python mới → **885/885** và **24/24** pass; build `ARI.API` + build cả hai site FE + `npm run check:i18n` pass.
 
 **Chấp nhận đánh đổi.** (a) Rubric khai bằng Excel chứ không phải form trên web — thêm một vòng tải file, đổi lại HR sửa/lưu trữ/gửi duyệt bộ tiêu chí bằng công cụ họ vốn dùng, và không phải dựng thêm một màn CRUD nữa. (b) Ngưỡng `InterviewPassScore` đặt ở **cấp tin**, không phải cấp vòng — vòng sau khó hơn vòng trước là chuyện thường, nhưng chưa có nhu cầu thật nên chưa tách; tách sau chỉ là thêm cột ở `InterviewRoundConfig`. (c) Điểm lặp nhãn + trọng số trong từng bản đánh giá (vài trăm byte/bản) — cái giá của việc báo cáo cũ tự giải thích được.
+---
+
+### ADR-061: Vai trò Hiring Manager theo đội tuyển dụng của từng tin; ba cổng quyết định; thư gửi ứng viên sửa được trước khi gửi; phễu khép kín tới `hired`
+
+- **Ngày:** 2026-08-31
+- **Trạng thái:** Đã triển khai
+- **Bối cảnh:** Đối chiếu quy trình ARISP với ATS thật (Greenhouse / Lever / Workable) lộ ra bốn lỗ, không phải một:
+
+  | Lỗ | Hiện trạng trước |
+  |---|---|
+  | Không có tiếng nói của phòng ban | Mọi quyết định nằm ở Recruiter (chủ tin) và HR Admin. **Người thực sự cần người — trưởng bộ phận — không tồn tại trong hệ thống** |
+  | Người chốt verdict sai vai | `SubmitHrReviewAsync` để HR Leader xác nhận/ghi đè kết quả AI. Trong ATS thật, HR sở hữu *quy trình và tuân thủ*; **quyết định tuyển hay không là của Hiring Manager** |
+  | Phễu không có đoạn kết | `Application.Status` dừng ở `pass`. Thư chúc mừng nói thẳng *"HR sẽ liên hệ để gửi Offer Letter"* — quy trình **thoát khỏi hệ thống** đúng ở bước quan trọng nhất |
+  | Thư gửi ứng viên là hộp đen | Mọi thư đều là HTML nội suy cứng tại call site, bấm nút là bay đi. Không xem trước được, không sửa được, không tra lại được đã gửi gì cho ai |
+
+  **Kết quả nhắm tới:** AI thay người *phỏng vấn*, không thay người *quyết định*. Phễu chạy trọn: soạn tin → HM ký duyệt JD → HR duyệt đăng → ứng tuyển → Recruiter sàng lọc → **HM duyệt shortlist** → AI phỏng vấn → **HM chốt verdict** → Offer → **HM duyệt offer** → ứng viên nhận/từ chối → `hired`.
+
+- **Quyết định.**
+
+  **1. Phạm vi theo `job_hiring_team_members`, KHÔNG theo phòng ban.** `users.department` là chuỗi text tự do do Gemini điền, chưa từng dùng trong query hay authz nào. Toàn bộ mô hình quyền đang đứng trên một trục `JobPosting.CreatedByUserId` — thêm đội tuyển dụng là đi cùng chiều đó, thêm phòng ban là mở **trục thứ hai** phải giữ đồng bộ mãi mãi. Greenhouse cũng gán Hiring Manager **theo từng tin** (tab Job Setup), không theo phòng ban. Department chỉ còn một công dụng: **xếp gợi ý lên đầu** lúc chọn người gán.
+
+  **2. `JobAccess` là helper tầng Application, KHÔNG phải `IAuthorizationHandler`.** Id của tin đến từ ~5 hình dạng route khác nhau (`{id}`, `{jobId}`, suy từ `applicationId`, từ `slotId`, từ `evaluationId`); một policy handler sẽ phải đoán route value cho từng dạng. Codebase còn có **0 custom authorization handler** — giữ nguyên phong cách để mọi cổng quyền nằm cùng một nơi và test được bằng bộ giả `IUnitOfWork` sẵn có.
+
+     Trả về **mức** chứ không phải bool, vì đọc và ghi không cùng ngưỡng: `None < TeamMember < Owner < Admin`. Sửa/xoá/đổi trạng thái tin cần `>= Owner`; xem hồ sơ, lịch, báo cáo AI của tin chỉ cần `>= TeamMember`. Trước đó vị từ này bị chép thành **hai bản `CanManageAsync` giống hệt nhau** (Scheduling + OnlineTest) cộng 7 bản nội tuyến — thêm một mức quyền mới đồng nghĩa sửa 9 chỗ và chắc chắn sót.
+
+  **3. Duyệt của HM là CỘT, không phải trạng thái mới.** `Application.HmDecision` (`pending|approved|rejected|bypassed`) tách *vị trí trong phễu* (`Status`) khỏi *cổng đã mở chưa*. Mã hoá bằng status thì "HM đã duyệt" buộc phải đi lùi về `cv_submitted` — mà `UpdateApplicationStatusAsync` từ chối — và câu hỏi "ứng viên này đang ở đâu" thành mơ hồ. `AccountRequest` (ADR-041), template duyệt của chính repo, cũng model bằng cột.
+
+  **4. Cờ bật/tắt cổng là SUY RA, không phải cột.** `RequiresHmApproval(job) := ∃ dòng đội tuyển dụng sống có role_on_job='hiring_manager'`. Một cột bool có thể `true` mà không ai được gán — khi đó phễu chặn ở **một người không tồn tại** và lối thoát duy nhất là quyền vượt cổng. Suy ra thì mệnh đề *"có cổng ⇒ có người mở được"* đúng về mặt cấu trúc. **Tin chưa gán HM giữ nguyên hành vi y hệt trước ADR này** — đó là đường mặc định, không phải ngoại lệ.
+
+  **5. DÙNG LẠI `HrReview` cho verdict của HM, không tạo entity thứ hai.** Sự **tồn tại** của một dòng `HrReview` là state chịu tải ở 4 nơi: khoá chấm lại, badge "chờ duyệt" trên chuông, status trong danh sách đánh giá, và cổng `ShareEvaluation` cho ứng viên. Khi HM **thay** HR làm người chốt, cả 4 hành vi đó là thứ ta muốn giữ nguyên — nên chỉ đổi *ai được ghi* và thêm cột ghi lại *ai đã chốt*. Tạo entity thứ hai mới là thứ gây 4 regression im lặng.
+
+     `ReviewerRole` là **ảnh chụp** (`hiring_manager|hr_admin|super_admin`) chứ không join ngược `users.role`: vai trò của một người đổi được về sau, còn câu hỏi "ai đã chốt tuyển người này, với tư cách gì" phải trả lời được mãi mãi.
+
+  **6. Cổng HM là cổng MỀM, ở cả ba chỗ.** HM nghỉ phép không được làm cả phễu đứng. Quản trị viên vượt được, nhưng **lý do bắt buộc** (≥ 10 ký tự), vào `AuditLog`, và **luôn báo cho chính HM bị vượt** — bypass im lặng mới là thất bại quản trị. `bypassed` hiện thành nhãn **riêng**, không gộp vào "đã duyệt": vượt cổng mà nhìn giống duyệt thật thì không ai biết cổng đã bị vượt.
+
+  **7. Thư sửa được = tham số `emailOverride` truyền vào CHÍNH command sẵn có**, không phải entity draft hai pha. Nếu hành động miền chạy trước rồi mới mở trình soạn, người dùng bỏ dở là **ứng viên bị xếp lịch mà không thư nào rời hệ thống** — đúng lỗi ADR-059 sinh ra để chữa. Soạn trước, gửi kèm hành động, giữ nguyên tính nguyên tử: **bấm Huỷ = không có gì xảy ra cả**, không chốt chỗ, không đổi trạng thái, không thư nào gửi. Bỏ trống `emailOverride` → hành vi y hệt trước đây, nên mọi luồng và test cũ vẫn chạy.
+
+     Nội dung được **resolve hết ở bước xem trước**, không để placeholder trong chuỗi người dùng sửa. Còn `{{candidateName}}` sau khi người dùng đã gõ tay nghĩa là phải chạy templating trên chuỗi do người dùng nhập — mở ra cả một lớp lỗi (placeholder gõ sai, injection). What-you-see-is-what-is-sent.
+
+     Luật phân loại: **có người bấm nút thì có trình soạn; máy tự gửi thì không.** Thư xác nhận nộp hồ sơ, nhắc lịch 24h/3h, quét no-show, xác minh email đều không có ai đứng sau nên không có gì để soạn.
+
+     **Vệ sinh HTML ở SERVER** (Ganss.Xss `HtmlSanitizer`), ngay trước `IEmailService` — không phải ở FE. Tiêu đề dùng **bộ lọc riêng** (`KeepChildNodes = true`, không cho thẻ nào) + gộp khoảng trắng: bộ lọc thân thư *giữ lại* thẻ định dạng nên tiêu đề đi qua nó sẽ lọt `<b>` ra dòng subject.
+
+  **8. Một application chỉ có MỘT thư mời sống** — unique index có filter ở tầng DB, không phải câu `if`. *"Hai offer, hai mức lương, gửi cả hai"* là hỏng nặng nhất tính năng này gây ra được. Hồ sơ chuyển sang `offer` lúc **GỬI**, không phải lúc tạo nháp — bản nháp không phải lời hứa.
+
+  **9. Portal dùng LỚP DTO RIÊNG `CandidateOfferDto`,** không kế thừa `OfferDto` rồi xoá trường. Quên xoá một lần là ghi chú đàm phán lương nội bộ rơi thẳng vào Portal. Ở lớp đó trường `Notes` **không tồn tại để mà quên**.
+
+- **Lỗ phân quyền đã vá (không nằm trong yêu cầu ban đầu, phát hiện khi rà).**
+  - **`GET /api/evaluations` không nhận cả `userId` lẫn `role`** — bất kỳ nhân sự nào cũng đọc được **mọi** báo cáo AI của công ty. Lỗ to nhất.
+  - **`POST /interview/review/confirm` lấy danh tính người duyệt từ header `X-User-Id` do CLIENT gửi, fallback cứng GUID `2222…`.** Bất kỳ ai qua được policy đều gán được quyết định tuyển cho người khác; request không kèm header thì gán cho một **user ma**. Càng nặng sau điểm 5 vì `ReviewedByUserId` nay là dấu vết ai đã chốt tuyển.
+  - **`?mine=true` do client tự khai** ở `GET /jobs/admin` và `GET /applications` — bỏ tham số đi là thấy dữ liệu cả công ty. Nay `?mine` hạ cấp thành **bộ lọc giao diện**, phạm vi thật luôn giao với `ScopedJobIdsAsync`.
+  - `GET /api/applications/{id}` và `PATCH .../status` **không kiểm tra gì**; `/api/dashboard/hr` rò KPI toàn công ty + tên ứng viên gần đây; `GET /api/interview/sessions` rò mọi phiên kèm `RecordingUrl`; `StaffProfileController` chỉ có `[Authorize]` trống.
+  - **`GetRecruitersQuery` so `u.Role == AppRoles.Recruiter` ("Recruiter") với DB lowercase NGAY TRONG expression tree** → SQL `=` phân biệt hoa thường trên Postgres → màn "Phân công & tải tuyển dụng" **luôn trả rỗng**. C# `==` ở test lại khớp cả hai phía nên test xanh trong khi production hỏng. Sinh ra `RoleNames` (giá trị DB) tách bạch với `AppRoles` (giá trị claim JWT) + `RoleNames.ToClaim()` là bảng ánh xạ duy nhất.
+
+- **Hệ quả / cạm bẫy đã gặp.**
+  - **Bẫy trigger ADR-057 lặp lại 3 lần.** Bảng mới (`job_hiring_team_members`, `email_logs`, `offers`) không tự có trigger — EF không bao giờ sinh `SELECT arisp_attach_change_triggers()`. Dựng **test chốt chặn**: mọi entity trong Domain phải **hoặc** được map trong `DbChangeRouter`, **hoặc** nằm trong danh sách `IntentionallyUnrouted` tường minh. Test này bắt được `EmailLog` rồi `Offer` ngay lúc tạo entity — đúng việc của nó, ba lần liên tiếp. Trigger: 30 → 33.
+  - **Đội tuyển dụng chưa hề nhận sự kiện realtime nào.** `DbChangeLookup` chỉ có `JobOwnerUserId`, nên kênh realtime **hẹp hơn quyền đọc thật**: HM đọc được hồ sơ/báo cáo/thư mời qua API nhưng màn của họ đứng im, phải F5 tay — đúng thứ ADR-057 sinh ra để xoá bỏ. Thêm `HiringTeamUserIds`, **không** `IgnoreQueryFilters` (gỡ khỏi đội là ngừng nhận sự kiện ngay, để realtime không rộng hơn API).
+  - **`ApplicationStatuses`: "hồ sơ coi như đã đóng" bị chép 7 bản với 7 thành phần khác nhau.** Nguy hiểm nhất là `FailNoShowsAsync` chỉ bỏ qua `not_pass|pass|withdrawn` — khi có `hired`, **ứng viên đã tuyển còn booking cũ sẽ bị quét thành `not_pass`**. Sửa TRƯỚC khi `hired` tồn tại.
+  - **`"applied"`/`"new"` là trạng thái ma** — hệ thống không bao giờ ghi, nên ô "Hồ sơ chưa sàng" luôn bằng 0. `ReassignJob` đếm `"rejected"` (cũng không phải trạng thái hồ sơ) nên coi `cv_rejected`/`withdrawn` là đang mở; `DeleteJob`/`archived` bị chặn bởi chính các hồ sơ đó. `cv_rejected` còn là **ngõ cụt** trong bảng chuyển trạng thái: `:1050` ghi giá trị này nhưng nó không phải key → mọi `PATCH /status` sau đó trả *"Transition mapping is not configured"*, hồ sơ chết cứng.
+  - **`_jobUi.appStatusLabel` là nơi DUY NHẤT dịch trạng thái hồ sơ sang nhãn** — thiếu một khoá là mọi màn cùng lúc hiện chuỗi thô (`hm_review`, `offer_declined`) cho người dùng đọc. Bản đồ trạng thái ở hai màn Ứng viên (HR + Recruiter) **giống nhau từng byte**; vá một bên thì bên kia lặng lẽ rơi vào nhóm `other`, tức hồ sơ **biến mất khỏi mọi bộ lọc** → tách ra `pages/_candidateStatus.ts`.
+  - **`TeamPage` nhập CSV biến MỌI vai không phải `hr_admin` thành `recruiter`** — nhập một file có cột `hiring_manager` thì cả danh sách được xin cấp sai vai, im lặng, không lỗi nào.
+  - **Liên kết chết sẵn có:** màn Phỏng vấn của HR sinh link `/hr/evaluations?evaluationId=` trong khi trang chỉ đọc `?id=` → bấm vào báo cáo mở ra danh sách trống. Nay trang nhận cả hai tên tham số và hai khu vực sinh link cùng quy ước.
+  - **Màn đánh giá của Recruiter bày ra nút "Xác nhận"/"Ghi đè"** mà policy phía server chưa bao giờ cho họ qua — ba nút chết trình bày như thao tác hợp lệ. Nay là banner chỉ đọc.
+  - **`StatsCardProps` không có `icon`/`href`** — prop truyền vào bị bỏ qua âm thầm (freshness check của TS không áp cho biến trung gian). Ô "chờ chốt kết quả" trên tổng quan HM còn ghi **cứng số 0**: một con số bịa trên bảng điều khiển tệ hơn không có ô nào, vì người dùng tin vào nó rồi bỏ sót việc.
+  - Thư chào mừng tài khoản staff gán nhãn **"Recruiter" cho tài khoản Hiring Manager**; danh sách tin hiện thẳng chuỗi thô `hiring_manager` ra màn hình → gom về `RoleNames.DisplayLabel`.
+  - `HtmlSanitizer` 8.1.870 dính advisory **GHSA-j92c-7v7g-gj3f** → nâng 9.2.1039.
+
+- **Thay đổi kèm theo.**
+  - Bảng mới: `job_hiring_team_members` (unique `(job,user)` không lọc để *hồi sinh* dòng đã gỡ thay vì insert trùng; unique `(job)` lọc `is_primary AND deleted_at IS NULL` chặn "hai HM cùng tưởng mình giữ cổng"), `email_logs`, `offers` (`ux_offers_application_live`, `idx_offers_expiry_sweep`).
+  - Cột mới: `applications.hm_decision|hm_decision_by_user_id|hm_decided_at|hm_decision_note`; `job_postings.hm_sign_off_status|_by_user_id|_at|_reason`; `hr_reviews.reviewer_role|is_hr_fallback|fallback_reason|suggested_level|suggested_salary_min|_max|_currency|strengths|concerns`. Migration `NormalizeUserRolesAndAddCheck` hạ chữ thường `users.role` **trước** khi thêm CHECK, vai lạ bị `is_active=false` và giữ giá trị cũ trong `lock_reason`.
+  - Trạng thái hồ sơ mới: `hm_review`, `offer`, `hired`, `offer_declined`; `cv_rejected → cv_submitted` vá ngõ cụt.
+  - Policy `HiringDecision` (SA + HrAdmin + HiringManager); `InternalStaff` += HiringManager. `HrManagement` **không đổi** — HM không tạo tài khoản, không duyệt tin lên `active`, không archive.
+  - Hết hạn thư mời **mở rộng `InterviewScheduleFollowUpHostedService`** thay vì dựng service thứ hai: cả hai việc đều là "chạy theo một hạn chót trên một văn bản đã gửi ứng viên". Tên class lệch về lịch — ghi lại ở đây, không đổi tên.
+  - FE: khu vực `/hm/*` (`HmLayout` là wrapper mỏng trên `WorkspaceLayout`, **không** copy `HrLayout` 400 dòng); `components/hiring/*` + `components/offers/*` dùng chung cho cả ba khu vực; `EmailComposerModal` (thanh công cụ tối giản trên `contentEditable`, **không** kéo WYSIWYG nặng vào — thư mẫu đã điền sẵn 95%, và vẫn phải sanitize server-side y như vậy); `OfferPage` phía ứng viên.
+
+- **Kiểm chứng.** 1045/1045 test .NET (47 Domain + 998 Application, +160 so với baseline 885); build `ARI.API`; build cả hai site FE; `npm run check:i18n` đạt. 5 migration áp thật lên Postgres tự host, `ux_offers_application_live` thử tay trên DB thật: thư thứ hai bị chặn, thu hồi thư cũ thì tạo lại được.
+
+- **Chấp nhận đánh đổi.**
+  - **`/hm/jobs/:id` và `/hm/candidates/:id` là trang RIÊNG**, không phải `hr/*` gắn thêm `variant="hm"` như dự tính ban đầu. Trang chi tiết tin của HR đã 1567 dòng và gần như toàn bộ là thao tác vận hành HM không có quyền làm (sửa tin, đổi trạng thái, cấu hình ca, cấp mã Kiosk, playbook); luồn thêm một vai vào đó nghĩa là **mỗi lần sửa trang phải nghĩ cho ba vai cùng lúc**. Phần thật sự dùng chung nằm ở `components/hiring/*` — đúng một bản.
+  - **Gán HM lúc tạo tin là bước thứ hai**, không nguyên tử: đội tuyển dụng chỉ gán được sau khi tin có id. Gán hỏng thì tin **vẫn được tạo** (huỷ tin vừa tạo chỉ vì gán người thất bại là mất trắng công nhập cả biểu mẫu) + hiện cảnh báo dẫn về panel trên trang chi tiết.
+  - **3/6 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`, `offer_sent`). Ba mẫu còn lại — mời vòng kế, cấp mã phỏng vấn, kết quả sau khi chốt verdict — hạ tầng đã đủ, mỗi cái là "viết một builder + thêm một `case` + thêm `emailOverride` vào command".
+  - **Ngưỡng bypass 10 ký tự** là quy ước, không phải phép đo chất lượng lý do. Nó chỉ chặn được ô trống và `"ok"`.
+  - Vẫn **giữ song song** đường push thủ công cũ của ADR-057, chưa gỡ.
+---
+
+### ADR-062: "Kiosk" là tên gọi nội bộ, không phải lời hứa khoá cấp hệ điều hành — mô hình đe doạ của buổi phỏng vấn thật và lý do chọn nền web
+
+- **Ngày:** 2026-08-31
+- **Trạng thái:** Đã chốt — **thay đổi tài liệu, không đổi một dòng code nào**
+- **Bối cảnh:** Từ "Kiosk" được dùng xuyên suốt ADR-015/016/052/054 và ~60 file mã nguồn, nhưng **chưa từng được định nghĩa ở đâu**. Trong khi đó `.ai/context.md` và `CLAUDE.md` viết thẳng *"Giao diện khóa (Kiosk Mode) tại văn phòng"* — không kèm một giới hạn nào.
+
+  Vấn đề: **"kiosk mode" theo nghĩa chặt là hệ điều hành hoặc trình duyệt khoá cứng thiết bị vào một ứng dụng** (Windows Assigned Access, `chrome --kiosk`, iOS Guided Access). ARISP không làm điều đó. Thứ ARISP làm là **trình duyệt toàn màn hình có ràng buộc + ghi nhật ký mọi lần rời màn hình**. Chính mã nguồn đã thừa nhận điều này ngay trong `useKioskLockdown.ts`:
+
+  > *"trang web KHÔNG chặn được Alt+Tab, phím Windows/Command, Ctrl+Alt+Del hay việc tắt máy. Chỉ hệ điều hành/trình duyệt ở chế độ kiosk thật mới khoá cứng được."*
+
+  Từ "kiosk" còn mang hàm ý **tự phục vụ, không người trông, khách vãng lai** — quầy check-in sân bay, máy bán vé. Thực tế của ARISP ngược lại: ứng viên **có hẹn giờ**, được **nhân viên cấp mã 6 ký tự**, ngồi **máy được chỉ định**, **có người ở đó**.
+
+  Hai khoảng cách này — giữa *tên gọi* và *thứ đã làm*, giữa *thứ đã làm* và *thứ được ghi trong tài liệu* — là chỗ dễ bị chất vấn nhất của cả hệ thống, và nó hoàn toàn là vấn đề câu chữ chứ không phải vấn đề kỹ thuật.
+
+- **Quyết định.**
+
+  **1. Giữ nguyên tên "Kiosk" trong mã nguồn, thu hẹp nghĩa của nó bằng một định nghĩa dứt khoát.** Tên trong mã được phép là tên rút gọn — miễn là tồn tại **đúng một chỗ** nói rõ nó bao gồm gì và không bao gồm gì. Chỗ đó là `.ai/glossary.md`, nay có mục **Kiosk** ghi thẳng: *"KHÔNG phải kiosk cấp hệ điều hành"*, kèm danh sách những thứ nó không bảo đảm.
+
+  **2. Không đổi tên bất kỳ định danh nào.** Claim JWT `Kiosk_session` đang lưu hành với TTL 3h và được so khớp ở policy `InterviewParticipant` lẫn `SessionHub`; từ này còn nằm ở route `/kiosk`, hook `useKioskLockdown`, namespace i18n `modules/kiosk` và 4 ADR đã viết. Đổi tên là **rủi ro thật đổi lấy con số không về mặt chức năng** — không sửa được một khiếm khuyết nào, chỉ để câu chữ đẹp hơn.
+
+  **3. Phát biểu mô hình đe doạ thành lập luận có chủ đích**, thay vì để nó nằm rải rác trong một dòng chú thích mã nguồn.
+
+- **Năm giới hạn thật của nền web — nói thẳng, không giảm nhẹ.**
+
+  | # | Giới hạn | Ghi chú |
+  |---|---|---|
+  | (a) | Không khoá được **Alt+Tab / phím Windows / màn hình phụ** | Trình duyệt không có quyền này. Đóng được bằng cấu hình máy trạm |
+  | (b) | **Không thấy được thiết bị thứ hai** — điện thoại có AI đặt cạnh bàn phím | Vector gian lận **chính** hiện nay. Không phần mềm nào chạy trên máy phỏng vấn thấy được |
+  | (c) | Quyền camera/mic **thu hồi được giữa chừng** | Phát hiện được, không ngăn được |
+  | (d) | **Camera ảo** (OBS) đẩy video quay sẵn vào được | Cần đối chiếu danh tính lúc nhận mã mới chặn được |
+  | (e) | Thoát toàn màn hình **phát hiện được nhưng không ngăn được** | Đây chính là lý do ADR-054 chọn ghi nhật ký thay vì chặn |
+
+- **Vì sao vẫn chọn nền web — và vì sao đó là lựa chọn đúng, không phải sự nhân nhượng.**
+
+  1. **Giám sát thật là sự có mặt vật lý.** Ứng viên ở văn phòng công ty, đúng khung giờ đã đặt, tại máy được chỉ định, có nhân viên tuyển dụng ở đó. Phần mềm đóng vai **răn đe + ghi bằng chứng**, không phải người gác cổng. Trung tâm khảo thí thật vận hành đúng như vậy — phần mềm khoá màn hình ở đó cũng không ngăn được ai quyết tâm gian lận, nó chỉ nâng chi phí và để lại dấu vết.
+  2. **Giới hạn (a) đóng được bằng bước triển khai, không phải bằng đổi kiến trúc.** `chrome --kiosk` + Windows Assigned Access trên chính máy desktop đó. Đây là việc của IT, đã viết thành `docs/kiosk-workstation-setup.md`.
+  3. **App native không giải quyết được (b)** — mà (b) mới là vector chính. Chuyển sang Electron chỉ đổi lấy đúng (a), trong khi gánh thêm phân phối, cập nhật, ký số, đa nền tảng, và một quy trình cài đặt trên máy công ty. Đổi rất nhiều để được rất ít.
+  4. **Phần còn lại của hệ thống bắt buộc phải là web**: job board công khai, portal ứng viên, workspace nhân sự, phỏng vấn thử tại nhà. Dựng thêm một ứng dụng native chỉ để phục vụ **một màn hình** là chia đôi codebase.
+
+  Kết luận: **web không sai; cái sai là hứa "Kiosk Mode" mà không kèm ranh giới.** ADR này sửa lời hứa, không sửa kiến trúc.
+
+- **Đối chiếu ngành.** Thứ ARISP làm tương ứng với khái niệm **lockdown browser / secure browser** trong ngành khảo thí — Respondus LockDown Browser và Safe Exam Browser (SEB) là hai bản hiện thực tham chiếu được dùng rộng rãi ở đại học. Nêu ra để người đọc đối chiếu được với sản phẩm có thật, và để thấy rằng ngay cả các sản phẩm chuyên dụng đó cũng **không giải quyết được (b)**.
+
+- **Hệ quả.**
+  - `.ai/glossary.md` thêm 7 mục: **Kiosk · Chế độ khoá màn hình · Cheat Signal · CheatScore · Interview Code · Magic Link · Pre-provisioning**. Trước đó không mục nào tồn tại, dù cả 4 ADR đều dựa vào chúng.
+  - Sửa một mục **mâu thuẫn thẳng với ADR-051**: glossary vẫn ghi buổi thử *"HR có thể xem kết quả"*, trong khi ADR-051 đã **ẩn hoàn toàn buổi thử khỏi HR/Recruiter**. Mâu thuẫn trong từ điển nguy hiểm hơn thiếu định nghĩa, vì nó được đọc như sự thật.
+  - `.ai/context.md` và `CLAUDE.md` bỏ cụm *"Giao diện khóa (Kiosk Mode)"*, thay bằng mô tả đúng kèm câu giới hạn và con trỏ tới ADR này.
+  - **Giao diện không đổi một chữ nào** — chuỗi hiển thị với ứng viên vốn đã chính xác (*"Chế độ khoá · Văn phòng"*, *"quầy lễ tân"*, *"Nhập mã phỏng vấn"*), không chỗ nào nói "Kiosk Mode" với người dùng cuối. Khoảng cách nằm hoàn toàn ở tài liệu nội bộ.
+
+- **Kiểm chứng.** Không đụng mã nguồn nên không có test nào phải chạy lại. Kiểm bằng: `grep "Kiosk Mode"` trên `.ai/`, `CLAUDE.md`, `README.md` chỉ còn khớp ở chỗ đang **phủ định** khái niệm đó; mọi thuật ngữ mà con trỏ Glossary trong `CLAUDE.md` liệt kê đều tra được trong `.ai/glossary.md` (24/24); `git status` chỉ liệt kê file `.md`.
+
+- **Phần 2 — RAG service là đường DUY NHẤT của luồng phỏng vấn (bổ sung 2026-08-31).**
+
+  Nguyên tắc người dùng đặt ra: *chỗ nào có RAG service thì phải thật sự dùng; nếu nó thể hiện trong
+  luồng mà code không chạy thì đó là LỖI; không chấp nhận .NET làm thay, cũng không chấp nhận LLM trả
+  toàn bộ kết quả một cách mơ hồ.* Rà lại theo nguyên tắc đó, tìm ra **bốn vi phạm**:
+
+  **(F1) .NET tự truy hồi, rồi kết quả bị vứt.** `GenerateAndSendNextQuestionAsync` đọc **toàn bộ**
+  chunk cv/jd/playbook bằng câu SQL lọc theo id — không vector, không xếp hạng, **không một
+  `Take()` nào**. Hậu quả xếp theo mức tệ dần:
+  1. Phần lớn **bị vứt**: `QuestionContext` phía Python không có trường `rag_context`, nên đống chunk
+     đó rơi mất lúc deserialize. Đọc DB xong ném đi.
+  2. Phần *sống sót* còn tệ hơn: `PlaybookStyleGuides` thực chất là **toàn bộ playbook đủ điều kiện**,
+     gửi nguyên khối không xếp hạng. Playbook vào prompt **hai lần** — một lần nguyên khối, một lần đã
+     truy hồi — khiến bước truy hồi thành **trang trí**.
+  3. `ProhibitedTopics` được tính ở **cả hai phía** rồi hợp lại, mà bản .NET tính trên tập rộng hơn.
+
+  → Gỡ sạch 2.679 ký tự. Truy hồi và phân loại `document_type` nay hoàn toàn thuộc Python; phạm vi
+  playbook theo tin + vòng do `_build_filters` bảo đảm (buổi thử không nạp playbook — ADR-015/038).
+
+  **(F2) Đường `AI:Provider=openai` tự nhận là RAG nhưng không truy hồi.** Nó là **context stuffing**:
+  không chọn đoạn liên quan, `document_type` không được tôn trọng (`compliance` nằm cùng rổ với tài
+  liệu thường — tức mời model hỏi đúng câu bị cấm), và prompt phình **tuyến tính** theo kích thước
+  playbook cho tới lúc tràn context window. Nguy hiểm nhất là nó *tự nhận là RAG*: biến tên
+  `ragContext`, có sẵn `OpenAIProvider.RetrieveAsync` — mà luồng phỏng vấn **chưa bao giờ gọi hàm đó**.
+
+  → Gỡ 14.400 ký tự cài đặt giả-RAG. Bốn phương thức luồng phỏng vấn (`StreamQuestionAsync`,
+  `AnalyzeAnswerAsync`, `GenerateEvaluationAsync`, `AssessLanguageProficiencyAsync`) nay **ném
+  `NotSupportedException`** kèm câu chỉ rõ phải đặt `AI:Provider=rag`, cộng **cảnh báo to lúc khởi
+  động**. Hỏng thì hỏng TO VÀ RÕ, thay vì xuống cấp im lặng. `EmbedAsync`, `DetectLanguageRequirementAsync`
+  và `CompleteJsonAsync` (fallback JSON cho Gemini) giữ nguyên — chúng không phụ thuộc truy hồi.
+
+  **(F3) LLM vẫn trả `verdict` + `score` tổng, và khi chưa khai rubric thì .NET dùng luôn.**
+  ADR-060 nói điểm do backend cộng, nhưng chỉ áp dụng khi `rubricCriteria.Count > 0`; thiếu rubric thì
+  `overallScore = evalReport.Score` và `verdict = evalReport.Verdict` — **hai con số model tự nghĩ ra
+  lại quyết định đậu/trượt của người thật**.
+
+  → **Bắt buộc có rubric mới chấm.** Thiếu rubric → ghi log lỗi và **không sinh báo cáo**, dừng
+  **trước** khi gọi model (không tiêu token cho bản đánh giá chắc chắn bị bỏ). Có rubric mà model
+  không chấm nổi tiêu chí nào → cũng không sinh báo cáo: cho 0 là **đánh trượt oan vì lỗi model**,
+  lấy điểm tổng của model là quay lại đúng thứ vừa loại bỏ. Không có nhánh nào lấy số của model nữa.
+  Phiên **không hỏng**: transcript, câu hỏi, câu trả lời, bản ghi hình đã lưu xong; chấm lại bằng
+  `/api/dev/regrade-session` sau khi khai rubric.
+
+  **(F4) `expected_answer` được nạp, được truy hồi, được phân loại — rồi không dùng để chấm.**
+  Ví dụ rõ nhất của "thể hiện trong luồng nhưng code không hoạt động". Chú thích trong chính prompt
+  Python ghi *"`expected_answer` dùng để chấm chứ không đọc cho ứng viên nghe (ADR-025)"*, nhưng nó chỉ
+  được truyền vào prompt **sinh câu hỏi**; `evaluate_prompt` **không nhận nó**, và `SessionContext`
+  thậm chí **không có `job_posting_id`/`round_number`** nên `/evaluate` *không thể* truy hồi dù muốn.
+
+  → Thêm `JobPostingId`/`RoundNumber` vào `SessionContext` cả hai phía; `generate_evaluation` truy hồi
+  `expected_answer` **theo chính nội dung hỏi–đáp của buổi phỏng vấn** (chỉ lấy đáp án liên quan tới
+  thứ đã thực sự được hỏi, không nhồi cả ngân hàng), rồi đưa vào prompt chấm kèm chỉ dẫn *chấm theo
+  đáp án của công ty, không theo ý model, và chấp nhận cách diễn đạt khác*.
+
+  **Kiểm chứng phần 2.** 1067/1067 test .NET (14 test cũ hỏng đúng như phải hỏng: chúng khẳng định
+  hành vi vừa bị loại bỏ hoặc gieo phiên không rubric — đã viết lại, kể cả `StubAiProvider` nay mặc
+  định trả điểm từng tiêu chí vì stub không có `CriterionScoresJson` giờ đại diện cho **model hỏng**
+  chứ không phải model bình thường); **29/29 test Python** (+5 test mới chốt `expected_answer` tới được
+  prompt chấm, buổi thử không nạp playbook, thiếu phạm vi thì bỏ qua).
+
+- **Phần 3 — Gỡ HẲN nhánh `openai`, bỏ luôn cờ `AI:Provider` (bổ sung 2026-09-01).**
+  **Thay thế phần "fallback in-process" của ADR-004 và ADR-039.**
+
+  Phần 2 để `OpenAIProvider` lại với bốn phương thức phỏng vấn ném `NotSupportedException` — nghĩa là
+  một nhánh **nửa vời**: còn tồn tại, còn cấu hình được, nhưng không làm nổi việc chính. Nay gỡ hẳn.
+
+  **Gỡ những gì:** `OpenAIProvider.cs` (210 dòng) và `LocalRagIngestionService.cs` (89 dòng) — cả hai
+  xoá khỏi repo; section `AI` khỏi `appsettings.json`; biến `AI_PROVIDER` khỏi `launchSettings.json`.
+  DI không còn nhánh rẽ: `IAIProvider` / `IEmbeddingProvider` / `IRagIngestionService` **luôn** là
+  `RagServiceProvider`.
+
+  **Vì sao bỏ luôn CỜ chứ không chỉ bỏ nhánh:** còn cờ là còn cấu hình sai được, mà cấu hình sai ở
+  đây hỏng **im lặng** — đó chính là toàn bộ lý do ADR này tồn tại. Không còn cờ thì không còn gì để
+  đặt sai.
+
+  **Rà trước khi xoá — cái gì thật sự còn dùng:**
+
+  | Phương thức | Ai gọi | Sau khi xoá |
+  |---|---|---|
+  | `CompleteJsonAsync` | `GeminiProvider` (dự phòng khi Gemini lỗi) | Đi qua `IAIProvider` → rag-service **`/complete-json`** (endpoint có sẵn) ✅ |
+  | `EmbedAsync` | chỉ `LocalRagIngestionService` | Bị xoá cùng ✅ |
+  | `RetrieveAsync` | **không ai** | — |
+  | `DetectLanguageRequirementAsync` | **không ai** | — |
+
+  Không test nào tham chiếu hai lớp bị xoá; không chỗ nào trong .NET đọc `AI:OpenAI:ApiKey` ngoài
+  chính `OpenAIProvider` (khoá đó nay thuộc về `rag-service/.env`).
+
+  **Dọn kèm:** `InterviewService` vẫn tiêm `IEmbeddingProvider` nhưng **chỉ gán vào field rồi không
+  dùng ở đâu** — sót lại từ phần 1 khi gỡ đoạn .NET tự truy hồi. Bỏ luôn; `InterviewServiceFactory`
+  ở tầng test truyền tham số theo VỊ TRÍ nên việc này làm 8 test đỏ đúng như phải đỏ, sửa một chỗ.
+
+  **Chế độ hỏng mới — chấp nhận:** Gemini hỏng **và** rag-service hỏng thì phân tích CV-JD chết hẳn
+  (trước có OpenAI in-process đỡ). Nhưng rag-service chết thì phỏng vấn đã chết rồi, nên đây không
+  phải một chế độ hỏng đáng kể thêm vào. Đổi lại: deploy quên cấu hình nay **lộ ra ngay**, không còn
+  đường nào để âm thầm chạy nửa vời.
+
+  **Không đổi:** nạp tài liệu vẫn best-effort ở `CreateJobCommand` (try/catch, chỉ ghi log) và vẫn
+  fail-hard ở `UploadPlaybookCommand` (xoá file đã lưu, trả lỗi) — đó vốn là hành vi của nhánh `rag`.
+
+  **Kiểm chứng phần 3.** 1073/1073 test .NET · 29/29 Python · build cả hai site FE.
+
+- **Chấp nhận đánh đổi.**
+  - **Tên trong mã nguồn vẫn lệch nhẹ với nghĩa chuẩn của ngành.** Người mới đọc `useKioskLockdown` vẫn có thể hiểu nhầm trong vài phút đầu — cho tới khi tra glossary. Đổi lại là không có rủi ro hồi quy nào, và không phải chạm vào một claim JWT đang lưu hành.
+  - **Giới hạn (a) chỉ được đóng khi IT thật sự cấu hình máy trạm.** Nếu bỏ qua bước đó, hệ thống vẫn chạy nhưng chỉ còn lớp răn đe của ADR-054 — điều này được ghi rõ ngay đầu `docs/kiosk-workstation-setup.md` thay vì để người triển khai tự đoán.
+  - **Không xử lý (b), (c), (d) ở phạm vi phần mềm.** Chúng cần đối chiếu danh tính lúc nhận mã và sự quan sát của con người tại chỗ — tức là quy trình vận hành, không phải mã nguồn. Ghi lại ở đây để lần sau không ai tưởng đó là thiếu sót bị bỏ quên.
+
+---
+
+### ADR-063: Phiếu yêu cầu tuyển dụng của Hiring Manager; tách cổng đề xuất khỏi cổng chốt lương
+
+- **Ngày:** 2026-09-01
+- **Trạng thái:** Đã chốt. **Thay thế một phần ADR-061** (cổng duyệt thư mời) và một phần vòng đời tin của ADR-042/047.
+
+- **Bối cảnh.** ADR-061 dựng vai trò Hiring Manager nhưng phễu vẫn **bắt đầu ở Recruiter**: ai đó tạo tin nháp, rồi mới gán HM vào đội tuyển dụng. Thực tế ngược lại — **nhu cầu tuyển phát sinh từ trưởng bộ phận**, và bộ phận nhân sự là nơi kiểm soát ngân sách lương trước khi việc được giao xuống. Hệ thống cũ không có chỗ nào ghi lại "ai xin tuyển, xin bao nhiêu người, dải lương nào, ai duyệt" — thông tin đó chỉ tồn tại ngoài hệ thống.
+
+  Đồng thời ADR-061 để **một policy `HiringDecision` duy nhất gác BỐN cổng khác nhau**: duyệt shortlist, ký duyệt JD, chốt Pass/Not Pass, và **duyệt thư mời nhận việc**. Ba cổng đầu là quyết định chuyên môn về ứng viên — đúng việc của HM. Cổng thứ tư là quyết định về **tiền**, và gộp chung khiến HM vừa đề xuất mức lương vừa tự duyệt chính đề xuất đó.
+
+- **Quyết định.**
+
+  1. **Thực thể mới `recruitment_requests`.** HM lập phiếu (vị trí, số lượng, lý do, mô tả sơ bộ, **dải lương đề xuất**) → HR Leader **duyệt kèm phân công Recruiter trong CÙNG một thao tác**, hoặc **trả lại kèm lý do** để HM sửa rồi gửi lại. `rejected` **không phải trạng thái kết thúc** — nó là một vòng của chu trình sửa–gửi lại; kết thúc thật chỉ có `approved` và `cancelled`.
+
+  2. **Mọi tin phải bắt nguồn từ một phiếu đã duyệt.** `job_postings.recruitment_request_id`, cưỡng chế ở `CreateJobCommand`. Cột **nullable** trong lược đồ nhưng **bắt buộc với tin mới**: gán một phiếu giả cho dữ liệu có trước ADR-063 là bịa ra một phiếu chưa ai từng duyệt, tệ hơn hẳn việc thừa nhận nó không có. Handler là nơi duy nhất phân biệt được tin mới với dữ liệu lịch sử.
+
+  3. **Người lập phiếu TỰ ĐỘNG thành Hiring Manager của tin.** ADR-061 quy định cổng ký duyệt JD chỉ tồn tại khi tin **có người được gán** ("cờ bật cổng suy ra từ việc có ai được gán"). Bắt Recruiter nhớ gán tay thì quên một lần là tin ra job board mà không ai ký duyệt — trong khi chính phiếu đã nói rõ ai có nhu cầu tuyển.
+
+  4. **Chữ ký duyệt JD của HM LÀ cổng đăng tin.** Bỏ bước duyệt riêng của HR Leader: HM ký duyệt → tin lên `active`. Thực hiện bằng cách **gọi lại `UpdateJobStatusCommand`** chứ không nhân bản — nhánh `→ active` ở đó còn ghi người duyệt, đóng dấu duyệt lên file JD, đặt `PublishedAt` và báo cho người tạo tin; chép tay bốn việc đó sang chỗ khác là bảo đảm sẽ lệch (cùng lý lẽ với ADR-059 khi duyệt CV gọi lại `AssignSlotCommand`). Chạy **sau** khi đã lưu chữ ký: bước đăng hỏng thì chữ ký vẫn còn, thông báo nói rõ phải sửa gì. Chủ tin (Recruiter) **cố ý vẫn không tự đăng được** — nếu không thì người viết JD tự bấm đăng là cổng ký duyệt tự bỏ qua được.
+
+  5. **Tách `HiringDecision` làm hai.** `HiringDecision` (HM + admin) giữ shortlist / ký JD / chốt verdict. **`OfferApproval` (chỉ HR Leader + Super Admin)** gác `POST /offers/{id}/decide`. HM vẫn **soạn và gửi duyệt** thư mời — họ đề xuất mức lương cụ thể — nhưng nút **chốt** là của HR Leader. Điều kiện được viết lại **tường minh trong handler**, không dựa vào policy: policy là lớp ngoài, ai đó nới một dòng là quyền cũ lặng lẽ sống lại.
+
+  6. **Không ai duyệt phiếu của CHÍNH MÌNH — kể cả Super Admin.** Đặc tả chỉ cấm HM, nhưng HM vốn đã không qua nổi policy duyệt, nên phát biểu hẹp như vậy là một câu luôn đúng và **không bảo vệ gì**. Chỗ hở thật là một HR Leader tự lập phiếu cho đội mình rồi tự bấm duyệt. Chặn theo **NGƯỜI**, không theo vai trò.
+
+  7. **Từ chối bắt buộc kèm lý do ≥10 ký tự** (cùng ngưỡng `fallback_reason` của ADR-061). Phiếu bị trả về mà không nói vì sao thì vòng sửa–gửi lại thành đoán mò. Lý do lần trước **giữ nguyên** khi HM gửi lại: đó là bối cảnh HR Leader cần khi xem vòng tiếp theo.
+
+- **Hệ quả.**
+  - **Liên kết phiếu ↔ tin chỉ một chiều** (`job_postings.recruitment_request_id`). Cố ý **không** thêm `recruitment_requests.job_posting_id`: hai chiều là hai nguồn sự thật cho cùng một sự kiện, đúng kiểu trôi lệch mà ADR-058 đã phải đi chữa (`booked_count` lệch khỏi chính các dòng booking). "Phiếu đã dựng tin chưa" suy ra bằng LEFT JOIN.
+  - **Unique index có filter** `ux_job_postings_recruitment_request_id` — một phiếu chỉ sinh một tin, chặn ở DB vì hai request đồng thời đều đọc thấy "chưa có tin" rồi cùng ghi.
+  - **Realtime (ADR-057):** `recruitment_requests` → người lập phiếu + Recruiter được phân công + nhóm `hr_admin`; cố ý **không** gửi ứng viên. Payload của `arisp_notify_change()` phải thêm khoá **`assigned_recruiter_id`** — thiếu nó thì người vừa được giao việc là người **duy nhất** không nhận được sự kiện, đúng lỗi ADR-061 gặp khi `DbChangeLookup` thiếu `HiringTeamUserIds`.
+  - **Phạm vi đọc do SERVER quyết định** (quy tắc 19): HM thấy phiếu mình lập, Recruiter thấy phiếu được giao, HR Leader thấy tất cả. Không có tham số `?mine`. Vai trò lạ rơi vào nhánh **mặc định ĐÓNG**.
+  - **Màn tạo tin nay cần `?requestId=`.** Recruiter vào từ chính phiếu được phân công; biểu mẫu **điền sẵn** vị trí/bộ phận/dải lương/địa điểm từ phiếu — bắt gõ lại là mời sai lệch giữa tin đăng và phiếu đã duyệt.
+  - **Một view dùng chung cho ba vai trò** (`components/recruitmentRequests/RecruitmentRequestsView`): server đã lọc phạm vi và trả kèm ba cờ quyền `canEdit`/`canReview`/`canCreateJob` cho từng phiếu, nên khác biệt giữa ba khu vực chỉ là hiện nút nào.
+
+- **Kiểm chứng.** 1049/1049 test .NET (+22 test mới: vòng đời phiếu, hai ràng buộc cốt lõi, cổng tạo tin, định tuyến realtime, và **HM không tự chốt được thư mời**) · `tsc --noEmit` sạch · `check:i18n` đạt · build `ARI.StaffSite` thành công.
+
+- **Chấp nhận đánh đổi.**
+  - **Thêm một bước vào phễu.** Tin không còn tạo được trong một lần bấm; phải có phiếu duyệt trước. Đó chính là điều quy trình yêu cầu, nhưng nó làm kịch bản test E2E dài thêm và **làm hỏng mọi đường tạo tin cũ** cho tới khi đi qua phiếu.
+  - **HR Leader mất quyền kiểm soát nội dung ra job board.** Đổi lấy việc bỏ một bước chờ; người chịu trách nhiệm nội dung nay là HM — người hiểu công việc cần tuyển. Đường ghi đè của admin vẫn còn (`UpdateJobStatusCommand` nhận admin cho mọi chuyển trạng thái).
+  - **Công ty chỉ có MỘT HR Leader thì phiếu do chính họ lập sẽ kẹt** — phải nhờ Super Admin duyệt. Chấp nhận: đây là hệ quả trực tiếp của luật "không tự duyệt", và nới ra là mở lại đúng chỗ hở vừa bịt.
+
+---
+
+### ADR-064: Trình soạn JD theo mẫu công ty; Hiring Manager duyệt bằng chính file JD
+
+- **Ngày:** 2026-09-01
+- **Trạng thái:** Đã chốt. **Bổ sung cho ADR-063** (không thay thế): phiếu vẫn là điểm bắt đầu, nhưng giữa phiếu và tin nay có một bước dựng JD.
+
+- **Bối cảnh.** ADR-063 bắt mọi tin phải sinh từ phiếu của Hiring Manager và cho màn tạo tin tự điền từ phiếu đó. Nhưng phiếu chỉ chứa **thông tin sơ bộ HM gõ vội** — vài dòng mô tả, vài dòng yêu cầu — nên bản JD suy ra từ nó quá mỏng để đăng ra career site.
+
+  Nghiêm trọng hơn: ADR-063 đặt **chữ ký của HM làm cổng đăng tin**, nhưng màn tin của HM **không có chỗ nào mở file JD**. `hm/JobDetailPage.tsx` không render trình xem tài liệu nào. Tức là HM đang ký duyệt mà **không nhìn thấy thứ mình duyệt** — cổng tồn tại về mặt kỹ thuật nhưng rỗng về mặt nghiệp vụ.
+
+- **Quyết định.**
+
+  1. **Mẫu JD là CẤU HÌNH CÓ CẤU TRÚC, không phải file .docx tải lên.** HR Leader cấu hình logo, thông tin công ty, màu/phông và **danh sách mục** (tiêu đề, thứ tự, bật/tắt); hệ thống dựng bố cục cố định. Hai hướng còn lại đều bị loại vì **hỏng âm thầm**: soạn tự do có chỗ điền thì gõ sai tên chỗ điền là file ra chữ `{{…}}` thô; mail-merge file Word thì phải thao tác XML và vỡ bố cục với bảng/text-box, lại không xem trước được. Đổi lại HR Leader không tự vẽ được bố cục tuỳ ý — chấp nhận.
+
+  2. **`key` của mục là BẤT BIẾN.** Nội dung JD đã soạn tra theo đúng khoá đó, nên đổi khoá là làm mất nội dung của mọi bản JD đã có mà **không sinh ra lỗi nào**. HR Leader chỉ đổi được tiêu đề, gợi ý, thứ tự và bật/tắt; khoá hiện ra trên giao diện để họ hiểu vì sao không sửa được.
+
+  3. **Một bố cục, hai bộ xuất.** `JdLayout` (tầng Application) quyết định *in cái gì, thứ tự nào*; `JdDocumentRenderer` (Infrastructure) chỉ còn *vẽ ra sao*. Viết riêng hai bộ xuất thì chúng trôi khỏi nhau ngay lần sửa thứ hai — thêm một mục ở docx, quên ở pdf, và không có gì báo. Nhờ tách, phần quyết định nội dung test được mà không chạm OpenXML hay PdfSharpCore.
+
+  4. **Không thêm thư viện nào.** DOCX dùng `DocumentFormat.OpenXml` (đã có từ ADR-049), PDF dùng `PdfSharpCore` (đã có từ `JdStampService`). Nhân dịp này tách `EnsureFontResolver` + `WrapParagraph` ra `PdfText` dùng chung — chép sang bộ dựng thứ hai là có hai bản tự xuống dòng, và lần sửa sau chỉ một bản được sửa.
+
+  5. **Nội dung JD được LƯU, không chỉ xuất file rồi quên.** HM từ chối ký duyệt kèm lý do là luồng đã có (ADR-061). Không lưu nội dung thì mỗi lần bị trả về, Recruiter phải soạn lại từ đầu — đúng thứ khiến vòng sửa–duyệt đắt tới mức người ta né tránh nó. Bảng `jd_documents`, **một bản trên mỗi phiếu** (unique index có filter).
+
+  6. **File tự đính kèm sang màn tạo tin**, không bắt tải xuống rồi tải lên lại. Màn tạo tin ưu tiên bản JD đã soạn: điền các trường **thẳng từ nội dung có cấu trúc** (không cần Gemini đoán lại từ file) và gán sẵn file đã sinh. Đường upload tay + `analyze-jd` **giữ nguyên** cho tin không đi qua trình soạn.
+
+  7. **HM xem được file JD ngay trên màn ký duyệt.** Không cần đổi DTO: `GetJobByIdQuery` vốn đã đổi `JdFileUrl` từ storageKey sang URL xem được cho staff, và `DocumentViewer` render được **cả PDF lẫn DOCX** trong trình duyệt (`docx-preview`). Chỉ thiếu phần giao diện — nay đã có.
+
+- **Hệ quả.**
+  - Nút trên phiếu đổi từ *"Dựng tin tuyển dụng từ phiếu này"* → **"Soạn JD theo mẫu công ty"**. Đường đi thành: phiếu → soạn JD → xuất file → tạo tin (file đi kèm) → HM xem file → ký duyệt → tin `active`.
+  - **Phân quyền dùng chung** `RecruitmentRequestAccess` giữa trình soạn JD và `CreateJobCommand`: soạn được JD nhưng không dựng được tin (hoặc ngược lại) là trạng thái vô nghĩa mà vẫn biểu diễn được nếu mỗi bên tự viết lại luật.
+  - **Logo là phần duy nhất được phép hỏng lặng lẽ**: đọc không ra thì xuất file không kèm ảnh. Để một file ảnh làm chết thao tác "tải PDF" thì người dùng không hiểu vì sao và cũng không tự sửa được.
+  - **Định dạng số khai tường minh**, không tra `CultureInfo("vi-VN")`: container Linux có thể chạy globalization-invariant, khi đó lương in ra `20,000,000` — file JD gửi ra ngoài công ty với dấu phân cách sai.
+  - `StorageFolder.Branding` mới cho logo — vòng đời khác hẳn `Avatar` (cấu hình chung của công ty, không xoá theo tài khoản nào).
+  - Realtime: `jd_templates` → nhóm `hr_admin`; `jd_documents` → **người soạn + nhóm hr_admin**. Cố ý không gửi HM dù họ sở hữu phiếu: HM không thao tác gì trên bản nháp JD, thứ họ cần thấy là file đã gắn vào TIN, và sự kiện đó đến từ `job_postings`.
+
+- **Kiểm chứng.** 1086/1086 test .NET (+13 mới: bố cục, phân quyền, một-bản-trên-mỗi-phiếu, xuất file, logo hỏng vẫn xuất được, định dạng số không phụ thuộc culture) · `tsc --noEmit` sạch · `check:i18n` đạt (34 namespace) · build `ARI.StaffSite` thành công.
+
+- **Chấp nhận đánh đổi.**
+  - **Thêm một bước nữa vào phễu.** Recruiter phải soạn JD trước khi tạo tin. Đó chính là điều làm JD tốt lên, nhưng nó kéo dài kịch bản test và làm luồng "tạo tin nhanh" không còn tồn tại.
+  - **Bố cục file cố định.** Công ty muốn một bố cục khác hẳn thì phải sửa `JdDocumentRenderer`, không cấu hình được từ giao diện.
+  - **Phông chữ phụ thuộc máy chủ.** Phông lạ rơi về Arial kèm log cảnh báo — chấp nhận, vì thay thế là nhúng phông vào repo.
+
+---
+
+### ADR-065: Định danh đội/bộ phận của nhân sự; hoàn thiện phiếu yêu cầu tuyển dụng
+
+- **Ngày:** 2026-09-03
+- **Trạng thái:** Đã chốt. **Bổ sung cho ADR-063** (biểu mẫu phiếu) và **KHÔNG lật ADR-061** — xem "Ranh giới" bên dưới.
+
+- **Bối cảnh.** Dùng thật màn phiếu thì lộ ra hai chuyện, và chuyện thứ hai mới là chính.
+
+  **(1) Phiếu còn thiếu trường và thiếu ràng buộc.** Biểu mẫu chỉ bắt buộc *Vị trí* và *Số lượng*. `expected_start_date` có cột trong DB từ ADR-063 nhưng **chưa từng có ô nhập** — Recruiter phải đi hỏi lại HM bao giờ cần người. Chưa có *Mức độ ưu tiên*, nên hàng chờ duyệt của HR Leader chỉ xếp theo ngày tạo. Và dải lương để trống thì **không phân biệt được "thoả thuận" với "quên điền"** — HR Leader phải trả phiếu về chỉ để hỏi lại.
+
+  **(2) Không xác định được Hiring Manager thuộc đội nào.** Người dùng nêu: *"HM Team A nhưng lại tạo phiếu ghi Team B"*. Rà lại thì hệ thống hở đúng chỗ đó: **chưa có bảng `departments`**, phòng ban là chuỗi tự do ở mọi nơi; `RecruitmentRequest.Department` là text HM tự gõ; và quyết định nhất — `User.Department` **nhân viên TỰ SỬA được** ở trang Cài đặt cá nhân.
+
+  > **Cái bẫy:** khoá ô phòng ban trên phiếu mà **không** bỏ ô đó khỏi trang Cài đặt thì biện pháp chỉ là hình thức — HM vào sửa hồ sơ rồi quay ra lập phiếu. Lỗ hổng thật nằm ở trang Cài đặt, không phải ở biểu mẫu phiếu.
+
+- **Ranh giới với ADR-061 — đọc trước khi tưởng ADR-061 bị lật.** ADR-061 **cố ý** loại phòng ban khỏi phân quyền: *"`users.department` là chuỗi text tự do… thêm phòng ban là mở trục thứ hai phải giữ đồng bộ mãi mãi"*. Thay đổi lần này **giữ nguyên quyết định đó**. Phân quyền vẫn đứng một mình trên `job_hiring_team_members`; `JobAccess` không đọc `DepartmentId` ở bất kỳ đâu. Ở đây chỉ sửa **toàn vẹn dữ liệu** — *"phiếu này của đội nào"* — vốn là câu hỏi khác hẳn *"ai được quyết định về tin này"*. Phòng ban là **"AI HỎI"**, không phải "hỏi được vị trí gì": HM đội Backend vẫn xin tuyển được vị trí ReactJS, vì họ sở hữu chỉ tiêu đó.
+
+- **Quyết định.**
+
+  1. **Bảng `departments`, và `User.Department` chuỗi bị BỎ HẲN** (không giữ song song làm "tên đã lưu sẵn"). Hai nguồn cho cùng một sự thật là đúng kiểu trôi lệch mà ADR-058 đã phải đi chữa với `booked_count`; tên đội tra bằng join lúc đọc (`DepartmentLookup`). Các DTO **giữ nguyên tên trường `department` trong JSON** nên frontend không phải sửa chỗ hiển thị.
+
+  2. **Đội giải thể thì TẮT, không xoá** — phiếu và tài khoản cũ vẫn phải tra được tên. Nên `DepartmentLookup` cố ý **không lọc theo `IsActive`**, còn `GetActiveAsync` (dùng khi gán mới) thì có.
+
+  3. **Bịt đường tự khai phòng ban.** `UpdateStaffProfileCommand` **không còn nhận** tham số đó — bỏ ở giao diện thôi là chưa đủ, server vẫn nhận thì một request tự dựng vẫn đổi được, mà đó chính là lỗ hổng cần bịt. Đường duy nhất còn lại là `UpdateUserDepartmentCommand` của Super Admin, có audit log.
+
+  4. **Đội lấy CỨNG từ tài khoản người lập.** HM **chưa được gán đội thì không lập được phiếu**, kèm câu chỉ rõ phải nhờ Super Admin gán — không phải một ô trống không giải thích.
+
+     > **Bản đầu cho quản trị viên lập phiếu hộ (phải chọn đội). Đã gỡ hẳn** — xem "Chỉ Hiring Manager lập phiếu" bên dưới. Khi đó <c>RecruitmentRequestInput</c> cũng bỏ luôn trường <c>DepartmentId</c>: một ô nhận từ client rồi bị bỏ qua trông như có tác dụng.
+
+  5. **"Thoả thuận" SUY RA từ dữ liệu, không thêm cột.** Tích = cả hai ô lương trống. Thêm cột `bool` thì biểu diễn được trạng thái mâu thuẫn (tích nhưng vẫn có số) — trạng thái nào biểu diễn được thì sẽ có lúc xảy ra. Bù lại **bắt buộc validation**: hoặc tích thoả thuận, hoặc điền ít nhất một con số — nếu không thì "thoả thuận" và "quên điền" lại lẫn vào nhau, đúng thứ ô tích này sinh ra để phân biệt.
+
+  6. **Mức độ ưu tiên điều khiển hàng chờ, và sắp xếp ĐẨY XUỐNG SQL.** `high → medium → low`, trong mỗi mức theo `CreatedAt` giảm dần. `RecruitmentPriority.Rank` là hàm C# nên **EF không dịch được** — SQL dùng biểu thức ba ngôi viết thẳng trong `OrderBy`; hàm chỉ dùng cho sắp xếp trong bộ nhớ. Sắp trong bộ nhớ sau khi phân trang là sắp nhầm một trang.
+
+  7. **Bốn trường mới trên phiếu và trên trình soạn JD:** *Ngày dự kiến bắt đầu*, *Mức độ ưu tiên*, và ba ô chuyển thành bắt buộc (*Lý do tuyển*, *Mô tả sơ bộ*, *Yêu cầu ứng viên*). Kèm hai ô **chỉ đọc** — Hiring Manager và Đội/Bộ phận — để người lập thấy phiếu sẽ mang tên ai và đội nào.
+
+- **Hệ quả.**
+  - Màn mới `/super-admin/departments` (danh sách + thêm/sửa/bật-tắt) và **ô chọn đội trên bảng Users** — Super Admin là người duy nhất gán được đội.
+  - **KHÔNG backfill tự động** text phòng ban cũ: `"SDC3.BU3"` và `"SDC3-BU3"` không thể tự gộp mà không đoán, mà đoán sai thì tạo ra liên kết tổ chức sai — im lặng và khó phát hiện hơn hẳn ô trống. Migration `RAISE NOTICE` liệt kê **email + giá trị cũ** của các tài khoản sẽ mất liên kết, để Super Admin gán lại đúng người.
+  - **`JdDocument.Department` giữ nguyên dạng chuỗi** — đó là ảnh chụp đưa vào file JD, phải bất biến kể cả khi đội đổi tên sau này (cùng lý lẽ `reviewer_role` là ảnh chụp trong ADR-061).
+  - Trùng tên đội chặn **không phân biệt hoa thường**: Postgres so sánh phân biệt hoa thường, nên nếu chỉ dựa vào unique index thì "Backend Team" và "backend team" là hai đội khác nhau — mọi thống kê theo đội sẽ tách đôi mà không ai để ý.
+  - `Department` được phân loại trong `DbChangeRouter` và migration gọi `SELECT arisp_attach_change_triggers();` (quy tắc 24) — bảng mới không có trigger thì màn quản lý đội và ô chọn đội không bao giờ tự cập nhật.
+  - Luồng `AccountRequest` **giữ text tự do** như một *đề xuất*; Super Admin chọn đội thật lúc duyệt. Đổi cả luồng đó sang khoá ngoại kéo theo import CSV — không đáng cho phần việc này.
+
+- **Kiểm chứng.** 1111/1111 test .NET (+14 mới: đội lấy từ tài khoản, HM chưa có đội bị chặn, không gán được đội đã tắt, trùng tên không phân biệt hoa thường, đội đã tắt vẫn tra được tên, gỡ khỏi đội vẫn làm được, audit log) · `tsc --noEmit` sạch · `check:i18n` đạt (35 namespace) · build `ARI.StaffSite` thành công.
+
+- **Chấp nhận đánh đổi.**
+  - **Một người chỉ thuộc một đội.** Cần hơn thì gán lại hoặc dùng đội cha. Nhiều đội trên một người sẽ đưa câu hỏi "phiếu này của đội nào" về lại chỗ mơ hồ ban đầu.
+  - **Phải gán tay đội cho các tài khoản cũ.** Cái giá của việc không đoán — và số tài khoản nội bộ đủ nhỏ để làm tay.
+  - **Mức độ ưu tiên do chính người xin tuyển tự đặt.** Không có cơ chế nào ngăn mọi phiếu đều `high`; nếu xảy ra thì đó là vấn đề vận hành, không phải vấn đề của hệ thống.
+
+---
+
+### ADR-066: Thu hồi phê duyệt phiếu yêu cầu tuyển dụng — mở lại để sửa, hoặc đóng phiếu
+
+- **Ngày:** 2026-09-03
+- **Trạng thái:** Đã chốt. **Bổ sung cho ADR-063** (vòng đời phiếu); không đụng tới ADR-061/065.
+
+- **Bối cảnh.** ADR-063 dựng vòng đời phiếu là `pending → approved | rejected`, trong đó `rejected` cố ý **không** phải trạng thái kết thúc (còn quay lại sửa–gửi lại). Nhưng `approved` thì là: duyệt xong, phiếu **đóng băng**.
+
+  Thực tế dùng thì nhu cầu tuyển đổi sau khi duyệt là chuyện thường — đội đổi hướng kỹ thuật, chỉ tiêu bị cắt giữa quý, hoặc HM nhận ra dải lương/số lượng cần sửa. Khi đó cách duy nhất là **lập phiếu mới**, và phiếu cũ nằm lại vĩnh viễn ở trạng thái *"đã duyệt, sẵn sàng dựng tin"*. Hai hệ quả, cái thứ hai tệ hơn:
+  1. Danh sách phiếu tích lũy những dòng chết mà không ai dám đụng.
+  2. **Recruiter được phân công vẫn thấy phiếu đó trong việc của mình** — không có tín hiệu nào nói việc đã bỏ. Họ có thể soạn xong cả bản JD cho một nhu cầu không còn tồn tại.
+
+  Đường `cancel` sẵn có **không dùng được** ở đây: nó không đòi lý do và không báo cho ai — đúng cho phiếu chưa ai duyệt, sai hoàn toàn khi đã có một Recruiter cầm việc và một chữ ký ngân sách cần huỷ hiệu lực.
+
+- **Quyết định.**
+
+  1. **Hai thao tác, một bản chất: THU HỒI PHÊ DUYỆT.** *Mở lại để sửa* (→ `pending`) và *đóng phiếu* (→ `cancelled`) chỉ khác đích đến; mọi ràng buộc giống hệt nhau nên dùng chung một hàm kiểm (`LoadRevocableAsync`) và **một** cờ quyền `CanRevoke`. Tách đôi cờ là mở đường cho trạng thái *"mở lại được nhưng không đóng được"* — vô nghĩa, mà trạng thái nào biểu diễn được thì sẽ có lúc xảy ra.
+
+  2. **Không thêm trạng thái mới.** `cancelled` mở rộng nghĩa thành *"phiếu không còn hiệu lực"* — rút trước khi duyệt, hoặc đóng sau khi duyệt. Một status `closed` riêng buộc mọi truy vấn, bộ lọc và bảng màu đang lọc `cancelled` phải nhớ thêm một giá trị nữa; giá trị nào quên là một phiếu chết hiện ra như đang sống.
+
+  3. **Chặn cứng khi phiếu ĐÃ dựng thành tin.** Đây là ràng buộc quan trọng nhất: lúc đó **TIN mới là nguồn sự thật**, không phải phiếu. Mở lại sinh ra một tin đang chạy mà phiếu nguồn của nó lại "chờ duyệt", và unique index một-phiếu-một-tin (ADR-063) khiến vòng dựng tin lần hai chết bằng 409 không ai hiểu. Điều kiện này **suy ra bằng LEFT JOIN** như mọi chỗ khác, không thêm cột — nên `IsRevocable()` cố ý chỉ trả lời được phần trạng thái, phần còn lại nằm trong handler.
+
+  4. **Mở lại thì PHÂN CÔNG ĐI THEO CHỮ KÝ.** `AssignedRecruiterId`, `ReviewedByUserId`, `ReviewedAt`, `ReviewReason` đều bị gỡ. ADR-063 chốt "duyệt kèm phân công trong CÙNG một thao tác"; để lại Recruiter trên một phiếu đang chờ duyệt là tự tạo ngoại lệ cho chính bất biến đó — và người đó vẫn thấy phiếu trong danh sách việc của mình. `SubmissionCount` tăng: đây là một vòng sửa–gửi lại thật.
+
+  5. **Đóng phiếu thì GIỮ NGUYÊN dấu vết.** Ngược lại hẳn: phiếu đóng là hồ sơ lịch sử, xoá "ai từng duyệt, ai từng được giao" là làm hỏng đúng thứ cần tra lại sau này.
+
+  6. **Lý do bắt buộc ≥10 ký tự, lưu vào cột RIÊNG.** `RevokedReason` + `RevokedByUserId`, không dùng lại `ReviewReason`/`ReviewedByUserId`: ô đầu là ghi chú của người **duyệt** — ghi đè lên là xoá bản ghi phê duyệt ngay lúc cần đối chiếu nhất; ô sau mang bất biến "không bao giờ trùng `RequestedByUserId`", mà HM đóng phiếu của chính mình thì trùng ngay.
+
+  7. **Ai được làm: chủ phiếu hoặc quản trị viên.** Recruiter được phân công cố ý **không** — họ thực thi nhu cầu chứ không phát sinh hay huỷ bỏ nó. Cũng **không** có luật "không tự xử lý phiếu của mình" như cổng duyệt, vì chính chủ phiếu mới là người dùng chính của thao tác này. Điều kiện viết tường minh trong handler chứ không gác bằng policy `RecruitmentRequestReview` — vai Hiring Manager không qua nổi policy đó (cùng lý lẽ với `OfferApproval` ở ADR-063).
+
+- **Hệ quả.**
+  - `RecruitmentRequestStatus.IsTerminal` bị **xoá** và thay bằng `IsRevocable`: cái tên cũ nay sai: `approved` không còn là ngõ cụt. Handler `cancel` chuyển sang kiểm `!IsEditable` và **chỉ đường sang đúng nút** thay vì báo "không rút lại được".
+  - **Báo cho người bị ảnh hưởng phải chốt danh sách TRƯỚC khi sửa phiếu** — bản đầu tiên đọc `AssignedRecruiterId` sau khi đã xoá nó, nên chính hai người cần biết nhất lại là hai người không được báo. Test bắt được; nay tách `RevokeRecipients()` với ghi chú nêu rõ thứ tự.
+  - **Trigger realtime (ADR-057) không cứu được chỗ này**: payload mang `assigned_recruiter_id` của hàng MỚI, mà mở lại vừa xoá đúng cột đó → Recruiter vừa mất việc là người duy nhất không nhận sự kiện. Phải báo tường minh.
+  - Giao diện: một khối "Nhu cầu tuyển đã thay đổi?" với hai nút, dùng chung một ô lý do (cùng ràng buộc ≥10 ký tự), và một banner hiện `revokedReason` + người thực hiện ngay trên phiếu — Recruiter không phải đi tìm trong chuông.
+
+- **Kiểm chứng.** 1130/1130 test .NET (+19 mới, gồm: phiếu đã dựng tin thì cả hai thao tác bị chặn; mở lại gỡ phân công còn đóng phiếu giữ nguyên; đóng phiếu không ghi đè ghi chú người duyệt; Recruiter và người ngoài bị chặn; `cancel` chỉ đường sang `close`) · `tsc --noEmit` sạch · `check:i18n` đạt · build `ARI.StaffSite` thành công.
+
+- **Chấp nhận đánh đổi.**
+  - **Phiếu đã thành tin thì hết đường sửa ở đây.** Người dùng phải hiểu ranh giới "trước khi có tin thì sửa phiếu, sau đó thì sửa tin". Đổi lại là không có hai nguồn sự thật cho cùng một nhu cầu tuyển.
+  - **Mở lại là mất chữ ký, phải xin duyệt lại từ đầu.** Cố ý: HM sửa xong dải lương mà không cần HR Leader duyệt lại thì cổng ngân sách của ADR-063 vô hiệu.
+  - **`cancelled` nay mang hai nghĩa.** Phân biệt được bằng `RevokedReason` có giá trị hay không, nhưng nếu sau này cần thống kê tách bạch "rút" với "đóng" thì phải đọc thêm audit log.
+
+---
+
+### ADR-067: Phễu duyệt hồ sơ khép kín quanh Hiring Manager; một ca một ứng viên; gỡ Live Avatar
+
+- **Bối cảnh.** Dùng thật màn chi tiết tin tuyển dụng lộ ra bốn chỗ mà quy trình trong đầu người dùng
+  và quy trình trong mã nguồn không khớp nhau:
+  1. **Duyệt CV kèm xếp lịch (ADR-059) đặt sai thứ tự.** Recruiter bấm "Duyệt hồ sơ" là phải chọn ngay
+     một ca vòng 1 — nhưng buổi phỏng vấn thật cần Hiring Manager có mặt, mà lúc đó chưa ai hỏi HM
+     xem họ rảnh giờ nào. Nghĩa là hệ thống bắt chọn một giờ chưa ai xác nhận dự được.
+  2. **Cổng duyệt của HM là ngõ cụt nửa vời.** ADR-061 để HM duyệt bằng cách mở cột `hm_decision` mà
+     KHÔNG đổi `status`, nên hồ sơ nằm lại `hm_review` chờ Recruiter bấm thêm một nút "duyệt" nữa —
+     hai lần duyệt cho một quyết định, và Recruiter không có tín hiệu nào nói đã tới lượt mình.
+  3. **Ca phỏng vấn có sức chứa nhiều người.** Model `AvailabilitySlot` mang `capacity`/`booked_count`
+     từ thời buổi phỏng vấn thuần AI. Nay HM ngồi cùng AI suốt buổi thì một ca không phục vụ được hai
+     người, và không có gì chặn việc xếp một ứng viên vào hai buổi trùng giờ ở hai tin khác nhau.
+  4. **Buổi thật bắt đầu mà không cần ai có mặt.** Nhập mã Kiosk là AI hỏi ngay. Người phỏng vấn thật
+     không có mặt cũng không ai biết.
+- **Quyết định.**
+  - **Phễu mới, ba bước rõ chủ thể:** Recruiter *Duyệt hồ sơ* → hồ sơ sang **`hm_review`** (KHÔNG báo
+    ứng viên) → HM duyệt **kèm gửi khung giờ mình có mặt được** → hồ sơ về **`screening` = "Chờ xếp
+    lịch"** trên bàn Recruiter → Recruiter xếp ca **nằm trọn trong khung giờ đó** → **lúc này** thư
+    "qua vòng" kèm giờ hẹn mới rời hệ thống.
+  - **Bảng mới `hiring_manager_availabilities`** (tin × vòng × người khai × khoảng thời gian).
+  - **Ba luật xếp lịch**, dồn vào MỘT hàm `SchedulingSupport.ValidateAssignmentAsync`: một ca một ứng
+    viên · ứng viên không dự hai buổi chồng giờ (kể cả tin khác) · ca phải nằm trọn trong khung HM rảnh.
+  - **Phòng chờ buổi thật:** phiên `real` sinh ra ở trạng thái mới **`waiting`**; HM *vào phòng*
+    (`hm-join`) rồi *cho vào* (`admit`) thì phiên mới `active`.
+  - **Gỡ hẳn HeyGen LiveAvatar** khỏi cả backend, frontend và cấu hình.
+- **Lý do.**
+  - **Vì sao HM gửi GIỜ RẢNH chứ không tự chọn ca.** Chọn ca là thao tác vận hành có thể hỏng vì lý do
+    lịch ("ca đã có người"); một cái duyệt CHUYÊN MÔN thất bại vì hết ghế là vô nghĩa. Và HM không phải
+    người vận hành lịch — đó là ranh giới vai trò mà ADR-061 dựng lên.
+  - **Vì sao khung giờ là ĐIỀU KIỆN của việc duyệt, không phải việc làm sau.** Duyệt mà không có giờ
+    nào để xếp thì hồ sơ rơi vào hàng chờ rồi đứng im: Recruiter mở ra thấy một danh sách không thao
+    tác được và không biết phải hỏi ai. Bắt buộc ngay tại chỗ duyệt là chỗ duy nhất còn đúng người.
+  - **Vì sao ứng viên không được báo gì cho tới khi có giờ hẹn.** Trước đây bước duyệt CV bắn chuông
+    "hồ sơ đã qua vòng duyệt CV" — ứng viên nhận tin vui rồi ngồi im không biết bao lâu, và nếu HM từ
+    chối sau đó thì tin vui ấy thành sai. Một lần báo, khi đã có thông tin hành động được.
+  - **Vì sao chốt chặn phòng chờ nằm ở TRẠNG THÁI phiên.** `GenerateAndSendNextQuestionAsync` vốn đã
+    đòi phiên `active`. Đặt phiên mới ở `waiting` là tận dụng đúng cái khoá đó: ứng viên (hay máy
+    Kiosk) gọi thẳng SignalR cũng không moi được câu hỏi nào ra. Không phải rải thêm câu `if` nào ở
+    tầng giao diện — mà lớp giao diện thì bao giờ cũng có đường vòng.
+  - **Vì sao `StartedAt` đặt lúc CHO VÀO chứ không lúc tạo phiên.** Đó là gốc tính trần thời lượng;
+    tính từ lúc nhập mã thì thời gian ngồi chờ HM bị trừ thẳng vào giờ phỏng vấn của ứng viên.
+  - **Vì sao một ca một ứng viên kiểm theo DÒNG booking chứ không theo cột `booked_count`.** Cột là
+    khoá tương tranh, dòng mới là sự thật — đúng bài học ADR-058 (hai nguồn thì sẽ có ngày lệch). Cột
+    vẫn giữ nguyên vai trò chống overbooking, chỉ không còn là căn cứ trả lời "ca này có ai chưa".
+  - **Vì sao "nằm TRỌN" chứ không "có giao nhau".** Ca 14:00–15:00 chồng lên khung rảnh 14:00–14:15
+    nghĩa là HM phải rời phòng giữa buổi. Về hình thức thì có giao nhau, về thực tế thì buổi đó không
+    tổ chức được.
+  - **Vì sao gỡ avatar.** Người dùng chốt không dùng nữa. Giữ lại một tích hợp không ai bật là giữ một
+    lớp phụ thuộc phải bảo trì (SDK, key, quota, đường reconnect, watchdog cờ `aiSpeaking`) cho một
+    tính năng chết — và chính đường avatar là nguồn của lớp watchdog phức tạp nhất trong hook phỏng vấn.
+- **Phạm vi áp dụng và các lối thoát cố ý.**
+  - **Luật khớp giờ HM chỉ áp khi tin ĐÃ gán Hiring Manager** — cùng nguyên tắc "cổng suy ra từ việc có
+    người được gán" của ADR-061. Tin chưa có ai thì không có ràng buộc nào để áp, và hành vi giữ y như
+    trước. Điều này cũng là lý do phần lớn test cũ của luồng xếp lịch không phải sửa.
+  - **Phòng chờ cũng chỉ tồn tại khi có HM.** Nếu không, ứng viên sẽ ngồi chờ vĩnh viễn một người
+    không tồn tại.
+  - **Quản trị viên / chủ tin mở cửa thay được**, nhưng ghi `interview_admitted_without_hm` vào audit
+    log — cùng khuôn với vượt cổng duyệt shortlist. Ứng viên đã đến văn phòng rồi mà HM kẹt họp thì
+    buổi phỏng vấn không được phép chết đứng, nhưng cũng không được im lặng.
+  - **Việc chốt giờ với chính ứng viên (SMS, Zalo, gọi điện) CỐ Ý nằm ngoài hệ thống.** Hệ thống không
+    mô hình hoá cuộc thương lượng đó; nó chỉ ràng buộc kết quả — ca chọn ra phải nằm trong giờ HM rảnh.
+    Đây là giới hạn được tuyên bố, không phải thiếu sót.
+- **Hệ quả.**
+  - `AcceptApplicationAsync` không còn báo gì cho ứng viên; nó chỉ nâng trạng thái + mở vòng 1.
+  - `RequestHmApprovalCommand` trên tin **không có HM** nay đẩy thẳng sang `screening` thay vì trả lỗi —
+    trước đó nút "Duyệt hồ sơ" chết cứng trên mọi tin cũ.
+  - Vượt cổng (`hm-bypass`) cũng phải đẩy hồ sơ đi tiếp; mở cửa rồi để hồ sơ đứng nguyên là đúng thứ bế
+    tắc mà thao tác đó sinh ra để gỡ.
+  - Dời lịch cả nhóm vào **cùng một ca** bị từ chối CẢ LỆNH (không dời một người rồi báo hai người kia
+    hỏng) — giữ tính "được ăn cả ngã về không" của ADR-058, chỉ đổi lý do từ "hết chỗ" sang "luật".
+  - Ô "sức chứa" biến khỏi màn cấu hình ca; ca dữ liệu cũ có nút **hạ về 1 chỗ**.
+  - **Màn "Hồ sơ chờ duyệt" riêng của HM bị gỡ**; cổng duyệt chuyển vào chính màn tin, cạnh khung
+    đọc CV. Màn cũ chỉ có tên + điểm CV, tức là bắt ra quyết định CHUYÊN MÔN mà không nhìn thấy hồ
+    sơ; nó cũng là bản danh sách ứng viên thứ hai, tách khỏi thanh quy trình mà mọi vai khác đang
+    dùng. Nhãn vòng trên thanh đó nay có **bản mặc định trong `CandidatePipeline`** thay vì để ba
+    trang tự ghép chuỗi — màn HM đã tra nhầm khoá và in ra `detail.round 1` cho người dùng thấy. Migration tự hạ những
+    ca tương lai đang giữ ≤ 1 người và `RAISE NOTICE` liệt kê ca đang giữ ≥ 2 người để nhân sự tự dời —
+    hạ sức chứa ở đó là đuổi người ra khỏi chỗ đã hẹn mà không ai báo.
+- **Chấp nhận đánh đổi.**
+  - **Thêm một bước cho HM.** Duyệt shortlist nay phải kèm khai lịch. Bù lại lượt duyệt sau trong cùng
+    đợt không phải khai lại (khung còn hiệu lực thì dùng tiếp), và đây chính là thông tin mà trước đây
+    Recruiter phải đi hỏi bằng tay.
+  - **Xếp lịch hàng loạt mất ý nghĩa.** Một ca một người thì không dồn nhóm vào một ca được; giao diện
+    nói thẳng điều đó thay vì để người dùng bấm rồi nhận lỗi.
+  - **Buổi phỏng vấn mất phần hình.** Màn hình còn một khối chỉ báo trạng thái. Đổi lại là bớt một nhà
+    cung cấp, một khoản credit, và toàn bộ lớp xử lý rớt-kết-nối-giữa-câu-nói của avatar.

@@ -33,44 +33,6 @@ namespace ARI.Infrastructure.Services
             => Task.FromResult(string.Empty);
     }
 
-    public class MockAvatarService : IAvatarService
-    {
-        public Task<SdpMessage> StartSessionAsync(string voiceId, string style, CancellationToken ct = default)
-        {
-            return Task.FromResult(new SdpMessage
-            {
-                Type = "offer",
-                Sdp = "v=0\r\no=HeyGenAvatarSession 12345 67890 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nc=IN IP4 127.0.0.1"
-            });
-        }
-
-        public Task<bool> SubmitSdpAnswerAsync(string sessionId, SdpMessage sdpAnswer, CancellationToken ct = default)
-        {
-            return Task.FromResult(true);
-        }
-
-        public Task<bool> SendIceCandidateAsync(string sessionId, IceCandidateMessage candidate, CancellationToken ct = default)
-        {
-            return Task.FromResult(true);
-        }
-
-        public Task<bool> SpeakTextAsync(string sessionId, string text, CancellationToken ct = default)
-        {
-            return Task.FromResult(true);
-        }
-
-        public Task<bool> StopSessionAsync(string sessionId, CancellationToken ct = default)
-        {
-            return Task.FromResult(true);
-        }
-
-        // Chưa cấu hình HeyGen key → trả null để FE fallback avatar tĩnh.
-        public Task<AvatarStreamingToken?> CreateStreamingTokenAsync(string? avatarId, string? voiceId, CancellationToken ct = default)
-        {
-            return Task.FromResult<AvatarStreamingToken?>(null);
-        }
-    }
-
     /// <summary>Chưa cấu hình Deepgram key → trả null để FE fallback (Web Speech API hoặc nhập tay).</summary>
     public class MockDeepgramTokenService : IDeepgramTokenService
     {

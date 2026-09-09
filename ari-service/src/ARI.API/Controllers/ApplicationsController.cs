@@ -8,6 +8,8 @@ using ARI.Application.Applications.Commands.SubmitApplication;
 using ARI.Application.Applications.Queries;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
+using ARI.Application.Emails;
+using ARI.Application.HiringTeam;
 using ARI.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -36,11 +38,45 @@ namespace ARI.API.Controllers
         public Guid? CandidateAccountId { get; set; }
     }
 
-    /// <summary>Body của POST /applications/{id}/accept — khung giờ vòng 1 gán kèm khi duyệt CV.</summary>
-    public class AcceptApplicationRequest
+    /// <summary>
+    /// Body của POST /applications/{id}/reject — thư cảm ơn do nhân sự sửa ở trình soạn thảo
+    /// (ADR-061). Bỏ trống → dùng mẫu.
+    /// </summary>
+    public class RejectApplicationRequest
     {
-        [Required(ErrorMessage = "Phải chọn khung giờ phỏng vấn vòng 1 khi duyệt hồ sơ.")]
-        public Guid SlotId { get; set; }
+        public EmailOverride? EmailOverride { get; set; }
+    }
+
+    /// <summary>Body của POST /applications/{id}/hm-decision.</summary>
+    public class HmDecisionRequest
+    {
+        /// <summary>approved | rejected</summary>
+        [Required(ErrorMessage = "Vui lòng chọn quyết định.")]
+        public string Decision { get; set; } = string.Empty;
+
+        /// <summary>Bắt buộc khi từ chối.</summary>
+        public string? Note { get; set; }
+
+        /// <summary>
+        /// Khung giờ Hiring Manager có mặt được cho vòng 1 (ADR-067) — gửi kèm khi duyệt.
+        /// Recruiter chỉ được xếp ca nằm trong các khung này.
+        /// </summary>
+        public List<HmAvailabilityWindowRequest>? Availabilities { get; set; }
+    }
+
+    /// <summary>Một khung giờ rảnh của Hiring Manager.</summary>
+    public class HmAvailabilityWindowRequest
+    {
+        public DateTimeOffset StartTime { get; set; }
+        public DateTimeOffset EndTime { get; set; }
+        public string? Note { get; set; }
+    }
+
+    /// <summary>Body của POST /applications/{id}/hm-bypass.</summary>
+    public class HmBypassRequest
+    {
+        [Required(ErrorMessage = "Vui lòng nhập lý do vượt cổng duyệt.")]
+        public string Reason { get; set; } = string.Empty;
     }
 
     [ApiController]
@@ -56,14 +92,23 @@ namespace ARI.API.Controllers
             _currentUserService = currentUserService;
         }
 
+        /// <summary>Ánh xạ mã lỗi phân quyền sang HTTP — 403 khác 404, đừng gộp làm một.</summary>
+        private IActionResult MapFailure(string? errorCode, string? message) => errorCode switch
+        {
+            CommonErrorCodes.NotFound => NotFound(new { message }),
+            CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message }),
+            _ => BadRequest(new { message }),
+        };
+
         [HttpGet("{id}")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetApplicationById(Guid id, CancellationToken ct)
         {
-            var result = await _sender.Send(new GetApplicationByIdQuery(id), ct);
+            var result = await _sender.Send(
+                new GetApplicationByIdQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return NotFound(new { message = result.Error });
+                return MapFailure(result.ErrorCode, result.Error);
             }
 
             return Ok(result.Value);
@@ -78,10 +123,11 @@ namespace ARI.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = await _sender.Send(new UpdateApplicationStatusCommand(id, request.Status), ct);
+            var result = await _sender.Send(
+                new UpdateApplicationStatusCommand(id, request.Status, _currentUserService.UserId, _currentUserService.Role), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return MapFailure(result.ErrorCode, result.Error);
             }
 
             return Ok(result.Value);
@@ -144,22 +190,20 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// Danh sách hồ sơ ứng tuyển. <paramref name="mine"/>=true: chỉ ứng viên thuộc các tin do
-        /// người đang đăng nhập tạo (Recruiter workspace). Mặc định: toàn bộ (HR/SA).
+        /// Danh sách hồ sơ ứng tuyển — phạm vi do SERVER quyết định theo vai trò và quyền trên tin.
+        ///
+        /// <paramref name="mine"/> nay chỉ là BỘ LỌC GIAO DIỆN ("chỉ hiện tin tôi tạo"), thu hẹp
+        /// thêm bên trong phạm vi đã được phép. Trước đây nó là cổng bảo mật duy nhất và do client
+        /// tự khai — bỏ tham số đi là đọc được hồ sơ của toàn công ty.
         /// </summary>
         [HttpGet]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> GetApplications([FromQuery] bool mine, CancellationToken ct)
         {
-            Guid? mineUid = null;
-            if (mine)
-            {
-                if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
-                    return Unauthorized(new { message = "Không xác định được người dùng." });
-                mineUid = uid;
-            }
+            if (_currentUserService.UserId is not { } uid || uid == Guid.Empty)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            var result = await _sender.Send(new GetApplicationsQuery(mineUid), ct);
+            var result = await _sender.Send(new GetApplicationsQuery(uid, _currentUserService.Role, mine), ct);
             if (result.IsFailure)
                 return BadRequest(new { message = result.Error });
 
@@ -180,41 +224,75 @@ namespace ARI.API.Controllers
             return Ok(new { eligible = result.Value });
         }
 
-        /// <summary>
-        /// Duyệt CV kèm xếp lịch vòng 1 (một thao tác — không còn duyệt suông).
-        /// <c>slotId</c> bắt buộc: hệ thống chốt chỗ rồi gửi thư mời phỏng vấn kèm giờ hẹn.
-        /// </summary>
-        [HttpPost("{id}/accept")]
-        [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm duyệt hồ sơ
-        public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptApplicationRequest? request, CancellationToken ct)
+        /// <summary>Lịch sử thư đã gửi cho ứng viên này (ADR-061) — tab "Lịch sử email".</summary>
+        [HttpGet("{id}/emails")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetEmails(Guid id, CancellationToken ct)
         {
             var result = await _sender.Send(
-                new AcceptApplicationCommand(id, request?.SlotId ?? Guid.Empty, _currentUserService.UserId, _currentUserService.Role), ct);
-            if (result.IsFailure)
-            {
-                return result.ErrorCode switch
-                {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
-                };
-            }
+                new GetApplicationEmailsQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
+        }
 
-            return Ok(new
-            {
-                message = "Đã duyệt hồ sơ, xếp lịch phỏng vấn vòng 1 và gửi thư mời cho ứng viên.",
-                bookingId = result.Value.BookingId,
-            });
+        // ─────────── Cổng duyệt shortlist của Hiring Manager (ADR-061) ───────────
+
+        /// <summary>
+        /// Chủ tin gửi hồ sơ cho Hiring Manager duyệt. Hồ sơ chuyển sang <c>hm_review</c> và
+        /// KHÔNG xếp lịch được cho tới khi cổng mở.
+        /// </summary>
+        [HttpPost("{id}/request-hm-approval")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> RequestHmApproval(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new RequestHmApprovalCommand(id, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure
+                ? MapFailure(result.ErrorCode, result.Error)
+                : Ok(new { message = "Đã gửi hồ sơ cho Hiring Manager duyệt." });
+        }
+
+        /// <summary>Hiring Manager duyệt hoặc từ chối hồ sơ trong shortlist.</summary>
+        [HttpPost("{id}/hm-decision")]
+        [Authorize(Policy = "HiringDecision")]
+        public async Task<IActionResult> HmDecision(Guid id, [FromBody] HmDecisionRequest request, CancellationToken ct)
+        {
+            var windows = (request.Availabilities ?? new List<HmAvailabilityWindowRequest>())
+                .Select(w => new ARI.Application.Scheduling.HmAvailabilityWindowInput(w.StartTime, w.EndTime, w.Note))
+                .ToList();
+
+            var result = await _sender.Send(new HmDecideApplicationCommand(
+                id, request.Decision, request.Note, _currentUserService.UserId, _currentUserService.Role, windows), ct);
+            return result.IsFailure
+                ? MapFailure(result.ErrorCode, result.Error)
+                : Ok(new { message = "Đã ghi nhận quyết định của Hiring Manager." });
+        }
+
+        /// <summary>
+        /// Quản trị viên vượt cổng duyệt (HM nghỉ / gấp). Lý do bắt buộc, ghi audit log và
+        /// báo cho chính Hiring Manager bị vượt.
+        /// </summary>
+        [HttpPost("{id}/hm-bypass")]
+        [Authorize(Policy = "HrManagement")]
+        public async Task<IActionResult> HmBypass(Guid id, [FromBody] HmBypassRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new BypassHmApprovalCommand(
+                id, request.Reason, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure
+                ? MapFailure(result.ErrorCode, result.Error)
+                : Ok(new { message = "Đã vượt cổng duyệt và thông báo cho Hiring Manager." });
         }
 
         [HttpPost("{id}/reject")]
         [Authorize(Policy = "InternalStaff")] // Chỉ HR / Staff mới có quyền bấm từ chối
-        public async Task<IActionResult> Reject(Guid id, CancellationToken ct)
+        public async Task<IActionResult> Reject(
+            Guid id, [FromBody] RejectApplicationRequest? request, CancellationToken ct)
         {
-            var result = await _sender.Send(new RejectApplicationCommand(id), ct);
+            var result = await _sender.Send(
+                new RejectApplicationCommand(
+                    id, _currentUserService.UserId, _currentUserService.Role, request?.EmailOverride), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return MapFailure(result.ErrorCode, result.Error);
             }
 
             return Ok(new { message = "Đã từ chối hồ sơ ứng tuyển và gửi thư cảm ơn cho ứng viên." });

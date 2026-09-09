@@ -8,13 +8,14 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 
 ---
 
-## User Roles (4 Vai trò người dùng)
+## User Roles (5 Vai trò người dùng)
 
 | Role | Mô tả & Phân quyền |
 |---|---|
 | **Super Admin** | **Quản trị viên hệ thống** – Cấu hình hệ thống toàn cục (Allowed domains cho OAuth2, webhook endpoint), quản lý tài khoản HR, theo dõi toàn bộ `audit_log` hệ thống. |
-| **HR Leader** | **Trưởng nhóm HR / HR Admin** – Quản lý Job Posting, cấu hình câu hỏi phỏng vấn, upload và quản trị Playbook phỏng vấn nội bộ, xem chi tiết Evaluation Report, quyết định phê duyệt (`Confirm`) hoặc thay đổi kết quả AI đề xuất (`Override` - bắt buộc nhập lý do). |
-| **Recruiter (HR Staff)** | **Chuyên viên tuyển dụng** – Tạo Job Posting nháp, quản lý thông tin ứng viên, tạo và cấp mã **Interview Code** cho ứng viên thi thật On-site tại văn phòng, xem Evaluation Report của ứng viên (không có quyền override kết quả hoặc thay đổi cấu hình toàn cục). |
+| **HR Leader** | **Trưởng nhóm HR / HR Admin** – Sở hữu **quy trình và tuân thủ**, không phải quyết định tuyển: quản lý Job Posting, duyệt tin lên `active`, cấu hình câu hỏi phỏng vấn, upload và quản trị Playbook, xem mọi Evaluation Report. Là **người chốt dự phòng** khi tin chưa gán Hiring Manager, hoặc khi cần chốt thay (bắt buộc nhập lý do, ghi `audit_log` và báo cho chính HM bị vượt) – ADR-061. |
+| **Hiring Manager** | **Trưởng bộ phận có nhu cầu tuyển – NGƯỜI RA QUYẾT ĐỊNH TUYỂN** (ADR-061). Ký duyệt mô tả công việc trước khi tin được đăng, duyệt shortlist trước khi ứng viên được xếp lịch, **chốt Pass/Not Pass kết quả AI** (kể cả `Override`, bắt buộc nhập lý do), duyệt mức lương/điều kiện của thư mời nhận việc, đề xuất cấp bậc + dải lương để điền sẵn thư mời. Phạm vi dữ liệu tính theo **đội tuyển dụng của từng tin** (`job_hiring_team_members`), KHÔNG theo phòng ban. Không vận hành phễu: không xếp lịch, không cấp mã, không sửa tin. |
+| **Recruiter (HR Staff)** | **Chuyên viên tuyển dụng** – Vận hành phễu: tạo Job Posting nháp, sàng lọc và gửi hồ sơ cho Hiring Manager duyệt, xếp lịch phỏng vấn, cấp mã **Interview Code** On-site, soạn thư mời nhận việc. Xem được Evaluation Report của tin mình phụ trách nhưng **không chốt kết quả** – chủ tin vận hành phễu, không quyết định tuyển. |
 | **Candidate** | **Ứng viên** – Tạo tài khoản cá nhân, tìm kiếm và tự ứng tuyển việc IT qua Job Board; nhận Magic Link vào Candidate Portal để đặt lịch và làm **Phỏng vấn thử (Practice Remote)** tại nhà; đến văn phòng công ty và nhập mã Interview Code để làm **Phỏng vấn thật (Real On-site)**; xem lại video recording, transcript, feedback sau khi HR Leader duyệt. |
 
 ---
@@ -32,8 +33,9 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
   * Xác thực truyền thống qua form điền **Email + Mật khẩu cá nhân** (tự đăng ký trước đó).
 * **Cổng dành cho ứng viên Candidate Portal (Xem kết quả/Lên lịch)**:
   * Xác thực **không mật khẩu (Passwordless)**. Ứng viên nhập Email -> Hệ thống gửi **Magic Link** về email -> Click link đăng nhập trực tiếp.
-* **Cổng Kiosk phỏng vấn On-site (Tại văn phòng)**:
-  * Giao diện khóa (Kiosk Mode) tại văn phòng. Chỉ hiển thị form nhập mã **Interview Code** gồm 6 ký tự.
+* **Cổng phỏng vấn On-site — máy trạm tại văn phòng** (tên nội bộ: *Kiosk*):
+  * Trình duyệt chạy **toàn màn hình có ràng buộc**, chỉ hiển thị form nhập mã **Interview Code** gồm 6 ký tự. Không cần đăng nhập — mã đổi lấy JWT phạm vi một phiên (ADR-052).
+  * **Không phải kiosk cấp hệ điều hành.** Trình duyệt không khoá được Alt+Tab, phím Windows hay màn hình phụ; lớp ràng buộc của ADR-054 là **răn đe + ghi bằng chứng**, không phải ngăn chặn tuyệt đối. Khoá cứng thật là **bước cấu hình máy trạm** (`chrome --kiosk` + Windows Assigned Access) — xem ADR-062 và `docs/kiosk-workstation-setup.md`.
 
 ### 2. Phân tách Quy trình Đăng ký (Registration Flow)
 * **Đối với HR Leader / Recruiter**: **Không có tính năng Đăng ký (Sign up) công khai**.
@@ -62,7 +64,7 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 ### On-site Interview (Phỏng vấn thật tại công ty)
 - **BẮT BUỘC CHO MỌI VÒNG PHỎNG VẤN THẬT.**
 - Candidate đến văn phòng công ty **đúng khung giờ đã đặt lịch** (Availability Slot của vòng). Recruiter/HR cấp **Interview Code** (one-time-use, có TTL – mặc định 2 giờ; chỉ dùng cho real, không có `code_type`).
-- Candidate nhập code tại thiết bị Kiosk của công ty → vào phỏng vấn ngay. Code vô hiệu hóa ngay sau khi dùng thành công.
+- Candidate nhập code tại **máy trạm phỏng vấn** của công ty → vào phỏng vấn ngay. Code vô hiệu hóa ngay sau khi dùng thành công.
 - RAG pipeline sử dụng toàn bộ dữ liệu: JD + CV + Playbook nội bộ công ty (style guide, question bank, technical scenarios, v.v.).
 
 ---
@@ -81,6 +83,21 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 | Scoring Rubric | ⬜ | Custom tiêu chí đánh giá per Job Posting |
 | Interview Persona | ⬜ | Tên, giọng, phong cách avatar AI |
 | **Interview Playbook** | ⬜ | Upload tài liệu phỏng vấn nội bộ (câu hỏi, kịch bản, rubric chi tiết, ...) |
+| **Hiring Manager** | ⬜ | Trưởng bộ phận phụ trách tin (ADR-061). Gán ở form tạo tin hoặc panel "Đội tuyển dụng" trên trang chi tiết. **Bỏ trống thì tin chạy y hệt trước ADR-061, không có cổng duyệt nào** |
+
+#### Cổng ký duyệt mô tả công việc (ADR-061)
+
+Chỉ áp dụng cho tin **đã gán Hiring Manager**:
+
+```
+draft --[chủ tin gửi duyệt]--> pending + hm_sign_off_status = pending, báo HM
+     HM ký duyệt  → approved → HR Admin duyệt đăng bình thường
+     HM yêu cầu sửa → rejected + góp ý → chủ tin sửa rồi gửi lại (tự reset về pending)
+     HR Admin duyệt đăng khi chưa có chữ ký → BỊ CHẶN, trừ khi nhập lý do vượt cổng
+                                              (ghi audit_log + báo cho HM bị vượt)
+```
+
+Ký duyệt là một **cột trên tin**, không phải trạng thái mới trong vòng đời tin: ký duyệt và vòng đời tin là hai trục vuông góc.
 
 ### Phase 2: Candidate Application
 - Candidate tự ứng tuyển qua **Job Board** (chủ động) hoặc được HR mời trực tiếp (passive).
@@ -103,7 +120,24 @@ Hệ thống ARISP áp dụng các cổng đăng nhập và quy trình đăng k�
 2. *(Tùy chọn)* Candidate upload CV → Gemini phân tích → hiển thị Match Score + Summary.
 3. Candidate bấm "Ứng tuyển" → điền thông tin (hoặc dùng lại CV đã upload) → Submit.
 4. Application được tạo kèm kết quả CV-JD Analysis (nếu có) → HR thấy ngay trên dashboard.
-5. Dựa trên bảng xếp hạng `matchScore` + review CV thủ công, HR chọn ứng viên và gửi **magic link**.
+5. Dựa trên bảng xếp hạng `matchScore` + review CV thủ công, Recruiter chọn ứng viên.
+
+#### Cổng duyệt shortlist của Hiring Manager (ADR-061)
+
+Chỉ áp dụng cho tin **đã gán Hiring Manager**:
+
+```
+cv_submitted --[Recruiter: "Gửi HM duyệt"]--> hm_review, hm_decision = pending, báo HM
+  HM duyệt          → hm_decision = approved  (trạng thái GIỮ NGUYÊN — cổng mở, vị trí không đổi)
+  HM loại (kèm lý do) → hm_decision = rejected, hồ sơ → cv_rejected
+  Admin vượt cổng    → hm_decision = bypassed + audit_log + BÁO CHO HM BỊ VƯỢT
+                        (nhãn RIÊNG, không gộp vào "đã duyệt")
+  → cổng mở rồi, Recruiter mới duyệt CV + xếp lịch được (ADR-059, một thao tác nguyên tử)
+```
+
+**Vì sao HM duyệt xong Recruiter mới xếp lịch, chứ không phải HM duyệt kèm chọn ca:** việc duyệt sẽ **hỏng vì lý do lịch** ("khung giờ đã đầy") — một cái duyệt trượt vì hết ghế là vô nghĩa. Và Hiring Manager không phải người vận hành lịch.
+
+6. Recruiter duyệt CV **kèm xếp lịch vòng 1 trong một thao tác** (ADR-059) → mở **trình soạn thư mời** đã điền sẵn giờ hẹn + địa điểm (ADR-061) → gửi.
 - Candidate nhận magic link → truy cập **Candidate Portal** để:
   - Xem thông tin vị trí ứng tuyển.
   - **Chọn khung giờ (Availability Slot) cho buổi phỏng vấn thật của vòng đó.**
@@ -143,12 +177,45 @@ Round N kết thúc → AI Evaluation → HR Leader Review
 - **Per-question analysis**
 - **Recommended next step**
 
-### Phase 6: HR Leader Review & Confirm
-- HR Leader xem Evaluation Report + recording.
-- **Confirm** hoặc **Override** (kèm `override_reason` bắt buộc).
-- Sau confirm → hệ thống tự động lưu kết quả, cho phép Recruiter cấp mã Interview Code mới nếu có vòng sau (Round N+1) hoặc gửi email thông báo từ chối.
+### Phase 6: Hiring Manager chốt kết quả (ADR-061)
 
-### Phase 7: Candidate Portal
+**Người chốt là Hiring Manager của tin, không phải HR Leader.** AI thay người *phỏng vấn*, không thay người *quyết định*; và người quyết định là trưởng bộ phận sẽ làm việc cùng ứng viên đó.
+
+- Hiring Manager xem Evaluation Report + recording → **Confirm** hoặc **Override** (kèm `override_reason` bắt buộc).
+- Ghi kèm **đề xuất cấp bậc + dải lương + điểm mạnh / điểm cần lưu ý** → điền sẵn vào thư mời nhận việc ở Phase 8, để công sức lúc chốt không phải gõ lại.
+- **Tin chưa gán Hiring Manager:** HR Admin / Super Admin chốt như trước, **không cần lý do gì** — đây là đường mặc định, không phải ngoại lệ.
+- **Tin ĐÃ gán Hiring Manager mà admin chốt thay:** bắt buộc nhập `fallback_reason` (≥ 10 ký tự) → ghi `audit_log` + **báo cho chính Hiring Manager bị vượt**. Cổng mềm để một người nghỉ phép không làm cả phễu đứng; nhưng bypass im lặng mới là thất bại quản trị.
+- **Recruiter không chốt được** ở bất kỳ trường hợp nào — chủ tin vận hành phễu, không quyết định tuyển.
+- Sau confirm → `Application.Status` cập nhật một lần theo `ResolveTotalRoundsAsync` (ADR-053): không đạt → `not_pass`; đạt & còn vòng → `interview`; **đạt & vòng cuối → `pass`**.
+
+### Phase 7: Offer → Hired (ADR-061)
+
+Đoạn kết của phễu, chạy **trọn trong hệ thống** — trước đây thư chúc mừng nói *"HR sẽ liên hệ để gửi Offer Letter"*, tức quy trình thoát khỏi hệ thống đúng ở bước quan trọng nhất.
+
+```
+(pass) → nháp → gửi duyệt → Hiring Manager duyệt → GỬI ứng viên → ứng viên nhận / từ chối
+                                  ↓ trả về nháp (kèm góp ý)
+```
+
+- Recruiter/HR soạn thư mời, **điền sẵn từ đề xuất lương Hiring Manager đã ghi ở Phase 6**.
+- Hiring Manager duyệt mức lương và điều kiện, hoặc trả về bản nháp kèm góp ý.
+- Gửi đi thì mở **trình soạn thảo** (Phase 8) — thư mời nhận việc là văn bản cam kết.
+- **Hồ sơ chuyển sang `offer` lúc GỬI, không phải lúc tạo nháp** — bản nháp không phải lời hứa.
+- Ứng viên nhận → `hired`; từ chối → `offer_declined`; quá hạn → hosted service tự đóng `expired` + `offer_declined`.
+- **Một hồ sơ chỉ có MỘT thư mời còn hiệu lực** — chặn bằng unique index có filter ở tầng DB, không phải câu `if`.
+- Ghi chú đàm phán nội bộ (`notes`) **không bao giờ** ra tới Portal: DTO của ứng viên là lớp riêng, trường đó không tồn tại ở đó.
+
+### Phase 8: Thư gửi ứng viên — điền sẵn, sửa được, rồi mới gửi (ADR-061)
+
+Luật phân loại: **có người bấm nút thì có trình soạn; máy tự gửi thì không.**
+
+- Bấm nút gửi → mở trình soạn **đã điền đầy đủ theo mẫu**, mọi giá trị đã thay thật (không còn placeholder). Nhân sự sửa câu chữ hoặc thêm ghi chú rồi mới gửi.
+- Việc gửi nằm trong **chính lệnh nghiệp vụ** (duyệt CV + xếp lịch, loại hồ sơ, gửi thư mời) — **bấm Huỷ = không có gì xảy ra cả**: không chốt chỗ, không đổi trạng thái, không thư nào rời hệ thống. Giữ nguyên tính nguyên tử mà ADR-059 đã phải đi chữa.
+- Không sửa gì → gửi đúng mẫu, hành vi y hệt trước đây.
+- Nội dung **lọc HTML ở server** trước khi gửi; `email_logs` lưu **đúng bản đã gửi** (không phải bản dựng lại từ mẫu) → tab "Lịch sử email" trên trang chi tiết ứng viên, và là bằng chứng nội dung đã cam kết với thư mời nhận việc.
+- Thư hệ thống tự phát (xác nhận nộp hồ sơ, nhắc lịch 24h/3h, quét no-show, xác minh email) **không có trình soạn** — không ai đứng sau để soạn.
+
+### Phase 9: Candidate Portal
 - Đăng nhập bằng email + magic link (không cần password).
 - Xem: recording, transcript, Evaluation Report (phần HR cho phép hiển thị), feedback.
 
@@ -243,7 +310,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | **CV-JD Analysis** | Google Gemini 2.5 Flash | Phân tích CV vs JD, chấm điểm match, tóm tắt – dành cho candidate xem trước + HR review |
 | **STT + VAD** | **Deepgram Nova-3** | Streaming real-time; **gộp sẵn VAD + endpointing** (`vad_events`/`endpointing`/`utterance_end`) — không cần thư viện VAD riêng |
 | **TTS** | ElevenLabs Flash v2.5 | Streaming (~75ms) |
-| **Avatar** | HeyGen Streaming Avatar | Hybrid Idle Strategy |
+| **Avatar** | — | ĐÃ GỠ (ADR-067): buổi phỏng vấn thuần audio, màn hình chỉ còn chỉ báo trạng thái |
 | **Email** | SendGrid / AWS SES | Invite, magic link, kết quả |
 | **File Storage** | `IFileStorageService` – Local disk (dev) / Cloudflare R2 (prod) | S3-compatible qua `AWSSDK.S3`, presigned URL; DB lưu `storageKey` (ADR-036) |
 | **Containers** | Docker + Docker Compose | |
@@ -255,7 +322,7 @@ Tính năng giúp ứng viên làm quen với format phỏng vấn AI trước k
 | ** CDN** | Cloudflare CDN | Optional – sau MVP |
 | **Version Control** | GitHub | |
 
-> **Streaming-First:** Deepgram STT stream (+VAD) → Hybrid RAG parallel → GPT-4o stream → ElevenLabs Flash v2.5 stream → HeyGen Avatar stream. Mục tiêu: **~0.8–1.2 giây** latency sau khi ứng viên dừng nói (cascaded tối ưu — ADR-006/043).
+> **Streaming-First:** Deepgram STT stream (+VAD) → Hybrid RAG parallel → GPT-4o stream → ElevenLabs Flash v2.5 stream → WebAudio. Mục tiêu: **~0.8–1.2 giây** latency sau khi ứng viên dừng nói (cascaded tối ưu — ADR-006/043).
 
 ---
 

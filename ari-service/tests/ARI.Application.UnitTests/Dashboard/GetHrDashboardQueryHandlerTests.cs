@@ -8,6 +8,7 @@ using ARI.Application.Dashboard.Queries.GetHrDashboard;
 using ARI.Application.DTOs;
 using ARI.Application.UnitTests.ApplicationFlow;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -20,8 +21,12 @@ namespace ARI.Application.UnitTests.Dashboard;
 /// </summary>
 public class GetHrDashboardQueryHandlerTests
 {
-    private static Task<Result<HrDashboardResponse>> Run(InMemoryUnitOfWork uow)
-        => new GetHrDashboardQueryHandler(uow).Handle(new GetHrDashboardQuery(), CancellationToken.None);
+    /// <summary>Mặc định chạy dưới quyền quản trị viên (thấy toàn công ty) để các bài dưới đây
+    /// kiểm đúng phép tính KPI; phần phạm vi dữ liệu có test riêng ở cuối file.</summary>
+    private static Task<Result<HrDashboardResponse>> Run(
+        InMemoryUnitOfWork uow, Guid? userId = null, string? role = null)
+        => new GetHrDashboardQueryHandler(uow).Handle(
+            new GetHrDashboardQuery(userId ?? Guid.NewGuid(), role ?? AppRoles.HrAdmin), CancellationToken.None);
 
     private static Evaluation Eval(Guid appId, int round, string verdict)
         => new() { ApplicationId = appId, SessionId = Guid.NewGuid(), RoundNumber = round, AiVerdict = verdict };
@@ -121,5 +126,58 @@ public class GetHrDashboardQueryHandlerTests
         Assert.Equal(2, withEvals.LatestRound);                    // vòng cao nhất
         Assert.Equal("pass", withEvals.LatestVerdict);
         Assert.Null(withEvals.MatchScore);                         // không phân tích → null
+    }
+
+    // ===== Phạm vi dữ liệu (Phase 1 của ADR-061) =====
+
+    private static (InMemoryUnitOfWork uow, Guid ownerA) TwoRecruitersOneJobEach()
+    {
+        var ownerA = Guid.NewGuid();
+        var jobA = ApplicationData.Job(owner: ownerA);
+        var jobB = ApplicationData.Job(owner: Guid.NewGuid());
+
+        var uow = new InMemoryUnitOfWork().Seed(jobA, jobB)
+            .Seed(ApplicationData.Application(jobA.Id, email: "a@x.io"))
+            .Seed(ApplicationData.Application(jobB.Id, email: "b@x.io"));
+
+        return (uow, ownerA);
+    }
+
+    [Fact]
+    public async Task Recruiter_dashboard_counts_only_their_own_jobs_and_applications()
+    {
+        // Trước đây màn tổng quan gom TOÀN BỘ tin và hồ sơ của công ty cho mọi InternalStaff —
+        // kèm tên ứng viên gần đây và bảng hiệu suất của từng recruiter khác.
+        var (uow, ownerA) = TwoRecruitersOneJobEach();
+
+        var d = (await Run(uow, userId: ownerA, role: AppRoles.Recruiter)).Value!;
+
+        Assert.Equal(1, d.ActiveJobs);
+        Assert.Equal(1, d.TotalApplications);
+        Assert.Single(d.RecentCandidates);
+        Assert.Single(d.TopJobs);
+    }
+
+    [Fact]
+    public async Task Admin_dashboard_still_covers_the_whole_company()
+    {
+        var (uow, _) = TwoRecruitersOneJobEach();
+
+        var d = (await Run(uow, role: AppRoles.HrAdmin)).Value!;
+
+        Assert.Equal(2, d.ActiveJobs);
+        Assert.Equal(2, d.TotalApplications);
+    }
+
+    [Fact]
+    public async Task Hiring_manager_with_no_assigned_jobs_sees_an_empty_dashboard()
+    {
+        var (uow, _) = TwoRecruitersOneJobEach();
+
+        var d = (await Run(uow, userId: Guid.NewGuid(), role: AppRoles.HiringManager)).Value!;
+
+        Assert.Equal(0, d.ActiveJobs);
+        Assert.Equal(0, d.TotalApplications);
+        Assert.Empty(d.RecentCandidates);
     }
 }

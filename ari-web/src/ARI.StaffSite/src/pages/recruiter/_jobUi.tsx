@@ -33,16 +33,23 @@ export const jobStatusBadge = (s: string, deadline?: string | null): string => {
   } as Record<string, string>)[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
 }
 
-// ===== Trạng thái Application (khớp backend: invited|cv_submitted|screening|interview|pass|not_pass|withdrawn) =====
+// ===== Trạng thái Application =====
+// Khớp `ApplicationStatuses` phía backend. ĐÂY LÀ NƠI DUY NHẤT dịch trạng thái hồ sơ sang nhãn
+// hiển thị, nên thiếu một khoá là mọi màn hình cùng lúc hiện chuỗi thô (`hm_review`, `offer_declined`)
+// ra cho người dùng đọc — bốn trạng thái của ADR-061 từng ở đúng tình trạng đó.
 export const appStatusLabel = (s: string): string =>
   ({
     invited: 'Đã mời',
     cv_submitted: 'Mới ứng tuyển',
+    hm_review: 'Chờ Hiring Manager duyệt',
     screening: 'Đang sơ loại',
     interview: 'Đang phỏng vấn',
     pass: 'Đạt',
     not_pass: 'Không đạt',
     cv_rejected: 'Từ chối (CV)',
+    offer: 'Đã gửi thư mời',
+    hired: 'Đã nhận việc',
+    offer_declined: 'Từ chối thư mời',
     withdrawn: 'Đã rút',
   } as Record<string, string>)[s] || s
 
@@ -50,11 +57,16 @@ export const appStatusBadge = (s: string): string =>
   ({
     invited: 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400',
     cv_submitted: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    hm_review: 'bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400',
     screening: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
     interview: 'bg-ai-100 dark:bg-ai-500/20 text-ai-700 dark:text-ai-400',
     pass: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
     not_pass: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
     cv_rejected: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+    offer: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
+    // "Đã nhận việc" là đích của cả phễu — cho nó sắc riêng, không dùng chung với "Đạt".
+    hired: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400',
+    offer_declined: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
     withdrawn: 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400',
   } as Record<string, string>)[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
 

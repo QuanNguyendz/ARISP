@@ -165,7 +165,10 @@ def _rubric_block(ctx: SessionContext) -> str:
     return "COMPANY SCORING RUBRIC (weights sum to 100):" + chr(10) + chr(10).join(lines)
 
 
-def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
+def evaluate_prompt(
+    ctx: SessionContext,
+    expected_answers: list[str] | None = None,
+) -> tuple[str, str]:
     import json
 
     lang = language_name(ctx.language)
@@ -193,10 +196,22 @@ def evaluate_prompt(ctx: SessionContext) -> tuple[str, str]:
         f"in {report_lang}, and never mix languages within the report."
     )
     history = json.dumps([qa.model_dump(by_alias=True) for qa in ctx.chat_history], ensure_ascii=False)
+    # Đáp án mong đợi do doanh nghiệp soạn (playbook `expected_answer`) — ĐÂY mới là chỗ dùng nó.
+    # Trước đây nó chỉ tới được prompt SINH CÂU HỎI (để biết cần đào sâu tới đâu) và không bao giờ
+    # tới prompt CHẤM, nên tài liệu HR upload lên không hề ảnh hưởng điểm số dù ADR-025 nói là
+    # "dùng để chấm chứ không đọc cho ứng viên nghe".
+    expected_block = ""
+    if expected_answers:
+        expected_block = (
+            "\n\nReference answers written by the company (playbook `expected_answer`). "
+            "Grade the candidate against these, not against your own idea of a good answer. "
+            "A candidate may phrase things differently and still be correct:\n"
+            + "\n".join(f"- {e}" for e in expected_answers)
+        )
     user = (
         f"Job Description:\n{ctx.job_description[:4000]}\n\n"
         f"Candidate CV:\n{ctx.candidate_cv[:4000]}\n\n"
-        f"Scoring Rubric:\n{_rubric_block(ctx)}\n\n"
+        f"Scoring Rubric:\n{_rubric_block(ctx)}{expected_block}\n\n"
         f"QA History:\n{history}"
     )
     return system, user

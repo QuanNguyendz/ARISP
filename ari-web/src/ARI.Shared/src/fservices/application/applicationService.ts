@@ -75,14 +75,11 @@ export const applicationService = {
    * Duyệt CV KÈM khung giờ vòng 1 — backend chốt chỗ rồi gửi thư mời phỏng vấn có giờ hẹn.
    * `slotId` là bắt buộc: duyệt suông sẽ để ứng viên không nhận được thư nào.
    */
-  async acceptApplication(applicationId: string, slotId: string): Promise<{ bookingId: string }> {
-    const { data } = await apiClient.post<{ bookingId: string }>(
-      `/applications/${applicationId}/accept`,
-      { slotId }
-    )
-    return data
-  },
-
+  /**
+   * Duyệt CV + xếp lịch vòng 1 trong MỘT thao tác (ADR-059).
+   * `emailOverride`: nội dung thư mời do nhân sự sửa ở trình soạn thảo (ADR-061) — gửi KÈM lệnh
+   * này chứ không phải một lời gọi riêng, để huỷ trình soạn = không chốt chỗ, không gửi thư.
+   */
   async rejectApplication(applicationId: string): Promise<void> {
     await apiClient.post(`/applications/${applicationId}/reject`)
   },
