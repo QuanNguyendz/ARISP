@@ -68,7 +68,11 @@ export default function OfferEditorModal({
   const role = normalizeRole(useAuthStore((s) => s.user)?.role)
 
   const isAdmin = role === ROLE.SuperAdmin || role === ROLE.HRAdmin
-  const canDecide = isAdmin || role === ROLE.HiringManager
+  // ADR-063: CHỐT thư là việc của HR Leader / Super Admin (policy `OfferApproval`). Trước đây Hiring Manager
+  // cũng thấy nút Duyệt — bấm vào chỉ để nhận 403, sót lại từ ADR-061 khi HM còn là người duyệt thư.
+  const canDecide = isAdmin
+  // GỬI cho ứng viên (qua trình soạn thư) là việc của chủ tin / quản trị viên — HM soạn và gửi duyệt, không gửi.
+  const canSend = role !== ROLE.HiringManager
 
   const status = offer?.status ?? OFFER_STATUS.Draft
   const editable = !offer || status === OFFER_STATUS.Draft
@@ -484,7 +488,7 @@ export default function OfferEditorModal({
               </button>
             )}
 
-            {offer && status === OFFER_STATUS.Approved && (
+            {offer && status === OFFER_STATUS.Approved && canSend && (
               <button
                 type="button"
                 className={PRIMARY_BTN}

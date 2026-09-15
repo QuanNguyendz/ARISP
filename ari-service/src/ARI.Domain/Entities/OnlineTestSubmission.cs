@@ -19,6 +19,16 @@ namespace ARI.Domain.Entities
         /// tín hiệu chống gian lận nhẹ do FE đếm và gửi kèm khi nộp. &gt; 0 → HR thấy cờ nghi vấn.
         /// </summary>
         public int TabSwitchCount { get; set; }
+
+        /// <summary>
+        /// Ai nộp bài này — <see cref="Constants.OnlineTestSubmittedBy"/>. <c>system</c> = ứng viên
+        /// không vào làm bài trong khung giờ đã hẹn, hệ thống tự nộp một bài trống khi hết hạn.
+        ///
+        /// Phải là cột riêng chứ không suy từ "bài trống": người vào làm rồi bỏ trắng hết cũng ra
+        /// 0 điểm, nhưng hai trường hợp đó là hai câu chuyện khác nhau với người tuyển dụng.
+        /// </summary>
+        public string SubmittedBy { get; set; } = Constants.OnlineTestSubmittedBy.Candidate;
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 }

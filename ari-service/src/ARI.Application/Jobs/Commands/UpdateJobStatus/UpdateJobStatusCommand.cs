@@ -16,9 +16,11 @@ using Microsoft.Extensions.Logging;
 namespace ARI.Application.Jobs.Commands.UpdateJobStatus
 {
     /// <summary>
-    /// Approval workflow tin tuyển dụng: Recruiter draft→pending / active→closed;
-    /// HrAdmin/SuperAdmin pending→active|rejected, →archived. Duyệt pending→active ghi nhận
-    /// người duyệt + đóng dấu duyệt lên file JD (best-effort).
+    /// Vòng đời tin tuyển dụng: Recruiter <c>draft|rejected → pending</c> (gửi Hiring Manager ký) và
+    /// <c>active → closed</c>; tin lên <c>active</c> khi HM ký (<c>JobHmSignOffCommand</c> gọi lại lệnh này)
+    /// hoặc quản trị viên vượt cổng có lý do; HM yêu cầu sửa thì tin về <c>rejected</c> (ADR-063/068).
+    /// HR Admin vẫn từ chối được tin đang chờ. Đăng lần đầu ghi nhận người duyệt + đóng dấu duyệt lên
+    /// file JD (best-effort).
     /// </summary>
     public record UpdateJobStatusCommand(Guid Id, UpdateJobStatusRequest Request, Guid UserId, string? Role)
         : IRequest<Result<JobPostingResponse>>;
@@ -144,10 +146,20 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                 if (job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow)
                     return Result.Failure<JobPostingResponse>("Hạn nộp hồ sơ của Job này đã ở quá khứ. Hãy cập nhật lại gia hạn Deadline trước khi chuyển sang Active.");
 
-                // Cổng ký duyệt JD của Hiring Manager (ADR-061). Tin KHÔNG gán HM thì
-                // HmSignOffStatus là null → không chặn gì, hành vi y hệt trước đây.
-                if (Domain.Constants.HmSignOffStatus.IsBlocking(job.HmSignOffStatus))
+                // Cổng ký duyệt JD của Hiring Manager (ADR-061/063) — áp cho lần đăng ĐẦU (từ nháp hoặc
+                // đang chờ duyệt). Mở lại tin đã đóng thì tin đã từng qua cổng, không ký lại.
+                //
+                // ADR-068: `null` KHÔNG còn nghĩa là "không có cổng". Mọi tin đều có Hiring Manager, nên
+                // chưa có chữ ký thì chỉ có hai đường: HM ký (lệnh ký duyệt ghi `approved` rồi mới gọi tới
+                // đây), hoặc quản trị viên vượt cổng có lý do.
+                var firstPublish = currentStatus == "pending" || currentStatus == "draft";
+                if (firstPublish && !Domain.Constants.HmSignOffStatus.IsCleared(job.HmSignOffStatus))
                 {
+                    // Vượt cổng là quyền của QUẢN TRỊ VIÊN. HM không "vượt" chữ ký của chính mình — họ ký.
+                    if (!isSuperOrHrAdmin)
+                        return Result.Failure<JobPostingResponse>(
+                            "Hãy ký duyệt mô tả công việc để đăng tin.", CommonErrorCodes.Forbidden);
+
                     var bypassReason = string.IsNullOrWhiteSpace(command.Request.HmBypassReason)
                         ? null
                         : command.Request.HmBypassReason.Trim();
@@ -156,8 +168,8 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                     {
                         return Result.Failure<JobPostingResponse>(
                             Domain.Constants.HmSignOffStatus.Is(job.HmSignOffStatus, Domain.Constants.HmSignOffStatus.Rejected)
-                                ? "Hiring Manager đã từ chối bản mô tả công việc này. Hãy sửa theo góp ý rồi gửi duyệt lại, hoặc nhập lý do để duyệt vượt cổng."
-                                : "Tin này đang chờ Hiring Manager ký duyệt. Nhập lý do nếu cần duyệt ngay.",
+                                ? "Hiring Manager đã yêu cầu sửa bản mô tả công việc này. Hãy để Recruiter sửa rồi gửi duyệt lại, hoặc nhập lý do (tối thiểu 10 ký tự) để đăng vượt cổng."
+                                : "Tin này chưa được Hiring Manager ký duyệt. Nhập lý do (tối thiểu 10 ký tự) nếu cần đăng ngay.",
                             CommonErrorCodes.Forbidden);
                     }
 
@@ -173,16 +185,23 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                             reason = bypassReason,
                         }), ct);
 
+                    // Ghi thành `bypassed` chứ không để nguyên `pending`: tin đã đăng mà cổng còn "chờ ký"
+                    // thì HM vẫn thấy nút ký và tin vẫn nằm trong danh sách việc của họ.
+                    job.HmSignOffStatus = Domain.Constants.HmSignOffStatus.Bypassed;
+                    job.HmSignOffByUserId = userId;
+                    job.HmSignOffAt = DateTimeOffset.UtcNow;
+                    job.HmSignOffReason = bypassReason;
+
                     if (bypassedHm != null)
                     {
                         await _unitOfWork.Repository<Notification>().AddAsync(new Notification
                         {
                             RecipientUserId = bypassedHm.UserId,
                             Type = "system",
-                            Title = "Tin được duyệt đăng khi chưa có chữ ký của bạn",
-                            Body = $"Tin \"{job.Title}\" đã được duyệt đăng. Lý do: {bypassReason}",
+                            Title = "Tin được đăng khi chưa có chữ ký của bạn",
+                            Body = $"Tin \"{job.Title}\" đã được đăng. Lý do: {bypassReason}",
                             Link = $"/hm/jobs/{job.Id}",
-                            DedupKey = $"job_hm_signoff_bypassed:{job.Id}",
+                            DedupKey = $"job_hm_signoff_bypassed:{job.Id}:{DateTimeOffset.UtcNow.Ticks}",
                             IsRead = false,
                         }, ct);
                     }
@@ -265,30 +284,33 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                 if (currentStatus != "draft" && currentStatus != "rejected")
                     return Result.Failure<JobPostingResponse>("Chỉ có thể gửi duyệt (pending) khi bài viết đang là bản nháp (draft) hoặc bị từ chối (rejected).");
 
-                // Khi sửa xong nộp lại, xóa tạm lý do từ chối cũ để chờ kết quả mới
+                // ADR-068: gửi duyệt là gửi cho MỘT người cụ thể — HM chính của tin. Thiếu HM (tin cũ
+                // chưa gán) hay HM đã bị khoá thì gửi đi là gửi vào chỗ không ai ký, nên chặn ngay tại
+                // đây kèm câu nói rõ HR Leader phải làm gì.
+                var (signOffHm, hmError) = await JobAccess.RequireActiveHiringManagerAsync(_unitOfWork, job.Id, ct);
+                if (signOffHm == null)
+                    return Result.Failure<JobPostingResponse>(hmError!, CommonErrorCodes.Conflict);
+
+                // Khi sửa xong nộp lại, xóa lý do cũ (của HR hay của HM) để chờ kết quả mới
                 job.RejectionReason = null;
 
-                // Mở cổng ký duyệt của Hiring Manager (ADR-061). Tin chưa gán HM giữ null → không
-                // có cổng nào. Reset cả lý do từ chối cũ: gửi lại là một lượt ký mới.
-                var signOffHm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
-                job.HmSignOffStatus = signOffHm == null ? null : Domain.Constants.HmSignOffStatus.Pending;
+                // Mở cổng ký duyệt của Hiring Manager (ADR-061). Reset cả góp ý cũ: gửi lại là một lượt
+                // ký mới.
+                job.HmSignOffStatus = Domain.Constants.HmSignOffStatus.Pending;
                 job.HmSignOffByUserId = null;
                 job.HmSignOffAt = null;
                 job.HmSignOffReason = null;
 
-                if (signOffHm != null)
+                await _unitOfWork.Repository<Notification>().AddAsync(new Notification
                 {
-                    await _unitOfWork.Repository<Notification>().AddAsync(new Notification
-                    {
-                        RecipientUserId = signOffHm.UserId,
-                        Type = "pending",
-                        Title = "Tin tuyển dụng chờ bạn ký duyệt",
-                        Body = $"Tin \"{job.Title}\" cần bạn xác nhận mô tả công việc trước khi đăng.",
-                        Link = $"/hm/jobs/{job.Id}",
-                        DedupKey = $"job_hm_signoff:{job.Id}:{DateTimeOffset.UtcNow.Ticks}",
-                        IsRead = false,
-                    }, ct);
-                }
+                    RecipientUserId = signOffHm.UserId,
+                    Type = "pending",
+                    Title = "Tin tuyển dụng chờ bạn ký duyệt",
+                    Body = $"Tin \"{job.Title}\" cần bạn xác nhận mô tả công việc trước khi đăng.",
+                    Link = $"/hm/jobs/{job.Id}",
+                    DedupKey = $"job_hm_signoff:{job.Id}:{DateTimeOffset.UtcNow.Ticks}",
+                    IsRead = false,
+                }, ct);
             }
 
             // CASE D: Đóng bài ('closed')
@@ -344,66 +366,16 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             if (!string.IsNullOrEmpty(statusResponse.SignedJdFileUrl))
                 statusResponse.SignedJdFileUrl = await _fileStorage.GetUrlAsync(statusResponse.SignedJdFileUrl, ct);
 
-            // Gửi thông báo SignalR và Email tương ứng
+            // Gửi thông báo SignalR và Email tương ứng.
+            //
+            // Gửi duyệt (`pending`) CHỈ báo Hiring Manager (ở trên, cùng giao dịch). Trước đây mọi HR admin
+            // còn nhận thêm thông báo + email "Tin tuyển dụng chờ duyệt" — sót lại từ trước ADR-063, khi HR
+            // Leader còn là người duyệt đăng. Nay họ không phải người hành động tiếp theo, và thư đó dạy họ
+            // bấm "Duyệt" trên một tin mà cổng thật đang chờ chữ ký của người khác. Sự kiện nhóm vẫn giữ để
+            // danh sách tin ở màn HR tự làm mới.
             if (targetStatus == "pending")
             {
                 await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveJobPostingUpdate", new { JobId = job.Id, Status = "pending", Title = job.Title }, ct);
-
-                var creator = await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
-                var creatorName = creator != null
-                    ? (string.IsNullOrWhiteSpace(creator.FullName) ? creator.Email : creator.FullName)
-                    : "Nhân viên";
-
-                var hrAdmins = await _unitOfWork.Repository<User>().FindAsync(
-                    u => u.Role == RoleNames.HrAdmin || u.Role == RoleNames.SuperAdmin, ct);
-                var notifRepo = _unitOfWork.Repository<Notification>();
-                var dedupKey = $"job_pending:{job.Id}:{DateTimeOffset.UtcNow.Ticks}";
-
-                foreach (var hr in hrAdmins)
-                {
-                    var hrSettings = !string.IsNullOrEmpty(hr.SettingsJson)
-                        ? System.Text.Json.JsonSerializer.Deserialize<StaffSettingsDto>(hr.SettingsJson) ?? new StaffSettingsDto()
-                        : new StaffSettingsDto();
-
-                    if (hrSettings.ReceivePush)
-                    {
-                        await notifRepo.AddAsync(new Notification
-                        {
-                            RecipientUserId = hr.Id,
-                            DedupKey = dedupKey,
-                            Type = "pending",
-                            Title = "Tin tuyển dụng chờ duyệt",
-                            Body = $"Tin tuyển dụng \"{job.Title}\" do {creatorName} gửi cần được phê duyệt.",
-                            Link = $"/hr/jobs/{job.Id}",
-                            CreatedAt = DateTimeOffset.UtcNow,
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
-                    }
-
-                    if (hrSettings.ReceiveEmail && !string.IsNullOrWhiteSpace(hr.Email))
-                    {
-                        var subject = $"[ARISP] - Yêu cầu phê duyệt tin tuyển dụng: {job.Title}";
-                        var htmlMessage = $@"
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
-            <h2 style='color: #1e293b; margin-top: 0;'>Yêu cầu phê duyệt tin tuyển dụng</h2>
-            <p style='color: #475569; font-size: 15px;'>Xin chào <strong>{hr.FullName ?? hr.Email}</strong>,</p>
-            <p style='color: #475569; font-size: 15px;'>Nhân viên <strong>{creatorName}</strong> ({creator?.Email ?? "N/A"}) vừa gửi yêu cầu phê duyệt tin tuyển dụng mới:</p>
-            <div style='background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 16px; margin: 20px 0; border-radius: 8px;'>
-                <p style='margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #1e293b;'>{job.Title}</p>
-                {(string.IsNullOrEmpty(job.Department) ? "" : $"<p style='margin: 0 0 4px 0; color: #64748b; font-size: 14px;'>Phòng ban: {job.Department}</p>")}
-                <p style='margin: 0; color: #64748b; font-size: 14px;'>Người tạo tin: <strong>{creatorName}</strong></p>
-            </div>
-            <p style='color: #475569; font-size: 15px;'>Vui lòng bấm vào nút bên dưới để xem chi tiết và phê duyệt tin tuyển dụng này:</p>
-            <div style='text-align: center; margin: 28px 0;'>
-                <a href='http://localhost:3001/hr/jobs/{job.Id}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem &amp; Duyệt tin tuyển dụng</a>
-            </div>
-            <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
-            <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Hệ thống tuyển dụng ARISP.</p>
-        </div>";
-                        try { await _emailService.SendEmailAsync(hr.Email, subject, htmlMessage); } catch { }
-                    }
-                }
-                await _unitOfWork.SaveChangesAsync(ct);
             }
             else if (targetStatus == "active" || targetStatus == "rejected")
             {
@@ -479,8 +451,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             }
 
             // Link tới trang chi tiết tin theo workspace của người tạo.
-            var isRecruiter = string.Equals(creator.Role, "recruiter", StringComparison.OrdinalIgnoreCase);
-            var link = isRecruiter ? $"/recruiter/my-jobs/{job.Id}" : $"/hr/jobs/{job.Id}";
+            var link = StaffLinks.Job(creator.Role, job.Id);
             var now = DateTimeOffset.UtcNow;
 
             var creatorSettings = !string.IsNullOrEmpty(creator.SettingsJson)

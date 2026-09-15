@@ -98,25 +98,44 @@ public class CvDecisionTests
         Assert.Contains("Không tìm thấy hồ sơ", res.Error);
     }
 
-    [Fact]
-    public async Task Accept_wrong_status_fails()
+    [Theory]
+    [InlineData("interview")]
+    [InlineData("cv_submitted")] // ADR-068: hồ sơ vừa nộp KHÔNG được duyệt thẳng — phải qua cổng Hiring Manager
+    [InlineData("invited")]
+    public async Task Accept_outside_an_open_hm_gate_fails(string status)
     {
-        var (uow, notif, email, app, _) = Seed(status: "interview");
+        var (uow, notif, email, app, _) = Seed(status: status);
 
         var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Chỉ có thể duyệt", res.Error);
-        Assert.Equal("interview", app.Status);
+        Assert.Equal(status, app.Status);
+        Assert.Empty(uow.Repo<InterviewInvite>().Items);
     }
 
     [Fact]
-    public async Task Accept_promotes_and_opens_the_round_without_telling_the_candidate()
+    public async Task Accept_is_refused_while_the_hm_has_not_decided()
+    {
+        var (uow, notif, email, app, _) = Seed(status: "hm_review");
+        app.HmDecision = "pending";
+
+        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("Hiring Manager", res.Error);
+        Assert.Equal("hm_review", app.Status);
+    }
+
+    [Theory]
+    [InlineData("approved")]
+    [InlineData("bypassed")]
+    public async Task Accept_promotes_and_opens_the_round_without_telling_the_candidate(string openDecision)
     {
         // ADR-067: bước này là chuyển động NỘI BỘ (Recruiter duyệt → HM duyệt → về hàng chờ xếp lịch).
         // Ứng viên chỉ được báo MỘT lần, khi đã có giờ hẹn cụ thể — trước đó họ nhận tin vui rồi ngồi
         // im không biết bao lâu, và nếu Hiring Manager từ chối sau đó thì tin vui ấy thành sai.
-        var (uow, notif, email, app, _) = Seed(status: "cv_submitted", accountId: _accountId);
+        var (uow, notif, email, app, _) = Seed(status: "hm_review", accountId: _accountId);
+        app.HmDecision = openDecision;
 
         var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
@@ -126,17 +145,6 @@ public class CvDecisionTests
         Assert.Empty(email.Sent);
         Assert.Empty(uow.Repo<Domain.Entities.Notification>().Items);
         Assert.DoesNotContain(notif.UserEvents, e => e.UserId == _accountId);
-    }
-
-    [Fact]
-    public async Task Accept_from_invited_status_succeeds()
-    {
-        var (uow, notif, email, app, _) = Seed(status: "invited");
-
-        var res = await Svc(uow, notif, email).AcceptApplicationAsync(app.Id, CancellationToken.None);
-
-        Assert.True(res.IsSuccess);
-        Assert.Equal("screening", app.Status);
     }
 
     // ---------- RejectApplicationAsync ----------

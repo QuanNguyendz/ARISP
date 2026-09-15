@@ -40,7 +40,8 @@ public class OfferFlowTests
             CandidateName = "Nguyen Van A", Status = appStatus, CandidateAccountId = _candidateAccountId,
         };
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
-            .Seed(new User { Id = _ownerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, IsActive = true });
+            .Seed(new User { Id = _ownerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, IsActive = true })
+            .Seed(new User { Id = _hrLeaderId, Email = "hr-leader@corp.io", Role = RoleNames.HrAdmin, IsActive = true });
 
         if (withHiringManager)
         {
@@ -55,9 +56,9 @@ public class OfferFlowTests
         return (uow, job, app);
     }
 
-    private Task<Result<OfferDto>> Create(InMemoryUnitOfWork uow, Guid appId, Guid? actor = null)
+    private Task<Result<OfferDto>> Create(InMemoryUnitOfWork uow, Guid appId, Guid? actor = null, string role = AppRoles.Recruiter)
         => new CreateOfferCommandHandler(uow).Handle(
-            new CreateOfferCommand(new UpsertOfferRequest { ApplicationId = appId }, actor ?? _ownerId, AppRoles.Recruiter),
+            new CreateOfferCommand(new UpsertOfferRequest { ApplicationId = appId }, actor ?? _ownerId, role),
             CancellationToken.None);
 
     private static Offer Ready(InMemoryUnitOfWork uow)
@@ -69,18 +70,19 @@ public class OfferFlowTests
         return offer;
     }
 
-    private Task<Result<bool>> Submit(InMemoryUnitOfWork uow, Guid offerId)
+    private Task<Result<bool>> Submit(InMemoryUnitOfWork uow, Guid offerId, Guid? actor = null, string role = AppRoles.Recruiter)
         => new SubmitOfferCommandHandler(uow, new RecordingNotificationService())
-            .Handle(new SubmitOfferCommand(offerId, _ownerId, AppRoles.Recruiter), CancellationToken.None);
+            .Handle(new SubmitOfferCommand(offerId, actor ?? _ownerId, role), CancellationToken.None);
 
     private Task<Result<bool>> Decide(InMemoryUnitOfWork uow, Guid offerId, string decision, string? note = null, Guid? actor = null, string? role = null)
         => new DecideOfferCommandHandler(uow, new RecordingNotificationService())
             .Handle(new DecideOfferCommand(offerId, decision, note, actor ?? _hrLeaderId, role ?? AppRoles.HrAdmin),
                 CancellationToken.None);
 
-    private Task<Result<bool>> Send(InMemoryUnitOfWork uow, Guid offerId, RecordingNotificationService? notif = null)
+    private Task<Result<bool>> Send(
+        InMemoryUnitOfWork uow, Guid offerId, RecordingNotificationService? notif = null, Guid? actor = null, string role = AppRoles.Recruiter)
         => new SendOfferCommandHandler(uow, notif ?? new RecordingNotificationService(), new EmptyConfiguration())
-            .Handle(new SendOfferCommand(offerId, _ownerId, AppRoles.Recruiter), CancellationToken.None);
+            .Handle(new SendOfferCommand(offerId, actor ?? _ownerId, role), CancellationToken.None);
 
     private Task<Result<bool>> Respond(InMemoryUnitOfWork uow, Guid offerId, string decision, string? note = null)
         => new RespondToOfferCommandHandler(uow, new RecordingNotificationService())
@@ -124,6 +126,107 @@ public class OfferFlowTests
     }
 
     [Fact]
+    public async Task Dien_san_chi_lay_de_xuat_cua_luot_chot_DAT_o_vong_cao_nhat()
+    {
+        // Thư mời là hệ quả của quyết định tuyển CUỐI CÙNG. Trước đây lấy đề xuất mới nhất của bất kỳ lượt
+        // chốt nào — kể cả lượt "không đạt", hay đề xuất sớm ở vòng 1 mà HM đã điều chỉnh ở vòng cuối.
+        var (uow, _, app) = Seed();
+        Evaluation Eval(int round) => new()
+        {
+            Id = Guid.NewGuid(), ApplicationId = app.Id, SessionId = Guid.NewGuid(),
+            RoundNumber = round, SessionType = "real", AiVerdict = "pass",
+        };
+        var r1 = Eval(1);
+        var r2 = Eval(2);
+        var practice = Eval(2);
+        practice.SessionType = "practice";
+        uow.Seed(r1).Seed(r2).Seed(practice)
+            .Seed(new ARI.Domain.Entities.HrReview
+            {
+                EvaluationId = r2.Id, ReviewedByUserId = _hmId, FinalVerdict = "pass",
+                SuggestedSalaryMax = 30_000_000m, CreatedAt = DateTimeOffset.UtcNow.AddDays(-1),
+            })
+            .Seed(new ARI.Domain.Entities.HrReview
+            {
+                // Mới hơn nhưng ở vòng THẤP hơn.
+                EvaluationId = r1.Id, ReviewedByUserId = _hmId, FinalVerdict = "pass",
+                SuggestedSalaryMax = 20_000_000m, CreatedAt = DateTimeOffset.UtcNow,
+            })
+            .Seed(new ARI.Domain.Entities.HrReview
+            {
+                // Buổi thử không bao giờ là căn cứ tuyển.
+                EvaluationId = practice.Id, ReviewedByUserId = _hmId, FinalVerdict = "pass",
+                SuggestedSalaryMax = 90_000_000m, CreatedAt = DateTimeOffset.UtcNow,
+            });
+
+        var res = await Create(uow, app.Id);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(30_000_000m, res.Value!.SalaryAmount);
+    }
+
+    // ===== ADR-063: Hiring Manager SOẠN và GỬI DUYỆT, không tự chốt =====
+
+    [Fact]
+    public async Task Hm_chinh_cua_tin_soan_sua_va_gui_duyet_duoc_thu_moi()
+    {
+        // Trước đây ba lệnh này đòi mức chủ tin, nên HM (thành viên đội) nhận 403 dù ADR-063 viết rõ họ soạn được.
+        var (uow, _, app) = Seed();
+
+        var created = await Create(uow, app.Id, actor: _hmId, role: AppRoles.HiringManager);
+        Assert.True(created.IsSuccess, created.Error);
+        var offer = Ready(uow);
+        Assert.Equal(_hmId, offer.CreatedByUserId);
+
+        var updated = await new UpdateOfferCommandHandler(uow).Handle(
+            new UpdateOfferCommand(offer.Id, new UpsertOfferRequest { ApplicationId = app.Id, SalaryAmount = 27_000_000m },
+                _hmId, AppRoles.HiringManager), CancellationToken.None);
+        Assert.True(updated.IsSuccess, updated.Error);
+        Assert.Equal(27_000_000m, offer.SalaryAmount);
+
+        var submitted = await Submit(uow, offer.Id, actor: _hmId, role: AppRoles.HiringManager);
+        Assert.True(submitted.IsSuccess, submitted.Error);
+        Assert.Equal(OfferStatus.PendingApproval, offer.Status);
+    }
+
+    [Fact]
+    public async Task Thanh_vien_phu_cua_doi_khong_soan_duoc_thu_moi()
+    {
+        // Mở đúng một lối vào có tên cho HM CHÍNH — không nới cho mọi thành viên đội.
+        var (uow, job, app) = Seed();
+        var interviewer = Guid.NewGuid();
+        uow.Seed(new User { Id = interviewer, Email = "iv@corp.io", Role = RoleNames.HiringManager, IsActive = true })
+            .Seed(new JobHiringTeamMember
+            {
+                JobPostingId = job.Id, UserId = interviewer, RoleOnJob = JobTeamRoles.Interviewer,
+                IsPrimary = false, AddedByUserId = _ownerId,
+            });
+
+        var res = await Create(uow, app.Id, actor: interviewer, role: AppRoles.HiringManager);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+        Assert.Empty(uow.Repo<Offer>().Items);
+    }
+
+    [Fact]
+    public async Task Hm_khong_gui_thu_cho_ung_vien_duoc()
+    {
+        // Gửi cho ứng viên (qua trình soạn thư) vẫn là việc của chủ tin / quản trị viên.
+        var (uow, _, app) = Seed();
+        await Create(uow, app.Id, actor: _hmId, role: AppRoles.HiringManager);
+        var offer = Ready(uow);
+        await Submit(uow, offer.Id, actor: _hmId, role: AppRoles.HiringManager);
+        await Decide(uow, offer.Id, "approved");
+
+        var res = await Send(uow, offer.Id, actor: _hmId, role: AppRoles.HiringManager);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(OfferStatus.Approved, offer.Status);
+        Assert.Equal(ApplicationStatuses.Pass, app.Status);
+    }
+
+    [Fact]
     public async Task Khong_tao_duoc_offer_thu_hai_khi_con_mot_cai_dang_song()
     {
         // "Hai offer, hai mức lương, gửi cả hai" là hỏng nặng nhất mà tính năng này gây ra được.
@@ -163,8 +266,10 @@ public class OfferFlowTests
     }
 
     [Fact]
-    public async Task Gui_duyet_bao_cho_hiring_manager_cua_tin()
+    public async Task Gui_duyet_bao_cho_HR_Leader_nguoi_chot_va_bao_HM_de_biet()
     {
+        // ADR-063: người CHỐT là HR Leader, nên họ phải nhận việc. Trước đây tin có HM thì chỉ HM được báo
+        // "Thư mời chờ bạn duyệt" (sót từ ADR-061) — HM bấm duyệt thì 403, còn HR Leader không nhận gì.
         var (uow, _, app) = Seed();
         await Create(uow, app.Id);
         var offer = Ready(uow);
@@ -173,7 +278,30 @@ public class OfferFlowTests
 
         Assert.True(res.IsSuccess);
         Assert.Equal(OfferStatus.PendingApproval, offer.Status);
-        Assert.Contains(uow.Repo<Notification>().Items, n => n.RecipientUserId == _hmId);
+        var notices = uow.Repo<Notification>().Items;
+        var toLeader = Assert.Single(notices, n => n.RecipientUserId == _hrLeaderId);
+        Assert.Equal("/hr/offers", toLeader.Link);
+        var toHm = Assert.Single(notices, n => n.RecipientUserId == _hmId);
+        Assert.Equal("/hm/offers", toHm.Link);
+        Assert.DoesNotContain("chờ bạn duyệt", toHm.Title);
+    }
+
+    [Fact]
+    public async Task Chot_thu_bao_nguoi_soan_chu_tin_va_hm_moi_nguoi_link_dung_workspace()
+    {
+        // Trước đây chỉ người soạn được báo, link cứng `/recruiter/offers` — HM soạn thư thì bấm vào gặp 403,
+        // còn chủ tin (người phải GỬI thư) không biết thư đã được chốt.
+        var (uow, _, app) = Seed();
+        await Create(uow, app.Id, actor: _hmId, role: AppRoles.HiringManager);
+        var offer = Ready(uow);
+        await Submit(uow, offer.Id, actor: _hmId, role: AppRoles.HiringManager);
+
+        var res = await Decide(uow, offer.Id, "approved");
+
+        Assert.True(res.IsSuccess);
+        var decided = uow.Repo<Notification>().Items.Where(n => n.DedupKey!.StartsWith($"offer_decided:{offer.Id}:")).ToList();
+        Assert.Contains(decided, n => n.RecipientUserId == _hmId && n.Link == "/hm/offers");
+        Assert.Contains(decided, n => n.RecipientUserId == _ownerId && n.Link == "/recruiter/offers");
     }
 
     // ===== Duyệt =====

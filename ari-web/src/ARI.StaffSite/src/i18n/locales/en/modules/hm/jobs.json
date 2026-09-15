@@ -27,17 +27,18 @@
     "jdFileTitle": "Job description file",
     "jdFileFallbackName": "JD file",
     "jdFileHint": "Review this file before signing off — your sign-off publishes the posting.",
-    "approveTitle": "Approve and send your availability",
+    "approveTitle": "Approve this application",
+    "approveBody": "The application moves to the recruiter's scheduling queue. The candidate is not notified until an interview time is booked.",
     "rejectTitle": "Reject this application",
-    "availabilityLabel": "Times you can attend the interview (round 1)",
-    "availabilityHint": "The recruiter will only book slots that fall entirely inside these windows. Agreeing on an exact time with the candidate (SMS, Zalo…) happens outside the system.",
     "rejectReasonLabel": "Reason for rejecting",
     "rejectReasonPlaceholder": "e.g. not enough experience with payments.",
-    "confirmApprove": "Approve and send availability",
+    "confirmApprove": "Approve",
     "confirmReject": "Confirm rejection",
     "cancel": "Cancel",
     "decisionError": "Could not record the decision. Please try again.",
-    "runningWindows": "Windows already declared and currently running (not editable here, still in effect):"
+    "testBankTitle": "Online test question bank",
+    "testBankHint": "You own the exam: write the questions, mark the correct answers and set the pass score.",
+    "testBankOpen": "Open the question bank"
   },
   "applicationStatus": {
     "invited": "Invited",
@@ -57,5 +58,25 @@
     "pending": "Awaiting your sign-off",
     "rejected": "You requested changes"
   },
-  "needsSignOff": "Waiting for your sign-off"
+  "needsSignOff": "Waiting for your sign-off",
+  "availability": {
+    "title": "My available hours",
+    "subtitle": "Recruiters can only book slots that fall entirely inside one of these windows. Edit any time.",
+    "round": "Round {{number}}",
+    "loading": "Loading your hours…",
+    "loadError": "Could not load your declared hours.",
+    "saveError": "Could not save your hours.",
+    "dropError": "Could not withdraw this window.",
+    "save": "Save hours",
+    "saved": "Saved. {{count}} window(s) currently in effect.",
+    "affected": "{{count}} already-booked interview(s) now fall outside your hours. The recruiter has been notified and must reschedule each one — nothing is cancelled automatically.",
+    "runningTitle": "Currently running",
+    "drop": "Withdraw",
+    "confirmDrop": "Withdraw {{window}}? Unassigned slots can no longer be booked inside it.",
+    "replaceHint": "Saving replaces every not-yet-started window with the list above. Windows already running are left alone — use Withdraw to drop one.",
+    "empty": "No hours declared for this round yet.",
+    "emptyEditable": "No hours declared for round {{number}} — the recruiter cannot book any interview for this round until you add some.",
+    "testRoundsNote_one": "Round {{rounds}} is an online test — you don't need to attend, so there are no hours to declare.",
+    "testRoundsNote_other": "Rounds {{rounds}} are online tests — you don't need to attend, so there are no hours to declare."
+  }
 }

@@ -88,7 +88,7 @@ export default function MyTeamJobsPage() {
 
                 {/* Tín hiệu quan trọng NHẤT với vai này: tin đang chờ chính họ ký duyệt thì không
                     được lẫn vào đám chip trạng thái chung. */}
-                {job.hmSignOffStatus === 'pending' && (
+                {job.status === 'pending' && job.hmSignOffStatus === 'pending' && (
                   <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                     <FileSignature className="h-3 w-3" /> {t('needsSignOff')}
                   </span>

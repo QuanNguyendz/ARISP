@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.HiringTeam;
 using ARI.Application.Scheduling;
 using ARI.Application.Services;
@@ -61,24 +62,19 @@ public class ShortlistGateTests
     }
 
     private Task<Result<bool>> Request(InMemoryUnitOfWork uow, Guid appId, Guid? actor = null)
-        => new RequestHmApprovalCommandHandler(uow, new RecordingNotificationService(), Svc(uow))
+        => new RequestHmApprovalCommandHandler(uow, new RecordingNotificationService())
             .Handle(new RequestHmApprovalCommand(appId, actor ?? _ownerId, AppRoles.Recruiter), CancellationToken.None);
 
-    /// <summary>Khung giờ rảnh mặc định để lệnh duyệt của HM đi qua được (ADR-067).</summary>
-    private static IReadOnlyList<HmAvailabilityWindowInput> Windows() => new[]
-    {
-        new HmAvailabilityWindowInput(
-            DateTimeOffset.UtcNow.AddDays(2), DateTimeOffset.UtcNow.AddDays(2).AddHours(4), null),
-    };
-
     private Task<Result<bool>> Decide(
-        InMemoryUnitOfWork uow, Guid appId, string decision, string? note = null, Guid? actor = null,
-        IReadOnlyList<HmAvailabilityWindowInput>? availabilities = null)
+        InMemoryUnitOfWork uow, Guid appId, string decision, string? note = null, Guid? actor = null)
         => new HmDecideApplicationCommandHandler(uow, new RecordingNotificationService(), Svc(uow))
-            .Handle(new HmDecideApplicationCommand(
-                    appId, decision, note, actor ?? _hmId, AppRoles.HiringManager,
-                    availabilities ?? Windows()),
+            .Handle(new HmDecideApplicationCommand(appId, decision, note, actor ?? _hmId, AppRoles.HiringManager),
                 CancellationToken.None);
+
+    /// <summary>Thông báo "HM đã quyết" gửi cho chủ tin — chỗ Recruiter biết có xếp lịch ngay được không.</summary>
+    private Notification OwnerDecisionNotice(InMemoryUnitOfWork uow, Guid appId)
+        => Assert.Single(uow.Repo<Notification>().Items,
+            n => n.RecipientUserId == _ownerId && n.DedupKey == $"hm_shortlist_decided:{appId}");
 
     private static Task<Result<bool>> Bypass(InMemoryUnitOfWork uow, Guid appId, string? reason, string role = AppRoles.HrAdmin)
         => new BypassHmApprovalCommandHandler(uow, new RecordingNotificationService(), Svc(uow))
@@ -104,17 +100,30 @@ public class ShortlistGateTests
     }
 
     [Fact]
-    public async Task Duyet_ho_so_tren_tin_khong_co_HM_thi_di_thang_sang_cho_xep_lich()
+    public async Task Tin_khong_co_HM_thi_cong_DONG_va_noi_ro_HR_Leader_can_gan_HM()
     {
-        // Tin chưa gán Hiring Manager thì KHÔNG có cổng nào để chờ (ADR-061: cổng suy ra từ việc có
-        // người được gán). Trước ADR-067 chỗ này trả lỗi, nghĩa là nút "Duyệt hồ sơ" chết cứng trên
-        // mọi tin cũ — hồ sơ không có đường nào đi tiếp.
+        // ADR-068: mọi tin luôn có Hiring Manager. Trước đây nhánh "tin chưa gán HM" đẩy thẳng hồ sơ
+        // sang `screening` — tức Recruiter gỡ HM khỏi đội là tự mở cổng đang kiểm mình.
         var (uow, _, app) = Seed(withHiringManager: false);
 
         var res = await Request(uow, app.Id);
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal(ApplicationStatuses.Screening, app.Status);
+        Assert.True(res.IsFailure);
+        Assert.Equal(JobAccessErrors.HiringManagerMissing, res.Error);
+        Assert.Equal(ApplicationStatuses.CvSubmitted, app.Status);
+    }
+
+    [Fact]
+    public async Task HM_bi_khoa_thi_cong_DONG_va_noi_ro_HR_Leader_can_chuyen_HM()
+    {
+        var (uow, _, app) = Seed();
+        uow.Repo<User>().Items.Single(u => u.Id == _hmId).IsActive = false;
+
+        var res = await Request(uow, app.Id);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(JobAccessErrors.HiringManagerInactive, res.Error);
+        Assert.Equal(ApplicationStatuses.CvSubmitted, app.Status);
     }
 
     [Fact]
@@ -148,59 +157,67 @@ public class ShortlistGateTests
     }
 
     [Fact]
-    public async Task HM_duyet_thi_khung_gio_ranh_duoc_luu_theo_tin_va_vong()
+    public async Task Duyet_KHONG_can_kem_lich_ranh_va_khong_ghi_lich_nao()
     {
-        var (uow, job, app) = Seed();
-        await Request(uow, app.Id);
-
-        await Decide(uow, app.Id, HmDecision.Approved);
-
-        var windows = uow.Repo<HiringManagerAvailability>().Items;
-        Assert.Single(windows);
-        Assert.Equal(job.Id, windows[0].JobPostingId);
-        Assert.Equal(1, windows[0].RoundNumber);
-        Assert.Equal(_hmId, windows[0].HiringManagerUserId);
-    }
-
-    [Fact]
-    public async Task Duyet_ma_khong_co_khung_gio_nao_thi_bi_chan()
-    {
-        // Duyệt mà không có giờ nào để xếp thì hồ sơ rơi vào hàng chờ rồi đứng im: Recruiter mở ra
-        // thấy một danh sách không thao tác được và không biết phải hỏi ai.
+        // ADR-067, sửa 2026-09-14: duyệt chỉ là quyết định chuyên môn. Lịch có mặt của HM khai riêng ở
+        // màn tin — trước đây nó là điều kiện của việc duyệt, nên HM không duyệt được một hồ sơ nào
+        // cho tới khi mở form lịch ra khai, lần nào cũng thế.
         var (uow, _, app) = Seed();
         await Request(uow, app.Id);
 
-        var res = await Decide(uow, app.Id, HmDecision.Approved,
-            availabilities: Array.Empty<HmAvailabilityWindowInput>());
+        var res = await Decide(uow, app.Id, HmDecision.Approved);
 
-        Assert.True(res.IsFailure);
-        Assert.Contains("khung giờ", res.Error);
-        Assert.Equal(ApplicationStatuses.HmReview, app.Status);
-        Assert.Equal(HmDecision.Pending, app.HmDecision);
+        Assert.True(res.IsSuccess);
+        Assert.Equal(ApplicationStatuses.Screening, app.Status);
+        Assert.Empty(uow.Repo<HiringManagerAvailability>().Items);
     }
 
     [Fact]
-    public async Task Duyet_nguoi_thu_hai_khong_phai_khai_lai_lich()
+    public async Task Duyet_khi_HM_chua_khai_lich_thi_Recruiter_duoc_bao_ro_con_thieu_gi()
     {
-        // Khung giờ đã khai còn hiệu lực thì lượt duyệt sau không cần gửi kèm gì — bắt khai lại mỗi
-        // hồ sơ là biến một đợt duyệt mười người thành mười lần nhập lịch giống hệt nhau.
-        var (uow, job, app) = Seed();
+        // Bỏ điều kiện "duyệt kèm lịch" thì hồ sơ có thể về hàng chờ xếp lịch khi vòng 1 chưa có khung
+        // nào. Đúng thứ bế tắc ADR-067 muốn xoá — nên Recruiter phải được nói thẳng là đang chờ ai,
+        // thay vì mở màn xếp lịch rồi mới bị từ chối.
+        var (uow, _, app) = Seed();
         await Request(uow, app.Id);
+
         await Decide(uow, app.Id, HmDecision.Approved);
 
-        var second = new ARI.Domain.Entities.Application
+        Assert.Contains("chưa khai lịch", OwnerDecisionNotice(uow, app.Id).Body);
+    }
+
+    [Fact]
+    public async Task Duyet_khi_HM_da_khai_lich_thi_Recruiter_duoc_bao_xep_trong_lich_do()
+    {
+        var (uow, job, app) = Seed();
+        uow.Seed(new HiringManagerAvailability
         {
-            Id = Guid.NewGuid(), JobPostingId = job.Id,
-            CandidateEmail = "cand2@example.io", CandidateName = "Tran Thi B", Status = "cv_submitted",
-        };
-        uow.Seed(second);
-        await Request(uow, second.Id);
+            JobPostingId = job.Id, RoundNumber = 1, HiringManagerUserId = _hmId,
+            StartTime = DateTimeOffset.UtcNow.AddDays(2), EndTime = DateTimeOffset.UtcNow.AddDays(2).AddHours(4),
+        });
+        await Request(uow, app.Id);
 
-        var res = await Decide(uow, second.Id, HmDecision.Approved,
-            availabilities: Array.Empty<HmAvailabilityWindowInput>());
+        await Decide(uow, app.Id, HmDecision.Approved);
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal(ApplicationStatuses.Screening, second.Status);
+        var body = OwnerDecisionNotice(uow, app.Id).Body;
+        Assert.Contains("lịch Hiring Manager đã khai", body);
+        Assert.DoesNotContain("chưa khai lịch", body);
+    }
+
+    [Fact]
+    public async Task Vong_1_trac_nghiem_thi_bao_xep_lich_thi_ngay_khong_can_HM()
+    {
+        // Bài thi trực tuyến không ai ngồi cùng: nhắc Recruiter đi đòi lịch HM ở đây là đẩy họ đi hỏi
+        // một thứ không bao giờ cần tới.
+        var (uow, job, app) = Seed();
+        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" });
+        await Request(uow, app.Id);
+
+        await Decide(uow, app.Id, HmDecision.Approved);
+
+        var body = OwnerDecisionNotice(uow, app.Id).Body;
+        Assert.Contains("trắc nghiệm", body);
+        Assert.DoesNotContain("chưa khai lịch", body);
     }
 
     [Fact]
@@ -310,15 +327,44 @@ public class ShortlistGateTests
         Assert.Equal(ApplicationStatuses.Screening, app.Status);
     }
 
-    [Fact]
-    public async Task Jobs_without_a_hiring_manager_keep_the_old_flow_untouched()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Accepting_never_skips_the_gate_from_a_fresh_application(bool withHiringManager)
     {
-        // Đây là đường mặc định cho toàn bộ dữ liệu cũ: không gán HM thì không có cổng nào.
-        var (uow, _, app) = Seed(withHiringManager: false);
+        // ADR-068 bỏ nhánh "hồ sơ vừa nộp thì duyệt thẳng" — nó chỉ tồn tại cho tin không có HM.
+        var (uow, _, app) = Seed(withHiringManager);
 
         var res = await Svc(uow).AcceptApplicationAsync(app.Id, CancellationToken.None);
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal(ApplicationStatuses.Screening, app.Status);
+        Assert.True(res.IsFailure);
+        Assert.Equal(ApplicationStatuses.CvSubmitted, app.Status);
+    }
+
+    [Theory]
+    [InlineData(ApplicationStatuses.Screening)]
+    [InlineData(ApplicationStatuses.HmReview)]
+    public async Task The_generic_status_patch_cannot_enter_or_leave_the_gate(string target)
+    {
+        // Trước đây `PATCH /applications/{id}/status` cho chủ tin đẩy thẳng `cv_submitted → screening` —
+        // bỏ qua cổng Hiring Manager kể cả trên tin có HM, không dấu vết nào.
+        var (uow, _, app) = Seed();
+
+        var res = await Svc(uow).UpdateApplicationStatusAsync(app.Id, target, CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(ApplicationStatuses.CvSubmitted, app.Status);
+    }
+
+    [Fact]
+    public async Task The_generic_status_patch_cannot_push_an_application_out_of_hm_review()
+    {
+        var (uow, _, app) = Seed();
+        await Request(uow, app.Id);
+
+        var res = await Svc(uow).UpdateApplicationStatusAsync(app.Id, ApplicationStatuses.Screening, CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(ApplicationStatuses.HmReview, app.Status);
     }
 }

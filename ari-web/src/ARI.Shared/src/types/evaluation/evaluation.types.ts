@@ -36,10 +36,80 @@ export interface EvaluationReport {
 
   /** ===== Người có thẩm quyền chốt kết quả này (ADR-061) ===== */
   jobPostingId?: string;
-  /** Tin có Hiring Manager chính không. False = mọi thứ như trước ADR-061. */
-  requiresHmApproval?: boolean;
+  /**
+   * active | inactive | missing (ADR-068). Người chốt LUÔN là Hiring Manager chính; mọi người khác — kể cả khi
+   * HM bị khoá hay tin cũ chưa gán — chỉ chốt THAY, kèm lý do.
+   */
+  hiringManagerState?: 'active' | 'inactive' | 'missing' | null;
   hiringManagerUserId?: string | null;
   hiringManagerName?: string | null;
+
+  /** ===== Buổi phỏng vấn mà báo cáo này chấm (chỉ có ở màn chi tiết) ===== */
+  roundType?: string | null;
+  /** Ca đã gán cho vòng này (ADR-048/067). */
+  slotStartTime?: string | null;
+  slotEndTime?: string | null;
+  sessionStartedAt?: string | null;
+  sessionEndedAt?: string | null;
+  durationSeconds?: number | null;
+  /** Toàn bộ lượt hỏi–đáp theo thứ tự, lấy từ DB — có cả câu ứng viên bỏ trống. */
+  transcript?: TranscriptTurn[];
+}
+
+/** Một lượt hỏi–đáp của buổi phỏng vấn, đúng như đã diễn ra. */
+export interface TranscriptTurn {
+  sequenceNumber: number;
+  question: string;
+  questionType?: string | null;
+  /** Null = ứng viên không trả lời câu này. */
+  answer?: string | null;
+  askedAt: string;
+  answeredAt?: string | null;
+  responseTimeMs?: number | null;
+}
+
+/**
+ * Buổi phỏng vấn thật đang ở bước nào trên đường tới báo cáo. Suy từ dữ liệu (ca · phiên · báo cáo · lượt
+ * chốt) — xem `InterviewResultStates` phía server.
+ */
+export type InterviewResultState =
+  | 'scheduled'
+  | 'overdue'
+  | 'waiting'
+  | 'in_progress'
+  | 'evaluating'
+  | 'pending_review'
+  | 'reviewed'
+  | 'aborted';
+
+/** Một buổi phỏng vấn thật (một vòng hội thoại) của một hồ sơ. */
+export interface InterviewResultRow {
+  applicationId: string;
+  jobPostingId: string;
+  candidateName?: string | null;
+  jobTitle?: string | null;
+  roundNumber: number;
+  roundType?: string | null;
+  slotStartTime?: string | null;
+  slotEndTime?: string | null;
+  state: InterviewResultState;
+  sessionId?: string | null;
+  sessionStatus?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  durationSeconds?: number | null;
+  evaluationId?: string | null;
+  aiVerdict?: string | null;
+  overallScore?: number | null;
+  /** Kết quả đã chốt — null khi chưa chốt. */
+  finalVerdict?: string | null;
+  reviewerRole?: string | null;
+  isHrFallback?: boolean;
+  hasRecording: boolean;
+  recordingExpiresAt?: string | null;
+  recordingDeletedAt?: string | null;
+  /** Số lượt hỏi–đáp có lời trả lời thật — 0 là không có transcript để đọc. */
+  transcriptTurns: number;
 }
 
 export interface CriterionScore {

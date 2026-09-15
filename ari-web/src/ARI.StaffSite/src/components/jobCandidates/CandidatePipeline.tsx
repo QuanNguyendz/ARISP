@@ -14,11 +14,24 @@ import {
   X,
   Send,
   ExternalLink,
+  BarChart3,
 } from 'lucide-react'
 import { DocumentPreview } from '@ari/shared/document/DocumentViewer'
 import { formatScore } from '@ari/shared/utils/format'
+import { roundTypeKey } from '@ari/shared/utils/roundTypes'
+import OnlineTestAnswerSheetModal from './OnlineTestAnswerSheetModal'
+import InterviewCodeCard from './InterviewCodeCard'
+import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 import type { HrApplicationItem } from '@ari/shared/types/application'
-import { buildStages, ageFrom, type PipelineStage, type RoundConfigLike } from './pipelineStages'
+import {
+  buildStages,
+  ageFrom,
+  inviteTargetRound,
+  isOnlineTestRound,
+  needsInterviewCode,
+  type PipelineStage,
+  type RoundConfigLike,
+} from './pipelineStages'
 
 /**
  * Khối ứng viên của màn chi tiết tin tuyển dụng, dựng theo lối ATS quen thuộc:
@@ -43,12 +56,23 @@ export interface CandidatePipelineProps {
   onApprove?: (app: HrApplicationItem) => void
   onReject?: (app: HrApplicationItem) => void
 
-  /** Mời phỏng vấn kèm xếp lịch (ADR-059 — duyệt và xếp lịch là một thao tác). */
-  onInvite?: (app: HrApplicationItem) => void
+  /**
+   * Mời phỏng vấn kèm xếp lịch. `round` là vòng CẦN xếp — do bảng này tính (`inviteTargetRound`)
+   * để trang Recruiter và trang HR không mỗi nơi tự suy một kiểu: ở vòng trắc nghiệm, hồ sơ đã có
+   * bài được mời sang VÒNG KẾ chứ không phải vòng đang đứng.
+   */
+  onInvite?: (app: HrApplicationItem, round: number) => void
   isInvitePending?: (app: HrApplicationItem) => boolean
 
   /** Đường tới trang hồ sơ đầy đủ của ứng viên. */
   candidateHref?: (app: HrApplicationItem) => string
+
+  /**
+   * Đường tới màn đánh giá của khu vực đang đứng (ADR-069). Có thì hồ sơ đã vào phễu phỏng vấn hiện khối
+   * "Kết quả phỏng vấn" — từng vòng, ca đã gán, báo cáo AI, video, transcript — ngay cạnh CV. Trước đây
+   * buổi phỏng vấn thật kết thúc là không còn đường nào từ màn tin tới báo cáo của nó.
+   */
+  evaluationHref?: (evaluationId: string) => string
 
   /** Nhãn trạng thái — mỗi khu vực có bộ chữ riêng nên nơi gọi tự truyền. */
   statusLabel: (status: string) => string
@@ -97,9 +121,40 @@ export interface CandidatePipelineProps {
   onBatchInvite?: (roundNumber: number) => void
 
   batchBusy?: boolean
+
+  /**
+   * Đường tới bảng điểm bài trắc nghiệm của tin. Nút chỉ hiện khi đang đứng ở **bước vòng trắc
+   * nghiệm** — đó là chỗ duy nhất bảng điểm trả lời một câu hỏi đang đặt ra; nằm trong màn ngân
+   * hàng câu hỏi thì nó lạc giữa việc soạn đề, và người cần nó phải nhớ là mình từng thấy nó ở đó.
+   *
+   * Không truyền = ẩn nút (vai trò không đọc được bảng điểm — Hiring Manager là một ví dụ, cổng
+   * `CanManageAsync` của endpoint đòi mức chủ tin).
+   */
+  onlineTestResultsHref?: string
+
+  /**
+   * Hiện thẻ "Mã vào phòng phỏng vấn" ở hồ sơ đang có lịch vòng hội thoại — Recruiter cấp mã ngay tại
+   * danh sách. Không truyền = ẩn (Hiring Manager xem hồ sơ nhưng không phát mã; server cũng chặn).
+   */
+  canIssueInterviewCode?: boolean
 }
 
 const CARD = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card'
+
+/**
+ * Trạng thái mà hồ sơ CÓ THỂ đã có buổi phỏng vấn thật — từ lúc chờ xếp lịch trở đi, kể cả khi đã đóng
+ * (không đạt, rút hồ sơ): báo cáo của các vòng đã qua vẫn phải mở được.
+ */
+const INTERVIEW_STAGES = new Set([
+  'screening',
+  'interview',
+  'pass',
+  'not_pass',
+  'offer',
+  'hired',
+  'offer_declined',
+  'withdrawn',
+])
 
 /**
  * Phần tử đang thực sự cuộn quanh `el`, hoặc `null` nếu đó là cả trang.
@@ -153,6 +208,7 @@ const STAGE_TONES: Record<string, string> = {
   schedule_declined: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
   test_open: 'bg-ai-100 dark:bg-ai-500/20 text-ai-700 dark:text-ai-400',
   test_submitted: 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
+  test_expired: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
   interview_waiting: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
   // Đang phỏng vấn = việc đang diễn ra ngay lúc này → sắc mạnh nhất trên bảng.
   interview_active: 'bg-brand-600 text-white dark:bg-brand-500',
@@ -216,6 +272,7 @@ export default function CandidatePipeline({
   onInvite,
   isInvitePending,
   candidateHref,
+  evaluationHref,
   statusLabel,
   statusBadge = defaultStatusBadge,
   roundLabel,
@@ -227,17 +284,16 @@ export default function CandidatePipeline({
   onBatchReject,
   onBatchInvite,
   batchBusy,
+  onlineTestResultsHref,
+  canIssueInterviewCode,
 }: CandidatePipelineProps) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
 
   /** "Vòng 2 (Chuyên môn)" — một cách gọi duy nhất cho cả ba màn tin. */
   const defaultRoundLabel = useCallback(
     (r: RoundConfigLike) => {
-      const key = (r.roundType || '').toLowerCase()
-      const type =
-        key === 'technical' || key === 'online_test' || key === 'screening'
-          ? t(`pipeline.roundTypes.${key === 'online_test' ? 'onlineTest' : key}`)
-          : ''
+      const key = roundTypeKey(r.roundType)
+      const type = key === 'other' ? '' : t(`pipeline.roundTypes.${key}`)
       return `${t('pipeline.round', { number: r.roundNumber })}${type ? ` (${type})` : ''}`
     },
     [t]
@@ -283,6 +339,30 @@ export default function CandidatePipeline({
     const m = /^round_(\d+)$/.exec(id)
     return m ? Number(m[1]) : null
   }, [activeStage])
+
+  /** Đang đứng ở bước vòng TRẮC NGHIỆM — quyết định cột điểm và nút bảng điểm bên dưới. */
+  const onTestRound = isOnlineTestRound(activeStage)
+
+  /**
+   * Vòng mà nút "Xếp lịch" hàng loạt sẽ xếp cho NHÓM đang chọn — cùng luật với nút mời từng người
+   * (`inviteTargetRound`), nên ở bước trắc nghiệm, người đã có bài được xếp sang vòng kế.
+   *
+   * Nhóm lẫn hai vòng khác nhau (vd một người cần xếp lại bài thi, một người cần sang vòng 2) thì
+   * KHÔNG đoán: trả `null` để nút tắt kèm lời giải thích. Một hộp xếp lịch chỉ xếp được một vòng.
+   */
+  const batchInviteRound = useMemo(() => {
+    if (schedulingRound == null) return null
+    const chosen = (activeStage?.items ?? []).filter((a) => (selectedIds ?? []).includes(a.id))
+    if (chosen.length === 0) return schedulingRound
+    const targets = Array.from(new Set(chosen.map((a) => inviteTargetRound(a, rounds))))
+    return targets.length === 1 ? targets[0] : null
+  }, [schedulingRound, activeStage, selectedIds, rounds])
+
+  /**
+   * Hồ sơ đang mở bài làm. Điểm tổng không nói được "sai ở đâu", mà đó mới là câu người sàng
+   * lọc hỏi trước khi quyết định giữ hay loại.
+   */
+  const [answerSheetOf, setAnswerSheetOf] = useState<HrApplicationItem | null>(null)
 
   const activeStageItemIds = useMemo(
     () => new Set((activeStage?.items ?? []).map((a) => a.id)),
@@ -345,6 +425,14 @@ export default function CandidatePipeline({
 
   return (
     <div ref={rootRef} className="space-y-4">
+      {answerSheetOf && (
+        <OnlineTestAnswerSheetModal
+          applicationId={answerSheetOf.id}
+          candidateName={answerSheetOf.candidateName || t('candidate')}
+          onClose={() => setAnswerSheetOf(null)}
+        />
+      )}
+
       <StageBar stages={stages} activeId={activeStage?.id} onPick={setStageId} />
 
       <div className={CARD}>
@@ -357,14 +445,28 @@ export default function CandidatePipeline({
             </span>
           </h2>
 
-          {selected && (
-            <button
-              onClick={() => changeSelection(null)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" /> {t('pipeline.backToList')}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Bảng điểm nằm ở ĐÚNG vòng trắc nghiệm, không phải trong màn ngân hàng câu hỏi: nó
+                trả lời câu hỏi của người đang nhìn danh sách ứng viên, không phải của người đang
+                soạn đề. */}
+            {onTestRound && onlineTestResultsHref && (
+              <a
+                href={onlineTestResultsHref}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
+              >
+                <BarChart3 className="h-3.5 w-3.5" /> {t('pipeline.testResults')}
+              </a>
+            )}
+
+            {selected && (
+              <button
+                onClick={() => changeSelection(null)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> {t('pipeline.backToList')}
+              </button>
+            )}
+          </div>
         </div>
 
         {activeStage?.count === 0 ? (
@@ -389,9 +491,12 @@ export default function CandidatePipeline({
               onApprove={onApprove}
               onReject={onReject}
               onInvite={onInvite}
+              inviteRound={inviteTargetRound(selected, rounds)}
               isInvitePending={isInvitePending}
               candidateHref={candidateHref}
+              evaluationHref={evaluationHref}
               hmDecision={hmDecision}
+              showInterviewCode={!!canIssueInterviewCode && needsInterviewCode(selected, rounds)}
             />
           </div>
         ) : (
@@ -407,11 +512,15 @@ export default function CandidatePipeline({
                       Ở bước sàng CV thì thao tác đúng là duyệt, không phải mời. */}
                   {schedulingRound != null && onBatchInvite && (
                     <button
-                      disabled={batchBusy}
-                      onClick={() => onBatchInvite(schedulingRound)}
+                      disabled={batchBusy || batchInviteRound == null}
+                      onClick={() => batchInviteRound != null && onBatchInvite(batchInviteRound)}
+                      title={batchInviteRound == null ? t('actions.scheduleMixedRounds') : undefined}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
                     >
-                      <Send className="h-4 w-4" /> {t('actions.schedule')}
+                      <Send className="h-4 w-4" />{' '}
+                      {batchInviteRound != null && batchInviteRound > schedulingRound
+                        ? t('actions.scheduleNextRound', { round: batchInviteRound })
+                        : t('actions.schedule')}
                     </button>
                   )}
                   {activeStage?.id === 'new' && onBatchApprove && (
@@ -449,6 +558,8 @@ export default function CandidatePipeline({
               selectedIds={selectedIds}
               onToggleSelect={onToggleSelect}
               onToggleSelectAll={onToggleSelectAll}
+              showTestScore={onTestRound}
+              onViewTest={setAnswerSheetOf}
             />
           </>
         )}
@@ -534,6 +645,8 @@ function CandidateTable({
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
+  showTestScore,
+  onViewTest,
 }: {
   items: HrApplicationItem[]
   onPick: (id: string) => void
@@ -542,6 +655,10 @@ function CandidateTable({
   selectedIds?: string[]
   onToggleSelect?: (id: string) => void
   onToggleSelectAll?: (idsOnScreen: string[], allSelected: boolean) => void
+  /** Ở vòng trắc nghiệm: thêm cột điểm bài thi — con số cả vòng đó quy về. */
+  showTestScore?: boolean
+  /** Mở bài làm chi tiết (từng câu, đáp án đã khoanh, đúng/sai). */
+  onViewTest?: (app: HrApplicationItem) => void
 }) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
 
@@ -570,6 +687,9 @@ function CandidateTable({
             <th className="px-4 py-3 font-medium">{t('pipeline.colArea')}</th>
             <th className="px-4 py-3 font-medium">{t('pipeline.colAge')}</th>
             <th className="px-4 py-3 font-medium">{t('pipeline.colMatch')}</th>
+            {showTestScore && (
+              <th className="px-4 py-3 font-medium">{t('pipeline.colTestScore')}</th>
+            )}
             <th className="px-4 py-3 font-medium">{t('pipeline.colStatus')}</th>
           </tr>
         </thead>
@@ -634,6 +754,48 @@ function CandidateTable({
                     <span className="text-sm text-ink-300">—</span>
                   )}
                 </td>
+                {showTestScore && (
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {a.onlineTestScore != null ? (
+                      <div className="flex flex-col gap-0.5">
+                        {/* Điểm và KẾT QUẢ đi cùng nhau: một con số trần bắt người đọc tự nhớ điểm
+                            sàn rồi tự so. Đạt hay trượt ở đây KHÔNG tự đổi trạng thái hồ sơ — loại hay
+                            giữ vẫn là quyết định của Recruiter. */}
+                        <span
+                          className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            a.onlineTestPassed
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                          }`}
+                        >
+                          {a.onlineTestPassed ? t('pipeline.testPassed') : t('pipeline.testFailed')}{' '}
+                          · {formatScore(a.onlineTestScore)}/100
+                        </span>
+                        {/* Bài hệ thống nộp thay khi hết hạn: "0 điểm do không làm" khác hẳn "0 điểm
+                            do làm sai hết" với người quyết định loại hay giữ. */}
+                        {a.onlineTestExpired && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600 dark:bg-white/10 dark:text-ink-300">
+                            {t('pipeline.testExpiredAuto')}
+                          </span>
+                        )}
+                        {onViewTest && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onViewTest(a)
+                            }}
+                            className="w-fit text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+                          >
+                            {t('pipeline.viewAnswers')}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-ink-300">{t('pipeline.testNotTaken')}</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${stageChip(a, statusLabel, statusBadge, t).tone}`}
@@ -707,9 +869,12 @@ function CandidateDetail({
   onApprove,
   onReject,
   onInvite,
+  inviteRound,
   isInvitePending,
   candidateHref,
+  evaluationHref,
   hmDecision,
+  showInterviewCode,
 }: {
   app: HrApplicationItem
   statusLabel: (s: string) => string
@@ -717,13 +882,18 @@ function CandidateDetail({
   processingAppId?: string | null
   onApprove?: (a: HrApplicationItem) => void
   onReject?: (a: HrApplicationItem) => void
-  onInvite?: (a: HrApplicationItem) => void
+  onInvite?: (a: HrApplicationItem, round: number) => void
+  /** Vòng mà nút mời sẽ xếp lịch — xem `inviteTargetRound`. */
+  inviteRound: number
   isInvitePending?: (a: HrApplicationItem) => boolean
   candidateHref?: (a: HrApplicationItem) => string
+  evaluationHref?: (evaluationId: string) => string
   hmDecision?: {
     onApprove: (a: HrApplicationItem) => void
     onReject: (a: HrApplicationItem) => void
   }
+  /** Hiện thẻ cấp mã vào phòng — xem `needsInterviewCode`. */
+  showInterviewCode?: boolean
 }) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
   const age = ageFrom(app.candidateDateOfBirth)
@@ -850,10 +1020,15 @@ function CandidateDetail({
           {canSchedule && onInvite && (
             <button
               disabled={busy || isInvitePending?.(app)}
-              onClick={() => onInvite(app)}
+              onClick={() => onInvite(app, inviteRound)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              <Send className="h-4 w-4" /> {t('actions.invite')}
+              <Send className="h-4 w-4" />{' '}
+              {/* Nói rõ vòng khi mời SANG vòng kế — "Mời phỏng vấn" trơn ở vòng trắc nghiệm không cho
+                  biết là đang xếp lại bài thi hay đang cho qua vòng. */}
+              {inviteRound > (app.currentRound && app.currentRound > 0 ? app.currentRound : 1)
+                ? t('actions.inviteNextRound', { round: inviteRound })
+                : t('actions.invite')}
             </button>
           )}
 
@@ -867,16 +1042,35 @@ function CandidateDetail({
             </button>
           )}
 
-          {candidateHref && (
-            <a
-              href={candidateHref(app)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
-            >
-              <ExternalLink className="h-4 w-4" /> {t('actions.viewApplication')}
-            </a>
-          )}
         </div>
       )}
+
+      {/* Xem hồ sơ đầy đủ: luôn có, kể cả hồ sơ đã đóng — trước đây nút này nằm chung khối thao tác nên hồ
+          sơ "Không đạt" mất luôn đường tới trang hồ sơ (và tới báo cáo của các vòng đã phỏng vấn). */}
+      {candidateHref && (
+        <div className={closed ? 'mb-4' : '-mt-2 mb-4'}>
+          <a
+            href={candidateHref(app)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
+          >
+            <ExternalLink className="h-4 w-4" /> {t('actions.viewApplication')}
+          </a>
+        </div>
+      )}
+
+      {/* ---- Kết quả phỏng vấn (ADR-069) ----
+          Hồ sơ đã vào phễu phỏng vấn: từng vòng · ca đã gán · báo cáo AI · video · transcript, kèm nút tới
+          đúng báo cáo. Đặt NGAY đây vì đây là chỗ mọi vai đang đứng khi buổi phỏng vấn vừa xong. */}
+      {evaluationHref && INTERVIEW_STAGES.has(app.status) && (
+        <div className="mb-4 rounded-xl border border-ink-200 p-4 dark:border-white/10">
+          <InterviewResultsCard applicationId={app.id} evaluationHref={evaluationHref} bare />
+        </div>
+      )}
+
+      {/* ---- Mã vào phòng phỏng vấn ----
+          Cấp ngay tại danh sách: đây là lúc ứng viên đang đứng ở quầy (tại văn phòng) hoặc sắp tới giờ
+          (làm từ nhà) — bắt Recruiter sang màn Phỏng vấn tìm lại người đó là thêm một vòng đi lạc. */}
+      {showInterviewCode && !closed && <InterviewCodeCard applicationId={app.id} />}
 
       {/* ---- CV đọc NGAY tại đây ----
           Trước đây phải mở lớp phủ cho từng người rồi đóng lại; sàng lọc mười hồ sơ là hai mươi cú

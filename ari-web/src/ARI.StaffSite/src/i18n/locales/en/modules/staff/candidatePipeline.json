@@ -6,8 +6,11 @@
     "invite": "Invite to interview",
     "viewApplication": "Open full profile",
     "schedule": "Schedule",
-    "hmApprove": "Approve & send availability",
-    "hmReject": "Reject"
+    "hmApprove": "Approve",
+    "hmReject": "Reject",
+    "inviteNextRound": "Invite to round {{round}}",
+    "scheduleNextRound": "Schedule round {{round}}",
+    "scheduleMixedRounds": "The selected candidates need scheduling for different rounds — select each group separately."
   },
   "pipeline": {
     "rejected": "Not a fit",
@@ -26,6 +29,9 @@
     "colArea": "Area",
     "colAge": "Age",
     "colMatch": "CV score",
+    "colTestScore": "Test score",
+    "testNotTaken": "Not taken",
+    "testResults": "Candidate scoreboard",
     "colStatus": "Status",
     "ageValue": "{{count}} yrs",
     "appliedAt": "Applied on",
@@ -39,7 +45,11 @@
       "screening": "Screening",
       "technical": "Technical",
       "onlineTest": "Online test"
-    }
+    },
+    "testPassed": "Passed",
+    "testFailed": "Below",
+    "viewAnswers": "View answers",
+    "testExpiredAuto": "Expired · auto-submitted"
   },
   "stage": {
     "cv_pending": "Awaiting CV screening",
@@ -54,6 +64,44 @@
     "interview_active": "Interview in progress",
     "interview_done": "Interview finished",
     "pending_result": "Awaiting decision",
-    "missed": "Did not attend"
+    "missed": "Did not attend",
+    "test_expired": "Did not take the test (expired)"
+  },
+  "code": {
+    "title": "Interview room code · Round {{round}}",
+    "remote": "From home",
+    "onsite": "At the office",
+    "loading": "Loading the interview code…",
+    "loadError": "Could not load the interview code.",
+    "issueError": "Could not issue an interview code.",
+    "issue": "Issue interview code",
+    "regenerate": "Issue a new code",
+    "confirmRegenerate": "Code {{code}} stops working immediately and the candidate must use the new one. Continue?",
+    "copyCode": "Copy code",
+    "copyLink": "Copy room link",
+    "openKiosk": "Open Kiosk page",
+    "copied": "Copied",
+    "expiresAt": "Expires at {{time}} · single use",
+    "expired": "The previous code has expired — issue a new one for the candidate.",
+    "remoteHint": "The candidate takes this round from home. Issue a code and send them the room link (code included) — the code also shows in their Portal.",
+    "onsiteHint": "The candidate takes this round at the office. When they check in: open the Kiosk page on the interview computer, issue a code and hand it to them.",
+    "nextStep": "After entering the code the candidate waits in the lobby — the interview starts once the hiring manager joins and lets them in."
+  },
+  "answerSheet": {
+    "title": "Test answer sheet",
+    "close": "Close",
+    "loading": "Loading the answer sheet…",
+    "loadError": "Could not load the answer sheet.",
+    "notTaken": "This candidate has not submitted the test.",
+    "passed": "Met the pass score",
+    "notPassed": "Below the pass score",
+    "passScore": "Pass score {{score}}/100",
+    "correctCount": "{{correct}}/{{total}} correct",
+    "tabSwitch": "Left the test {{count}} time(s)",
+    "right": "Correct",
+    "wrong": "Wrong",
+    "blank": "Blank",
+    "picked": "picked",
+    "expiredNotice": "The candidate was scheduled but never started the test. When it expired, the system submitted a blank test — so every question below is unanswered."
   }
 }

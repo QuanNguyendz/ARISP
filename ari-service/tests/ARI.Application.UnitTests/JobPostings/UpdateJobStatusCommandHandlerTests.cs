@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Jobs.Commands.UpdateJobStatus;
 using ARI.Application.UnitTests.TestSupport;
@@ -160,7 +162,7 @@ public class UpdateJobStatusCommandHandlerTests
         Assert.Equal("Không thể chuyển tin tuyển dụng sang lưu trữ (archived) khi đang có hồ sơ ứng tuyển đang hoạt động.", res.Error);
     }
 
-    // UTCID13 — owner đổi draft → pending → Success, xoá RejectionReason cũ
+    // UTCID13 — owner đổi draft → pending → Success, xoá RejectionReason cũ, mở cổng ký cho HM
     [Fact]
     public async Task UTCID13_Draft_to_pending()
     {
@@ -168,23 +170,66 @@ public class UpdateJobStatusCommandHandlerTests
         var job = JobPostingData.Job(owner: OwnerA, status: "draft");
         job.RejectionReason = "old reason";
         c.Uow.Seed(job);
+        var hm = HiringManagerSeed.Primary(c.Uow, job.Id);
 
         var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("pending", job.Status);
         Assert.Null(job.RejectionReason);
+        Assert.Equal(HmSignOffStatus.Pending, job.HmSignOffStatus);
+        Assert.Contains(c.Uow.Repo<Notification>().Items, n => n.RecipientUserId == hm.Id);
     }
 
-    // UTCID14 — admin duyệt pending → active → Success, ghi nhận người duyệt
+    // UTCID13b — ADR-068: gửi duyệt là gửi cho HM chính; tin thiếu HM thì không gửi được
     [Fact]
-    public async Task UTCID14_Approve_pending_to_active()
+    public async Task UTCID13b_Draft_to_pending_without_a_hiring_manager_is_refused()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        c.Uow.Seed(job);
+
+        var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(JobAccessErrors.HiringManagerMissing, res.Error);
+        Assert.Equal("draft", job.Status);
+    }
+
+    // UTCID13c — gửi duyệt KHÔNG còn báo "chờ duyệt" cho HR (ADR-063: HR không duyệt đăng nữa)
+    [Fact]
+    public async Task UTCID13c_Resubmitting_tells_only_the_hiring_manager()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "rejected");
+        c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"));
+        var hm = HiringManagerSeed.Primary(c.Uow, job.Id);
+
+        var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter);
+
+        Assert.True(res.IsSuccess);
+        var notices = c.Uow.Repo<Notification>().Items;
+        Assert.Contains(notices, n => n.RecipientUserId == hm.Id);
+        Assert.DoesNotContain(notices, n => n.RecipientUserId == HrA);
+    }
+
+    // UTCID14 — admin đăng pending → active khi HM chưa ký: bắt buộc lý do vượt cổng, cổng ghi `bypassed`
+    [Fact]
+    public async Task UTCID14_Admin_publishing_without_hm_signature_needs_a_bypass_reason()
     {
         var c = NewCtx();
         var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
+        job.HmSignOffStatus = HmSignOffStatus.Pending;
         c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"));
+        var hm = HiringManagerSeed.Primary(c.Uow, job.Id);
 
-        var res = await Run(c, job.Id, Req("active"), HrA, AppRoles.HrAdmin);
+        var refused = await Run(c, job.Id, Req("active"), HrA, AppRoles.HrAdmin);
+        Assert.True(refused.IsFailure);
+        Assert.Equal("pending", job.Status);
+
+        var req = Req("active");
+        req.HmBypassReason = "Hiring Manager nghỉ phép, vị trí cần đăng gấp";
+        var res = await Run(c, job.Id, req, HrA, AppRoles.HrAdmin);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("active", job.Status);
@@ -192,6 +237,24 @@ public class UpdateJobStatusCommandHandlerTests
         Assert.Equal(HrA, job.ApprovedByUserId);
         Assert.NotNull(job.ApprovedAt);
         Assert.False(string.IsNullOrEmpty(job.ApproverName));
+        // Ghi `bypassed` chứ không để nguyên `pending` — nếu không, HM vẫn thấy nút ký trên tin đã đăng.
+        Assert.Equal(HmSignOffStatus.Bypassed, job.HmSignOffStatus);
+        Assert.Contains(c.Uow.Repo<Notification>().Items, n => n.RecipientUserId == hm.Id);
+    }
+
+    // UTCID14b — ADR-068: bản nháp CHƯA từng gửi ký (cổng null) cũng không được đăng thẳng mà không lý do
+    [Fact]
+    public async Task UTCID14b_Admin_cannot_publish_a_draft_straight_without_a_bypass_reason()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "draft");
+        c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"));
+        HiringManagerSeed.Primary(c.Uow, job.Id);
+
+        var res = await Run(c, job.Id, Req("active"), HrA, AppRoles.HrAdmin);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal("draft", job.Status);
     }
 
     // UTCID15 — owner đóng tin active → closed → Success

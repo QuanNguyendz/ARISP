@@ -151,6 +151,31 @@ namespace ARI.Application.JdDocuments
         }
 
         private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        /// <summary>
+        /// Tin đã dựng từ phiếu (nếu có), và câu lỗi nếu JD của phiếu KHÔNG được sửa lúc này (ADR-068).
+        ///
+        /// Hiring Manager ký duyệt BẰNG CHÍNH FILE JD (ADR-064), nên file đó phải đứng yên trong lúc họ
+        /// đang xem (<c>pending</c>) và sau khi tin đã đăng. Trước đây trình soạn không kiểm gì: bấm "Lưu
+        /// nháp" (lần nào cũng xuất lại file) là xoá luôn file mà tin đang trỏ tới — HM mở ra gặp link chết.
+        /// Tin <c>draft</c> / <c>rejected</c> (HM vừa yêu cầu sửa) thì sửa được, và file mới gắn lại vào tin.
+        /// </summary>
+        public static async Task<(JobPosting? job, string? error)> LinkedJobAsync(
+            IUnitOfWork uow, Guid requestId, CancellationToken ct)
+        {
+            var job = (await uow.Repository<JobPosting>().FindAsync(
+                    j => j.RecruitmentRequestId == requestId && j.DeletedAt == null, ct))
+                .FirstOrDefault();
+            if (job == null) return (null, null);
+
+            var status = (job.Status ?? string.Empty).Trim().ToLowerInvariant();
+            if (status is "draft" or "rejected") return (job, null);
+
+            return (job, status == "pending"
+                ? "Tin đang chờ Hiring Manager ký duyệt đúng file JD này nên không sửa được lúc này. "
+                  + "Nếu cần sửa, Hiring Manager chọn \"Yêu cầu sửa\" để tin quay về cho bạn."
+                : "Tin đã được đăng bằng file JD này nên không sửa JD được nữa.");
+        }
     }
 
     // ---------------------------------------------------------------------------------
@@ -212,6 +237,9 @@ namespace ARI.Application.JdDocuments
             if (string.IsNullOrWhiteSpace(request.Input.Title))
                 return Result.Failure("Tiêu đề vị trí là bắt buộc.");
 
+            var (_, jobError) = await JdDocumentSupport.LinkedJobAsync(_unitOfWork, req.Id, ct);
+            if (jobError != null) return Result.Failure(jobError, CommonErrorCodes.Conflict);
+
             var doc = await JdDocumentSupport.GetAsync(_unitOfWork, req.Id, ct);
             var isNew = doc == null;
             doc ??= JdDocumentSupport.SeedFromRequest(req, request.ActorId ?? Guid.Empty,
@@ -261,6 +289,9 @@ namespace ARI.Application.JdDocuments
                     ? Result.Failure<JdGeneratedFileDto>(error!)
                     : Result.Failure<JdGeneratedFileDto>(error!, code);
 
+            var (job, jobError) = await JdDocumentSupport.LinkedJobAsync(_unitOfWork, req.Id, ct);
+            if (jobError != null) return Result.Failure<JdGeneratedFileDto>(jobError, CommonErrorCodes.Conflict);
+
             var doc = await JdDocumentSupport.GetAsync(_unitOfWork, req.Id, ct);
             if (doc == null)
                 return Result.Failure<JdGeneratedFileDto>(
@@ -291,6 +322,19 @@ namespace ARI.Application.JdDocuments
             // file JD, chỉ khác đường sinh ra.
             var key = await _storage.SaveAsync(bytes, fileName, contentType, StorageFolder.Jd, ct);
 
+            var staleKey = doc.GeneratedFileStorageKey;
+
+            // Tin nháp / bị trả về đang dùng CHÍNH file trình soạn xuất ra → gắn file mới vào tin, để lượt
+            // gửi duyệt tới HM xem đúng bản vừa sửa. Tin dùng file tải tay thì không đụng tới file của tin.
+            if (job != null && !string.IsNullOrWhiteSpace(staleKey) && job.JdFileUrl == staleKey)
+            {
+                job.JdFileUrl = key;
+                job.JdFileName = fileName;
+                job.JdFileFormat = format;
+                job.UpdatedAt = DateTimeOffset.UtcNow;
+                _unitOfWork.Repository<JobPosting>().Update(job);
+            }
+
             // Xoá bản CŨ sau khi bản mới đã nằm chắc trên storage. Mỗi lượt xuất file trước đây để
             // lại một object mồ côi: soạn qua vài vòng sửa là kho phình ra hàng chục bản JD của cùng
             // một phiếu, mà chỉ bản cuối được tham chiếu.
@@ -298,11 +342,20 @@ namespace ARI.Application.JdDocuments
             // Xoá SAU chứ không xoá trước: hỏng ở bước `SaveAsync` thì phiếu vẫn còn file cũ để mở,
             // còn hơn mất cả hai. Và xoá là **best-effort** — object đã mất hoặc storage chập chờn
             // không được phép làm hỏng thao tác xuất file mà người dùng vừa thực hiện thành công.
-            var staleKey = doc.GeneratedFileStorageKey;
+            //
+            // KHÔNG xoá khi còn tin nào trỏ tới file đó (ADR-068): trước đây xoá vô điều kiện, nên tin dựng
+            // từ file này mất file JD ngay lần xuất lại kế tiếp.
             if (!string.IsNullOrWhiteSpace(staleKey) && staleKey != key)
             {
-                try { await _storage.DeleteAsync(staleKey!, ct); }
-                catch { /* file rác còn lại thì dọn sau, không đánh đổi lấy một lỗi 500 */ }
+                var thisJobId = job?.Id ?? Guid.Empty; // biến cục bộ: EF không được phải tự đánh giá `job.Id` khi job null
+                var stillReferenced = await _unitOfWork.Repository<JobPosting>().CountAsync(
+                    j => j.JdFileUrl == staleKey && j.Id != thisJobId, ct) > 0
+                    || (job != null && job.JdFileUrl == staleKey);
+                if (!stillReferenced)
+                {
+                    try { await _storage.DeleteAsync(staleKey!, ct); }
+                    catch { /* file rác còn lại thì dọn sau, không đánh đổi lấy một lỗi 500 */ }
+                }
             }
 
             doc.GeneratedFileStorageKey = key;

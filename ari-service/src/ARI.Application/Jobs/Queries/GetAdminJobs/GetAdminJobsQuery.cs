@@ -97,13 +97,16 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
                 .Distinct()
                 .ToList();
             var usersById = (await _unitOfWork.Repository<User>()
-                    .QueryAsync(q => q.Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email, u.Role }), ct))
+                    .QueryAsync(q => q.Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email, u.Role, u.IsActive }), ct))
                 .ToDictionary(u => u.Id, u => new
                 {
                     Name = string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName,
                     // Trước đây câu tam phân ở đây bỏ sót hiring_manager nên cột "Người tạo" hiện
                     // thẳng chuỗi thô `hiring_manager` ra màn hình.
-                    RoleLabel = RoleNames.DisplayLabel(u.Role)
+                    RoleLabel = RoleNames.DisplayLabel(u.Role),
+                    // Cùng định nghĩa "HM còn hoạt động" với `JobAccess.HiringManagerStatusAsync` (ADR-068);
+                    // tài khoản đã xoá mềm bị query filter loại nên không có mặt trong từ điển này.
+                    IsActiveHm = u.IsActive && RoleNames.Is(u.Role, RoleNames.HiringManager),
                 });
 
             foreach (var dto in jobList)
@@ -116,8 +119,16 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
 
                 if (primaryHmByJob.TryGetValue(dto.Id, out var hmUserId))
                 {
-                    dto.RequiresHmApproval = true;
-                    dto.HiringManagerName = usersById.TryGetValue(hmUserId, out var hm) ? hm.Name : null;
+                    var found = usersById.TryGetValue(hmUserId, out var hm);
+                    dto.HiringManagerUserId = hmUserId;
+                    dto.HiringManagerName = found ? hm!.Name : null;
+                    dto.HiringManagerState = found && hm!.IsActiveHm
+                        ? HiringManagerStateNames.Active
+                        : HiringManagerStateNames.Inactive;
+                }
+                else
+                {
+                    dto.HiringManagerState = HiringManagerStateNames.Missing;
                 }
             }
 

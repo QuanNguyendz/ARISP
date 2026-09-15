@@ -30,6 +30,7 @@ import {
   Circle,
   MessageSquareText,
   ArrowDownUp,
+  ArrowRight,
   Pencil,
 } from 'lucide-react'
 import { applicationService } from '@ari/shared/fservices/application'
@@ -41,6 +42,8 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import type { MyApplicationItem, MyApplicationRound } from '@ari/shared/types/application'
+import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
+import { formatTime24 } from '@ari/shared/utils/time24'
 
 type FilterKey = 'all' | 'action' | 'processing' | 'done'
 type TFunction = (key: string, options?: Record<string, unknown>) => string
@@ -113,7 +116,7 @@ function formatDateTime(iso?: string | null): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (isNaN(d.getTime())) return ''
-  return `${formatDate(iso)} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  return `${formatDate(iso)} ${formatTime24(d)}`
 }
 
 function formatRelative(t: TFunction, iso?: string | null): string {
@@ -386,12 +389,16 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
                     </div>
                   </div>
                 </div>
+                {/* Portal chỉ nhận mã của vòng làm TỪ NHÀ (server lọc — vòng tại văn phòng thì nhân
+                    sự đưa mã tận tay). Nên việc duy nhất còn lại ở đây là vào phòng: mở trang Kiosk
+                    với ô mã đã điền sẵn. */}
+                <p className="mt-2 text-xs text-ink-600">{t('applications.enterRoomHint')}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link
-                    to={`/jobs/${app.jobPostingId}`}
+                    to={`/kiosk?code=${encodeURIComponent(app.interviewCode!.code)}`}
                     className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
                   >
-                    <MapPin className="h-4 w-4" /> {t('applications.viewJobPosting')}
+                    <ArrowRight className="h-4 w-4" /> {t('applications.enterRoom')}
                   </Link>
                   <button
                     onClick={copyCode}
@@ -400,6 +407,12 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
                     <Copy className="h-4 w-4" />{' '}
                     {copied ? t('applications.copied') : t('applications.copyCode')}
                   </button>
+                  <Link
+                    to={`/jobs/${app.jobPostingId}`}
+                    className="flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-50"
+                  >
+                    <MapPin className="h-4 w-4" /> {t('applications.viewJobPosting')}
+                  </Link>
                 </div>
               </div>
             )}
@@ -990,9 +1003,12 @@ export default function ApplicationsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <div className="text-sm font-semibold text-ink-800">
-                              {t('applications.roundInterview', {
-                                number: nextSchedule.slot.roundNumber,
-                              })}
+                              {/* Vòng trắc nghiệm là bài thi, không phải buổi phỏng vấn. */}
+                              {isOnlineTestRound(nextSchedule.slot.roundType)
+                                ? t('applications.roundTest', { number: nextSchedule.slot.roundNumber })
+                                : t('applications.roundInterview', {
+                                    number: nextSchedule.slot.roundNumber,
+                                  })}
                             </div>
                             <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
                               {info.rel}

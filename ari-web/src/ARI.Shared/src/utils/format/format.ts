@@ -13,6 +13,7 @@ export function formatDate(date: Date | string, locale = 'vi-VN'): string {
   });
 }
 
+// Giờ LUÔN 24 tiếng dù `locale` là gì — `en-US` mặc định in "3:00 PM" (xem `utils/time24`).
 export function formatDateTime(date: Date | string, locale = 'vi-VN'): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleString(locale, {
@@ -21,6 +22,7 @@ export function formatDateTime(date: Date | string, locale = 'vi-VN'): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
   });
 }
 
@@ -29,6 +31,7 @@ export function formatTime(date: Date | string, locale = 'vi-VN'): string {
   return d.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
   });
 }
 

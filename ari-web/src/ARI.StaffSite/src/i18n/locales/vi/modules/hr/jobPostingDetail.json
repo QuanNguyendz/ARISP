@@ -130,13 +130,14 @@
   "noFilterResults": "Không tìm thấy ứng viên nào phù hợp với bộ lọc.",
   "paginationLabel": "ứng viên",
   "pendingApproval": {
-    "title": "Tin đang chờ bạn duyệt",
-    "description": "Recruiter {{name}} đã gửi tin kèm file JD. Duyệt để đăng tin (JD sẽ được đóng dấu xác nhận) hoặc từ chối kèm lý do.",
-    "approve": "Duyệt & đóng dấu",
-    "reject": "Từ chối"
+    "title": "Tin đang chờ Hiring Manager ký duyệt",
+    "description": "Recruiter {{name}} đã gửi tin. {{hm}} ký duyệt mô tả công việc thì tin tự đăng (file JD được đóng dấu). Chỉ đăng vượt cổng khi thật cần — lý do được ghi nhật ký kiểm toán và báo cho Hiring Manager.",
+    "approve": "Đăng vượt cổng HM",
+    "reject": "Trả về cho Recruiter"
   },
   "rejectedBanner": {
-    "label": "Đã từ chối:"
+    "label": "Đã từ chối:",
+    "hmLabel": "Hiring Manager yêu cầu sửa:"
   },
   "approvedBanner": {
     "label": "Đã duyệt bởi",
@@ -168,7 +169,7 @@
     "acceptSuccess": "Đã duyệt CV ứng viên (Vòng 1). Hãy xếp lịch để hệ thống gửi email mời phỏng vấn kèm lịch hẹn.",
     "rejectSuccess": "Đã từ chối hồ sơ và gửi email cảm ơn ứng viên thành công.",
     "inviteSuccess": "Đã gửi lời mời (magic link) cho ứng viên.",
-    "jobApproveSuccess": "Đã duyệt tin tuyển dụng. File JD đã được đóng dấu xác nhận.",
+    "jobApproveSuccess": "Đã đăng tin khi chưa có chữ ký. Hiring Manager đã được báo; file JD được đóng dấu.",
     "jobRejectSuccess": "Đã từ chối tin tuyển dụng. Recruiter sẽ thấy lý do để chỉnh sửa.",
     "batchAcceptSuccess": "Đã duyệt thành công {{success}} hồ sơ.",
     "batchRejectSuccess": "Đã từ chối thành công {{success}} hồ sơ.",
@@ -199,5 +200,20 @@
     "negotiable": "Thỏa thuận",
     "from": "Từ",
     "to": "Đến"
-  }
+  },
+  "draftBanner": {
+    "title": "Bản nháp",
+    "description": "Tin cần Recruiter gửi Hiring Manager ký duyệt trước khi đăng. Quản trị viên có thể đăng vượt cổng kèm lý do (ghi nhật ký, báo cho Hiring Manager), hoặc tiếp tục chỉnh sửa.",
+    "publish": "Đăng vượt cổng HM",
+    "edit": "Sửa tin"
+  },
+  "bypassModal": {
+    "title": "Đăng tin khi chưa có chữ ký của Hiring Manager",
+    "description": "Tin \"{{title}}\" sẽ được đăng ngay mà không chờ {{hm}} ký duyệt. Lý do được ghi vào nhật ký kiểm toán và gửi cho Hiring Manager.",
+    "placeholder": "Ví dụ: Hiring Manager nghỉ phép tới 20/09, vị trí cần mở tuyển ngay tuần này.",
+    "hint": "Tối thiểu 10 ký tự.",
+    "cancel": "Huỷ",
+    "confirm": "Đăng vượt cổng"
+  },
+  "theHiringManager": "Hiring Manager của tin"
 }

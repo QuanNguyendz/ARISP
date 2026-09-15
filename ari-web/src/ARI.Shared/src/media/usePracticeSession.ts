@@ -97,7 +97,8 @@ export function useInterviewSession(options: InterviewSessionOptions) {
   const [timeUp, setTimeUp] = useState(false) // hết giờ — đang chờ AI nói câu kết thúc
   /**
    * Phòng chờ buổi THẬT (ADR-067): `waiting` = chưa ai vào phòng · `hm_joined` = Hiring Manager đã
-   * có mặt · `admitted` = đã được cho vào, AI đang hỏi. Buổi thử và tin chưa gán HM luôn `admitted`.
+   * có mặt · `admitted` = đã được cho vào, AI đang hỏi. Buổi thử luôn `admitted`; buổi thật luôn bắt
+   * đầu ở `waiting` (ADR-068: mọi tin đều có Hiring Manager — trạng thái do server quyết, hook chỉ đi theo).
    */
   const [admission, setAdmission] = useState<'waiting' | 'hm_joined' | 'admitted'>('admitted')
   // Id phiên đã tạo — page dùng để mở trang xem lại transcript sau khi kết thúc (ADR-051).

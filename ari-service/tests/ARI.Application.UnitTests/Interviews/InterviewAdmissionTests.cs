@@ -147,6 +147,38 @@ public class InterviewAdmissionTests
     }
 
     [Fact]
+    public async Task Chu_tin_KHONG_dieu_khien_duoc_phong_thay_HM()
+    {
+        // ADR-068: phòng chờ tồn tại để bảo đảm có Hiring Manager ngồi cùng AI. Recruiter "vào phòng rồi cho
+        // vào" là buổi đó chạy không có HM — đúng thứ phòng chờ chặn. Trước đây chủ tin làm được.
+        var (uow, _, session) = Seed();
+
+        var join = await Join(uow, session.Id, actor: _ownerId, role: AppRoles.Recruiter);
+        var admit = await Admit(uow, session.Id, actor: _ownerId, role: AppRoles.Recruiter);
+
+        Assert.True(join.IsFailure);
+        Assert.Equal(CommonErrorCodes.Forbidden, join.ErrorCode);
+        Assert.True(admit.IsFailure);
+        Assert.Equal(InterviewSessionStatuses.Waiting, session.Status);
+        Assert.Null(session.HmJoinedAt);
+    }
+
+    [Fact]
+    public async Task Tin_chua_co_HM_thi_chi_quan_tri_vien_mo_cua_duoc_va_co_audit()
+    {
+        // Lối thoát cho dữ liệu cũ / HM bị khoá: ứng viên không bị bỏ ngồi chờ vô hạn, nhưng có dấu vết.
+        var (uow, _, session) = Seed(withHiringManager: false);
+        var adminId = Guid.NewGuid();
+
+        await Join(uow, session.Id, actor: adminId, role: AppRoles.HrAdmin);
+        var res = await Admit(uow, session.Id, actor: adminId, role: AppRoles.HrAdmin);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(InterviewSessionStatuses.Active, session.Status);
+        Assert.Contains(uow.Repo<AuditLog>().Items, a => a.Action == "interview_admitted_without_hm");
+    }
+
+    [Fact]
     public async Task HM_dung_nguoi_thi_KHONG_ghi_audit_vuot_cong()
     {
         var (uow, _, session) = Seed();

@@ -6,6 +6,8 @@ using System.Security.Cryptography;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.Interviews;
+using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 
 namespace ARI.Application.Services
@@ -59,6 +61,18 @@ namespace ARI.Application.Services
                 finalRoundNumber = sessions.Any() ? sessions.Max(s => s.RoundNumber) + 1 : 1;
             }
 
+            var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                r => r.JobPostingId == jobPosting.Id && r.RoundNumber == finalRoundNumber, ct);
+            var roundConfig = roundConfigs.FirstOrDefault();
+            int ttlHours = roundConfig?.InterviewCodeTtlHours ?? 2;
+
+            // Vòng TRẮC NGHIỆM không dùng mã: ứng viên làm bài trực tuyến trong Portal (ADR-049). Cấp mã
+            // ở đây thì nhập mã tại Kiosk sẽ mở một PHIÊN PHỎNG VẤN AI cho một vòng vốn là bài thi.
+            if (InterviewInviteEmail.IsOnlineTest(roundConfig?.RoundType))
+            {
+                return Result.Failure<InterviewCode>(InterviewCodeRules.OnlineTestReason(finalRoundNumber));
+            }
+
             // ADR-015/016: mã On-site chỉ cấp khi ứng viên ĐÃ ĐẶT LỊCH buổi phỏng vấn thật của vòng
             // (InterviewBooking "scheduled"). Ứng viên đang sàng lọc / chưa đặt lịch thì CHƯA được cấp mã.
             var bookings = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
@@ -71,10 +85,12 @@ namespace ARI.Application.Services
                     $"Ứng viên chưa đặt lịch phỏng vấn thật cho vòng {finalRoundNumber} — chưa thể cấp mã. Mã On-site chỉ cấp sau khi ứng viên đã đặt lịch buổi phỏng vấn thật.");
             }
 
-            var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
-                r => r.JobPostingId == jobPosting.Id && r.RoundNumber == finalRoundNumber, ct);
-            var roundConfig = roundConfigs.FirstOrDefault();
-            int ttlHours = roundConfig?.InterviewCodeTtlHours ?? 2;
+            // Đã vào phòng vòng này thì không cấp thêm mã — mã thứ hai là phiên thứ hai (xem luật).
+            var enteredRoom = await InterviewCodeRules.EnteredRoomReasonAsync(_unitOfWork, applicationId, finalRoundNumber, ct);
+            if (enteredRoom != null)
+            {
+                return Result.Failure<InterviewCode>(enteredRoom);
+            }
 
             string generatedCode = string.Empty;
             bool isUnique = false;
@@ -96,15 +112,30 @@ namespace ARI.Application.Services
                 return Result.Failure<InterviewCode>("Không thể khởi tạo mã phỏng vấn duy nhất do phân tách dải mã bị trùng lặp.");
             }
 
+            // MỘT mã còn hiệu lực cho mỗi (hồ sơ, vòng). Mã cũ chưa dùng hết hiệu lực NGAY lúc cấp mã mới:
+            // để chúng sống song song thì ứng viên cầm được hai mã, và nhập cả hai là hai phiên (chốt chặn
+            // phía trên chỉ chạy lúc CẤP, không chạy lúc NHẬP). Cấp lại vì ứng viên làm mất mã hay
+            // Recruiter bấm nhầm là chuyện thường ngày, nên đây là đường chính chứ không phải ngoại lệ.
+            var now = DateTimeOffset.UtcNow;
+            var superseded = (await _unitOfWork.Repository<InterviewCode>().FindAsync(
+                    c => c.ApplicationId == applicationId && c.RoundNumber == finalRoundNumber
+                         && c.UsedAt == null && c.ExpiresAt > now, ct))
+                .ToList();
+            foreach (var old in superseded)
+            {
+                old.ExpiresAt = now;
+                _unitOfWork.Repository<InterviewCode>().Update(old);
+            }
+
             var interviewCode = new InterviewCode
             {
                 Id = Guid.NewGuid(),
                 ApplicationId = applicationId,
                 RoundNumber = finalRoundNumber,
                 Code = generatedCode,
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
+                ExpiresAt = now.AddHours(ttlHours),
                 CreatedByUserId = createdByUserId,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = now
             };
 
             await _unitOfWork.Repository<InterviewCode>().AddAsync(interviewCode, ct);
@@ -125,7 +156,7 @@ namespace ARI.Application.Services
                 Action = "interview_code_generated",
                 EntityType = "InterviewCode",
                 EntityId = interviewCode.Id,
-                Metadata = $"{{\"application_id\":\"{applicationId}\",\"round_number\":{finalRoundNumber},\"code\":\"{generatedCode}\"}}",
+                Metadata = $"{{\"application_id\":\"{applicationId}\",\"round_number\":{finalRoundNumber},\"code\":\"{generatedCode}\",\"superseded\":{superseded.Count}}}",
                 CreatedAt = DateTimeOffset.UtcNow
             };
 

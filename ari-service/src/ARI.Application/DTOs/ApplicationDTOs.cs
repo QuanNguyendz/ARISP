@@ -94,6 +94,29 @@ namespace ARI.Application.DTOs
         public DateTimeOffset? InterviewDate { get; set; }
 
         /// <summary>
+        /// Điểm bài trắc nghiệm của VÒNG HIỆN TẠI (0–100), null khi vòng này không phải vòng trắc
+        /// nghiệm hoặc ứng viên chưa nộp bài.
+        ///
+        /// Đây là DTO của phía NHÂN SỰ nên điểm đi kèm — khác hẳn <c>CandidateOnlineTestDto</c>, nơi
+        /// điểm và kết quả đạt/trượt cố ý không rời server (kết quả chỉ công bố khi cả vòng đã chốt).
+        /// </summary>
+        public decimal? OnlineTestScore { get; set; }
+
+        /// <summary>
+        /// Bài trắc nghiệm của vòng hiện tại có đạt điểm sàn không. Null khi chưa nộp.
+        /// <b>Không tự đổi trạng thái hồ sơ</b>: dưới sàn thì ứng viên vẫn ở nguyên vòng trắc nghiệm
+        /// cho tới khi Recruiter quyết định loại — đây chỉ là con số để họ quyết định.
+        /// </summary>
+        public bool? OnlineTestPassed { get; set; }
+
+        /// <summary>
+        /// Bài trắc nghiệm của vòng hiện tại do hệ thống nộp thay khi hết hạn — ứng viên đã được hẹn
+        /// giờ nhưng không vào làm. Điểm (thường là 0) vẫn là điểm thật; cờ này để bảng nói rõ "không
+        /// làm bài" thay vì trông như "làm sai hết". Null khi chưa có bài.
+        /// </summary>
+        public bool? OnlineTestExpired { get; set; }
+
+        /// <summary>
         /// Phản hồi của ứng viên với lịch vòng hiện tại đang được xếp: pending | confirmed.
         /// Null nếu chưa có lịch "scheduled" cho vòng hiện tại (ADR-048).
         /// </summary>

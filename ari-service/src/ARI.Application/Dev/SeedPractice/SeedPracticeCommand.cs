@@ -106,6 +106,9 @@ namespace ARI.Application.Dev.SeedPractice
 
             await _unitOfWork.SaveChangesAsync(ct); // persist candidate + job trước khi tạo application
 
+            // ADR-068: mọi tin đều có Hiring Manager chính, kể cả tin sandbox.
+            await DevHiringManagerSeed.EnsureAsync(_unitOfWork, _passwordHasher, job, ct);
+
             // 4) Application đủ điều kiện: Status="interview" là trạng thái sau-xếp-lịch mà
             //    StaffScheduling.AssignSlotCommand tạo ra (screening→interview) → PracticeEligible.
             //    Reuse để test lặp (với PracticeAttemptsPerRound=0), trừ khi Fresh=true.

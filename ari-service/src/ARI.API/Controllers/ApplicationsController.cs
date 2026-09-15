@@ -11,6 +11,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Emails;
 using ARI.Application.HiringTeam;
 using ARI.Application.Interfaces;
+using ARI.Application.Interviews;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -56,20 +57,13 @@ namespace ARI.API.Controllers
 
         /// <summary>Bắt buộc khi từ chối.</summary>
         public string? Note { get; set; }
-
-        /// <summary>
-        /// Khung giờ Hiring Manager có mặt được cho vòng 1 (ADR-067) — gửi kèm khi duyệt.
-        /// Recruiter chỉ được xếp ca nằm trong các khung này.
-        /// </summary>
-        public List<HmAvailabilityWindowRequest>? Availabilities { get; set; }
     }
 
-    /// <summary>Một khung giờ rảnh của Hiring Manager.</summary>
-    public class HmAvailabilityWindowRequest
+    /// <summary>Body của POST /applications/{id}/interview-code.</summary>
+    public class IssueInterviewCodeRequest
     {
-        public DateTimeOffset StartTime { get; set; }
-        public DateTimeOffset EndTime { get; set; }
-        public string? Note { get; set; }
+        /// <summary>true = cấp mã mới, mã cũ hết hiệu lực ngay. false = đang có mã thì trả lại chính mã đó.</summary>
+        public bool Regenerate { get; set; }
     }
 
     /// <summary>Body của POST /applications/{id}/hm-bypass.</summary>
@@ -251,17 +245,16 @@ namespace ARI.API.Controllers
                 : Ok(new { message = "Đã gửi hồ sơ cho Hiring Manager duyệt." });
         }
 
-        /// <summary>Hiring Manager duyệt hoặc từ chối hồ sơ trong shortlist.</summary>
+        /// <summary>
+        /// Hiring Manager duyệt hoặc từ chối hồ sơ trong shortlist. Lịch có mặt của HM KHÔNG đi kèm
+        /// lệnh này — khai riêng qua <c>PUT /api/schedules/hm-availability</c>.
+        /// </summary>
         [HttpPost("{id}/hm-decision")]
         [Authorize(Policy = "HiringDecision")]
         public async Task<IActionResult> HmDecision(Guid id, [FromBody] HmDecisionRequest request, CancellationToken ct)
         {
-            var windows = (request.Availabilities ?? new List<HmAvailabilityWindowRequest>())
-                .Select(w => new ARI.Application.Scheduling.HmAvailabilityWindowInput(w.StartTime, w.EndTime, w.Note))
-                .ToList();
-
             var result = await _sender.Send(new HmDecideApplicationCommand(
-                id, request.Decision, request.Note, _currentUserService.UserId, _currentUserService.Role, windows), ct);
+                id, request.Decision, request.Note, _currentUserService.UserId, _currentUserService.Role), ct);
             return result.IsFailure
                 ? MapFailure(result.ErrorCode, result.Error)
                 : Ok(new { message = "Đã ghi nhận quyết định của Hiring Manager." });
@@ -280,6 +273,35 @@ namespace ARI.API.Controllers
             return result.IsFailure
                 ? MapFailure(result.ErrorCode, result.Error)
                 : Ok(new { message = "Đã vượt cổng duyệt và thông báo cho Hiring Manager." });
+        }
+
+        // ─────────── Mã vào phòng phỏng vấn — cấp ngay trên danh sách ứng viên ───────────
+
+        /// <summary>
+        /// Trạng thái mã của vòng đang có lịch: vòng nào, làm từ nhà hay tại văn phòng, mã đang còn hiệu
+        /// lực (nếu có) và link Kiosk. Chỉ chủ tin hoặc quản trị viên.
+        /// </summary>
+        [HttpGet("{id}/interview-code")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetInterviewCode(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new GetApplicationInterviewCodeQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
+        }
+
+        /// <summary>
+        /// Cấp mã cho vòng đang có lịch. Không <c>regenerate</c> mà đang có mã thì trả lại chính mã đó;
+        /// <c>regenerate</c> thì mã cũ hết hiệu lực ngay.
+        /// </summary>
+        [HttpPost("{id}/interview-code")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> IssueInterviewCode(
+            Guid id, [FromBody] IssueInterviewCodeRequest? request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new IssueApplicationInterviewCodeCommand(
+                id, request?.Regenerate ?? false, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
         }
 
         [HttpPost("{id}/reject")]

@@ -22,8 +22,12 @@ namespace ARI.Application.UnitTests.Scheduling;
 /// </summary>
 public class RescheduleBookingsBatchTests
 {
+    /// <summary>ADR-068: mọi tin đều có Hiring Manager (kèm khung giờ rộng cho tin test dựng tay).</summary>
     private static ARI.Application.Services.InterviewService Svc(InMemoryUnitOfWork uow)
-        => InterviewServiceFactory.Create(uow, new RecordingNotificationService());
+    {
+        HiringManagerSeed.EnsureForAllJobs(uow);
+        return InterviewServiceFactory.Create(uow, new RecordingNotificationService());
+    }
 
     [Fact]
     public async Task Don_nhieu_nguoi_vao_mot_ca_thi_khong_doi_ai_ca()

@@ -137,6 +137,21 @@ namespace ARI.Application.Jobs.Commands.CreateJob
                 AddedByUserId = command.UserId,
             }, ct);
 
+            // ADR-068: người lập phiếu có thể đã bị khoá / đổi vai trò từ lúc phiếu được duyệt tới giờ.
+            // KHÔNG chặn tạo tin — Recruiter đã soạn xong JD theo phiếu, chặn ở đây là bắt họ bỏ công đó
+            // để chờ một phiếu mới. Tin vẫn được tạo với đúng người trên phiếu (bất biến "luôn có HM chính"
+            // giữ nguyên), cổng của tin đóng cho tới khi HR Leader chuyển HM, và HR Leader được báo ngay.
+            var requester = await _unitOfWork.Repository<User>().GetByIdAsync(recruitmentRequest.RequestedByUserId, ct);
+            var requesterActive = requester != null && requester.DeletedAt == null && requester.IsActive
+                                  && RoleNames.Is(requester.Role, RoleNames.HiringManager);
+            if (!requesterActive)
+            {
+                await ARI.Application.HiringTeam.HiringManagerAlerts.NotifyAdminsAsync(
+                    _unitOfWork, new[] { job },
+                    "Người lập phiếu không còn là Hiring Manager đang hoạt động.",
+                    $"hm_inactive_on_create:{job.Id}", ct);
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
 
             // Ingest JD vào RAG (chunk+embed+pgvector) để retrieve khi phỏng vấn. Không chặn

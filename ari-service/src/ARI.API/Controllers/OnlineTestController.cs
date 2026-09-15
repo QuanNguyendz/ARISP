@@ -134,6 +134,19 @@ namespace ARI.API.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Bài làm chi tiết của một ứng viên: từng câu, đáp án họ khoanh, đáp án đúng, đúng/sai.
+        /// Trả <c>null</c> khi chưa nộp bài — đó là câu trả lời hợp lệ, không phải lỗi.
+        /// </summary>
+        [HttpGet("applications/{applicationId:guid}/answers")]
+        public async Task<IActionResult> GetAnswerSheet(Guid applicationId, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new GetOnlineTestAnswerSheetQuery(applicationId, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(result.Value);
+        }
+
         /// <summary>Bảng tổng hợp điểm bài thi trắc nghiệm của toàn bộ ứng viên đã thi trong một job.</summary>
         [HttpGet("jobs/{jobId:guid}/results")]
         public async Task<IActionResult> GetJobResults(Guid jobId, CancellationToken ct)

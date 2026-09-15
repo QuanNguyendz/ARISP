@@ -50,21 +50,38 @@ namespace ARI.Domain.Constants
     /// <summary>Chữ ký duyệt JD của Hiring Manager trên một tin (ADR-061, cổng 3b).</summary>
     public static class HmSignOffStatus
     {
+        /// <summary>Recruiter đã gửi duyệt, đang chờ Hiring Manager ký.</summary>
         public const string Pending = "pending";
+
+        /// <summary>Hiring Manager đã ký — tin được đăng.</summary>
         public const string Approved = "approved";
+
+        /// <summary>
+        /// Hiring Manager yêu cầu sửa — tin đồng thời về <c>rejected</c> để Recruiter sửa rồi gửi lại
+        /// (ADR-068). Gửi lại thì cổng tự về <see cref="Pending"/>.
+        /// </summary>
         public const string Rejected = "rejected";
 
-        public static readonly string[] All = { Pending, Approved, Rejected };
+        /// <summary>
+        /// Quản trị viên đăng tin mà không chờ chữ ký (lý do ≥10 ký tự, audit log, báo cho HM bị vượt).
+        /// Ghi thành giá trị riêng chứ không để nguyên <see cref="Pending"/> — nếu không, tin đã đăng vẫn
+        /// hiện nút ký cho HM và vẫn nằm trong danh sách "chờ bạn ký".
+        /// </summary>
+        public const string Bypassed = "bypassed";
+
+        public static readonly string[] All = { Pending, Approved, Rejected, Bypassed };
 
         public static bool Is(string? actual, string expected) =>
             !string.IsNullOrWhiteSpace(actual)
             && string.Equals(actual.Trim(), expected, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Đang CHẶN việc đăng tin: chờ ký hoặc đã bị từ chối. <c>null</c> = tin không có Hiring
-        /// Manager nào → không có cổng nào, hành vi y hệt trước ADR-061.
+        /// Cổng ký duyệt đã được giải chưa — chỉ khi đó tin mới được đăng LẦN ĐẦU.
+        ///
+        /// <c>null</c> KHÔNG còn nghĩa là "không có cổng" (ADR-068: mọi tin luôn có Hiring Manager):
+        /// null là tin chưa từng gửi duyệt, nên đăng thẳng từ bản nháp cũng phải vượt cổng có lý do.
         /// </summary>
-        public static bool IsBlocking(string? status) =>
-            Is(status, Pending) || Is(status, Rejected);
+        public static bool IsCleared(string? status) =>
+            Is(status, Approved) || Is(status, Bypassed);
     }
 }

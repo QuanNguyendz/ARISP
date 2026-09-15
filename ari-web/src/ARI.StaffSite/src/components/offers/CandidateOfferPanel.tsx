@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FileSignature, Plus } from 'lucide-react'
 import { offerService, OFFER_STATUS } from '@ari/shared/fservices/offer'
+import jobService from '@ari/shared/fservices/job'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { normalizeRole, ROLE } from '@ari/shared/utils/roles'
 import { OFFERS_NS, offerStatusBadgeClass, formatSalary, formatDate } from '../hiring/hiringConfig'
@@ -12,6 +13,11 @@ interface CandidateOfferPanelProps {
   applicationId: string
   /** Trạng thái hồ sơ — thư mời chỉ mở được sau khi ứng viên qua HẾT các vòng (`pass`). */
   status: string
+  /**
+   * Tin của hồ sơ — cần cho vai Hiring Manager: chỉ HM CHÍNH của tin soạn được thư (ADR-063), thành viên
+   * phụ của đội thì không. Không truyền thì vai HM coi như không soạn được.
+   */
+  jobPostingId?: string
   onChanged?: () => void
 }
 
@@ -37,10 +43,13 @@ const LIVE = new Set<string>([
 export default function CandidateOfferPanel({
   applicationId,
   status,
+  jobPostingId,
   onChanged,
 }: CandidateOfferPanelProps) {
   const { t } = useTranslation(OFFERS_NS)
-  const role = normalizeRole(useAuthStore((s) => s.user)?.role)
+  const currentUser = useAuthStore((s) => s.user)
+  const role = normalizeRole(currentUser?.role)
+  const isHm = role === ROLE.HiringManager
   const [editorOpen, setEditorOpen] = useState(false)
   /** Soạn thư MỚI dù hồ sơ đã có thư cũ đã khép — modal phải mở ở chế độ tạo, không phải sửa. */
   const [replacing, setReplacing] = useState(false)
@@ -54,8 +63,16 @@ export default function CandidateOfferPanel({
   const live = mine.find((o) => LIVE.has(o.status))
   const latest = live ?? mine[0]
 
-  // Hiring Manager duyệt thư nhưng không soạn thư; ở đây họ vào bằng nút mở thư đã có.
-  const canCreate = role !== ROLE.HiringManager
+  // Tin của hồ sơ — chỉ cần với vai HM, để biết họ có phải HM CHÍNH của tin không.
+  const { data: job } = useQuery({
+    queryKey: ['job', jobPostingId],
+    queryFn: () => jobService.getJobPostingById(jobPostingId!),
+    enabled: isHm && !!jobPostingId,
+  })
+
+  // ADR-063: Hiring Manager CHÍNH của tin soạn và gửi duyệt thư mời (họ đề xuất mức lương), HR Leader chốt.
+  // Trước đây nút này ẩn hẳn với HM — sót từ ADR-061, khi HM còn là người DUYỆT thư chứ không soạn.
+  const canCreate = !isHm || (!!job && job.hiringManagerUserId === currentUser?.id)
 
   if (!latest && status !== 'pass') return null
 

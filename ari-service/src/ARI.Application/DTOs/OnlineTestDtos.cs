@@ -50,7 +50,31 @@ namespace ARI.Application.DTOs
         List<CandidateTestQuestionDto> Questions,
         bool AlreadySubmitted,
         DateTimeOffset? SubmittedAt,
-        bool CvPassed);
+        bool CvPassed,
+
+        /// <summary>
+        /// Giờ hẹn làm bài (= giờ bắt đầu ca nhân sự đã xếp). <c>null</c> khi chưa được xếp lịch.
+        /// </summary>
+        DateTimeOffset? OpensAt = null,
+
+        /// <summary>Hết giờ được phép VÀO thi (= <see cref="OpensAt"/> + 1 tiếng).</summary>
+        DateTimeOffset? ClosesAt = null,
+
+        /// <summary>
+        /// Có được bắt đầu lúc này không. Sai thì <c>Questions</c> trả RỖNG — chốt chặn nằm ở việc
+        /// không có đề chứ không phải ở một cờ giao diện tự giác.
+        /// </summary>
+        bool CanStart = false,
+
+        /// <summary>
+        /// Bài thi đã HẾT HẠN mà ứng viên không vào làm: cửa vào đã đóng khi chưa có bài nào, hoặc
+        /// bài hiện có là do hệ thống nộp thay. Giao diện nói "Đã hết hạn" thay vì "Đã nộp bài" —
+        /// hai câu đó kể hai chuyện khác nhau với chính ứng viên.
+        ///
+        /// Cố ý không kèm điểm: bài hệ thống nộp cũng là một kết quả, và kết quả chỉ công bố khi
+        /// cả vòng đã chốt.
+        /// </summary>
+        bool Expired = false);
 
     /// <summary>
     /// Biên nhận nộp bài — thứ DUY NHẤT ứng viên nhận lại sau khi bấm nộp.
@@ -69,7 +93,41 @@ namespace ARI.Application.DTOs
         int PassScore,
         int CorrectCount,
         int TotalQuestions,
-        DateTimeOffset SubmittedAt);
+        DateTimeOffset SubmittedAt,
+        /// <summary>Bài do hệ thống nộp thay khi hết hạn — ứng viên không vào làm bài.</summary>
+        bool Expired = false);
+
+    /// <summary>
+    /// Một câu trong bài làm của ứng viên — kèm ĐÁP ÁN ĐÚNG, nên chỉ dùng ở đường NHÂN SỰ.
+    ///
+    /// <see cref="SelectedOptions"/> rỗng nghĩa là ứng viên <b>bỏ trắng</b> câu đó, khác với chọn sai;
+    /// phân biệt được hai thứ này là một nửa lý do màn xem bài tồn tại.
+    /// </summary>
+    public record OnlineTestAnswerReviewItemDto(
+        Guid QuestionId,
+        string QuestionText,
+        List<string> Options,
+        string QuestionType,
+        List<int> SelectedOptions,
+        List<int> CorrectOptions,
+        bool IsCorrect);
+
+    /// <summary>Toàn bộ bài làm của một ứng viên — điểm tổng + từng câu.</summary>
+    public record OnlineTestAnswerSheetDto(
+        Guid ApplicationId,
+        string CandidateName,
+        int RoundNumber,
+        decimal Score,
+        bool IsPassed,
+        int PassScore,
+        int CorrectCount,
+        int TotalQuestions,
+        DateTimeOffset SubmittedAt,
+        /// <summary>Số lần rời khỏi bài thi (chuyển tab / mất focus) — tín hiệu chống gian lận nhẹ.</summary>
+        int TabSwitchCount,
+        List<OnlineTestAnswerReviewItemDto> Items,
+        /// <summary>Bài do hệ thống nộp thay khi hết hạn — ứng viên không vào làm bài.</summary>
+        bool Expired = false);
 
     /// <summary>Một dòng điểm của ứng viên trong bảng tổng hợp theo job.</summary>
     public record OnlineTestScoreRowDto(
@@ -82,7 +140,9 @@ namespace ARI.Application.DTOs
         int CorrectCount,
         int TotalQuestions,
         DateTimeOffset SubmittedAt,
-        int TabSwitchCount);
+        int TabSwitchCount,
+        /// <summary>Bài do hệ thống nộp thay khi hết hạn — ứng viên không vào làm bài.</summary>
+        bool Expired = false);
 
     /// <summary>Bảng tổng hợp điểm bài trắc nghiệm của toàn bộ ứng viên đã thi trong một job.</summary>
     public record OnlineTestJobResultsDto(
@@ -96,7 +156,13 @@ namespace ARI.Application.DTOs
         decimal AverageScore,
         decimal HighestScore,
         decimal LowestScore,
-        List<OnlineTestScoreRowDto> Rows);
+        List<OnlineTestScoreRowDto> Rows,
+        /// <summary>
+        /// Trong <see cref="SubmissionCount"/>, bao nhiêu bài là hệ thống nộp thay khi hết hạn. Vẫn
+        /// tính vào mọi con số (đó là kết quả thật: 0 điểm, chưa đạt) — con số này để người đọc biết
+        /// điểm trung bình đang kéo xuống vì người không vào thi, không phải vì đề khó.
+        /// </summary>
+        int ExpiredCount = 0);
 
     // ===== Request bodies (model binding từ controller) =====
 

@@ -38,6 +38,18 @@ namespace ARI.Application.Evaluations
         public string? Concerns { get; set; }
     }
 
+    /// <summary>Một lượt hỏi–đáp của buổi phỏng vấn, đúng như đã diễn ra.</summary>
+    public class TranscriptTurnDto
+    {
+        public int SequenceNumber { get; set; }
+        public string Question { get; set; } = string.Empty;
+        public string? QuestionType { get; set; }
+        /// <summary>Lời ứng viên (đã qua STT, ứng viên có thể đã sửa tay — ADR-050). Null = không trả lời.</summary>
+        public string? Answer { get; set; }
+        public DateTimeOffset AskedAt { get; set; }
+        public DateTimeOffset? AnsweredAt { get; set; }
+        public int? ResponseTimeMs { get; set; }
+    }
 
     public class QuestionAnalysisDto
     {
@@ -222,6 +234,25 @@ namespace ARI.Application.Evaluations
         /// <summary>Thời điểm video đã bị xoá theo hạn lưu (để HR không tưởng là mất dữ liệu).</summary>
         public DateTimeOffset? RecordingDeletedAt { get; set; }
 
+        // ===== Buổi phỏng vấn mà báo cáo này chấm =====
+        // Báo cáo đọc tách khỏi buổi thì người duyệt không biết đang xem ca nào, lúc nào, bao lâu —
+        // và không có cách nào đối chiếu nhận xét của AI với chính lời ứng viên đã nói.
+
+        public string? RoundType { get; set; }
+        /// <summary>Ca đã gán cho vòng này (ADR-048/067).</summary>
+        public DateTimeOffset? SlotStartTime { get; set; }
+        public DateTimeOffset? SlotEndTime { get; set; }
+        public DateTimeOffset? SessionStartedAt { get; set; }
+        public DateTimeOffset? SessionEndedAt { get; set; }
+        public int? DurationSeconds { get; set; }
+
+        /// <summary>
+        /// Toàn bộ lượt hỏi–đáp của buổi, theo đúng thứ tự — lấy từ DB, không phải bản AI chép lại.
+        /// Khác <see cref="QuestionAnalyses"/>: phần phân tích chỉ có những câu AI chấm, còn transcript
+        /// có cả câu ứng viên bỏ trống.
+        /// </summary>
+        public List<TranscriptTurnDto> Transcript { get; set; } = new();
+
         /// <summary>
         /// Điểm khớp CV-JD do Gemini chấm (ADR-030), lấy từ `cv_jd_analyses` gắn với hồ sơ.
         /// Null = hồ sơ nộp trước khi có phân tích (không chạy lại — kết quả dùng 1 lần per CV+JD).
@@ -235,8 +266,11 @@ namespace ARI.Application.Evaluations
         // Handler điền, không phải FromEntity: cần đọc bảng đội tuyển dụng. Giao diện dùng để
         // quyết định hiện nút "Chốt kết quả" hay banner "đang chờ Hiring Manager chốt".
 
-        /// <summary>Tin có Hiring Manager chính không. False = mọi thứ như trước ADR-061.</summary>
-        public bool RequiresHmApproval { get; set; }
+        /// <summary>
+        /// active | inactive | missing (ADR-068). Người chốt LUÔN là Hiring Manager chính; mọi người khác
+        /// (kể cả khi HM bị khoá hay tin cũ chưa gán) chỉ chốt THAY — có lý do, có dấu vết.
+        /// </summary>
+        public string? HiringManagerState { get; set; }
         public Guid? HiringManagerUserId { get; set; }
         public string? HiringManagerName { get; set; }
 

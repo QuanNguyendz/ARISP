@@ -130,13 +130,14 @@
   "noFilterResults": "No candidates match the current filters.",
   "paginationLabel": "candidates",
   "pendingApproval": {
-    "title": "This posting is awaiting your approval",
-    "description": "Recruiter {{name}} submitted this posting with JD file. Approve to publish (JD will be stamped) or reject with reason.",
-    "approve": "Approve & Stamp",
-    "reject": "Reject"
+    "title": "Waiting for the Hiring Manager's sign-off",
+    "description": "Recruiter {{name}} submitted this posting. Once {{hm}} signs off the job description it goes live automatically (the JD file is stamped). Only publish without sign-off when truly needed — the reason is audited and sent to the Hiring Manager.",
+    "approve": "Publish without sign-off",
+    "reject": "Return to Recruiter"
   },
   "rejectedBanner": {
-    "label": "Rejected:"
+    "label": "Rejected:",
+    "hmLabel": "Hiring Manager requested changes:"
   },
   "approvedBanner": {
     "label": "Approved by",
@@ -168,7 +169,7 @@
     "acceptSuccess": "CV approved (Round 1). Assign a schedule to send the interview invitation email with the appointment.",
     "rejectSuccess": "Application rejected and thank you email sent to candidate successfully.",
     "inviteSuccess": "Magic link invitation sent to candidate.",
-    "jobApproveSuccess": "Job posting approved. JD file has been stamped.",
+    "jobApproveSuccess": "Published without sign-off. The Hiring Manager has been notified; the JD file is stamped.",
     "jobRejectSuccess": "Job posting rejected. Recruiter will see the reason to edit.",
     "batchAcceptSuccess": "Successfully approved {{success}} applications.",
     "batchRejectSuccess": "Successfully rejected {{success}} applications.",
@@ -199,5 +200,20 @@
     "negotiable": "Negotiable",
     "from": "From",
     "to": "To"
-  }
+  },
+  "draftBanner": {
+    "title": "Draft",
+    "description": "The Recruiter needs to send this posting to the Hiring Manager for sign-off before it goes live. An administrator can publish without sign-off with a reason (audited, the Hiring Manager is notified), or keep editing.",
+    "publish": "Publish without sign-off",
+    "edit": "Edit posting"
+  },
+  "bypassModal": {
+    "title": "Publish without the Hiring Manager's sign-off",
+    "description": "\"{{title}}\" will go live now without waiting for {{hm}} to sign off. The reason is written to the audit log and sent to the Hiring Manager.",
+    "placeholder": "e.g. the Hiring Manager is on leave until Sep 20 and the role must open this week.",
+    "hint": "At least 10 characters.",
+    "cancel": "Cancel",
+    "confirm": "Publish without sign-off"
+  },
+  "theHiringManager": "the Hiring Manager"
 }

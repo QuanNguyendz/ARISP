@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -71,16 +73,37 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
                 response.RecordingDeletedAt = session.RecordingDeletedAt;
                 if (!string.IsNullOrEmpty(session.RecordingUrl))
                     response.RecordingUrl = await _fileStorage.GetUrlAsync(session.RecordingUrl, ct);
+
+                response.RoundType = session.RoundType;
+                response.SessionStartedAt = session.StartedAt;
+                response.SessionEndedAt = session.EndedAt;
+                response.DurationSeconds = session.DurationSeconds;
             }
+
+            // Ca đã gán cho vòng này — người duyệt cần biết đang xem buổi nào của tin nào.
+            var booking = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                    b => b.ApplicationId == application.Id
+                         && b.RoundNumber == evaluation.RoundNumber
+                         && b.Status != BookingStatus.Cancelled
+                         && b.Status != BookingStatus.Declined, ct))
+                .OrderByDescending(b => b.CreatedAt)
+                .FirstOrDefault();
+            if (booking != null)
+            {
+                var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
+                response.SlotStartTime = slot?.StartTime;
+                response.SlotEndTime = slot?.EndTime;
+            }
+
+            response.Transcript = await LoadTranscriptAsync(evaluation.SessionId, ct);
 
             // Ai là người có thẩm quyền chốt kết quả này (ADR-061). Giao diện cần biết để hiện đúng
             // một trong hai thứ: nút chốt, hay banner "đang chờ Hiring Manager" kèm nút chốt thay.
-            var primaryHm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+            var (primaryHm, hmUser, hmState) = await JobAccess.HiringManagerStatusAsync(_unitOfWork, job.Id, ct);
+            response.HiringManagerState = HiringManagerStateNames.Of(hmState);
             if (primaryHm != null)
             {
-                response.RequiresHmApproval = true;
                 response.HiringManagerUserId = primaryHm.UserId;
-                var hmUser = await _unitOfWork.Repository<User>().GetByIdAsync(primaryHm.UserId, ct);
                 if (hmUser != null)
                     response.HiringManagerName =
                         string.IsNullOrWhiteSpace(hmUser.FullName) ? hmUser.Email : hmUser.FullName;
@@ -99,6 +122,39 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             }
 
             return Result.Success(response);
+        }
+
+        /// <summary>
+        /// Câu hỏi theo thứ tự + câu trả lời tương ứng (cùng cách ghép với màn xem lại buổi thử của ứng
+        /// viên). Nạp câu trả lời MỘT lần rồi ghép trong bộ nhớ — không truy vấn theo từng câu hỏi.
+        /// </summary>
+        private async Task<List<TranscriptTurnDto>> LoadTranscriptAsync(Guid sessionId, CancellationToken ct)
+        {
+            var questions = (await _unitOfWork.Repository<Question>()
+                    .FindAsync(q => q.SessionId == sessionId, ct))
+                .OrderBy(q => q.SequenceNumber)
+                .ToList();
+            if (questions.Count == 0) return new List<TranscriptTurnDto>();
+
+            var answerByQuestion = (await _unitOfWork.Repository<Answer>()
+                    .FindAsync(a => a.SessionId == sessionId, ct))
+                .GroupBy(a => a.QuestionId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(a => a.CreatedAt).First());
+
+            return questions.Select(q =>
+            {
+                answerByQuestion.TryGetValue(q.Id, out var a);
+                return new TranscriptTurnDto
+                {
+                    SequenceNumber = q.SequenceNumber,
+                    Question = q.QuestionText,
+                    QuestionType = q.QuestionType,
+                    Answer = string.IsNullOrWhiteSpace(a?.Transcript) ? null : a!.Transcript,
+                    AskedAt = q.CreatedAt,
+                    AnsweredAt = a?.CreatedAt,
+                    ResponseTimeMs = a?.ResponseTimeMs,
+                };
+            }).ToList();
         }
     }
 }

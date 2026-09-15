@@ -18,8 +18,6 @@
   "round": "Vòng {{number}}",
   "practice": "Thử",
   "real": "Thật",
-  "screening": "Sơ loại",
-  "technical": "Chuyên môn",
   "durationMinutes": "{{minutes}} phút",
   "noDuration": "—",
   "actions": "Thao tác",
@@ -43,5 +41,11 @@
   "pass": "Pass",
   "notPass": "Not Pass",
   "viewReport": "Xem báo cáo",
-  "cvCriteriaTitle": "Điểm CV theo tiêu chí công ty"
+  "cvCriteriaTitle": "Điểm CV theo tiêu chí công ty",
+  "roundTypes": {
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "onlineTest": "Trắc nghiệm",
+    "other": "Phỏng vấn"
+  }
 }

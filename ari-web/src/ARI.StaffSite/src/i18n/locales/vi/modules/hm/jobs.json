@@ -27,17 +27,18 @@
     "jdFileTitle": "Bản mô tả công việc",
     "jdFileFallbackName": "File JD",
     "jdFileHint": "Xem kỹ file này trước khi ký duyệt — ký duyệt xong là tin được đăng.",
-    "approveTitle": "Duyệt hồ sơ và gửi lịch rảnh",
+    "approveTitle": "Duyệt hồ sơ",
+    "approveBody": "Hồ sơ sẽ chuyển sang hàng chờ xếp lịch của Recruiter. Ứng viên chưa nhận thông báo nào cho tới khi được xếp giờ hẹn.",
     "rejectTitle": "Từ chối hồ sơ",
-    "availabilityLabel": "Khung giờ bạn có thể tham gia phỏng vấn (vòng 1)",
-    "availabilityHint": "Recruiter sẽ xếp ca cho ứng viên nằm trọn trong những khung này. Việc chốt giờ cụ thể với ứng viên (SMS, Zalo…) diễn ra ngoài hệ thống.",
     "rejectReasonLabel": "Lý do từ chối",
     "rejectReasonPlaceholder": "Ví dụ: chưa đủ kinh nghiệm mảng thanh toán.",
-    "confirmApprove": "Duyệt và gửi lịch",
+    "confirmApprove": "Duyệt",
     "confirmReject": "Xác nhận từ chối",
     "cancel": "Huỷ",
     "decisionError": "Không ghi được quyết định. Vui lòng thử lại.",
-    "runningWindows": "Khung giờ đã khai và đang diễn ra (không sửa ở đây, vẫn còn hiệu lực):"
+    "testBankTitle": "Ngân hàng đề trắc nghiệm",
+    "testBankHint": "Bạn là người ra đề: soạn câu hỏi, chọn đáp án đúng và đặt điểm sàn cho vòng thi.",
+    "testBankOpen": "Mở ngân hàng đề"
   },
   "applicationStatus": {
     "invited": "Đã mời",
@@ -57,5 +58,25 @@
     "pending": "Chờ bạn ký duyệt",
     "rejected": "Bạn đã yêu cầu sửa"
   },
-  "needsSignOff": "Chờ bạn ký duyệt"
+  "needsSignOff": "Chờ bạn ký duyệt",
+  "availability": {
+    "title": "Lịch tôi có mặt được",
+    "subtitle": "Recruiter chỉ xếp được ca nằm trọn trong một khung dưới đây. Sửa lại bất cứ lúc nào.",
+    "round": "Vòng {{number}}",
+    "loading": "Đang tải lịch…",
+    "loadError": "Không tải được lịch đã khai.",
+    "saveError": "Không lưu được lịch.",
+    "dropError": "Không rút được khung giờ này.",
+    "save": "Lưu lịch",
+    "saved": "Đã lưu. Hiện có {{count}} khung còn hiệu lực.",
+    "affected": "{{count}} buổi đã hẹn nay nằm ngoài lịch của bạn. Recruiter đã được báo và cần dời lịch cho từng người — hệ thống không tự huỷ buổi nào.",
+    "runningTitle": "Khung đang diễn ra",
+    "drop": "Rút khung này",
+    "confirmDrop": "Rút khung {{window}}? Ca chưa gán sẽ không xếp vào đây được nữa.",
+    "replaceHint": "Lưu sẽ thay toàn bộ khung chưa bắt đầu bằng danh sách trên. Khung đang diễn ra không bị đụng tới — muốn bỏ thì bấm Rút khung này.",
+    "empty": "Chưa khai khung giờ nào cho vòng này.",
+    "emptyEditable": "Chưa có khung giờ nào cho vòng {{number}} — Recruiter chưa xếp được ca phỏng vấn vòng này cho tới khi bạn khai.",
+    "testRoundsNote_one": "Vòng {{rounds}} là bài trắc nghiệm trực tuyến — không cần bạn có mặt nên không khai lịch.",
+    "testRoundsNote_other": "Vòng {{rounds}} là bài trắc nghiệm trực tuyến — không cần bạn có mặt nên không khai lịch."
+  }
 }

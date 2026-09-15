@@ -13,7 +13,7 @@ namespace ARI.Domain.Constants
         /// <summary>Đang soạn — chỉ nhân sự thấy, chưa hứa gì với ai.</summary>
         public const string Draft = "draft";
 
-        /// <summary>Đã gửi cho Hiring Manager (hoặc quản trị viên) duyệt mức lương/điều kiện.</summary>
+        /// <summary>Đã gửi HR Leader (hoặc Super Admin) chốt mức lương/điều kiện — ADR-063.</summary>
         public const string PendingApproval = "pending_approval";
 
         /// <summary>Đã duyệt, chờ nhân sự gửi cho ứng viên.</summary>

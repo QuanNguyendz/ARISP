@@ -29,6 +29,20 @@ export interface UploadPlaybookPayload {
   roundNumber?: number
 }
 
+/** Playbook của một tin + quyền thêm/xoá của người gọi — cờ do server quyết (ADR-069). */
+export interface JobPlaybooks {
+  items: PlaybookItem[]
+  canManage: boolean
+}
+
+/** Playbook trong màn tin: áp cho cả tin, hoặc cho đúng một vòng. Tin lấy từ URL. */
+export interface UploadJobPlaybookPayload {
+  file: File
+  scope: 'job_posting' | 'round'
+  documentType: string
+  roundNumber?: number
+}
+
 export const playbookService = {
   async getPlaybooks(scope?: string): Promise<PlaybookItem[]> {
     const { data } = await apiClient.get<PlaybookItem[]>('/playbooks', { params: scope ? { scope } : undefined })
@@ -50,6 +64,30 @@ export const playbookService = {
 
   async deletePlaybook(id: string): Promise<void> {
     await apiClient.delete(`/playbooks/${id}`)
+  },
+
+  // ===== Playbook THEO TIN — quản lý ngay trong màn tin (ADR-069) =====
+
+  async getJobPlaybooks(jobId: string): Promise<JobPlaybooks> {
+    const { data } = await apiClient.get<JobPlaybooks>(`/jobs/${jobId}/playbooks`)
+    return data
+  },
+
+  async uploadJobPlaybook(jobId: string, payload: UploadJobPlaybookPayload): Promise<PlaybookItem> {
+    const fd = new FormData()
+    fd.append('file', payload.file)
+    fd.append('scope', payload.scope)
+    fd.append('documentType', payload.documentType)
+    if (payload.scope === 'round' && payload.roundNumber != null)
+      fd.append('roundNumber', String(payload.roundNumber))
+    const { data } = await apiClient.post<PlaybookItem>(`/jobs/${jobId}/playbooks`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async deleteJobPlaybook(jobId: string, id: string): Promise<void> {
+    await apiClient.delete(`/jobs/${jobId}/playbooks/${id}`)
   },
 
   /**

@@ -33,6 +33,39 @@ namespace ARI.Application.Offers
         }
 
         /// <summary>
+        /// Ai SOẠN và GỬI DUYỆT được thư mời (ADR-063): chủ tin / quản trị viên, <b>hoặc Hiring Manager chính</b>
+        /// của tin — người đề xuất mức lương cụ thể. Trước đây ba lệnh soạn / sửa / gửi duyệt đòi mức
+        /// <c>Owner</c>, nên HM (mức <c>TeamMember</c>) nhận 403 dù ADR-063 viết rõ họ soạn được.
+        ///
+        /// KHÔNG nới <see cref="JobAccess"/>: mở ở đó là kéo theo sửa tin, xếp lịch… những việc HM cố ý không
+        /// được làm. Cùng khuôn "mở một lối vào có tên" với <c>OnlineTestSupport.CanManageAsync</c>. Chốt thư
+        /// vẫn chỉ HR Leader (policy <c>OfferApproval</c>), gửi cho ứng viên vẫn chỉ chủ tin / quản trị viên.
+        /// </summary>
+        public static async Task<bool> CanDraftAsync(
+            IUnitOfWork uow, Guid jobPostingId, JobAccessLevel level, Guid? userId, CancellationToken ct)
+            => level >= JobAccessLevel.Owner
+               || await JobAccess.IsPrimaryHiringManagerAsync(uow, jobPostingId, userId, ct);
+
+        /// <summary>
+        /// Báo cùng một nội dung cho nhiều người, mỗi người một link ĐÚNG workspace của họ
+        /// (<see cref="StaffLinks"/>). Bỏ trùng và bỏ <c>Guid.Empty</c>; trả về danh sách đã báo để người gọi
+        /// đẩy chuông realtime SAU khi lưu.
+        /// </summary>
+        public static async Task<List<Guid>> NotifyStaffAboutOffersAsync(
+            IUnitOfWork uow, IEnumerable<Guid?> recipients,
+            string type, string title, string body, string dedupPrefix, CancellationToken ct)
+        {
+            var sent = new List<Guid>();
+            foreach (var id in recipients.Where(r => r is { } g && g != Guid.Empty).Select(r => r!.Value).Distinct())
+            {
+                await NotifyStaffAsync(uow, id, type, title, body,
+                    await StaffLinks.OffersAsync(uow, id, ct), $"{dedupPrefix}:{id}", ct);
+                sent.Add(id);
+            }
+            return sent;
+        }
+
+        /// <summary>
         /// Thêm thông báo cho nhân sự, BỎ QUA nếu đã có bản cùng (người nhận, dedupKey).
         ///
         /// `notifications` có UNIQUE trên `(recipient_user_id, dedup_key)`, nên thêm lần hai là
@@ -147,8 +180,10 @@ namespace ARI.Application.Offers
                 _unitOfWork, request.Request.ApplicationId, request.UserId, request.Role, ct);
             if (app == null || job == null)
                 return Result.Failure<OfferDto>(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
-            if (level < JobAccessLevel.Owner)
-                return Result.Failure<OfferDto>(JobAccessErrors.ApplicationManageForbidden, CommonErrorCodes.Forbidden);
+            if (!await OfferSupport.CanDraftAsync(_unitOfWork, job.Id, level, request.UserId, ct))
+                return Result.Failure<OfferDto>(
+                    "Chỉ Hiring Manager phụ trách tin, chủ tin hoặc quản trị viên mới soạn được thư mời.",
+                    CommonErrorCodes.Forbidden);
 
             // Chỉ ra offer cho người đã qua HẾT các vòng (ADR-053).
             if (!ApplicationStatuses.Is(app.Status, ApplicationStatuses.Pass))
@@ -197,18 +232,28 @@ namespace ARI.Application.Offers
             return Result.Success(OfferDto.FromEntity(offer, app, job));
         }
 
-        /// <summary>Đề xuất lương/cấp bậc mới nhất của người chốt kết quả phỏng vấn.</summary>
+        /// <summary>
+        /// Đề xuất lương của người chốt kết quả ở VÒNG CAO NHẤT mà ứng viên được chốt ĐẠT.
+        ///
+        /// Trước đây lấy đề xuất mới nhất của BẤT KỲ lượt chốt nào — kể cả một lượt chốt "không đạt" hay
+        /// đề xuất sớm ở vòng 1 mà HM đã điều chỉnh ở vòng cuối. Thư mời là hệ quả của quyết định tuyển
+        /// cuối cùng, nên chỉ đề xuất đi kèm quyết định đó mới được điền sẵn.
+        /// </summary>
         internal static async Task<HrReview?> LatestSuggestionAsync(
             IUnitOfWork uow, Guid applicationId, CancellationToken ct)
         {
-            var evalIds = (await uow.Repository<Evaluation>()
-                .FindAsync(e => e.ApplicationId == applicationId && e.SessionType == "real", ct))
-                .Select(e => e.Id).ToHashSet();
-            if (evalIds.Count == 0) return null;
+            var roundByEval = (await uow.Repository<Evaluation>()
+                    .FindAsync(e => e.ApplicationId == applicationId && e.SessionType == "real", ct))
+                .ToDictionary(e => e.Id, e => e.RoundNumber);
+            if (roundByEval.Count == 0) return null;
 
+            var evalIds = roundByEval.Keys.ToHashSet();
             return (await uow.Repository<HrReview>().FindAsync(r => evalIds.Contains(r.EvaluationId), ct))
-                .OrderByDescending(r => r.CreatedAt)
-                .FirstOrDefault(r => r.SuggestedSalaryMin.HasValue || r.SuggestedSalaryMax.HasValue);
+                .Where(r => string.Equals(r.FinalVerdict, "pass", StringComparison.OrdinalIgnoreCase)
+                            && (r.SuggestedSalaryMin.HasValue || r.SuggestedSalaryMax.HasValue))
+                .OrderByDescending(r => roundByEval[r.EvaluationId])
+                .ThenByDescending(r => r.CreatedAt)
+                .FirstOrDefault();
         }
     }
 
@@ -230,7 +275,7 @@ namespace ARI.Application.Offers
                 _unitOfWork, request.Id, request.UserId, request.Role, ct);
             if (offer == null)
                 return Result.Failure<OfferDto>("Không tìm thấy thư mời nhận việc.", CommonErrorCodes.NotFound);
-            if (level < JobAccessLevel.Owner)
+            if (!await OfferSupport.CanDraftAsync(_unitOfWork, offer.JobPostingId, level, request.UserId, ct))
                 return Result.Failure<OfferDto>("Bạn không có quyền sửa thư mời này.", CommonErrorCodes.Forbidden);
             if (!OfferStatus.Is(offer.Status, OfferStatus.Draft))
                 return Result.Failure<OfferDto>("Chỉ sửa được thư mời khi còn là bản nháp.");
@@ -282,7 +327,7 @@ namespace ARI.Application.Offers
                 _unitOfWork, request.Id, request.UserId, request.Role, ct);
             if (offer == null || app == null || job == null)
                 return Result<bool>.Failure("Không tìm thấy thư mời nhận việc.", CommonErrorCodes.NotFound);
-            if (level < JobAccessLevel.Owner)
+            if (!await OfferSupport.CanDraftAsync(_unitOfWork, job.Id, level, request.UserId, ct))
                 return Result<bool>.Failure("Bạn không có quyền gửi duyệt thư mời này.", CommonErrorCodes.Forbidden);
             if (!OfferStatus.Is(offer.Status, OfferStatus.Draft))
                 return Result<bool>.Failure("Chỉ gửi duyệt được thư mời đang ở bản nháp.");
@@ -300,47 +345,43 @@ namespace ARI.Application.Offers
             offer.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<Offer>().Update(offer);
 
-            // Người duyệt: Hiring Manager của tin; tin chưa gán HM thì rơi về quản trị viên.
-            var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
-            if (hm != null)
-            {
-                await OfferSupport.NotifyStaffAsync(_unitOfWork, hm.UserId,
-                    "pending", "Thư mời nhận việc chờ bạn duyệt",
-                    $"Ứng viên {app.CandidateName} — vị trí \"{job.Title}\".",
-                    "/hm/offers", $"offer_pending:{offer.Id}", ct);
-            }
-            else
-            {
-                // Tin chưa gán HM: trước đây chỉ phát một sự kiện realtime cho nhóm `hr_admin` —
-                // **không ai đang mở ứng dụng lúc đó thì không còn dấu vết nào**. Thư nằm im ở
-                // `pending_approval` vô thời hạn, mà nó vẫn giữ chỗ "một thư mời sống" của hồ sơ nên
-                // cũng không soạn được thư thay thế. Ghi thông báo BỀN cho từng quản trị viên.
-                var admins = await _unitOfWork.Repository<User>().QueryAsync(
+            // Người CHỐT là HR Leader (ADR-063) — nên họ là người phải nhận việc, với MỌI tin. Trước đây
+            // tin có HM thì chỉ HM được báo "Thư mời chờ bạn duyệt" (sót lại từ ADR-061), trong khi HM
+            // bấm duyệt thì bị 403 và HR Leader không nhận gì — thư nằm im ở `pending_approval`, vẫn giữ
+            // chỗ "một thư mời sống" của hồ sơ nên cũng không soạn được thư thay thế. Thông báo BỀN cho
+            // từng người: sự kiện realtime thôi thì ai không mở ứng dụng lúc đó là mất dấu.
+            var stamp = DateTimeOffset.UtcNow.Ticks; // mỗi lượt gửi duyệt là một việc mới (trả về rồi gửi lại)
+            var approverIds = (await _unitOfWork.Repository<User>().QueryAsync(
                     q => q.Where(u => u.IsActive
                                       && (u.Role == RoleNames.HrAdmin || u.Role == RoleNames.SuperAdmin))
-                          .Select(u => u.Id), ct);
+                          .Select(u => u.Id), ct))
+                .Where(id => id != request.UserId)
+                .Select(id => (Guid?)id)
+                .ToList();
+            var approversNotified = await OfferSupport.NotifyStaffAboutOffersAsync(_unitOfWork, approverIds,
+                "pending", "Thư mời nhận việc chờ chốt",
+                $"Ứng viên {app.CandidateName} — vị trí \"{job.Title}\".",
+                $"offer_pending:{offer.Id}:{stamp}", ct);
 
-                foreach (var adminId in admins)
-                {
-                    await OfferSupport.NotifyStaffAsync(_unitOfWork, adminId,
-                        "pending", "Thư mời nhận việc chờ duyệt",
-                        $"Ứng viên {app.CandidateName} — vị trí \"{job.Title}\" (tin chưa gán Hiring Manager).",
-                        "/hr/offers", $"offer_pending:{offer.Id}", ct);
-                }
-            }
+            // Bên còn lại của cặp "người đề xuất – người vận hành" được báo để biết thư đã đi duyệt:
+            // HM gửi thì chủ tin biết (họ sẽ là người gửi cho ứng viên), chủ tin gửi thì HM biết.
+            var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+            var fyi = await OfferSupport.NotifyStaffAboutOffersAsync(_unitOfWork,
+                new Guid?[] { job.CreatedByUserId, hm?.UserId }
+                    .Where(id => id != request.UserId && !approverIds.Contains(id)),
+                "system", "Thư mời đã được gửi HR Leader chốt",
+                $"Ứng viên {app.CandidateName} — vị trí \"{job.Title}\".",
+                $"offer_submitted_fyi:{offer.Id}:{stamp}", ct);
 
             await AdminSupport.WriteAuditAsync(_unitOfWork, request.UserId, "offer_submitted", nameof(Offer), offer.Id,
                 AuditMetadata.Serialize(new { candidate = app.CandidateName, salary = offer.SalaryAmount }), ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            if (hm == null)
+            await _notifications.PublishGroupEventAsync("hr_admin", "ReceiveUserNotification",
+                new { Type = "OfferPendingApproval", OfferId = offer.Id }, ct);
+            foreach (var id in approversNotified.Concat(fyi).Distinct())
             {
-                await _notifications.PublishGroupEventAsync("hr_admin", "ReceiveUserNotification",
-                    new { Type = "OfferPendingApproval", OfferId = offer.Id }, ct);
-            }
-            else
-            {
-                await _notifications.PublishUserEventAsync(hm.UserId, "ReceiveUserNotification",
+                await _notifications.PublishUserEventAsync(id, "ReceiveUserNotification",
                     new { Type = "OfferPendingApproval", OfferId = offer.Id }, ct);
             }
 
@@ -421,19 +462,30 @@ namespace ARI.Application.Offers
             offer.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<Offer>().Update(offer);
 
-            await OfferSupport.NotifyStaffAsync(_unitOfWork, offer.CreatedByUserId,
+            // Báo người soạn + chủ tin + Hiring Manager, mỗi người link đúng workspace. Chủ tin luôn có mặt
+            // vì sau khi chốt, GỬI cho ứng viên là việc của họ — kể cả khi người soạn là HM. Trước đây chỉ
+            // người soạn được báo, với link cứng `/recruiter/offers` (HM hay HR bấm vào là gặp trang 403).
+            var hmForDecision = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+            var notified = await OfferSupport.NotifyStaffAboutOffersAsync(_unitOfWork,
+                new Guid?[] { offer.CreatedByUserId, job.CreatedByUserId, hmForDecision?.UserId }
+                    .Where(id => id != request.UserId),
                 decision == "approved" ? "approved" : "rejected",
-                decision == "approved" ? "Thư mời đã được duyệt" : "Thư mời cần chỉnh sửa",
-                $"{app.CandidateName} — vị trí \"{job.Title}\"." + (note != null ? $" {note}" : string.Empty),
-                "/recruiter/offers", $"offer_decided:{offer.Id}:{DateTimeOffset.UtcNow.Ticks}", ct);
+                decision == "approved" ? "Thư mời đã được HR Leader chốt" : "Thư mời cần chỉnh sửa",
+                $"{app.CandidateName} — vị trí \"{job.Title}\"."
+                    + (decision == "approved" ? " Chủ tin gửi thư cho ứng viên qua trình soạn thư." : string.Empty)
+                    + (note != null ? $" {note}" : string.Empty),
+                $"offer_decided:{offer.Id}:{DateTimeOffset.UtcNow.Ticks}", ct);
 
             await AdminSupport.WriteAuditAsync(_unitOfWork, request.UserId,
                 decision == "approved" ? "offer_approved" : "offer_rejected", nameof(Offer), offer.Id,
                 AuditMetadata.Serialize(new { candidate = app.CandidateName, note }), ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            await _notifications.PublishUserEventAsync(offer.CreatedByUserId, "ReceiveUserNotification",
-                new { Type = "OfferDecided", OfferId = offer.Id, Decision = decision }, ct);
+            foreach (var id in notified)
+            {
+                await _notifications.PublishUserEventAsync(id, "ReceiveUserNotification",
+                    new { Type = "OfferDecided", OfferId = offer.Id, Decision = decision }, ct);
+            }
 
             return Result.Success(true);
         }

@@ -4,13 +4,13 @@
     "subtitle": "Nhập mã 6 ký tự do nhân viên tuyển dụng cung cấp để bắt đầu phỏng vấn.",
     "startButton": "Bắt đầu phỏng vấn",
     "checkingCode": "Đang kiểm tra mã...",
-    "mode": "Chế độ khoá · Văn phòng",
+    "mode": "Chế độ khoá màn hình",
     "validity": {
       "hours": "Mã hiệu lực 2 giờ",
       "oneTime": "Dùng một lần",
       "autoRecover": "Tự khôi phục khi mất kết nối"
     },
-    "noCode": "Chưa có mã? Vui lòng liên hệ nhân viên tuyển dụng tại quầy lễ tân.",
+    "noCode": "Chưa có mã? Tại văn phòng: hỏi nhân viên tuyển dụng ở quầy lễ tân. Làm từ nhà: mã nằm trong Hồ sơ ứng tuyển của bạn.",
     "continue": "Tiếp tục buổi phỏng vấn đang dở",
     "errors": {
       "notFound": "Mã phỏng vấn không tồn tại. Vui lòng kiểm tra lại từng ký tự.",

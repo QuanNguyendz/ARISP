@@ -34,7 +34,8 @@ const CARD =
  * chỗ là các danh sách BẤM VÀO LÀM ĐƯỢC NGAY, xếp theo mức cấp bách:
  *  1. ứng viên đang ngồi chờ được cho vào phòng phỏng vấn (có người đang đợi thật, tính bằng phút);
  *  2. hồ sơ chờ chính người này duyệt — dẫn thẳng tới màn tin, nơi có CV để đọc trước khi quyết định;
- *  3. tin chờ chính người này ký duyệt mô tả công việc, và thư mời chờ duyệt.
+ *  3. tin chờ chính người này ký duyệt mô tả công việc, và thư mời cần người này soạn (ADR-063: HM
+ *     soạn + gửi duyệt, HR Leader chốt — thư đang chờ HR Leader chỉ hiện để theo dõi).
  *
  * Mọi con số đếm từ dữ liệu thật — một số ghi cứng trên bảng điều khiển tệ hơn là không có ô nào,
  * vì người dùng tin vào nó rồi bỏ sót việc.
@@ -74,13 +75,42 @@ export default function HmDashboardPage() {
 
   // Tin đang chờ CHÍNH NGƯỜI NÀY ký duyệt mô tả công việc — không phải mọi tin ở trạng thái chờ.
   const jobsNeedingSignOff =
-    jobs?.filter((j) => j.hmSignOffStatus === 'pending' && j.hiringManagerUserId === user?.id) ?? []
+    jobs?.filter(
+      (j) => j.status === 'pending' && j.hmSignOffStatus === 'pending' && j.hiringManagerUserId === user?.id
+    ) ?? []
 
   const awaitingShortlist = applications.filter(
     (a: HrApplicationItem) => a.status === 'hm_review' && a.hmDecision === 'pending'
   )
 
-  const awaitingOfferApproval = offers.filter((o) => o.status === OFFER_STATUS.PendingApproval)
+  // Thư mời (ADR-063): HM CHÍNH của tin soạn và gửi duyệt, HR Leader chốt. Việc của người này là SOẠN
+  // — trước đây ô này đếm "thư chờ duyệt" như thể HM là người duyệt, bấm vào chỉ để nhận 403.
+  const myPrimaryJobIds = new Set(
+    (jobs ?? []).filter((j) => j.hiringManagerUserId === user?.id).map((j) => j.id)
+  )
+  const LIVE_OFFER = new Set<string>([
+    OFFER_STATUS.Draft,
+    OFFER_STATUS.PendingApproval,
+    OFFER_STATUS.Approved,
+    OFFER_STATUS.Sent,
+    OFFER_STATUS.Accepted,
+  ])
+  const appsWithLiveOffer = new Set(
+    offers.filter((o) => LIVE_OFFER.has(o.status)).map((o) => o.applicationId)
+  )
+  // Qua hết các vòng mà chưa có thư còn hiệu lực — cùng điều kiện nút "Soạn thư mời" ở hồ sơ ứng viên.
+  const candidatesAwaitingOffer = applications.filter(
+    (a: HrApplicationItem) =>
+      a.status === 'pass' && myPrimaryJobIds.has(a.jobPostingId) && !appsWithLiveOffer.has(a.id)
+  )
+  // Bản nháp chưa gửi duyệt — kể cả thư HR Leader vừa trả về kèm lý do.
+  const myDraftOffers = offers.filter(
+    (o) => o.status === OFFER_STATUS.Draft && myPrimaryJobIds.has(o.jobPostingId)
+  )
+  const offersAwaitingHrLeader = offers.filter(
+    (o) => o.status === OFFER_STATUS.PendingApproval && myPrimaryJobIds.has(o.jobPostingId)
+  )
+  const offerWork = candidatesAwaitingOffer.length + myDraftOffers.length
 
   const waitingRooms = rooms.filter((r) => r.status === 'waiting')
 
@@ -98,8 +128,8 @@ export default function HmDashboardPage() {
       color: 'text-amber-600 dark:text-amber-400',
     },
     {
-      label: t('stats.awaitingOfferApproval'),
-      value: awaitingOfferApproval.length,
+      label: t('stats.awaitingOfferDraft'),
+      value: offerWork,
       icon: <ClipboardCheck className="w-4 h-4" />,
       color: 'text-indigo-600 dark:text-indigo-400',
     },
@@ -253,7 +283,7 @@ export default function HmDashboardPage() {
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-3">
-                              {job.hmSignOffStatus === 'pending' && (
+                              {job.status === 'pending' && job.hmSignOffStatus === 'pending' && (
                                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                                   {t('jobs.needsSignOff')}
                                 </span>
@@ -343,21 +373,54 @@ export default function HmDashboardPage() {
                   </section>
                 )}
 
-                {awaitingOfferApproval.length > 0 && (
+                {(offerWork > 0 || offersAwaitingHrLeader.length > 0) && (
                   <section className={CARD}>
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+                    <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
                       <ClipboardCheck className="h-4 w-4 text-indigo-500" />
                       {t('offers.title')}
                     </h3>
-                    <Link
-                      to="/hm/offers"
-                      className="flex items-center justify-between gap-2 rounded-xl border border-ink-100 p-3 text-sm hover:bg-ink-50 dark:border-white/10 dark:hover:bg-white/5"
-                    >
-                      <span className="text-ink-700 dark:text-ink-200">
-                        {t('offers.count', { count: awaitingOfferApproval.length })}
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-ink-400" />
-                    </Link>
+                    <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">{t('offers.hint')}</p>
+                    <div className="space-y-2">
+                      {candidatesAwaitingOffer.map((a) => (
+                        <Link
+                          key={a.id}
+                          to={`/hm/candidates/${a.id}`}
+                          className="flex items-center justify-between gap-2 rounded-xl border border-ink-100 p-3 text-sm hover:bg-ink-50 dark:border-white/10 dark:hover:bg-white/5"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-ink-900 dark:text-white">
+                              {a.candidateName}
+                            </span>
+                            <span className="block truncate text-xs text-ink-500 dark:text-ink-400">
+                              {t('offers.toDraft', { job: a.jobTitle ?? '' })}
+                            </span>
+                          </span>
+                          <ArrowRight className="h-4 w-4 shrink-0 text-ink-400" />
+                        </Link>
+                      ))}
+                      {myDraftOffers.length > 0 && (
+                        <Link
+                          to="/hm/offers"
+                          className="flex items-center justify-between gap-2 rounded-xl border border-ink-100 p-3 text-sm hover:bg-ink-50 dark:border-white/10 dark:hover:bg-white/5"
+                        >
+                          <span className="text-ink-700 dark:text-ink-200">
+                            {t('offers.drafts', { count: myDraftOffers.length })}
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-ink-400" />
+                        </Link>
+                      )}
+                      {offersAwaitingHrLeader.length > 0 && (
+                        <Link
+                          to="/hm/offers"
+                          className="flex items-center justify-between gap-2 rounded-xl p-3 text-sm text-ink-500 hover:bg-ink-50 dark:text-ink-400 dark:hover:bg-white/5"
+                        >
+                          <span>
+                            {t('offers.awaitingHrLeader', { count: offersAwaitingHrLeader.length })}
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-ink-400" />
+                        </Link>
+                      )}
+                    </div>
                   </section>
                 )}
               </div>

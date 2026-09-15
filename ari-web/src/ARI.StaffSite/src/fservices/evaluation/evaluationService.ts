@@ -3,6 +3,7 @@ import type {
   EvaluationReport,
   HRReview,
   EvaluationFilter,
+  InterviewResultRow,
   SubmitEvaluationReviewPayload,
 } from '@ari/shared/types/evaluation'
 
@@ -51,6 +52,25 @@ export const evaluationService = {
     const { data } = await apiClient.get<EvaluationReport[]>(
       `/evaluations/application/${applicationId}`
     )
+    return data
+  },
+
+  /**
+   * Các buổi phỏng vấn thật của một hồ sơ theo vòng (ADR-069): ca · diễn biến · báo cáo · có video /
+   * transcript. Có cả vòng AI còn đang chấm — thứ mà danh sách đánh giá không thể hiện.
+   */
+  async getApplicationInterviews(applicationId: string): Promise<InterviewResultRow[]> {
+    const { data } = await apiClient.get<InterviewResultRow[]>(
+      `/evaluations/application/${applicationId}/interviews`
+    )
+    return data
+  },
+
+  /** Buổi phỏng vấn thật vừa kết thúc trong phạm vi của người gọi (mặc định 24 giờ qua). */
+  async getRecentInterviews(hours = 24): Promise<InterviewResultRow[]> {
+    const { data } = await apiClient.get<InterviewResultRow[]>('/evaluations/recent-interviews', {
+      params: { hours },
+    })
     return data
   },
 

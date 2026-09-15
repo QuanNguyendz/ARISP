@@ -5,8 +5,6 @@
   "loadError": "Không tải được tin tuyển dụng.",
   "slotsLoadError": "Không tải được danh sách khung giờ.",
   "roundLabel": "Vòng {{number}} · {{type}}",
-  "screening": "Sơ loại",
-  "technical": "Chuyên môn",
   "addSlot": "Thêm khung giờ",
   "slotForm": {
     "date": "Ngày",
@@ -14,7 +12,10 @@
     "endTime": "Kết thúc",
     "capacity": "Sức chứa (số ứng viên / khung)",
     "add": "Thêm khung giờ",
-    "oneCandidatePerSlot": "Mỗi ca chỉ nhận một ứng viên — Hiring Manager ngồi cùng AI suốt buổi. Cần thêm chỗ thì tạo thêm ca."
+    "oneCandidatePerSlot": "Mỗi ca chỉ nhận một ứng viên — Hiring Manager ngồi cùng AI suốt buổi. Cần thêm chỗ thì tạo thêm ca.",
+    "testLimit": "Giới hạn số ứng viên (tùy chọn)",
+    "testLimitPlaceholder": "Không giới hạn",
+    "testLimitHint": "Bài thi trực tuyến nên nhiều ứng viên làm cùng một khung giờ được. Bỏ trống để không giới hạn."
   },
   "validation": {
     "fillAllFields": "Vui lòng nhập ngày, giờ bắt đầu và giờ kết thúc.",
@@ -22,7 +23,7 @@
     "overlapsExisting": "Khung giờ này chồng lên một ca đã tạo. Hiring Manager dự cùng ứng viên nên hai ca không được trùng giờ."
   },
   "slotList": {
-    "title": "Khung giờ vòng {{round}} ({{count}})",
+    "title": "Vòng {{round}} — {{count}} khung giờ",
     "empty": "Chưa có khung giờ nào cho vòng này.",
     "booked": "Đã đặt {{booked}}/{{capacity}}",
     "full": "Đã đầy",
@@ -42,7 +43,19 @@
       "confirmed": "Đã xác nhận",
       "declined": "Báo bận"
     },
-    "overlapping": "Trùng giờ"
+    "overlapping": "Trùng giờ",
+    "bookedUnlimited": "Đã đặt {{booked}} · không giới hạn",
+    "cannotDeleteHistory": "Ca này còn lịch sử của ứng viên (xem danh sách bên dưới) — giữ lại để còn dấu vết. Cần dùng lại thì sửa giờ.",
+    "history": {
+      "title": "Lịch sử của ca (không chiếm chỗ)",
+      "state": {
+        "declined_by_candidate": "Đã từ chối tham dự",
+        "no_show": "Không tham dự",
+        "rejected_by_staff": "Đã bị loại",
+        "expired_no_response": "Quá hạn xác nhận",
+        "cancelled": "Đã huỷ"
+      }
+    }
   },
   "actions": {
     "capacityError": "Không thể đổi sức chứa.",
@@ -56,5 +69,11 @@
     "empty": "Hiring Manager chưa gửi khung giờ cho vòng {{round}}. Bạn vẫn tạo ca được, nhưng chưa gán được cho ai cho tới khi họ gửi lịch.",
     "use": "Dùng khung này",
     "outsideWarning": "Ca đang nhập nằm ngoài mọi khung giờ rảnh của Hiring Manager — tạo thì được, nhưng sẽ không gán được cho ứng viên nào."
+  },
+  "roundTypes": {
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "onlineTest": "Trắc nghiệm",
+    "other": "Phỏng vấn"
   }
 }

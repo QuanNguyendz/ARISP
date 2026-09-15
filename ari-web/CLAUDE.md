@@ -10,3 +10,5 @@
 - Dev: `npm run dev:candidate` (3000) / `npm run dev:staff` (3001).
 
 **Patterns:** Không fetch API trong component – qua `fservices/`. Dùng custom hook cho logic tái sử dụng. Không dùng `any`.
+
+**Giờ luôn 24 tiếng (không SA/CH):** ô nhập giờ dùng `TimeInput` / `DateTimeInput` (`@ari/shared/ui`), **không** dùng `<input type="time">` / `datetime-local` — ô gốc lấy khuôn 12h/24h từ cài đặt vùng của Windows, không ép được. Hiển thị giờ dùng `formatTime24` / `formatDateTime24` (`@ari/shared/utils/time24`); cần Intl viết phần ngày thì trộn `HOUR_CYCLE_24` — không gọi `toLocaleTimeString(undefined | [])`.

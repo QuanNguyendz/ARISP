@@ -179,6 +179,13 @@ namespace ARI.Infrastructure.Data
                 .Property(s => s.SelectedAnswers)
                 .HasColumnType("jsonb");
 
+            // Mặc định ở DB = "candidate" để mọi bài đã có trước cột này đọc đúng nghĩa của nó:
+            // trước đây chỉ ứng viên mới nộp được bài.
+            modelBuilder.Entity<OnlineTestSubmission>()
+                .Property(s => s.SubmittedBy)
+                .HasMaxLength(20)
+                .HasDefaultValue(OnlineTestSubmittedBy.Candidate);
+
             // Mỗi hồ sơ chỉ nộp bài trắc nghiệm 1 lần / vòng (single-attempt).
             modelBuilder.Entity<OnlineTestSubmission>()
                 .HasIndex(s => new { s.ApplicationId, s.RoundNumber })

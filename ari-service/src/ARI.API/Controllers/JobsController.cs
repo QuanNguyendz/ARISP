@@ -28,16 +28,25 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
-    /// <summary>Body của POST /jobs/{id}/hiring-team — gán một người vào đội tuyển dụng của tin.</summary>
+    /// <summary>
+    /// Body của POST /jobs/{id}/hiring-team — thêm một thành viên PHỤ vào đội tuyển dụng của tin.
+    /// Hiring Manager chính KHÔNG đặt ở đây (ADR-068) — xem <see cref="SetPrimaryHiringManagerRequest"/>.
+    /// </summary>
     public class AddHiringTeamMemberRequest
     {
         public Guid UserId { get; set; }
 
-        /// <summary>hiring_manager | interviewer | observer — bỏ trống thì mặc định hiring_manager.</summary>
+        /// <summary>interviewer | observer | hiring_manager (HM phụ, chỉ đọc) — bỏ trống thì mặc định interviewer.</summary>
         public string? RoleOnJob { get; set; }
+    }
 
-        /// <summary>Đặt làm Hiring Manager CHÍNH của tin (người mà chữ ký duyệt chặn phễu).</summary>
-        public bool IsPrimary { get; set; }
+    /// <summary>Body của PUT /jobs/{id}/hiring-manager — HR Leader gán / chuyển Hiring Manager chính (ADR-068).</summary>
+    public class SetPrimaryHiringManagerRequest
+    {
+        public Guid UserId { get; set; }
+
+        /// <summary>Bắt buộc, tối thiểu 10 ký tự — ghi audit và gửi cho cả HM cũ lẫn HM mới.</summary>
+        public string? Reason { get; set; }
     }
 
     /// <summary>Body của POST /jobs/{id}/hm-signoff.</summary>
@@ -193,8 +202,22 @@ namespace ARI.API.Controllers
             Guid id, [FromBody] AddHiringTeamMemberRequest request, CancellationToken ct)
         {
             var result = await _sender.Send(new AddHiringTeamMemberCommand(
-                id, request.UserId, request.RoleOnJob, request.IsPrimary,
+                id, request.UserId, request.RoleOnJob,
                 _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result) : Ok(result.Value);
+        }
+
+        /// <summary>
+        /// Gán hoặc chuyển Hiring Manager chính của tin (ADR-068). Chỉ HR Leader / Super Admin, kèm lý do —
+        /// Recruiter không tự chọn được người kiểm mình ở các cổng duyệt.
+        /// </summary>
+        [HttpPut("{id:guid}/hiring-manager")]
+        [Authorize(Policy = "HrManagement")]
+        public async Task<IActionResult> SetPrimaryHiringManager(
+            Guid id, [FromBody] SetPrimaryHiringManagerRequest request, CancellationToken ct)
+        {
+            var result = await _sender.Send(new SetPrimaryHiringManagerCommand(
+                id, request.UserId, request.Reason, _currentUserService.UserId, _currentUserService.Role), ct);
             return result.IsFailure ? MapFailure(result) : Ok(result.Value);
         }
 
@@ -208,8 +231,8 @@ namespace ARI.API.Controllers
         }
 
         /// <summary>
-        /// Hiring Manager ký duyệt (hoặc yêu cầu sửa) mô tả công việc trước khi tin được đăng.
-        /// Từ chối KHÔNG đổi trạng thái tin — chủ tin sửa rồi gửi duyệt lại như bình thường.
+        /// Hiring Manager ký duyệt (tin lên <c>active</c>) hoặc yêu cầu sửa mô tả công việc (tin về
+        /// <c>rejected</c> để Recruiter sửa rồi gửi duyệt lại) — ADR-063/068.
         /// </summary>
         [HttpPost("{id:guid}/hm-signoff")]
         [Authorize(Policy = "HiringDecision")]

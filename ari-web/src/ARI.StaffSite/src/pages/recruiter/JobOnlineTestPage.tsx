@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { jobPaths } from '@/pages/_jobPaths'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -13,7 +14,6 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
-  BarChart3,
   Upload,
   Download,
   FileSpreadsheet,
@@ -39,11 +39,9 @@ export default function JobOnlineTestPage() {
   const { t } = useTranslation('modules/recruiter/onlineTest')
   const { id: jobId } = useParams<{ id: string }>()
   const location = useLocation()
-  const isHr = location.pathname.startsWith('/hr')
-  const backTo = isHr ? `/hr/jobs/${jobId}` : `/recruiter/my-jobs/${jobId}`
-  const resultsTo = isHr
-    ? `/hr/jobs/${jobId}/online-test/results`
-    : `/recruiter/my-jobs/${jobId}/online-test/results`
+  // Ba vai dùng chung trang này (HR, Recruiter, Hiring Manager) — đường quay lại phải bám
+  // đúng khu đang đứng, không thì người dùng bị đá sang khu mình không có quyền.
+  const backTo = jobPaths(location.pathname, jobId).detail
 
   const [bank, setBank] = useState<OnlineTestBank | null>(null)
   const [loading, setLoading] = useState(true)
@@ -282,12 +280,6 @@ export default function JobOnlineTestPage() {
             {bank?.jobTitle ? t('bank.jobLabel', { title: bank.jobTitle }) : t('bank.subtitle')}
           </p>
         </div>
-        <Link
-          to={resultsTo}
-          className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
-        >
-          <BarChart3 className="h-4 w-4" /> {t('bank.results')}
-        </Link>
       </motion.div>
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}

@@ -1,7 +1,7 @@
 {
   "title": "Interview Playbook",
-  "description": "Tài liệu phỏng vấn nội bộ — AI nạp vào RAG để hỏi đúng phong cách & nội dung công ty",
-  "uploadPlaybook": "Upload Playbook",
+  "description": "Tài liệu phỏng vấn cấp CÔNG TY — áp cho mọi tin: phong cách hỏi, văn hoá, quy định không được hỏi, bộ tiêu chí chấm chung.",
+  "uploadPlaybook": "Thêm playbook công ty",
   "loadingError": "Không tải được danh sách playbook.",
   "deleteError": "Không thể xoá playbook.",
   "filters": {
@@ -32,8 +32,8 @@
     "cvRubric": "Tiêu chí chấm CV",
     "interviewRubric": "Tiêu chí chấm phỏng vấn"
   },
-  "uploadTitle": "Upload Playbook",
-  "uploadHint": "PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",
+  "uploadTitle": "Thêm playbook công ty",
+  "uploadHint": "Áp cho MỌI tin tuyển dụng. PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",
   "selectFile": "Chọn file tài liệu...",
   "selectFileError": "Vui lòng chọn file.",
   "selectJob": "Chọn tin",
@@ -48,5 +48,8 @@
   "criteriaCount": "{{count}} tiêu chí",
   "rubricHint": "Bộ tiêu chí là bảng Excel theo mẫu: mã tiêu chí, tên hiển thị, trọng số (%) và chuẩn chấm. Tổng trọng số phải đúng 100 — nếu không, hệ thống sẽ từ chối file.",
   "downloadTemplate": "Tải file mẫu",
-  "templateDownloadError": "Không tải được file mẫu."
+  "templateDownloadError": "Không tải được file mẫu.",
+  "jobScopedHint": "Playbook theo tin và theo vòng do Hiring Manager chính thêm ngay trong màn tin (HR Leader cũng thêm/xoá được ở đó). Ở đây chỉ để xem toàn cảnh.",
+  "openJob": "Mở tin",
+  "unknownJob": "Tin không còn trong danh sách"
 }

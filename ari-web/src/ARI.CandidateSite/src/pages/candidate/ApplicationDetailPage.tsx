@@ -29,7 +29,21 @@ import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 import type { CandidateOnlineTest } from '@ari/shared/types/onlineTest'
 import CriterionBar from '@components/CriterionBar'
 import { formatDate, formatDuration, langLevel } from './_reportUi'
+import { formatTime24, HOUR_CYCLE_24 } from '@ari/shared/utils/time24'
 import type { MyApplicationDetail, MyApplicationSession } from '@ari/shared/types/application'
+
+/**
+ * Bài trắc nghiệm đã hết hạn mà ứng viên không vào làm.
+ *
+ * Server là nguồn chính (`expired`: cửa đã đóng khi chưa có bài, hoặc bài là hệ thống nộp thay).
+ * Chỉ tự suy từ giờ đóng cửa khi server cũ chưa trả cờ đó — và khi ấy chỉ cho người CHƯA có bài.
+ */
+function isTestExpired(test: CandidateOnlineTest): boolean {
+  if (typeof test.expired === 'boolean') return test.expired
+  return (
+    !test.alreadySubmitted && !!test.closesAt && Date.now() > new Date(test.closesAt).getTime()
+  )
+}
 
 function ReportPanel({
   s,
@@ -306,6 +320,42 @@ function RoundPlaceholder({
       )
     }
 
+    // ---- Cửa vào phòng thi (giờ hẹn → +1 tiếng) -------------------------------------------
+    // Server chỉ trả đề trong cửa sổ đó, nên thẻ này phải nói đúng với server: hiện nút "Bắt đầu"
+    // ngoài cửa sổ là mời ứng viên bấm vào một trang trống, đúng lúc họ đang sốt ruột nhất.
+    const opensAt = onlineTest.opensAt ? new Date(onlineTest.opensAt) : null
+    const closesAt = onlineTest.closesAt ? new Date(onlineTest.closesAt) : null
+    const fmt = (d: Date) =>
+      d.toLocaleString(undefined, {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        ...HOUR_CYCLE_24,
+      })
+
+    // HẾT HẠN: được hẹn giờ nhưng không vào làm — cửa đã đóng khi chưa có bài, hoặc bài hiện có là
+    // hệ thống nộp thay. Kiểm TRƯỚC nhánh "đã nộp": bài hệ thống nộp thay không phải bài của ứng
+    // viên, và bảo họ "Đã nộp bài" là khiến họ tưởng mình đã thi. Không còn nút nào để bấm — việc
+    // duy nhất còn lại là liên hệ nhân sự, nên thẻ nói rõ điều đó thay vì để ứng viên đoán.
+    if (isTestExpired(onlineTest)) {
+      return (
+        <div className="rounded-2xl border border-red-200 bg-red-50/50 p-10 text-center shadow-card">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-500">
+            <XCircle className="h-6 w-6" />
+          </div>
+          <p className="mt-3 font-semibold text-ink-800">{t('onlineTest.expiredTitle')}</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-600">
+            {opensAt && closesAt
+              ? t('onlineTest.expiredDetail', { opens: fmt(opensAt), closes: fmt(closesAt) })
+              : t('onlineTest.expiredDetailNoTime')}
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-xs text-ink-500">{t('onlineTest.expiredContact')}</p>
+        </div>
+      )
+    }
+
     if (onlineTest.alreadySubmitted) {
       // Đã nộp = xong phần việc của ứng viên. KHÔNG hiện điểm, điểm sàn hay đạt/trượt: kết quả chỉ
       // được công bố khi bộ phận tuyển dụng chốt cả vòng.
@@ -316,6 +366,31 @@ function RoundPlaceholder({
           </div>
           <p className="mt-3 font-semibold text-ink-800">{t('onlineTest.submittedTitle')}</p>
           <p className="mt-1 text-sm text-ink-500">{t('onlineTest.submittedHint')}</p>
+        </div>
+      )
+    }
+
+    // CHƯA TỚI GIỜ (hoặc chưa được xếp lịch): nói giờ mở cửa, không có nút.
+    if (!onlineTest.canStart) {
+      return (
+        <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-card">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-500">
+            <Clock className="h-6 w-6" />
+          </div>
+          <p className="mt-3 font-semibold text-ink-800">
+            {opensAt ? t('onlineTest.notOpenTitle') : t('onlineTest.notScheduledTitle')}
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+            {opensAt
+              ? t('onlineTest.notOpenDetail', { opens: fmt(opensAt) })
+              : t('onlineTest.notScheduledDetail')}
+          </p>
+          <p className="mt-1 text-xs text-ink-400">
+            {t('onlineTest.readyDescription', {
+              count: onlineTest.totalQuestions,
+              minutes: onlineTest.durationMinutes,
+            })}
+          </p>
         </div>
       )
     }
@@ -368,8 +443,7 @@ function RoundPlaceholder({
         </p>
         {s.scheduledAt && (
           <p className="mt-2 text-base font-bold text-blue-700">
-            {formatDate(s.scheduledAt)}{' '}
-            {new Date(s.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {formatDate(s.scheduledAt)} {formatTime24(s.scheduledAt)}
           </p>
         )}
         <p className="mt-2 text-xs text-ink-500">
@@ -389,11 +463,7 @@ function RoundPlaceholder({
         </p>
         {s.scheduledAt && (
           <p className="mt-2 text-base font-bold text-amber-700">
-            {formatDate(s.scheduledAt)}{' '}
-            {new Date(s.scheduledAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatDate(s.scheduledAt)} {formatTime24(s.scheduledAt)}
           </p>
         )}
         <p className="mt-2 text-sm text-ink-500">{t('missed.description')}</p>
@@ -469,6 +539,19 @@ function RoundButton({
     if (s.pendingHrReview) {
       return { cls: 'bg-amber-50 text-amber-700', icon: Clock, label: t('badge.pendingHr') }
     }
+    // Vòng trắc nghiệm hết hạn: thẻ bên phải nói "Đã hết hạn", nên nhãn ở đây cũng phải nói vậy —
+    // một bên "Được mời" một bên "Hết hạn" là màn hình tự mâu thuẫn.
+    if (isTestRound && ((onlineTest && isTestExpired(onlineTest)) || s.status === 'expired')) {
+      return { cls: 'bg-red-50 text-red-700', icon: XCircle, label: t('badge.testExpired') }
+    }
+    // Vòng trắc nghiệm đã nộp bài: đó là KẾT QUẢ của vòng. Trước đây server tìm phiên phỏng vấn
+    // (vòng thi không bao giờ có) nên người đã nộp bài vẫn bị gắn "Quá hạn".
+    if (isTestRound && (s.status === 'completed' || onlineTest?.alreadySubmitted)) {
+      return { cls: 'bg-emerald-50 text-emerald-700', icon: CheckCircle2, label: t('badge.testSubmitted') }
+    }
+    if (isTestRound && s.status === 'not_started') {
+      return { cls: 'bg-ink-100 text-ink-400', icon: Clock, label: t('badge.testNotStarted') }
+    }
     if (s.status === 'in_progress' || s.status === 'active') {
       return { cls: 'bg-brand-50 text-brand-700', icon: Clock, label: t('badge.inProgress') }
     }
@@ -525,7 +608,7 @@ function RoundButton({
       {displayDate && (
         <div className="mt-1 text-[11px] text-ink-400">
           {formatDate(displayDate)}
-          {s.scheduledAt && !s.endedAt && !s.startedAt ? ` · ${new Date(s.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+          {s.scheduledAt && !s.endedAt && !s.startedAt ? ` · ${formatTime24(s.scheduledAt)}` : ''}
           {formatDuration(s.durationSeconds) ? ` · ${formatDuration(s.durationSeconds)}` : ''}
         </div>
       )}
@@ -656,25 +739,38 @@ export default function ApplicationDetailPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-ink-800">
-                      {t('upcomingInterview.interview')} {detail.upcomingInterview.roundNumber}
+                      {/* Vòng trắc nghiệm là bài thi, không phải buổi phỏng vấn. */}
+                      {onlineTest && onlineTest.roundNumber === detail.upcomingInterview.roundNumber
+                        ? t('upcomingInterview.test', { round: detail.upcomingInterview.roundNumber })
+                        : t('upcomingInterview.interviewRound', {
+                            round: detail.upcomingInterview.roundNumber,
+                          })}
                     </div>
                     <div className="truncate text-xs text-ink-500">{jobTitle}</div>
                     <div className="mt-1 inline-flex items-center gap-1 text-xs text-ink-400">
                       <Clock className="h-3.5 w-3.5" />
-                      {new Date(detail.upcomingInterview.startTime).toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatTime24(detail.upcomingInterview.startTime)}
                       {detail.location ? ` · ${detail.location}` : ''}
                     </div>
                   </div>
                 </div>
-                <Link
-                  to="/candidate/applications"
-                  className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-                >
-                  <CalendarPlus className="h-4 w-4" /> {t('viewCode')}
-                </Link>
+                {/* Vòng TRẮC NGHIỆM không có mã phỏng vấn và không tới văn phòng — nút "Xem mã &
+                    hướng dẫn" ở đó chỉ hứa một thứ không tồn tại. Việc đúng của buổi này là MỞ BÀI THI. */}
+                {onlineTest && onlineTest.roundNumber === detail.upcomingInterview.roundNumber ? (
+                  <Link
+                    to={`/candidate/online-test/${detail.id}`}
+                    className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                  >
+                    <ClipboardList className="h-4 w-4" /> {t('onlineTest.openTest')}
+                  </Link>
+                ) : (
+                  <Link
+                    to="/candidate/applications"
+                    className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                  >
+                    <CalendarPlus className="h-4 w-4" /> {t('viewCode')}
+                  </Link>
+                )}
               </div>
             )}
 

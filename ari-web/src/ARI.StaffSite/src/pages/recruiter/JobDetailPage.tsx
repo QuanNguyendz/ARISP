@@ -52,6 +52,7 @@ import { JobDetailSkeleton } from './_skeletons'
  * đã mở, đúng thứ mà test `ShortlistGateTests` phía backend khẳng định là không được xảy ra.
  */
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
+import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
@@ -269,7 +270,7 @@ export default function RecruiterJobDetailPage() {
    *
    * KHÔNG kèm chọn ca nữa, và KHÔNG báo gì cho ứng viên: giờ hẹn chỉ xếp được sau khi HM duyệt
    * và gửi khung giờ họ có mặt được — chọn ca tại đây là chọn một giờ chưa ai xác nhận dự được.
-   * Tin chưa gán HM thì server tự đẩy thẳng sang bước chờ xếp lịch.
+   * ADR-068: mọi tin đều có HM — tin thiếu HM (hoặc HM bị khoá) thì server trả lỗi nói rõ HR Leader cần làm gì.
    */
   const handleAccept = async (appId: string) => {
     setProcessingAppId(appId)
@@ -452,6 +453,17 @@ export default function RecruiterJobDetailPage() {
                 <Pencil className="h-4 w-4" /> {t('editJob')}
               </Link>
             )}
+            {/* HM ký duyệt BẰNG CHÍNH FILE JD (ADR-064) — nên khi họ yêu cầu sửa, lối sửa tự nhiên nhất là
+                mở lại trình soạn: file xuất lại tự gắn vào tin (ADR-068). Server khoá trình soạn khi tin
+                đang chờ ký hoặc đã đăng, nên nút chỉ hiện đúng lúc sửa được. */}
+            {canEdit && job.recruitmentRequestId && (
+              <Link
+                to={`/recruiter/recruitment-requests/${job.recruitmentRequestId}/jd`}
+                className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3.5 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+              >
+                <FileText className="h-4 w-4" /> {t('editJdInComposer')}
+              </Link>
+            )}
             {canSubmit && (
               <button
                 onClick={() => changeStatus('pending')}
@@ -482,8 +494,18 @@ export default function RecruiterJobDetailPage() {
         {job.status === 'rejected' && job.rejectionReason && (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {/* Tin về `rejected` có hai nguồn (ADR-068): Hiring Manager yêu cầu sửa JD, hoặc HR trả về. */}
             <span>
-              <b>{t('hrRejected')}:</b> {t('hrRejectedHint', { reason: job.rejectionReason })}
+              {job.hmSignOffStatus === 'rejected' ? (
+                <>
+                  <b>{t('hmRequestedChanges', { name: job.hiringManagerName || t('theHiringManager') })}:</b>{' '}
+                  {t('hmRequestedChangesHint', { reason: job.rejectionReason })}
+                </>
+              ) : (
+                <>
+                  <b>{t('hrRejected')}:</b> {t('hrRejectedHint', { reason: job.rejectionReason })}
+                </>
+              )}
             </span>
           </div>
         )}
@@ -557,11 +579,19 @@ export default function RecruiterJobDetailPage() {
       <div className="mb-6">
         <HiringTeamPanel
           jobPostingId={job.id}
+          jobStatus={job.status}
+          hiringManagerState={job.hiringManagerState}
           hmSignOffStatus={job.hmSignOffStatus}
           hmSignOffReason={job.hmSignOffReason}
           canManage
           onChanged={() => void refetchJob()}
         />
+      </div>
+
+      {/* Playbook của tin (ADR-069): Hiring Manager chính thêm/xoá; chủ tin CHỈ ĐỌC — người vận hành
+          phễu cần biết AI sẽ hỏi theo tài liệu nào, nhưng không quyết định nội dung đó. */}
+      <div className="mb-6">
+        <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
       </div>
 
       {/*
@@ -578,10 +608,10 @@ export default function RecruiterJobDetailPage() {
         processingAppId={processingAppId}
         onApprove={(a) => handleAccept(a.id)}
         onReject={(a) => void handleReject(a.id)}
-        onInvite={(a) => {
+        onInvite={(a, round) => {
           setInviteModalTarget({
             applications: [{ id: a.id, name: a.candidateName || t('candidate') }],
-                  targetRound: a.currentRound && a.currentRound > 0 ? a.currentRound : 1,
+            targetRound: round,
           })
         }}
         isInvitePending={(a) =>
@@ -603,8 +633,11 @@ export default function RecruiterJobDetailPage() {
         onBatchApprove={handleBatchAccept}
         onBatchReject={() => void handleBatchReject()}
         onBatchInvite={handleBatchInvite}
+        onlineTestResultsHref={`/recruiter/my-jobs/${id}/online-test/results`}
+        canIssueInterviewCode
         batchBusy={batchProcessing}
         candidateHref={(a) => `/recruiter/candidates/${a.id}`}
+        evaluationHref={(evaluationId) => `/recruiter/evaluations?id=${evaluationId}`}
         statusLabel={appStatusLabel}
         statusBadge={appStatusBadge}
       />
@@ -717,6 +750,11 @@ export default function RecruiterJobDetailPage() {
           applications={inviteModalTarget.applications}
           jobPostingId={id}
           targetRoundNumber={inviteModalTarget.targetRound}
+          roundType={
+            (job?.roundConfigs ?? []).find(
+              (r) => r.roundNumber === inviteModalTarget.targetRound
+            )?.roundType
+          }
           onClose={() => setInviteModalTarget(null)}
           onSuccess={(msg) => {
             setNotice(msg)

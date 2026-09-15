@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using ARI.Application.Evaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluationDetail;
 using ARI.Application.Evaluations.Queries.GetEvaluations;
 using ARI.Application.Evaluations.Queries.GetEvaluationsByApplication;
@@ -136,6 +137,31 @@ namespace ARI.API.Controllers
             }
 
             return Ok(result.Value);
+        }
+
+        /// <summary>
+        /// Các buổi phỏng vấn thật của một hồ sơ, theo vòng: ca đã gán · diễn biến · báo cáo AI · có video /
+        /// transcript hay không. Có cả vòng AI còn đang chấm hoặc buổi hỏng giữa chừng — thứ mà danh sách
+        /// đánh giá không thể hiện.
+        /// </summary>
+        [HttpGet("application/{applicationId:guid}/interviews")]
+        public async Task<IActionResult> GetApplicationInterviews(Guid applicationId, CancellationToken ct)
+        {
+            if (applicationId == Guid.Empty)
+                return BadRequest(new { message = "Mã hồ sơ ứng tuyển (applicationId) không được phép là Guid rỗng." });
+
+            var result = await _sender.Send(new GetApplicationInterviewResultsQuery(
+                applicationId, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
+        }
+
+        /// <summary>Buổi phỏng vấn thật vừa kết thúc trong phạm vi của người gọi (mặc định 24 giờ qua).</summary>
+        [HttpGet("recent-interviews")]
+        public async Task<IActionResult> GetRecentInterviews([FromQuery] int hours = 24, CancellationToken ct = default)
+        {
+            var result = await _sender.Send(new GetRecentInterviewResultsQuery(
+                _currentUserService.UserId, _currentUserService.Role, hours), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
         }
     }
 }

@@ -207,6 +207,7 @@ namespace ARI.Application.RecruitmentRequests
                 req.Id, req.Title, req.DepartmentId,
                 await DepartmentLookup.NameForUserAsync(_unitOfWork, req.DepartmentId, ct),
                 req.Headcount, req.Priority, req.Reason, req.Description, req.Requirements,
+                RequestedRounds.Parse(req.RequestedRounds),
                 req.EmploymentType, req.WorkMode, req.Location, req.ExperienceLevel, req.ExpectedStartDate,
                 req.SalaryMin, req.SalaryMax, req.SalaryCurrency,
                 req.Status, req.ReviewReason,

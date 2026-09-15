@@ -107,7 +107,20 @@ namespace ARI.API.Controllers
                 request.JobPostingId, request.RoundNumber, windows,
                 _currentUser.UserId, _currentUser.Role), ct);
             if (result.IsFailure) return MapFailure(result);
-            return Ok(new { windowCount = result.Value });
+            return Ok(new { windowCount = result.Value.WindowCount, affectedBookings = result.Value.AffectedBookings });
+        }
+
+        /// <summary>
+        /// Bỏ MỘT khung giờ đã khai — kể cả khung đang diễn ra (HM có việc đột xuất giữa buổi).
+        /// Lệnh PUT ở trên cố ý không đụng tới khung đang chạy, nên đây là đường duy nhất rút nó.
+        /// </summary>
+        [HttpDelete("hm-availability/{id:guid}")]
+        public async Task<IActionResult> DeleteHmAvailability(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new DeleteHmAvailabilityCommand(id, _currentUser.UserId, _currentUser.Role), ct);
+            if (result.IsFailure) return MapFailure(result);
+            return Ok(new { windowCount = result.Value.WindowCount, affectedBookings = result.Value.AffectedBookings });
         }
 
         /// <summary>Danh sách slot của một job (tùy chọn lọc theo vòng).</summary>

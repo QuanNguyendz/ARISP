@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
@@ -14,33 +14,36 @@ import {
   X,
   Loader2,
   AlertCircle,
+  ScrollText,
 } from 'lucide-react'
 import { PageHeader, ErrorAlert, LoadingSpinner } from '@ari/shared/ui'
 import { jobService } from '@ari/shared/fservices/job'
 import { hiringTeamService } from '@ari/shared/fservices/hiringTeam'
-import { scheduleService } from '@ari/shared/fservices/schedule'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import CandidatePipeline from '@/components/jobCandidates/CandidatePipeline'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
-import HmAvailabilityFields, {
-  toLocalInput,
-  toPayload,
-  hasBlockingIssue,
-  type DraftWindow,
-} from '@/components/hiring/HmAvailabilityFields'
+import HmAvailabilityPanel, { HM_AVAILABILITY_ANCHOR } from '@/components/hiring/HmAvailabilityPanel'
+import HmApproveScheduleNotice from '@/components/hiring/HmApproveScheduleNotice'
+import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
+import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card'
 
+const scrollToAvailability = () =>
+  document
+    .getElementById(HM_AVAILABILITY_ANCHOR)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
 /**
  * Chi tiết tin dưới góc nhìn Hiring Manager (ADR-061).
  *
  * CỐ Ý là một trang riêng chứ không phải `hr/JobPostingDetailPage` gắn thêm `variant="hm"`: trang
  * đó đã 1567 dòng và gần như toàn bộ nội dung là thao tác vận hành mà Hiring Manager không có
- * quyền làm (sửa tin, đổi trạng thái, cấu hình ca, cấp mã Kiosk, playbook). Luồn thêm một vai vào
+ * quyền làm (sửa tin, đổi trạng thái, cấu hình ca, cấp mã Kiosk). Luồn thêm một vai vào
  * đó nghĩa là mỗi lần sửa trang phải nghĩ cho ba vai cùng lúc.
  *
  * **Cổng duyệt shortlist nằm NGAY TẠI ĐÂY** (thay màn danh sách riêng trước đây): quyết định của
@@ -76,28 +79,30 @@ export default function HmJobDetailPage() {
     app: HrApplicationItem
     mode: 'approve' | 'reject'
   } | null>(null)
-  const [windows, setWindows] = useState<DraftWindow[]>([])
-  /**
-   * Khung giờ ĐÃ khai và còn hiệu lực nhưng ĐÃ bắt đầu — không nạp vào ô sửa được, vì luật "giờ bắt
-   * đầu phải ở tương lai" sẽ báo sai ngay cho một khung hoàn toàn hợp lệ. Chúng vẫn tính là lịch
-   * rảnh (lệnh duyệt THÊM khung chứ không thay cả danh sách), nên chỉ cần hiện lại cho HM biết.
-   */
-  const [runningWindows, setRunningWindows] = useState<string[]>([])
   const [reason, setReason] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
 
+  /** Đóng hộp thoại rồi đưa HM tới chỗ khai lịch — cùng trang, cột bên phải. */
+  const goToAvailability = () => {
+    setDecision(null)
+    scrollToAvailability()
+  }
+
+  // Tới từ hộp duyệt ở trang hồ sơ ứng viên (link kèm `#hm-availability`) → cuộn thẳng tới mục lịch.
+  // Router không tự cuộn theo hash, và thẻ lịch chỉ có mặt sau khi tin đã tải xong. Phụ thuộc vào
+  // "đã tải" chứ không vào chính `job`: tin refetch (realtime) thì trang không được tự cuộn lại.
+  const { hash } = useLocation()
+  const jobLoaded = !!job
+  useEffect(() => {
+    if (jobLoaded && hash === `#${HM_AVAILABILITY_ANCHOR}`) scrollToAvailability()
+  }, [jobLoaded, hash])
+
   const submit = useMutation({
-    mutationFn: (input: {
-      appId: string
-      mode: 'approve' | 'reject'
-      note?: string
-      availabilities?: { startTime: string; endTime: string; note?: string | null }[]
-    }) =>
+    mutationFn: (input: { appId: string; mode: 'approve' | 'reject'; note?: string }) =>
       hiringTeamService.submitHmDecision(
         input.appId,
         input.mode === 'approve' ? 'approved' : 'rejected',
-        input.note,
-        input.availabilities
+        input.note
       ),
     onSuccess: () => {
       setDecision(null)
@@ -111,46 +116,6 @@ export default function HmJobDetailPage() {
       setActionError(message ?? t('detail.decisionError'))
     },
   })
-
-  /**
-   * Mở hộp thoại duyệt kèm NẠP LẠI khung giờ đã khai cho vòng 1 của tin này — duyệt người thứ hai
-   * trong cùng đợt thì không phải gõ lại, và sửa được nếu lịch đổi.
-   */
-  const openApprove = async (app: HrApplicationItem) => {
-    setActionError(null)
-    setDecision({ app, mode: 'approve' })
-    try {
-      const existing = await scheduleService.getHmAvailability(app.jobPostingId, 1)
-      const now = Date.now()
-      const upcoming = existing.filter((w) => new Date(w.startTime).getTime() > now)
-      const running = existing.filter((w) => new Date(w.startTime).getTime() <= now)
-
-      setWindows(
-        upcoming.map((w) => ({
-          start: toLocalInput(w.startTime),
-          end: toLocalInput(w.endTime),
-          note: w.note ?? '',
-        }))
-      )
-      setRunningWindows(
-        running.map((w) => {
-          const from = new Date(w.startTime)
-          const to = new Date(w.endTime)
-          const fmt = (d: Date) =>
-            d.toLocaleString('vi-VN', {
-              day: '2-digit',
-              month: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          return `${fmt(from)} – ${fmt(to)}`
-        })
-      )
-    } catch {
-      setWindows([])
-      setRunningWindows([])
-    }
-  }
 
   if (isLoading) return <LoadingSpinner message={t('loading')} />
   if (error || !job) return <ErrorAlert message={t('loadError')} />
@@ -224,13 +189,18 @@ export default function HmJobDetailPage() {
             <CandidatePipeline
               apps={applications}
               rounds={job.roundConfigs || []}
+              onlineTestResultsHref={`/hm/jobs/${job.id}/online-test/results`}
               processingAppId={submit.isPending ? (decision?.app.id ?? null) : null}
               candidateHref={(a) => `/hm/candidates/${a.id}`}
+              evaluationHref={(evaluationId) => `/hm/evaluations?id=${evaluationId}`}
               statusLabel={(s) => t(`applicationStatus.${s}`, { defaultValue: s })}
               hmDecision={
                 isTheHiringManager
                   ? {
-                      onApprove: (a) => void openApprove(a),
+                      onApprove: (a) => {
+                        setActionError(null)
+                        setDecision({ app: a, mode: 'approve' })
+                      },
                       onReject: (a) => {
                         setActionError(null)
                         setReason('')
@@ -243,6 +213,40 @@ export default function HmJobDetailPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Nơi DUY NHẤT HM khai lịch có mặt, theo từng vòng (vòng trắc nghiệm không có). Lệnh
+                duyệt hồ sơ không còn mang lịch theo — lịch là của NGƯỜI cho cả đợt, không phải của
+                từng hồ sơ. */}
+            <HmAvailabilityPanel
+              jobPostingId={job.id}
+              rounds={job.roundConfigs || []}
+              canEdit={isTheHiringManager}
+            />
+
+            {/* Ngân hàng đề là quyết định CHUYÊN MÔN — hỏi gì, đáp án nào đúng, bao nhiêu điểm
+                là đạt — nên nó thuộc về Hiring Manager. Chỉ hiện khi tin thật sự có vòng trắc nghiệm. */}
+            {(job.roundConfigs || []).some((r) => isOnlineTestRound(r.roundType)) && (
+              <section className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card dark:border-white/10 dark:bg-white/5">
+                <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+                  <ScrollText className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                  {t('detail.testBankTitle')}
+                </h2>
+                <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
+                  {t('detail.testBankHint')}
+                </p>
+                <Link
+                  to={`/hm/jobs/${job.id}/online-test`}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-ink-200 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-white/10 dark:text-ink-200 dark:hover:bg-white/10"
+                >
+                  {t('detail.testBankOpen')}
+                </Link>
+              </section>
+            )}
+
+            {/* Playbook của tin (ADR-069) — cùng lý do với ngân hàng đề: hỏi gì, câu nào bắt buộc, đáp án
+                tốt trông ra sao là quyết định CHUYÊN MÔN của Hiring Manager, nên HM thêm/xoá ngay tại tin
+                thay vì phải nhờ HR vào màn Playbook chung. */}
+            <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
+
             {/* File JD — ADR-064. Chữ ký của Hiring Manager LÀ cổng đăng tin (ADR-063), nên họ phải
                 xem được đúng thứ mình đang duyệt. Trước đây màn này không có chỗ nào mở file, tức là
                 ký duyệt mà không nhìn thấy bản mô tả công việc. */}
@@ -267,6 +271,8 @@ export default function HmJobDetailPage() {
 
             <HiringTeamPanel
               jobPostingId={job.id}
+              jobStatus={job.status}
+              hiringManagerState={job.hiringManagerState}
               hmSignOffStatus={job.hmSignOffStatus}
               hmSignOffReason={job.hmSignOffReason}
               // Hiring Manager KHÔNG tự thêm/gỡ người trong đội của mình — đó là việc của chủ tin.
@@ -301,30 +307,11 @@ export default function HmJobDetailPage() {
 
               {decision.mode === 'approve' ? (
                 <>
-                  <p className="text-sm font-medium text-ink-900 dark:text-white">
-                    {t('detail.availabilityLabel')}
-                  </p>
-                  <p className="text-xs text-ink-500 dark:text-ink-400">
-                    {t('detail.availabilityHint')}
-                  </p>
-
-                  {/* Khung đã bắt đầu vẫn còn hiệu lực nhưng không sửa được ở đây — hiện lại để HM
-                      biết mình đã có lịch, khỏi gõ trùng. */}
-                  {runningWindows.length > 0 && (
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-300">
-                      <p className="font-semibold">{t('detail.runningWindows')}</p>
-                      <ul className="mt-1 space-y-0.5">
-                        {runningWindows.map((w) => (
-                          <li key={w}>{w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <HmAvailabilityFields
-                    rows={windows}
-                    onChange={setWindows}
-                    disabled={submit.isPending}
+                  <p className="text-sm text-ink-700 dark:text-ink-300">{t('detail.approveBody')}</p>
+                  <HmApproveScheduleNotice
+                    jobPostingId={job.id}
+                    rounds={job.roundConfigs}
+                    onOpenAvailability={goToAvailability}
                   />
                 </>
               ) : (
@@ -358,23 +345,12 @@ export default function HmJobDetailPage() {
               <button
                 type="button"
                 disabled={
-                  submit.isPending ||
-                  (decision.mode === 'approve'
-                    ? // Có dòng SAI thì chặn hẳn; còn "không thêm khung nào" vẫn duyệt được khi lịch
-                      // đã khai trước đó còn hiệu lực — bắt khai lại mỗi hồ sơ là biến một đợt duyệt
-                      // mười người thành mười lần nhập lịch giống hệt nhau.
-                      hasBlockingIssue(windows) ||
-                      (toPayload(windows).length === 0 && runningWindows.length === 0)
-                    : reason.trim().length === 0)
+                  submit.isPending || (decision.mode === 'reject' && reason.trim().length === 0)
                 }
                 onClick={() =>
                   submit.mutate(
                     decision.mode === 'approve'
-                      ? {
-                          appId: decision.app.id,
-                          mode: 'approve',
-                          availabilities: toPayload(windows),
-                        }
+                      ? { appId: decision.app.id, mode: 'approve' }
                       : { appId: decision.app.id, mode: 'reject', note: reason.trim() }
                   )
                 }

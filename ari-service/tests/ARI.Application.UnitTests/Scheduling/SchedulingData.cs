@@ -93,7 +93,8 @@ internal static class SchedulingData
 internal sealed class SlotSqlEmulator
 {
     private readonly Dictionary<Guid, int> _booked = new();
-    private readonly Dictionary<Guid, int> _capacity = new();
+    /// <summary>null = không giới hạn, giống <c>capacity IS NULL</c> ở DB thật.</summary>
+    private readonly Dictionary<Guid, int?> _capacity = new();
 
     public SlotSqlEmulator(InMemoryUnitOfWork uow)
     {
@@ -120,7 +121,8 @@ internal sealed class SlotSqlEmulator
 
         if (sql.Contains("booked_count = booked_count +")) // chiếm chỗ: chỉ khi còn đủ cho CẢ nhóm
         {
-            if (_booked[slotId] + amount <= _capacity[slotId]) { _booked[slotId] += amount; return Task.FromResult(1); }
+            if (_capacity[slotId] is not { } cap || _booked[slotId] + amount <= cap)
+            { _booked[slotId] += amount; return Task.FromResult(1); }
             return Task.FromResult(0);
         }
         if (sql.Contains("GREATEST(booked_count -")) // trả chỗ (không âm)

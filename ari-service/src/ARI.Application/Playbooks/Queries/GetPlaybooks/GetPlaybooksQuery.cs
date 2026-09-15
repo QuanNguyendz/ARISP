@@ -24,10 +24,25 @@ namespace ARI.Application.Playbooks.Queries.GetPlaybooks
 
         public async Task<Result<List<PlaybookListItemDto>>> Handle(GetPlaybooksQuery request, CancellationToken ct)
         {
-            // Projection ở tầng SQL — KHÔNG kéo cột parsedText (nội dung playbook rất lớn).
             var scopeLower = request.Scope?.ToLowerInvariant();
-            var docs = await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(q =>
-                (string.IsNullOrEmpty(scopeLower) ? q : q.Where(d => d.Scope.ToLower() == scopeLower))
+            var items = await PlaybookListing.LoadAsync(_unitOfWork,
+                q => string.IsNullOrEmpty(scopeLower) ? q : q.Where(d => d.Scope.ToLower() == scopeLower), ct);
+            return Result.Success(items);
+        }
+    }
+
+    /// <summary>
+    /// Dựng dòng danh sách playbook — dùng chung cho màn Playbook công ty và khối playbook trong màn tin,
+    /// để hai nơi không mỗi nơi một bản projection (bản thứ hai sẽ quên cắt <c>parsedText</c>).
+    /// </summary>
+    internal static class PlaybookListing
+    {
+        public static async Task<List<PlaybookListItemDto>> LoadAsync(
+            IUnitOfWork uow, Func<IQueryable<PlaybookDocument>, IQueryable<PlaybookDocument>> filter, CancellationToken ct)
+        {
+            // Projection ở tầng SQL — KHÔNG kéo cột parsedText (nội dung playbook rất lớn).
+            var docs = await uow.Repository<PlaybookDocument>().QueryAsync(q =>
+                filter(q)
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => new
                     {
@@ -38,17 +53,15 @@ namespace ARI.Application.Playbooks.Queries.GetPlaybooks
                     }), ct);
 
             var uploaderIds = docs.Select(d => d.UploadedByUserId).Distinct().ToList();
-            var uploaderNames = (await _unitOfWork.Repository<User>()
+            var uploaderNames = (await uow.Repository<User>()
                     .QueryAsync(q => q.Where(u => uploaderIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName, u.Email }), ct))
                 .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
 
-            var items = docs.Select(d => new PlaybookListItemDto(
+            return docs.Select(d => new PlaybookListItemDto(
                 d.Id, d.Scope, d.ScopeRefId, d.RoundNumber, d.DocumentType,
                 d.FileName, d.FileFormat, d.Status, d.CreatedAt,
                 uploaderNames.TryGetValue(d.UploadedByUserId, out var n) ? n : null,
                 string.IsNullOrWhiteSpace(d.RubricJson) ? null : ScoringRubric.Deserialize(d.RubricJson).Count)).ToList();
-
-            return Result.Success(items);
         }
     }
 }

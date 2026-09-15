@@ -75,6 +75,19 @@ namespace ARI.Application.Scheduling
                     .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct))
                 .ToDictionary(j => j.Id, j => j.Title);
 
+            // Loại vòng theo (tin, vòng) — để gọi đúng tên và tính đúng lúc một buổi "đã qua".
+            var roundTypes = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                    .QueryAsync(q => q.Where(r => jobIds.Contains(r.JobPostingId))
+                        .Select(r => new { r.JobPostingId, r.RoundNumber, r.RoundType }), ct))
+                .GroupBy(r => (r.JobPostingId, r.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.First().RoundType);
+
+            // Vòng trắc nghiệm đã có bài thì xong việc của ứng viên — dù cửa vào còn mở.
+            var submitted = (await _unitOfWork.Repository<OnlineTestSubmission>()
+                    .FindAsync(x => myAppIds.Contains(x.ApplicationId), ct))
+                .Select(x => (x.ApplicationId, x.RoundNumber))
+                .ToHashSet();
+
             // Vòng đang có lịch scheduled — để bỏ qua booking bị từ chối đã được xếp lại.
             var scheduledRounds = bookings
                 .Where(b => b.Status == "scheduled")
@@ -89,6 +102,7 @@ namespace ARI.Application.Scheduling
                 appById.TryGetValue(b.ApplicationId, out var app);
                 return new CandidateScheduleItemDto
                 {
+                    RoundType = app != null && roundTypes.TryGetValue((app.JobPostingId, b.RoundNumber), out var rt) ? rt : null,
                     BookingId = b.Id,
                     ApplicationId = b.ApplicationId,
                     JobTitle = app != null && jobTitle.TryGetValue(app.JobPostingId, out var t) ? t : null,
@@ -108,7 +122,16 @@ namespace ARI.Application.Scheduling
 
                 if (b.Status == "scheduled")
                 {
-                    (item.StartTime >= now ? upcoming : past).Add(item);
+                    // Còn ở nhóm "sắp tới" tới khi buổi THỰC SỰ kết thúc, không phải tới giờ bắt đầu.
+                    // Chia theo giờ bắt đầu thì ca vừa bắt đầu 5 phút đã rơi sang "Đã diễn ra", và nút
+                    // xác nhận trong thư mời báo nhầm "lịch này đã được phản hồi trước đó".
+                    // Vòng trắc nghiệm: tới khi cửa vào đóng (giờ hẹn + 1 tiếng), hoặc khi đã có bài.
+                    var isTest = InterviewInviteEmail.IsOnlineTest(item.RoundType);
+                    var open = isTest
+                        ? !submitted.Contains((b.ApplicationId, b.RoundNumber))
+                          && now <= item.StartTime + ARI.Application.OnlineTest.OnlineTestSupport.EntryWindow
+                        : now < item.EndTime;
+                    (open ? upcoming : past).Add(item);
                 }
                 else if (b.Status == "declined" && !scheduledRounds.Contains((b.ApplicationId, b.RoundNumber)))
                 {
@@ -234,7 +257,7 @@ namespace ARI.Application.Scheduling
         {
             var reason = (request.Reason ?? string.Empty).Trim();
             if (reason.Length < 3)
-                return Result.Failure("Vui lòng nhập lý do bạn không thể tham dự để nhân sự xếp lịch khác.");
+                return Result.Failure("Vui lòng nhập lý do bạn không thể tham dự.");
             if (reason.Length > 500)
                 reason = reason[..500];
 

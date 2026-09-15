@@ -57,7 +57,12 @@
     "priority": "Mức độ ưu tiên",
     "expectedStartDate": "Ngày dự kiến bắt đầu",
     "salaryNegotiable": "Thoả thuận",
-    "salaryNegotiableHint": "Phiếu ghi \"thoả thuận\" — HR Leader sẽ chốt con số ở bước duyệt thư mời."
+    "salaryNegotiableHint": "Phiếu ghi \"thoả thuận\" — HR Leader sẽ chốt con số ở bước duyệt thư mời.",
+    "rounds": "Vòng phỏng vấn cho vị trí này",
+    "roundsHint": "Thứ tự chính là số vòng. Recruiter sẽ dựng tin theo đúng danh sách này.",
+    "roundsMoveUp": "Đưa lên trước",
+    "roundsMoveDown": "Đưa xuống sau",
+    "roundsRemove": "Bỏ vòng này"
   },
   "detail": {
     "title": "Chi tiết phiếu",
@@ -104,5 +109,11 @@
     "high": "Ưu tiên cao",
     "medium": "Bình thường",
     "low": "Ưu tiên thấp"
+  },
+  "roundTypes": {
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "onlineTest": "Trắc nghiệm",
+    "other": "Phỏng vấn"
   }
 }

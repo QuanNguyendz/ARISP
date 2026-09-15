@@ -18,8 +18,6 @@
   "round": "Round {{number}}",
   "practice": "Practice",
   "real": "Real",
-  "screening": "Screening",
-  "technical": "Technical",
   "durationMinutes": "{{minutes}} min",
   "noDuration": "—",
   "actions": "Actions",
@@ -43,5 +41,11 @@
   "pass": "Pass",
   "notPass": "Not Pass",
   "viewReport": "View report",
-  "cvCriteriaTitle": "CV score by company criteria"
+  "cvCriteriaTitle": "CV score by company criteria",
+  "roundTypes": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "onlineTest": "Online test",
+    "other": "Interview"
+  }
 }

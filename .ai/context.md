@@ -13,7 +13,7 @@ ARISP là nền tảng tuyển dụng nội bộ doanh nghiệp tích hợp **Jo
 | Role | Mô tả & Phân quyền |
 |---|---|
 | **Super Admin** | **Quản trị viên hệ thống** – Cấu hình hệ thống toàn cục (Allowed domains cho OAuth2, webhook endpoint), quản lý tài khoản HR, theo dõi toàn bộ `audit_log` hệ thống. |
-| **HR Leader** | **Trưởng nhóm HR / HR Admin** – Sở hữu **quy trình và tuân thủ**, không phải quyết định tuyển: quản lý Job Posting, duyệt tin lên `active`, cấu hình câu hỏi phỏng vấn, upload và quản trị Playbook, xem mọi Evaluation Report. Là **người chốt dự phòng** khi tin chưa gán Hiring Manager, hoặc khi cần chốt thay (bắt buộc nhập lý do, ghi `audit_log` và báo cho chính HM bị vượt) – ADR-061. |
+| **HR Leader** | **Trưởng nhóm HR / HR Admin** – Sở hữu **quy trình và tuân thủ**, không phải quyết định tuyển: quản lý Job Posting, đăng tin **vượt cổng chữ ký HM** khi cần (lý do ≥10 — ADR-068), cấu hình câu hỏi phỏng vấn, upload và quản trị Playbook, xem mọi Evaluation Report. Là người **gán / chuyển Hiring Manager chính** của tin (ADR-068) và **chốt thư mời**; chốt thay HM khi cần (bắt buộc nhập lý do, ghi `audit_log` và báo cho chính HM bị vượt) – ADR-061. |
 | **Hiring Manager** | **Trưởng bộ phận có nhu cầu tuyển – NGƯỜI RA QUYẾT ĐỊNH TUYỂN** (ADR-061). Ký duyệt mô tả công việc trước khi tin được đăng, duyệt shortlist trước khi ứng viên được xếp lịch, **chốt Pass/Not Pass kết quả AI** (kể cả `Override`, bắt buộc nhập lý do), duyệt mức lương/điều kiện của thư mời nhận việc, đề xuất cấp bậc + dải lương để điền sẵn thư mời. Phạm vi dữ liệu tính theo **đội tuyển dụng của từng tin** (`job_hiring_team_members`), KHÔNG theo phòng ban. Không vận hành phễu: không xếp lịch, không cấp mã, không sửa tin. |
 | **Recruiter (HR Staff)** | **Chuyên viên tuyển dụng** – Vận hành phễu: tạo Job Posting nháp, sàng lọc và gửi hồ sơ cho Hiring Manager duyệt, xếp lịch phỏng vấn, cấp mã **Interview Code** On-site, soạn thư mời nhận việc. Xem được Evaluation Report của tin mình phụ trách nhưng **không chốt kết quả** – chủ tin vận hành phễu, không quyết định tuyển. |
 | **Candidate** | **Ứng viên** – Tạo tài khoản cá nhân, tìm kiếm và tự ứng tuyển việc IT qua Job Board; nhận Magic Link vào Candidate Portal để đặt lịch và làm **Phỏng vấn thử (Practice Remote)** tại nhà; đến văn phòng công ty và nhập mã Interview Code để làm **Phỏng vấn thật (Real On-site)**; xem lại video recording, transcript, feedback sau khi HR Leader duyệt. |
@@ -183,8 +183,8 @@ Round N kết thúc → AI Evaluation → HR Leader Review
 
 - Hiring Manager xem Evaluation Report + recording → **Confirm** hoặc **Override** (kèm `override_reason` bắt buộc).
 - Ghi kèm **đề xuất cấp bậc + dải lương + điểm mạnh / điểm cần lưu ý** → điền sẵn vào thư mời nhận việc ở Phase 8, để công sức lúc chốt không phải gõ lại.
-- **Tin chưa gán Hiring Manager:** HR Admin / Super Admin chốt như trước, **không cần lý do gì** — đây là đường mặc định, không phải ngoại lệ.
-- **Tin ĐÃ gán Hiring Manager mà admin chốt thay:** bắt buộc nhập `fallback_reason` (≥ 10 ký tự) → ghi `audit_log` + **báo cho chính Hiring Manager bị vượt**. Cổng mềm để một người nghỉ phép không làm cả phễu đứng; nhưng bypass im lặng mới là thất bại quản trị.
+- **Mọi tin luôn có đúng một Hiring Manager chính** (ADR-068) — thiếu HM hoặc HM bị khoá thì cổng **đóng**, HR Leader chuyển HM. Ngoại lệ cũ "tin chưa gán HM thì admin chốt tự do" đã bỏ.
+- **Admin chốt thay:** bắt buộc nhập `fallback_reason` (≥ 10 ký tự) → ghi `audit_log` + **báo cho chính Hiring Manager bị vượt**. Cổng mềm để một người nghỉ phép không làm cả phễu đứng; nhưng bypass im lặng mới là thất bại quản trị.
 - **Recruiter không chốt được** ở bất kỳ trường hợp nào — chủ tin vận hành phễu, không quyết định tuyển.
 - Sau confirm → `Application.Status` cập nhật một lần theo `ResolveTotalRoundsAsync` (ADR-053): không đạt → `not_pass`; đạt & còn vòng → `interview`; **đạt & vòng cuối → `pass`**.
 
@@ -193,12 +193,13 @@ Round N kết thúc → AI Evaluation → HR Leader Review
 Đoạn kết của phễu, chạy **trọn trong hệ thống** — trước đây thư chúc mừng nói *"HR sẽ liên hệ để gửi Offer Letter"*, tức quy trình thoát khỏi hệ thống đúng ở bước quan trọng nhất.
 
 ```
-(pass) → nháp → gửi duyệt → Hiring Manager duyệt → GỬI ứng viên → ứng viên nhận / từ chối
+(pass) → nháp → gửi duyệt → HR Leader chốt → GỬI ứng viên → ứng viên nhận / từ chối
                                   ↓ trả về nháp (kèm góp ý)
 ```
 
-- Recruiter/HR soạn thư mời, **điền sẵn từ đề xuất lương Hiring Manager đã ghi ở Phase 6**.
-- Hiring Manager duyệt mức lương và điều kiện, hoặc trả về bản nháp kèm góp ý.
+- **Hiring Manager chính hoặc chủ tin** soạn thư mời, **điền sẵn từ đề xuất lương HM đã ghi ở Phase 6** (ADR-063/068). Gửi duyệt → mọi HR Leader + Super Admin nhận thông báo.
+- **HR Leader chốt** mức lương và điều kiện (policy `OfferApproval`), hoặc trả về bản nháp kèm góp ý. HM không tự chốt đề xuất của chính mình.
+- Chủ tin / admin gửi thư cho ứng viên; HM không gửi.
 - Gửi đi thì mở **trình soạn thảo** (Phase 8) — thư mời nhận việc là văn bản cam kết.
 - **Hồ sơ chuyển sang `offer` lúc GỬI, không phải lúc tạo nháp** — bản nháp không phải lời hứa.
 - Ứng viên nhận → `hired`; từ chối → `offer_declined`; quá hạn → hosted service tự đóng `expired` + `offer_declined`.
@@ -226,6 +227,8 @@ Luật phân loại: **có người bấm nút thì có trình soạn; máy tự
 ### Interview Playbook (Org Knowledge Base)
 
 Doanh nghiệp upload tài liệu phỏng vấn nội bộ để AI phỏng vấn đúng phong cách và đúng nội dung mong muốn.
+
+**Ai quản lý (ADR-069):** playbook **Company** do HR Leader / Super Admin thêm ở màn Playbook (thanh bên); playbook **Job Posting / Round** là nội dung chuyên môn của vị trí nên do **Hiring Manager chính của tin** thêm/xoá **ngay trong màn tin** (HR Leader vẫn làm được), Recruiter chủ tin chỉ đọc.
 
 **Phạm vi upload:**
 

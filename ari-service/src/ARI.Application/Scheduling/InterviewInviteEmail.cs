@@ -33,6 +33,39 @@ namespace ARI.Application.Scheduling
         public static bool IsOnlineTest(string? roundType) =>
             string.Equals((roundType ?? string.Empty).Trim(), "online_test", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Vòng ứng viên tham gia TỪ NHÀ, không phải tới văn phòng: bài trắc nghiệm và vòng sơ loại.
+        ///
+        /// Chỉ nói về ĐỊA ĐIỂM. Vòng sơ loại vẫn là buổi hội thoại với AI, vẫn có Hiring Manager cho
+        /// vào phòng và vẫn cần Mã phỏng vấn — chỉ khác là ứng viên ngồi ở nhà. Vòng chuyên môn giữ
+        /// nguyên: tới văn phòng.
+        /// </summary>
+        public static bool IsRemoteRound(string? roundType) =>
+            IsOnlineTest(roundType)
+            || string.Equals((roundType ?? string.Empty).Trim(), "screening", StringComparison.OrdinalIgnoreCase);
+
+        // ---- Câu chữ theo LOẠI vòng --------------------------------------------------------------
+        // Vòng trắc nghiệm là một BÀI THI, không phải buổi phỏng vấn: gọi nó là "phỏng vấn" trong
+        // chuông, thư nhắc hay Portal là nói sai thứ ứng viên sắp làm. Gom về đây để mọi nơi gửi cho
+        // ứng viên gọi cùng một tên.
+
+        /// <summary>"lịch làm bài trắc nghiệm" | "lịch phỏng vấn" — dùng GIỮA câu.</summary>
+        public static string AppointmentNoun(string? roundType) =>
+            IsOnlineTest(roundType) ? "lịch làm bài trắc nghiệm" : "lịch phỏng vấn";
+
+        /// <summary>"Bài trắc nghiệm" | "Buổi phỏng vấn" — dùng ĐẦU câu.</summary>
+        public static string SessionNoun(string? roundType) =>
+            IsOnlineTest(roundType) ? "Bài trắc nghiệm" : "Buổi phỏng vấn";
+
+        /// <summary>
+        /// Hậu quả của việc không phản hồi và không tham dự. Hai loại vòng khác hẳn nhau: vòng phỏng
+        /// vấn thì hồ sơ dừng lại (ADR-059); vòng trắc nghiệm thì bài HẾT HẠN và hệ thống nộp thay —
+        /// hồ sơ vẫn ở vòng đó, Recruiter quyết định (xem OnlineTestExpiry).
+        /// </summary>
+        public static string NoShowConsequenceHtml(string? roundType) => IsOnlineTest(roundType)
+            ? "Nếu bạn <strong>không vào làm bài</strong> trong khung giờ trên (từ giờ hẹn tới 1 tiếng sau), bài thi sẽ <strong>hết hạn và được hệ thống tự động nộp</strong>."
+            : "Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ của bạn sẽ <strong>dừng lại ở vòng này</strong>.";
+
         public static string RoundLabel(string? roundType) => (roundType ?? string.Empty).ToLowerInvariant() switch
         {
             "screening" => "Sơ loại (Screening)",
@@ -66,6 +99,7 @@ namespace ARI.Application.Scheduling
             var currentType = roundConfigs.FirstOrDefault(r => r.RoundNumber == round)?.RoundType;
             var previousType = roundConfigs.FirstOrDefault(r => r.RoundNumber == round - 1)?.RoundType;
             var onlineTest = IsOnlineTest(currentType);
+            var remote = IsRemoteRound(currentType);
 
             // Giờ hẹn hiển thị theo múi giờ VN (+7) — ứng viên và nhân sự đều ở VN.
             var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
@@ -92,7 +126,10 @@ namespace ARI.Application.Scheduling
             var locationHtml = onlineTest
                 ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
                   + "<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>Làm bài trực tuyến</strong> trên Candidate Portal — không cần tới văn phòng.</td></tr>"
-                : await BuildLocationRowsAsync(unitOfWork, ct);
+                : remote
+                    ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
+                      + "<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>Phỏng vấn trực tuyến</strong> — bạn tham gia từ nhà, không cần tới văn phòng.</td></tr>"
+                    : await BuildLocationRowsAsync(unitOfWork, ct);
 
             var processHtml = roundConfigs.Count == 0
                 ? string.Empty
@@ -109,9 +146,14 @@ namespace ARI.Application.Scheduling
             var practiceHtml = onlineTest
                 ? "<p style='color:#475569; font-size:13px;'>Bài trắc nghiệm mở trực tiếp trên Candidate Portal đúng khung giờ trên. "
                   + "Bạn chỉ có <strong>một lượt làm bài</strong>, hãy chuẩn bị đường truyền ổn định trước khi bắt đầu.</p>"
-                : "<p style='color:#475569; font-size:13px;'>Buổi phỏng vấn thật diễn ra <strong>tại văn phòng</strong> — nhân sự sẽ cấp "
-                  + "<strong>Mã phỏng vấn (Interview Code)</strong> cho bạn tại chỗ. Trước ngày hẹn, bạn có thể luyện tập miễn phí "
-                  + "với chế độ <em>phỏng vấn thử</em> trên Candidate Portal.</p>";
+                : remote
+                    ? "<p style='color:#475569; font-size:13px;'>Buổi phỏng vấn diễn ra <strong>trực tuyến</strong> — bạn tham gia tại nhà, "
+                      + "nhân sự sẽ gửi <strong>Mã phỏng vấn (Interview Code)</strong> trước giờ hẹn. Hãy chuẩn bị "
+                      + "<strong>micro, camera và đường truyền ổn định</strong>. Trước ngày hẹn, bạn có thể luyện tập miễn phí "
+                      + "với chế độ <em>phỏng vấn thử</em> trên Candidate Portal.</p>"
+                    : "<p style='color:#475569; font-size:13px;'>Buổi phỏng vấn thật diễn ra <strong>tại văn phòng</strong> — nhân sự sẽ cấp "
+                      + "<strong>Mã phỏng vấn (Interview Code)</strong> cho bạn tại chỗ. Trước ngày hẹn, bạn có thể luyện tập miễn phí "
+                      + "với chế độ <em>phỏng vấn thử</em> trên Candidate Portal.</p>";
 
             var subject = onlineTest
                 ? $"[ARISP] Mời làm bài trắc nghiệm vòng {round} - vị trí {jobTitle}"
@@ -145,16 +187,16 @@ namespace ARI.Application.Scheduling
                         <a href='{confirmLink}' style='display:inline-block; padding:12px 26px; background-color:#16a34a; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10003; Xác nhận tham dự</a>
                     </td>
                     <td style='padding:0 8px;'>
-                        <a href='{declineLink}' style='display:inline-block; padding:12px 26px; background-color:#dc2626; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10007; Tôi bận, xin đổi lịch</a>
+                        <a href='{declineLink}' style='display:inline-block; padding:12px 26px; background-color:#dc2626; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10007; Từ chối tham dự</a>
                     </td>
                 </tr>
             </table>
 
             <div style='background-color:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin:16px 0;'>
                 <p style='margin:0; color:#9a3412; font-size:13px;'>
-                    <strong>Lưu ý:</strong> Mỗi lịch chỉ phản hồi <strong>một lần</strong> — sau khi bấm Xác nhận hoặc Đổi lịch, bạn sẽ <strong>không thể thay đổi</strong> lựa chọn.
-                    Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ của bạn sẽ <strong>dừng lại ở vòng này</strong>.
-                    Bận thì hãy bấm <strong>&quot;Tôi bận, xin đổi lịch&quot;</strong> và ghi rõ những khung giờ bạn tham dự được — nhân sự sẽ xếp ca khác cho bạn.
+                    <strong>Lưu ý:</strong> Mỗi lịch chỉ phản hồi <strong>một lần</strong> — sau khi bấm Xác nhận hoặc Từ chối, bạn sẽ <strong>không thể thay đổi</strong> lựa chọn.
+                    {NoShowConsequenceHtml(currentType)}
+                    Bạn <strong>vẫn muốn tham gia</strong> nhưng bận đúng giờ này? Hãy <strong>liên hệ trực tiếp bộ phận nhân sự</strong> để thống nhất một khung giờ khác — hệ thống không tự xếp lại lịch.
                 </p>
             </div>
 
@@ -182,6 +224,9 @@ namespace ARI.Application.Scheduling
             CancellationToken ct = default)
         {
             var invite = await BuildAsync(unitOfWork, configuration, app, job, round, bookingId, startTimeUtc, ct);
+            var roundType = (await unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => r.JobPostingId == app.JobPostingId && r.RoundNumber == round, ct))
+                .FirstOrDefault()?.RoundType;
 
             var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
             var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
@@ -194,23 +239,23 @@ namespace ARI.Application.Scheduling
             var html = $@"
         <div style='font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
             <p style='color:#334155; font-size:15px;'>Chào <strong>{app.CandidateName}</strong>,</p>
-            <p style='color:#334155; font-size:15px;'>Chúng tôi <strong>chưa nhận được phản hồi</strong> của bạn cho lịch phỏng vấn <strong>vòng {round}</strong> dưới đây.</p>
+            <p style='color:#334155; font-size:15px;'>Chúng tôi <strong>chưa nhận được phản hồi</strong> của bạn cho {AppointmentNoun(roundType)} <strong>vòng {round}</strong> dưới đây.</p>
             <p style='text-align:center; font-size:18px; font-weight:bold; color:#4f46e5; margin:18px 0;'>{whenText}</p>
-            <p style='color:#334155; font-size:15px;'>Buổi phỏng vấn diễn ra sau khoảng <strong>{hoursLeft} giờ</strong> nữa. Vui lòng chọn một trong hai:</p>
+            <p style='color:#334155; font-size:15px;'>{(IsOnlineTest(roundType) ? "Bài trắc nghiệm mở" : "Buổi phỏng vấn diễn ra")} sau khoảng <strong>{hoursLeft} giờ</strong> nữa. Vui lòng chọn một trong hai:</p>
             <table role='presentation' cellpadding='0' cellspacing='0' style='margin:16px auto;'>
                 <tr>
                     <td style='padding:0 8px;'>
                         <a href='{confirmLink}' style='display:inline-block; padding:12px 26px; background-color:#16a34a; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10003; Xác nhận tham dự</a>
                     </td>
                     <td style='padding:0 8px;'>
-                        <a href='{declineLink}' style='display:inline-block; padding:12px 26px; background-color:#dc2626; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10007; Tôi bận, xin đổi lịch</a>
+                        <a href='{declineLink}' style='display:inline-block; padding:12px 26px; background-color:#dc2626; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;'>&#10007; Từ chối tham dự</a>
                     </td>
                 </tr>
             </table>
             <div style='background-color:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin:16px 0;'>
                 <p style='margin:0; color:#9a3412; font-size:13px;'>
-                    Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ sẽ <strong>dừng lại ở vòng này</strong>.
-                    Bận thì bấm &quot;Tôi bận, xin đổi lịch&quot; và ghi rõ khung giờ bạn tham dự được — nhân sự sẽ xếp ca khác.
+                    {NoShowConsequenceHtml(roundType)}
+                    Vẫn muốn tham gia nhưng bận đúng giờ này? Hãy liên hệ trực tiếp bộ phận nhân sự để thống nhất lịch khác.
                 </p>
             </div>
             <hr style='border:none; border-top:1px solid #e2e8f0; margin:22px 0;' />

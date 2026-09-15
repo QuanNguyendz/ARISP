@@ -35,7 +35,10 @@ namespace ARI.Application.Dev.SeedInterviewJob
         string PracticeUrl,
         string? KioskCode,
         DateTimeOffset? KioskCodeExpiresAt,
-        bool ReusedApplication);
+        bool ReusedApplication,
+        // ADR-068: buổi thật luôn qua phòng chờ — đăng nhập tài khoản HM này để vào phòng và cho ứng viên vào.
+        string HiringManagerEmail,
+        string HiringManagerLogin);
 
     public class SeedInterviewJobCommandHandler
         : IRequestHandler<SeedInterviewJobCommand, Result<SeedInterviewJobResult>>
@@ -135,6 +138,9 @@ namespace ARI.Application.Dev.SeedInterviewJob
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
+            // 3b) Hiring Manager chính (ADR-068) — mọi tin đều có; buổi thật chờ HM cho vào phòng.
+            await DevHiringManagerSeed.EnsureAsync(_unitOfWork, _passwordHasher, job, ct);
+
             // 4) Cấu hình 3 vòng — mốc để backend biết đâu là vòng CUỐI (chỉ khi đó mới "Đạt").
             var existingRounds = (await _unitOfWork.Repository<InterviewRoundConfig>()
                 .FindAsync(r => r.JobPostingId == job.Id, ct)).ToList();
@@ -226,7 +232,9 @@ namespace ARI.Application.Dev.SeedInterviewJob
                 $"/interview/practice/{app.Id}?round={RoundScreening}",
                 activeCode?.Code,
                 activeCode?.ExpiresAt,
-                reused));
+                reused,
+                DevHiringManagerSeed.Email,
+                DevHiringManagerSeed.Password));
         }
 
         /// <summary>Slot tương lai + booking "scheduled" cho một vòng (mô phỏng HR đã gán lịch).</summary>

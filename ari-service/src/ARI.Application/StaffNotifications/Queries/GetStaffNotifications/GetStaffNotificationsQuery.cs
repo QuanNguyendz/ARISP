@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -141,7 +142,7 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                 var submissions = await _unitOfWork.Repository<OnlineTestSubmission>()
                     .QueryAsync(q => q
                         .Where(s => appIds.Contains(s.ApplicationId) && s.CreatedAt >= since)
-                        .Select(s => new { s.Id, s.ApplicationId, s.Score, s.IsPassed, s.RoundNumber, s.CreatedAt }), ct);
+                        .Select(s => new { s.Id, s.ApplicationId, s.Score, s.IsPassed, s.RoundNumber, s.CreatedAt, s.SubmittedBy }), ct);
                 if (submissions.Count > 0)
                 {
                     var subAppIds = submissions.Select(s => s.ApplicationId).Distinct().ToList();
@@ -155,9 +156,16 @@ namespace ARI.Application.StaffNotifications.Queries.GetStaffNotifications
                         var jid = a?.JobPostingId ?? Guid.Empty;
                         var name = a?.CandidateName ?? "Ứng viên";
                         var verdict = s.IsPassed ? "Đạt" : "Chưa đạt";
+                        // Bài hệ thống nộp thay khi hết hạn: ứng viên KHÔNG làm bài — báo "hoàn thành"
+                        // là nói sai điều người tuyển dụng cần biết nhất về dòng này.
+                        var expired = OnlineTestSubmittedBy.IsSystem(s.SubmittedBy);
                         Add($"onlinetest:{s.Id}", "online_test",
-                            $"Ứng viên hoàn thành bài thi trắc nghiệm ({verdict})",
-                            $"{name} · {Title(jid)} · {(int)Math.Round(s.Score)}/100",
+                            expired
+                                ? "Ứng viên không vào làm bài trắc nghiệm (hết hạn)"
+                                : $"Ứng viên hoàn thành bài thi trắc nghiệm ({verdict})",
+                            expired
+                                ? $"{name} · {Title(jid)} · hệ thống tự nộp bài trống · {(int)Math.Round(s.Score)}/100"
+                                : $"{name} · {Title(jid)} · {(int)Math.Round(s.Score)}/100",
                             jid != Guid.Empty ? OnlineTestResultsLink(jid) : $"{linkBase}/candidates/{s.ApplicationId}",
                             s.CreatedAt);
                     }

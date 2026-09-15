@@ -1,4 +1,5 @@
 import type { HrApplicationItem } from '@ari/shared/types/application'
+import { isOnlineTestRound as isOnlineTestRoundType } from '@ari/shared/utils/roundTypes'
 
 /**
  * Các BƯỚC trên thanh quy trình của màn chi tiết tin tuyển dụng.
@@ -28,6 +29,15 @@ export interface PipelineStage {
 
   /** Bước kết thúc thành công — tô màu khác để nhìn ra ngay ở cuối phễu. */
   isSuccess?: boolean
+
+  /**
+   * Số vòng của bước này (chỉ có ở các bước vòng phỏng vấn), để nơi gọi tra lại cấu hình vòng —
+   * suy ngược từ chuỗi id `round_2` là mời một bảng phân tích chuỗi vào chỗ không cần có.
+   */
+  roundNumber?: number
+
+  /** `roundType` của vòng (`screening` | `technical` | `online_test` | …). */
+  roundType?: string | null
 }
 
 /** Trạng thái coi là đã rời phễu theo hướng xấu. */
@@ -44,6 +54,31 @@ const REJECTED = new Set([
 export interface RoundConfigLike {
   roundNumber: number
   roundType?: string | null
+}
+
+/** Vòng thi trắc nghiệm — nhận cả một cấu hình vòng lẫn một bước trên thanh quy trình. */
+export const isOnlineTestRound = (r?: { roundType?: string | null } | null): boolean =>
+  isOnlineTestRoundType(r?.roundType)
+
+/**
+ * Thứ tự hiển thị hồ sơ TRONG một vòng.
+ *
+ * Vòng trắc nghiệm xếp theo ĐIỂM giảm dần: cả vòng này quy về một con số, và việc đầu tiên của
+ * Recruiter khi mở ra là "ai làm tốt nhất" — bắt họ đọc hết bảng rồi tự so là bỏ phí thông tin
+ * đang có sẵn. Người CHƯA nộp bài xuống cuối (không có điểm ≠ điểm 0), trong nhóm đó giữ thứ tự
+ * nộp hồ sơ. Các vòng hội thoại giữ nguyên thứ tự cũ — điểm ở đó chỉ có sau khi nhân sự chốt.
+ */
+function sortRoundItems(items: HrApplicationItem[], round: RoundConfigLike): HrApplicationItem[] {
+  if (!isOnlineTestRound(round)) return items
+
+  return [...items].sort((a, b) => {
+    const sa = a.onlineTestScore
+    const sb = b.onlineTestScore
+    if (sa == null && sb == null) return 0
+    if (sa == null) return 1
+    if (sb == null) return -1
+    return sb - sa
+  })
 }
 
 /**
@@ -79,7 +114,11 @@ export function buildStages(
       stage(
         `round_${r.roundNumber}`,
         labels.roundLabel(r),
-        inInterview.filter((a) => (a.currentRound ?? 1) === r.roundNumber)
+        sortRoundItems(
+          inInterview.filter((a) => (a.currentRound ?? 1) === r.roundNumber),
+          r
+        ),
+        { roundNumber: r.roundNumber, roundType: r.roundType }
       )
     )
 
@@ -127,6 +166,45 @@ export function buildStages(
   }
 
   return stages
+}
+
+/**
+ * Vòng mà thao tác "Mời phỏng vấn / Xếp lịch" sẽ xếp cho một hồ sơ.
+ *
+ * Mặc định là VÒNG HIỆN TẠI: xếp lần đầu, hoặc xếp lại sau khi ứng viên từ chối tham dự.
+ *
+ * Riêng vòng TRẮC NGHIỆM: vòng này không có bước Hiring Manager chốt kết quả nào để sinh lời mời vòng
+ * sau (vòng hội thoại thì có — HM chốt ĐẠT là hồ sơ tự sang vòng kế). Nên với hồ sơ ĐÃ CÓ BÀI ở vòng
+ * đó, "mời" nghĩa là cho qua vòng kế: Recruiter nhìn điểm rồi quyết định, không giữ thì bấm Loại.
+ * Trước đây nút mời vẫn tải ca của chính vòng trắc nghiệm và báo "chưa có ca trống cho vòng 1" dù vòng 2
+ * đã có lịch sẵn. Server chặn thêm việc nhảy qua vòng trắc nghiệm khi chưa có bài.
+ */
+export function inviteTargetRound(app: HrApplicationItem, rounds: RoundConfigLike[]): number {
+  const current = app.currentRound && app.currentRound > 0 ? app.currentRound : 1
+  const here = rounds.find((r) => r.roundNumber === current)
+  const hasNext = rounds.some((r) => r.roundNumber === current + 1)
+  return isOnlineTestRound(here) && app.onlineTestScore != null && hasNext ? current + 1 : current
+}
+
+/**
+ * Trạng thái vòng mà ở đó Recruiter cần CẤP MÃ VÀO PHÒNG: đã có lịch và ứng viên chưa vào phòng.
+ * `missed` vẫn tính — ca đã qua giờ nhưng hồ sơ chưa bị đóng (còn trong ân hạn), ứng viên tới muộn
+ * vẫn phải vào được.
+ */
+const CODE_STAGES = new Set(['schedule_pending', 'schedule_confirmed', 'missed'])
+
+/**
+ * Hồ sơ này có cần thẻ "Mã vào phòng phỏng vấn" không: vòng HỘI THOẠI (sơ loại / chuyên môn), đã xếp
+ * lịch, chưa nhập mã. Vòng trắc nghiệm làm trong Portal nên không dùng mã.
+ *
+ * Chỉ là lọc sơ ở giao diện để không gọi API cho mọi hồ sơ được chọn — server
+ * (`GET /applications/{id}/interview-code`) mới trả lời chính xác cấp được hay không.
+ */
+export function needsInterviewCode(app: HrApplicationItem, rounds: RoundConfigLike[]): boolean {
+  if (app.status !== 'interview') return false
+  const current = app.currentRound && app.currentRound > 0 ? app.currentRound : 1
+  if (isOnlineTestRound(rounds.find((r) => r.roundNumber === current))) return false
+  return CODE_STAGES.has(app.stageStatus ?? '')
 }
 
 /** Tuổi từ ngày sinh — bảng ứng viên hiện tuổi chứ không hiện ngày sinh. */

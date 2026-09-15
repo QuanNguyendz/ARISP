@@ -328,7 +328,7 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("booked_count");
 
-                    b.Property<int>("Capacity")
+                    b.Property<int?>("Capacity")
                         .HasColumnType("integer")
                         .HasColumnName("capacity");
 
@@ -2293,6 +2293,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("selected_answers");
 
+                    b.Property<string>("SubmittedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("candidate")
+                        .HasColumnName("submitted_by");
+
                     b.Property<int>("TabSwitchCount")
                         .HasColumnType("integer")
                         .HasColumnName("tab_switch_count");
@@ -2503,6 +2511,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<Guid>("RequestedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by_user_id");
+
+                    b.Property<string>("RequestedRounds")
+                        .HasColumnType("text")
+                        .HasColumnName("requested_rounds");
 
                     b.Property<string>("Requirements")
                         .HasColumnType("text")

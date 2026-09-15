@@ -116,6 +116,16 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
       })
       break
 
+    // Lịch có mặt của Hiring Manager (ADR-067). Server đã định tuyến bảng này từ đầu nhưng client
+    // không có nhánh nào đón, nên HM khai lịch xong thì màn cấu hình lịch của Recruiter vẫn báo "chưa
+    // gửi khung giờ" cho tới khi tải lại trang. Nay lịch chỉ khai ở màn tin của HM — tách hẳn khỏi
+    // lệnh duyệt — nên đường realtime này là cách duy nhất Recruiter thấy nó ngay.
+    case 'hiring_manager_availabilities':
+      queryClient.invalidateQueries({
+        queryKey: jobPostingId ? ['hm-availability', jobPostingId] : ['hm-availability'],
+      })
+      break
+
     // Phiên phỏng vấn thật: huy hiệu "Đang thực hiện" trên màn Phỏng vấn trước đây không bao giờ
     // tự đổi vì bảng này chưa được định tuyến.
     case 'interview_sessions':

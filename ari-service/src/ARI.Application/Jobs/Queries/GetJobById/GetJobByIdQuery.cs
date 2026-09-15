@@ -72,14 +72,15 @@ namespace ARI.Application.Jobs.Queries.GetJobById
                 // Cổng Hiring Manager (ADR-061). Nằm TRONG nhánh staff vì HmSignOffReason là góp ý
                 // nội bộ về tin; ứng viên xem tin trên Job Board đi qua đúng handler này với
                 // isStaff = false.
-                var primaryHm = await Common.Security.JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
+                var (primaryHm, hmUser, hmState) =
+                    await Common.Security.JobAccess.HiringManagerStatusAsync(_unitOfWork, job.Id, ct);
                 jobResponse.HmSignOffStatus = job.HmSignOffStatus;
                 jobResponse.HmSignOffReason = job.HmSignOffReason;
-                jobResponse.RequiresHmApproval = primaryHm != null;
+                jobResponse.RecruitmentRequestId = job.RecruitmentRequestId;
+                jobResponse.HiringManagerState = Common.Security.HiringManagerStateNames.Of(hmState);
                 if (primaryHm != null)
                 {
                     jobResponse.HiringManagerUserId = primaryHm.UserId;
-                    var hmUser = await _unitOfWork.Repository<User>().GetByIdAsync(primaryHm.UserId, ct);
                     if (hmUser != null)
                         jobResponse.HiringManagerName =
                             string.IsNullOrWhiteSpace(hmUser.FullName) ? hmUser.Email : hmUser.FullName;

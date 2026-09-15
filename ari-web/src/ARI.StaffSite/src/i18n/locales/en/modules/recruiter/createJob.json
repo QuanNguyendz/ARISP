@@ -74,10 +74,7 @@
     "interviewPassScore": "Interview pass score",
     "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook.",
     "hiringManager": "Hiring Manager",
-    "hiringManagerNone": "— Not assigned (you can add one later) —",
-    "hiringManagerHint": "The department lead who approves candidates, signs off the job description and makes the final interview call. Leave empty and the job runs with no approval gates, exactly as before.",
-    "hmAssignFailed": "The job was created but the Hiring Manager could not be assigned. You can assign one from the job page.",
-    "goToJobToAssign": "Open the job page to assign a Hiring Manager",
+    "hiringManagerHint": "The author of the recruitment request — assigned automatically as the job's primary Hiring Manager (approves candidates, signs off the job description, confirms results). To change it, ask an HR Leader to transfer the Hiring Manager on the job page.",
     "jdDraft": {
       "description": "Job description",
       "requirements": "Candidate requirements"

@@ -66,15 +66,14 @@ public class UpdateApplicationStatusTests
     }
 
     /// <summary>
-    /// Cổng duyệt shortlist của Hiring Manager phải có đường ra cả hai phía: duyệt xong đi tiếp
-    /// (`screening`), và rút lại việc gửi duyệt (`cv_submitted`) khi gửi nhầm.
+    /// Hồ sơ đang ở cổng Hiring Manager vẫn phải có đường LUI qua lệnh chung: rút lại việc gửi duyệt
+    /// (`cv_submitted`) khi gửi nhầm, loại, hoặc ứng viên rút. Đường TIẾN (`screening`) thì không — xem test dưới.
     /// </summary>
     [Theory]
-    [InlineData(ApplicationStatuses.Screening)]
     [InlineData(ApplicationStatuses.CvSubmitted)]
     [InlineData(ApplicationStatuses.CvRejected)]
     [InlineData(ApplicationStatuses.Withdrawn)]
-    public async Task Hm_review_co_duong_ra(string target)
+    public async Task Hm_review_co_duong_lui(string target)
     {
         var (uow, notif, app) = Seed(ApplicationStatuses.HmReview, _accountId);
 
@@ -84,15 +83,22 @@ public class UpdateApplicationStatusTests
         Assert.Equal(target, app.Status);
     }
 
-    [Fact]
-    public async Task Cv_submitted_gui_duoc_sang_cong_duyet_hm()
+    /// <summary>
+    /// ADR-068: `hm_review` và `screening` chỉ đạt được qua các lệnh cổng (gửi HM duyệt → báo HM; HM duyệt /
+    /// quản trị viên vượt cổng có lý do). Trước đây PATCH chung đi thẳng được — bỏ qua cổng HM, không dấu vết.
+    /// </summary>
+    [Theory]
+    [InlineData(ApplicationStatuses.CvSubmitted, ApplicationStatuses.HmReview)]
+    [InlineData(ApplicationStatuses.CvSubmitted, ApplicationStatuses.Screening)]
+    [InlineData(ApplicationStatuses.HmReview, ApplicationStatuses.Screening)]
+    public async Task Cong_duyet_hm_khong_vao_ra_duoc_bang_lenh_chung(string from, string target)
     {
-        var (uow, notif, app) = Seed(ApplicationStatuses.CvSubmitted, _accountId);
+        var (uow, notif, app) = Seed(from, _accountId);
 
-        var res = await Run(uow, notif, app.Id, ApplicationStatuses.HmReview);
+        var res = await Run(uow, notif, app.Id, target);
 
-        Assert.True(res.IsSuccess, res.Error);
-        Assert.Equal(ApplicationStatuses.HmReview, app.Status);
+        Assert.True(res.IsFailure);
+        Assert.Equal(from, app.Status);
     }
 
     [Fact]

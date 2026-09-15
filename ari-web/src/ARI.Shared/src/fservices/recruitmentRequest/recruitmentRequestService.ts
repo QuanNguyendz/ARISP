@@ -36,6 +36,16 @@ export interface RecruitmentRequestInput {
 
   /** Kỹ năng và tiêu chí ứng viên phải đáp ứng — ghép vào bản nháp JD ở bước dựng tin. */
   requirements?: string
+
+  /**
+   * Các vòng phỏng vấn mong muốn, theo THỨ TỰ (thứ tự chính là số vòng) —
+   * `online_test` | `screening` | `technical`.
+   *
+   * Quy trình tuyển của một vị trí là quyết định chuyên môn của trưởng bộ phận; Recruiter dựng
+   * tin là thi hành quyết định đó. Danh sách này điền sẵn cấu hình vòng ở màn tạo tin.
+   */
+  requestedRounds?: string[]
+
   employmentType?: string
   workMode?: string
   location?: string

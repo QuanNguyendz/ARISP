@@ -98,6 +98,58 @@ public class SlotTimeConflictTests
         Assert.True(res.IsSuccess);
     }
 
+    // ---------- Vòng trắc nghiệm: không có HM ngồi cùng nên đứng ngoài luật chồng giờ ----------
+
+    private static InterviewRoundConfig TestRound(Guid jobId, int round) =>
+        new() { JobPostingId = jobId, RoundNumber = round, RoundType = "online_test" };
+
+    [Fact]
+    public async Task Ca_phong_van_tao_duoc_trong_luc_dang_co_dot_thi_trac_nghiem()
+    {
+        // Luật chồng giờ sinh ra vì HM phải ngồi cả hai phòng. Bài thi trực tuyến không ai ngồi cùng —
+        // không miễn thì một đợt thi cả ngày chặn mọi ca phỏng vấn vòng sau trong ngày đó.
+        var job = SchedulingData.Job(owner: _ownerId);
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+        var exam = SchedulingData.Slot(job.Id, round: 1, start: start);
+        exam.EndTime = start.AddHours(8);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(TestRound(job.Id, 1)).Seed(exam);
+
+        var res = await Create(uow, SchedulingData.SlotRequest(
+            job.Id, round: 2, start: start.AddHours(2), end: start.AddHours(3)));
+
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Hai_dot_thi_trac_nghiem_goi_nhau_van_tao_duoc()
+    {
+        var job = SchedulingData.Job(owner: _ownerId);
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(TestRound(job.Id, 1))
+            .Seed(SchedulingData.Slot(job.Id, round: 1, start: start));
+
+        var res = await Create(uow, SchedulingData.SlotRequest(
+            job.Id, round: 1, start: start.AddMinutes(30), end: start.AddHours(2)));
+
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Ca_phong_van_VAN_bi_chan_khi_chong_ca_phong_van_khac_du_tin_co_vong_thi()
+    {
+        // Miễn trừ chỉ dành cho ca THI — hai ca phỏng vấn của tin có vòng thi vẫn không được trùng giờ.
+        var job = SchedulingData.Job(owner: _ownerId);
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(TestRound(job.Id, 1))
+            .Seed(SchedulingData.Slot(job.Id, round: 2, start: start));
+
+        var res = await Create(uow, SchedulingData.SlotRequest(
+            job.Id, round: 3, start: start.AddMinutes(20), end: start.AddMinutes(50)));
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("chồng lên ca đã có", res.Error);
+    }
+
     // ---------- Sửa giờ ----------
 
     [Fact]

@@ -1,7 +1,7 @@
 {
   "title": "Interview Playbook",
-  "description": "Internal interview documents — AI loads into RAG to ask in company style & content",
-  "uploadPlaybook": "Upload Playbook",
+  "description": "COMPANY-level interview documents — apply to every job: interviewing style, culture, topics not to ask, the default scoring rubric.",
+  "uploadPlaybook": "Add company playbook",
   "loadingError": "Failed to load playbooks.",
   "deleteError": "Cannot delete playbook.",
   "filters": {
@@ -32,8 +32,8 @@
     "cvRubric": "CV Scoring Rubric",
     "interviewRubric": "Interview Scoring Rubric"
   },
-  "uploadTitle": "Upload Playbook",
-  "uploadHint": "PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",
+  "uploadTitle": "Add company playbook",
+  "uploadHint": "Applies to EVERY job. PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",
   "selectFile": "Select document file...",
   "selectFileError": "Please select a file.",
   "selectJob": "Select a job posting",
@@ -48,5 +48,8 @@
   "criteriaCount": "{{count}} criteria",
   "rubricHint": "A scoring rubric is an Excel sheet following the template: criterion key, display name, weight (%) and scoring standard. Weights must sum to exactly 100 — otherwise the file is rejected.",
   "downloadTemplate": "Download template",
-  "templateDownloadError": "Could not download the template."
+  "templateDownloadError": "Could not download the template.",
+  "jobScopedHint": "Job and round playbooks are added by the primary Hiring Manager right on the job page (the HR Leader can add/delete them there too). This page shows them for an overview only.",
+  "openJob": "Open job",
+  "unknownJob": "Job no longer listed"
 }

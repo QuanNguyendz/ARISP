@@ -44,6 +44,8 @@ public class OnlineTestBankGateTests
 
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(JobPostingData.RoundEntity(job.Id, 1, roundType));
         for (var i = 0; i < questionCount; i++) uow.Seed(Question(job.Id));
+        // ADR-068: mọi tin đều có Hiring Manager chính — gửi duyệt là gửi cho người đó.
+        HiringManagerSeed.Primary(uow, job.Id, addedBy: owner);
 
         return (uow, job, owner);
     }

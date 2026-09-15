@@ -114,6 +114,23 @@ public class ApplicationStageStatusTests
         Assert.Equal(ApplicationStageStatus.Missed, await Stage(uow, app));
     }
 
+    [Fact]
+    public async Task Vong_trac_nghiem_nhung_chua_xep_lich_thi_van_la_cho_xep_lich()
+    {
+        // Lỗi đã gặp: hồ sơ nằm ở "Chờ xếp lịch" nhưng bảng ghi "Chưa nộp bài thi" — đổ lỗi nhầm
+        // người. Bài thi chỉ mở cùng thư mời kèm giờ hẹn (ADR-059), nên ứng viên chưa được mời làm
+        // bài; việc đang chờ là việc của Recruiter.
+        var job = SchedulingData.Job();
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "screening");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig
+            {
+                JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test",
+            });
+
+        Assert.Equal(ApplicationStageStatus.AwaitingSchedule, await Stage(uow, app));
+    }
+
     // ---------- Vòng trắc nghiệm ----------
 
     [Fact]
@@ -143,6 +160,48 @@ public class ApplicationStageStatusTests
             .Seed(new OnlineTestSubmission { ApplicationId = app.Id, RoundNumber = 1 });
 
         Assert.Equal(ApplicationStageStatus.TestSubmitted, await Stage(uow, app));
+    }
+
+    [Fact]
+    public async Task Vong_trac_nghiem_he_thong_nop_thay_thi_la_het_han_khong_phai_da_nop()
+    {
+        // "0 điểm do không làm" và "0 điểm do làm sai hết" là hai câu chuyện khác nhau với người
+        // quyết định loại hay giữ — bảng không được gộp chúng vào "Đã nộp bài thi".
+        var job = SchedulingData.Job();
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig
+            {
+                JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test",
+            })
+            .Seed(new OnlineTestSubmission
+            {
+                ApplicationId = app.Id, RoundNumber = 1, SubmittedBy = OnlineTestSubmittedBy.System,
+            });
+
+        Assert.Equal(ApplicationStageStatus.TestExpired, await Stage(uow, app));
+    }
+
+    [Theory]
+    [InlineData(-30, "test_open")]     // trong cửa vào (giờ hẹn → +1h)
+    [InlineData(-61, "test_expired")]  // cửa đã đóng, chưa có bài — hệ thống chưa kịp nộp thay
+    [InlineData(120, "test_open")]     // chưa tới giờ
+    public async Task Vong_trac_nghiem_cua_da_dong_ma_chua_co_bai_thi_bao_het_han_ngay(
+        int startOffsetMinutes, string expected)
+    {
+        // Hệ thống chỉ nộp thay sau hạn chót (đóng cửa + thời lượng bài); trong khoảng giữa đó ứng
+        // viên đã không còn vào được, và bảng phải nói ngay chứ không đợi tác vụ nền.
+        var job = SchedulingData.Job();
+        var slot = SchedulingData.Slot(job.Id, start: DateTimeOffset.UtcNow.AddMinutes(startOffsetMinutes));
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid(), status: "interview");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(slot).Seed(app)
+            .Seed(SchedulingData.Booking(app.Id, slot.Id))
+            .Seed(new InterviewRoundConfig
+            {
+                JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test",
+            });
+
+        Assert.Equal(expected, await Stage(uow, app));
     }
 
     // ---------- Phiên phỏng vấn nói to nhất ----------

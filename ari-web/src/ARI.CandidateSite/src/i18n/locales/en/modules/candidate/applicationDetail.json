@@ -7,12 +7,13 @@
   "position": "Job Position",
   "upcomingInterview": {
     "title": "Upcoming Schedule",
-    "interview": "Interview"
+    "interviewRound": "Interview · Round {{round}}",
+    "test": "Online test · Round {{round}}"
   },
   "viewCode": "View Code & Instructions",
   "roundList": {
-    "title": "Interview Rounds",
-    "empty": "No interview rounds for this application yet."
+    "title": "Selection rounds",
+    "empty": "No selection rounds for this application yet."
   },
   "practiceList": {
     "title": "Practice Sessions",
@@ -43,7 +44,10 @@
     "noResult": "No result yet",
     "practiceInterview": "Practice Interview",
     "realInterview": "Real Interview",
-    "onlineTest": "Taken online"
+    "onlineTest": "Taken online",
+    "testExpired": "Expired",
+    "testSubmitted": "Submitted",
+    "testNotStarted": "Not taken yet"
   },
   "criteria": {
     "byCriteria": "By Criteria",
@@ -123,6 +127,15 @@
     "remoteHint": "Taken online right here — no office visit and no interview code needed.",
     "start": "Start the test",
     "submittedTitle": "Online test submitted",
-    "submittedHint": "Recruiting will let you know the outcome once this round is decided."
+    "submittedHint": "Recruiting will let you know the outcome once this round is decided.",
+    "openTest": "Open the online test",
+    "expiredTitle": "The online test has expired",
+    "expiredDetail": "The test opened at {{opens}} and accepted entries until {{closes}}. You did not start it in that window, so it has expired and was submitted automatically.",
+    "expiredContact": "If something prevented you from joining on time, contact HR directly — the system does not reopen the test.",
+    "notOpenTitle": "The test has not opened yet",
+    "notOpenDetail": "It opens at {{opens}}. You have 1 hour from then to start — please come back on time.",
+    "notScheduledTitle": "No test time yet",
+    "notScheduledDetail": "HR will schedule your test and send you an invitation.",
+    "expiredDetailNoTime": "You did not start the test in the scheduled window, so it has expired and was submitted automatically."
   }
 }

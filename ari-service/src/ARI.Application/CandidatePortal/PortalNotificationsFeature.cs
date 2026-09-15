@@ -5,7 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Interfaces;
+using ARI.Application.Interviews;
 using ARI.Application.StaffNotifications;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -90,15 +92,26 @@ namespace ARI.Application.CandidatePortal
                 Add($"applied:{a.Id}", "applied", "Đã nộp hồ sơ ứng tuyển",
                     JobTitle(a.JobPostingId), $"/candidate/applications/{a.Id}", a.CreatedAt);
 
-            // 2. Lời mời phỏng vấn (mã On-site còn hiệu lực)
+            // 2. Mã vào phòng phỏng vấn còn hiệu lực — CHỈ vòng làm từ nhà. Vòng tại văn phòng thì
+            // Recruiter đưa mã tận tay khi ứng viên đã tới (InterviewCodeRules.ShownToCandidate), nên
+            // báo "mã đã sẵn sàng" ở đây là nói về một thứ ứng viên không nhìn thấy trong Portal.
             var codes = (await _unitOfWork.Repository<InterviewCode>()
                 .FindAsync(c => appIds.Contains(c.ApplicationId) && c.UsedAt == null && c.ExpiresAt > nowUtc, ct)).ToList();
+            var codeRoundTypes = codes.Count == 0
+                ? new List<InterviewRoundConfig>()
+                : (await _unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => jobIds.Contains(r.JobPostingId), ct)).ToList();
             foreach (var c in codes)
             {
                 var app = apps.FirstOrDefault(a => a.Id == c.ApplicationId);
-                Add($"invite:{c.Id}", "invite", $"Lời mời phỏng vấn vòng {c.RoundNumber}",
-                    $"{(app != null ? JobTitle(app.JobPostingId) : "")} · On-site — mã phỏng vấn đã sẵn sàng tại Hồ sơ ứng tuyển.",
-                    app != null ? $"/candidate/applications/{app.Id}" : "/candidate/applications", c.CreatedAt);
+                if (app == null) continue;
+                var roundType = codeRoundTypes
+                    .FirstOrDefault(r => r.JobPostingId == app.JobPostingId && r.RoundNumber == c.RoundNumber)?.RoundType;
+                if (!InterviewCodeRules.ShownToCandidate(roundType)) continue;
+
+                Add($"invite:{c.Id}", "invite", $"Mã vào phòng phỏng vấn vòng {c.RoundNumber} đã sẵn sàng",
+                    $"{JobTitle(app.JobPostingId)} · Làm từ nhà — mở Hồ sơ ứng tuyển và bấm \"Vào phòng phỏng vấn\".",
+                    $"/candidate/applications", c.CreatedAt);
             }
 
             // 3. Kết quả vòng đã được HR chia sẻ
@@ -132,11 +145,18 @@ namespace ARI.Application.CandidatePortal
             var slots = slotIds.Any()
                 ? (await _unitOfWork.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id), ct)).ToDictionary(s => s.Id, s => s)
                 : new Dictionary<Guid, AvailabilitySlot>();
+            var scheduleJobIds = apps.Select(a => a.JobPostingId).Distinct().ToList();
+            var roundTypes = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => scheduleJobIds.Contains(r.JobPostingId), ct))
+                .GroupBy(r => (r.JobPostingId, r.RoundNumber))
+                .ToDictionary(g => g.Key, g => g.First().RoundType);
             foreach (var b in bookings)
             {
                 if (!slots.TryGetValue(b.AvailabilitySlotId, out var slot) || slot.StartTime <= nowUtc) continue;
                 var app = apps.FirstOrDefault(a => a.Id == b.ApplicationId);
-                Add($"schedule:{b.Id}", "schedule", $"Lịch phỏng vấn vòng {b.RoundNumber} sắp tới",
+                var roundType = app != null && roundTypes.TryGetValue((app.JobPostingId, b.RoundNumber), out var rt) ? rt : null;
+                var noun = ARI.Application.Scheduling.InterviewInviteEmail.AppointmentNoun(roundType);
+                Add($"schedule:{b.Id}", "schedule", $"{char.ToUpperInvariant(noun[0])}{noun[1..]} vòng {b.RoundNumber} sắp tới",
                     $"{(app != null ? JobTitle(app.JobPostingId) : "")} · {slot.StartTime:dd/MM HH:mm}",
                     $"/portal/schedule/{b.ApplicationId}", b.CreatedAt);
             }
@@ -149,9 +169,15 @@ namespace ARI.Application.CandidatePortal
                 var app = apps.FirstOrDefault(a => a.Id == s.ApplicationId);
                 // CỐ Ý không nói đạt/trượt và không kèm điểm: kết quả chỉ công bố khi cả vòng
                 // đã chốt. Chuông này chỉ xác nhận bài đã vào hệ thống.
+                //
+                // Bài do hệ thống nộp thay khi hết hạn thì KHÔNG được báo "đã nhận bài của bạn" —
+                // ứng viên chưa hề làm bài, và câu đó sẽ khiến họ tưởng mình đã thi.
+                var expired = OnlineTestSubmittedBy.IsSystem(s.SubmittedBy);
                 Add($"online_test:{s.Id}", "result",
-                    "Đã nhận bài trắc nghiệm của bạn",
-                    $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Bộ phận tuyển dụng sẽ thông báo kết quả sau.",
+                    expired ? "Bài trắc nghiệm đã hết hạn" : "Đã nhận bài trắc nghiệm của bạn",
+                    expired
+                        ? $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Bạn không vào làm bài trong khung giờ đã hẹn nên hệ thống đã tự động nộp bài. Gặp sự cố thì liên hệ trực tiếp bộ phận nhân sự."
+                        : $"{(app != null ? JobTitle(app.JobPostingId) : "")} · Bộ phận tuyển dụng sẽ thông báo kết quả sau.",
                     $"/candidate/applications/{s.ApplicationId}", s.CreatedAt);
             }
 

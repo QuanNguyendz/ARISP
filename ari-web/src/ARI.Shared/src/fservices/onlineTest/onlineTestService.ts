@@ -1,4 +1,6 @@
 import { apiClient } from '@ari/shared/api/apiClient'
+import { API_BASE_URL } from '@ari/shared/config/constants'
+import { useAuthStore } from '@ari/shared/store/auth'
 import type {
   OnlineTestBank,
   OnlineTestQuestion,
@@ -8,10 +10,22 @@ import type {
   CandidateOnlineTest,
   OnlineTestResult,
   OnlineTestSubmitAck,
+  OnlineTestAnswerSheet,
   UpsertOnlineTestQuestion,
 } from '@ari/shared/types/onlineTest'
 
 export const onlineTestService = {
+  /**
+   * Bài làm chi tiết của một ứng viên — `null` khi chưa nộp bài (là câu trả lời hợp lệ, không phải lỗi).
+   * Chỉ đường NHÂN SỰ: response mang đáp án đúng.
+   */
+  async getAnswerSheet(applicationId: string): Promise<OnlineTestAnswerSheet | null> {
+    const { data } = await apiClient.get<OnlineTestAnswerSheet | null>(
+      `/online-test/applications/${applicationId}/answers`
+    )
+    return data ?? null
+  },
+
   // ===== HR / Recruiter: quản lý ngân hàng câu hỏi =====
   async getBank(jobId: string): Promise<OnlineTestBank> {
     const { data } = await apiClient.get<OnlineTestBank>(`/online-test/jobs/${jobId}`)
@@ -104,6 +118,30 @@ export const onlineTestService = {
       { answers, tabSwitchCount }
     )
     return data
+  },
+
+  /**
+   * Bản "gửi lúc trang đang đóng": rời bài thi là tự nộp, mà request thường bị huỷ khi unload nên
+   * dùng `fetch keepalive` (sendBeacon không đặt được header Authorization). Cùng cách ADR-054 gửi
+   * tín hiệu rời phòng lúc đóng trang.
+   */
+  submitBeacon(
+    applicationId: string,
+    answers: Record<string, number[]>,
+    tabSwitchCount = 0
+  ): void {
+    const token = useAuthStore.getState().tokens?.accessToken
+    if (!token) return
+    try {
+      void fetch(`${API_BASE_URL}/portal/online-test/${applicationId}/submit`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ answers, tabSwitchCount }),
+      })
+    } catch {
+      /* trang đang đóng — không còn gì để xử lý */
+    }
   },
 }
 

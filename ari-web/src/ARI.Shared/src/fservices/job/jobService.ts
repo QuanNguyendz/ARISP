@@ -110,14 +110,21 @@ export const jobService = {
     return data
   },
 
-  // HR Admin: Approve / reject / change a job posting status.
-  // status: 'active' (duyệt) | 'rejected' (từ chối, cần rejectionReason) | 'closed' | 'archived' | 'pending'
+  /**
+   * Đổi trạng thái tin: 'pending' (gửi Hiring Manager ký) | 'rejected' (HR trả về, cần `rejectionReason`)
+   * | 'active' | 'closed' | 'archived'.
+   *
+   * Đăng lần đầu (`active` từ nháp / đang chờ) khi HM CHƯA ký thì quản trị viên phải kèm `hmBypassReason`
+   * (≥10 ký tự) — ADR-063/068. Trước đây hàm này không có trường đó, nên nút "Duyệt" của HR trên tin đang chờ
+   * ký luôn nhận 403.
+   */
   async updateJobStatus(
     id: string,
     status: JobPosting['status'],
-    rejectionReason?: string
+    rejectionReason?: string,
+    hmBypassReason?: string
   ): Promise<void> {
-    await apiClient.patch(`/jobs/${id}/status`, { status, rejectionReason })
+    await apiClient.patch(`/jobs/${id}/status`, { status, rejectionReason, hmBypassReason })
   },
 
   // Update display settings without changing status or full job content

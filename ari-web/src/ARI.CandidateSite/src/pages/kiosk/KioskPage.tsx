@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { ArrowRight, Lock, Clock, ShieldCheck, RefreshCw, Bot, AlertTriangle, Loader2 } from 'lucide-react'
@@ -8,19 +8,42 @@ import { setInterviewSessionToken } from '@ari/shared/api/apiClient'
 import { useKioskLockdown } from '@ari/shared/media/useKioskLockdown'
 import { loadKioskSession, saveKioskSession, type KioskSession } from './kioskSession'
 
+/** Mã trong link `?code=` — chuẩn hoá đúng như ô nhập (chữ hoa, chỉ chữ + số, tối đa 6 ký tự). */
+const codeFromLink = (raw: string | null) =>
+  (raw ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6)
+
 export default function KioskPage() {
   const { t } = useTranslation('modules/kiosk')
   const navigate = useNavigate()
-  const [code, setCode] = useState(['', '', '', '', '', ''])
+  const [searchParams, setSearchParams] = useSearchParams()
+  /**
+   * Vòng làm TỪ NHÀ: Recruiter gửi link vào phòng đã kèm mã (`/kiosk?code=ABC123`), và nút "Vào phòng
+   * phỏng vấn" trong Portal cũng mở đúng link đó — ô mã điền sẵn, ứng viên chỉ còn bấm bắt đầu. KHÔNG
+   * tự bấm hộ: toàn màn hình chỉ bật được trong chính cú bấm của người dùng (ADR-054).
+   */
+  const [linkCode] = useState(() => codeFromLink(searchParams.get('code')))
+  const [code, setCode] = useState(() => Array.from({ length: 6 }, (_, i) => linkCode[i] ?? ''))
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resumable, setResumable] = useState<KioskSession | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const startRef = useRef<HTMLButtonElement>(null)
   const { requestFullscreen } = useKioskLockdown(null, false)
 
   useEffect(() => {
-    inputRefs.current[0]?.focus()
+    if (linkCode.length === 6) {
+      startRef.current?.focus()
+      // Bỏ mã khỏi thanh địa chỉ sau khi đã đọc: nó không cần nằm lại trong lịch sử trình duyệt.
+      setSearchParams({}, { replace: true })
+    } else {
+      inputRefs.current[0]?.focus()
+    }
     setResumable(loadKioskSession())
+    // Chỉ chạy một lần lúc mở trang — `linkCode` là ảnh chụp của link ban đầu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleInput = (index: number, value: string) => {
@@ -213,6 +236,7 @@ export default function KioskPage() {
             )}
 
             <button
+              ref={startRef}
               onClick={handleStartInterview}
               disabled={!isCodeComplete || checking}
               className={`mt-8 w-full rounded-2xl px-6 py-4 text-base font-bold flex items-center justify-center gap-2 transition-all ${

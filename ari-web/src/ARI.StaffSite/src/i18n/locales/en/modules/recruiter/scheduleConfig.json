@@ -5,8 +5,6 @@
   "loadError": "Unable to load job posting.",
   "slotsLoadError": "Unable to load time slots.",
   "roundLabel": "Round {{number}} · {{type}}",
-  "screening": "Screening",
-  "technical": "Technical",
   "addSlot": "Add Time Slot",
   "slotForm": {
     "date": "Date",
@@ -14,7 +12,10 @@
     "endTime": "End",
     "capacity": "Capacity (candidates / slot)",
     "add": "Add Time Slot",
-    "oneCandidatePerSlot": "Each slot takes a single candidate — the hiring manager sits in with the AI for the whole session. Need more room? Create another slot."
+    "oneCandidatePerSlot": "Each slot takes a single candidate — the hiring manager sits in with the AI for the whole session. Need more room? Create another slot.",
+    "testLimit": "Candidate limit (optional)",
+    "testLimitPlaceholder": "No limit",
+    "testLimitHint": "The test runs online, so many candidates can sit it in the same window. Leave blank for no limit."
   },
   "validation": {
     "fillAllFields": "Please fill in date, start time and end time.",
@@ -22,7 +23,7 @@
     "overlapsExisting": "This time overlaps a slot you already created. The hiring manager attends with the candidate, so two slots cannot overlap."
   },
   "slotList": {
-    "title": "Time Slots for Round {{round}} ({{count}})",
+    "title": "Round {{round}} — {{count}} time slots",
     "empty": "No time slots for this round yet.",
     "booked": "Booked {{booked}}/{{capacity}}",
     "full": "Full",
@@ -42,7 +43,19 @@
       "confirmed": "Confirmed",
       "declined": "Declined"
     },
-    "overlapping": "Overlapping"
+    "overlapping": "Overlapping",
+    "bookedUnlimited": "{{booked}} booked · no limit",
+    "cannotDeleteHistory": "This slot still has candidate history (listed below) — it is kept as a record. Edit its time if you need to reuse it.",
+    "history": {
+      "title": "Slot history (not holding a seat)",
+      "state": {
+        "declined_by_candidate": "Declined to attend",
+        "no_show": "Did not attend",
+        "rejected_by_staff": "Rejected",
+        "expired_no_response": "Confirmation expired",
+        "cancelled": "Cancelled"
+      }
+    }
   },
   "actions": {
     "capacityError": "Unable to change capacity.",
@@ -56,5 +69,11 @@
     "empty": "The hiring manager has not sent availability for round {{round}} yet. You can still create slots, but none can be assigned until they do.",
     "use": "Use this window",
     "outsideWarning": "The slot you are entering falls outside every window the hiring manager can attend — you can create it, but it cannot be assigned to anyone."
+  },
+  "roundTypes": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "onlineTest": "Online test",
+    "other": "Interview"
   }
 }
