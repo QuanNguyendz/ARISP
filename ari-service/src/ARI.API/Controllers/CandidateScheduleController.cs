@@ -71,14 +71,18 @@ namespace ARI.API.Controllers
             return Ok(new { message = "Đã xác nhận lịch phỏng vấn." });
         }
 
-        /// <summary>Ứng viên bận, từ chối lịch kèm lý do để nhân sự xếp lịch khác.</summary>
+        /// <summary>
+        /// Ứng viên từ chối buổi phỏng vấn này kèm lý do. Chỗ được trả lại để nhân sự dùng cho
+        /// người khác — nhưng hệ thống <b>không hứa xếp lại</b>: muốn đổi giờ thì chính ứng viên liên hệ
+        /// bộ phận nhân sự (SMS, điện thoại…), giống ranh giới "chốt giờ ngoài hệ thống" của ADR-067.
+        /// </summary>
         [HttpPost("candidate/schedule/{bookingId:guid}/decline")]
         public async Task<IActionResult> Decline(Guid bookingId, [FromBody] DeclineScheduleRequest request, CancellationToken ct)
         {
             var (accId, email) = Identity();
             var result = await _sender.Send(new DeclineScheduleCommand(bookingId, request?.Reason ?? string.Empty, accId, email), ct);
             if (result.IsFailure) return MapFailure(result);
-            return Ok(new { message = "Đã gửi lý do từ chối. Nhân sự sẽ xếp lịch khác cho bạn." });
+            return Ok(new { message = "Đã ghi nhận bạn không tham dự buổi này. Vẫn muốn tiếp tục thì hãy liên hệ trực tiếp bộ phận nhân sự." });
         }
 
         /// <summary>Ứng viên ẩn (xoá khỏi danh sách) một lịch đã bị huỷ/từ chối. Không đụng luồng xếp lại của nhân sự.</summary>

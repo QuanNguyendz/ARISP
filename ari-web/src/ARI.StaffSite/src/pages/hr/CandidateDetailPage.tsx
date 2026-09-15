@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,12 +9,9 @@ import {
   Mail,
   Phone,
   Briefcase,
-  ClipboardList,
-  Video,
   Copy,
   Check,
   CheckCircle2,
-  Clock,
   CalendarClock,
   UserCheck,
   Scale,
@@ -24,18 +21,13 @@ import { ErrorAlert } from '@ari/shared/ui'
 import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
-import { evaluationService } from '@/fservices/evaluation/evaluationService'
-import { interviewService, type HrInterviewSessionItem } from '@ari/shared/fservices/interview'
+import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import { interviewService } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
-import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { CandidateOnlineProfileModal } from './CandidatesPage'
 import {
   appStatusBadge,
   appStatusLabel,
-  verdictBadge,
-  verdictLabel,
-  sessionStatusBadge,
-  sessionStatusLabel,
   initials,
   scoreColor,
   timeAgo,
@@ -56,8 +48,6 @@ export default function HrCandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
   const [app, setApp] = useState<HrApplicationItem | null>(null)
-  const [evals, setEvals] = useState<EvaluationReport[]>([])
-  const [sessions, setSessions] = useState<HrInterviewSessionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -72,14 +62,7 @@ export default function HrCandidateDetailPage() {
         setLoading(true)
         setError('')
         try {
-          const [a, ev, ss] = await Promise.all([
-            applicationService.getHrApplicationById(id),
-            evaluationService.getEvaluationsByApplicationId(id).catch(() => [] as EvaluationReport[]),
-            interviewService.getHrSessions(id).catch(() => [] as HrInterviewSessionItem[]),
-          ])
-          setApp(a)
-          setEvals(ev)
-          setSessions(ss)
+          setApp(await applicationService.getHrApplicationById(id))
         } catch (e) {
           setError(apiErr(e, t('loadingError')))
         } finally {
@@ -87,8 +70,6 @@ export default function HrCandidateDetailPage() {
         }
       })()
   }, [id, t])
-
-  const mySessions = useMemo(() => sessions.filter((s) => s.applicationId === id), [sessions, id])
 
   const genCode = async () => {
     if (!id) return
@@ -124,11 +105,6 @@ export default function HrCandidateDetailPage() {
       /* giữ nguyên hồ sơ hiện tại nếu refetch lỗi */
     }
   }
-
-  const roundLabel = (num: number, type?: string) =>
-    `${t('round', { number: num })} · ${type === 'technical' ? t('technical') : t('screening')}`
-
-  // Chỉ hiển thị phiên/đánh giá THẬT — backend đã lọc bỏ phiên thử (riêng tư của ứng viên, ADR-051).
 
   if (loading) return <JobDetailSkeleton />
   if (!app) {
@@ -246,97 +222,13 @@ export default function HrCandidateDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
-            <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-              <ClipboardList className="h-5 w-5 text-brand-600 dark:text-brand-400" />{' '}
-              {t('reportTitle')} {t('reportCount', { count: evals.length })}
-            </h2>
-            {evals.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-500 dark:text-ink-400">
-                {t('noReport')}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {evals.map((ev) => (
-                  <Link
-                    key={ev.id}
-                    to={`/hr/evaluations?id=${ev.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 hover:border-brand-300 dark:hover:border-brand-500/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(ev.roundNumber)}
-                      </p>
-                      <p className="text-xs text-ink-400">
-                        {timeAgo(ev.createdAt)}
-                        {ev.hrReview ? ` · ${t('hrReviewed')}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {ev.overallScore != null && (
-                        <span className={`text-lg font-bold ${scoreColor(ev.overallScore)}`}>
-                          {ev.overallScore}
-                        </span>
-                      )}
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(ev.finalVerdict ?? ev.aiVerdict)}`}
-                      >
-                        {verdictLabel(ev.finalVerdict ?? ev.aiVerdict)}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
-            <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-              <Video className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('sessionTitle')}{' '}
-              {t('sessionCount', { count: mySessions.length })}
-            </h2>
-            {mySessions.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-500 dark:text-ink-400">
-                {t('noSession')}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {mySessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink-900 dark:text-white">
-                        {roundLabel(s.roundNumber, s.roundType)}
-                      </p>
-                      <p className="flex items-center gap-1 text-xs text-ink-400">
-                        <Clock className="h-3 w-3" />
-                        {s.durationSeconds
-                          ? t('durationMinutes', { minutes: Math.round(s.durationSeconds / 60) })
-                          : t('noDuration')}{' '}
-                        · {timeAgo(s.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {s.verdict && (
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verdictBadge(s.verdict)}`}
-                        >
-                          {verdictLabel(s.verdict)}
-                        </span>
-                      )}
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${sessionStatusBadge(s.status)}`}
-                      >
-                        {sessionStatusLabel(s.status)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Kết quả phỏng vấn theo vòng (ADR-069): ca đã gán · diễn biến · báo cáo AI · video · transcript,
+              kèm nút tới đúng báo cáo. Thay cho hai khối cũ (danh sách đánh giá + danh sách phiên) vốn không
+              có video/transcript, không nói được "AI đang chấm", và một khối không bấm vào đâu được. */}
+          <InterviewResultsCard
+            applicationId={app.id}
+            evaluationHref={(evaluationId) => `/hr/evaluations?id=${evaluationId}`}
+          />
         </div>
 
         <div className="space-y-6">

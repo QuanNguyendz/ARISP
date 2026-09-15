@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { candidatePath, jobPaths } from '@/pages/_jobPaths'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -36,15 +37,25 @@ function fmtDate(iso: string, lang: string): string {
   })
 }
 
+/**
+ * Thẻ thống kê: MỘT con số lớn + một dòng phụ giải thích.
+ *
+ * Trước đây một thẻ nhồi hai đại lượng vào cùng một dòng, nối bằng dấu chấm giữa — `0 · 0%`,
+ * `30 · 30` — còn chú thích thì nằm ở nhãn (`Điểm TB · cao nhất`). Người đọc phải ánh xạ vị trí
+ * của số với vị trí của chữ mới biết số nào là gì, và đọc sai thì không có dấu hiệu nào để nhận
+ * ra. Nay mỗi con số đi kèm chính cái tên của nó.
+ */
 function StatCard({
   icon: Icon,
   label,
   value,
+  hint,
   tone = 'ink',
 }: {
   icon: typeof Users
   label: string
   value: string
+  hint?: string
   tone?: 'ink' | 'emerald' | 'brand' | 'red'
 }) {
   const toneCls: Record<string, string> = {
@@ -62,6 +73,7 @@ function StatCard({
         <div className="min-w-0">
           <p className="text-xs text-ink-500 dark:text-ink-400">{label}</p>
           <p className="text-lg font-bold text-ink-900 dark:text-white">{value}</p>
+          {hint && <p className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">{hint}</p>}
         </div>
       </div>
     </div>
@@ -72,8 +84,13 @@ export default function JobOnlineTestResultsPage() {
   const { t, i18n } = useTranslation('modules/recruiter/onlineTest')
   const { id: jobId } = useParams<{ id: string }>()
   const location = useLocation()
-  const isHr = location.pathname.startsWith('/hr')
-  const backTo = isHr ? `/hr/jobs/${jobId}/online-test` : `/recruiter/my-jobs/${jobId}/online-test`
+  // Quay lại đúng chỗ người dùng vừa đi ra: DANH SÁCH ỨNG VIÊN ở màn chi tiết tin. Bảng điểm nay
+  // được mở từ bước "Vòng trắc nghiệm" của thanh quy trình, không còn mở từ màn soạn đề nữa.
+  // Bám đúng khu đang đứng (HR / Recruiter / Hiring Manager).
+  const paths = jobPaths(location.pathname, jobId)
+  const backTo = paths.detail
+  // Đường riêng tới ngân hàng câu hỏi — chỉ dùng ở trạng thái "tin này chưa có câu hỏi nào".
+  const bankTo = paths.onlineTestBank
 
   const [data, setData] = useState<OnlineTestJobResults | null>(null)
   const [loading, setLoading] = useState(true)
@@ -181,7 +198,7 @@ export default function JobOnlineTestResultsPage() {
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 py-16 text-center shadow-card">
           <ScrollText className="h-8 w-8 text-ink-300" />
           <p className="text-sm text-ink-500 dark:text-ink-400">{t('results.noQuestions')}</p>
-          <Link to={backTo} className="text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline">
+          <Link to={bankTo} className="text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline">
             {t('results.createLink')}
           </Link>
         </div>
@@ -192,28 +209,45 @@ export default function JobOnlineTestResultsPage() {
             <StatCard
               icon={Users}
               label={t('results.stats.taken')}
-              value={t('results.stats.takenValue', { count: data.submissionCount })}
+              value={`${data.submissionCount}`}
+              hint={
+                // Bài hệ thống nộp thay vẫn là kết quả (0 điểm, chưa đạt) nên vẫn đếm vào đây — nhưng
+                // phải nói ra, không thì điểm trung bình thấp trông như đề quá khó.
+                (data.expiredCount ?? 0) > 0
+                  ? t('results.stats.takenHintExpired', { count: data.expiredCount })
+                  : t('results.stats.takenHint')
+              }
               tone="brand"
             />
+            {/* Chưa ai thi thì KHÔNG hiện tỉ lệ: "0% số người đã thi" là một phép chia cho 0 được
+                vẽ ra thành chữ, và "100%" ở thẻ Chưa đạt còn dễ hiểu nhầm hơn. */}
             <StatCard
               icon={CheckCircle2}
               label={t('results.stats.passed', { score: data.passScore })}
-              value={t('results.stats.passedValue', { count: data.passedCount, rate: passRate })}
+              value={`${data.passedCount}`}
+              hint={
+                data.submissionCount > 0
+                  ? t('results.stats.ofTakers', { rate: passRate })
+                  : undefined
+              }
               tone="emerald"
             />
             <StatCard
               icon={XCircle}
               label={t('results.stats.notPassed')}
               value={`${data.notPassedCount}`}
+              hint={
+                data.submissionCount > 0
+                  ? t('results.stats.ofTakers', { rate: 100 - passRate })
+                  : undefined
+              }
               tone="red"
             />
             <StatCard
               icon={Award}
-              label={t('results.stats.avgHigh')}
-              value={t('results.stats.avgHighValue', {
-                avg: data.averageScore,
-                high: Math.round(data.highestScore),
-              })}
+              label={t('results.stats.avgScore')}
+              value={t('results.stats.outOf100', { score: data.averageScore })}
+              hint={t('results.stats.highestHint', { score: Math.round(data.highestScore) })}
             />
           </div>
 
@@ -245,11 +279,7 @@ export default function JobOnlineTestResultsPage() {
                         <td className="px-5 py-3 text-ink-400">{idx + 1}</td>
                         <td className="px-5 py-3">
                           <Link
-                            to={
-                              isHr
-                                ? `/hr/candidates/${r.applicationId}`
-                                : `/recruiter/candidates/${r.applicationId}`
-                            }
+                            to={candidatePath(location.pathname, r.applicationId)}
                             className="font-medium text-ink-900 dark:text-white hover:text-brand-600 dark:hover:text-brand-400"
                           >
                             {r.candidateName}
@@ -271,6 +301,11 @@ export default function JobOnlineTestResultsPage() {
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-500/15 dark:text-red-400">
                               <XCircle className="h-3 w-3" /> {t('results.notPassed')}
+                            </span>
+                          )}
+                          {r.expired && (
+                            <span className="mt-1 block w-fit rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600 dark:bg-white/10 dark:text-ink-300">
+                              {t('results.expiredAuto')}
                             </span>
                           )}
                         </td>

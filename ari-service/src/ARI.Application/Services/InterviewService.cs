@@ -8,6 +8,7 @@ using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
+using ARI.Application.Offers;
 using ARI.Application.Options;
 using ARI.Application.Playbooks;
 using ARI.Application.Scheduling;
@@ -408,6 +409,8 @@ namespace ARI.Application.Services
 
             var local = slot.StartTime.ToOffset(TimeSpan.FromHours(7));
             var whenText = $"{local:HH:mm} ngày {local:dd/MM/yyyy} (giờ VN)";
+            var roundType = await SchedulingSupport.RoundTypeAsync(_unitOfWork, app.JobPostingId, booking.RoundNumber, ct);
+            var appointment = InterviewInviteEmail.AppointmentNoun(roundType);
 
             // 1. Send DB Notification + SignalR
             if (app.CandidateAccountId.HasValue)
@@ -417,8 +420,8 @@ namespace ARI.Application.Services
                 {
                     CandidateAccountId = app.CandidateAccountId.Value,
                     Type = "schedule_reminder",
-                    Title = "Nhắc nhở lịch phỏng vấn",
-                    Body = $"Nhắc nhở: Bạn có lịch phỏng vấn (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng đăng nhập Candidate Portal để kiểm tra.",
+                    Title = $"Nhắc nhở {appointment}",
+                    Body = $"Nhắc nhở: Bạn có {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng đăng nhập Candidate Portal để kiểm tra.",
                     Link = $"/portal/schedule/{app.Id}",
                     IsRead = false
                 }, ct);
@@ -427,11 +430,11 @@ namespace ARI.Application.Services
             }
 
             // 2. Send Email
-            var subject = $"[ARISP] - Nhắc nhở lịch phỏng vấn vị trí {jobTitle}";
+            var subject = $"[ARISP] - Nhắc nhở {appointment} vị trí {jobTitle}";
             var html = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
                     <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
-                    <p>Đây là thư nhắc nhở về lịch phỏng vấn <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{jobTitle}</strong>:</p>
+                    <p>Đây là thư nhắc nhở về {appointment} <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{jobTitle}</strong>:</p>
                     <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
                     <p>Trạng thái hiện tại: <strong>{(booking.ConfirmationStatus == "confirmed" ? "Đã xác nhận" : "Chờ xác nhận")}</strong>.</p>
                     <p>Vui lòng chuẩn bị sẵn sàng và truy cập hệ thống đúng giờ.</p>
@@ -731,13 +734,13 @@ namespace ARI.Application.Services
                     Timezone = s.Timezone,
                     Capacity = s.Capacity,
                     BookedCount = seatsTaken,
-                    SeatsAvailable = Math.Max(s.Capacity - seatsTaken, 0),
+                    SeatsAvailable = s.Capacity.HasValue ? Math.Max(s.Capacity.Value - seatsTaken, 0) : (int?)null,
                     ConfirmedCount = bks.Count(b => b.Status == BookingStatus.Scheduled && b.ConfirmationStatus == BookingConfirmationStatus.Confirmed),
                     PendingCount = bks.Count(b => b.Status == BookingStatus.Scheduled && b.ConfirmationStatus == BookingConfirmationStatus.Pending),
                     DeclinedCount = bks.Count(b => b.Status == BookingStatus.Declined),
                     CancelledCount = bks.Count(b => b.Status == BookingStatus.Cancelled),
                     TotalBookingRows = bks.Count,
-                    IsOverCapacity = seatsTaken > s.Capacity,
+                    IsOverCapacity = s.Capacity.HasValue && seatsTaken > s.Capacity.Value,
                     IsPast = s.StartTime < nowUtc
                 };
             }).ToList());
@@ -936,11 +939,11 @@ namespace ARI.Application.Services
             // `GenerateAndSendNextQuestionAsync` (chỉ chạy khi phiên `active`), nên gọi thẳng SignalR
             // cũng không moi được câu hỏi nào ra trước khi được duyệt.
             //
-            // Tin CHƯA gán Hiring Manager thì không có cổng nào để chờ — vào thẳng như trước, cùng
-            // lý lẽ "cổng suy ra từ việc có người được gán" của ADR-061. Nếu không, một tin cũ sẽ có
-            // ứng viên ngồi chờ vĩnh viễn một người không tồn tại.
-            var needsHmAdmission = request.SessionType == "real"
-                && await JobAccess.RequiresHiringManagerApprovalAsync(_unitOfWork, jobPosting.Id, ct);
+            // ADR-068: MỌI buổi thật đều qua phòng chờ. Trước đây tin chưa gán HM thì vào thẳng — tức là
+            // gỡ HM khỏi đội là buổi phỏng vấn chạy không người ngồi cùng. Tin thiếu HM / HM bị khoá thì
+            // quản trị viên vẫn cho vào thay được (có audit), nên ứng viên không bị bỏ ngồi chờ vô hạn —
+            // và từ trước đó lịch của tin như vậy đã không xếp được (luật 3 của `ValidateAssignmentAsync`).
+            var needsHmAdmission = request.SessionType == "real";
 
             var session = new InterviewSession
             {
@@ -1651,6 +1654,21 @@ namespace ARI.Application.Services
                     EvaluationId = evaluation.Id,
                     ApplicationId = application.Id
                 }, ct);
+
+                // Người CHỐT kết quả là Hiring Manager (ADR-061), vậy mà trước đây chỉ nhóm `hr_admin` được
+                // đẩy sự kiện — HM không nhận thông báo nào và phải tự vào màn "Kết quả phỏng vấn" mới biết
+                // có việc. Ghi thông báo lưu lại (idempotent theo báo cáo) cho đúng người phải hành động.
+                var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, application.JobPostingId, ct);
+                if (hm != null)
+                {
+                    await OfferSupport.NotifyStaffAsync(_unitOfWork, hm.UserId, "pending",
+                        "Có kết quả phỏng vấn chờ bạn chốt",
+                        $"Ứng viên {application.CandidateName} — vị trí \"{jobPosting.Title}\", vòng {session.RoundNumber}.",
+                        "/hm/evaluations", $"hm_evaluation_ready:{evaluation.Id}", ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                    await _notificationService.PublishUserEventAsync(hm.UserId, "ReceiveUserNotification",
+                        new { Type = "AiEvaluationComplete", EvaluationId = evaluation.Id }, ct);
+                }
             }
         }
 
@@ -1667,11 +1685,12 @@ namespace ARI.Application.Services
             // ===== AI ĐÃ PHỎNG VẤN — NGƯỜI CHỐT LÀ HIRING MANAGER (ADR-061) =====
             //
             // Trong ATS, HR sở hữu quy trình và tuân thủ; quyết định tuyển hay không thuộc về
-            // trưởng bộ phận sẽ làm việc cùng ứng viên. Quản trị viên giữ vai DỰ PHÒNG:
-            //   • tin CHƯA gán Hiring Manager  → quản trị viên chốt như trước, không cần gì thêm
-            //     (đây là đường MẶC ĐỊNH cho toàn bộ dữ liệu cũ, không phải ngoại lệ);
-            //   • tin CÓ Hiring Manager        → chỉ HM đó chốt; quản trị viên chốt thay phải nhập
-            //     lý do, bị ghi IsHrFallback + audit, và HM được báo.
+            // trưởng bộ phận sẽ làm việc cùng ứng viên. Chỉ HM chính của tin chốt; quản trị viên chốt
+            // THAY phải nhập lý do, bị ghi IsHrFallback + audit, và HM (nếu có) được báo.
+            //
+            // ADR-068 bỏ nhánh "tin chưa gán HM thì quản trị viên chốt tự do, không cần lý do": mọi tin
+            // đều có HM, nên thiếu HM (tin cũ chưa gán) hay HM bị khoá cũng là chốt THAY — có lý do, có dấu
+            // vết, như mọi lần quản trị viên quyết định thay người phụ trách.
             // Chủ tin (Recruiter) KHÔNG bao giờ chốt: họ vận hành phễu, không quyết định tuyển.
             var applicationForGate = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .GetByIdAsync(evaluation.ApplicationId, ct);
@@ -1688,22 +1707,18 @@ namespace ARI.Application.Services
                 : request.FallbackReason.Trim();
             var isHrFallback = false;
 
-            if (primaryHm != null && !isTheHiringManager)
+            if (!isTheHiringManager)
             {
                 if (!isAdminActor)
                     return Result.Failure<bool>(
                         "Chỉ Hiring Manager phụ trách tin này mới chốt được kết quả phỏng vấn.");
 
                 if (fallbackReason == null || fallbackReason.Length < 10)
-                    return Result.Failure<bool>(
-                        "Tin này có Hiring Manager phụ trách. Nhập lý do nếu bạn cần chốt thay (tối thiểu 10 ký tự).");
+                    return Result.Failure<bool>(primaryHm == null
+                        ? "Tin này chưa có Hiring Manager phụ trách. Nhập lý do nếu bạn cần chốt thay (tối thiểu 10 ký tự), hoặc gán Hiring Manager cho tin."
+                        : "Tin này có Hiring Manager phụ trách. Nhập lý do nếu bạn cần chốt thay (tối thiểu 10 ký tự).");
 
                 isHrFallback = true;
-            }
-            else if (primaryHm == null && !isAdminActor)
-            {
-                return Result.Failure<bool>(
-                    "Chỉ HR Admin hoặc Super Admin mới chốt được kết quả của tin chưa có Hiring Manager.");
             }
 
             bool isOverride = evaluation.AiVerdict != request.FinalVerdict;
@@ -1746,6 +1761,9 @@ namespace ARI.Application.Services
 
             await _unitOfWork.Repository<HrReview>().AddAsync(review, ct);
 
+            // Người nhận việc "soạn thư mời" — đẩy chuông realtime SAU khi đã lưu thông báo.
+            var offerTaskRecipients = new List<Guid>();
+
             // Update Application status based on final verdict
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
@@ -1767,6 +1785,25 @@ namespace ARI.Application.Services
 
                 var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
                 var jobTitle = jobPosting?.Title ?? "vị trí ứng tuyển";
+
+                // Qua VÒNG CUỐI → việc tiếp theo là soạn thư mời nhận việc (ADR-063: HM chính hoặc chủ tin
+                // soạn và gửi duyệt, HR Leader chốt). Trước đây không nhân sự nào được báo ở bước này — ứng
+                // viên nhận thư "thư mời sẽ được gửi tới Anh/Chị" còn phía công ty không ai có việc trong tay.
+                if (evaluation.SessionType == "real"
+                    && ApplicationStatuses.Is(application.Status, ApplicationStatuses.Pass)
+                    && jobPosting != null)
+                {
+                    foreach (var recipient in new[] { jobPosting.CreatedByUserId, primaryHm?.UserId ?? Guid.Empty }
+                                 .Where(id => id != Guid.Empty).Distinct())
+                    {
+                        await OfferSupport.NotifyStaffAsync(_unitOfWork, recipient, "pending",
+                            "Ứng viên đã qua vòng cuối — soạn thư mời",
+                            $"{application.CandidateName} — vị trí \"{jobTitle}\". Soạn thư mời nhận việc rồi gửi HR Leader chốt.",
+                            await StaffLinks.CandidateAsync(_unitOfWork, recipient, application.Id, ct),
+                            $"offer_needed:{application.Id}:{recipient}", ct);
+                        offerTaskRecipients.Add(recipient);
+                    }
+                }
 
                 bool hasProgressed = false;
                 // Auto-Progression Logic to Round N+1 (ADR-017 / ADR-014)
@@ -1896,7 +1933,7 @@ namespace ARI.Application.Services
             // Chốt THAY Hiring Manager là hành vi cần dấu vết riêng + phải báo cho chính người bị
             // vượt: một quyết định tuyển đi qua đầu người phụ trách mà họ không biết là thất bại
             // quản trị, dù lý do có chính đáng.
-            if (isHrFallback && primaryHm != null)
+            if (isHrFallback)
             {
                 await _unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
                 {
@@ -1906,13 +1943,16 @@ namespace ARI.Application.Services
                     EntityId = evaluation.Id,
                     Metadata = AuditMetadata.Serialize(new
                     {
-                        hiringManagerUserId = primaryHm.UserId,
+                        hiringManagerUserId = primaryHm?.UserId,
                         applicationId = evaluation.ApplicationId,
                         finalVerdict = request.FinalVerdict,
                         reason = fallbackReason,
                     }),
                 }, ct);
+            }
 
+            if (isHrFallback && primaryHm != null)
+            {
                 await _unitOfWork.Repository<Notification>().AddAsync(new Notification
                 {
                     RecipientUserId = primaryHm.UserId,
@@ -1931,6 +1971,12 @@ namespace ARI.Application.Services
             {
                 await _notificationService.PublishUserEventAsync(primaryHm.UserId, "ReceiveUserNotification",
                     new { Type = "HrReviewFallback", EvaluationId = evaluation.Id }, ct);
+            }
+
+            foreach (var recipient in offerTaskRecipients)
+            {
+                await _notificationService.PublishUserEventAsync(recipient, "ReceiveUserNotification",
+                    new { Type = "OfferNeeded", ApplicationId = evaluation.ApplicationId }, ct);
             }
 
             return Result.Success(true);

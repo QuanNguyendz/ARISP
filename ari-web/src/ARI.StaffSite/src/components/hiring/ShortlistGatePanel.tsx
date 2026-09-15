@@ -1,19 +1,15 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { UserCheck, ShieldAlert, Send, Check, X } from 'lucide-react'
 import { hiringTeamService } from '@ari/shared/fservices/hiringTeam'
 import jobService from '@ari/shared/fservices/job'
-import { scheduleService } from '@ari/shared/fservices/schedule'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { normalizeRole, ROLE } from '@ari/shared/utils/roles'
 import { HIRING_NS, hmDecisionBadgeClass } from './hiringConfig'
-import HmAvailabilityFields, {
-  toLocalInput,
-  toPayload,
-  hasBlockingIssue,
-  type DraftWindow,
-} from './HmAvailabilityFields'
+import HmApproveScheduleNotice from './HmApproveScheduleNotice'
+import { HM_AVAILABILITY_ANCHOR } from './HmAvailabilityPanel'
 
 interface ShortlistGatePanelProps {
   applicationId: string
@@ -55,6 +51,7 @@ export default function ShortlistGatePanel({
 }: ShortlistGatePanelProps) {
   const { t } = useTranslation(HIRING_NS)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
   const role = normalizeRole(currentUser?.role)
 
@@ -63,10 +60,12 @@ export default function ShortlistGatePanel({
   const [note, setNote] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // Duyệt kèm khai lịch rảnh (ADR-067) — mở form thay vì duyệt ngay, vì khung giờ là ĐIỀU KIỆN của
-  // việc duyệt chứ không phải một việc để làm sau.
+  /**
+   * Hộp xác nhận duyệt đang mở. Duyệt chỉ là quyết định chuyên môn — lịch có mặt khai riêng ở màn
+   * tin (ADR-067, sửa 2026-09-14) — nhưng vẫn qua một bước xác nhận để nói ra Recruiter có xếp lịch
+   * vòng 1 ngay được không.
+   */
   const [approving, setApproving] = useState(false)
-  const [windows, setWindows] = useState<DraftWindow[]>([])
 
   const { data: job } = useQuery({
     queryKey: ['job', jobPostingId],
@@ -79,16 +78,6 @@ export default function ShortlistGatePanel({
     setActionError(message ?? fallback)
   }
 
-  /**
-   * Khung giờ đã khai cho vòng 1 của tin này. Nạp lại để HM thấy mình đã gửi gì — duyệt người thứ
-   * hai trong cùng đợt thì không phải nhập lại, và sửa được nếu lịch đổi.
-   */
-  const { data: existingWindows } = useQuery({
-    queryKey: ['hm-availability', jobPostingId, 1],
-    queryFn: () => scheduleService.getHmAvailability(jobPostingId, 1),
-    enabled: !!jobPostingId,
-  })
-
   const done = () => {
     setActionError(null)
     setRejecting(false)
@@ -96,31 +85,7 @@ export default function ShortlistGatePanel({
     setApproving(false)
     setNote('')
     queryClient.invalidateQueries({ queryKey: ['applications'] })
-    queryClient.invalidateQueries({ queryKey: ['hm-availability', jobPostingId, 1] })
     onChanged?.()
-  }
-
-  /**
-   * Chỉ nạp khung CHƯA bắt đầu vào ô sửa được: luật "giờ bắt đầu phải ở tương lai" sẽ báo sai ngay
-   * cho một khung đang diễn ra mà hoàn toàn hợp lệ. Khung đang chạy vẫn còn hiệu lực ở server (lệnh
-   * duyệt THÊM khung chứ không thay cả danh sách), nên bỏ khỏi ô nhập là không mất gì.
-   */
-  const runningCount = (existingWindows ?? []).filter(
-    (w) => new Date(w.startTime).getTime() <= Date.now()
-  ).length
-
-  const openApprove = () => {
-    setActionError(null)
-    setWindows(
-      (existingWindows ?? [])
-        .filter((w) => new Date(w.startTime).getTime() > Date.now())
-        .map((w) => ({
-          start: toLocalInput(w.startTime),
-          end: toLocalInput(w.endTime),
-          note: w.note ?? '',
-        }))
-    )
-    setApproving(true)
   }
 
   const request = useMutation({
@@ -130,15 +95,8 @@ export default function ShortlistGatePanel({
   })
 
   const decide = useMutation({
-    mutationFn: ({
-      decision,
-      reason,
-      availabilities,
-    }: {
-      decision: 'approved' | 'rejected'
-      reason?: string
-      availabilities?: { startTime: string; endTime: string; note?: string | null }[]
-    }) => hiringTeamService.submitHmDecision(applicationId, decision, reason, availabilities),
+    mutationFn: ({ decision, reason }: { decision: 'approved' | 'rejected'; reason?: string }) =>
+      hiringTeamService.submitHmDecision(applicationId, decision, reason),
     onSuccess: done,
     onError: (e) => fail(e, t('gate.decideError')),
   })
@@ -149,8 +107,13 @@ export default function ShortlistGatePanel({
     onError: (e) => fail(e, t('gate.bypassError')),
   })
 
-  // Tin chưa gán Hiring Manager → không có cổng nào để hiện.
-  if (!job?.requiresHmApproval) return null
+  // ADR-068: mọi tin đều có cổng Hiring Manager — không còn trường hợp "tin không có cổng" để ẩn panel.
+  // Trước đây tin chưa gán HM thì panel biến mất và nút "Duyệt hồ sơ" đưa thẳng ứng viên sang xếp lịch.
+  if (!job) return null
+
+  // Vị trí HM chính không có người hành động được → cổng ĐÓNG. Vẫn hiện panel (quản trị viên còn nút vượt
+  // cổng), kèm câu nói rõ HR Leader phải làm gì.
+  const hmUnavailable = job.hiringManagerState === 'missing' || job.hiringManagerState === 'inactive'
 
   const isAdmin = role === ROLE.SuperAdmin || role === ROLE.HRAdmin
   const isTheHiringManager = job.hiringManagerUserId === currentUser?.id
@@ -177,6 +140,14 @@ export default function ShortlistGatePanel({
         </div>
       )}
 
+      {hmUnavailable && (
+        <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+          {job.hiringManagerState === 'inactive'
+            ? t('team.inactive', { name: hmName })
+            : t('team.missing')}
+        </div>
+      )}
+
       {hmDecision && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span
@@ -196,7 +167,7 @@ export default function ShortlistGatePanel({
           type="button"
           className={PRIMARY_BTN}
           onClick={() => request.mutate()}
-          disabled={request.isPending}
+          disabled={request.isPending || hmUnavailable}
         >
           <Send className="h-4 w-4" /> {t('gate.request')}
         </button>
@@ -206,35 +177,28 @@ export default function ShortlistGatePanel({
       {awaitingDecision && isTheHiringManager && (
         <div className="space-y-3">
           {approving ? (
-            /* Duyệt = đồng ý CHUYÊN MÔN + gửi giờ mình có mặt được. Hai thứ đi cùng một thao tác vì
-               thiếu vế sau thì hồ sơ về hàng chờ xếp lịch mà không có giờ nào xếp được. */
-            <div>
-              <p className="mb-1.5 text-sm font-medium text-ink-900 dark:text-white">
-                {t('gate.availabilityLabel')}
-              </p>
-              <p className="mb-2 text-xs text-ink-500 dark:text-ink-400">
-                {t('gate.availabilityHint')}
-              </p>
-              <HmAvailabilityFields
-                rows={windows}
-                onChange={setWindows}
-                disabled={decide.isPending}
+            <div className="space-y-2">
+              <p className="text-sm text-ink-700 dark:text-ink-300">{t('gate.approveBody')}</p>
+              <HmApproveScheduleNotice
+                jobPostingId={jobPostingId}
+                rounds={job.roundConfigs}
+                // Mục lịch nằm ở màn tin của HM — route `/hm/*` chỉ mở cho vai Hiring Manager, nên
+                // người khác (dù được gán làm HM của tin) không có nút dẫn tới một trang họ không vào được.
+                onOpenAvailability={
+                  role === ROLE.HiringManager
+                    ? () => navigate(`/hm/jobs/${jobPostingId}#${HM_AVAILABILITY_ANCHOR}`)
+                    : undefined
+                }
               />
-              <div className="mt-3 flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <button type="button" className={GHOST_BTN} onClick={() => setApproving(false)}>
                   {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                  onClick={() =>
-                    decide.mutate({ decision: 'approved', availabilities: toPayload(windows) })
-                  }
-                  disabled={
-                    decide.isPending ||
-                    hasBlockingIssue(windows) ||
-                    (toPayload(windows).length === 0 && runningCount === 0)
-                  }
+                  onClick={() => decide.mutate({ decision: 'approved' })}
+                  disabled={decide.isPending}
                 >
                   <Check className="h-4 w-4" /> {t('gate.confirmApprove')}
                 </button>
@@ -245,7 +209,10 @@ export default function ShortlistGatePanel({
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                onClick={openApprove}
+                onClick={() => {
+                  setActionError(null)
+                  setApproving(true)
+                }}
                 disabled={decide.isPending}
               >
                 <Check className="h-4 w-4" /> {t('gate.approve')}

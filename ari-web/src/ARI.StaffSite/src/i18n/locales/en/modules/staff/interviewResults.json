@@ -1,0 +1,44 @@
+{
+  "title": "Interview results",
+  "description": "Each real interview round: booked slot, progress, AI report, video and transcript.",
+  "loading": "Loading...",
+  "loadError": "Could not load interview results.",
+  "empty": "No real interview yet.",
+  "round": "Round {{number}}",
+  "roundTypes": {
+    "screening": "Screening",
+    "technical": "Technical",
+    "onlineTest": "Online test",
+    "other": "Interview"
+  },
+  "slot": "Slot {{date}} · {{from}}–{{to}}",
+  "noSlot": "No slot assigned",
+  "duration": "{{minutes}} min",
+  "states": {
+    "scheduled": "Scheduled",
+    "overdue": "Past the slot — no session yet",
+    "waiting": "In the waiting room",
+    "in_progress": "Interview in progress",
+    "evaluating": "AI is scoring",
+    "pending_review": "Awaiting the Hiring Manager",
+    "reviewed": "Result confirmed",
+    "aborted": "Interview interrupted"
+  },
+  "verdict": {
+    "pass": "Pass",
+    "not_pass": "Not pass"
+  },
+  "aiVerdict": "AI: {{verdict}}",
+  "score": "{{score}}/100",
+  "video": "Video available",
+  "noVideo": "No video",
+  "videoDeleted": "Video deleted after the retention period",
+  "transcript": "Transcript, {{count}} turns",
+  "noTranscript": "No transcript",
+  "viewReport": "View report",
+  "evaluatingHint": "The report will appear here once the AI finishes scoring — usually within minutes.",
+  "abortedHint": "This interview has no report. You can reschedule the candidate.",
+  "recentTitle": "Just finished",
+  "recentDescription": "Real interviews that ended in the last 24 hours — open the AI report to confirm the result.",
+  "recentEmpty": "No interview ended in the last 24 hours."
+}

@@ -301,4 +301,71 @@ public class SubmitOnlineTestCommandHandlerTests
         Assert.True(res.IsSuccess); // best-effort: lỗi SignalR không làm hỏng việc nộp bài
         Assert.Single(uow.Repo<OnlineTestSubmission>().Items);
     }
+
+    // ---------- Hạn chót (đóng cửa + thời lượng bài) ----------
+
+    /// <summary>Tin (bài 30') + hồ sơ + 1 câu, kèm lịch thi bắt đầu <paramref name="minutesAgo"/> phút trước.</summary>
+    private (InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app, OnlineTestQuestion q) ScheduledAgo(int minutesAgo)
+    {
+        var job = OnlineTestData.Job(passScore: 70);
+        var app = OnlineTestData.Application(job.Id, _accountId, email: Email);
+        var q = OnlineTestData.Single(job.Id, 0);
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id, RoundNumber = 1,
+            StartTime = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
+            EndTime = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo + 60),
+            Capacity = null,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(q).Seed(slot)
+            .Seed(new InterviewBooking
+            {
+                ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 1,
+                Status = ARI.Domain.Constants.BookingStatus.Scheduled,
+            });
+        return (uow, app, q);
+    }
+
+    [Fact]
+    public async Task Nop_sau_gio_dong_cua_nhung_truoc_han_chot_van_duoc_nhan()
+    {
+        // Cửa 1 tiếng là cửa VÀO: người vào ở phút 59 còn nguyên đồng hồ làm bài của mình.
+        var (uow, app, q) = ScheduledAgo(80);
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, new() { [q.Id] = new() { 0 } }));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(ARI.Domain.Constants.OnlineTestSubmittedBy.Candidate, Graded(uow).SubmittedBy);
+    }
+
+    [Fact]
+    public async Task Qua_han_chot_thi_khong_nhan_bai()
+    {
+        // Quá hạn chót thì bài đã thuộc về hệ thống nộp thay; bài tới muộn hơn chỉ có thể là đồng hồ
+        // phía trình duyệt đã bị vượt qua.
+        var (uow, app, q) = ScheduledAgo(180);
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, new() { [q.Id] = new() { 0 } }));
+
+        Assert.False(res.IsSuccess);
+        Assert.Equal(CommonErrorCodes.Conflict, res.ErrorCode);
+        Assert.Empty(uow.Repo<OnlineTestSubmission>().Items);
+    }
+
+    [Fact]
+    public async Task He_thong_da_nop_thay_thi_bao_het_han_chu_khong_bao_da_nop()
+    {
+        var (uow, app, q) = ScheduledAgo(180);
+        uow.Seed(new OnlineTestSubmission
+        {
+            ApplicationId = app.Id, RoundNumber = 1,
+            SubmittedBy = ARI.Domain.Constants.OnlineTestSubmittedBy.System,
+        });
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, new() { [q.Id] = new() { 0 } }));
+
+        Assert.False(res.IsSuccess);
+        Assert.Contains("hết hạn", res.Error);
+        Assert.Single(uow.Repo<OnlineTestSubmission>().Items);
+    }
 }

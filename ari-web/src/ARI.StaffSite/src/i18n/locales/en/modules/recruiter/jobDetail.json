@@ -27,10 +27,10 @@
   "interviewSchedule": "Interview Schedule",
   "onlineTestBank": "Question Bank",
   "editJob": "Edit Job",
-  "submitForApproval": "Submit for HR Approval",
+  "submitForApproval": "Send to HM for sign-off",
   "closeJob": "Close Job",
   "statusUpdated": "Status updated.",
-  "jobSubmittedForApproval": "Job sent for HR Leader approval.",
+  "jobSubmittedForApproval": "Sent to the Hiring Manager to sign off the job description. It goes live once signed.",
   "jobClosed": "Job posting closed.",
   "hrRejected": "HR Rejected",
   "hrRejectedHint": "{{reason}}. Edit job and resubmit.",
@@ -124,5 +124,9 @@
     "sentToHiringManagerBatch": "Sent {{count}} applications to the hiring manager.",
     "acceptError": "Could not send the application to the hiring manager."
   },
-  "statusError": "Cannot update job status."
+  "statusError": "Cannot update job status.",
+  "hmRequestedChanges": "{{name}} requested changes",
+  "hmRequestedChangesHint": "{{reason}}. Edit the posting (or the JD) and send it to the Hiring Manager again.",
+  "theHiringManager": "Hiring Manager",
+  "editJdInComposer": "Edit JD in composer"
 }

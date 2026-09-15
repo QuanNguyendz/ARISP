@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { roundTypeKey } from '@ari/shared/utils/roundTypes'
 import {
   ClipboardList,
   Plus,
@@ -81,6 +82,9 @@ const inputCls =
   'w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none placeholder:text-ink-400 focus:border-brand-400'
 const labelCls = 'mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300'
 
+/** Ba loại vòng một tin có thể cấu hình — cùng thứ tự với `InterviewRoundTypes.All` ở backend. */
+const ROUND_TYPES = ['online_test', 'screening', 'technical'] as const
+
 /**
  * Ô `<input type="date">` giữ giá trị dạng `YYYY-MM-DD`, nhưng API nhận một MỐC thời gian.
  *
@@ -104,6 +108,9 @@ const emptyInput = (): RecruitmentRequestInput => ({
   reason: '',
   description: '',
   requirements: '',
+  // Gợi ý mặc định đúng phễu phổ biến nhất: thi sàng lọc → sơ loại → chuyên môn. HM bỏ bớt
+  // hoặc đổi thứ tự được; để trống hoàn toàn thì server chặn.
+  requestedRounds: ['online_test', 'screening', 'technical'],
   employmentType: 'full_time',
   workMode: 'onsite',
   location: '',
@@ -655,6 +662,19 @@ function RequestFormModal({
           <p className="mt-1 text-xs text-ink-400">{t('form.requirementsHint')}</p>
         </div>
 
+        {/* Quy trình tuyển của một vị trí là quyết định CHUYÊN MÔN: trưởng bộ phận biết vị trí này
+            cần thi trắc nghiệm trước hay phỏng vấn thẳng, cần mấy vòng chuyên môn. Recruiter dựng tin là
+            thi hành quyết định đó — không hỏi ở đây thì họ phải tự đoán hoặc đi hỏi lại bằng tay. */}
+        <div>
+          <label className={labelCls}>{t('form.rounds')} *</label>
+          <RoundPicker
+            value={form.requestedRounds ?? []}
+            onChange={(next) => setForm({ ...form, requestedRounds: next })}
+            t={t}
+          />
+          <p className="mt-1 text-xs text-ink-400">{t('form.roundsHint')}</p>
+        </div>
+
         <div className="flex gap-3 pt-2">
           <button
             type="button"
@@ -786,6 +806,7 @@ function RequestDetailPanel({
           reason: detail.reason ?? '',
           description: detail.description ?? '',
           requirements: detail.requirements ?? '',
+          requestedRounds: detail.requestedRounds ?? [],
           employmentType: detail.employmentType ?? 'full_time',
           workMode: detail.workMode ?? 'onsite',
           location: detail.location ?? '',
@@ -864,6 +885,14 @@ function RequestDetailPanel({
         {detail.reason && <Field label={t('form.reason')} value={detail.reason} />}
         {detail.description && <Field label={t('form.description')} value={detail.description} />}
         {detail.requirements && <Field label={t('form.requirements')} value={detail.requirements} />}
+        {(detail.requestedRounds ?? []).length > 0 && (
+          <Field
+            label={t('form.rounds')}
+            value={(detail.requestedRounds ?? [])
+              .map((r, i) => `${i + 1}. ${t(`roundTypes.${roundTypeKey(r)}`)}`)
+              .join('  ·  ')}
+          />
+        )}
 
         {/* Lý do thu hồi (ADR-066): Recruiter vừa mất việc và HR Leader vừa bị huỷ chữ ký đều phải
             đọc được dòng này ngay trên phiếu, không phải đi tìm trong chuông. */}
@@ -1084,6 +1113,93 @@ function Panel({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card dark:border-white/10 dark:bg-white/5 sm:p-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
       {children}
+    </div>
+  )
+}
+
+/**
+ * Chọn các vòng phỏng vấn cho vị trí — THỨ TỰ là một phần của câu trả lời.
+ *
+ * Vì sao không dùng một ô chọn nhiều (multi-select): thứ tự chính là SỐ VÒNG, mà multi-select thì
+ * thứ tự do lúc bấm quyết định và người dùng không nhìn thấy nó. Ở đây danh sách đã chọn hiện thành
+ * "1. Trắc nghiệm → 2. Sơ loại", đổi chỗ được, nên thứ nhìn thấy đúng bằng thứ sẽ lưu.
+ */
+function RoundPicker({
+  value,
+  onChange,
+  t,
+}: {
+  value: string[]
+  onChange: (next: string[]) => void
+  t: (key: string, opts?: Record<string, unknown>) => string
+}) {
+  const label = (r: string) => t(`roundTypes.${roundTypeKey(r)}`)
+  const move = (i: number, delta: number) => {
+    const j = i + delta
+    if (j < 0 || j >= value.length) return
+    const next = [...value]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && (
+        <ul className="space-y-1.5">
+          {value.map((r, i) => (
+            <li
+              key={`${r}-${i}`}
+              className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2 dark:border-white/10"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-ink-800 dark:text-ink-100">
+                {label(r)}
+              </span>
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                className="rounded-lg px-1.5 py-1 text-ink-400 hover:bg-ink-100 disabled:opacity-30 dark:hover:bg-white/10"
+                aria-label={t('form.roundsMoveUp')}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === value.length - 1}
+                className="rounded-lg px-1.5 py-1 text-ink-400 hover:bg-ink-100 disabled:opacity-30 dark:hover:bg-white/10"
+                aria-label={t('form.roundsMoveDown')}
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+                className="rounded-lg px-1.5 py-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                aria-label={t('form.roundsRemove')}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-1.5">
+        {ROUND_TYPES.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onChange([...value, r])}
+            className="inline-flex items-center gap-1 rounded-xl border border-dashed border-ink-300 px-2.5 py-1.5 text-xs text-ink-600 hover:bg-ink-50 dark:border-white/20 dark:text-ink-300 dark:hover:bg-white/5"
+          >
+            + {label(r)}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -92,6 +92,41 @@ public class GetAvailabilitySlotsQueryHandlerTests
         var ex = await Assert.ThrowsAsync<Exception>(() => Run(uow, SlotIds.JobId));
         Assert.Equal("Slot DB Error", ex.Message);
     }
+
+    [Fact]
+    public async Task Dong_da_dong_noi_ro_cua_ai_va_vi_sao()
+    {
+        // Lỗi đã gặp: ca hiện "2 lượt đã đóng" — một con số không trả lời được "lượt gì, của ai".
+        var slot = SlotIds.Slot(booked: 1);
+        var holder = SchedulingData.Application(SlotIds.JobId, Guid.NewGuid(), status: "interview");
+        var decliner = SchedulingData.Application(SlotIds.JobId, Guid.NewGuid(), status: "interview");
+        decliner.CandidateName = "Tran Thi B";
+        var rejected = SchedulingData.Application(SlotIds.JobId, Guid.NewGuid(), status: "not_pass");
+        rejected.CandidateName = "Le Van C";
+
+        var declined = SchedulingData.DeclinedBooking(decliner.Id, slot.Id);
+        declined.DeclineReason = "Trùng lịch học";
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot)
+            .Seed(holder, decliner, rejected)
+            .Seed(SchedulingData.Booking(holder.Id, slot.Id))
+            .Seed(declined)
+            .Seed(SchedulingData.Booking(rejected.Id, slot.Id, status: "cancelled", declinedBy: "staff"));
+
+        var res = await Run(uow, SlotIds.JobId);
+
+        var dto = Assert.Single(res.Value);
+        Assert.Equal(2, dto.ClosedBookingCount);
+        Assert.Single(dto.Bookings); // người đang giữ chỗ không lẫn vào danh sách đã đóng
+
+        var d = Assert.Single(dto.ClosedBookings, c => c.ApplicationId == decliner.Id);
+        Assert.Equal("Tran Thi B", d.CandidateName);
+        Assert.Equal(SlotCandidateState.DeclinedByCandidate, d.State);
+        Assert.Equal("Trùng lịch học", d.Reason);
+
+        var r = Assert.Single(dto.ClosedBookings, c => c.ApplicationId == rejected.Id);
+        Assert.Equal("Le Van C", r.CandidateName);
+        Assert.Equal(SlotCandidateState.RejectedByStaff, r.State);
+    }
 }
 
 /// <summary>
@@ -103,9 +138,9 @@ public class CreateSlotCommandHandlerTests
     private static Task<Result<AvailabilitySlotResponse>> Run(InMemoryUnitOfWork uow, CreateSlotRequest req)
         => new CreateSlotCommandHandler(uow).Handle(new CreateSlotCommand(req, SlotIds.Owner, AppRoles.Recruiter), CancellationToken.None);
 
-    // capacity mặc định là 1: từ ADR-067 mọi giá trị khác đều bị chặn ngay đầu handler, nên để 2 làm
-    // mặc định thì mọi ca khác lại dừng ở đúng câu lỗi đó thay vì ở điều kiện nó định kiểm.
-    private static CreateSlotRequest Req(Guid? jobId = null, int round = 1, int capacity = 1, DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh")
+    // capacity mặc định là 1 — giá trị hợp lệ ở mọi loại vòng, nên các ca khác dừng ở đúng điều kiện
+    // chúng định kiểm thay vì dừng ở luật sức chứa.
+    private static CreateSlotRequest Req(Guid? jobId = null, int round = 1, int? capacity = 1, DateTimeOffset? start = null, DateTimeOffset? end = null, string tz = "Asia/Ho_Chi_Minh")
         => new()
         {
             JobPostingId = jobId ?? SlotIds.JobId, RoundNumber = round, Capacity = capacity,
@@ -133,16 +168,87 @@ public class CreateSlotCommandHandlerTests
         Assert.Equal("Khung giờ phải nằm trong tương lai.", res.Error);
     }
 
-    // ADR-067: một ca = một ứng viên. Chặn ở CỔNG TẠO chứ không âm thầm ghi đè về 1 — một ô
-    // "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn như đang có tác dụng.
+    // ADR-067: một ca = một ứng viên ở vòng HỘI THOẠI. Chặn ở CỔNG TẠO chứ không âm thầm ghi đè
+    // về 1 — một ô "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn như đang có tác dụng.
+    //
+    // Phép kiểm này phụ thuộc LOẠI vòng nên nó chạy SAU khi tra được tin — vì thế ca test phải
+    // gieo tin, khác với các ca validate thuần tuý ở trên.
     [Theory]
     [InlineData(0)]
     [InlineData(3)]
     public async Task UTCID04_Capacity_must_be_exactly_one(int capacity)
     {
-        var res = await Run(new InMemoryUnitOfWork(), Req(capacity: capacity));
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job())
+            .Seed(new InterviewRoundConfig { JobPostingId = SlotIds.JobId, RoundNumber = 1, RoundType = "screening" });
+
+        var res = await Run(uow, Req(capacity: capacity));
+
         Assert.True(res.IsFailure);
         Assert.Equal("Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.", res.Error);
+        Assert.Empty(uow.Repo<AvailabilitySlot>().Items);
+    }
+
+    // ---------- Vòng TRẮC NGHIỆM: mặc định không giới hạn ----------
+
+    private static InMemoryUnitOfWork TestRoundUow() =>
+        new InMemoryUnitOfWork().Seed(SlotIds.Job())
+            .Seed(new InterviewRoundConfig { JobPostingId = SlotIds.JobId, RoundNumber = 1, RoundType = "online_test" });
+
+    [Fact]
+    public async Task Vong_trac_nghiem_bo_trong_suc_chua_thi_khong_gioi_han()
+    {
+        // Bài thi trực tuyến: ai cũng làm được trong cùng một khung giờ, không có ghế nào để đếm
+        // và không có Hiring Manager nào phải chia mình ra.
+        var uow = TestRoundUow();
+
+        var res = await Run(uow, Req(capacity: null));
+
+        Assert.True(res.IsSuccess);
+        Assert.Null(res.Value.Capacity);
+        Assert.Null(Assert.Single(uow.Repo<AvailabilitySlot>().Items).Capacity);
+    }
+
+    [Fact]
+    public async Task Vong_trac_nghiem_van_dat_duoc_tran()
+    {
+        var uow = TestRoundUow();
+
+        var res = await Run(uow, Req(capacity: 25));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(25, res.Value.Capacity);
+    }
+
+    [Fact]
+    public async Task Vong_trac_nghiem_tran_duoi_mot_thi_bi_chan()
+    {
+        var res = await Run(TestRoundUow(), Req(capacity: 0));
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("từ 1 trở lên", res.Error);
+    }
+
+    [Fact]
+    public async Task Vong_hoi_thoai_bo_trong_suc_chua_thi_thanh_mot()
+    {
+        // Bỏ trống = "để hệ thống quyết theo loại vòng", không phải lỗi.
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job())
+            .Seed(new InterviewRoundConfig { JobPostingId = SlotIds.JobId, RoundNumber = 1, RoundType = "technical" });
+
+        var res = await Run(uow, Req(capacity: null));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(1, res.Value.Capacity);
+    }
+
+    [Fact]
+    public async Task Tin_chua_khai_vong_thi_coi_nhu_vong_hoi_thoai()
+    {
+        // Không tra được cấu hình vòng thì giữ luật chặt hơn, không âm thầm mở trần.
+        var res = await Run(new InMemoryUnitOfWork().Seed(SlotIds.Job()), Req(capacity: 5));
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("MỘT ứng viên", res.Error);
     }
 
     [Fact]
@@ -227,11 +333,51 @@ public class DeleteSlotCommandHandlerTests
     [Fact]
     public async Task UTCID03_Booked_slot_rejected()
     {
-        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(booked: 1));
+        // Đọc theo DÒNG booking chứ không theo cột `booked_count` (ADR-058) — nên ca test phải gieo
+        // một dòng thật, không phải một con số trên cột.
+        var slot = SlotIds.Slot(booked: 1);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot)
+            .Seed(SchedulingData.Booking(Guid.NewGuid(), slot.Id));
+
         var res = await Run(uow);
+
         Assert.True(res.IsFailure);
         Assert.Equal("Không thể xoá khung giờ đã có ứng viên đặt lịch.", res.Error);
         Assert.Single(uow.Repo<AvailabilitySlot>().Items);
+    }
+
+    /// <summary>
+    /// Ca trả 500 trên máy thật: <c>booked_count</c> chỉ đếm booking <c>scheduled</c>, nên một ca từng bị
+    /// ứng viên báo bận hiện ra "Đã đặt 0/1" — trông như trống. Bản cũ đọc đúng cột đó rồi gọi
+    /// <c>Delete</c>, và Postgres chặn ở khoá ngoại của <c>interview_bookings</c>.
+    ///
+    /// KHÔNG xoá kèm dòng booking cũ: đó là bằng chứng "ứng viên này được mời vào ĐÚNG giờ đó rồi
+    /// báo bận" (<c>decline_reason</c>, <c>declined_by</c>). Bỏ ca đi thì lời giải thích ấy mất chỗ bám.
+    /// </summary>
+    [Fact]
+    public async Task Ca_tung_bi_bao_ban_thi_khong_xoa_duoc_du_cot_dem_bang_0()
+    {
+        var slot = SlotIds.Slot(booked: 0);
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(slot)
+            .Seed(SchedulingData.DeclinedBooking(Guid.NewGuid(), slot.Id));
+
+        var res = await Run(uow);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("giữ lại để còn dấu vết", res.Error);
+        Assert.Single(uow.Repo<AvailabilitySlot>().Items);
+    }
+
+    [Fact]
+    public async Task Cot_dem_troi_len_nhung_khong_co_dong_nao_thi_van_xoa_duoc()
+    {
+        // Cột lệch không được biến một ca trống thành ca vĩnh viễn không xoá được.
+        var uow = new InMemoryUnitOfWork().Seed(SlotIds.Job()).Seed(SlotIds.Slot(booked: 3));
+
+        var res = await Run(uow);
+
+        Assert.True(res.IsSuccess);
+        Assert.Empty(uow.Repo<AvailabilitySlot>().Items);
     }
 
     [Fact]

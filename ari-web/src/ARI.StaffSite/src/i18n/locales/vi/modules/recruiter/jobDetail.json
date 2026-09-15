@@ -27,10 +27,10 @@
   "interviewSchedule": "Lịch phỏng vấn",
   "onlineTestBank": "Ngân hàng câu hỏi",
   "editJob": "Sửa tin",
-  "submitForApproval": "Gửi HR duyệt",
+  "submitForApproval": "Gửi HM ký duyệt",
   "closeJob": "Đóng tin",
   "statusUpdated": "Đã cập nhật trạng thái.",
-  "jobSubmittedForApproval": "Đã gửi tin cho HR Leader duyệt.",
+  "jobSubmittedForApproval": "Đã gửi tin cho Hiring Manager ký duyệt mô tả công việc. Ký xong tin tự đăng.",
   "jobClosed": "Đã đóng tin tuyển dụng.",
   "hrRejected": "HR từ chối",
   "hrRejectedHint": "{{reason}}. Sửa tin và gửi duyệt lại.",
@@ -124,5 +124,9 @@
     "sentToHiringManagerBatch": "Đã gửi {{count}} hồ sơ cho Hiring Manager duyệt.",
     "acceptError": "Không gửi được hồ sơ cho Hiring Manager."
   },
-  "statusError": "Không thể cập nhật trạng thái tin."
+  "statusError": "Không thể cập nhật trạng thái tin.",
+  "hmRequestedChanges": "{{name}} yêu cầu sửa",
+  "hmRequestedChangesHint": "{{reason}}. Sửa tin (hoặc JD) rồi gửi Hiring Manager ký lại.",
+  "theHiringManager": "Hiring Manager",
+  "editJdInComposer": "Sửa JD bằng trình soạn"
 }

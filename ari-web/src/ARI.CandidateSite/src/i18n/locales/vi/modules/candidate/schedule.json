@@ -1,25 +1,27 @@
 {
-  "pageTitle": "Lịch phỏng vấn của bạn",
-  "pageDescription": "Lịch do bộ phận nhân sự xếp. Vui lòng xác nhận, hoặc từ chối kèm lý do để được xếp lịch khác.",
+  "pageTitle": "Lịch hẹn của bạn",
+  "pageDescription": "Lịch do bộ phận nhân sự xếp. Vui lòng xác nhận tham dự, hoặc từ chối kèm lý do.",
   "breadcrumb": {
     "home": "Trang chủ"
   },
   "backToApplications": "Về hồ sơ ứng tuyển",
   "errors": {
-    "loadFailed": "Không tải được lịch phỏng vấn.",
+    "loadFailed": "Không tải được lịch hẹn.",
     "confirmFailed": "Xác nhận lịch thất bại.",
     "declineFailed": "Gửi lý do thất bại.",
     "dismissFailed": "Xoá lịch thất bại.",
     "reasonTooShort": "Vui lòng nhập lý do (ít nhất 3 ký tự).",
-    "alreadyResponded": "Lịch này đã được phản hồi trước đó và không thể thay đổi."
+    "alreadyResponded": "Lịch này đã được phản hồi trước đó và không thể thay đổi.",
+    "slotPassed": "Buổi này đã qua giờ hẹn nên không thể phản hồi nữa. Nếu có vấn đề, hãy liên hệ trực tiếp bộ phận nhân sự.",
+    "noLongerValid": "Lịch này không còn hiệu lực — bạn đã từ chối trước đó, hoặc nhân sự đã thay đổi lịch."
   },
   "loginRequired": {
     "message": "Vui lòng đăng nhập Portal ứng viên để xem và xác nhận lịch phỏng vấn của bạn.",
     "button": "Đăng nhập để tiếp tục"
   },
-  "noScheduleTitle": "Chưa có lịch phỏng vấn",
-  "noSchedule": "Nhân sự chưa xếp lịch phỏng vấn cho bạn. Bạn sẽ nhận thông báo ngay khi có lịch.",
-  "jobTitleFallback": "Phỏng vấn",
+  "noScheduleTitle": "Chưa có lịch hẹn",
+  "noSchedule": "Nhân sự chưa xếp lịch cho bạn. Bạn sẽ nhận thông báo ngay khi có lịch.",
+  "jobTitleFallback": "Vị trí ứng tuyển",
   "nextUp": {
     "label": "Buổi gần nhất"
   },
@@ -33,15 +35,16 @@
     "minutes": "Còn {{count}} phút",
     "hours": "Còn {{count}} giờ",
     "tomorrow": "Ngày mai",
-    "days": "Còn {{count}} ngày"
+    "days": "Còn {{count}} ngày",
+    "testOpen": "Đang mở bài thi"
   },
   "dayGroup": {
     "count": "{{count}} buổi"
   },
   "awaitingSection": {
     "badge": "Đã từ chối",
-    "title": "{{jobTitle}} · Vòng {{round}}",
-    "message": "Bạn đã từ chối lịch{{declineReason}}. Nhân sự sẽ xếp một khung giờ khác và thông báo lại cho bạn.",
+    "title": "{{jobTitle}} · {{roundLabel}}",
+    "message": "Bạn đã từ chối buổi này{{declineReason}}. Nếu bạn vẫn muốn tiếp tục ứng tuyển, hãy liên hệ trực tiếp bộ phận nhân sự để thống nhất một khung giờ khác.",
     "dismissButton": "Xoá khỏi danh sách"
   },
   "scheduleItem": {
@@ -50,7 +53,8 @@
     "pendingConfirmation": "Chưa xác nhận",
     "confirmedLocked": "Bạn đã xác nhận tham dự. Quyết định đã được khoá và không thể thay đổi.",
     "confirmButton": "Xác nhận tham dự",
-    "declineButton": "Từ chối / đổi lịch"
+    "declineButton": "Từ chối tham dự",
+    "roundLabelTest": "Vòng {{round}} · Bài trắc nghiệm"
   },
   "prep": {
     "title": "Cần chuẩn bị gì",
@@ -68,15 +72,22 @@
   },
   "modal": {
     "confirmTitle": "Xác nhận tham dự?",
-    "declineTitle": "Từ chối / xin đổi lịch?",
-    "confirmSummary": "{{jobTitle}} · Vòng {{round}} — {{day}}, {{time}}",
+    "declineTitle": "Từ chối tham dự?",
+    "confirmSummary": "{{jobTitle}} · {{roundLabel}} — {{day}}, {{time}}",
     "declineReasonLabel": "Lý do bạn không thể tham dự:",
-    "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường ngày 20/8. Em có thể tham dự sáng 22/8 hoặc chiều 23/8.",
+    "declineReasonPlaceholder": "Ví dụ: Trùng lịch thi ở trường ngày 20/8 nên em không tham dự được.",
     "warning": "Bạn đã chắc chắn với quyết định của mình chưa? Sau khi bấm, bạn sẽ không thể sửa lại lựa chọn này nữa.",
-    "warningDecline": " Nhân sự sẽ sắp xếp một khung giờ khác dựa trên lý do của bạn.",
+    "warningDecline": " Đây là từ chối buổi phỏng vấn này — hệ thống KHÔNG tự xếp lịch khác cho bạn. Vẫn muốn tham gia thì hãy liên hệ trực tiếp bộ phận nhân sự.",
     "laterButton": "Để sau",
     "confirmButton": "Tôi chắc chắn — Xác nhận",
-    "declineButton": "Tôi chắc chắn — Từ chối",
-    "declineReasonHint": "Hãy ghi rõ <b>những khung giờ bạn tham dự được</b> để nhân sự xếp ca phù hợp — hoặc nói rõ nếu bạn <b>không muốn tiếp tục</b> ứng tuyển."
+    "declineButton": "Tôi chắc chắn — Từ chối tham dự",
+    "declineReasonHint": "Lý do này gửi tới bộ phận nhân sự. Hãy nói rõ nếu bạn <b>không muốn tiếp tục</b> ứng tuyển.",
+    "warningDeclineTest": " Đây là từ chối làm bài trắc nghiệm này — hệ thống KHÔNG tự xếp giờ khác cho bạn. Vẫn muốn tham gia thì hãy liên hệ trực tiếp bộ phận nhân sự."
+  },
+  "prepTest": {
+    "title": "Chuẩn bị cho bài trắc nghiệm",
+    "item1": "Làm bài trực tuyến ngay trên Candidate Portal — không cần tới văn phòng, không cần mã phỏng vấn.",
+    "item2": "Bài thi mở đúng giờ hẹn và chỉ nhận người vào làm trong 1 tiếng kể từ đó.",
+    "item3": "Bạn chỉ có một lượt làm bài; rời trang giữa chừng thì bài sẽ tự nộp — hãy chuẩn bị đường truyền ổn định."
   }
 }

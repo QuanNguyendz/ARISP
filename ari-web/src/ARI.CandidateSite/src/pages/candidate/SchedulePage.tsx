@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { scheduleService } from '@ari/shared/fservices/schedule'
+import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import type { CandidateScheduleItem } from '@ari/shared/fservices/schedule'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -186,6 +187,22 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
   // coi cả cụm là tên biến, không tìm thấy, và in nguyên chuỗi đó ra màn hình.
   const jobTitleOf = (item: CandidateScheduleItem) => item.jobTitle || t('jobTitleFallback')
 
+  /**
+   * Vòng TRẮC NGHIỆM là một bài thi, không phải buổi phỏng vấn — nhãn, đồng hồ và lời dặn của nó
+   * phải nói đúng như vậy. Trước đây mọi lịch đều hiện "Vòng N", còn bên dưới là hướng dẫn mang
+   * CCCD tới Kiosk và mời luyện phỏng vấn thử — sai hoàn toàn với một bài làm tại nhà.
+   */
+  const isTest = (item: CandidateScheduleItem) => isOnlineTestRound(item.roundType)
+  const roundLabelOf = (item: CandidateScheduleItem) =>
+    isTest(item)
+      ? t('scheduleItem.roundLabelTest', { round: item.roundNumber })
+      : t('scheduleItem.roundLabel', { round: item.roundNumber })
+  /** Bài thi đã tới giờ thì đang MỞ (còn cửa vào 1 tiếng) — "đang diễn ra" là chữ của buổi phỏng vấn. */
+  const countdownOf = (item: CandidateScheduleItem) =>
+    isTest(item) && new Date(item.startTime).getTime() <= now
+      ? { text: t('relative.testOpen'), urgent: true }
+      : countdown(t, item.startTime, now)
+
   const needsLogin = error ? isUnauthorized(error) : false
   const displayError = error && !needsLogin ? errMsg(error, t('errors.loadFailed')) : ''
 
@@ -255,14 +272,19 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
     const target = upcoming.find((s) => s.bookingId === bookingId)
     if (target && target.confirmationStatus !== 'confirmed') {
       openModal(bookingId, action)
-    } else {
+    } else if (target) {
       setActionError(t('errors.alreadyResponded'))
+    } else if (past.some((s) => s.bookingId === bookingId)) {
+      // Buổi đã qua — KHÔNG phải "đã phản hồi". Nói nhầm lý do thì ứng viên tưởng mình đã bấm rồi.
+      setActionError(t('errors.slotPassed'))
+    } else {
+      setActionError(t('errors.noLongerValid'))
     }
     const next = new URLSearchParams(searchParams)
     next.delete('booking')
     next.delete('action')
     setSearchParams(next, { replace: true })
-  }, [loading, data, upcoming, searchParams, setSearchParams, t])
+  }, [loading, data, upcoming, past, searchParams, setSearchParams, t])
 
   const grouped = useMemo(() => {
     const map = new Map<string, CandidateScheduleItem[]>()
@@ -364,7 +386,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
                     </div>
                   </div>
                   {(() => {
-                    const c = countdown(t, nextUp.startTime, now)
+                    const c = countdownOf(nextUp)
                     return (
                       <span
                         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
@@ -412,7 +434,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="flex items-center gap-2 text-sm font-bold text-amber-900">
                     <CalendarClock className="h-4 w-4 shrink-0" />
-                    {t('awaitingSection.title', { jobTitle: jobTitleOf(s), round: s.roundNumber })}
+                    {t('awaitingSection.title', { jobTitle: jobTitleOf(s), roundLabel: roundLabelOf(s) })}
                   </p>
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
                     <X className="h-3.5 w-3.5" /> {t('awaitingSection.badge')}
@@ -481,7 +503,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
                 <div className="divide-y divide-ink-100">
                   {daySlots.map((s) => {
                     const confirmed = s.confirmationStatus === 'confirmed'
-                    const c = countdown(t, s.startTime, now)
+                    const c = countdownOf(s)
                     return (
                       <div
                         key={s.bookingId}
@@ -499,7 +521,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-400">
                               <span className="rounded-md bg-ink-100 px-1.5 py-0.5 font-medium text-ink-600">
-                                {t('scheduleItem.roundLabel', { round: s.roundNumber })}
+                                {roundLabelOf(s)}
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-3 w-3" /> {s.timezone}
@@ -557,8 +579,25 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
               </section>
             ))}
 
-            {/* ===== Nhắc mang gì đi ===== */}
-            {upcoming.length > 0 && (
+            {/* ===== Bài trắc nghiệm: làm tại nhà, không Kiosk, không mã ===== */}
+            {upcoming.some(isTest) && (
+              <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-ink-900">
+                  <KeyRound className="h-4 w-4 text-brand-600" /> {t('prepTest.title')}
+                </h3>
+                <ul className="mt-3 space-y-2">
+                  {[t('prepTest.item1'), t('prepTest.item2'), t('prepTest.item3')].map((line) => (
+                    <li key={line} className="flex items-start gap-2 text-sm text-ink-600">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                      <span className="leading-relaxed">{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* ===== Nhắc mang gì đi — chỉ khi có BUỔI PHỎNG VẤN sắp tới ===== */}
+            {upcoming.some((s) => !isTest(s)) && (
               <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink-900">
                   <KeyRound className="h-4 w-4 text-brand-600" /> {t('prep.title')}
@@ -574,8 +613,8 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
               </div>
             )}
 
-            {/* ===== Mời luyện tập ===== */}
-            {upcoming.length > 0 && (
+            {/* ===== Mời luyện tập — vòng trắc nghiệm không có phỏng vấn thử (lộ đề) ===== */}
+            {upcoming.some((s) => !isTest(s)) && (
               <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-ai-100 bg-gradient-to-r from-brand-50 to-ai-50 p-5">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-ai-600 shadow-card">
                   <Sparkles className="h-5 w-5" />
@@ -610,8 +649,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
                     >
                       <span className="text-sm font-semibold text-ink-500">{timeRange(s)}</span>
                       <span className="min-w-0 flex-1 truncate text-sm text-ink-500">
-                        {jobTitleOf(s)} ·{' '}
-                        {t('scheduleItem.roundLabel', { round: s.roundNumber })}
+                        {jobTitleOf(s)} · {roundLabelOf(s)}
                       </span>
                       <span className="shrink-0 text-xs text-ink-400">{dayKey(s.startTime)}</span>
                     </li>
@@ -651,7 +689,7 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
               <p className="mb-3 rounded-xl bg-ink-50 px-3 py-2.5 text-sm leading-relaxed text-ink-700">
                 {t('modal.confirmSummary', {
                   jobTitle: jobTitleOf(modalItem),
-                  round: modalItem.roundNumber,
+                  roundLabel: roundLabelOf(modalItem),
                   day: dayKey(modalItem.startTime),
                   time: timeRange(modalItem),
                 })}
@@ -684,7 +722,10 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p className="text-xs leading-relaxed text-amber-800">
                 {t('modal.warning')}
-                {modal.action === 'decline' && t('modal.warningDecline')}
+                {modal.action === 'decline' &&
+                  (modalItem && isTest(modalItem)
+                    ? t('modal.warningDeclineTest')
+                    : t('modal.warningDecline'))}
               </p>
             </div>
 

@@ -74,10 +74,7 @@
     "interviewPassScore": "Điểm sàn phỏng vấn",
     "interviewPassScoreHint": "Từ điểm này trở lên AI kết luận \"đạt\" (0–100). Chỉ áp dụng khi đã khai bộ tiêu chí chấm phỏng vấn trong Playbook.",
     "hiringManager": "Hiring Manager phụ trách",
-    "hiringManagerNone": "— Chưa gán (có thể gán sau) —",
-    "hiringManagerHint": "Trưởng bộ phận duyệt hồ sơ, ký duyệt mô tả công việc và chốt kết quả phỏng vấn. Bỏ trống thì tin chạy như trước, không có cổng duyệt nào.",
-    "hmAssignFailed": "Đã tạo tin nhưng chưa gán được Hiring Manager. Bạn gán lại ở trang chi tiết tin.",
-    "goToJobToAssign": "Mở trang tin để gán Hiring Manager",
+    "hiringManagerHint": "Người lập phiếu yêu cầu tuyển dụng — hệ thống tự gán làm Hiring Manager chính của tin (duyệt hồ sơ, ký duyệt mô tả công việc, chốt kết quả). Muốn đổi người thì nhờ HR Leader chuyển Hiring Manager ở trang tin.",
     "jdDraft": {
       "description": "Mô tả công việc",
       "requirements": "Yêu cầu ứng viên"

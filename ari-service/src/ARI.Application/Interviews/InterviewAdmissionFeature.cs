@@ -39,9 +39,14 @@ namespace ARI.Application.Interviews
         /// <summary>
         /// Ai được điều khiển phòng chờ của phiên này.
         ///
-        /// Hiring Manager của tin là người đương nhiên. Quản trị viên và chủ tin cũng làm được —
-        /// nhưng đó là lối thoát hiểm có DẤU VẾT (audit log), không phải quyền ngang hàng: ứng viên
-        /// đã đến văn phòng rồi mà HM kẹt họp thì buổi phỏng vấn không được phép chết đứng.
+        /// Hiring Manager của tin là người đương nhiên. Quản trị viên cũng làm được — nhưng đó là lối
+        /// thoát hiểm có DẤU VẾT (audit log), không phải quyền ngang hàng: ứng viên đã đến văn phòng rồi
+        /// mà HM kẹt họp (hay tài khoản HM vừa bị khoá) thì buổi phỏng vấn không được phép chết đứng.
+        ///
+        /// ADR-068 bỏ quyền của CHỦ TIN: phòng chờ tồn tại để bảo đảm có Hiring Manager ngồi cùng AI,
+        /// mà Recruiter "vào phòng rồi cho vào" thì buổi đó chạy không có HM — đúng thứ phòng chờ chặn.
+        /// Cùng lý lẽ với việc Recruiter không được đổi HM của tin: người vận hành phễu không thay được
+        /// người kiểm nó.
         /// </summary>
         public static async Task<Decision> EvaluateAsync(
             IUnitOfWork unitOfWork, Guid sessionId, Guid? actorId, string? actorRole, CancellationToken ct)
@@ -61,12 +66,11 @@ namespace ARI.Application.Interviews
             if (app == null || job == null)
                 return new Decision(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound, session, null, null, false);
 
-            var hm = await JobAccess.PrimaryHiringManagerAsync(unitOfWork, job.Id, ct);
-            var isPrimaryHm = hm != null && hm.UserId == uid;
+            var isPrimaryHm = await JobAccess.IsPrimaryHiringManagerAsync(unitOfWork, job.Id, uid, ct);
 
-            if (!isPrimaryHm && level < JobAccessLevel.Owner)
+            if (!isPrimaryHm && level < JobAccessLevel.Admin)
                 return new Decision(
-                    "Chỉ Hiring Manager phụ trách tin này (hoặc chủ tin / quản trị viên) mới điều khiển được phòng phỏng vấn.",
+                    "Chỉ Hiring Manager phụ trách tin này (hoặc quản trị viên, có ghi dấu vết) mới điều khiển được phòng phỏng vấn.",
                     CommonErrorCodes.Forbidden, session, app, job, false);
 
             return new Decision(null, null, session, app, job, isPrimaryHm);

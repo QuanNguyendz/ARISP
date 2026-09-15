@@ -190,6 +190,78 @@ public class JdDocumentFlowTests
         Assert.NotNull(doc.GeneratedAt);
     }
 
+    // ---------- File JD của tin đã dựng (ADR-068) ----------
+
+    /// <summary>Phiếu đã soạn + xuất file một lần, rồi dựng thành tin trỏ vào chính file đó.</summary>
+    private async Task<(InMemoryUnitOfWork Uow, RecruitmentRequest Req, JobPosting Job, RecordingFileStorage Storage, string FirstKey)>
+        JobBuiltFromComposer(string jobStatus)
+    {
+        var (uow, req) = Seed();
+        await Save(uow, req.Id, _recruiterId, RoleNames.Recruiter, Input());
+        var storage = new RecordingFileStorage();
+        var first = await Generate(uow, req.Id, _recruiterId, RoleNames.Recruiter, "pdf", storage);
+
+        var job = new JobPosting
+        {
+            Id = Guid.NewGuid(), Title = "Intern Backend", JobDescription = "JD", Status = jobStatus,
+            CreatedByUserId = _recruiterId, RecruitmentRequestId = req.Id,
+            JdFileUrl = first.Value!.StorageKey, JdFileName = first.Value.FileName, JdFileFormat = "pdf",
+        };
+        uow.Seed(job);
+        return (uow, req, job, storage, first.Value.StorageKey);
+    }
+
+    [Theory]
+    [InlineData("pending")] // HM đang ký duyệt ĐÚNG file này
+    [InlineData("active")]  // tin đã đăng bằng file này
+    public async Task JD_cua_tin_dang_cho_ky_hoac_da_dang_thi_khong_sua_duoc(string jobStatus)
+    {
+        // Trước đây trình soạn không kiểm gì: "Lưu nháp" (lần nào cũng xuất lại file) xoá luôn file mà tin đang
+        // trỏ tới — HM mở ra gặp link chết.
+        var (uow, req, job, storage, firstKey) = await JobBuiltFromComposer(jobStatus);
+
+        var save = await Save(uow, req.Id, _recruiterId, RoleNames.Recruiter, Input("Tên mới"));
+        var generate = await Generate(uow, req.Id, _recruiterId, RoleNames.Recruiter, "pdf", storage);
+
+        Assert.True(save.IsFailure);
+        Assert.True(generate.IsFailure);
+        Assert.Equal(CommonErrorCodes.Conflict, generate.ErrorCode);
+        Assert.Equal(firstKey, job.JdFileUrl);
+        Assert.Empty(storage.Deleted);
+    }
+
+    [Fact]
+    public async Task Tin_bi_tra_ve_de_sua_thi_xuat_lai_file_va_gan_vao_tin()
+    {
+        // HM "Yêu cầu sửa" → tin `rejected` → Recruiter sửa JD. Bản mới phải là thứ HM xem ở lượt ký tới.
+        var (uow, req, job, storage, firstKey) = await JobBuiltFromComposer("rejected");
+
+        await Save(uow, req.Id, _recruiterId, RoleNames.Recruiter, Input("Intern Backend (đã bổ sung quyền lợi)"));
+        var res = await Generate(uow, req.Id, _recruiterId, RoleNames.Recruiter, "pdf", storage);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(res.Value!.StorageKey, job.JdFileUrl);
+        Assert.NotEqual(firstKey, job.JdFileUrl);
+        Assert.Contains(firstKey, storage.Deleted); // bản cũ không còn ai trỏ tới → dọn
+    }
+
+    [Fact]
+    public async Task File_cu_con_tin_khac_tro_toi_thi_khong_bi_xoa()
+    {
+        var (uow, req, _, storage, firstKey) = await JobBuiltFromComposer("draft");
+        uow.Seed(new JobPosting
+        {
+            Id = Guid.NewGuid(), Title = "Tin đã lưu trữ", Status = "closed", CreatedByUserId = _recruiterId,
+            JdFileUrl = firstKey,
+        });
+
+        await Save(uow, req.Id, _recruiterId, RoleNames.Recruiter, Input());
+        var res = await Generate(uow, req.Id, _recruiterId, RoleNames.Recruiter, "pdf", storage);
+
+        Assert.True(res.IsSuccess);
+        Assert.DoesNotContain(firstKey, storage.Deleted);
+    }
+
     [Fact]
     public async Task Chua_luu_noi_dung_thi_chua_xuat_duoc_file()
     {

@@ -74,7 +74,8 @@ namespace ARI.Domain.Constants
         /// <summary>
         /// Ứng viên KHÔNG tham dự buổi phỏng vấn đã hẹn (phớt lờ thư mời hoặc xác nhận rồi không
         /// đến) → hệ thống tự đánh trượt. Khác <see cref="DeclinedByCandidate"/> ở chỗ KHÔNG xếp
-        /// lại lịch được: người báo bận thì được xếp ca khác, người không đến thì hồ sơ dừng lại.
+        /// lại lịch được: chỗ của người từ chối được trả về kho để nhân sự dùng lại, người không đến thì
+        /// hồ sơ dừng lại. Việc thống nhất một giờ KHÁC với chính ứng viên nằm ngoài hệ thống.
         /// </summary>
         public const string NoShow = "no_show";
 

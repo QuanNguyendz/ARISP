@@ -1,8 +1,8 @@
 {
   "title": "Xếp lịch phỏng vấn · Vòng {{round}}",
   "declineWarning": {
-    "title": "Ứng viên đã từ chối lịch trước (xin đổi lịch)",
-    "hint": "Hãy chọn một khung giờ khác phù hợp hơn cho ứng viên."
+    "title": "Ứng viên đã từ chối buổi trước",
+    "hint": "Chỉ xếp lại khi đã thống nhất được giờ với họ — hệ thống không tự hỏi giùm."
   },
   "scheduled": {
     "title": "Đã xếp lịch cho ứng viên",

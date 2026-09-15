@@ -144,6 +144,87 @@ public class GenerateInterviewCodeTests
         Assert.Equal(2, res.Value.RoundNumber); // vòng kế = max(completed)+1
     }
 
+    // ---------- Luật cấp mã (dùng chung mọi đường cấp) ----------
+
+    [Fact]
+    public async Task Generate_for_online_test_round_is_rejected()
+    {
+        // Bài trắc nghiệm làm trong Portal (ADR-049). Có mã thì nhập tại Kiosk sẽ mở một phiên PHỎNG
+        // VẤN AI cho một vòng vốn là bài thi.
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app)
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1))
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" });
+
+        var res = await svc.GenerateCodeAsync(app.Id, 1, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("trắc nghiệm", res.Error);
+        Assert.Empty(ctx.Uow.Repo<ARI.Domain.Entities.InterviewCode>().Items);
+    }
+
+    [Theory]
+    [InlineData("waiting", "đang ở phòng")]
+    [InlineData("active", "đang ở phòng")]
+    [InlineData("completed", "phỏng vấn xong")]
+    public async Task Generate_after_candidate_entered_the_room_is_rejected(string sessionStatus, string reason)
+    {
+        // Nhập mã luôn mở phiên MỚI — mã thứ hai là phòng chờ thứ hai cho cùng một người.
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app)
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1))
+            .Seed(new InterviewSession { ApplicationId = app.Id, RoundNumber = 1, SessionType = "real", Status = sessionStatus });
+
+        var res = await svc.GenerateCodeAsync(app.Id, 1, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains(reason, res.Error);
+        Assert.Empty(ctx.Uow.Repo<ARI.Domain.Entities.InterviewCode>().Items);
+    }
+
+    [Fact]
+    public async Task Generate_after_an_aborted_session_is_allowed()
+    {
+        // Phiên hỏng giữa chừng không được khoá ứng viên ngoài phòng — cấp mã mới để vào lại.
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app)
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1))
+            .Seed(new InterviewSession { ApplicationId = app.Id, RoundNumber = 1, SessionType = "real", Status = "aborted" });
+
+        var res = await svc.GenerateCodeAsync(app.Id, 1, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Generating_again_expires_the_previous_unused_code()
+    {
+        // MỘT mã sống cho mỗi (hồ sơ, vòng): để hai mã cùng hiệu lực thì ứng viên nhập được cả hai và
+        // sinh hai phiên phỏng vấn.
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app).Seed(InterviewCodeData.Booking(app.Id, round: 1));
+
+        var first = (await svc.GenerateCodeAsync(app.Id, 1, Guid.NewGuid(), CancellationToken.None)).Value;
+        var second = (await svc.GenerateCodeAsync(app.Id, 1, Guid.NewGuid(), CancellationToken.None)).Value;
+
+        Assert.True(first.ExpiresAt <= DateTimeOffset.UtcNow);
+        Assert.True(second.ExpiresAt > DateTimeOffset.UtcNow);
+        Assert.NotEqual(first.Code, second.Code);
+
+        // Mã cũ nhập vào Kiosk bị từ chối là "hết hạn" — không mở được phiên thứ hai.
+        var validate = await svc.ValidateCodeAsync(first.Code, CancellationToken.None);
+        Assert.False(validate.Value.Valid);
+        Assert.Equal("expired", validate.Value.Reason);
+    }
+
     // ---------- GenerateBatchAsync ----------
 
     [Fact]

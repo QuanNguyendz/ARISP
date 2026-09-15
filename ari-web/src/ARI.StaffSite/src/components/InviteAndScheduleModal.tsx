@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Calendar, Send, CheckCircle2, Users, AlertCircle, Loader2 } from 'lucide-react'
 import { scheduleService, type HmAvailabilityWindow } from '@ari/shared/fservices/schedule'
+import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
 import { EMAIL_TEMPLATES } from '@ari/shared/fservices/email'
 import type { AvailabilitySlot } from '@ari/shared/types/job'
@@ -16,6 +17,14 @@ interface InviteAndScheduleModalProps {
   applications: InviteTargetApplication[]
   jobPostingId: string
   targetRoundNumber?: number
+  /**
+   * `roundType` của vòng đang xếp (`online_test` | `screening` | `technical`).
+   *
+   * Vòng TRẮC NGHIỆM không có Hiring Manager ngồi cùng, nên server không áp luật khớp giờ HM
+   * lẫn luật "một ca một ứng viên". Thiếu thông tin này thì hộp thoại cảnh báo về những ràng
+   * buộc không tồn tại — và còn chặn luôn nút xếp lịch.
+   */
+  roundType?: string | null
   onClose: () => void
   onSuccess: (message: string) => void
 }
@@ -47,6 +56,7 @@ export default function InviteAndScheduleModal({
   applications,
   jobPostingId,
   targetRoundNumber = 1,
+  roundType,
   onClose,
   onSuccess,
 }: InviteAndScheduleModalProps) {
@@ -77,8 +87,15 @@ export default function InviteAndScheduleModal({
   const isBatch = applications.length > 1
   const selectedSlot = slots.find((s) => s.id === selectedSlotId)
 
-  // Một ca chỉ nhận MỘT ứng viên (ADR-067) — chọn nhiều người rồi dồn vào một ca là không thể.
-  const tooManyCandidates = applications.length > 1
+  /**
+   * Vòng thi trắc nghiệm: ứng viên làm bài trực tuyến, không ai ngồi cùng. Hai ràng buộc của
+   * ADR-067 sinh ra từ sự có mặt của Hiring Manager đều không áp ở đây.
+   */
+  const isTestRound = isOnlineTestRound(roundType)
+
+  // Một ca chỉ nhận MỘT ứng viên (ADR-067) — trừ vòng trắc nghiệm, nơi một khung giờ thi
+  // nhận bao nhiêu người cũng được.
+  const tooManyCandidates = !isTestRound && applications.length > 1
 
   useEffect(() => {
     let isMounted = true
@@ -97,24 +114,25 @@ export default function InviteAndScheduleModal({
           (s) =>
             (s.roundNumber == null || s.roundNumber === effectiveRound) &&
             new Date(s.startTime) > now &&
-            s.bookedCount < s.capacity
+            // `capacity == null` = không giới hạn (vòng trắc nghiệm).
+            (s.capacity == null || s.bookedCount < s.capacity)
         )
 
         // Lọc theo lịch rảnh của HM — cùng vị từ với server (nằm TRỌN trong một khung), để danh sách
         // trên màn không bao giờ chứa một lựa chọn mà bấm vào sẽ bị từ chối.
         //
-        // Chưa khai khung nào thì KHÔNG lọc: lúc đó không có gì để đối chiếu, và thông báo bên dưới
-        // nói rõ đang thiếu gì thay vì hiện một danh sách trống không giải thích.
-        const valid =
-          hmWindows.length === 0
-            ? open
-            : open.filter((s) =>
-                hmWindows.some(
-                  (w) =>
-                    new Date(w.startTime) <= new Date(s.startTime) &&
-                    new Date(w.endTime) >= new Date(s.endTime)
-                )
+        // ADR-068: mọi tin đều có Hiring Manager, nên vòng hội thoại LUÔN lọc — chưa khai khung nào là
+        // không ca nào xếp được (server từ chối), và thông báo bên dưới nói rõ đang chờ ai. Trước đây
+        // "chưa khai thì không lọc" để lọt những ca bấm vào chỉ để nhận lỗi. Vòng trắc nghiệm không lọc.
+        const valid = isOnlineTestRound(roundType)
+          ? open
+          : open.filter((s) =>
+              hmWindows.some(
+                (w) =>
+                  new Date(w.startTime) <= new Date(s.startTime) &&
+                  new Date(w.endTime) >= new Date(s.endTime)
               )
+            )
 
         if (isMounted) {
           setWindows(hmWindows)
@@ -131,7 +149,7 @@ export default function InviteAndScheduleModal({
     return () => {
       isMounted = false
     }
-  }, [jobPostingId, effectiveRound])
+  }, [jobPostingId, effectiveRound, roundType])
 
   const handleConfirm = async (emailOverride?: { subject: string; bodyHtml: string }) => {
     if (!selectedSlot) {
@@ -248,11 +266,13 @@ export default function InviteAndScheduleModal({
             </div>
           )}
 
-          {!loadingSlots && windows.length === 0 && (
+          {/* Vòng trắc nghiệm không cần lịch HM — báo thiếu một thứ không dùng đến sẽ đẩy Recruiter
+              đi hỏi Hiring Manager một câu vô nghĩa, rồi chờ một thứ không bao giờ cần tới. */}
+          {!loadingSlots && !isTestRound && windows.length === 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-              Hiring Manager chưa gửi khung giờ có mặt được cho vòng {effectiveRound}. Nếu tin này có
-              Hiring Manager, hãy đề nghị họ gửi lịch rảnh trước — nếu không, thao tác xếp lịch sẽ bị
-              server từ chối.
+              Hiring Manager chưa khai khung giờ có mặt được cho vòng {effectiveRound}, nên chưa ca nào
+              xếp được. Hãy đề nghị họ khai ở mục “Lịch tôi có mặt được” trên màn tin. Tin chưa có Hiring
+              Manager (hoặc Hiring Manager đã bị khoá) thì HR Leader cần gán / chuyển Hiring Manager trước.
             </div>
           )}
 

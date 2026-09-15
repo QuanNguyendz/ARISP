@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.Scheduling;
 using ARI.Application.UnitTests.TestSupport;
 using ARI.Domain.Constants;
@@ -23,8 +24,9 @@ namespace ARI.Application.UnitTests.Scheduling;
 /// <item>Ca phải nằm TRỌN trong khung giờ Hiring Manager có mặt được.</item>
 /// </list>
 ///
-/// Luật 3 chỉ áp khi tin ĐÃ gán Hiring Manager — tin chưa có ai thì không có ràng buộc nào để áp,
-/// và đó cũng là lý do phần lớn test cũ của luồng xếp lịch không phải đổi.
+/// ADR-068: mọi tin đều có Hiring Manager, nên luật 3 LUÔN áp cho vòng hội thoại — tin thiếu HM (hay HM bị
+/// khoá) là không xếp được. Test không nói về lịch HM thì <see cref="HiringManagerSeed.EnsureForAllJobs"/>
+/// gán cho mỗi tin một HM có khung giờ rộng, để luật 3 không phải thứ làm nó hỏng.
 /// </summary>
 public class SlotConflictRulesTests
 {
@@ -34,15 +36,20 @@ public class SlotConflictRulesTests
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
     private Task<Result<AssignSlotResultDto>> Assign(
-        InMemoryUnitOfWork uow, Guid appId, Guid slotId, int round = 1)
-        => new AssignSlotCommandHandler(uow, new RecordingNotificationService(), EmptyConfig)
+        InMemoryUnitOfWork uow, Guid appId, Guid slotId, int round = 1, bool ensureHiringManagers = true)
+    {
+        if (ensureHiringManagers) HiringManagerSeed.EnsureForAllJobs(uow);
+        return new AssignSlotCommandHandler(uow, new RecordingNotificationService(), EmptyConfig)
             .Handle(new AssignSlotCommand(appId, slotId, round, _staffId, AppRoles.Recruiter),
                 CancellationToken.None);
+    }
 
     /// <summary>Gán Hiring Manager cho tin + khai một khung giờ rảnh phủ trọn khoảng đã cho.</summary>
     private void WithHiringManager(
         InMemoryUnitOfWork uow, Guid jobId, DateTimeOffset from, DateTimeOffset to, int round = 1)
     {
+        if (uow.Repo<User>().Items.All(u => u.Id != _hmId))
+            uow.Seed(new User { Id = _hmId, Email = "hm@corp.io", Role = RoleNames.HiringManager, IsActive = true });
         uow.Seed(new JobHiringTeamMember
         {
             JobPostingId = jobId, UserId = _hmId, RoleOnJob = JobTeamRoles.HiringManager,
@@ -248,6 +255,104 @@ public class SlotConflictRulesTests
 
         Assert.True(res.IsFailure);
         Assert.Contains("chưa gửi khung giờ", res.Error);
+    }
+
+    [Fact]
+    public async Task Tin_chua_co_HM_thi_KHONG_xep_duoc_ca_phong_van()
+    {
+        // ADR-068: trước đây tin chưa gán HM bỏ qua luật 3/4 và xếp ca vào lịch của không ai cả — tới hôm
+        // phỏng vấn, phòng chờ đợi một người không tồn tại. Nay cổng ĐÓNG kèm câu nói rõ phải làm gì.
+        var uow = new InMemoryUnitOfWork();
+        var job = SchedulingData.Job(owner: _staffId);
+        var slot = SchedulingData.Slot(job.Id);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+        uow.Seed(job).Seed(slot).Seed(app);
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Assign(uow, app.Id, slot.Id, ensureHiringManagers: false);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(JobAccessErrors.HiringManagerMissing, res.Error);
+        Assert.Empty(uow.Repo<InterviewBooking>().Items);
+    }
+
+    [Fact]
+    public async Task HM_bi_khoa_thi_KHONG_xep_duoc_ca_phong_van()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var job = SchedulingData.Job(owner: _staffId);
+        var slot = SchedulingData.Slot(job.Id, start: start);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+        uow.Seed(job).Seed(slot).Seed(app);
+        WithHiringManager(uow, job.Id, start.AddHours(-1), start.AddHours(3));
+        uow.Repo<User>().Items.Single(u => u.Id == _hmId).IsActive = false;
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Assign(uow, app.Id, slot.Id);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(JobAccessErrors.HiringManagerInactive, res.Error);
+    }
+
+    // ---------- Luật 4: chính Hiring Manager không dự hai buổi cùng lúc ----------
+
+    /// <summary>
+    /// Tin thứ hai do CÙNG Hiring Manager phụ trách, đã hẹn một ứng viên khác ở ca bắt đầu lúc
+    /// <paramref name="start"/>. <paramref name="roundType"/> là loại của vòng 1 ở tin đó.
+    /// </summary>
+    private void OtherJobOfSameHm(InMemoryUnitOfWork uow, DateTimeOffset start, string roundType)
+    {
+        var other = SchedulingData.Job(owner: _staffId);
+        var otherSlot = SchedulingData.Slot(other.Id, round: 1, start: start);
+        var otherApp = SchedulingData.Application(other.Id, Guid.NewGuid(), email: "other@example.io");
+        uow.Seed(other).Seed(otherSlot).Seed(otherApp)
+            .Seed(SchedulingData.Booking(otherApp.Id, otherSlot.Id))
+            .Seed(new InterviewRoundConfig { JobPostingId = other.Id, RoundNumber = 1, RoundType = roundType })
+            .Seed(new JobHiringTeamMember
+            {
+                JobPostingId = other.Id, UserId = _hmId, RoleOnJob = JobTeamRoles.HiringManager,
+                IsPrimary = true, AddedByUserId = _staffId,
+            });
+    }
+
+    [Fact]
+    public async Task HM_khong_du_hai_buoi_phong_van_trung_gio_o_hai_tin()
+    {
+        var uow = new InMemoryUnitOfWork();
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var job = SchedulingData.Job(owner: _staffId);
+        var slot = SchedulingData.Slot(job.Id, start: start);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+        uow.Seed(job).Seed(slot).Seed(app);
+        WithHiringManager(uow, job.Id, start.AddHours(-1), start.AddHours(3));
+        OtherJobOfSameHm(uow, start, "technical");
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Assign(uow, app.Id, slot.Id);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("Hiring Manager đã có buổi phỏng vấn khác", res.Error);
+    }
+
+    [Fact]
+    public async Task Dot_thi_trac_nghiem_o_tin_khac_khong_chiem_mat_HM()
+    {
+        // Bài thi trực tuyến không ai ngồi cùng. Tính nó là "HM đang bận" thì một đợt thi cả ngày ở
+        // tin kia chặn mọi ca phỏng vấn cùng ngày ở tin này — dù HM hoàn toàn rảnh.
+        var uow = new InMemoryUnitOfWork();
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var job = SchedulingData.Job(owner: _staffId);
+        var slot = SchedulingData.Slot(job.Id, start: start);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+        uow.Seed(job).Seed(slot).Seed(app);
+        WithHiringManager(uow, job.Id, start.AddHours(-1), start.AddHours(3));
+        OtherJobOfSameHm(uow, start, "online_test");
+        _ = new SlotSqlEmulator(uow);
+
+        var res = await Assign(uow, app.Id, slot.Id);
+
+        Assert.True(res.IsSuccess);
     }
 
     // ---------- Ngoại lệ: vòng TRẮC NGHIỆM làm tại nhà ----------

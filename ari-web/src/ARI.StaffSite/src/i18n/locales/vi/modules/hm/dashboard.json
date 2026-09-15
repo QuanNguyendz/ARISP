@@ -9,7 +9,7 @@
     "awaitingSignOff": "Chờ bạn ký duyệt",
     "awaitingDecision": "Chờ bạn quyết định",
     "awaitingShortlist": "Hồ sơ chờ bạn duyệt",
-    "awaitingOfferApproval": "Thư mời chờ duyệt"
+    "awaitingOfferDraft": "Thư mời cần bạn soạn"
   },
   "jobs": {
     "title": "Tin tuyển dụng của bạn",
@@ -48,8 +48,12 @@
     "hint": "Chữ ký của bạn là điều kiện để tin được đăng — hãy mở file JD ra đọc trước khi ký."
   },
   "offers": {
-    "title": "Thư mời chờ duyệt",
-    "count_one": "{{count}} thư đang chờ ý kiến của bạn",
-    "count_other": "{{count}} thư đang chờ ý kiến của bạn"
+    "title": "Thư mời nhận việc",
+    "hint": "Bạn soạn và gửi duyệt, HR Leader chốt mức lương rồi Recruiter gửi ứng viên.",
+    "toDraft": "Đã qua hết các vòng · {{job}} — soạn thư mời",
+    "drafts_one": "{{count}} bản nháp chưa gửi duyệt",
+    "drafts_other": "{{count}} bản nháp chưa gửi duyệt",
+    "awaitingHrLeader_one": "{{count}} thư đang chờ HR Leader chốt",
+    "awaitingHrLeader_other": "{{count}} thư đang chờ HR Leader chốt"
   }
 }

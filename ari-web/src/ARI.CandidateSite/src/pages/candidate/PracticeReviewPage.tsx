@@ -21,6 +21,7 @@ import { interviewService } from '@ari/shared/fservices/interview'
 import { Skeleton } from '@ari/shared/ui/Skeleton'
 import CriterionBar from '@components/CriterionBar'
 import { formatDate, formatDuration, scoreColor, type TFn } from './_reportUi'
+import { formatTime24 } from '@ari/shared/utils/time24'
 import type { MyPracticeReview, MyPracticeTurn } from '@ari/shared/types/application'
 
 /** ISO giờ → HH:mm cho dòng meta của từng lượt. */
@@ -28,7 +29,7 @@ function turnTime(iso?: string | null): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return formatTime24(d)
 }
 
 /** Thanh điểm 0–10 cho chỉ số năng lực ngôn ngữ — cùng thang cỡ chữ với CriterionBar. */

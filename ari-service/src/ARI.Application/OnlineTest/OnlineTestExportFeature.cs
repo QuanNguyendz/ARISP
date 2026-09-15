@@ -61,7 +61,8 @@ namespace ARI.Application.OnlineTest
                 // Dòng tiêu đề tổng hợp.
                 sheetData.Append(RowOf(Text($"Bảng điểm trắc nghiệm — {dto.JobTitle}")));
                 sheetData.Append(RowOf(Text(
-                    $"Điểm sàn: {dto.PassScore}/100 · Đã thi: {dto.SubmissionCount} · Đạt: {dto.PassedCount} · Chưa đạt: {dto.NotPassedCount} · Điểm TB: {dto.AverageScore}")));
+                    $"Điểm sàn: {dto.PassScore}/100 · Đã thi: {dto.SubmissionCount} · Đạt: {dto.PassedCount} · Chưa đạt: {dto.NotPassedCount} · Điểm TB: {dto.AverageScore}"
+                    + (dto.ExpiredCount > 0 ? $" · Hết hạn (hệ thống tự nộp): {dto.ExpiredCount}" : ""))));
                 sheetData.Append(new Row());
 
                 // Header cột.
@@ -82,7 +83,9 @@ namespace ARI.Application.OnlineTest
                         Number(r.CorrectCount),
                         Number(r.TotalQuestions),
                         Number((double)r.Score),
-                        Text(r.IsPassed ? "Đạt" : "Chưa đạt"),
+                        // Bài hệ thống nộp thay: ghi rõ ngay ở cột kết quả — một số 0 trần trong file
+                        // xuất ra trông y như người làm sai hết.
+                        Text(r.Expired ? "Chưa đạt (hết hạn — hệ thống tự nộp)" : r.IsPassed ? "Đạt" : "Chưa đạt"),
                         // Cột chống gian lận: số lần rời tab/mất focus. 0 → "-" cho gọn.
                         r.TabSwitchCount > 0 ? Number(r.TabSwitchCount) : Text("-"),
                         Text(local.ToString("dd/MM/yyyy HH:mm"))));

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Application.Scheduling;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
@@ -39,6 +40,14 @@ namespace ARI.Application.Applications
         // Vòng trắc nghiệm
         public const string TestOpen = "test_open";
         public const string TestSubmitted = "test_submitted";
+
+        /// <summary>
+        /// Ứng viên được hẹn giờ nhưng không vào làm bài: cửa vào đã đóng khi chưa có bài, hoặc bài
+        /// hiện có là do hệ thống nộp thay khi hết hạn. Hồ sơ vẫn ở vòng — tách khỏi
+        /// <see cref="TestSubmitted"/> vì "0 điểm do không làm" và "0 điểm do làm sai hết" là hai
+        /// câu chuyện khác nhau với người quyết định loại hay giữ.
+        /// </summary>
+        public const string TestExpired = "test_expired";
 
         // Vòng hội thoại với AI
         public const string InterviewWaiting = "interview_waiting";
@@ -109,6 +118,13 @@ namespace ARI.Application.Applications
 
             if (ApplicationStatuses.Is(app.Status, ApplicationStatuses.HmReview)) return HmReview;
 
+            // Chưa xếp lịch thì chưa có việc gì của VÒNG để mô tả — kể cả vòng trắc nghiệm.
+            //
+            // Vì sao phải chặn trước: bài thi chỉ mở cùng thư mời kèm giờ hẹn (ADR-059), nên một hồ
+            // sơ đang nằm ở "Chờ xếp lịch" mà bảng ghi "Chưa nộp bài" là đổ lỗi nhầm người — ứng
+            // viên chưa được mời làm bài, việc đang chờ là việc của Recruiter.
+            if (ApplicationStatuses.Is(app.Status, ApplicationStatuses.Screening)) return AwaitingSchedule;
+
             var round = app.CurrentRound ?? 1;
 
             // ---- Vòng đang diễn ra: phiên phỏng vấn nói to nhất -------------------------------
@@ -134,8 +150,24 @@ namespace ARI.Application.Applications
 
             if (InterviewInviteEmail.IsOnlineTest(roundType))
             {
-                if (submissions.Any(s => s.ApplicationId == app.Id && s.RoundNumber == round))
-                    return TestSubmitted;
+                var submission = submissions
+                    .FirstOrDefault(s => s.ApplicationId == app.Id && s.RoundNumber == round);
+                if (submission != null)
+                    return OnlineTestSubmittedBy.IsSystem(submission.SubmittedBy) ? TestExpired : TestSubmitted;
+
+                // Chưa có bài mà cửa vào đã đóng: ứng viên không còn vào được nữa, dù hệ thống chỉ nộp
+                // thay sau hạn chót (xem OnlineTestExpiry). Bảng phải nói ngay, không đợi tác vụ nền.
+                var testBooking = bookings
+                    .Where(b => b.ApplicationId == app.Id && b.RoundNumber == round
+                                && string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(b => b.CreatedAt)
+                    .FirstOrDefault();
+                var testSlot = testBooking == null
+                    ? null
+                    : slots.FirstOrDefault(s => s.Id == testBooking.AvailabilitySlotId);
+                if (testSlot != null && now > testSlot.StartTime + OnlineTestSupport.EntryWindow)
+                    return TestExpired;
+
                 // Chưa nộp: mở rồi hay chưa tới giờ — cả hai đều là "chờ ứng viên làm bài", nhưng
                 // phân biệt được thì người vận hành biết có nên nhắc hay không.
                 return TestOpen;
@@ -172,8 +204,7 @@ namespace ARI.Application.Applications
                     StringComparison.OrdinalIgnoreCase)))
                 return ScheduleDeclined;
 
-            if (ApplicationStatuses.Is(app.Status, ApplicationStatuses.Screening)) return AwaitingSchedule;
-
+            // `screening` đã được trả lời ở đầu hàm — tới đây hồ sơ chắc chắn đã qua bước xếp lịch.
             return PendingResult;
         }
     }

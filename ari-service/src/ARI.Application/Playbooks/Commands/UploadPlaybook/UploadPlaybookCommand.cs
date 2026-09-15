@@ -11,11 +11,14 @@ using MediatR;
 namespace ARI.Application.Playbooks.Commands.UploadPlaybook
 {
     /// <summary>
-    /// Upload playbook: parse text → lưu file → tạo PlaybookDocument → chunk+embed vào RAG (ADR-039).
-    /// Absorb từ PlaybookService cũ (1 consumer duy nhất). Lỗi ingest/persist → xoá file đã lưu.
+    /// Upload playbook: kiểm quyền + tính hợp lệ → parse text → lưu file → tạo PlaybookDocument →
+    /// chunk+embed vào RAG (ADR-039). Lỗi ingest/persist → xoá file đã lưu.
+    ///
+    /// Hai cửa gọi vào đây — màn Playbook công ty và màn tin (ADR-069) — nên mọi luật (ai được viết phạm
+    /// vi nào, loại tài liệu, đuôi file, vòng có thật không) nằm trong handler, không nằm ở controller.
     /// </summary>
     public record UploadPlaybookCommand(
-        Guid UserId, string Scope, Guid? ScopeRefId, int? RoundNumber, string DocumentType,
+        Guid UserId, string? ActorRole, string Scope, Guid? ScopeRefId, int? RoundNumber, string DocumentType,
         string FileName, byte[] Bytes, string Ext) : IRequest<Result<UploadedPlaybookDto>>;
 
     public class UploadPlaybookCommandHandler : IRequestHandler<UploadPlaybookCommand, Result<UploadedPlaybookDto>>
@@ -39,7 +42,43 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
 
         public async Task<Result<UploadedPlaybookDto>> Handle(UploadPlaybookCommand request, CancellationToken ct)
         {
-            var isRubric = ScoringRubric.IsRubricType(request.DocumentType);
+            var scope = PlaybookAccess.NormalizeScope(request.Scope);
+            if (scope == null)
+                return Result.Failure<UploadedPlaybookDto>("Phạm vi phải là 'org', 'job_posting' hoặc 'round'.");
+
+            var documentType = (request.DocumentType ?? string.Empty).Trim().ToLowerInvariant();
+            if (!PlaybookAccess.DocumentTypes.Contains(documentType))
+                return Result.Failure<UploadedPlaybookDto>("Loại tài liệu playbook không hợp lệ.");
+
+            if (request.Bytes == null || request.Bytes.Length == 0)
+                return Result.Failure<UploadedPlaybookDto>("File playbook không được để trống.");
+            if (request.Bytes.LongLength > PlaybookAccess.MaxFileBytes)
+                return Result.Failure<UploadedPlaybookDto>("Kích thước file không được vượt quá 15MB.");
+
+            var ext = (request.Ext ?? string.Empty).Trim().ToLowerInvariant();
+            if (!PlaybookAccess.AllowedExtensions(documentType).Contains(ext))
+                return Result.Failure<UploadedPlaybookDto>(ScoringRubric.IsRubricType(documentType)
+                    ? "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu. Hãy tải file mẫu rồi điền vào."
+                    : "Định dạng không hợp lệ. Chấp nhận .pdf, .docx, .txt, .md");
+
+            // Playbook công ty không gắn tin nào; playbook vòng phải gắn đúng một vòng hội thoại có thật.
+            var scopeRefId = scope == PlaybookScope.ScopeOrg ? null : request.ScopeRefId;
+            var roundNumber = scope == PlaybookScope.ScopeRound ? request.RoundNumber : null;
+
+            var (accessError, accessCode) = await PlaybookAccess.CheckWriteAsync(
+                _unitOfWork, scope, scopeRefId, request.UserId, request.ActorRole, ct);
+            if (accessError != null)
+                return accessCode == null
+                    ? Result.Failure<UploadedPlaybookDto>(accessError)
+                    : Result.Failure<UploadedPlaybookDto>(accessError, accessCode);
+
+            if (scope == PlaybookScope.ScopeRound)
+            {
+                var roundError = await PlaybookAccess.CheckRoundAsync(_unitOfWork, scopeRefId!.Value, roundNumber, ct);
+                if (roundError != null) return Result.Failure<UploadedPlaybookDto>(roundError);
+            }
+
+            var isRubric = ScoringRubric.IsRubricType(documentType);
 
             // Bộ tiêu chí chấm điểm là DỮ LIỆU (bảng Excel), không phải văn bản tự do: parse thành
             // tiêu chí + trọng số và chặn ngay nếu tổng ≠ 100 — sai ở đây mà lọt xuống thì mọi điểm
@@ -50,10 +89,6 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
 
             if (isRubric)
             {
-                if (!string.Equals(request.Ext, ".xlsx", StringComparison.OrdinalIgnoreCase))
-                    return Result.Failure<UploadedPlaybookDto>(
-                        "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu. Hãy tải file mẫu rồi điền vào.");
-
                 var parsed = RubricSheet.Parse(request.Bytes);
                 var errors = parsed.Errors.Select(e => e.Row > 0 ? $"Dòng {e.Row}: {e.Message}" : e.Message).ToList();
                 errors.AddRange(ScoringRubric.Validate(parsed.Criteria));
@@ -71,7 +106,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 try
                 {
                     using var stream = new MemoryStream(request.Bytes);
-                    parsedText = (await _documentParser.ParseDocumentAsync(stream, request.Ext))?.Replace("\0", string.Empty) ?? string.Empty;
+                    parsedText = (await _documentParser.ParseDocumentAsync(stream, ext))?.Replace("\0", string.Empty) ?? string.Empty;
                 }
                 catch (Exception ex)
                 {
@@ -79,7 +114,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 }
             }
 
-            var contentType = request.Ext switch
+            var contentType = ext switch
             {
                 ".pdf" => "application/pdf",
                 ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -98,16 +133,16 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 return Result.Failure<UploadedPlaybookDto>($"Không thể lưu file: {ex.Message}", CommonErrorCodes.ServerError);
             }
 
-            var fileFormat = request.Ext.TrimStart('.');
+            var fileFormat = ext.TrimStart('.');
 
             try
             {
                 var document = new PlaybookDocument
                 {
-                    Scope = request.Scope,
-                    ScopeRefId = request.ScopeRefId,
-                    RoundNumber = request.RoundNumber,
-                    DocumentType = request.DocumentType.Trim(),
+                    Scope = scope,
+                    ScopeRefId = scopeRefId,
+                    RoundNumber = roundNumber,
+                    DocumentType = documentType,
                     FileName = request.FileName,
                     FileUrl = storageKey,
                     FileFormat = fileFormat,
@@ -127,7 +162,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                         sourceType: "playbook",
                         sourceId: document.Id,
                         text: parsedText,
-                        scope: request.Scope,
+                        scope: scope,
                         documentType: document.DocumentType,
                         ct: ct);
                 }

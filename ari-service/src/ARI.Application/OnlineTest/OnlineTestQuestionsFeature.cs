@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -263,7 +264,8 @@ namespace ARI.Application.OnlineTest
 
             return Result.Success<OnlineTestResultDto?>(new OnlineTestResultDto(
                 submission.Score, submission.IsPassed, job.OnlineTestPassScore,
-                submission.CorrectCount, submission.TotalQuestions, submission.CreatedAt));
+                submission.CorrectCount, submission.TotalQuestions, submission.CreatedAt,
+                OnlineTestSubmittedBy.IsSystem(submission.SubmittedBy)));
         }
     }
 
@@ -325,7 +327,8 @@ namespace ARI.Application.OnlineTest
                         s.CorrectCount,
                         s.TotalQuestions,
                         s.CreatedAt,
-                        s.TabSwitchCount);
+                        s.TabSwitchCount,
+                        OnlineTestSubmittedBy.IsSystem(s.SubmittedBy));
                 })
                 .ToList();
 
@@ -336,7 +339,8 @@ namespace ARI.Application.OnlineTest
 
             return new OnlineTestJobResultsDto(
                 job.Id, job.Title, job.OnlineTestPassScore, bankCount,
-                rows.Count, passed, rows.Count - passed, avg, highest, lowest, rows);
+                rows.Count, passed, rows.Count - passed, avg, highest, lowest, rows,
+                rows.Count(r => r.Expired));
         }
     }
 }

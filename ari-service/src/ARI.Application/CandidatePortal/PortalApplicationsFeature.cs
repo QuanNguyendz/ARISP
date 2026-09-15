@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.Interviews;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -139,6 +141,10 @@ namespace ARI.Application.CandidatePortal
                         .FindAsync(i => appIds.Contains(i.ApplicationId))).ToList()
                     : new List<InterviewInvite>();
 
+                bool IsTestRound(Guid jobId, int round) =>
+                    roundTypeByJobRound.TryGetValue((jobId, round), out var rt)
+                    && ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(rt);
+
                 // Resolve CV storageKey -> URL hiển thị (presigned nếu dùng S3) trước khi project (LINQ sync).
                 var cvUrlMap = new Dictionary<Guid, string?>();
                 foreach (var a in appsList)
@@ -151,9 +157,14 @@ namespace ARI.Application.CandidatePortal
                         jobsDict.TryGetValue(a.JobPostingId, out var job);
                         int? matchScore = (a.CvJdAnalysisId.HasValue && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)) ? an.MatchScore : (int?)null;
 
-                        // Vòng đang hoạt động = vòng được mời mới nhất (mỗi vòng có 1 invite). Mặc định 1.
-                        var inviteRounds = invites.Where(i => i.ApplicationId == a.Id).Select(i => i.RoundNumber).ToList();
-                        int activeRound = inviteRounds.Count > 0 ? inviteRounds.Max() : 1;
+                        // Vòng đang hoạt động = vòng mới nhất mà hồ sơ được MỜI hoặc đã có LỊCH giữ chỗ.
+                        // Lịch phải được tính: qua vòng trắc nghiệm là Recruiter xếp thẳng lịch vòng kế,
+                        // không có bước HM chốt nào sinh lời mời vòng sau — thiếu nó thì hồ sơ đã có lịch
+                        // vòng 2 vẫn bị coi là đang ở vòng 1.
+                        var inviteRounds = invites.Where(i => i.ApplicationId == a.Id).Select(i => i.RoundNumber)
+                            .Concat(bookings.Where(b => b.ApplicationId == a.Id).Select(b => b.RoundNumber))
+                            .ToList();
+                        int activeRound = inviteRounds.Count > 0 ? Math.Max(1, inviteRounds.Max()) : 1;
                         // Phỏng vấn thử theo VÒNG: còn lượt nếu số phiên practice của vòng này chưa chạm
                         // giới hạn (Interview:PracticeAttemptsPerRound, <= 0 = không giới hạn — dev/test)
                         // và chưa làm phỏng vấn thật của vòng này.
@@ -165,8 +176,9 @@ namespace ARI.Application.CandidatePortal
                         roundTypeByJobRound.TryGetValue((a.JobPostingId, activeRound), out var activeRoundType);
                         bool onlineTestRound = ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(activeRoundType);
                         // Đã LỠ buổi thật của vòng (lịch còn hiệu lực nhưng qua giờ, không có phiên thật)
-                        // → coi như trượt vòng đó, phỏng vấn thử không còn nghĩa gì nữa.
-                        bool missedActiveRound = bookings.Any(b => b.ApplicationId == a.Id
+                        // → coi như trượt vòng đó, phỏng vấn thử không còn nghĩa gì nữa. Vòng trắc nghiệm
+                        // không bao giờ "lỡ": nó không có phiên nào, và hết hạn thì hệ thống nộp thay.
+                        bool missedActiveRound = !onlineTestRound && bookings.Any(b => b.ApplicationId == a.Id
                             && slotById.ContainsKey(b.AvailabilitySlotId)
                             && slotById[b.AvailabilitySlotId].RoundNumber == activeRound
                             && slotById[b.AvailabilitySlotId].EndTime <= nowUtc
@@ -216,9 +228,14 @@ namespace ARI.Application.CandidatePortal
                             })
                             .ToList();
 
-                        // Mã phỏng vấn còn hiệu lực mới nhất (theo vòng).
+                        // Mã phỏng vấn còn hiệu lực mới nhất (theo vòng) — CHỈ của vòng làm từ nhà.
+                        // Vòng tại văn phòng thì Recruiter đưa mã tận tay khi ứng viên đã tới; hiện nó
+                        // ở đây là cho vào phòng từ bất cứ đâu (InterviewCodeRules.ShownToCandidate).
                         var code = activeCodes
-                            .Where(c => c.ApplicationId == a.Id)
+                            .Where(c => c.ApplicationId == a.Id
+                                        && InterviewCodeRules.ShownToCandidate(roundConfigRows
+                                            .FirstOrDefault(r => r.JobPostingId == a.JobPostingId
+                                                                 && r.RoundNumber == c.RoundNumber)?.RoundType))
                             .OrderByDescending(c => c.RoundNumber)
                             .ThenByDescending(c => c.CreatedAt)
                             .FirstOrDefault();
@@ -240,8 +257,13 @@ namespace ARI.Application.CandidatePortal
 
                         // Lịch đã qua giờ mà vòng đó chưa hề có phiên phỏng vấn THẬT → quá hạn.
                         // Ứng viên cần liên hệ nhân sự xếp lại thay vì thấy mãi "đã xếp lịch".
+                        //
+                        // BỎ vòng trắc nghiệm: vòng đó không bao giờ sinh phiên phỏng vấn, nên phép kiểm
+                        // này đánh dấu "lỡ buổi" cho CẢ người đã nộp bài — ứng viên đọc "Bạn đã lỡ buổi
+                        // phỏng vấn vòng 1… hồ sơ dừng lại" ngay trên thẻ hồ sơ đang ở vòng 2.
                         var missed = bookings
                             .Where(b => b.ApplicationId == a.Id && slotById.ContainsKey(b.AvailabilitySlotId)
+                                && !IsTestRound(a.JobPostingId, slotById[b.AvailabilitySlotId].RoundNumber)
                                 && slotById[b.AvailabilitySlotId].EndTime <= nowUtc
                                 && !allSessions.Any(s => s.ApplicationId == a.Id && s.SessionType == "real"
                                     && s.RoundNumber == slotById[b.AvailabilitySlotId].RoundNumber))
@@ -277,11 +299,14 @@ namespace ARI.Application.CandidatePortal
                             a.UpdatedAt,
                             Rounds = rounds,
                             InterviewCode = code == null ? null : new { code.Code, code.ExpiresAt, code.RoundNumber },
+                            // Kèm LOẠI vòng để giao diện gọi đúng tên: vòng trắc nghiệm là "bài trắc nghiệm",
+                            // không phải "phỏng vấn".
                             UpcomingInterview = upcoming == null ? null : new
                             {
                                 upcoming.StartTime,
                                 upcoming.Timezone,
-                                RoundNumber = upcoming.RoundNumber
+                                RoundNumber = upcoming.RoundNumber,
+                                RoundType = roundTypeByJobRound.TryGetValue((a.JobPostingId, upcoming.RoundNumber), out var urt) ? urt : null,
                             },
                             MissedInterview = missed == null ? null : new
                             {
@@ -378,11 +403,17 @@ namespace ARI.Application.CandidatePortal
                 .Select(b => slotById[b.AvailabilitySlotId])
                 .FirstOrDefault();
 
-            // Mã phỏng vấn On-site còn hiệu lực
+            // Mã phỏng vấn còn hiệu lực — chỉ của vòng làm từ nhà (xem InterviewCodeRules.ShownToCandidate).
             var activeCode = (await _unitOfWork.Repository<InterviewCode>()
                 .FindAsync(c => c.ApplicationId == id && c.UsedAt == null && c.ExpiresAt > nowUtc))
+                .Where(c => InterviewCodeRules.ShownToCandidate(
+                    roundConfigs.FirstOrDefault(r => r.RoundNumber == c.RoundNumber)?.RoundType))
                 .OrderByDescending(c => c.RoundNumber).ThenByDescending(c => c.CreatedAt)
                 .FirstOrDefault();
+
+            // Bài trắc nghiệm đã nộp — KẾT QUẢ của vòng trắc nghiệm (vòng đó không có phiên phỏng vấn).
+            var testSubmissions = (await _unitOfWork.Repository<OnlineTestSubmission>()
+                .FindAsync(x => x.ApplicationId == id)).ToList();
 
             // Tổng hợp các roundNumber của job
             var roundNumbers = new SortedSet<int>();
@@ -405,7 +436,13 @@ namespace ARI.Application.CandidatePortal
                 var s = sessions.FirstOrDefault(x => x.RoundNumber == rNum);
                 var rc = roundConfigs.FirstOrDefault(x => x.RoundNumber == rNum);
                 var inv = invites.FirstOrDefault(x => x.RoundNumber == rNum);
-                var bk = bookings.FirstOrDefault(x => slotById.TryGetValue(x.AvailabilitySlotId, out var sl) && sl.RoundNumber == rNum);
+                // Ưu tiên lịch ĐANG GIỮ CHỖ: một vòng có thể còn dòng cũ đã từ chối nằm trước dòng
+                // hiện hành, và đọc nhầm dòng cũ là hiện sai cả giờ hẹn lẫn trạng thái.
+                var bk = bookings
+                    .Where(x => slotById.TryGetValue(x.AvailabilitySlotId, out var sl) && sl.RoundNumber == rNum)
+                    .OrderByDescending(x => x.Status == "scheduled")
+                    .ThenByDescending(x => x.CreatedAt)
+                    .FirstOrDefault();
                 var slot = bk != null && slotById.TryGetValue(bk.AvailabilitySlotId, out var sl2) ? sl2 : null;
 
                 object? evalData = null;
@@ -417,6 +454,9 @@ namespace ARI.Application.CandidatePortal
 
                 string status;
                 DateTimeOffset? scheduledAt = slot?.StartTime;
+
+                var isTestRound = ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(rc?.RoundType);
+                var testSub = isTestRound ? testSubmissions.FirstOrDefault(x => x.RoundNumber == rNum) : null;
 
                 if (s != null)
                 {
@@ -457,11 +497,22 @@ namespace ARI.Application.CandidatePortal
                         }
                     }
                 }
+                else if (testSub != null)
+                {
+                    // Vòng trắc nghiệm: BÀI ĐÃ NỘP là kết quả của vòng. Trước đây vòng này rơi xuống
+                    // nhánh dưới — tìm phiên phỏng vấn, không thấy (vòng thi không bao giờ có) — nên
+                    // người đã nộp bài vẫn bị gắn nhãn "Quá hạn".
+                    status = OnlineTestSubmittedBy.IsSystem(testSub.SubmittedBy) ? "expired" : "completed";
+                }
                 else if (slot != null && bk?.Status == "scheduled")
                 {
                     // Hết giờ hẹn mà không có phiên phỏng vấn thật nào của vòng → quá hạn, không
                     // để hiển thị mãi "đã xếp lịch" (ứng viên cần liên hệ nhân sự xếp lại).
-                    status = slot.EndTime <= nowUtc ? "missed" : "scheduled";
+                    // Vòng trắc nghiệm thì không "quá hạn" mà HẾT HẠN — khi cửa vào đóng (giờ hẹn +
+                    // 1 tiếng), không phải khi ca kết thúc.
+                    status = isTestRound
+                        ? (nowUtc > slot.StartTime + ARI.Application.OnlineTest.OnlineTestSupport.EntryWindow ? "expired" : "scheduled")
+                        : (slot.EndTime <= nowUtc ? "missed" : "scheduled");
                 }
                 else if (inv != null)
                 {

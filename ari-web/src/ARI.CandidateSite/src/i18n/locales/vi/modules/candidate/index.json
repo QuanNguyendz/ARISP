@@ -158,7 +158,7 @@
     "updateCv": "Cập nhật CV",
     "noCvYet": "Bạn chưa tải CV lên hồ sơ. Tải CV để AI chấm điểm phù hợp và HR xem nhanh.",
     "uploadCvHint": "Tải CV để AI chấm điểm phù hợp và HR xem nhanh.",
-    "upcomingSchedule": "Lịch phỏng vấn sắp tới",
+    "upcomingSchedule": "Lịch hẹn sắp tới",
     "viewAllSchedule": "Xem thêm",
     "roundInterview": "Vòng {{number}} · Phỏng vấn",
     "bringCccd": "Mang theo CCCD và mã phỏng vấn để nhập tại Kiosk.",
@@ -189,8 +189,10 @@
       "cvRejected": "CV chưa phù hợp",
       "roundPassed": "Qua vòng {{passed}}/{{total}}"
     },
-    "actionNeeded": "Cần hành động · Bạn được mời phỏng vấn vòng {{round}} (On-site)",
-    "interviewCode": "Mã phỏng vấn On-site (nhập tại Kiosk văn phòng)",
+    "actionNeeded": "Cần hành động · Mã vào phòng phỏng vấn vòng {{round}} đã sẵn sàng (làm từ nhà)",
+    "interviewCode": "Mã vào phòng phỏng vấn (làm từ nhà)",
+    "enterRoom": "Vào phòng phỏng vấn",
+    "enterRoomHint": "Bấm Vào phòng phỏng vấn — ô mã đã được điền sẵn. Sau khi nhập mã, bạn chờ trong phòng chờ tới khi Hiring Manager cho vào.",
     "expireCountdown": "Hết hạn sau",
     "oneTimeSixChars": "Dùng 1 lần · 6 ký tự",
     "viewJobPosting": "Xem tin tuyển dụng",
@@ -199,7 +201,7 @@
     "hrConfirming": "Kết quả đang chờ HR Leader xác nhận",
     "hrConfirmingHint": "Bạn sẽ nhận thông báo ngay khi có kết quả vòng phỏng vấn này.",
     "missedInterview": "Bạn đã lỡ buổi phỏng vấn vòng {{round}}",
-    "missedInterviewHint": "Lịch hẹn {{time}} đã qua mà không ghi nhận buổi phỏng vấn nào, nên hồ sơ dừng lại ở vòng này. Lần sau, nếu bận hãy bấm \"Tôi bận, xin đổi lịch\" ngay trong thư mời để được xếp khung giờ khác.",
+    "missedInterviewHint": "Lịch hẹn {{time}} đã qua mà không ghi nhận buổi phỏng vấn nào, nên hồ sơ dừng lại ở vòng này. Lần sau, nếu bận hãy liên hệ trước với bộ phận nhân sự để thống nhất một khung giờ khác.",
     "practiceRemote": "Phỏng vấn thử (Remote) · Vòng {{round}}",
     "practiceAvailable": "Bạn đã <b>qua vòng CV</b>! Làm <b>1 buổi phỏng vấn thử</b> cho vòng này để làm quen với AI trước buổi thật — không ảnh hưởng kết quả tuyển dụng.",
     "startPractice": "Bắt đầu phỏng vấn thử",
@@ -240,7 +242,8 @@
       "viewCv": "Xem CV",
       "downloadCv": "Tải về",
       "downloadCvAria": "Tải CV về"
-    }
+    },
+    "roundTest": "Vòng {{number}} · Làm bài trắc nghiệm"
   },
   "applicationDetail": {
     "title": "Chi tiết đơn ứng tuyển",

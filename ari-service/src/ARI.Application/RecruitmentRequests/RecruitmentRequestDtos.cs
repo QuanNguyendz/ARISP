@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ARI.Application.RecruitmentRequests
 {
@@ -20,6 +21,12 @@ namespace ARI.Application.RecruitmentRequests
 
         /// <summary>Kỹ năng và tiêu chí ứng viên phải đáp ứng — ghép thẳng vào bản nháp JD.</summary>
         string? Requirements,
+
+        /// <summary>
+        /// Các vòng phỏng vấn mong muốn, theo THỨ TỰ (thứ tự chính là số vòng). Quy trình tuyển của một
+        /// vị trí là quyết định chuyên môn của trưởng bộ phận; Recruiter dựng tin là thi hành quyết định đó.
+        /// </summary>
+        IReadOnlyList<string>? RequestedRounds,
 
         string? EmploymentType,
         string? WorkMode,
@@ -79,6 +86,8 @@ namespace ARI.Application.RecruitmentRequests
         string? Reason,
         string? Description,
         string? Requirements,
+        /// <summary>Các vòng phỏng vấn HM muốn tin này có, theo thứ tự. Rỗng với phiếu cũ.</summary>
+        IReadOnlyList<string> RequestedRounds,
         string? EmploymentType,
         string? WorkMode,
         string? Location,

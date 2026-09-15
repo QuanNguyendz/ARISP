@@ -13,9 +13,11 @@ import {
   Clock,
   Lock,
   ShieldAlert,
+  XCircle,
 } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 import type { OnlineTestSubmitAck } from '@ari/shared/types/onlineTest'
+import { HOUR_CYCLE_24 } from '@ari/shared/utils/time24'
 
 function errMsg(e: unknown, fallback: string, unauthorized: string): string {
   const x = e as { response?: { data?: { message?: string }; status?: number } }
@@ -55,6 +57,19 @@ function SubmittedCard({ detail }: { detail?: string }) {
   )
 }
 
+/** Giờ hẹn theo múi giờ máy người dùng — dùng ở cả hai thông báo cửa đóng. */
+function fmtWhen(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...HOUR_CYCLE_24,
+  })
+}
+
 export default function CandidateOnlineTestPage() {
   const { t } = useTranslation('modules/candidate/onlineTest')
   const { applicationId } = useParams<{ applicationId: string }>()
@@ -69,6 +84,15 @@ export default function CandidateOnlineTestPage() {
   const tabSwitchRef = useRef(0)
   const lastLeaveRef = useRef(0)
 
+  /**
+   * Đã bấm "Bắt đầu làm bài" chưa.
+   *
+   * Vì sao có cửa này thay vì vào thẳng: rời bài thi là TỰ NỘP, nên luật đó phải được nói trước
+   * khi đồng hồ chạy — biết sau khi mất bài thì biết để làm gì. Đồng hồ cũng chỉ khởi động từ đây:
+   * trước đó nó chạy ngay khi tải trang, nên mở nhầm tab là mất thời gian thật.
+   */
+  const [started, setStarted] = useState(false)
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['online-test', applicationId],
     queryFn: () => onlineTestService.getTest(applicationId as string),
@@ -79,7 +103,7 @@ export default function CandidateOnlineTestPage() {
   const questions = useMemo(() => data?.questions ?? [], [data])
   const answeredCount = questions.filter((q) => (answers[q.id]?.length ?? 0) > 0).length
   const allAnswered = questions.length > 0 && answeredCount === questions.length
-  const taking = !!data && !data.alreadySubmitted && questions.length > 0 && !result
+  const taking = !!data && !data.alreadySubmitted && questions.length > 0 && !result && started
 
   const select = (questionId: string, optionIndex: number, multiple: boolean) => {
     setAnswers((prev) => {
@@ -111,12 +135,13 @@ export default function CandidateOnlineTestPage() {
     [applicationId, submitting, result, allAnswered, answers, t]
   )
 
-  // Khởi tạo đồng hồ đếm ngược một lần khi có đề (chưa nộp).
+  // Đồng hồ chỉ chạy TỪ LÚC BẤM BẮT ĐẦU — trước đó nó khởi động ngay khi tải trang, nên
+  // mở nhầm tab là mất thời gian làm bài thật.
   useEffect(() => {
-    if (data && !data.alreadySubmitted && data.questions.length > 0) {
+    if (started && data && !data.alreadySubmitted && data.questions.length > 0) {
       setTimeLeft((prev) => (prev === null ? data.durationMinutes * 60 : prev))
     }
-  }, [data])
+  }, [started, data])
 
   // Tick mỗi giây.
   useEffect(() => {
@@ -134,28 +159,45 @@ export default function CandidateOnlineTestPage() {
     }
   }, [taking, timeLeft, submit])
 
-  // Chống gian lận: bắt sự kiện rời khỏi bài thi (ẩn tab hoặc mất focus cửa sổ). Chỉ theo dõi
-  // khi đang làm bài. Gộp blur + visibilitychange xảy ra sát nhau (chuyển tab thường bắn cả hai)
-  // bằng cửa sổ khử trùng 500ms để không đếm gấp đôi 1 hành động.
+  /**
+   * Rời khỏi bài thi = TỰ NỘP ngay.
+   *
+   * Trước đây chỉ đếm số lần rời rồi gửi kèm lúc nộp — một con số để nhân sự nhìn, không ngăn
+   * được gì. Nay rời là đóng bài. Luật này được nói rõ ở cửa trước khi bắt đầu — một luật phạt
+   * mà người bị phạt không được biết trước thì không phải luật.
+   *
+   * `pagehide` dùng bản keepalive: đóng tab thì request thường bị huỷ giữa chừng.
+   */
   useEffect(() => {
     if (!taking) return
+
     const registerLeave = () => {
       const now = Date.now()
+      // Chuyển tab thường bắn cả blur lẫn visibilitychange — khử trùng 500ms.
       if (now - lastLeaveRef.current < 500) return
       lastLeaveRef.current = now
       tabSwitchRef.current += 1
       setTabSwitches(tabSwitchRef.current)
+      void submit(true)
     }
     const onVisibility = () => {
       if (document.hidden) registerLeave()
     }
+    const onPageHide = () => {
+      if (!applicationId) return
+      tabSwitchRef.current += 1
+      onlineTestService.submitBeacon(applicationId, answers, tabSwitchRef.current)
+    }
+
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('blur', registerLeave)
+    window.addEventListener('pagehide', onPageHide)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('blur', registerLeave)
+      window.removeEventListener('pagehide', onPageHide)
     }
-  }, [taking])
+  }, [taking, submit, applicationId, answers])
 
   return (
     <div className="min-h-screen bg-ink-50 px-4 py-10">
@@ -197,8 +239,53 @@ export default function CandidateOnlineTestPage() {
           <SubmittedCard
             detail={t('page.submittedCount', { total: result.totalQuestions })}
           />
+        ) : data?.expired ? (
+          /* HẾT HẠN — kiểm TRƯỚC "đã nộp": bài hệ thống nộp thay khi hết hạn không phải bài của ứng
+             viên, và câu "Bạn đã hoàn thành bài thi này" sẽ khiến họ tưởng mình đã thi. */
+          <div className="rounded-2xl border border-red-200 bg-red-50/50 p-10 text-center shadow-sm">
+            <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-red-100 text-red-500">
+              <XCircle className="h-7 w-7" />
+            </span>
+            <h2 className="text-base font-bold text-ink-800">{t('page.window.expiredTitle')}</h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-ink-600">
+              {data.opensAt
+                ? t('page.window.expiredDetail', { time: fmtWhen(data.opensAt) })
+                : t('page.window.expiredDetailNoTime')}
+            </p>
+            <p className="mx-auto mt-3 max-w-md text-xs text-ink-500">{t('page.window.expiredContact')}</p>
+            <Link
+              to="/candidate/applications"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" /> {t('page.back')}
+            </Link>
+          </div>
         ) : data?.alreadySubmitted ? (
           <SubmittedCard detail={t('page.alreadyDone')} />
+        ) : data && data.canStart === false && data.opensAt ? (
+          /* Cửa vào phòng thi đóng — phân biệt CHƯA TỚI GIỜ với ĐÃ QUÁ GIỜ, vì hai tình huống ấy
+             dẫn tới hai việc khác hẳn: một bên là quay lại sau, một bên là liên hệ nhân sự. */
+          <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
+            <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-ink-100 text-ink-400">
+              <Clock className="h-7 w-7" />
+            </span>
+            <h2 className="text-base font-bold text-ink-800">
+              {new Date(data.opensAt).getTime() > Date.now()
+                ? t('page.window.notYetTitle')
+                : t('page.window.closedTitle')}
+            </h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+              {new Date(data.opensAt).getTime() > Date.now()
+                ? t('page.window.notYetDetail', { time: fmtWhen(data.opensAt) })
+                : t('page.window.closedDetail', { time: fmtWhen(data.opensAt) })}
+            </p>
+            <Link
+              to="/candidate/applications"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" /> {t('page.back')}
+            </Link>
+          </div>
         ) : questions.length === 0 ? (
           <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
             <AlertCircle className="mx-auto mb-3 h-12 w-12 text-ink-300" />
@@ -209,6 +296,49 @@ export default function CandidateOnlineTestPage() {
             >
               <ArrowLeft className="h-4 w-4" /> {t('page.back')}
             </Link>
+          </div>
+        ) : !started ? (
+          /* CỬA TRƯỚC KHI BẮT ĐẦU.
+             Luật "rời bài thi là tự nộp" phải được nói Ở ĐÂY, trước khi đồng hồ chạy — một luật phạt
+             mà người bị phạt chỉ biết sau khi mất bài thì không phải luật. */
+          <div className="rounded-2xl border border-ink-200 bg-white p-8 shadow-sm">
+            <div className="text-center">
+              <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
+                <ClipboardList className="h-7 w-7" />
+              </span>
+              <h2 className="text-base font-bold text-ink-800">{t('page.gate.title')}</h2>
+              <p className="mt-1 text-sm text-ink-500">
+                {t('page.gate.summary', {
+                  count: questions.length,
+                  minutes: data?.durationMinutes ?? 0,
+                })}
+              </p>
+            </div>
+
+            <ul className="mx-auto mt-5 max-w-md space-y-2 text-sm text-ink-700">
+              <li className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  <b>{t('page.gate.leaveRuleTitle')}</b> {t('page.gate.leaveRule')}
+                </span>
+              </li>
+              <li className="flex items-start gap-2 rounded-xl border border-ink-200 px-3 py-2">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
+                <span>{t('page.gate.timerRule', { minutes: data?.durationMinutes ?? 0 })}</span>
+              </li>
+              <li className="flex items-start gap-2 rounded-xl border border-ink-200 px-3 py-2">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
+                <span>{t('page.gate.oneAttemptRule')}</span>
+              </li>
+            </ul>
+
+            <button
+              onClick={() => setStarted(true)}
+              className="mx-auto mt-6 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+            >
+              <ClipboardList className="h-4 w-4" /> {t('page.gate.startButton')}
+            </button>
+            <p className="mt-2 text-center text-xs text-ink-400">{t('page.gate.startHint')}</p>
           </div>
         ) : (
           <>

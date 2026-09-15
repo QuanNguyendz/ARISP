@@ -51,16 +51,48 @@ namespace ARI.Application.Scheduling
             // Ai đang giữ chỗ ở từng ca — tra MỘT lượt cho cả trang thay vì mỗi ca một truy vấn.
             // Chỉ booking `scheduled` mới là người thật sự đang giữ chỗ (vị từ duy nhất — ADR-058).
             var slotIds = slots.Select(s => s.Id).ToList();
-            var bookings = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
-                    b => slotIds.Contains(b.AvailabilitySlotId) && b.Status == BookingStatus.Scheduled, ct))
+            var allRows = (await _unitOfWork.Repository<InterviewBooking>().FindAsync(
+                    b => slotIds.Contains(b.AvailabilitySlotId), ct))
                 .ToList();
+
+            var bookings = allRows
+                .Where(b => string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var appIds = allRows.Select(b => b.ApplicationId).Distinct().ToList();
+            var apps = appIds.Count == 0
+                ? new List<ARI.Domain.Entities.Application>()
+                : (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                    .FindAsync(a => appIds.Contains(a.Id), ct)).ToList();
+
+            // Dòng đã đóng không chiếm chỗ nhưng làm ca không xoá được — giao diện phải nói trước
+            // thay vì để người dùng bấm xoá rồi nhận lỗi, và nói RÕ là của ai, vì sao.
+            foreach (var dto in result)
+            {
+                dto.ClosedBookings = allRows
+                    .Where(b => b.AvailabilitySlotId == dto.Id
+                                && !string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(b => b.UpdatedAt)
+                    .Select(b =>
+                    {
+                        var app = apps.FirstOrDefault(a => a.Id == b.ApplicationId);
+                        return new SlotClosedBookingDto
+                        {
+                            BookingId = b.Id,
+                            ApplicationId = b.ApplicationId,
+                            CandidateName = app?.CandidateName,
+                            CandidateEmail = app?.CandidateEmail,
+                            State = ARI.Application.Services.InterviewService.ResolveCandidateState(
+                                b.Status, b.ConfirmationStatus, b.DeclinedBy),
+                            Reason = b.DeclineReason,
+                        };
+                    })
+                    .ToList();
+                dto.ClosedBookingCount = dto.ClosedBookings.Count;
+            }
 
             if (bookings.Count > 0)
             {
-                var appIds = bookings.Select(b => b.ApplicationId).Distinct().ToList();
-                var apps = (await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
-                    .FindAsync(a => appIds.Contains(a.Id), ct)).ToList();
-
                 foreach (var dto in result)
                 {
                     dto.Bookings = bookings
@@ -111,12 +143,6 @@ namespace ARI.Application.Scheduling
                 return Result.Failure<AvailabilitySlotResponse>("Giờ kết thúc phải sau giờ bắt đầu.");
             if (request.StartTime <= DateTimeOffset.UtcNow)
                 return Result.Failure<AvailabilitySlotResponse>("Khung giờ phải nằm trong tương lai.");
-            // Một ca = một ứng viên (ADR-067): buổi phỏng vấn thật có Hiring Manager ngồi cùng AI,
-            // nên không thể xếp hai người vào cùng một khung. Chặn ở CỔNG TẠO chứ không âm thầm ghi
-            // đè về 1 — một ô "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn như đang có tác dụng.
-            if (request.Capacity != 1)
-                return Result.Failure<AvailabilitySlotResponse>(
-                    "Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.");
             if (request.RoundNumber < 1)
                 return Result.Failure<AvailabilitySlotResponse>("RoundNumber phải >= 1.");
 
@@ -124,8 +150,15 @@ namespace ARI.Application.Scheduling
             if (job == null) return Result.Failure<AvailabilitySlotResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
             if (!ok) return Result.Failure<AvailabilitySlotResponse>("Bạn không có quyền tạo lịch cho tin này.", CommonErrorCodes.Forbidden);
 
+            // Sức chứa tuỳ LOẠI vòng, nên phải biết tin và vòng trước đã: vòng trắc nghiệm mặc định
+            // không giới hạn, vòng hội thoại đúng bằng 1 (ADR-067).
+            var roundType = await SchedulingSupport.RoundTypeAsync(
+                _unitOfWork, request.JobPostingId, request.RoundNumber, ct);
+            var (capacityError, capacity) = SchedulingSupport.ResolveCapacity(roundType, request.Capacity);
+            if (capacityError != null) return Result.Failure<AvailabilitySlotResponse>(capacityError);
+
             var overlap = await SchedulingSupport.ValidateSlotTimeAsync(
-                _unitOfWork, request.JobPostingId, request.StartTime, request.EndTime, null, ct);
+                _unitOfWork, request.JobPostingId, request.RoundNumber, request.StartTime, request.EndTime, null, ct);
             if (overlap != null) return Result.Failure<AvailabilitySlotResponse>(overlap);
 
             var slot = new AvailabilitySlot
@@ -135,7 +168,7 @@ namespace ARI.Application.Scheduling
                 StartTime = request.StartTime,
                 EndTime = request.EndTime,
                 Timezone = string.IsNullOrWhiteSpace(request.Timezone) ? "Asia/Ho_Chi_Minh" : request.Timezone,
-                Capacity = request.Capacity,
+                Capacity = capacity,
                 BookedCount = 0,
             };
             await _unitOfWork.Repository<AvailabilitySlot>().AddAsync(slot, ct);
@@ -168,8 +201,28 @@ namespace ARI.Application.Scheduling
             var (ok, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, slot.JobPostingId, command.UserId, command.Role, ct);
             if (!ok) return Result.Failure("Bạn không có quyền xoá khung giờ này.", CommonErrorCodes.Forbidden);
 
-            if (slot.BookedCount > 0)
+            // Đọc theo DÒNG booking chứ không theo cột `booked_count` (bài học ADR-058) — và đọc
+            // MỌI dòng, không chỉ dòng đang giữ chỗ.
+            //
+            // Vì sao phải đếm cả dòng ĐÃ ĐÓNG: `booked_count` chỉ đếm booking `scheduled`, nên một ca
+            // từng bị ứng viên báo bận hiện ra là "Đã đặt 0/1" — trông như trống. Xoá nó thì Postgres
+            // chặn ở khoá ngoại `FK_interview_bookings_availability_slots_...` và người dùng nhận 500
+            // kèm một câu không nói được điều gì. Chính là lỗi vừa gặp.
+            //
+            // Vì sao KHÔNG xoá kèm dòng booking cũ: dòng đó là bằng chứng "ứng viên này được mời vào
+            // ĐÚNG giờ đó rồi báo bận" (`decline_reason`, `declined_by` — ADR-058). Bỏ ca đi thì lời
+            // giải thích ấy mất chỗ bám. Ca từng được đem ra mời ai đó là một phần hồ sơ, không phải
+            // rác cần dọn — cần dùng lại thì SỬA GIỜ của nó.
+            var rows = (await _unitOfWork.Repository<InterviewBooking>()
+                .FindAsync(b => b.AvailabilitySlotId == slot.Id, ct)).ToList();
+
+            if (rows.Any(b => string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase)))
                 return Result.Failure("Không thể xoá khung giờ đã có ứng viên đặt lịch.");
+
+            if (rows.Count > 0)
+                return Result.Failure(
+                    "Ca này từng được gán cho ứng viên (đã báo bận hoặc đã huỷ) nên phải giữ lại để còn dấu vết. "
+                    + "Cần dùng lại thì sửa giờ của ca, đừng xoá.");
 
             _unitOfWork.Repository<AvailabilitySlot>().Delete(slot);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -229,7 +282,7 @@ namespace ARI.Application.Scheduling
                 return Result.Failure<AvailabilitySlotResponse>("Khung giờ phải nằm trong tương lai.");
 
             var overlap = await SchedulingSupport.ValidateSlotTimeAsync(
-                _unitOfWork, slot.JobPostingId, command.StartTime, command.EndTime, slot.Id, ct);
+                _unitOfWork, slot.JobPostingId, slot.RoundNumber, command.StartTime, command.EndTime, slot.Id, ct);
             if (overlap != null) return Result.Failure<AvailabilitySlotResponse>(overlap);
 
             slot.StartTime = command.StartTime;
@@ -246,7 +299,7 @@ namespace ARI.Application.Scheduling
     // PATCH /api/schedules/slots/{id}/capacity — sửa sức chứa
     // ============================================================
 
-    public record UpdateSlotCapacityCommand(Guid Id, int Capacity, Guid? UserId, string? Role)
+    public record UpdateSlotCapacityCommand(Guid Id, int? Capacity, Guid? UserId, string? Role)
         : IRequest<Result<AvailabilitySlotResponse>>;
 
     public class UpdateSlotCapacityCommandHandler : IRequestHandler<UpdateSlotCapacityCommand, Result<AvailabilitySlotResponse>>
@@ -266,15 +319,19 @@ namespace ARI.Application.Scheduling
             var (ok, _) = await SchedulingSupport.CanManageAsync(_unitOfWork, slot.JobPostingId, command.UserId, command.Role, ct);
             if (!ok) return Result.Failure<AvailabilitySlotResponse>("Bạn không có quyền sửa khung giờ này.", CommonErrorCodes.Forbidden);
 
-            // Cùng luật với lúc tạo (ADR-067). Endpoint giữ lại vì ca DỮ LIỆU CŨ có thể còn sức
-            // chứa > 1 và cần hạ về 1.
-            if (command.Capacity != 1)
-                return Result.Failure<AvailabilitySlotResponse>(
-                    "Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.");
-            if (command.Capacity < slot.BookedCount)
+            // Cùng luật với lúc tạo: vòng hội thoại đúng bằng 1, vòng trắc nghiệm không giới hạn
+            // (hoặc một trần do Recruiter đặt).
+            var roundType = await SchedulingSupport.RoundTypeAsync(
+                _unitOfWork, slot.JobPostingId, slot.RoundNumber, ct);
+            var (capacityError, capacity) = SchedulingSupport.ResolveCapacity(roundType, command.Capacity);
+            if (capacityError != null) return Result.Failure<AvailabilitySlotResponse>(capacityError);
+
+            // Hạ trần xuống dưới số đã đặt là đuổi người ra khỏi chỗ họ đang giữ mà không ai báo.
+            // Không giới hạn thì không có trần nào để mà thấp hơn.
+            if (capacity is { } cap && cap < slot.BookedCount)
                 return Result.Failure<AvailabilitySlotResponse>($"Sức chứa không được nhỏ hơn số đã đặt ({slot.BookedCount}).");
 
-            slot.Capacity = command.Capacity;
+            slot.Capacity = capacity;
             slot.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<AvailabilitySlot>().Update(slot);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -350,6 +407,18 @@ namespace ARI.Application.Scheduling
             if (existing.Any())
                 return Result.Failure<AssignSlotResultDto>("Ứng viên đã có lịch cho vòng này. Hãy huỷ lịch cũ trước khi gán lại.");
 
+            // Qua vòng TRẮC NGHIỆM = Recruiter xếp thẳng lịch vòng kế (vòng này không có bước Hiring
+            // Manager chốt kết quả nào để sinh lời mời vòng sau). Nên chính thao tác này phải chặn
+            // việc NHẢY QUA bài thi: chưa có bài ở vòng trắc nghiệm ngay trước thì chưa có gì để
+            // quyết định cho qua. Bài hệ thống nộp thay khi hết hạn vẫn tính — đó là một kết quả (0
+            // điểm), và giữ hay loại là việc của Recruiter.
+            if (round > 1
+                && InterviewInviteEmail.IsOnlineTest(await SchedulingSupport.RoundTypeAsync(_unitOfWork, app.JobPostingId, round - 1, ct))
+                && await _unitOfWork.Repository<OnlineTestSubmission>().CountAsync(
+                    s => s.ApplicationId == applicationId && s.RoundNumber == round - 1, ct) == 0)
+                return Result.Failure<AssignSlotResultDto>(
+                    $"Ứng viên chưa có bài thi trắc nghiệm vòng {round - 1} — chưa thể xếp lịch vòng {round}.");
+
             // Ba luật chống xếp lịch hỏng (ADR-067): một ca một người · ứng viên không dự hai buổi
             // trùng giờ (kể cả tin khác) · ca phải nằm trong giờ Hiring Manager có mặt được.
             // Kiểm TRƯỚC khi chiếm chỗ, để một lượt gán bị từ chối không để lại chỗ đã trừ.
@@ -359,8 +428,11 @@ namespace ARI.Application.Scheduling
                 return Result.Failure<AssignSlotResultDto>(violation);
 
             // Chốt chỗ NGUYÊN TỬ chống overbooking (DB row-lock 1 câu lệnh, không mutate entity đang được EF theo dõi).
+            // `capacity IS NULL` = không giới hạn (vòng trắc nghiệm): vẫn TĂNG booked_count để con số
+            // "bao nhiêu người đã đăng ký" còn đúng, chỉ bỏ phép so với trần.
             var incremented = await _unitOfWork.ExecuteSqlRawAsync(
-                "UPDATE availability_slots SET booked_count = booked_count + 1, updated_at = {0} WHERE id = {1} AND booked_count < capacity",
+                "UPDATE availability_slots SET booked_count = booked_count + 1, updated_at = {0} "
+                + "WHERE id = {1} AND (capacity IS NULL OR booked_count < capacity)",
                 new object[] { DateTimeOffset.UtcNow, slot.Id }, ct);
             if (incremented == 0)
                 return Result.Failure<AssignSlotResultDto>("Khung giờ đã đầy. Vui lòng chọn khung giờ khác hoặc tăng sức chứa.");
@@ -421,6 +493,7 @@ namespace ARI.Application.Scheduling
             if (app.CandidateAccountId.HasValue)
             {
                 var notifRepo = _unitOfWork.Repository<ARI.Domain.Entities.Notification>();
+                var assignedRoundType = await SchedulingSupport.RoundTypeAsync(_unitOfWork, app.JobPostingId, round, ct);
                 // Dedup theo booking.Id: mỗi lần xếp/xếp-lại là booking mới → luôn thông báo lại.
                 var dedupKey = $"schedule_assigned:{booking.Id}";
                 var already = await notifRepo.FindAsync(
@@ -432,8 +505,10 @@ namespace ARI.Application.Scheduling
                         CandidateAccountId = app.CandidateAccountId.Value,
                         DedupKey = dedupKey,
                         Type = "schedule",
-                        Title = "Lịch phỏng vấn đã được xếp",
-                        Body = $"Nhân sự đã xếp lịch phỏng vấn (vòng {round}) cho bạn: {whenText}. Vui lòng XÁC NHẬN nếu bạn tham dự được, hoặc báo bận kèm lý do để được xếp lịch khác.",
+                        Title = InterviewInviteEmail.IsOnlineTest(assignedRoundType)
+                            ? "Lịch làm bài trắc nghiệm đã được xếp"
+                            : "Lịch phỏng vấn đã được xếp",
+                        Body = $"Nhân sự đã xếp {InterviewInviteEmail.AppointmentNoun(assignedRoundType)} (vòng {round}) cho bạn: {whenText}. Vui lòng XÁC NHẬN nếu bạn tham dự được, hoặc từ chối kèm lý do.",
                         Link = $"/portal/schedule/{applicationId}",
                         IsRead = false
                     }, ct);

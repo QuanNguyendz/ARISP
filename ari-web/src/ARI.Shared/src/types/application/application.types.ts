@@ -75,6 +75,8 @@ export interface MyApplicationUpcoming {
   startTime: string
   timezone?: string | null
   roundNumber: number
+  /** Loại vòng — vòng trắc nghiệm là "bài trắc nghiệm", không phải "phỏng vấn". */
+  roundType?: string | null
 }
 
 export interface MyApplicationItem {
@@ -328,6 +330,23 @@ export interface HrApplicationItem {
   hmDecidedAt?: string | null
   interviewScore?: number | null
   interviewDate?: string
+  /**
+   * Điểm bài trắc nghiệm của VÒNG HIỆN TẠI (0–100) — null khi vòng này không phải vòng trắc nghiệm
+   * hoặc ứng viên chưa nộp bài. Vòng trắc nghiệm không có `Evaluation` nên `interviewScore` luôn
+   * trống ở đó; đây là con số duy nhất nói được ứng viên làm bài ra sao.
+   */
+  onlineTestScore?: number | null
+  /**
+   * Bài trắc nghiệm có đạt điểm sàn không (null khi chưa nộp). **Không tự đổi trạng thái hồ sơ** —
+   * dưới sàn thì ứng viên vẫn ở nguyên vòng trắc nghiệm cho tới khi Recruiter quyết định loại.
+   */
+  onlineTestPassed?: boolean | null
+  /**
+   * Bài trắc nghiệm do hệ thống nộp thay khi hết hạn — ứng viên được hẹn giờ nhưng không vào làm.
+   * Điểm vẫn là điểm thật (thường là 0); cờ này để bảng nói "không làm bài" thay vì trông như
+   * "làm sai hết". Null khi chưa có bài.
+   */
+  onlineTestExpired?: boolean | null
   /** Phản hồi của ứng viên với lịch vòng hiện tại: pending | confirmed (null nếu chưa có lịch). */
   scheduleConfirmationStatus?: string | null
   /** Lý do ứng viên báo bận lần xếp lịch gần nhất (khi đang chờ nhân sự xếp lại). */

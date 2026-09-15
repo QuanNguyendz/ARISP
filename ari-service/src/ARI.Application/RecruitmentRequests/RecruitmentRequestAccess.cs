@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,4 +53,28 @@ namespace ARI.Application.RecruitmentRequests
             return (request, null, null);
         }
     }
+    /// <summary>
+    /// Đọc cột <c>requested_rounds</c> (mảng JSON) thành danh sách vòng.
+    ///
+    /// Đọc phòng thủ: cột là chuỗi JSON do một bản cũ hơn ghi, nên một giá trị hỏng KHÔNG được làm
+    /// chết cả màn chi tiết phiếu. Hỏng thì coi như phiếu chưa khai vòng nào — cùng cách
+    /// `ParseCriterionScores` xử lý dữ liệu điểm cũ (ADR-060).
+    /// </summary>
+    public static class RequestedRounds
+    {
+        public static List<string> Parse(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try
+            {
+                var raw = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+                return ARI.Domain.Constants.InterviewRoundTypes.Sanitize(raw);
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+    }
+
 }

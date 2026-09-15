@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -18,10 +17,6 @@ import {
 import { jdDocumentService, type JdDocument } from '@ari/shared/fservices/jdDocument'
 import { jdTemplateService, type JdTemplate } from '@ari/shared/fservices/jdTemplate'
 import jobService from '@ari/shared/fservices/job'
-import {
-  hiringTeamService,
-  type HiringManagerOption,
-} from '@ari/shared/fservices/hiringTeam'
 import { ErrorAlert, Select } from '@ari/shared/ui'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
@@ -139,6 +134,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
   /** Phiếu đã duyệt, chưa dựng tin, trong phạm vi người đang đăng nhập (server tự lọc theo vai trò). */
   const [openRequests, setOpenRequests] = useState<RecruitmentRequestListItem[]>([])
+  /** Người lập phiếu này sẽ là Hiring Manager chính của tin — server tự gán (ADR-063/068). */
+  const selectedRequest = openRequests.find((r) => r.id === recruitmentRequestId)
 
   // Màn phiếu nằm ở khu vực nào thì suy từ chính route đang đứng — StaffSite khoá route theo
   // vai trò, nên `/hr/jobs/create` phải trỏ về `/hr/...` chứ không phải `/recruiter/...`.
@@ -320,19 +317,6 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     setRounds(u)
   }
 
-  // Hiring Manager của tin (ADR-061). Chỉ dùng khi TẠO MỚI: sửa tin thì đội tuyển dụng đã có
-  // panel riêng trên trang chi tiết, và gán lại ở đây sẽ đá nhau với panel đó.
-  const [hiringManagerId, setHiringManagerId] = useState('')
-  const [hmWarning, setHmWarning] = useState('')
-  /** Tin đã tạo xong nhưng gán Hiring Manager hỏng — giữ đường dẫn để người dùng tự sang gán lại. */
-  const [createdJobHref, setCreatedJobHref] = useState('')
-
-  const { data: hiringManagerOptions = [] } = useQuery({
-    queryKey: ['hiring-manager-options'],
-    queryFn: () => hiringTeamService.getHiringManagerOptions(),
-    enabled: mode !== 'edit',
-  })
-
   // Danh sách phiếu chọn được: đã duyệt VÀ chưa dựng tin. Server đã lọc phạm vi theo vai trò
   // (Recruiter thấy phiếu được giao, HR Leader thấy tất cả) nên ở đây chỉ cần bỏ những phiếu đã
   // có tin — chọn trúng một phiếu như thế thì lúc lưu bị trả 409.
@@ -425,6 +409,22 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
         if (rr.location) setLocation(rr.location)
         if (rr.headcount) setVacancies(rr.headcount)
+
+        // Cấu hình vòng theo ĐÚNG danh sách trên phiếu (ADR-063 mở rộng): quy trình tuyển của một
+        // vị trí là quyết định chuyên môn của Hiring Manager, Recruiter dựng tin là thi hành nó.
+        // Vẫn sửa được bên dưới — đây là ĐIỀN SẴN, không phải khoá cứng; phiếu cũ không khai vòng
+        // nào thì giữ nguyên bộ mặc định.
+        if (rr.requestedRounds?.length) {
+          setRounds(
+            rr.requestedRounds.map((type, i) => ({
+              roundNumber: i + 1,
+              roundType: type,
+              interviewLanguage: 'vi',
+              interviewCodeTtlHours: 2,
+              maxDurationMinutes: type === 'online_test' ? 30 : MAX_ROUND_MINUTES,
+            }))
+          )
+        }
         if (rr.salaryMin != null || rr.salaryMax != null) {
           setSalaryIsNegotiable(false)
           setSalaryMin(rr.salaryMin ?? '')
@@ -504,26 +504,12 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       if (mode === 'edit' && jobId) saved = await jobService.updateJob(jobId, payload)
       else saved = await jobService.createJobPosting(payload)
 
-      // Đội tuyển dụng chỉ gán được SAU khi tin có id, nên đây là bước thứ hai chứ không nằm
-      // trong cùng một lệnh. Gán hỏng thì tin VẪN được tạo — huỷ tin vừa tạo chỉ vì gán người thất
-      // bại là mất trắng công nhập cả biểu mẫu.
-      //
-      // NHƯNG KHÔNG được điều hướng ngay sau khi đặt cảnh báo: trang unmount trước khi kịp render,
-      // nên người dùng tưởng đã gán xong trong khi tin chạy KHÔNG có cổng duyệt nào — đúng cái kết
-      // cục im lặng mà cảnh báo này sinh ra để chặn. Dừng lại, báo rõ, và đưa sẵn lối đi tiếp.
+      // Hiring Manager của tin do SERVER gán — người lập phiếu, trong CÙNG lệnh tạo tin (ADR-063/068).
+      // Trước đây trang này còn một ô chọn HM kiểu cũ và gán ở bước thứ hai: chọn ai đó là hạ người lập
+      // phiếu xuống, còn bước hai hỏng thì tin chạy không có cổng duyệt nào.
       const jobHref = routerLocation.pathname.startsWith('/hr')
         ? `/hr/jobs/${saved.id}`
         : `/recruiter/my-jobs/${saved.id}`
-
-      if (mode !== 'edit' && hiringManagerId) {
-        try {
-          await hiringTeamService.addMember(saved.id, { userId: hiringManagerId, isPrimary: true })
-        } catch {
-          setHmWarning(t('form.hmAssignFailed'))
-          setCreatedJobHref(jobHref)
-          return
-        }
-      }
 
       navigate(jobHref)
     } catch (err: any) {
@@ -1039,39 +1025,13 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
               <label className={label}>{t('form.languageRequirement')}</label>
               <input value={languageRequirement} onChange={(e) => setLanguageRequirement(e.target.value)} placeholder={t('form.languageRequirementPlaceholder')} className={input} />
             </div>
-            {mode !== 'edit' && (
+            {mode === 'create' && selectedRequest && (
               <div>
-                <label className={label}>{t('form.hiringManager')}</label>
-                <select
-                  value={hiringManagerId}
-                  onChange={(e) => setHiringManagerId(e.target.value)}
-                  className={input}
-                >
-                  <option value="">{t('form.hiringManagerNone')}</option>
-                  {hiringManagerOptions.map((o: HiringManagerOption) => (
-                    <option key={o.id} value={o.id}>
-                      {o.fullName?.trim() || o.email}
-                      {o.department ? ` — ${o.department}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">
-                  {t('form.hiringManagerHint')}
+                <p className={label}>{t('form.hiringManager')}</p>
+                <p className="rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50/60 dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white">
+                  {selectedRequest.requestedByName}
                 </p>
-                {hmWarning && (
-                  <div className="mt-1.5 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
-                    <p className="text-xs text-amber-700 dark:text-amber-400">{hmWarning}</p>
-                    {createdJobHref && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(createdJobHref)}
-                        className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300 underline"
-                      >
-                        {t('form.goToJobToAssign')}
-                      </button>
-                    )}
-                  </div>
-                )}
+                <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">{t('form.hiringManagerHint')}</p>
               </div>
             )}
 

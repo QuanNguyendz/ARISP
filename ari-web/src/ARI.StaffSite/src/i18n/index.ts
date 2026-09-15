@@ -52,6 +52,10 @@ import staffHiringVi from './locales/vi/modules/staff/hiring.json'
 import staffHiringEn from './locales/en/modules/staff/hiring.json'
 import staffOffersVi from './locales/vi/modules/staff/offers.json'
 import staffOffersEn from './locales/en/modules/staff/offers.json'
+import staffInterviewResultsVi from './locales/vi/modules/staff/interviewResults.json'
+import staffInterviewResultsEn from './locales/en/modules/staff/interviewResults.json'
+import staffJobPlaybooksVi from './locales/vi/modules/staff/jobPlaybooks.json'
+import staffJobPlaybooksEn from './locales/en/modules/staff/jobPlaybooks.json'
 import hrJobPostingDetailVi from './locales/vi/modules/hr/jobPostingDetail.json'
 import hrJobPostingDetailEn from './locales/en/modules/hr/jobPostingDetail.json'
 
@@ -114,6 +118,8 @@ export const resources = {
     'modules/hr/jdTemplate': hrJdTemplateVi,
     'modules/staff/hiring': staffHiringVi,
     'modules/staff/offers': staffOffersVi,
+    'modules/staff/interviewResults': staffInterviewResultsVi,
+    'modules/staff/jobPlaybooks': staffJobPlaybooksVi,
     'modules/hr/jobPostingDetail': hrJobPostingDetailVi,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardVi,
@@ -158,6 +164,8 @@ export const resources = {
     'modules/hr/jdTemplate': hrJdTemplateEn,
     'modules/staff/hiring': staffHiringEn,
     'modules/staff/offers': staffOffersEn,
+    'modules/staff/interviewResults': staffInterviewResultsEn,
+    'modules/staff/jobPlaybooks': staffJobPlaybooksEn,
     'modules/hr/jobPostingDetail': hrJobPostingDetailEn,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardEn,
@@ -201,6 +209,8 @@ const siteNamespaces = [
   'modules/hr/jdTemplate',
   'modules/staff/hiring',
   'modules/staff/offers',
+  'modules/staff/interviewResults',
+  'modules/staff/jobPlaybooks',
   'modules/hr/jobPostingDetail',
   'modules/recruiter/dashboard',
   'modules/recruiter/jobs',

@@ -17,8 +17,15 @@ namespace ARI.Application.HiringTeam
     /// <summary>
     /// Cổng duyệt shortlist của Hiring Manager (ADR-061, 3a — sửa ở ADR-067).
     ///
-    /// Trình tự CỐ Ý là: Recruiter duyệt hồ sơ → HM quyết định <b>kèm khung giờ họ có mặt được</b>
-    /// → hồ sơ về hàng chờ xếp lịch của <b>Recruiter</b> → Recruiter chọn ca nằm trong khung đó.
+    /// Trình tự CỐ Ý là: Recruiter duyệt hồ sơ → HM quyết định CHUYÊN MÔN (duyệt / từ chối) → hồ sơ
+    /// về hàng chờ xếp lịch của <b>Recruiter</b> → Recruiter chọn ca nằm trong giờ HM có mặt được.
+    ///
+    /// <b>Giờ có mặt của HM KHÔNG đi kèm lệnh duyệt</b> (ADR-067, sửa 2026-09-14). HM khai nó riêng
+    /// ở màn tin (<c>SetHmAvailabilityCommand</c>, mục "Lịch tôi có mặt được"), theo từng vòng. Hai
+    /// lý do: lịch rảnh là thuộc tính của NGƯỜI trong một khoảng thời gian, không phải của từng hồ sơ
+    /// — gắn nó vào lượt duyệt chỉ khai được vòng 1 và bắt nhập lại mỗi đợt; và vòng 1 có thể là bài
+    /// trắc nghiệm, nơi HM không phải có mặt. Luật khớp giờ vẫn còn nguyên, chỉ dời chỗ chặn sang bước
+    /// GÁN ca (<c>SchedulingSupport.ValidateAssignmentAsync</c>).
     ///
     /// HM gửi giờ rảnh chứ KHÔNG tự chọn ca: chọn ca là thao tác vận hành có thể thất bại vì lý do
     /// lịch ("ca đã có người"), mà một cái duyệt chuyên môn hỏng vì hết ghế là vô nghĩa. Việc chốt
@@ -31,16 +38,24 @@ namespace ARI.Application.HiringTeam
     internal static class ShortlistGateSupport
     {
         /// <summary>
-        /// Người gọi có phải Hiring Manager CHÍNH của tin không. Quản trị viên KHÔNG tự động thoả:
-        /// họ có đường riêng là "vượt cổng" (kèm lý do + audit), để phân biệt rõ trong dấu vết
-        /// giữa "HM đã duyệt" và "quản trị viên duyệt thay".
+        /// Câu báo cho Recruiter: hồ sơ vừa được duyệt có XẾP LỊCH NGAY được không.
+        ///
+        /// Cần vì lịch rảnh của HM nay khai riêng chứ không đi kèm lệnh duyệt (ADR-067, sửa
+        /// 2026-09-14), nên "HM đã duyệt mà vòng 1 chưa có khung giờ nào" là tình huống hợp lệ. Nói
+        /// luôn trong thông báo thì Recruiter biết phải hỏi ai, thay vì mở màn xếp lịch rồi mới bị từ
+        /// chối — đúng kiểu hồ sơ "đứng im trong hàng chờ" mà ADR-067 muốn xoá.
         /// </summary>
-        public static async Task<bool> IsPrimaryHmAsync(
-            IUnitOfWork uow, Guid jobPostingId, Guid? userId, CancellationToken ct)
+        public static async Task<string> Round1ScheduleHintAsync(
+            IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
         {
-            if (userId is not { } uid || uid == Guid.Empty) return false;
-            var hm = await JobAccess.PrimaryHiringManagerAsync(uow, jobPostingId, ct);
-            return hm != null && hm.UserId == uid;
+            var round1Type = await SchedulingSupport.RoundTypeAsync(uow, jobPostingId, 1, ct);
+            if (InterviewInviteEmail.IsOnlineTest(round1Type))
+                return "Vòng 1 là bài trắc nghiệm trực tuyến — xếp lịch thi được ngay, không cần Hiring Manager có mặt.";
+
+            var windows = await HmAvailabilitySupport.ActiveWindowsAsync(uow, jobPostingId, 1, ct);
+            return windows.Count > 0
+                ? "Hãy xếp ca phỏng vấn nằm trong lịch Hiring Manager đã khai."
+                : "Hiring Manager chưa khai lịch có mặt cho vòng 1 — ca chỉ xếp được sau khi họ khai.";
         }
     }
 
@@ -55,14 +70,11 @@ namespace ARI.Application.HiringTeam
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notifications;
-        private readonly IApplicationService _applicationService;
 
-        public RequestHmApprovalCommandHandler(
-            IUnitOfWork unitOfWork, INotificationService notifications, IApplicationService applicationService)
+        public RequestHmApprovalCommandHandler(IUnitOfWork unitOfWork, INotificationService notifications)
         {
             _unitOfWork = unitOfWork;
             _notifications = notifications;
-            _applicationService = applicationService;
         }
 
         public async Task<Result<bool>> Handle(RequestHmApprovalCommand request, CancellationToken ct)
@@ -78,19 +90,12 @@ namespace ARI.Application.HiringTeam
                 && !ApplicationStatuses.Is(app.Status, ApplicationStatuses.Invited))
                 return Result<bool>.Failure("Chỉ gửi duyệt được hồ sơ vừa nộp CV và chưa qua sàng lọc.");
 
-            var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
-
-            // Tin chưa gán Hiring Manager thì KHÔNG có cổng nào để chờ (ADR-061: cổng suy ra từ việc
-            // có người được gán). Trước đây chỗ này trả lỗi, nghĩa là nút "Duyệt hồ sơ" của Recruiter
-            // chết cứng trên những tin cũ — nay hồ sơ đi thẳng sang hàng chờ xếp lịch, đúng như hành
-            // vi trước khi có vai trò Hiring Manager.
+            // ADR-068: mọi tin luôn có Hiring Manager, nên thiếu HM (tin cũ chưa gán) hay HM đã bị khoá
+            // đều là cổng ĐÓNG kèm câu nói rõ HR Leader phải làm gì. Trước đây nhánh này đẩy thẳng hồ sơ
+            // sang `screening` — tức là Recruiter chỉ cần gỡ HM khỏi đội là tự mở cổng đang kiểm mình.
+            var (hm, hmError) = await JobAccess.RequireActiveHiringManagerAsync(_unitOfWork, job.Id, ct);
             if (hm == null)
-            {
-                var advance = await _applicationService.AcceptApplicationAsync(app.Id, ct);
-                if (advance.IsFailure) return advance;
-                await _unitOfWork.SaveChangesAsync(ct);
-                return Result.Success(true);
-            }
+                return Result<bool>.Failure(hmError!, CommonErrorCodes.Conflict);
 
             app.Status = ApplicationStatuses.HmReview;
             app.HmDecision = HmDecision.Pending;
@@ -124,14 +129,12 @@ namespace ARI.Application.HiringTeam
     // POST /api/applications/{id}/hm-decision  (Hiring Manager)
     // ============================================================
 
-    /// <param name="Availabilities">
-    /// Khung giờ HM có mặt được cho vòng 1 (ADR-067), gửi KÈM lệnh duyệt. Bỏ trống chỉ hợp lệ khi
-    /// vòng 1 của tin đã có khung giờ còn hiệu lực từ lần duyệt trước — duyệt người thứ hai trong
-    /// cùng đợt không phải khai lại lịch.
-    /// </param>
+    /// <summary>
+    /// HM duyệt hoặc từ chối một hồ sơ. Chỉ là quyết định CHUYÊN MÔN — lịch có mặt của HM khai riêng
+    /// ở màn tin, không đi kèm lệnh này (xem <see cref="ShortlistGateSupport"/>).
+    /// </summary>
     public record HmDecideApplicationCommand(
-        Guid ApplicationId, string Decision, string? Note, Guid? ActorId, string? ActorRole,
-        IReadOnlyList<HmAvailabilityWindowInput>? Availabilities = null)
+        Guid ApplicationId, string Decision, string? Note, Guid? ActorId, string? ActorRole)
         : IRequest<Result<bool>>;
 
     public class HmDecideApplicationCommandHandler : IRequestHandler<HmDecideApplicationCommand, Result<bool>>
@@ -159,7 +162,7 @@ namespace ARI.Application.HiringTeam
             if (app == null)
                 return Result<bool>.Failure(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
 
-            if (!await ShortlistGateSupport.IsPrimaryHmAsync(_unitOfWork, app.JobPostingId, request.ActorId, ct))
+            if (!await JobAccess.IsPrimaryHiringManagerAsync(_unitOfWork, app.JobPostingId, request.ActorId, ct))
                 return Result<bool>.Failure(
                     "Chỉ Hiring Manager phụ trách tin này mới duyệt được hồ sơ.", CommonErrorCodes.Forbidden);
 
@@ -171,25 +174,15 @@ namespace ARI.Application.HiringTeam
             if (decision == HmDecision.Rejected && note == null)
                 return Result<bool>.Failure("Vui lòng nhập lý do khi từ chối hồ sơ.");
 
-            // ---- Lịch rảnh đi CÙNG lệnh duyệt (ADR-067) -------------------------------------
-            // Duyệt mà không có giờ nào để xếp thì hồ sơ rơi vào hàng chờ xếp lịch rồi đứng im ở đó:
-            // Recruiter mở ra thấy một danh sách không thao tác được và không biết phải hỏi ai.
-            // Nên khung giờ là điều kiện của việc DUYỆT, không phải một việc để làm sau.
-            if (decision == HmDecision.Approved)
-            {
-                var (windows, windowError) = HmAvailabilitySupport.Sanitize(request.Availabilities);
-                if (windowError != null) return Result<bool>.Failure(windowError);
-
-                if (windows.Count > 0)
-                    await HmAvailabilityWriteGate.AppendAsync(
-                        _unitOfWork, app.JobPostingId, 1, request.ActorId!.Value, windows, ct);
-
-                var active = await HmAvailabilitySupport.ActiveWindowsAsync(_unitOfWork, app.JobPostingId, 1, ct);
-                if (active.Count + windows.Count == 0)
-                    return Result<bool>.Failure(
-                        "Vui lòng gửi kèm khung giờ bạn có thể tham gia phỏng vấn vòng 1 — "
-                        + "Recruiter sẽ xếp lịch cho ứng viên trùng khung giờ đó.");
-            }
+            // Duyệt KHÔNG đòi lịch rảnh (ADR-067, sửa 2026-09-14). Trước đây khung giờ vòng 1 là điều
+            // kiện của việc duyệt, nhưng nó trộn hai thứ khác bản chất: quyết định về MỘT hồ sơ và
+            // lịch của MỘT người cho cả đợt. Hệ quả là HM phải mở lại form lịch ở mỗi lượt duyệt, chỉ
+            // khai được vòng 1, và có chỗ thứ hai (màn tin) cũng sửa cùng dữ liệu đó. Lịch nay khai ở
+            // đúng một nơi; luật khớp giờ vẫn chặn ở bước gán ca, và thông báo bên dưới nói rõ cho
+            // Recruiter nếu vòng 1 chưa có khung nào.
+            var scheduleHint = decision == HmDecision.Approved
+                ? await ShortlistGateSupport.Round1ScheduleHintAsync(_unitOfWork, app.JobPostingId, ct)
+                : null;
 
             app.HmDecision = decision;
             app.HmDecisionByUserId = request.ActorId;
@@ -216,9 +209,7 @@ namespace ARI.Application.HiringTeam
                         ? "Hiring Manager đã duyệt — hồ sơ chờ bạn xếp lịch"
                         : "Hiring Manager đã từ chối hồ sơ",
                     Body = $"{app.CandidateName} — vị trí \"{job.Title}\"."
-                           + (decision == HmDecision.Approved
-                               ? " Hãy xếp ca phỏng vấn nằm trong khung giờ Hiring Manager đã gửi."
-                               : string.Empty)
+                           + (scheduleHint != null ? $" {scheduleHint}" : string.Empty)
                            + (note != null ? $" Lý do: {note}" : string.Empty),
                     Link = $"/recruiter/candidates/{app.Id}",
                     DedupKey = $"hm_shortlist_decided:{app.Id}",
@@ -319,6 +310,8 @@ namespace ARI.Application.HiringTeam
             _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+            // Vượt cổng vẫn làm được khi HM bị khoá hoặc tin cũ chưa gán HM — đó chính là lối thoát
+            // của quản trị viên (ADR-068). Có HM thì luôn báo cho họ.
             var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, app.JobPostingId, ct);
 
             await AdminSupport.WriteAuditAsync(_unitOfWork, request.ActorId, "hm_shortlist_bypassed",

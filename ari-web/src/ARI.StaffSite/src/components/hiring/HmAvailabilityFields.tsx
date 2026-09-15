@@ -1,6 +1,15 @@
 import { Plus, Trash2, AlertCircle } from 'lucide-react'
+import { DateTimeInput } from '@ari/shared/ui'
+import {
+  isCompleteLocalDateTime,
+  joinLocalDateTime,
+  splitLocalDateTime,
+} from '@ari/shared/utils/time24'
 
-/** Một khung giờ đang soạn — giữ ở dạng chuỗi `datetime-local` để bind thẳng vào input. */
+/**
+ * Một khung giờ đang soạn. `start`/`end` giữ khuôn `YYYY-MM-DDTHH:mm` và được phép DỞ (`2026-09-15T`)
+ * trong lúc nhập — ô ngày và ô giờ là hai ô riêng (giờ 24 tiếng, xem `DateTimeInput`).
+ */
 export interface DraftWindow {
   start: string
   end: string
@@ -23,7 +32,7 @@ export const MAX_WINDOW_HOURS = 12
  * ADR-065 (`expected_start_date`); `new Date(...).toISOString()` cắt đứt hẳn phụ thuộc đó.
  */
 export function toInstant(local: string): string | null {
-  if (!local) return null
+  if (!isCompleteLocalDateTime(local)) return null
   const d = new Date(local)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
@@ -36,7 +45,7 @@ export function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** Mốc "bây giờ" ở dạng `datetime-local`, dùng cho thuộc tính `min` của ô nhập. */
+/** Mốc "bây giờ" ở dạng `YYYY-MM-DDTHH:mm`. */
 export const nowLocalInput = () => toLocalInput(new Date().toISOString())
 
 export type WindowIssue = 'empty' | 'incomplete' | 'past' | 'endBeforeStart' | 'tooLong' | null
@@ -51,7 +60,8 @@ export type WindowIssue = 'empty' | 'incomplete' | 'past' | 'endBeforeStart' | '
  */
 export function issueOf(r: DraftWindow): WindowIssue {
   if (!r.start && !r.end) return 'empty'
-  if (!r.start || !r.end) return 'incomplete'
+  // Mới chọn ngày mà chưa chọn giờ (hoặc ngược lại) cũng là "chưa đủ" — không phải lỗi giờ.
+  if (!isCompleteLocalDateTime(r.start) || !isCompleteLocalDateTime(r.end)) return 'incomplete'
 
   const start = new Date(r.start)
   const end = new Date(r.end)
@@ -65,7 +75,7 @@ export function issueOf(r: DraftWindow): WindowIssue {
 }
 
 const ISSUE_TEXT: Record<Exclude<WindowIssue, null | 'empty'>, string> = {
-  incomplete: 'Cần điền cả giờ bắt đầu và giờ kết thúc.',
+  incomplete: 'Cần chọn đủ ngày và giờ cho cả lúc bắt đầu lẫn lúc kết thúc.',
   past: 'Giờ bắt đầu phải ở tương lai.',
   endBeforeStart: 'Giờ kết thúc phải sau giờ bắt đầu.',
   tooLong: `Mỗi khung tối đa ${MAX_WINDOW_HOURS} tiếng — rảnh nhiều ngày thì tách thành nhiều khung.`,
@@ -96,55 +106,82 @@ interface Props {
   disabled?: boolean
 }
 
-const INPUT =
-  'rounded-xl border px-2.5 py-1.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white bg-white dark:bg-white/5'
-const INPUT_OK = 'border-ink-200 dark:border-white/10'
-const INPUT_BAD = 'border-red-300 dark:border-red-500/40'
+const LABEL = 'w-8 shrink-0 text-xs font-medium text-ink-500 dark:text-ink-400'
 
 export default function HmAvailabilityFields({ rows, onChange, disabled }: Props) {
   const set = (i: number, patch: Partial<DraftWindow>) =>
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
 
-  // Tính một lần mỗi lần vẽ: chặn được người dùng chọn giờ quá khứ ngay trên bộ chọn của trình
-  // duyệt, trước cả khi có thông báo lỗi nào.
-  const min = nowLocalInput()
+  /**
+   * Đổi lúc bắt đầu. Ngày KẾT THÚC đi theo ngày bắt đầu cho tới khi người dùng tự đổi nó: khung giờ
+   * gần như luôn nằm trong một ngày (tối đa 12 tiếng), bắt chọn cùng một ngày hai lần là thừa.
+   * "Tự đổi" nhận ra được mà không cần cờ riêng — ngày kết thúc khác ngày bắt đầu CŨ.
+   */
+  const setStart = (i: number, start: string) => {
+    const r = rows[i]
+    const oldStartDate = splitLocalDateTime(r.start).date
+    const newStartDate = splitLocalDateTime(start).date
+    const { date: endDate, time: endTime } = splitLocalDateTime(r.end)
+    const follows = newStartDate && (!endDate || endDate === oldStartDate)
+    set(i, { start, end: follows ? joinLocalDateTime(newStartDate, endTime) : r.end })
+  }
+
+  // Chặn chọn ngày đã qua ngay trên bộ lịch của trình duyệt, trước cả khi có thông báo lỗi nào.
+  const today = splitLocalDateTime(nowLocalInput()).date
 
   return (
     <div className="space-y-2">
       {rows.map((r, i) => {
         const issue = issueOf(r)
         const bad = issue !== null && issue !== 'empty'
-        const frame = `${INPUT} ${bad ? INPUT_BAD : INPUT_OK}`
+        // "Chưa nhập xong" chỉ là nhắc, không phải lỗi — tô đỏ một dòng đang gõ dở là la người dùng
+        // vì chưa kịp làm xong. Đỏ chỉ dành cho giờ SAI thật (quá khứ, ngược chiều, quá dài).
+        const wrong = bad && issue !== 'incomplete'
+        const startDate = splitLocalDateTime(r.start).date
 
         return (
-          <div key={i} className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="datetime-local"
+          <div
+            key={i}
+            className={`space-y-2 rounded-xl border p-2.5 ${
+              wrong
+                ? 'border-red-200 bg-red-50/40 dark:border-red-500/30 dark:bg-red-500/5'
+                : 'border-ink-200 dark:border-white/10'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={LABEL}>Từ</span>
+              <DateTimeInput
                 value={r.start}
-                min={min}
+                onChange={(v) => setStart(i, v)}
+                minDate={today}
                 disabled={disabled}
-                onChange={(e) => set(i, { start: e.target.value })}
-                className={frame}
-                aria-label="Bắt đầu"
+                invalid={wrong}
+                className="flex-1"
+                dateAriaLabel="Ngày bắt đầu"
+                timeAriaLabel="Giờ bắt đầu"
               />
-              <span className="text-sm text-ink-400">→</span>
-              <input
-                type="datetime-local"
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={LABEL}>Đến</span>
+              <DateTimeInput
                 value={r.end}
-                min={r.start || min}
+                onChange={(v) => set(i, { end: v })}
+                minDate={startDate || today}
                 disabled={disabled}
-                onChange={(e) => set(i, { end: e.target.value })}
-                className={frame}
-                aria-label="Kết thúc"
+                invalid={wrong}
+                className="flex-1"
+                dateAriaLabel="Ngày kết thúc"
+                timeAriaLabel="Giờ kết thúc"
               />
+            </div>
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={r.note}
                 disabled={disabled}
                 onChange={(e) => set(i, { note: e.target.value })}
                 placeholder="Ghi chú (tuỳ chọn)"
-                className={`${INPUT} ${INPUT_OK} min-w-0 flex-1`}
+                className="min-w-0 flex-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
               <button
                 type="button"
@@ -158,7 +195,11 @@ export default function HmAvailabilityFields({ rows, onChange, disabled }: Props
             </div>
 
             {bad && (
-              <p className="flex items-center gap-1.5 pl-1 text-xs text-red-600 dark:text-red-400">
+              <p
+                className={`flex items-center gap-1.5 text-xs ${
+                  wrong ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'
+                }`}
+              >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 {ISSUE_TEXT[issue as Exclude<WindowIssue, null | 'empty'>]}
               </p>

@@ -217,12 +217,27 @@ public class GetMyApplicationsQueryHandlerTests
         var app = PortalAppsData.App(job.Id);
         var slot = new AvailabilitySlot { Id = Guid.NewGuid(), JobPostingId = job.Id, RoundNumber = 1, StartTime = DateTimeOffset.UtcNow.AddDays(1), EndTime = DateTimeOffset.UtcNow.AddDays(1).AddHours(1), Timezone = "UTC", Capacity = 5 };
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" })
             .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 1, Code = "ABC123", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() })
             .Seed(new InterviewBooking { Id = Guid.NewGuid(), ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 1, Status = "scheduled" })
             .Seed(slot);
         var arr = PortalAppsData.Json(await Run(Handler(uow), null));
         Assert.NotEqual(JsonValueKind.Null, arr[0].GetProperty("InterviewCode").ValueKind);
         Assert.NotEqual(JsonValueKind.Null, arr[0].GetProperty("UpcomingInterview").ValueKind);
+    }
+
+    [Fact]
+    public async Task UTCID13b_Onsite_round_code_is_not_shown()
+    {
+        // Vòng chuyên môn TẠI VĂN PHÒNG: Recruiter đưa mã tận tay khi ứng viên đã tới. Hiện mã ở Portal
+        // là cho vào phòng từ bất cứ đâu — đúng thứ "bắt buộc tại văn phòng" muốn ngăn.
+        var job = JobBoardData.PublicJob();
+        var app = PortalAppsData.App(job.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "technical" })
+            .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 1, Code = "ABC123", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() });
+        var arr = PortalAppsData.Json(await Run(Handler(uow), null));
+        Assert.Equal(JsonValueKind.Null, arr[0].GetProperty("InterviewCode").ValueKind);
     }
 
     [Fact]
@@ -392,10 +407,27 @@ public class GetMyApplicationDetailQueryHandlerTests
         var job = JobBoardData.PublicJob();
         var app = PortalAppsData.App(job.Id);
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" })
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 2, RoundType = "screening" })
             .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 1, Code = "AAA111", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() })
             .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 2, Code = "BBB222", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() });
         var obj = PortalAppsData.Json(await Run(Handler(uow), app.Id));
         Assert.Equal(2, obj.GetProperty("InterviewCode").GetProperty("RoundNumber").GetInt32());
+    }
+
+    [Fact]
+    public async Task UTCID10b_Onsite_round_code_is_skipped()
+    {
+        // Mã vòng 2 (chuyên môn, tại văn phòng) không hiện — còn lại mã vòng 1 làm từ nhà.
+        var job = JobBoardData.PublicJob();
+        var app = PortalAppsData.App(job.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" })
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 2, RoundType = "technical" })
+            .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 1, Code = "AAA111", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() })
+            .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app.Id, RoundNumber = 2, Code = "BBB222", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() });
+        var obj = PortalAppsData.Json(await Run(Handler(uow), app.Id));
+        Assert.Equal(1, obj.GetProperty("InterviewCode").GetProperty("RoundNumber").GetInt32());
     }
 
     [Fact]

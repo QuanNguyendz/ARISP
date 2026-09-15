@@ -36,7 +36,8 @@ namespace ARI.API.Controllers
     /// <summary>
     /// Thư mời nhận việc (ADR-061, Phase 5) — đoạn kết của phễu tuyển dụng.
     ///
-    /// Luồng: nháp → gửi duyệt → Hiring Manager duyệt → gửi ứng viên → ứng viên nhận/từ chối.
+    /// Luồng (ADR-063): Hiring Manager chính hoặc chủ tin soạn nháp → gửi duyệt → HR Leader chốt →
+    /// chủ tin gửi ứng viên (trình soạn thư) → ứng viên nhận/từ chối.
     /// Hồ sơ chỉ chuyển sang <c>offer</c> khi thư ĐƯỢC GỬI — bản nháp không phải lời hứa.
     /// </summary>
     [ApiController]

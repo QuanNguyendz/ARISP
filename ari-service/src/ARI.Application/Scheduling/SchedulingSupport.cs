@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,20 +63,29 @@ namespace ARI.Application.Scheduling
         /// ngồi cùng AI, mà mỗi tin chỉ có MỘT Hiring Manager — hai ca chồng giờ nghĩa là bắt họ ở
         /// hai phòng cùng lúc, dù đó là hai vòng khác nhau.
         ///
+        /// <b>Ca thi TRẮC NGHIỆM đứng ngoài luật này, cả hai chiều.</b> Luật sinh ra từ sự có mặt
+        /// của HM, mà bài thi làm trực tuyến không ai ngồi cùng. Không miễn thì một khung thi cả ngày
+        /// (09:00–17:00) chặn luôn mọi ca phỏng vấn vòng sau trong ngày đó, và hai đợt thi gối nhau
+        /// cũng không tạo được.
+        ///
         /// <paramref name="excludeSlotId"/>: khi SỬA giờ, chính ca đang sửa không được tính là đụng
         /// với bản thân nó.
         /// </summary>
         public static async Task<string?> ValidateSlotTimeAsync(
             IUnitOfWork unitOfWork,
             Guid jobPostingId,
+            int roundNumber,
             DateTimeOffset start,
             DateTimeOffset end,
             Guid? excludeSlotId,
             CancellationToken ct)
         {
+            var testRounds = await OnlineTestRoundsAsync(unitOfWork, jobPostingId, ct);
+            if (testRounds.Contains(roundNumber)) return null;
+
             var siblings = (await unitOfWork.Repository<AvailabilitySlot>()
                     .FindAsync(s => s.JobPostingId == jobPostingId, ct))
-                .Where(s => s.Id != excludeSlotId)
+                .Where(s => s.Id != excludeSlotId && !testRounds.Contains(s.RoundNumber))
                 .ToList();
 
             // Chồng lấn = giao nhau thật sự. Ca 14:00–15:00 và 15:00–16:00 nối đuôi nhau thì KHÔNG
@@ -90,10 +100,58 @@ namespace ARI.Application.Scheduling
         }
 
         /// <summary>
-        /// Ba luật chống xếp lịch hỏng (ADR-067). Trả về thông báo lỗi, hoặc <c>null</c> nếu xếp được.
+        /// <c>RoundType</c> của một vòng trong tin, <c>null</c> nếu tin chưa khai vòng đó.
+        /// </summary>
+        public static async Task<string?> RoundTypeAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, CancellationToken ct)
+            => (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                    r => r.JobPostingId == jobPostingId && r.RoundNumber == roundNumber, ct))
+                .FirstOrDefault()?.RoundType;
+
+        /// <summary>
+        /// Số thứ tự các vòng TRẮC NGHIỆM của tin — những vòng mà Hiring Manager không phải có mặt.
+        /// </summary>
+        public static async Task<HashSet<int>> OnlineTestRoundsAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, CancellationToken ct)
+            => (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                    r => r.JobPostingId == jobPostingId, ct))
+                .Where(r => InterviewInviteEmail.IsOnlineTest(r.RoundType))
+                .Select(r => r.RoundNumber)
+                .ToHashSet();
+
+        /// <summary>
+        /// Sức chứa hợp lệ của một ca, tuỳ LOẠI vòng. Trả về <c>(lỗi, sức chứa đã chốt)</c>.
+        ///
+        /// <b>Vòng hội thoại: đúng bằng 1.</b> Hiring Manager ngồi cùng AI suốt buổi nên một ca
+        /// không phục vụ được hai người (ADR-067). Chặn ở CỔNG chứ không âm thầm ghi đè về 1 — một
+        /// ô "sức chứa 3" nhận vào rồi bị bỏ qua trông vẫn như đang có tác dụng.
+        ///
+        /// <b>Vòng trắc nghiệm: mặc định KHÔNG giới hạn.</b> Bài thi trực tuyến không có ghế nào để
+        /// đếm — ai cũng làm được trong cùng khung giờ, và không có Hiring Manager nào phải chia
+        /// mình ra. Vẫn đặt được trần nếu Recruiter muốn mở đợt thi nhỏ.
+        ///
+        /// <paramref name="requested"/> <c>null</c> nghĩa là "để hệ thống quyết theo loại vòng".
+        /// </summary>
+        public static (string? error, int? capacity) ResolveCapacity(string? roundType, int? requested)
+        {
+            if (InterviewInviteEmail.IsOnlineTest(roundType))
+            {
+                if (requested == null) return (null, null);          // không giới hạn
+                return requested < 1
+                    ? ("Giới hạn số ứng viên mỗi ca phải từ 1 trở lên. Bỏ trống nếu không muốn giới hạn.", null)
+                    : (null, requested);
+            }
+
+            return requested is null or 1
+                ? (null, 1)
+                : ("Mỗi ca phỏng vấn chỉ nhận MỘT ứng viên. Cần nhiều chỗ hơn thì tạo thêm ca.", null);
+        }
+
+        /// <summary>
+        /// Các luật chống xếp lịch hỏng (ADR-067). Trả về thông báo lỗi, hoặc <c>null</c> nếu xếp được.
         ///
         /// Nằm ở ĐÂY chứ không trong từng handler vì có ba đường cùng ghi một booking — gán ca, dời
-        /// một người, dời cả nhóm. Viết riêng ở ba nơi thì luật thứ tư thêm sau sẽ chỉ vào được hai.
+        /// một người, dời cả nhóm. Viết riêng ở ba nơi thì luật thêm sau sẽ chỉ vào được hai.
         ///
         /// <paramref name="excludeBookingId"/>: khi DỜI lịch, chính booking đang dời không được tính
         /// là "đã có lịch trùng giờ" với bản thân nó.
@@ -156,18 +214,21 @@ namespace ARI.Application.Scheduling
             }
 
             // ---- Luật 3: ca phải nằm trong giờ Hiring Manager có mặt được --------------------
-            // Chỉ áp khi tin ĐÃ gán Hiring Manager: tin chưa có ai thì không có ràng buộc nào để áp,
-            // và hành vi giữ y như trước ADR-067. Vòng trắc nghiệm cũng thoát: HM không dự bài thi.
+            // Vòng trắc nghiệm thoát: HM không dự bài thi.
+            //
+            // ADR-068: mọi buổi phỏng vấn hội thoại đều có HM ngồi cùng, nên tin thiếu HM (tin cũ chưa
+            // gán) hay HM đã bị khoá là KHÔNG xếp được — trước đây hai trường hợp này bỏ qua luật 3/4 và
+            // xếp ca vào lịch của không ai cả, tới hôm phỏng vấn phòng chờ đợi một người không tồn tại.
             if (isOnlineTest) return null;
 
-            var hm = await JobAccess.PrimaryHiringManagerAsync(unitOfWork, slot.JobPostingId, ct);
-            if (hm == null) return null;
+            var (hm, hmError) = await JobAccess.RequireActiveHiringManagerAsync(unitOfWork, slot.JobPostingId, ct);
+            if (hm == null) return hmError;
 
             var windows = await HmAvailabilitySupport.ActiveWindowsAsync(
                 unitOfWork, slot.JobPostingId, roundNumber, ct);
             if (windows.Count == 0)
                 return "Hiring Manager chưa gửi khung giờ có thể tham gia phỏng vấn cho vòng này. "
-                       + "Hãy đề nghị họ gửi lịch rảnh trước khi xếp ca.";
+                       + "Hãy đề nghị họ khai ở mục “Lịch tôi có mặt được” trên màn tin trước khi xếp ca.";
 
             if (!HmAvailabilitySupport.IsCovered(windows, slot.StartTime, slot.EndTime))
                 return "Khung giờ này nằm ngoài lịch rảnh của Hiring Manager. "
@@ -188,9 +249,18 @@ namespace ARI.Application.Scheduling
 
             if (hmJobIds.Count == 0) return null;
 
+            // Ca thi TRẮC NGHIỆM của tin kia không chiếm mặt HM: không ai ngồi cùng bài thi. Không bỏ
+            // ra thì một đợt thi cả ngày ở tin A chặn mọi ca phỏng vấn cùng ngày ở tin B — dù HM rảnh.
+            var otherTestRounds = (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                    r => hmJobIds.Contains(r.JobPostingId), ct))
+                .Where(r => InterviewInviteEmail.IsOnlineTest(r.RoundType))
+                .Select(r => (r.JobPostingId, r.RoundNumber))
+                .ToHashSet();
+
             var hmSlotIds = (await unitOfWork.Repository<AvailabilitySlot>().FindAsync(
                     s => hmJobIds.Contains(s.JobPostingId)
                          && slot.StartTime < s.EndTime && s.StartTime < slot.EndTime, ct))
+                .Where(s => !otherTestRounds.Contains((s.JobPostingId, s.RoundNumber)))
                 .Select(s => s.Id)
                 .ToList();
             if (hmSlotIds.Count == 0) return null;

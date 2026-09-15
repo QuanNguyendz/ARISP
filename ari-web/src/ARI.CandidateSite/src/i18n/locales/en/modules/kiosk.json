@@ -4,13 +4,13 @@
     "subtitle": "Enter the 6-character code provided by the recruiter to start the interview.",
     "startButton": "Start Interview",
     "checkingCode": "Checking code...",
-    "mode": "Locked Mode · Office",
+    "mode": "Locked screen mode",
     "validity": {
       "hours": "Code valid for 2 hours",
       "oneTime": "One-time use",
       "autoRecover": "Auto-recovers on disconnect"
     },
-    "noCode": "Don't have a code? Please contact the recruiter at the reception desk.",
+    "noCode": "Don't have a code? At the office: ask the recruiter at reception. From home: the code is in your Applications page.",
     "continue": "Continue Incomplete Interview",
     "errors": {
       "notFound": "Interview code does not exist. Please check each character.",

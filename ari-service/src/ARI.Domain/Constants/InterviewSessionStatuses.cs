@@ -21,8 +21,8 @@ namespace ARI.Domain.Constants
 
         /// <summary>
         /// Buổi THẬT: ứng viên đã nhập mã và đang ở phòng chờ, AI chưa hỏi câu nào.
-        /// Rời khỏi trạng thái này chỉ bằng thao tác cho vào của Hiring Manager (hoặc quản trị viên
-        /// dự phòng khi tin chưa gán HM).
+        /// Rời khỏi trạng thái này chỉ bằng thao tác cho vào của Hiring Manager chính (hoặc quản trị viên
+        /// cho vào thay, có ghi audit — ADR-068).
         /// </summary>
         public const string Waiting = "waiting";
 

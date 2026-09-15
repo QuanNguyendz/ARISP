@@ -50,6 +50,24 @@ public class PracticeConductTests
     }
 
     [Fact]
+    public async Task A_real_session_always_starts_in_the_waiting_room_even_without_a_hiring_manager()
+    {
+        // ADR-068: trước đây tin chưa gán HM thì phiên thật vào thẳng `active` — gỡ HM khỏi đội là buổi phỏng
+        // vấn chạy không người ngồi cùng. Nay mọi buổi thật chờ HM (hoặc quản trị viên, có audit) cho vào.
+        var job = PracticeData.Job(language: "vi");
+        var app = PracticeData.App(job.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(PracticeData.Rubric(job.Id)).Seed(app);
+
+        var res = await Svc(uow, new(), new(), new()).StartSessionAsync(
+            new StartSessionRequest { ApplicationId = app.Id, RoundNumber = 1, SessionType = "real" }, CancellationToken.None);
+
+        Assert.True(res.IsSuccess, res.Error);
+        var session = Assert.Single(uow.Repo<InterviewSession>().Items);
+        Assert.Equal("waiting", session.Status);
+        Assert.Null(session.StartedAt); // giờ ngồi chờ không bị trừ vào thời lượng phỏng vấn
+    }
+
+    [Fact]
     public async Task Start_creates_active_practice_session()
     {
         var job = PracticeData.Job(language: "en");

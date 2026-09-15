@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
@@ -42,8 +43,10 @@ public class RecruitmentRequestFlowTests
     private static RecruitmentRequestInput Input(
         decimal? min = 20_000_000, decimal? max = 30_000_000, string? requirements = SampleRequirements,
         string? priority = RecruitmentPriority.Medium, DateTimeOffset? startDate = null,
-        string? reason = "Mở rộng đội", string? description = "Cần kỹ sư .NET", bool negotiable = false) =>
+        string? reason = "Mở rộng đội", string? description = "Cần kỹ sư .NET", bool negotiable = false,
+        IReadOnlyList<string>? rounds = null) =>
         new("Backend Developer", 2, priority, reason, description, requirements,
+            rounds ?? new[] { InterviewRoundTypes.OnlineTest, InterviewRoundTypes.Technical },
             "full_time", "onsite", "Hà Nội", "senior",
             startDate ?? DateTimeOffset.UtcNow.AddMonths(1), min, max, "VND", negotiable);
 

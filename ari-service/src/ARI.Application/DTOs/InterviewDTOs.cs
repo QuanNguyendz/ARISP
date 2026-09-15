@@ -190,14 +190,16 @@ namespace ARI.Application.DTOs
         public DateTimeOffset StartTime { get; set; }
         public DateTimeOffset EndTime { get; set; }
         public string Timezone { get; set; } = "Asia/Ho_Chi_Minh";
-        public int Capacity { get; set; }
+
+        /// <summary>Sức chứa; <c>null</c> = không giới hạn (vòng trắc nghiệm).</summary>
+        public int? Capacity { get; set; }
 
         /// <summary>Số chỗ đang bị chiếm = booking có <c>Status = "scheduled"</c>.</summary>
         public int BookedCount { get; set; }
 
-        /// <summary>Số chỗ còn nhận thêm được, đã kẹp không âm. Tính sẵn để giao diện không tự trừ
-        /// (chỗ nào tự trừ là chỗ đó có cơ hội ra số âm khi ca bị vượt sức chứa).</summary>
-        public int SeatsAvailable { get; set; }
+        /// <summary>Số chỗ còn nhận thêm được, đã kẹp không âm; <c>null</c> khi ca không giới hạn. Tính sẵn
+        /// để giao diện không tự trừ (chỗ nào tự trừ là chỗ đó có cơ hội ra số âm khi ca bị vượt sức chứa).</summary>
+        public int? SeatsAvailable { get; set; }
 
         /// <summary>Đang giữ chỗ VÀ ứng viên đã xác nhận tham dự.</summary>
         public int ConfirmedCount { get; set; }

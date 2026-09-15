@@ -8,8 +8,15 @@ using MediatR;
 
 namespace ARI.Application.Playbooks.Commands.DeletePlaybook
 {
-    /// <summary>Xoá mềm một playbook VÀ gỡ chunk của nó khỏi kho vector.</summary>
-    public record DeletePlaybookCommand(Guid Id) : IRequest<Result>;
+    /// <summary>
+    /// Xoá mềm một playbook VÀ gỡ chunk của nó khỏi kho vector.
+    ///
+    /// <paramref name="JobPostingId"/> có giá trị khi gọi từ màn tin (ADR-069): tài liệu phải thuộc đúng tin
+    /// đó — nếu không, id của tài liệu tin khác (hay của playbook công ty) đi qua URL của tin này sẽ xoá
+    /// được thứ người gọi không hề nhìn thấy trên màn hình.
+    /// </summary>
+    public record DeletePlaybookCommand(Guid Id, Guid? ActorId, string? ActorRole, Guid? JobPostingId = null)
+        : IRequest<Result>;
 
     public class DeletePlaybookCommandHandler : IRequestHandler<DeletePlaybookCommand, Result>
     {
@@ -27,6 +34,17 @@ namespace ARI.Application.Playbooks.Commands.DeletePlaybook
             var doc = await _unitOfWork.Repository<PlaybookDocument>().GetByIdAsync(request.Id, ct);
             if (doc == null)
                 return Result.Failure("Không tìm thấy playbook.", CommonErrorCodes.NotFound);
+
+            if (request.JobPostingId is { } jobId
+                && (doc.Scope == PlaybookScope.ScopeOrg || doc.ScopeRefId != jobId))
+                return Result.Failure("Không tìm thấy playbook.", CommonErrorCodes.NotFound);
+
+            // Cùng luật với lúc thêm: playbook công ty là của HR Leader, playbook theo tin là của HM chính.
+            // Trước đây lệnh này không kiểm gì ngoài policy ở controller.
+            var (accessError, accessCode) = await PlaybookAccess.CheckWriteAsync(
+                _unitOfWork, doc.Scope, doc.ScopeRefId, request.ActorId, request.ActorRole, ct);
+            if (accessError != null)
+                return accessCode == null ? Result.Failure(accessError) : Result.Failure(accessError, accessCode);
 
             // Gỡ chunk TRƯỚC khi xoá mềm. Bản cũ chỉ set DeletedAt nên tài liệu biến mất khỏi màn hình
             // nhưng chunk vẫn nằm trong kho vector và tiếp tục được truy hồi ở mọi buổi phỏng vấn —

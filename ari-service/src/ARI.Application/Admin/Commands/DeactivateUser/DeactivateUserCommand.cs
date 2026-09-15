@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.HiringTeam;
 using ARI.Application.Interfaces;
 using ARI.Domain.Entities;
 using MediatR;
@@ -41,6 +42,14 @@ namespace ARI.Application.Admin.Commands.DeactivateUser
             _unitOfWork.Repository<User>().Update(user);
             await AdminSupport.WriteAuditAsync(_unitOfWork, request.ActorId, "user_deactivated", "User", user.Id,
                 $"{{\"email\":\"{user.Email}\",\"reason\":{System.Text.Json.JsonSerializer.Serialize(reason)}}}", ct);
+
+            // ADR-068: khoá KHÔNG bị chặn (việc an ninh), nhưng các tin người này đang làm Hiring Manager
+            // chính sẽ đóng cổng — báo HR Leader chuyển HM ngay trong cùng giao dịch.
+            var heldJobs = await HiringManagerAlerts.OpenJobsHeldByAsync(_unitOfWork, user.Id, ct);
+            await HiringManagerAlerts.NotifyAdminsAsync(_unitOfWork, heldJobs,
+                $"Tài khoản Hiring Manager {user.FullName ?? user.Email} vừa bị khoá.",
+                $"hm_inactive:{user.Id}:{DateTimeOffset.UtcNow.Ticks}", ct);
+
             await _unitOfWork.SaveChangesAsync();
 
             return Result.Success();

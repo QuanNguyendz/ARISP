@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -16,14 +17,23 @@ import {
   CheckCircle2,
   Download,
   Scale,
+  Info,
+  ArrowRight,
 } from 'lucide-react'
 import { PageHeader, ErrorAlert, EmptyState, Pagination, Select } from '@ari/shared/ui'
 import { CardGridSkeleton } from './_skeletons'
 import { playbookService, isRubricDocType } from '@/fservices/playbook/playbookService'
 import type { PlaybookItem } from '@/fservices/playbook/playbookService'
 import jobService from '@ari/shared/fservices/job'
-import type { JobPosting } from '@ari/shared/types/job'
 
+/**
+ * Playbook của HR Leader (ADR-025 · ADR-069).
+ *
+ * Màn này quản lý playbook CÔNG TY — thứ áp cho mọi tin (văn phong, văn hoá, điều cấm hỏi, bộ tiêu chí chung).
+ * Playbook THEO TIN / THEO VÒNG là nội dung chuyên môn của từng vị trí nên do Hiring Manager chính thêm ngay
+ * trong màn tin; ở đây chúng chỉ hiện để HR Leader nhìn toàn cảnh, kèm lối vào đúng tin để sửa. Trước đây màn
+ * này là nơi DUY NHẤT thêm được playbook theo tin, trong khi HM — người biết cần hỏi gì — không vào được.
+ */
 export default function HrPlaybooksPage() {
   const { t } = useTranslation('modules/hr/playbooks')
 
@@ -63,6 +73,7 @@ export default function HrPlaybooksPage() {
     s === 'org' ? Building2 : s === 'job_posting' ? Briefcase : Layers
 
   const [docs, setDocs] = useState<PlaybookItem[]>([])
+  const [jobTitles, setJobTitles] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
@@ -74,7 +85,13 @@ export default function HrPlaybooksPage() {
     setLoading(true)
     setError('')
     try {
-      setDocs(await playbookService.getPlaybooks())
+      const [items, jobs] = await Promise.all([
+        playbookService.getPlaybooks(),
+        // Tên tin cho các thẻ playbook theo tin — hỏng thì thẻ vẫn hiện, chỉ thiếu tên.
+        jobService.getAdminJobPostings().catch(() => []),
+      ])
+      setDocs(items)
+      setJobTitles(Object.fromEntries(jobs.map((j) => [j.id, j.title])))
     } catch (e: any) {
       setError(e?.response?.data?.message || t('loadingError'))
     } finally {
@@ -126,6 +143,10 @@ export default function HrPlaybooksPage() {
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
 
+      <div className="mb-6 flex items-start gap-2 rounded-xl border border-ai-200 bg-ai-50/60 px-4 py-3 text-sm text-ai-800 dark:border-ai-500/20 dark:bg-ai-500/10 dark:text-ai-300">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" /> {t('jobScopedHint')}
+      </div>
+
       <div className="mb-6 flex flex-wrap gap-2">
         {[['all', t('filters.all')], ...SCOPES].map(([v, l]) => (
           <button
@@ -151,6 +172,7 @@ export default function HrPlaybooksPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {paged.map((d, i) => {
             const Icon = scopeIcon(d.scope)
+            const isOrg = d.scope === 'org'
             return (
               <motion.div
                 key={d.id}
@@ -180,17 +202,20 @@ export default function HrPlaybooksPage() {
                       <Icon className="h-3 w-3" /> {scopeLabel(d.scope)}
                       {d.roundNumber ? ` · V${d.roundNumber}` : ''}
                     </span>
-                    <button
-                      onClick={() => remove(d.id)}
-                      disabled={deletingId === d.id}
-                      className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-500/10"
-                    >
-                      {deletingId === d.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </button>
+                    {/* Xoá ở đây chỉ dành cho playbook công ty — playbook theo tin quản lý tại màn tin. */}
+                    {isOrg && (
+                      <button
+                        onClick={() => remove(d.id)}
+                        disabled={deletingId === d.id}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-500/10"
+                      >
+                        {deletingId === d.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <h3 className="font-semibold text-ink-900 dark:text-white">
@@ -199,6 +224,17 @@ export default function HrPlaybooksPage() {
                 <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-ink-500 dark:text-ink-400">
                   <FileText className="h-3 w-3" /> {d.fileName}
                 </p>
+                {!isOrg && d.scopeRefId && (
+                  <Link
+                    to={`/hr/jobs/${d.scopeRefId}`}
+                    className="mt-2 flex items-center gap-1 truncate text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    <Briefcase className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{jobTitles[d.scopeRefId] ?? t('unknownJob')}</span>
+                    <span className="shrink-0">· {t('openJob')}</span>
+                    <ArrowRight className="h-3 w-3 shrink-0" />
+                  </Link>
+                )}
                 <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3 text-xs dark:border-white/10">
                   <span
                     className={`rounded-full px-2 py-0.5 ${d.status === 'ready' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'}`}
@@ -234,6 +270,7 @@ export default function HrPlaybooksPage() {
       {showUpload && (
         <UploadModal
           t={t}
+          docTypes={DOC_TYPES}
           onClose={() => setShowUpload(false)}
           onUploaded={(doc) => {
             setDocs((prev) => [doc, ...prev])
@@ -245,34 +282,24 @@ export default function HrPlaybooksPage() {
   )
 }
 
+/** Thêm playbook CÔNG TY — phạm vi cố định `org` (playbook theo tin thêm ở màn tin, ADR-069). */
 function UploadModal({
   t,
+  docTypes,
   onClose,
   onUploaded,
 }: {
   t: (key: string) => string
+  docTypes: [string, string][]
   onClose: () => void
   onUploaded: (doc: PlaybookItem) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [scope, setScope] = useState('org')
   const [documentType, setDocumentType] = useState('style_guide')
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
-  const [scopeRefId, setScopeRefId] = useState('')
-  const [roundNumber, setRoundNumber] = useState<number>(1)
-  const [jobs, setJobs] = useState<JobPosting[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (scope !== 'org' && jobs.length === 0) {
-      jobService
-        .getAdminJobPostings()
-        .then(setJobs)
-        .catch(() => {})
-    }
-  }, [scope, jobs.length])
 
   const isRubric = isRubricDocType(documentType)
 
@@ -308,20 +335,10 @@ function UploadModal({
       setError(t('selectFileError'))
       return
     }
-    if (scope !== 'org' && !scopeRefId) {
-      setError(t('selectJobError'))
-      return
-    }
     setSubmitting(true)
     setError('')
     try {
-      const doc = await playbookService.uploadPlaybook({
-        file,
-        scope,
-        documentType,
-        scopeRefId: scope !== 'org' ? scopeRefId : undefined,
-        roundNumber: scope === 'round' ? roundNumber : undefined,
-      })
+      const doc = await playbookService.uploadPlaybook({ file, scope: 'org', documentType })
       onUploaded(doc)
     } catch (e: any) {
       setError(e?.response?.data?.message || t('uploadError'))
@@ -329,30 +346,6 @@ function UploadModal({
       setSubmitting(false)
     }
   }
-
-  const inputCls =
-    'w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-400'
-
-  const DOC_TYPES: [string, string][] = [
-    ['style_guide', t('docTypes.styleGuide')],
-    ['question_bank', t('docTypes.questionBank')],
-    ['competency_framework', t('docTypes.competencyFramework')],
-    ['culture_guide', t('docTypes.cultureGuide')],
-    ['compliance', t('docTypes.compliance')],
-    ['red_flag', t('docTypes.redFlag')],
-    ['technical_scenario', t('docTypes.technicalScenario')],
-    ['expected_answer', t('docTypes.expectedAnswer')],
-    ['must_ask', t('docTypes.mustAsk')],
-    ['round_playbook', t('docTypes.roundPlaybook')],
-    ['cv_rubric', t('docTypes.cvRubric')],
-    ['interview_rubric', t('docTypes.interviewRubric')],
-  ]
-
-  const SCOPES: [string, string][] = [
-    ['org', t('scopes.org')],
-    ['job_posting', t('scopes.jobPosting')],
-    ['round', t('scopes.round')],
-  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -425,64 +418,18 @@ function UploadModal({
             <span className="truncate">{file ? file.name : t('selectFile')}</span>
           </button>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                {t('documentType')}
-              </label>
-              <Select
-                value={documentType}
-                onChange={changeDocumentType}
-                className="w-full"
-                buttonClassName="px-3 py-2.5 text-sm"
-                options={DOC_TYPES.map(([v, l]) => ({ value: v, label: l }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                {t('scope')}
-              </label>
-              <Select
-                value={scope}
-                onChange={setScope}
-                className="w-full"
-                buttonClassName="px-3 py-2.5 text-sm"
-                options={SCOPES.map(([v, l]) => ({ value: v, label: l }))}
-              />
-            </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+              {t('documentType')}
+            </label>
+            <Select
+              value={documentType}
+              onChange={changeDocumentType}
+              className="w-full"
+              buttonClassName="px-3 py-2.5 text-sm"
+              options={docTypes.map(([v, l]) => ({ value: v, label: l }))}
+            />
           </div>
-
-          {scope !== 'org' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className={scope === 'round' ? '' : 'col-span-2'}>
-                <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                  {t('jobPosting')}
-                </label>
-                <Select
-                  value={scopeRefId}
-                  onChange={setScopeRefId}
-                  placeholder={`— ${t('selectJob')} —`}
-                  className="w-full"
-                  buttonClassName="px-3 py-2.5 text-sm"
-                  options={jobs.map((j) => ({ value: j.id, label: j.title }))}
-                />
-              </div>
-              {scope === 'round' && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-                    {t('round')}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={roundNumber}
-                    onChange={(e) => setRoundNumber(Number(e.target.value))}
-                    className={inputCls}
-                  />
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

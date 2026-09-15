@@ -112,7 +112,12 @@ export default function AssignSchedulePanel({
   const openSlots = useMemo(() => {
     const now = Date.now()
     return slots
-      .filter((s) => new Date(s.startTime).getTime() > now && s.bookedCount < s.capacity)
+      // `capacity == null` = không giới hạn (vòng trắc nghiệm) — luôn còn chỗ.
+      .filter(
+        (s) =>
+          new Date(s.startTime).getTime() > now &&
+          (s.capacity == null || s.bookedCount < s.capacity)
+      )
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
   }, [slots])
 
@@ -201,7 +206,7 @@ export default function AssignSchedulePanel({
                 value: s.id,
                 label:
                   slotLabel(s) +
-                  (s.capacity > 1
+                  (s.capacity != null && s.capacity > 1
                     ? ` (${t('capacityHint', { available: s.capacity - s.bookedCount, total: s.capacity })})`
                     : ''),
               }))}

@@ -107,6 +107,13 @@ export default function PendingJobsPage() {
   const [actionId, setActionId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<JobPosting | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  /**
+   * Đăng khi Hiring Manager CHƯA ký (ADR-063/068) — lý do bắt buộc ≥10 ký tự. Người duyệt đăng là HM (chữ
+   * ký của họ LÀ cổng đăng tin); màn này chỉ còn lối thoát có dấu vết của quản trị viên. Trước đây nút
+   * "Duyệt" gọi thẳng `active` không kèm lý do nên trên mọi tin đang chờ ký nó luôn nhận 403.
+   */
+  const [bypassTarget, setBypassTarget] = useState<JobPosting | null>(null)
+  const [bypassReason, setBypassReason] = useState('')
   const [page, setPage] = useState(1)
 
   const pendingJobs = useMemo(() => jobs.filter((j) => j.status === 'pending'), [jobs])
@@ -150,12 +157,16 @@ export default function PendingJobsPage() {
 
   const queryClient = useQueryClient()
 
-  const approve = async (job: JobPosting) => {
+  const confirmBypass = async () => {
+    if (!bypassTarget || bypassReason.trim().length < 10) return
+    const job = bypassTarget
     setActionId(job.id)
     setError(null)
     try {
-      await jobService.updateJobStatus(job.id, 'active')
+      await jobService.updateJobStatus(job.id, 'active', undefined, bypassReason.trim())
       queryClient.invalidateQueries({ queryKey: ['admin-jobs'] })
+      setBypassTarget(null)
+      setBypassReason('')
     } catch (err) {
       // Server nêu lý do cụ thể (vd tin có vòng trắc nghiệm nhưng ngân hàng đề chưa đủ câu).
       const e = err as { response?: { data?: { message?: string } } }
@@ -241,6 +252,14 @@ export default function PendingJobsPage() {
                         <Clock className="w-3 h-3" />
                         {t('approval.createdAt')}: {formatDateTime(job.createdAt)}
                       </span>
+                      {/* Ai đang giữ cổng đăng tin (ADR-063) — và cảnh báo khi không còn ai giữ được (ADR-068). */}
+                      <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                        {job.hiringManagerState && job.hiringManagerState !== 'active'
+                          ? t('approval.hmUnavailable')
+                          : t('approval.awaitingHm', {
+                              name: job.hiringManagerName || t('approval.theHiringManager'),
+                            })}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap lg:justify-end">
@@ -255,15 +274,18 @@ export default function PendingJobsPage() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => approve(job)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-50 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                      onClick={() => {
+                        setBypassTarget(job)
+                        setBypassReason('')
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium hover:bg-amber-50 dark:hover:bg-amber-500/30 transition-colors disabled:opacity-50"
                     >
                       {busy ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <CheckCircle className="w-4 h-4" />
                       )}
-                      {t('approval.approve')}
+                      {t('approval.publishBypass')}
                     </button>
                     <button
                       type="button"
@@ -293,6 +315,59 @@ export default function PendingJobsPage() {
           label={t('paginationLabel')}
           onPageChange={setPage}
         />
+      )}
+
+      {bypassTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover"
+          >
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">
+              {t('approval.bypassModalTitle')}
+            </h3>
+            <p className="text-sm text-ink-500 dark:text-ink-400 mb-4">
+              {t('approval.bypassModalDescription', {
+                title: bypassTarget.title,
+                hm: bypassTarget.hiringManagerName || t('approval.theHiringManager'),
+              })}
+            </p>
+            <textarea
+              value={bypassReason}
+              onChange={(e) => setBypassReason(e.target.value)}
+              rows={4}
+              placeholder={t('approval.bypassPlaceholder')}
+              className="w-full px-3 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
+            />
+            <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">{t('approval.bypassHint')}</p>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setBypassTarget(null)
+                  setBypassReason('')
+                }}
+                className="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 text-sm font-medium transition-colors"
+              >
+                {t('approval.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={bypassReason.trim().length < 10 || actionId === bypassTarget.id}
+                onClick={confirmBypass}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 transition-colors disabled:opacity-50"
+              >
+                {actionId === bypassTarget.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                {t('approval.confirmBypass')}
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
 
       {rejectTarget && (

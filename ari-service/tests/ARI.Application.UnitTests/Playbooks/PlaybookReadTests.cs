@@ -7,6 +7,7 @@ using ARI.Application.Playbooks.Commands.DeletePlaybook;
 using ARI.Application.Playbooks.Queries.GetPlaybooks;
 using ARI.Application.UnitTests.Auth;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -21,7 +22,10 @@ namespace ARI.Application.UnitTests.Playbooks;
 public class DeletePlaybookCommandHandlerTests
 {
     private static PlaybookDocument Doc()
-        => new() { Scope = "company", DocumentType = "guide", FileName = "guide.pdf", UploadedByUserId = Guid.NewGuid() };
+        => new() { Scope = "org", DocumentType = "style_guide", FileName = "guide.pdf", UploadedByUserId = Guid.NewGuid() };
+
+    /// <summary>Playbook công ty do HR Leader xoá (ADR-069: lệnh nay kiểm quyền theo phạm vi tài liệu).</summary>
+    private static DeletePlaybookCommand AdminDelete(Guid id) => new(id, Guid.NewGuid(), AppRoles.HrAdmin);
 
     private static DeletePlaybookCommandHandler Handler(InMemoryUnitOfWork uow, RecordingRagIngestionService? rag = null)
         => new(uow, rag ?? new RecordingRagIngestionService());
@@ -30,7 +34,7 @@ public class DeletePlaybookCommandHandlerTests
     [Fact]
     public async Task UTCID01_Not_found()
     {
-        var res = await Handler(new InMemoryUnitOfWork()).Handle(new DeletePlaybookCommand(Guid.NewGuid()), CancellationToken.None);
+        var res = await Handler(new InMemoryUnitOfWork()).Handle(AdminDelete(Guid.NewGuid()), CancellationToken.None);
         Assert.True(res.IsFailure);
         Assert.Equal("Không tìm thấy playbook.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
@@ -44,7 +48,7 @@ public class DeletePlaybookCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(doc);
         var rag = new RecordingRagIngestionService();
 
-        var res = await Handler(uow, rag).Handle(new DeletePlaybookCommand(doc.Id), CancellationToken.None);
+        var res = await Handler(uow, rag).Handle(AdminDelete(doc.Id), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.NotNull(doc.DeletedAt);
@@ -65,11 +69,11 @@ public class DeletePlaybookCommandHandlerTests
     [Fact]
     public async Task Keeps_document_visible_when_chunk_removal_fails()
     {
-        var doc = new PlaybookDocument { Scope = "job", DocumentType = "style", FileName = "pb.pdf", UploadedByUserId = Guid.NewGuid() };
+        var doc = new PlaybookDocument { Scope = "org", DocumentType = "style_guide", FileName = "pb.pdf", UploadedByUserId = Guid.NewGuid() };
         var uow = new InMemoryUnitOfWork().Seed(doc);
         var rag = new RecordingRagIngestionService { ThrowOnIngest = true };
 
-        var res = await Handler(uow, rag).Handle(new DeletePlaybookCommand(doc.Id), CancellationToken.None);
+        var res = await Handler(uow, rag).Handle(AdminDelete(doc.Id), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Null(doc.DeletedAt);
@@ -82,7 +86,7 @@ public class DeletePlaybookCommandHandlerTests
     {
         var doc = Doc();
         var uow = new InMemoryUnitOfWork().Seed(doc).FailUpdateFor<PlaybookDocument>("Update Error");
-        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow).Handle(new DeletePlaybookCommand(doc.Id), CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow).Handle(AdminDelete(doc.Id), CancellationToken.None));
         Assert.Equal("Update Error", ex.Message);
     }
 
@@ -92,7 +96,7 @@ public class DeletePlaybookCommandHandlerTests
     {
         var doc = Doc();
         var uow = new InMemoryUnitOfWork().Seed(doc).FailSaveOn(1, "Save Error");
-        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow).Handle(new DeletePlaybookCommand(doc.Id), CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<Exception>(() => Handler(uow).Handle(AdminDelete(doc.Id), CancellationToken.None));
         Assert.Equal("Save Error", ex.Message);
     }
 }

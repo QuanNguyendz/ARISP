@@ -9,7 +9,7 @@
     "awaitingSignOff": "Awaiting your sign-off",
     "awaitingDecision": "Awaiting your decision",
     "awaitingShortlist": "Candidates awaiting you",
-    "awaitingOfferApproval": "Offers to approve"
+    "awaitingOfferDraft": "Offers for you to draft"
   },
   "jobs": {
     "title": "Your job postings",
@@ -48,8 +48,12 @@
     "hint": "Your signature is what lets a job go live — open the JD file and read it before signing."
   },
   "offers": {
-    "title": "Offers awaiting approval",
-    "count_one": "{{count}} offer is waiting for your input",
-    "count_other": "{{count}} offers are waiting for your input"
+    "title": "Job offers",
+    "hint": "You draft the offer and send it for approval; the HR Leader signs off the salary, then the recruiter sends it to the candidate.",
+    "toDraft": "Cleared every round · {{job}} — draft the offer",
+    "drafts_one": "{{count}} draft not yet sent for approval",
+    "drafts_other": "{{count}} drafts not yet sent for approval",
+    "awaitingHrLeader_one": "{{count}} offer awaiting the HR Leader",
+    "awaitingHrLeader_other": "{{count}} offers awaiting the HR Leader"
   }
 }

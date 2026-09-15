@@ -7,12 +7,13 @@
   "position": "Vị trí tuyển dụng",
   "upcomingInterview": {
     "title": "Lịch sắp tới",
-    "interview": "Phỏng vấn"
+    "interviewRound": "Phỏng vấn · Vòng {{round}}",
+    "test": "Bài trắc nghiệm · Vòng {{round}}"
   },
   "viewCode": "Xem mã & hướng dẫn",
   "roundList": {
-    "title": "Các vòng phỏng vấn",
-    "empty": "Chưa có vòng phỏng vấn nào cho hồ sơ này."
+    "title": "Các vòng tuyển chọn",
+    "empty": "Chưa có vòng tuyển chọn nào cho hồ sơ này."
   },
   "practiceList": {
     "title": "Phỏng vấn thử",
@@ -21,10 +22,10 @@
     "view": "Xem lại →"
   },
   "round": {
-    "screening": "Screening",
-    "technical": "Technical",
-    "online_test": "Online Test",
-    "final": "Final"
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "online_test": "Trắc nghiệm",
+    "final": "Vòng cuối"
   },
   "missed": {
     "title": "Vòng {{round}}: Đã quá hạn buổi phỏng vấn",
@@ -43,7 +44,10 @@
     "noResult": "Chưa có kết quả",
     "practiceInterview": "Phỏng vấn thử",
     "realInterview": "Phỏng vấn thật",
-    "onlineTest": "Làm bài trực tuyến"
+    "onlineTest": "Làm bài trực tuyến",
+    "testExpired": "Hết hạn",
+    "testSubmitted": "Đã nộp bài",
+    "testNotStarted": "Chưa làm bài"
   },
   "criteria": {
     "byCriteria": "Theo tiêu chí",
@@ -123,6 +127,15 @@
     "remoteHint": "Làm trực tuyến ngay tại đây — không cần tới văn phòng, không cần mã phỏng vấn.",
     "start": "Bắt đầu làm bài",
     "submittedTitle": "Đã nộp bài trắc nghiệm",
-    "submittedHint": "Bộ phận tuyển dụng sẽ thông báo kết quả khi chốt vòng này."
+    "submittedHint": "Bộ phận tuyển dụng sẽ thông báo kết quả khi chốt vòng này.",
+    "openTest": "Mở bài thi trắc nghiệm",
+    "expiredTitle": "Đã hết hạn làm bài thi trắc nghiệm",
+    "expiredDetail": "Bài thi mở lúc {{opens}} và chỉ nhận người vào làm tới {{closes}}. Bạn không vào làm bài trong khoảng thời gian này nên bài thi đã hết hạn và được hệ thống tự động nộp.",
+    "expiredContact": "Nếu bạn gặp sự cố khiến không vào được đúng giờ, hãy liên hệ trực tiếp bộ phận nhân sự — hệ thống không tự mở lại bài thi.",
+    "notOpenTitle": "Bài thi chưa mở",
+    "notOpenDetail": "Bài thi mở lúc {{opens}}. Bạn có 1 tiếng kể từ lúc đó để vào làm bài — hãy quay lại đúng giờ.",
+    "notScheduledTitle": "Chưa có giờ làm bài",
+    "notScheduledDetail": "Bộ phận nhân sự sẽ xếp giờ làm bài và gửi thư mời cho bạn.",
+    "expiredDetailNoTime": "Bạn không vào làm bài trong khung giờ đã hẹn nên bài thi đã hết hạn và được hệ thống tự động nộp."
   }
 }

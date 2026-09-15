@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Application.Offers;
 using ARI.Application.Options;
 using ARI.Application.Scheduling;
@@ -24,6 +25,9 @@ namespace ARI.Infrastructure.Services
     ///    luồng thư mời</b> của vòng đó, không đẻ thư mới.
     /// 2. <b>Tự đánh trượt người không tham dự</b>: qua giờ hẹn (cộng thêm khoảng ân hạn) mà không có
     ///    phiên phỏng vấn THẬT nào của vòng → hồ sơ <c>not_pass</c>, lịch đóng lại.
+    /// 3. <b>Bài trắc nghiệm hết hạn</b> KHÔNG đi đường số 2: quá hạn chót mà chưa có bài thì hệ thống
+    ///    nộp thay một bài trống (<see cref="OnlineTestExpiry"/>) — lịch giữ nguyên, chỗ không trả,
+    ///    hồ sơ ở nguyên vòng với 0 điểm cho Recruiter quyết định.
     ///
     /// Thay cho cơ chế cũ "quá hạn xác nhận 48h thì tự huỷ lịch rồi trả chỗ cho nhân sự xếp lại":
     /// cách đó đối xử với người <i>phớt lờ</i> thư mời y hệt người <i>chủ động báo bận</i>, trong khi
@@ -32,6 +36,14 @@ namespace ARI.Infrastructure.Services
     public class InterviewScheduleFollowUpHostedService : BackgroundService
     {
         private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(30);
+
+        /// <summary>
+        /// Nhịp riêng của việc nộp thay bài trắc nghiệm hết hạn. Nhịp 30 phút chung là đủ cho nhắc
+        /// lịch hay thư mời nhận việc, nhưng ở đây người tuyển dụng đang nhìn bảng điểm của vòng: điểm
+        /// của người không vào thi phải hiện ra sau hạn chót vài phút, không phải nửa tiếng. Một lượt
+        /// quét chỉ là vài truy vấn trên các lịch đang giữ chỗ.
+        /// </summary>
+        private static readonly TimeSpan TestExpiryInterval = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(1);
 
         private readonly IServiceScopeFactory _scopeFactory;
@@ -56,8 +68,25 @@ namespace ARI.Infrastructure.Services
             try { await Task.Delay(StartupDelay, stoppingToken); }
             catch (OperationCanceledException) { return; }
 
+            var lastFullScan = DateTimeOffset.MinValue;
+
             while (!stoppingToken.IsCancellationRequested)
             {
+                // Chạy TRƯỚC việc đánh trượt người vắng mặt, cùng một vòng quét — dù việc đó đã bỏ
+                // qua vòng trắc nghiệm, thứ tự này giữ cho vòng đó luôn có kết quả trước khi bất cứ
+                // luật nào khác nhìn vào nó.
+                try { await ExpireOnlineTestsAsync(stoppingToken); }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex) { _logger.LogError(ex, "Tự nộp bài trắc nghiệm hết hạn thất bại."); }
+
+                if (DateTimeOffset.UtcNow - lastFullScan < ScanInterval)
+                {
+                    try { await Task.Delay(TestExpiryInterval, stoppingToken); }
+                    catch (OperationCanceledException) { break; }
+                    continue;
+                }
+                lastFullScan = DateTimeOffset.UtcNow;
+
                 // Hai việc tách nhau: nhắc lỗi thì vẫn phải đánh trượt được và ngược lại.
                 try { await RemindPendingAsync(stoppingToken); }
                 catch (OperationCanceledException) { break; }
@@ -81,7 +110,7 @@ namespace ARI.Infrastructure.Services
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex) { _logger.LogError(ex, "Đóng thư mời nhận việc quá hạn thất bại."); }
 
-                try { await Task.Delay(ScanInterval, stoppingToken); }
+                try { await Task.Delay(TestExpiryInterval, stoppingToken); }
                 catch (OperationCanceledException) { break; }
             }
         }
@@ -136,15 +165,21 @@ namespace ARI.Infrastructure.Services
                     if (!already.Any())
                     {
                         var local = slot.StartTime.ToOffset(TimeSpan.FromHours(7));
+                        var roundType = (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                                r => r.JobPostingId == app.JobPostingId && r.RoundNumber == booking.RoundNumber, ct))
+                            .FirstOrDefault()?.RoundType;
+                        var isTest = InterviewInviteEmail.IsOnlineTest(roundType);
                         await unitOfWork.Repository<Notification>().AddAsync(new Notification
                         {
                             CandidateAccountId = app.CandidateAccountId.Value,
                             DedupKey = dedupKey,
                             Type = "schedule",
-                            Title = "Bạn chưa phản hồi lịch phỏng vấn",
-                            Body = $"Buổi phỏng vấn vòng {booking.RoundNumber} lúc {local:HH:mm dd/MM/yyyy} sắp diễn ra. "
-                                   + "Vui lòng xác nhận tham dự, hoặc báo bận kèm lý do để được xếp lịch khác. "
-                                   + "Không phản hồi và không tham dự thì hồ sơ sẽ dừng lại ở vòng này.",
+                            Title = $"Bạn chưa phản hồi {InterviewInviteEmail.AppointmentNoun(roundType)}",
+                            Body = $"{InterviewInviteEmail.SessionNoun(roundType)} vòng {booking.RoundNumber} lúc {local:HH:mm dd/MM/yyyy} sắp {(isTest ? "mở" : "diễn ra")}. "
+                                   + "Vui lòng xác nhận tham dự, hoặc từ chối kèm lý do. "
+                                   + (isTest
+                                       ? "Không vào làm bài trong khung giờ đó thì bài thi sẽ hết hạn và được hệ thống tự động nộp."
+                                       : "Không phản hồi và không tham dự thì hồ sơ sẽ dừng lại ở vòng này."),
                             Link = $"/portal/schedule/{app.Id}",
                             IsRead = false,
                         }, ct);
@@ -179,6 +214,34 @@ namespace ARI.Infrastructure.Services
             await unitOfWork.SaveChangesAsync(ct);
         }
 
+        // ───────────────── 0. Bài trắc nghiệm hết hạn = hệ thống nộp thay ─────────────────
+
+        private async Task ExpireOnlineTestsAsync(CancellationToken ct)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var notif = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
+            var created = await OnlineTestExpiry.AutoSubmitExpiredAsync(unitOfWork, DateTimeOffset.UtcNow, ct);
+            if (created.Count == 0) return;
+
+            // Nhân sự nhận thay đổi qua trigger của `online_test_submissions` (ADR-057). Ứng viên thì
+            // cần thêm sự kiện chuông để Portal đồng bộ thông báo "bài đã hết hạn" ngay.
+            foreach (var e in created)
+            {
+                if (e.CandidateAccountId is not { } accountId) continue;
+                try
+                {
+                    await notif.PublishUserEventAsync(accountId, "ReceiveUserNotification",
+                        // KHÔNG kèm điểm: kết quả chỉ công bố khi cả vòng đã chốt.
+                        new { Type = "OnlineTestExpired", applicationId = e.ApplicationId, roundNumber = e.RoundNumber }, ct);
+                }
+                catch { /* best-effort */ }
+            }
+
+            _logger.LogInformation("Đã tự nộp {Count} bài trắc nghiệm hết hạn (ứng viên không vào làm).", created.Count);
+        }
+
         // ────────────────────── 2. Không tham dự = trượt ──────────────────────
 
         private async Task FailNoShowsAsync(CancellationToken ct)
@@ -210,8 +273,35 @@ namespace ARI.Infrastructure.Services
             var sessions = (await unitOfWork.Repository<InterviewSession>().FindAsync(
                 s => appIds.Contains(s.ApplicationId) && s.SessionType == "real", ct)).ToList();
 
+            // Vòng TRẮC NGHIỆM không bao giờ đi đường này (RoundAttendance.CanBeNoShow): không vào làm
+            // bài vẫn là CÓ kết quả — hết hạn thì hệ thống nộp thay (ExpireOnlineTestsAsync), lịch giữ
+            // nguyên, chỗ không trả, hồ sơ ở lại vòng. Trước đây vòng này bị quét như vòng hội thoại:
+            // lịch bị huỷ, ca hiện "Đã đặt 0/1", hồ sơ tự sang `not_pass`, và Portal báo ứng viên
+            // "Chưa có giờ làm bài" dù họ đã được hẹn.
+            var jobIdBySlot = slotById.ToDictionary(kv => kv.Key, kv => kv.Value.JobPostingId);
+            var jobIds = overdue
+                .Select(b => jobIdBySlot.TryGetValue(b.AvailabilitySlotId, out var j) ? j : Guid.Empty)
+                .Where(j => j != Guid.Empty).Distinct().ToList();
+
+            var roundConfigs = jobIds.Count == 0
+                ? new List<InterviewRoundConfig>()
+                : (await unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => jobIds.Contains(r.JobPostingId), ct)).ToList();
+
+            var submissions = (await unitOfWork.Repository<OnlineTestSubmission>()
+                .FindAsync(s => appIds.Contains(s.ApplicationId), ct)).ToList();
+
+            string? RoundTypeOf(InterviewBooking b)
+            {
+                var jobId = jobIdBySlot.TryGetValue(b.AvailabilitySlotId, out var j) ? j : Guid.Empty;
+                return roundConfigs
+                    .FirstOrDefault(r => r.JobPostingId == jobId && r.RoundNumber == b.RoundNumber)?.RoundType;
+            }
+
             var noShows = overdue
-                .Where(b => !sessions.Any(s => s.ApplicationId == b.ApplicationId && s.RoundNumber == b.RoundNumber))
+                .Where(b => RoundAttendance.CanBeNoShow(RoundTypeOf(b)))
+                .Where(b => !RoundAttendance.HasAttended(
+                    b.ApplicationId, b.RoundNumber, RoundTypeOf(b), sessions, submissions))
                 .ToList();
             if (noShows.Count == 0) return;
 
@@ -419,16 +509,24 @@ namespace ARI.Infrastructure.Services
                 var job = await unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
                 closed.Add((app.Id, app.CandidateAccountId, app.CandidateName, job?.Title));
 
-                await unitOfWork.Repository<Notification>().AddAsync(new Notification
+                // Người soạn thư có thể là Hiring Manager (ADR-063), còn người đã GỬI thư là chủ tin — báo
+                // cả hai, mỗi người link đúng workspace (trước đây `/hr/offers` cứng cho mọi người nhận).
+                foreach (var recipient in new[] { offer.CreatedByUserId, job?.CreatedByUserId ?? Guid.Empty }
+                             .Where(id => id != Guid.Empty).Distinct())
                 {
-                    RecipientUserId = offer.CreatedByUserId,
-                    Type = "result",
-                    Title = "Thư mời nhận việc đã quá hạn",
-                    Body = $"{app.CandidateName} — vị trí \"{job?.Title}\" không phản hồi trước hạn.",
-                    Link = "/hr/offers",
-                    DedupKey = $"offer_expired:{offer.Id}",
-                    IsRead = false,
-                }, ct);
+                    await unitOfWork.Repository<Notification>().AddAsync(new Notification
+                    {
+                        RecipientUserId = recipient,
+                        Type = "result",
+                        Title = "Thư mời nhận việc đã quá hạn",
+                        Body = $"{app.CandidateName} — vị trí \"{job?.Title}\" không phản hồi trước hạn.",
+                        Link = await ARI.Application.Common.StaffLinks.OffersAsync(unitOfWork, recipient, ct),
+                        DedupKey = recipient == offer.CreatedByUserId
+                            ? $"offer_expired:{offer.Id}"
+                            : $"offer_expired:{offer.Id}:{recipient}",
+                        IsRead = false,
+                    }, ct);
+                }
             }
 
             await unitOfWork.SaveChangesAsync(ct);

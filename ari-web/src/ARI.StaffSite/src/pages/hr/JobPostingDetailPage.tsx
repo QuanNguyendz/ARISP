@@ -31,8 +31,10 @@ import CandidatePipeline from '@/components/jobCandidates/CandidatePipeline'
 import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
+import { formatDateTime24 } from '@ari/shared/utils/time24'
 import { appStatusLabel } from '../recruiter/_jobUi'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
+import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 
 /**
  * Trạng thái mà nút Duyệt / Loại ở vòng CV còn thao tác được — giống hệt màn Recruiter.
@@ -77,6 +79,12 @@ export default function JobPostingDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  /**
+   * Đăng tin khi Hiring Manager CHƯA ký (ADR-063/068) — quyền của quản trị viên, lý do bắt buộc ≥10 ký tự.
+   * Trước đây nút "Duyệt" gọi thẳng `active` không kèm lý do, nên trên mọi tin đang chờ ký nó luôn nhận 403.
+   */
+  const [bypassOpen, setBypassOpen] = useState(false)
+  const [bypassReason, setBypassReason] = useState('')
 
   const loadApps = useCallback(async () => {
     if (!id) return
@@ -190,7 +198,8 @@ export default function JobPostingDetailPage() {
    * "Duyệt hồ sơ" ở bước sàng CV = đẩy hồ sơ sang bàn của Hiring Manager (ADR-067).
    *
    * KHÔNG kèm chọn ca nữa, và KHÔNG báo gì cho ứng viên: giờ hẹn chỉ xếp được sau khi HM duyệt và
-   * gửi khung giờ họ có mặt được. Tin chưa gán HM thì server tự đẩy thẳng sang bước chờ xếp lịch.
+   * gửi khung giờ họ có mặt được.
+   * ADR-068: mọi tin đều có HM — tin thiếu HM (hoặc HM bị khoá) thì server trả lỗi nói rõ HR Leader cần làm gì.
    */
   const handleAccept = async (appId: string) => {
     setProcessingAppId(appId)
@@ -235,13 +244,15 @@ export default function JobPostingDetailPage() {
     })
   }, [apps])
 
-  const approve = async () => {
-    if (!id) return
+  const publishWithoutSignOff = async () => {
+    if (!id || bypassReason.trim().length < 10) return
     setBusy(true)
     setActionError(null)
     setNotice(null)
     try {
-      await jobService.updateJobStatus(id, 'active')
+      await jobService.updateJobStatus(id, 'active', undefined, bypassReason.trim())
+      setBypassOpen(false)
+      setBypassReason('')
       setNotice(t('notices.jobApproveSuccess'))
       await load()
     } catch (err: unknown) {
@@ -513,7 +524,10 @@ export default function JobPostingDetailPage() {
                     {t('pendingApproval.title')}
                   </h3>
                   <p className="mt-0.5 text-sm text-ink-600 dark:text-ink-400">
-                    {t('pendingApproval.description', { name: job.createdByName || '' })}
+                    {t('pendingApproval.description', {
+                      name: job.createdByName || '',
+                      hm: job.hiringManagerName || t('theHiringManager'),
+                    })}
                   </p>
                 </div>
               </div>
@@ -521,8 +535,11 @@ export default function JobPostingDetailPage() {
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={approve}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                  onClick={() => {
+                    setBypassOpen(true)
+                    setBypassReason('')
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 disabled:opacity-50"
                 >
                   {busy ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -556,10 +573,10 @@ export default function JobPostingDetailPage() {
                 </span>
                 <div>
                   <h3 className="text-base font-semibold text-ink-900 dark:text-white">
-                    Bản nháp của bạn
+                    {t('draftBanner.title')}
                   </h3>
                   <p className="mt-0.5 text-sm text-ink-600 dark:text-ink-400">
-                    Đây là tin tuyển dụng nháp. Bạn có thể kích hoạt trực tiếp mà không cần duyệt, hoặc tiếp tục chỉnh sửa.
+                    {t('draftBanner.description')}
                   </p>
                 </div>
               </div>
@@ -567,15 +584,13 @@ export default function JobPostingDetailPage() {
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={approve}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50"
+                  onClick={() => {
+                    setBypassOpen(true)
+                    setBypassReason('')
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 disabled:opacity-50"
                 >
-                  {busy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Target className="h-4 w-4" />
-                  )}{' '}
-                  Kích hoạt luôn
+                  <Target className="h-4 w-4" /> {t('draftBanner.publish')}
                 </button>
                 <button
                   type="button"
@@ -583,7 +598,7 @@ export default function JobPostingDetailPage() {
                   onClick={() => navigate(`/hr/jobs/${job.id}/edit`)}
                   className="inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/30 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50"
                 >
-                  <Edit2 className="h-4 w-4" /> Sửa tin
+                  <Edit2 className="h-4 w-4" /> {t('draftBanner.edit')}
                 </button>
               </div>
             </div>
@@ -594,7 +609,9 @@ export default function JobPostingDetailPage() {
           <div className="mb-6 flex items-start gap-2 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <b>{t('rejectedBanner.label')}</b> {job.rejectionReason}
+              {/* Tin về `rejected` có hai nguồn: HM yêu cầu sửa (ADR-068) hoặc HR trả về — nói rõ ai. */}
+              <b>{job.hmSignOffStatus === 'rejected' ? t('rejectedBanner.hmLabel') : t('rejectedBanner.label')}</b>{' '}
+              {job.rejectionReason}
             </span>
           </div>
         )}
@@ -604,7 +621,7 @@ export default function JobPostingDetailPage() {
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>
               {t('approvedBanner.label')} <b>{job.approverName || 'HR Leader'}</b>{' '}
-              {t('approvedBanner.at')} {new Date(job.approvedAt).toLocaleString()}.
+              {t('approvedBanner.at')} {formatDateTime24(job.approvedAt)}.
             </span>
           </div>
         )}
@@ -807,11 +824,17 @@ export default function JobPostingDetailPage() {
                 mọi tin, nên canManage cố định true ở khu vực này. */}
             <HiringTeamPanel
               jobPostingId={job.id}
+              jobStatus={job.status}
+              hiringManagerState={job.hiringManagerState}
               hmSignOffStatus={job.hmSignOffStatus}
               hmSignOffReason={job.hmSignOffReason}
               canManage
               onChanged={() => void load()}
             />
+
+            {/* Playbook của tin (ADR-069) — người soạn là Hiring Manager chính; HR Leader vẫn thêm/xoá
+                được khi cần (HM nghỉ, HM bị khoá). Quyền do server trả về kèm danh sách. */}
+            <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
           </div>
         </div>
 
@@ -833,8 +856,8 @@ export default function JobPostingDetailPage() {
             phễu là điều kiện để ba vai trò bàn về cùng một bức tranh — và là một chỗ để sửa thay vì
             ba (bài học gộp hai màn Phỏng vấn ở ADR-058).
 
-            HR Leader có đủ thao tác vận hành ở đây vì họ là người chốt dự phòng khi tin chưa gán
-            Hiring Manager (ADR-061); server vẫn kiểm lại từng lệnh.
+            HR Leader có đủ thao tác vận hành ở đây vì họ là quản trị viên làm thay được mọi bước (có lý
+            do + audit — ADR-068); server vẫn kiểm lại từng lệnh.
           */}
           <CandidatePipeline
             apps={apps}
@@ -843,16 +866,17 @@ export default function JobPostingDetailPage() {
             processingAppId={processingAppId}
             onApprove={(a) => handleAccept(a.id)}
             onReject={(a) => void handleReject(a.id)}
-            onInvite={(a) =>
+            onInvite={(a, round) =>
               setInviteModalTarget({
                 applications: [{ id: a.id, name: a.candidateName || t('candidate') }],
-                          targetRound: a.currentRound && a.currentRound > 0 ? a.currentRound : 1,
+                targetRound: round,
               })
             }
             isInvitePending={(a) =>
               inviteModalTarget?.applications.some((x) => x.id === a.id) ?? false
             }
             candidateHref={(a) => `/hr/candidates/${a.id}`}
+            evaluationHref={(evaluationId) => `/hr/evaluations?id=${evaluationId}`}
             statusLabel={appStatusLabel}
             selectedIds={selectedIds}
             onToggleSelect={(cid) =>
@@ -870,10 +894,59 @@ export default function JobPostingDetailPage() {
             onBatchApprove={handleBatchAccept}
             onBatchReject={() => void handleBatchReject()}
             onBatchInvite={handleBatchInvite}
+            onlineTestResultsHref={`/hr/jobs/${id}/online-test/results`}
+            canIssueInterviewCode
             batchBusy={batchProcessing}
           />
         </div>
       </motion.div>
+
+      {bypassOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-card-hover"
+          >
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1">{t('bypassModal.title')}</h3>
+            <p className="text-sm text-ink-500 dark:text-ink-400 mb-4">
+              {t('bypassModal.description', {
+                title: job.title,
+                hm: job.hiringManagerName || t('theHiringManager'),
+              })}
+            </p>
+            <textarea
+              value={bypassReason}
+              onChange={(e) => setBypassReason(e.target.value)}
+              rows={4}
+              placeholder={t('bypassModal.placeholder')}
+              className="w-full px-3 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-900 dark:text-white placeholder:text-ink-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
+            />
+            <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">{t('bypassModal.hint')}</p>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setBypassOpen(false)
+                  setBypassReason('')
+                }}
+                className="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 text-sm font-medium transition-colors"
+              >
+                {t('bypassModal.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={bypassReason.trim().length < 10 || busy}
+                onClick={publishWithoutSignOff}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 transition-colors disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}{' '}
+                {t('bypassModal.confirm')}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {rejectOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/50 backdrop-blur-sm">
@@ -1037,6 +1110,11 @@ export default function JobPostingDetailPage() {
           applications={inviteModalTarget.applications}
           jobPostingId={id}
           targetRoundNumber={inviteModalTarget.targetRound}
+          roundType={
+            (job?.roundConfigs ?? []).find(
+              (r) => r.roundNumber === inviteModalTarget.targetRound
+            )?.roundType
+          }
           onClose={() => setInviteModalTarget(null)}
           onSuccess={(msg) => {
             setNotice(msg)

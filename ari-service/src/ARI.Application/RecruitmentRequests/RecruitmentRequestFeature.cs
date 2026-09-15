@@ -162,6 +162,15 @@ namespace ARI.Application.RecruitmentRequests
             if (string.IsNullOrWhiteSpace(input.Requirements))
                 return Result.Failure("Yêu cầu ứng viên là bắt buộc.");
 
+            // Quy trình tuyển là quyết định chuyên môn của trưởng bộ phận. Để trống thì Recruiter phải
+            // tự đoán hoặc đi hỏi lại bằng tay — đúng khoảng trống mà phiếu sinh ra để lấp. Bắt buộc chứ
+            // không phải tùy chọn: một ô tùy chọn hầu như luôn trống thì không phục vụ được mục đích nào.
+            var rounds = InterviewRoundTypes.Sanitize(input.RequestedRounds);
+            if (rounds.Count == 0)
+                return Result.Failure("Hãy chọn ít nhất một vòng phỏng vấn cho vị trí này.");
+            if (rounds.Count > InterviewRoundTypes.MaxRounds)
+                return Result.Failure($"Tối đa {InterviewRoundTypes.MaxRounds} vòng phỏng vấn cho một vị trí.");
+
             if (input.SalaryMin.HasValue && input.SalaryMin < 0)
                 return Result.Failure("Mức lương không được âm.");
 
@@ -194,6 +203,14 @@ namespace ARI.Application.RecruitmentRequests
             entity.Reason = Trim(input.Reason);
             entity.Description = Trim(input.Description);
             entity.Requirements = Trim(input.Requirements);
+
+            // Lưu ẢNH CHỤP mong muốn lúc lập phiếu, không phải cấu hình sống: cấu hình thật là
+            // `InterviewRoundConfig` của tin, được điền sẵn từ đây rồi sống đời riêng (ADR-063: liên kết
+            // phiếu↔tin một chiều).
+            var rounds = InterviewRoundTypes.Sanitize(input.RequestedRounds);
+            entity.RequestedRounds = rounds.Count == 0
+                ? null
+                : System.Text.Json.JsonSerializer.Serialize(rounds);
             entity.EmploymentType = Trim(input.EmploymentType);
             entity.WorkMode = Trim(input.WorkMode);
             entity.Location = Trim(input.Location);

@@ -25,14 +25,13 @@
   "vocabulary": "Từ vựng CN",
   "questionAnalysis": "Phân tích theo câu hỏi",
   "aiComment": "AI nhận xét",
-  "recordingTranscript": "Bản ghi buổi phỏng vấn",
+  "recordingTranscript": "Buổi phỏng vấn: video & transcript",
   "recordingExpiresAt": "Video tự động xoá sau {{date}}",
   "recordingDeleted": "Video đã được xoá tự động ngày {{date}} theo chính sách lưu trữ.",
   "recordingNone": "Buổi phỏng vấn này chưa có bản ghi hình.",
   "aiVerdict": "Verdict của AI",
   "recommendation": "Đề xuất",
   "hrDecision": "Quyết định của HR",
-  "hrDecisionHint": "Xác nhận verdict của AI hoặc ghi đè (bắt buộc nêu lý do).",
   "confirming": "Đang xác nhận...",
   "confirmAi": "Xác nhận AI",
   "override": "Override",
@@ -82,6 +81,22 @@
       "super_admin": "Super Admin (chốt thay)"
     },
     "awaitingDecision": "Đang chờ {{name}} chốt kết quả. Bạn xem được báo cáo nhưng không phải người quyết định.",
-    "awaitingAdminDecision": "Đang chờ HR Admin chốt kết quả. Bạn xem được báo cáo nhưng không phải người quyết định."
+    "awaitingAdminDecision": "Tin này chưa có Hiring Manager đang hoạt động — HR Leader cần gán / chuyển Hiring Manager, hoặc chốt thay kèm lý do. Bạn xem được báo cáo nhưng không phải người quyết định.",
+    "unavailableHint": "Tin này chưa có Hiring Manager đang hoạt động (chưa gán, hoặc tài khoản đã bị khoá). Bạn chốt thay được nhưng phải ghi lý do — hoặc gán / chuyển Hiring Manager cho tin trước."
+  },
+  "session": {
+    "slot": "Ca phỏng vấn",
+    "slotValue": "Ca {{date}} · {{from}}–{{to}}",
+    "noSlot": "Không tìm thấy ca đã gán",
+    "started": "Diễn ra",
+    "startedValue": "Bắt đầu {{from}} · kết thúc {{to}}",
+    "duration": "Thời lượng",
+    "durationValue": "{{minutes}} phút",
+    "transcriptTitle": "Transcript ({{count}} lượt hỏi–đáp)",
+    "transcriptEmpty": "Buổi này không có lượt hỏi–đáp nào được ghi lại.",
+    "aiAsked": "AI hỏi · câu {{number}}",
+    "candidateSaid": "Ứng viên trả lời",
+    "showAll": "Xem toàn bộ {{count}} lượt",
+    "collapse": "Thu gọn"
   }
 }

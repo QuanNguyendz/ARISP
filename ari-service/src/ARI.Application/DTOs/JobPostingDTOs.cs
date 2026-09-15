@@ -66,9 +66,9 @@ namespace ARI.Application.DTOs
         public string? RejectionReason { get; set; } // Chỉ bắt buộc khi đổi status sang 'rejected'
 
         /// <summary>
-        /// Lý do duyệt đăng tin khi Hiring Manager CHƯA ký duyệt (ADR-061). Chỉ dùng cho
-        /// <c>status = "active"</c> trên tin có gán Hiring Manager; tối thiểu 10 ký tự,
-        /// được ghi vào audit log và báo cho chính người bị vượt.
+        /// Lý do quản trị viên đăng tin khi Hiring Manager CHƯA ký duyệt (ADR-061/068). Bắt buộc cho lần đăng
+        /// ĐẦU (<c>status = "active"</c> từ nháp / đang chờ) khi chưa có chữ ký; tối thiểu 10 ký tự, được ghi vào
+        /// audit log, báo cho chính HM bị vượt, và cổng ghi thành <c>bypassed</c>.
         /// </summary>
         public string? HmBypassReason { get; set; }
     }
@@ -157,17 +157,30 @@ namespace ARI.Application.DTOs
         // viết chưa rõ") — thứ không bao giờ được nằm trong phản hồi gửi cho ứng viên. Handler nào
         // xác định được người gọi là staff thì tự điền; quên điền chỉ mất tính năng, không rò dữ liệu.
 
-        /// <summary>pending | approved | rejected. Null = tin không có Hiring Manager, không có cổng nào.</summary>
+        /// <summary>pending | approved | rejected | bypassed. Null = tin chưa từng gửi Hiring Manager ký.</summary>
         public string? HmSignOffStatus { get; set; }
 
-        /// <summary>Góp ý của Hiring Manager khi yêu cầu sửa mô tả công việc — nội bộ.</summary>
+        /// <summary>
+        /// Góp ý của Hiring Manager khi yêu cầu sửa mô tả công việc, hoặc lý do quản trị viên đăng vượt
+        /// cổng (<c>bypassed</c>) — nội bộ.
+        /// </summary>
         public string? HmSignOffReason { get; set; }
 
-        /// <summary>Tin có cổng duyệt của Hiring Manager không — suy ra từ đội tuyển dụng, không phải cột bật/tắt.</summary>
-        public bool RequiresHmApproval { get; set; }
+        /// <summary>
+        /// Vị trí Hiring Manager chính của tin (ADR-068): <c>active</c> | <c>inactive</c> (bị khoá / xoá /
+        /// đổi vai trò — HR Leader cần chuyển) | <c>missing</c> (tin cũ chưa gán — HR Leader cần gán).
+        /// Khác <c>active</c> thì mọi cổng duyệt của tin đang ĐÓNG.
+        /// </summary>
+        public string? HiringManagerState { get; set; }
 
         public Guid? HiringManagerUserId { get; set; }
         public string? HiringManagerName { get; set; }
+
+        /// <summary>
+        /// Phiếu yêu cầu tuyển dụng mà tin được dựng từ đó — màn tin của Recruiter dùng để mở lại trình soạn JD
+        /// khi Hiring Manager yêu cầu sửa (ADR-068). Chỉ điền cho nhân sự, như các trường trên.
+        /// </summary>
+        public Guid? RecruitmentRequestId { get; set; }
 
         public static JobPostingResponse FromEntity(JobPosting job, List<RoundConfigDto> roundConfigs) =>
             new()
@@ -253,10 +266,17 @@ namespace ARI.Application.DTOs
         // Không có HmSignOffReason ở đây: danh sách không phải chỗ đọc góp ý, và bớt một đường
         // để lộ ra ngoài là bớt một chỗ phải nhớ.
 
-        /// <summary>pending | approved | rejected. Null = tin không có Hiring Manager.</summary>
+        /// <summary>pending | approved | rejected | bypassed. Null = tin chưa từng gửi Hiring Manager ký.</summary>
         public string? HmSignOffStatus { get; set; }
 
-        public bool RequiresHmApproval { get; set; }
+        /// <summary>active | inactive | missing — xem <see cref="JobPostingResponse.HiringManagerState"/>.</summary>
+        public string? HiringManagerState { get; set; }
+
+        /// <summary>
+        /// Id của Hiring Manager chính — màn của HM đếm "tin chờ tôi ký" bằng trường này. Trước đây danh
+        /// sách không trả nó nên con số đó luôn bằng 0.
+        /// </summary>
+        public Guid? HiringManagerUserId { get; set; }
         public string? HiringManagerName { get; set; }
 
         public static JobPostingListItemResponse FromEntity(JobPosting job) =>

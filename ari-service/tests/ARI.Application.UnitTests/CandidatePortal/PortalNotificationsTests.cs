@@ -107,12 +107,31 @@ public class GetPortalNotificationsQueryHandlerTests
     [Fact]
     public async Task UTCID07_Active_code_creates_invite()
     {
-        var app = Guid.NewGuid();
+        // Vòng SƠ LOẠI làm từ nhà: ứng viên cần mã để tự mở phòng, nên phải được báo.
+        var app = Guid.NewGuid(); var job = Guid.NewGuid();
         var uow = new InMemoryUnitOfWork()
-            .Seed(PortalNotifData.App(app, Guid.NewGuid(), DateTimeOffset.UtcNow))
+            .Seed(PortalNotifData.App(app, job, DateTimeOffset.UtcNow))
+            .Seed(new InterviewRoundConfig { JobPostingId = job, RoundNumber = 1, RoundType = "screening" })
             .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app, RoundNumber = 1, Code = "ABC123", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() });
         var res = await Run(uow);
         Assert.Contains(res.Value.Items, i => i.Type == "invite");
+    }
+
+    [Theory]
+    [InlineData("technical")]
+    [InlineData(null)]
+    public async Task UTCID07b_Onsite_code_is_not_announced(string? roundType)
+    {
+        // Vòng TẠI VĂN PHÒNG: Recruiter đưa mã tận tay khi ứng viên đã tới — báo mã trong Portal là cho
+        // vào phòng từ bất cứ đâu. Vòng chưa khai loại cũng coi như tại văn phòng: không lộ khi không chắc.
+        var app = Guid.NewGuid(); var job = Guid.NewGuid();
+        var uow = new InMemoryUnitOfWork()
+            .Seed(PortalNotifData.App(app, job, DateTimeOffset.UtcNow))
+            .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app, RoundNumber = 1, Code = "ABC123", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), CreatedByUserId = Guid.NewGuid() });
+        if (roundType != null)
+            uow.Seed(new InterviewRoundConfig { JobPostingId = job, RoundNumber = 1, RoundType = roundType });
+        var res = await Run(uow);
+        Assert.DoesNotContain(res.Value.Items, i => i.Type == "invite");
     }
 
     [Fact]
@@ -189,6 +208,7 @@ public class GetPortalNotificationsQueryHandlerTests
         var now = DateTimeOffset.UtcNow;
         var uow = new InMemoryUnitOfWork()
             .Seed(PortalNotifData.App(app, job, now.AddHours(-3))).Seed(PortalNotifData.Job(job, "Dev"))
+            .Seed(new InterviewRoundConfig { JobPostingId = job, RoundNumber = 1, RoundType = "screening" })
             .Seed(new InterviewCode { Id = Guid.NewGuid(), ApplicationId = app, RoundNumber = 1, Code = "AAA111", ExpiresAt = now.AddHours(2), CreatedByUserId = Guid.NewGuid(), CreatedAt = now.AddHours(-2) })
             .Seed(new InterviewBooking { Id = Guid.NewGuid(), ApplicationId = app, AvailabilitySlotId = slot, RoundNumber = 1, Status = "scheduled", CreatedAt = now.AddHours(-1) })
             .Seed(new AvailabilitySlot { Id = slot, JobPostingId = job, RoundNumber = 1, StartTime = now.AddDays(1), EndTime = now.AddDays(1).AddHours(1), Timezone = "UTC", Capacity = 5 })

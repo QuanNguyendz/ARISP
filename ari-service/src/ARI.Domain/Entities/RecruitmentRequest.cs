@@ -66,6 +66,25 @@ namespace ARI.Domain.Entities
         /// </summary>
         public string? Requirements { get; set; }
 
+        /// <summary>
+        /// Các vòng phỏng vấn HM muốn tin này có, theo THỨ TỰ — mảng JSON các
+        /// <see cref="Constants.InterviewRoundTypes"/>, ví dụ <c>["online_test","screening","technical"]</c>.
+        ///
+        /// <b>Vì sao nó nằm trên PHIẾU chứ không chỉ ở màn dựng tin.</b> Quy trình tuyển của một vị
+        /// trí là quyết định chuyên môn: trưởng bộ phận biết vị trí này cần thi trắc nghiệm trước
+        /// hay phỏng vấn thẳng, cần mấy vòng chuyên môn. Recruiter dựng tin thì thi hành quyết định
+        /// đó. Không hỏi ở phiếu thì Recruiter phải tự đoán, hoặc đi hỏi lại bằng tay — đúng khoảng
+        /// trống mà ADR-063 sinh ra để lấp (phiếu là nơi HM nói ra mọi thứ mình cần).
+        ///
+        /// Chuỗi JSON chứ không phải bảng con: đây là ẢNH CHỤP mong muốn tại thời điểm lập phiếu,
+        /// không phải cấu hình sống. Cấu hình thật là <c>InterviewRoundConfig</c> của tin, và nó
+        /// được điền sẵn từ đây rồi sống đời riêng — sửa vòng của tin không được sửa ngược lại phiếu
+        /// (liên kết phiếu↔tin một chiều, ADR-063).
+        ///
+        /// <c>null</c> cho phiếu cũ lập trước khi có ô này.
+        /// </summary>
+        public string? RequestedRounds { get; set; }
+
         public string? EmploymentType { get; set; }
         public string? WorkMode { get; set; }
         public string? Location { get; set; }

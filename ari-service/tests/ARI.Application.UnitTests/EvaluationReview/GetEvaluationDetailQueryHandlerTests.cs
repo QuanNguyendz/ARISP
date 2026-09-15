@@ -212,4 +212,69 @@ public class GetEvaluationDetailQueryHandlerTests
         Assert.True(res.IsFailure);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
     }
+
+    /// <summary>
+    /// Báo cáo phải đi kèm chính buổi phỏng vấn nó chấm: transcript đủ mọi lượt theo thứ tự (kể cả câu ứng
+    /// viên bỏ trống — phần phân tích của AI thì không có), cùng giờ ca đã gán và thời lượng.
+    /// </summary>
+    [Fact]
+    public async Task Includes_full_transcript_in_order_and_the_booked_slot()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var session = EvaluationData.Session(app.Id, round: 2, recordingUrl: "rec/key.webm");
+        session.EndedAt = session.StartedAt!.Value.AddMinutes(18);
+        session.DurationSeconds = 18 * 60;
+        var eval = EvaluationData.Eval(app.Id, sessionId: session.Id, round: 2);
+
+        var q1 = new Question { SessionId = session.Id, SequenceNumber = 1, QuestionText = "Giới thiệu bản thân?" };
+        var q2 = new Question { SessionId = session.Id, SequenceNumber = 2, QuestionText = "Kể về một sự cố production?" };
+        var q3 = new Question { SessionId = session.Id, SequenceNumber = 3, QuestionText = "Câu hỏi cuối?" };
+        var a1 = new Answer { QuestionId = q1.Id, SessionId = session.Id, Transcript = "Em là A." };
+        var a2 = new Answer { QuestionId = q2.Id, SessionId = session.Id, Transcript = "Có lần DB đầy ổ." };
+
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id, RoundNumber = 2,
+            StartTime = DateTimeOffset.UtcNow.AddHours(-1), EndTime = DateTimeOffset.UtcNow.AddMinutes(-30),
+        };
+        var booking = new InterviewBooking { ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 2 };
+
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(eval)
+            .Seed(q3).Seed(q1).Seed(q2).Seed(a1).Seed(a2).Seed(slot).Seed(booking);
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.True(res.IsSuccess);
+        var detail = res.Value!;
+        Assert.Equal(new[] { 1, 2, 3 }, detail.Transcript.Select(t => t.SequenceNumber));
+        Assert.Equal("Em là A.", detail.Transcript[0].Answer);
+        Assert.Null(detail.Transcript[2].Answer);                     // câu bỏ trống vẫn hiện, không bị nuốt
+        Assert.Equal(slot.StartTime, detail.SlotStartTime);
+        Assert.Equal(slot.EndTime, detail.SlotEndTime);
+        Assert.Equal(18 * 60, detail.DurationSeconds);
+        Assert.Equal("technical", detail.RoundType);
+        Assert.NotNull(detail.RecordingUrl);
+    }
+
+    /// <summary>Ca ứng viên đã báo bận không phải giờ hẹn của buổi này nữa — không được hiện nhầm.</summary>
+    [Fact]
+    public async Task Declined_booking_is_not_shown_as_the_slot()
+    {
+        var job = EvaluationData.Job();
+        var app = EvaluationData.App(job.Id);
+        var eval = EvaluationData.Eval(app.Id);
+        var slot = new AvailabilitySlot { JobPostingId = job.Id, StartTime = DateTimeOffset.UtcNow, EndTime = DateTimeOffset.UtcNow.AddHours(1) };
+        var booking = new InterviewBooking
+        {
+            ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 1, Status = BookingStatus.Declined,
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(eval).Seed(slot).Seed(booking);
+
+        var res = await Run(uow, eval.Id);
+
+        Assert.True(res.IsSuccess);
+        Assert.Null(res.Value!.SlotStartTime);
+        Assert.Empty(res.Value.Transcript);
+    }
 }

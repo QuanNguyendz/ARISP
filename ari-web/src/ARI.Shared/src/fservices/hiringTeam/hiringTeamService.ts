@@ -26,10 +26,14 @@ export interface HiringManagerOption {
   matchesJobDepartment: boolean
 }
 
+/**
+ * Thêm một thành viên PHỤ vào đội (người phỏng vấn / người theo dõi / HM phụ chỉ đọc). Hiring Manager chính
+ * KHÔNG đặt ở đây (ADR-068) — xem `setPrimaryHiringManager`.
+ */
 export interface AddHiringTeamMemberRequest {
   userId: string
+  /** interviewer | observer | hiring_manager — bỏ trống thì server mặc định interviewer. */
   roleOnJob?: string
-  isPrimary?: boolean
 }
 
 export const hiringTeamService = {
@@ -43,8 +47,18 @@ export const hiringTeamService = {
     return data
   },
 
+  /** Gỡ thành viên PHỤ. Server từ chối gỡ Hiring Manager chính — chỉ chuyển được (ADR-068). */
   async removeMember(jobPostingId: string, memberId: string): Promise<void> {
     await apiClient.delete(`/jobs/${jobPostingId}/hiring-team/${memberId}`)
+  },
+
+  /**
+   * Gán hoặc chuyển Hiring Manager chính của tin (ADR-068). Chỉ HR Leader / Super Admin, lý do tối thiểu
+   * 10 ký tự — server báo cho cả HM cũ lẫn HM mới.
+   */
+  async setPrimaryHiringManager(jobPostingId: string, userId: string, reason: string): Promise<HiringTeamMember> {
+    const { data } = await apiClient.put<HiringTeamMember>(`/jobs/${jobPostingId}/hiring-manager`, { userId, reason })
+    return data
   },
 
   /**
@@ -68,21 +82,15 @@ export const hiringTeamService = {
   /**
    * Hiring Manager duyệt hoặc từ chối. `note` bắt buộc khi từ chối.
    *
-   * `availabilities` (ADR-067): khung giờ HM có mặt được cho vòng 1, gửi KÈM lệnh duyệt. Recruiter
-   * chỉ xếp được ca nằm trong các khung này, nên duyệt mà không có khung nào (và chưa khai lần
-   * trước) sẽ bị server từ chối — hồ sơ về hàng chờ mà không có giờ nào để xếp thì nằm im ở đó.
+   * Chỉ là quyết định chuyên môn — lịch có mặt của HM KHÔNG đi kèm lệnh này mà khai riêng qua
+   * `scheduleService.setHmAvailability` (mục "Lịch tôi có mặt được" ở màn tin).
    */
   async submitHmDecision(
     applicationId: string,
     decision: 'approved' | 'rejected',
-    note?: string,
-    availabilities?: { startTime: string; endTime: string; note?: string | null }[]
+    note?: string
   ): Promise<void> {
-    await apiClient.post(`/applications/${applicationId}/hm-decision`, {
-      decision,
-      note,
-      availabilities,
-    })
+    await apiClient.post(`/applications/${applicationId}/hm-decision`, { decision, note })
   },
 
   /** Quản trị viên vượt cổng duyệt — lý do bắt buộc, tối thiểu 10 ký tự. */
@@ -92,7 +100,10 @@ export const hiringTeamService = {
 
   // ===== Cổng ký duyệt JD (ADR-061) =====
 
-  /** Hiring Manager ký duyệt / yêu cầu sửa mô tả công việc. `reason` bắt buộc khi từ chối. */
+  /**
+   * Hiring Manager ký duyệt (tin lên `active`) / yêu cầu sửa (tin về `rejected` cho Recruiter sửa) mô tả công
+   * việc. `reason` bắt buộc khi yêu cầu sửa, tối thiểu 10 ký tự.
+   */
   async submitJobSignOff(
     jobPostingId: string,
     decision: 'approved' | 'rejected',

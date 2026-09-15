@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
@@ -17,12 +16,13 @@ using Microsoft.AspNetCore.Mvc;
 namespace ARI.API.Controllers
 {
     /// <summary>
-    /// Quản lý Interview Playbook (tài liệu phỏng vấn nội bộ) — upload, liệt kê, xoá.
-    /// Khi upload: parse text → lưu file → chunk + embed vào document_chunks cho RAG.
+    /// Màn Playbook của HR Leader — nơi quản lý playbook CÔNG TY và nhìn toàn cảnh playbook các tin.
+    /// Playbook THEO TIN do Hiring Manager thêm/xoá ngay trong màn tin (<see cref="JobPlaybooksController"/>,
+    /// ADR-069). Mọi luật (ai được viết phạm vi nào, loại tài liệu, đuôi file) nằm trong command, dùng
+    /// chung cho cả hai cửa.
     /// </summary>
     [ApiController]
     [Route("api/playbooks")]
-    [Authorize(Policy = "HrManagement")]
     public class PlaybooksController : ControllerBase
     {
         private readonly ISender _sender;
@@ -36,6 +36,7 @@ namespace ARI.API.Controllers
 
         /// <summary>Danh sách playbook (lọc theo scope nếu có). Không trả parsedText.</summary>
         [HttpGet]
+        [Authorize(Policy = "HrManagement")]
         public async Task<IActionResult> GetPlaybooks([FromQuery] string? scope, CancellationToken ct)
         {
             var result = await _sender.Send(new GetPlaybooksQuery(scope), ct);
@@ -46,8 +47,11 @@ namespace ARI.API.Controllers
         /// Tải file Excel mẫu để khai bộ tiêu chí chấm điểm (ADR-060).
         /// <c>type</c> = <c>cv_rubric</c> (chấm CV) hoặc <c>interview_rubric</c> (chấm phỏng vấn) —
         /// mẫu khác nhau vì tiêu chí chấm hồ sơ khác hẳn tiêu chí chấm buổi phỏng vấn.
+        /// Mở cho mọi nhân sự nội bộ: file mẫu không chứa dữ liệu, và Hiring Manager cần nó để khai bộ
+        /// tiêu chí cho tin của mình (ADR-069) — trước đây endpoint nằm sau policy của HR nên HM nhận 403.
         /// </summary>
         [HttpGet("rubric-template")]
+        [Authorize(Policy = "InternalStaff")]
         public IActionResult GetRubricTemplate([FromQuery] string? type)
         {
             var forCv = string.Equals(type?.Trim(), ScoringRubric.TypeCvRubric, StringComparison.OrdinalIgnoreCase);
@@ -58,75 +62,32 @@ namespace ARI.API.Controllers
 
         /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD; riêng bộ tiêu chí chấm điểm là .xlsx).</summary>
         [HttpPost]
+        [Authorize(Policy = "HrManagement")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadPlaybook([FromForm] UploadPlaybookForm form, CancellationToken ct)
         {
             var file = form.File;
-            var scope = form.Scope;
-            var documentType = form.DocumentType;
-            var scopeRefId = form.ScopeRefId;
-            var roundNumber = form.RoundNumber;
-
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "File playbook không được để trống." });
-            if (file.Length > 15 * 1024 * 1024)
+            if (file.Length > PlaybookAccess.MaxFileBytes)
                 return BadRequest(new { message = "Kích thước file không được vượt quá 15MB." });
 
-            var allowedScopes = new[] { "org", "job_posting", "round" };
-            scope = (scope ?? "org").Trim().ToLowerInvariant();
-            if (!allowedScopes.Contains(scope))
-                return BadRequest(new { message = "Scope phải là 'org', 'job_posting' hoặc 'round'." });
-
-            if (string.IsNullOrWhiteSpace(documentType))
-                return BadRequest(new { message = "documentType là bắt buộc." });
-
-            if (scope == "job_posting" && (scopeRefId == null || scopeRefId == Guid.Empty))
-                return BadRequest(new { message = "scopeRefId (JobPostingId) là bắt buộc khi scope = 'job_posting'." });
-            if (scope == "round" && roundNumber == null)
-                return BadRequest(new { message = "roundNumber là bắt buộc khi scope = 'round'." });
-
-            var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
-            // Bộ tiêu chí chấm điểm là bảng số liệu → chỉ nhận .xlsx theo mẫu; tài liệu văn xuôi thì
-            // ngược lại, .xlsx không có nghĩa gì (ADR-060).
-            var isRubric = ScoringRubric.IsRubricType(documentType);
-            var allowedExt = isRubric ? new[] { ".xlsx" } : new[] { ".pdf", ".docx", ".txt", ".md" };
-            if (string.IsNullOrEmpty(ext) || Array.IndexOf(allowedExt, ext) < 0)
-                return BadRequest(new
-                {
-                    message = isRubric
-                        ? "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu."
-                        : "Định dạng không hợp lệ. Chấp nhận .pdf, .docx, .txt, .md",
-                });
-
-            byte[] bytes;
-            using (var ms = new MemoryStream())
-            {
-                await file.CopyToAsync(ms, ct);
-                bytes = ms.ToArray();
-            }
-
-            var userId = _currentUser.UserId ?? Guid.Empty;
-
+            var bytes = await PlaybookUpload.ReadAsync(file, ct);
             var result = await _sender.Send(new UploadPlaybookCommand(
-                userId, scope, scopeRefId, roundNumber, documentType, file.FileName, bytes, ext), ct);
+                _currentUser.UserId ?? Guid.Empty, _currentUser.Role, form.Scope, form.ScopeRefId, form.RoundNumber,
+                form.DocumentType, file.FileName, bytes, Path.GetExtension(file.FileName) ?? string.Empty), ct);
 
-            if (result.IsFailure)
-            {
-                return result.ErrorCode == CommonErrorCodes.ServerError
-                    ? StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
-            }
-
-            return Ok(result.Value);
+            return result.IsFailure ? PlaybookUpload.MapFailure(this, result.ErrorCode, result.Error) : Ok(result.Value);
         }
 
-        /// <summary>Xoá mềm một playbook.</summary>
+        /// <summary>Xoá mềm một playbook (và gỡ nội dung khỏi kho tri thức của AI).</summary>
         [HttpDelete("{id:guid}")]
+        [Authorize(Policy = "HrManagement")]
         public async Task<IActionResult> DeletePlaybook(Guid id, CancellationToken ct)
         {
-            var result = await _sender.Send(new DeletePlaybookCommand(id), ct);
+            var result = await _sender.Send(new DeletePlaybookCommand(id, _currentUser.UserId, _currentUser.Role), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return PlaybookUpload.MapFailure(this, result.ErrorCode, result.Error);
 
             return Ok(new { message = "Đã xoá playbook.", id });
         }
@@ -140,5 +101,25 @@ namespace ARI.API.Controllers
         public string DocumentType { get; set; } = string.Empty;
         public Guid? ScopeRefId { get; set; }
         public int? RoundNumber { get; set; }
+    }
+
+    /// <summary>Phần HTTP dùng chung của hai cửa upload playbook: đọc file và đổi mã lỗi thành status.</summary>
+    internal static class PlaybookUpload
+    {
+        public static async Task<byte[]> ReadAsync(IFormFile file, CancellationToken ct)
+        {
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, ct);
+            return ms.ToArray();
+        }
+
+        public static IActionResult MapFailure(ControllerBase c, string? errorCode, string? message) => errorCode switch
+        {
+            CommonErrorCodes.Forbidden => c.StatusCode(StatusCodes.Status403Forbidden, new { message }),
+            CommonErrorCodes.NotFound => c.NotFound(new { message }),
+            CommonErrorCodes.Conflict => c.Conflict(new { message }),
+            CommonErrorCodes.ServerError => c.StatusCode(StatusCodes.Status500InternalServerError, new { message }),
+            _ => c.BadRequest(new { message }),
+        };
     }
 }

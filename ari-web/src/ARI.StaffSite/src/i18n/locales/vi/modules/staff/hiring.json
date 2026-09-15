@@ -6,18 +6,36 @@
   "team": {
     "title": "Đội tuyển dụng",
     "description": "Hiring Manager của tin — người duyệt hồ sơ, ký duyệt mô tả công việc và chốt kết quả phỏng vấn.",
-    "add": "Gán Hiring Manager",
-    "empty": "Tin này chưa gán Hiring Manager. Mọi cổng duyệt đều mở, phễu chạy như trước.",
+    "add": "Thêm thành viên",
+    "empty": "Chưa có thành viên nào.",
+    "missing": "Tin này chưa có Hiring Manager phụ trách nên mọi cổng duyệt đang ĐÓNG. HR Leader cần gán Hiring Manager cho tin.",
+    "inactive": "Hiring Manager {{name}} không còn hoạt động (tài khoản bị khoá hoặc đổi vai trò) nên mọi cổng duyệt đang ĐÓNG. HR Leader cần chuyển tin cho Hiring Manager khác.",
     "primary": "Người quyết định",
-    "primaryHint": "Người mà chữ ký duyệt chặn phễu của tin này.",
+    "primaryHint": "Người mà chữ ký duyệt chặn phễu của tin này. Không gỡ được — chỉ HR Leader chuyển được.",
     "remove": "Gỡ khỏi đội",
-    "selectLabel": "Chọn Hiring Manager",
-    "selectPlaceholder": "— Chọn người phụ trách —",
+    "selectLabel": "Chọn người",
+    "selectPlaceholder": "— Chọn người —",
     "selectHint": "Người cùng phòng ban với tin được xếp lên đầu. Đây chỉ là gợi ý — phòng ban không quyết định quyền truy cập.",
     "sameDepartment": "(cùng phòng ban)",
-    "confirmAdd": "Gán vào tin",
-    "addError": "Không gán được Hiring Manager cho tin này.",
+    "roleLabel": "Vai trò trong tin",
+    "roles": {
+      "interviewer": "Người phỏng vấn",
+      "observer": "Người theo dõi",
+      "hiring_manager": "Hiring Manager phụ (chỉ xem)"
+    },
+    "confirmAdd": "Thêm vào tin",
+    "addError": "Không thêm được thành viên vào tin này.",
     "removeError": "Không gỡ được thành viên khỏi đội tuyển dụng."
+  },
+  "transfer": {
+    "assign": "Gán Hiring Manager",
+    "change": "Chuyển Hiring Manager",
+    "selectLabel": "Hiring Manager mới",
+    "reasonLabel": "Lý do (bắt buộc, tối thiểu 10 ký tự)",
+    "reasonPlaceholder": "Ví dụ: Hiring Manager cũ chuyển sang dự án khác từ 01/10.",
+    "hint": "Việc đang chờ (ký JD, hồ sơ chờ duyệt, kết quả chờ chốt) chuyển sang người mới; lịch có mặt của Hiring Manager cũ hết hiệu lực. Cả hai người đều được báo.",
+    "confirm": "Xác nhận",
+    "error": "Không gán / chuyển được Hiring Manager."
   },
   "signOff": {
     "prompt": "Mô tả công việc này đang chờ bạn ký duyệt trước khi tin được đăng.",
@@ -25,13 +43,16 @@
     "requestChanges": "Yêu cầu sửa",
     "reasonLabel": "Cần sửa những gì?",
     "reasonPlaceholder": "Ví dụ: mức lương thấp hơn mặt bằng, thiếu yêu cầu về kinh nghiệm hệ thống phân tán...",
+    "reasonHint": "Tối thiểu 10 ký tự. Tin sẽ quay về cho Recruiter sửa rồi gửi lại.",
     "confirmRequestChanges": "Gửi yêu cầu sửa",
     "reason": "Góp ý: {{reason}}",
+    "bypassReason": "Lý do đăng khi chưa có chữ ký: {{reason}}",
     "error": "Không ghi nhận được quyết định ký duyệt.",
     "status": {
       "pending": "Đang chờ {{name}} ký duyệt mô tả công việc.",
       "approved": "{{name}} đã ký duyệt mô tả công việc.",
-      "rejected": "{{name}} yêu cầu sửa mô tả công việc."
+      "rejected": "{{name}} yêu cầu sửa — tin đã quay về cho Recruiter sửa rồi gửi lại.",
+      "bypassed": "Quản trị viên đã đăng tin khi chưa có chữ ký của {{name}}."
     }
   },
   "gate": {
@@ -59,9 +80,13 @@
     "requestError": "Không gửi được hồ sơ cho Hiring Manager.",
     "decideError": "Không ghi nhận được quyết định.",
     "bypassError": "Không vượt được cổng duyệt.",
-    "availabilityLabel": "Khung giờ bạn có thể tham gia phỏng vấn (vòng 1)",
-    "availabilityHint": "Recruiter sẽ xếp ca cho ứng viên nằm trọn trong những khung này. Việc chốt giờ cụ thể với ứng viên (SMS, Zalo…) diễn ra ngoài hệ thống.",
-    "confirmApprove": "Duyệt và gửi lịch"
+    "approveBody": "Hồ sơ sẽ chuyển sang hàng chờ xếp lịch của Recruiter. Ứng viên chưa nhận thông báo nào cho tới khi được xếp giờ hẹn.",
+    "approveRound1Test": "Vòng 1 là bài trắc nghiệm trực tuyến — không cần bạn có mặt, Recruiter xếp lịch thi được ngay.",
+    "approveChecking": "Đang kiểm tra lịch vòng 1…",
+    "approveHasWindows": "Recruiter sẽ xếp ca vòng 1 nằm trong lịch bạn đã khai ở mục “Lịch tôi có mặt được”.",
+    "approveNoWindows": "Bạn chưa khai lịch có mặt cho vòng 1. Vẫn duyệt được, nhưng Recruiter chỉ xếp được ca sau khi bạn khai ở mục “Lịch tôi có mặt được”.",
+    "approveOpenAvailability": "Mở mục Lịch tôi có mặt được",
+    "confirmApprove": "Duyệt"
   },
   "emails": {
     "title": "Lịch sử email",

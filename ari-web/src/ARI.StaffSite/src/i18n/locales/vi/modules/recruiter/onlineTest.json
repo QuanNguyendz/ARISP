@@ -70,7 +70,7 @@
     }
   },
   "results": {
-    "back": "Ngân hàng câu hỏi",
+    "back": "Danh sách ứng viên",
     "title": "Bảng điểm trắc nghiệm",
     "jobLabel": "Tin: {{title}}",
     "subtitle": "Tổng hợp điểm bài thi của ứng viên.",
@@ -81,12 +81,14 @@
     "createLink": "Tạo ngân hàng câu hỏi →",
     "stats": {
       "taken": "Đã thi",
-      "takenValue": "{{count}} ứng viên",
-      "passed": "Đạt (điểm sàn {{score}})",
-      "passedValue": "{{count}} · {{rate}}%",
-      "notPassed": "Chưa đạt",
-      "avgHigh": "Điểm TB · cao nhất",
-      "avgHighValue": "{{avg}} · {{high}}"
+      "takenHint": "ứng viên",
+      "passed": "Đạt điểm sàn ({{score}}/100)",
+      "notPassed": "Chưa đạt điểm sàn",
+      "ofTakers": "{{rate}}% số người đã thi",
+      "avgScore": "Điểm trung bình",
+      "outOf100": "{{score}}/100",
+      "highestHint": "Cao nhất {{score}}/100",
+      "takenHintExpired": "ứng viên · trong đó {{count}} bài hết hạn (hệ thống tự nộp)"
     },
     "table": {
       "index": "#",
@@ -102,6 +104,7 @@
     "notPassed": "Chưa đạt",
     "tabSwitchNone": "Không rời màn hình trong lúc thi",
     "tabSwitchFlag": "Rời tab/cửa sổ {{count}} lần khi làm bài — nghi vấn gian lận",
-    "empty": "Chưa có ứng viên nào nộp bài thi."
+    "empty": "Chưa có ứng viên nào nộp bài thi.",
+    "expiredAuto": "Hết hạn · hệ thống tự nộp"
   }
 }

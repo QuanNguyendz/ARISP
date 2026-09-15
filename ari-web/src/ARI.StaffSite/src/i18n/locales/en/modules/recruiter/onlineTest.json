@@ -70,7 +70,7 @@
     }
   },
   "results": {
-    "back": "Question bank",
+    "back": "Candidate list",
     "title": "Online Test Scores",
     "jobLabel": "Job: {{title}}",
     "subtitle": "Aggregated candidate test scores.",
@@ -81,12 +81,14 @@
     "createLink": "Create the question bank →",
     "stats": {
       "taken": "Took the test",
-      "takenValue": "{{count}} candidates",
-      "passed": "Passed (pass score {{score}})",
-      "passedValue": "{{count}} · {{rate}}%",
-      "notPassed": "Not passed",
-      "avgHigh": "Average · highest",
-      "avgHighValue": "{{avg}} · {{high}}"
+      "takenHint": "candidates",
+      "passed": "Met the pass score ({{score}}/100)",
+      "notPassed": "Below the pass score",
+      "ofTakers": "{{rate}}% of those who sat it",
+      "avgScore": "Average score",
+      "outOf100": "{{score}}/100",
+      "highestHint": "Highest {{score}}/100",
+      "takenHintExpired": "candidates · {{count}} expired (auto-submitted)"
     },
     "table": {
       "index": "#",
@@ -102,6 +104,7 @@
     "notPassed": "Not passed",
     "tabSwitchNone": "Never left the screen during the test",
     "tabSwitchFlag": "Left the tab/window {{count}} time(s) during the test — possible cheating",
-    "empty": "No candidate has submitted the test yet."
+    "empty": "No candidate has submitted the test yet.",
+    "expiredAuto": "Expired · auto-submitted"
   }
 }

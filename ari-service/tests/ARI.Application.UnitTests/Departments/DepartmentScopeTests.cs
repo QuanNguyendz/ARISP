@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
@@ -46,8 +47,10 @@ public class DepartmentScopeTests
 
     private static RecruitmentRequestInput Input() =>
         new("Backend Developer", 2, RecruitmentPriority.High, "Mở rộng đội",
-            "Cần kỹ sư .NET", "Thành thạo C#", "full_time", "onsite", "Hà Nội", "senior",
-            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND");
+            "Cần kỹ sư .NET", "Thành thạo C#",
+            new[] { InterviewRoundTypes.Screening, InterviewRoundTypes.Technical },
+            "full_time", "onsite", "Hà Nội", "senior",
+            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND", false);
 
     private Task<Result<Guid>> Create(InMemoryUnitOfWork uow, RecruitmentRequestInput input, Guid actor, string role) =>
         new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())

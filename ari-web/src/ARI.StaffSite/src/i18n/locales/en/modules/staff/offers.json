@@ -4,7 +4,7 @@
     "loading": "Loading..."
   },
   "title": "Job offers",
-  "description": "The end of the pipeline: draft the offer, send it to the Hiring Manager, then send it to the candidate.",
+  "description": "The end of the pipeline: the Hiring Manager or Recruiter drafts the offer and sends it for approval, the HR Leader signs it off, then it goes to the candidate.",
   "loadError": "Could not load the offer list.",
   "searchPlaceholder": "Search by candidate or role...",
   "emptyTitle": "No offers yet",
@@ -45,8 +45,8 @@
   "editor": {
     "title": "Job offer",
     "createTitle": "Draft job offer",
-    "createHint": "Fill in salary, start date and response deadline, then send it for approval.",
-    "returnedReason": "Returned to draft by the Hiring Manager: {{reason}}",
+    "createHint": "Fill in salary, start date and response deadline, then send it to the HR Leader for approval.",
+    "returnedReason": "Returned to draft by the HR Leader: {{reason}}",
     "candidateNote": "Candidate replied: {{note}}"
   },
   "fields": {

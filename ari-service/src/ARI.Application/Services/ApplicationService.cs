@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Applications;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
@@ -39,16 +40,22 @@ namespace ARI.Application.Services
         /// <see cref="RejectApplicationAsync"/> ghi nhưng KHÔNG phải khoá, nên mọi hồ sơ bị loại ở
         /// vòng CV rơi vào nhánh "Transition mapping … is not configured" — không thao tác lại
         /// được và thông báo lỗi thì không nói được vì sao.
+        ///
+        /// <b><c>hm_review</c> và <c>screening</c> KHÔNG phải đích của lệnh PATCH chung</b> (ADR-068).
+        /// Hai trạng thái đó chỉ đạt được qua các lệnh cổng: <c>RequestHmApprovalCommand</c> (vào
+        /// <c>hm_review</c>, báo cho HM) và HM duyệt / quản trị viên vượt cổng có lý do (ra
+        /// <c>screening</c>). Trước đây chủ tin PATCH thẳng <c>cv_submitted → screening</c> được — bỏ
+        /// qua cổng Hiring Manager kể cả trên tin có HM, không dấu vết nào.
         /// </summary>
         private static readonly Dictionary<string, HashSet<string>> AllowedStatusTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
             { ApplicationStatuses.Invited, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvSubmitted, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
-            { ApplicationStatuses.CvSubmitted, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.HmReview, ApplicationStatuses.Screening, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.CvSubmitted, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
             // Cổng duyệt của Hiring Manager (ADR-061). Thiếu KHOÁ này là mọi hồ sơ đang chờ HM rơi
             // đúng vào nhánh "Transition mapping … is not configured" mà chú thích trên đã đi chữa
             // cho cv_rejected — kẹt vĩnh viễn, không rút được, không mở lại được.
             // `→ cv_submitted` là đường rút lại việc gửi duyệt (gửi nhầm người, gửi nhầm hồ sơ).
-            { ApplicationStatuses.HmReview, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Screening, ApplicationStatuses.CvSubmitted, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
+            { ApplicationStatuses.HmReview, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvSubmitted, ApplicationStatuses.CvRejected, ApplicationStatuses.Withdrawn } },
             { ApplicationStatuses.CvRejected, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.CvSubmitted } }, // mở lại hồ sơ bị loại nhầm
             { ApplicationStatuses.Screening, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Interview, ApplicationStatuses.NotPass, ApplicationStatuses.Withdrawn } },
             { ApplicationStatuses.Interview, new(StringComparer.OrdinalIgnoreCase) { ApplicationStatuses.Pass, ApplicationStatuses.NotPass, ApplicationStatuses.Withdrawn } },
@@ -581,7 +588,32 @@ namespace ARI.Application.Services
                 return dict;
             });
 
-            await Task.WhenAll(jobTask, analysisTask, bookingsTask, invitesTask, sessionsTask, evalsTask, candidatesTask);
+            // Điểm bài trắc nghiệm — nguồn điểm của VÒNG TRẮC NGHIỆM, nơi không có `Evaluation` nào
+            // (không có phiên phỏng vấn thì AI không chấm gì). Thiếu nó thì cột điểm của vòng đó
+            // luôn trống và bảng không xếp được theo điểm.
+            var testsTask = Task.Run(async () =>
+            {
+                var dict = new Dictionary<(Guid ApplicationId, int RoundNumber), (decimal Score, bool Passed, bool Expired)>();
+                try
+                {
+                    if (appIds.Count == 0) return dict;
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var subs = await uow.Repository<OnlineTestSubmission>()
+                        .QueryAsync(q => q
+                            .Where(s => appIds.Contains(s.ApplicationId))
+                            .Select(s => new { s.ApplicationId, s.RoundNumber, s.Score, s.IsPassed, s.SubmittedBy }), ct);
+                    foreach (var g in subs.GroupBy(s => (s.ApplicationId, s.RoundNumber)))
+                    {
+                        var first = g.First();
+                        dict[g.Key] = (first.Score, first.IsPassed, OnlineTestSubmittedBy.IsSystem(first.SubmittedBy));
+                    }
+                }
+                catch { }
+                return dict;
+            });
+
+            await Task.WhenAll(jobTask, analysisTask, bookingsTask, invitesTask, sessionsTask, evalsTask, testsTask, candidatesTask);
 
             var jobDict = await jobTask;
             var analysisDataById = await analysisTask;
@@ -589,9 +621,13 @@ namespace ARI.Application.Services
             var highestRoundInvites = await invitesTask;
             var highestRoundSessions = await sessionsTask;
             var evalDict = await evalsTask;
+            var testDict = await testsTask;
             var candidateDictByEmail = await candidatesTask;
 
             var bookedAppIds = scheduledBookings.Select(b => b.ApplicationId).ToHashSet();
+            var highestRoundBookings = scheduledBookings
+                .GroupBy(b => b.ApplicationId)
+                .ToDictionary(g => g.Key, g => g.Max(b => b.RoundNumber));
             var bookingSlotLookup = new Dictionary<(Guid ApplicationId, int RoundNumber), Guid>();
             foreach (var g in scheduledBookings.GroupBy(b => (b.ApplicationId, b.RoundNumber)))
             {
@@ -613,21 +649,11 @@ namespace ARI.Application.Services
 
             var mapped = apps.Select(app =>
             {
-                int? currentRound = null;
-                if (app.Status != "cv_submitted" && app.Status != "invited" && app.Status != "cv_rejected")
-                {
-                    if (app.Status == "screening")
-                    {
-                        currentRound = 1;
-                    }
-                    else
-                    {
-                        var maxInviteRound = highestRoundInvites.TryGetValue(app.Id, out var ir) ? ir : 0;
-                        var maxSessionRound = highestRoundSessions.TryGetValue(app.Id, out var sr) ? sr : 0;
-                        currentRound = Math.Max(maxInviteRound, maxSessionRound);
-                        if (currentRound == 0) currentRound = 1;
-                    }
-                }
+                var currentRound = ApplicationCurrentRound.Resolve(
+                    app.Status,
+                    highestRoundInvites.TryGetValue(app.Id, out var ir) ? ir : 0,
+                    highestRoundSessions.TryGetValue(app.Id, out var sr) ? sr : 0,
+                    highestRoundBookings.TryGetValue(app.Id, out var br) ? br : 0);
 
                 DateTimeOffset? interviewDate = null;
                 if (currentRound.HasValue)
@@ -668,7 +694,16 @@ namespace ARI.Application.Services
                     HmDecisionNote = app.HmDecisionNote,
                     HmDecidedAt = app.HmDecidedAt,
                     InterviewScore = currentRound.HasValue && evalDict.TryGetValue((app.Id, currentRound.Value), out var iscr) ? iscr : null,
-                    InterviewDate = interviewDate
+                    InterviewDate = interviewDate,
+                    OnlineTestScore = currentRound.HasValue && testDict.TryGetValue((app.Id, currentRound.Value), out var tst)
+                        ? tst.Score
+                        : (decimal?)null,
+                    OnlineTestPassed = currentRound.HasValue && testDict.TryGetValue((app.Id, currentRound.Value), out var tst2)
+                        ? tst2.Passed
+                        : (bool?)null,
+                    OnlineTestExpired = currentRound.HasValue && testDict.TryGetValue((app.Id, currentRound.Value), out var tst3)
+                        ? tst3.Expired
+                        : (bool?)null,
                 };
 
                 var emailKey = (app.CandidateEmail ?? "").Trim().ToLower();
@@ -850,25 +885,22 @@ namespace ARI.Application.Services
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
 
             int? currentRound = null;
-            if (application.Status != "cv_submitted" && application.Status != "invited" && application.Status != "cv_rejected")
+            if (ApplicationCurrentRound.Resolve(application.Status, 0, 0, 0) is not null)
             {
-                if (application.Status == "screening")
-                {
-                    currentRound = 1;
-                }
-                else
-                {
-                    var maxInviteRound = (await _unitOfWork.Repository<InterviewInvite>()
-                        .FindAsync(i => i.ApplicationId == id, ct))
-                        .Select(i => i.RoundNumber).DefaultIfEmpty(0).Max();
+                var maxInviteRound = (await _unitOfWork.Repository<InterviewInvite>()
+                    .FindAsync(i => i.ApplicationId == id, ct))
+                    .Select(i => i.RoundNumber).DefaultIfEmpty(0).Max();
 
-                    var maxSessionRound = (await _unitOfWork.Repository<InterviewSession>()
-                        .FindAsync(s => s.ApplicationId == id, ct))
-                        .Select(s => s.RoundNumber).DefaultIfEmpty(0).Max();
+                var maxSessionRound = (await _unitOfWork.Repository<InterviewSession>()
+                    .FindAsync(s => s.ApplicationId == id, ct))
+                    .Select(s => s.RoundNumber).DefaultIfEmpty(0).Max();
 
-                    currentRound = Math.Max(maxInviteRound, maxSessionRound);
-                    if (currentRound == 0) currentRound = 1;
-                }
+                var maxBookingRound = (await _unitOfWork.Repository<InterviewBooking>()
+                    .FindAsync(b => b.ApplicationId == id && b.Status == BookingStatus.Scheduled, ct))
+                    .Select(b => b.RoundNumber).DefaultIfEmpty(0).Max();
+
+                currentRound = ApplicationCurrentRound.Resolve(
+                    application.Status, maxInviteRound, maxSessionRound, maxBookingRound);
             }
 
             decimal? score = null;
@@ -1040,20 +1072,21 @@ namespace ARI.Application.Services
             if (application == null)
                 return Result<bool>.Failure("Không tìm thấy hồ sơ ứng tuyển này.");
 
-            // Hồ sơ ở giai đoạn CV thì duyệt thẳng như cũ. Hồ sơ đang nằm ở cổng Hiring Manager thì
-            // CHỈ đi tiếp được khi cổng đã mở (HM duyệt, hoặc quản trị viên vượt cổng có lý do) —
-            // ADR-061. Cổng mở nằm ở cột HmDecision chứ không phải ở Status: Status nói hồ sơ đang
-            // ở đâu, HmDecision nói đã được phép đi tiếp chưa.
-            var inCvPhase = ApplicationStatuses.Is(application.Status, ApplicationStatuses.CvSubmitted)
-                            || ApplicationStatuses.Is(application.Status, ApplicationStatuses.Invited);
+            // Hồ sơ CHỈ rời giai đoạn CV qua cổng Hiring Manager đã mở (HM duyệt, hoặc quản trị viên
+            // vượt cổng có lý do) — ADR-061. Cổng mở nằm ở cột HmDecision chứ không phải ở Status:
+            // Status nói hồ sơ đang ở đâu, HmDecision nói đã được phép đi tiếp chưa.
+            //
+            // ADR-068 bỏ nhánh "hồ sơ vừa nộp thì duyệt thẳng": nhánh đó chỉ tồn tại cho tin không có
+            // HM, mà nay mọi tin đều có HM. Để lại thì bất kỳ ai gọi được hàm này cũng đẩy được hồ sơ
+            // qua cổng mà không có quyết định nào của HM.
             var gateOpen = ApplicationStatuses.Is(application.Status, ApplicationStatuses.HmReview)
                            && HmDecision.IsOpen(application.HmDecision);
 
-            if (!inCvPhase && !gateOpen)
+            if (!gateOpen)
             {
                 return ApplicationStatuses.Is(application.Status, ApplicationStatuses.HmReview)
                     ? Result<bool>.Failure("Hồ sơ đang chờ Hiring Manager duyệt. Chưa xếp lịch được.")
-                    : Result<bool>.Failure("Chỉ có thể duyệt hồ sơ ứng tuyển ở trạng thái mới nộp (cv_submitted) hoặc được mời (invited).");
+                    : Result<bool>.Failure("Hồ sơ phải được Hiring Manager duyệt (hoặc quản trị viên duyệt thay có lý do) trước khi sang bước xếp lịch.");
             }
 
             // Nâng trạng thái + tạo token đánh dấu vòng, NHƯNG không gửi email ở đây (sendEmail: false) —

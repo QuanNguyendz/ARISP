@@ -1,8 +1,8 @@
 {
   "title": "Schedule Interview · Round {{round}}",
   "declineWarning": {
-    "title": "Candidate declined previous schedule (requested reschedule)",
-    "hint": "Please select a more suitable time slot for the candidate."
+    "title": "Candidate declined the previous session",
+    "hint": "Only reschedule once you have agreed a time with them — the system does not ask on your behalf."
   },
   "scheduled": {
     "title": "Interview scheduled for candidate",

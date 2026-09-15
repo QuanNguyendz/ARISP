@@ -226,6 +226,11 @@ function App() {
             <Route path="/hm/dashboard" element={<HmDashboardPage />} />
             <Route path="/hm/jobs" element={<HmJobsPage />} />
             <Route path="/hm/jobs/:id" element={<HmJobDetailPage />} />
+            {/* Ngân hàng đề là quyết định CHUYÊN MÔN (hỏi gì, đáp án nào đúng, bao nhiêu điểm là
+                đạt) nên nó thuộc về Hiring Manager, không phải Recruiter. Dùng lại đúng hai trang
+                của Recruiter — một bản sao thứ hai là hai chỗ phải nhớ sửa. */}
+            <Route path="/hm/jobs/:id/online-test" element={<JobOnlineTestPage />} />
+            <Route path="/hm/jobs/:id/online-test/results" element={<JobOnlineTestResultsPage />} />
             <Route path="/hm/interview-rooms" element={<HmInterviewRoomsPage />} />
             <Route path="/hm/candidates/:id" element={<HmCandidateDetailPage />} />
             <Route path="/hm/offers" element={<HmOffersPage />} />

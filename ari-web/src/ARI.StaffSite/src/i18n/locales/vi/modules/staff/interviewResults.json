@@ -1,0 +1,44 @@
+{
+  "title": "Kết quả phỏng vấn",
+  "description": "Từng vòng phỏng vấn thật: ca đã gán, diễn biến, báo cáo AI, video và transcript.",
+  "loading": "Đang tải...",
+  "loadError": "Không tải được kết quả phỏng vấn.",
+  "empty": "Chưa có buổi phỏng vấn thật nào.",
+  "round": "Vòng {{number}}",
+  "roundTypes": {
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "onlineTest": "Trắc nghiệm",
+    "other": "Phỏng vấn"
+  },
+  "slot": "Ca {{date}} · {{from}}–{{to}}",
+  "noSlot": "Chưa gán ca",
+  "duration": "{{minutes}} phút",
+  "states": {
+    "scheduled": "Đã xếp lịch",
+    "overdue": "Quá giờ hẹn — chưa có phiên",
+    "waiting": "Đang ở phòng chờ",
+    "in_progress": "Đang phỏng vấn",
+    "evaluating": "AI đang chấm",
+    "pending_review": "Chờ Hiring Manager chốt",
+    "reviewed": "Đã chốt kết quả",
+    "aborted": "Buổi bị gián đoạn"
+  },
+  "verdict": {
+    "pass": "Đạt",
+    "not_pass": "Không đạt"
+  },
+  "aiVerdict": "AI: {{verdict}}",
+  "score": "{{score}}/100",
+  "video": "Có video",
+  "noVideo": "Không có video",
+  "videoDeleted": "Video đã xoá theo hạn lưu",
+  "transcript": "Transcript {{count}} lượt",
+  "noTranscript": "Không có transcript",
+  "viewReport": "Xem đánh giá",
+  "evaluatingHint": "Báo cáo sẽ hiện ở đây khi AI chấm xong — thường chỉ vài phút.",
+  "abortedHint": "Buổi này không có báo cáo. Có thể xếp lại lịch cho ứng viên.",
+  "recentTitle": "Buổi vừa kết thúc",
+  "recentDescription": "Các buổi phỏng vấn thật kết thúc trong 24 giờ qua — mở báo cáo AI để chốt kết quả.",
+  "recentEmpty": "Chưa có buổi nào kết thúc trong 24 giờ qua."
+}

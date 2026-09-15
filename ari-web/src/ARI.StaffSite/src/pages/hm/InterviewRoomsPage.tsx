@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { DoorOpen, LogIn, Users, Clock, Briefcase } from 'lucide-react'
+import { DoorOpen, LogIn, Users, Clock, Briefcase, History } from 'lucide-react'
 import { PageHeader, EmptyState, ErrorAlert, LoadingSpinner } from '@ari/shared/ui'
 import { interviewService, type WaitingRoom } from '@ari/shared/fservices/interview'
+import { evaluationService } from '@/fservices/evaluation/evaluationService'
+import { ResultRow } from '@/components/evaluations/InterviewResultsCard'
+import { INTERVIEW_RESULTS_NS, recentInterviewsKey } from '@/components/evaluations/interviewResultsConfig'
 
 /**
  * Phòng phỏng vấn thật đang mở — màn của Hiring Manager (ADR-067).
@@ -145,7 +148,48 @@ export default function InterviewRoomsPage() {
             })}
           </ul>
         )}
+
+        <RecentlyEnded />
       </div>
     </div>
+  )
+}
+
+/**
+ * Buổi vừa kết thúc (ADR-069). HM ngồi trong phòng suốt buổi; buổi xong là thẻ phòng biến mất khỏi danh
+ * sách trên — trước đây kéo theo cả đường tới báo cáo AI của chính buổi vừa ngồi. Cùng nhịp tự làm mới với
+ * danh sách phòng; realtime (phiên / báo cáo đổi) cũng làm mới vì khoá nằm dưới `['evaluations']`.
+ */
+function RecentlyEnded() {
+  const { t } = useTranslation(INTERVIEW_RESULTS_NS)
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: recentInterviewsKey,
+    queryFn: () => evaluationService.getRecentInterviews(24),
+    refetchInterval: 30_000,
+  })
+
+  return (
+    <section className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card dark:border-white/10 dark:bg-white/5">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
+        <History className="h-5 w-5 text-brand-600 dark:text-brand-400" /> {t('recentTitle')}
+      </h2>
+      <p className="mb-4 mt-1 text-sm text-ink-500 dark:text-ink-400">{t('recentDescription')}</p>
+      {isLoading ? (
+        <LoadingSpinner message={t('loading')} />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-ink-500 dark:text-ink-400">{t('recentEmpty')}</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <ResultRow
+              key={r.sessionId ?? `${r.applicationId}-${r.roundNumber}`}
+              row={r}
+              showCandidate
+              evaluationHref={(id) => `/hm/evaluations?id=${id}`}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

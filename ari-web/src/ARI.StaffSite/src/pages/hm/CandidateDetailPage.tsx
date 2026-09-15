@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Briefcase, Mail, Phone, FileText, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft, Briefcase, Mail, Phone, FileText } from 'lucide-react'
 import { PageHeader, ErrorAlert, LoadingSpinner } from '@ari/shared/ui'
 import { applicationService } from '@ari/shared/fservices/application'
-import { evaluationService } from '@/fservices/evaluation/evaluationService'
 import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
 import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
 import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
+import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card'
@@ -32,12 +32,6 @@ export default function HmCandidateDetailPage() {
   } = useQuery({
     queryKey: ['hr-application', id],
     queryFn: () => applicationService.getHrApplicationById(id),
-    enabled: !!id,
-  })
-
-  const { data: evaluations = [] } = useQuery({
-    queryKey: ['application-evaluations', id],
-    queryFn: () => evaluationService.getEvaluationsByApplicationId(id),
     enabled: !!id,
   })
 
@@ -110,36 +104,12 @@ export default function HmCandidateDetailPage() {
               )}
             </section>
 
-            <section className={CARD}>
-              <h2 className="mb-1 text-sm font-semibold text-ink-900 dark:text-white">
-                {t('evaluations.title')}
-              </h2>
-              <p className="mb-4 text-xs text-ink-500 dark:text-ink-400">
-                {t('evaluations.description')}
-              </p>
-              {evaluations.length === 0 ? (
-                <p className="text-sm text-ink-500 dark:text-ink-400">{t('evaluations.empty')}</p>
-              ) : (
-                <ul className="divide-y divide-ink-100 dark:divide-white/10">
-                  {evaluations.map((ev) => (
-                    <li key={ev.id}>
-                      <Link
-                        to={`/hm/evaluations?id=${ev.id}`}
-                        className="-mx-2 flex items-center justify-between gap-4 rounded-lg px-2 py-3 transition-colors hover:bg-ink-50 dark:hover:bg-white/5"
-                      >
-                        <span className="flex items-center gap-2 text-sm text-ink-900 dark:text-white">
-                          <ClipboardCheck className="h-4 w-4 text-brand-600 dark:text-brand-400" />
-                          {t('evaluations.round', { number: ev.roundNumber ?? 1 })}
-                        </span>
-                        <span className="text-sm text-ink-500 dark:text-ink-400">
-                          {typeof ev.overallScore === 'number' ? `${ev.overallScore}/100` : '—'}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            {/* Kết quả phỏng vấn theo vòng (ADR-069): ca · diễn biến · báo cáo AI · video · transcript. Trước đây
+                chỉ là danh sách đánh giá — trống trơn trong lúc AI còn đang chấm buổi vừa xong. */}
+            <InterviewResultsCard
+              applicationId={app.id}
+              evaluationHref={(evaluationId) => `/hm/evaluations?id=${evaluationId}`}
+            />
 
             <EmailHistoryPanel applicationId={app.id} />
           </div>
@@ -156,6 +126,7 @@ export default function HmCandidateDetailPage() {
             <CandidateOfferPanel
               applicationId={app.id}
               status={app.status}
+              jobPostingId={app.jobPostingId}
               onChanged={() => refetch()}
             />
           </div>

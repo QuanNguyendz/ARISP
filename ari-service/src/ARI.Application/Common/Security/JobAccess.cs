@@ -78,8 +78,12 @@ namespace ARI.Application.Common.Security
 
         /// <summary>
         /// Hiring Manager CHÍNH của tin — người mà chữ ký duyệt chặn phễu và là người chốt kết quả
-        /// phỏng vấn. <c>null</c> khi tin chưa gán ai: khi đó mọi cổng duyệt của ADR-061 đều mở
-        /// (hành vi y hệt trước khi có vai trò này).
+        /// phỏng vấn.
+        ///
+        /// ADR-068: mọi tin LUÔN có một người ở vị trí này (người lập phiếu được gán lúc tạo tin; gỡ
+        /// không được, chỉ chuyển được). Trả <c>null</c> chỉ còn là dữ liệu hỏng/tin cũ chưa được gán —
+        /// và khi đó mọi cổng duyệt ĐÓNG, không mở. Chỗ cần chặn phễu dùng
+        /// <see cref="RequireActiveHiringManagerAsync"/> thay vì tự kiểm null.
         /// </summary>
         public static async Task<JobHiringTeamMember?> PrimaryHiringManagerAsync(
             IUnitOfWork unitOfWork, Guid jobPostingId, CancellationToken ct)
@@ -92,16 +96,58 @@ namespace ARI.Application.Common.Security
         }
 
         /// <summary>
-        /// Tin này có cổng duyệt của Hiring Manager không — SUY RA từ việc có ai được gán hay không,
-        /// KHÔNG phải một cột bật/tắt riêng.
+        /// Hiring Manager chính của tin cùng tình trạng tài khoản của họ (ADR-068).
         ///
-        /// Cột bool có thể bật mà không ai được gán, khi đó phễu chặn ở một người không tồn tại và
-        /// lối thoát duy nhất là quyền vượt cổng của quản trị viên. Suy ra thì mệnh đề
-        /// <i>"có cổng ⇒ có người mở được"</i> đúng về mặt cấu trúc.
+        /// Tách <see cref="HiringManagerState.Inactive"/> khỏi <see cref="HiringManagerState.Missing"/>:
+        /// khoá tài khoản là thao tác an ninh nên KHÔNG bị chặn, và người bị khoá vẫn nằm ở vị trí HM
+        /// cho tới khi HR Leader chuyển tin. Hai trường hợp cần câu hướng dẫn khác nhau ("gán" hay
+        /// "chuyển"), còn với cổng duyệt thì như nhau: đều đóng.
         /// </summary>
-        public static async Task<bool> RequiresHiringManagerApprovalAsync(
+        public static async Task<(JobHiringTeamMember? member, User? user, HiringManagerState state)>
+            HiringManagerStatusAsync(IUnitOfWork unitOfWork, Guid jobPostingId, CancellationToken ct)
+        {
+            var hm = await PrimaryHiringManagerAsync(unitOfWork, jobPostingId, ct);
+            if (hm == null) return (null, null, HiringManagerState.Missing);
+
+            var user = await unitOfWork.Repository<User>().GetByIdAsync(hm.UserId, ct);
+            var active = user != null
+                         && user.DeletedAt == null
+                         && user.IsActive
+                         && RoleNames.Is(user.Role, RoleNames.HiringManager);
+            return (hm, user, active ? HiringManagerState.Active : HiringManagerState.Inactive);
+        }
+
+        /// <summary>
+        /// Hiring Manager chính CÒN HOẠT ĐỘNG của tin, hoặc câu lỗi nói rõ HR Leader phải làm gì.
+        ///
+        /// Đây là chốt chặn MẶC ĐỊNH ĐÓNG của ADR-068 — cùng tinh thần <c>DbChangeRouter</c>: thiếu người
+        /// duyệt thì phễu dừng lại và nói to lên, chứ không lặng lẽ bỏ qua cổng như trước đây (khi đó một
+        /// Recruiter gỡ HM khỏi đội là tự mở mọi cổng đang kiểm chính mình).
+        /// </summary>
+        public static async Task<(JobHiringTeamMember? member, string? error)> RequireActiveHiringManagerAsync(
             IUnitOfWork unitOfWork, Guid jobPostingId, CancellationToken ct)
-            => await PrimaryHiringManagerAsync(unitOfWork, jobPostingId, ct) != null;
+        {
+            var (hm, _, state) = await HiringManagerStatusAsync(unitOfWork, jobPostingId, ct);
+            return state switch
+            {
+                HiringManagerState.Active => (hm, null),
+                HiringManagerState.Inactive => (null, JobAccessErrors.HiringManagerInactive),
+                _ => (null, JobAccessErrors.HiringManagerMissing),
+            };
+        }
+
+        /// <summary>
+        /// Người gọi có phải Hiring Manager CHÍNH của tin không. Quản trị viên KHÔNG tự động thoả: họ
+        /// có đường riêng là "làm thay" (kèm lý do + audit), để dấu vết phân biệt rõ "HM đã duyệt" với
+        /// "quản trị viên duyệt thay".
+        /// </summary>
+        public static async Task<bool> IsPrimaryHiringManagerAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, Guid? userId, CancellationToken ct)
+        {
+            if (userId is not { } uid || uid == Guid.Empty) return false;
+            var hm = await PrimaryHiringManagerAsync(unitOfWork, jobPostingId, ct);
+            return hm != null && hm.UserId == uid;
+        }
 
         /// <summary>
         /// Có quyền QUẢN LÝ tin này không (chủ tin hoặc quản trị viên).
@@ -186,5 +232,41 @@ namespace ARI.Application.Common.Security
         public const string ApplicationManageForbidden = "Bạn không có quyền thao tác trên hồ sơ thuộc tin tuyển dụng này.";
         public const string EvaluationNotFound = "Không tìm thấy báo cáo đánh giá này.";
         public const string EvaluationForbidden = "Bạn không có quyền xem báo cáo đánh giá thuộc tin tuyển dụng này.";
+
+        /// <summary>ADR-068 — tin không có Hiring Manager chính (tin cũ chưa được gán).</summary>
+        public const string HiringManagerMissing =
+            "Tin này chưa có Hiring Manager phụ trách. HR Leader cần gán Hiring Manager cho tin trước khi đi tiếp.";
+
+        /// <summary>ADR-068 — Hiring Manager chính đã bị khoá, xoá hoặc không còn vai trò Hiring Manager.</summary>
+        public const string HiringManagerInactive =
+            "Hiring Manager của tin này không còn hoạt động. HR Leader cần chuyển tin cho một Hiring Manager khác.";
+    }
+
+    /// <summary>Giá trị chuỗi của <see cref="HiringManagerState"/> trong DTO trả về cho frontend.</summary>
+    public static class HiringManagerStateNames
+    {
+        public const string Active = "active";
+        public const string Inactive = "inactive";
+        public const string Missing = "missing";
+
+        public static string Of(HiringManagerState state) => state switch
+        {
+            HiringManagerState.Active => Active,
+            HiringManagerState.Inactive => Inactive,
+            _ => Missing,
+        };
+    }
+
+    /// <summary>Tình trạng vị trí Hiring Manager chính của một tin (ADR-068).</summary>
+    public enum HiringManagerState
+    {
+        /// <summary>Có người, tài khoản đang hoạt động và đúng vai trò — cổng duyệt vận hành bình thường.</summary>
+        Active = 0,
+
+        /// <summary>Có người nhưng đã bị khoá / xoá / đổi vai trò — cổng đóng, chờ HR Leader chuyển.</summary>
+        Inactive = 1,
+
+        /// <summary>Không có ai (dữ liệu có trước ADR-063 chưa được gán) — cổng đóng, chờ HR Leader gán.</summary>
+        Missing = 2,
     }
 }

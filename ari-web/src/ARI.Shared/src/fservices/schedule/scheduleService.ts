@@ -7,7 +7,8 @@ export interface CreateSlotRequest {
   startTime: string
   endTime: string
   timezone?: string
-  capacity?: number
+  /** Bỏ trống = để server quyết theo LOẠI vòng (trắc nghiệm: không giới hạn; còn lại: 1). */
+  capacity?: number | null
 }
 
 /** Một mục lịch phỏng vấn của ứng viên (kèm booking để xác nhận/từ chối) — ADR-048. */
@@ -22,6 +23,8 @@ export interface CandidateScheduleItem {
   /** pending | confirmed | declined */
   confirmationStatus: string
   declineReason?: string | null
+  /** Loại vòng (`online_test` | `screening` | `technical`) — gọi đúng tên "bài trắc nghiệm" / "phỏng vấn". */
+  roundType?: string | null
 }
 
 export interface CandidateSchedule {
@@ -44,6 +47,13 @@ export interface HmAvailabilityWindow {
   hiringManagerName?: string | null
 }
 
+export interface HmAvailabilitySaveResult {
+  /** Số khung còn hiệu lực sau khi sửa. */
+  windowCount: number
+  /** Số buổi đã hẹn nay nằm ngoài mọi khung — Recruiter phải dời lịch cho từng người. */
+  affectedBookings: number
+}
+
 export const scheduleService = {
   // ===== Lịch rảnh của Hiring Manager (ADR-067) =====
   async getHmAvailability(jobPostingId: string, round?: number): Promise<HmAvailabilityWindow[]> {
@@ -53,17 +63,30 @@ export const scheduleService = {
     return data
   },
 
+  /**
+   * Kết quả một lần sửa lịch rảnh. `affectedBookings` là số buổi ĐÃ HẸN nay rơi ra ngoài giờ
+   * Hiring Manager có mặt được — luật khớp giờ chỉ chạy lúc gán ca, nên không có chốt chặn nào
+   * bắt được việc này. Phải đưa lên màn hình ngay tại chỗ vừa bấm.
+   */
   async setHmAvailability(
     jobPostingId: string,
     roundNumber: number,
     windows: { startTime: string; endTime: string; note?: string | null }[]
-  ): Promise<number> {
-    const { data } = await apiClient.put<{ windowCount: number }>('/schedules/hm-availability', {
+  ): Promise<HmAvailabilitySaveResult> {
+    const { data } = await apiClient.put<HmAvailabilitySaveResult>('/schedules/hm-availability', {
       jobPostingId,
       roundNumber,
       windows,
     })
-    return data?.windowCount ?? 0
+    return { windowCount: data?.windowCount ?? 0, affectedBookings: data?.affectedBookings ?? 0 }
+  },
+
+  /** Bỏ MỘT khung — kể cả khung đang diễn ra, thứ mà lệnh PUT cố ý không đụng tới. */
+  async deleteHmAvailability(windowId: string): Promise<HmAvailabilitySaveResult> {
+    const { data } = await apiClient.delete<HmAvailabilitySaveResult>(
+      `/schedules/hm-availability/${windowId}`
+    )
+    return { windowCount: data?.windowCount ?? 0, affectedBookings: data?.affectedBookings ?? 0 }
   },
 
   // ===== Recruiter/HR: quản lý khung giờ phỏng vấn của job =====
@@ -99,7 +122,8 @@ export const scheduleService = {
     return data
   },
 
-  async updateSlotCapacity(slotId: string, capacity: number): Promise<AvailabilitySlot> {
+  /** `capacity = null` → bỏ trần (chỉ vòng trắc nghiệm chấp nhận). */
+  async updateSlotCapacity(slotId: string, capacity: number | null): Promise<AvailabilitySlot> {
     const { data } = await apiClient.patch<AvailabilitySlot>(
       `/schedules/slots/${slotId}/capacity`,
       {

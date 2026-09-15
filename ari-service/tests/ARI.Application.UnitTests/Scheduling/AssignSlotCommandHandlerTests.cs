@@ -25,9 +25,16 @@ public class AssignSlotCommandHandlerTests
 
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
+    /// <summary>
+    /// ADR-068: mọi tin đều có Hiring Manager — gán cho những tin test dựng tay trước khi gọi handler, để luật
+    /// khớp giờ HM không phải thứ làm hỏng những test không nói về nó.
+    /// </summary>
     private Task<Result<AssignSlotResultDto>> Run(
         InMemoryUnitOfWork uow, RecordingNotificationService notif, AssignSlotCommand cmd)
-        => new AssignSlotCommandHandler(uow, notif, EmptyConfig).Handle(cmd, CancellationToken.None);
+    {
+        HiringManagerSeed.EnsureForAllJobs(uow);
+        return new AssignSlotCommandHandler(uow, notif, EmptyConfig).Handle(cmd, CancellationToken.None);
+    }
 
     private AssignSlotCommand Cmd(Guid appId, Guid slotId, int round = 1, Guid? user = null, string? role = null)
         => new(appId, slotId, round, user ?? _staffId, role ?? AppRoles.Recruiter);
@@ -159,6 +166,49 @@ public class AssignSlotCommandHandlerTests
         Assert.True(res.IsSuccess);
         Assert.Equal("interview", app.Status);
         Assert.Single(uow.Repo<InterviewBooking>().Items);
+    }
+
+    // ---------- Qua vòng trắc nghiệm = xếp thẳng lịch vòng kế ----------
+
+    /// <summary>Tin có vòng 1 trắc nghiệm, vòng 2 sơ loại; hồ sơ đang ở vòng 1 và một ca vòng 2.</summary>
+    private (InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app, AvailabilitySlot slot) AfterOnlineTest()
+    {
+        var job = SchedulingData.Job(owner: _staffId);
+        var app = SchedulingData.Application(job.Id, _accountId, status: "interview");
+        var slot = SchedulingData.Slot(job.Id, round: 2);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(slot)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" })
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 2, RoundType = "screening" });
+        _ = new SlotSqlEmulator(uow);
+        return (uow, app, slot);
+    }
+
+    [Theory]
+    [InlineData(OnlineTestSubmittedBy.Candidate)]
+    [InlineData(OnlineTestSubmittedBy.System)] // bài hệ thống nộp thay khi hết hạn vẫn là một kết quả
+    public async Task Da_co_bai_trac_nghiem_thi_xep_duoc_lich_vong_ke(string submittedBy)
+    {
+        // Vòng trắc nghiệm không có bước HM chốt kết quả nào để sinh lời mời vòng sau — Recruiter
+        // nhìn điểm rồi xếp thẳng lịch vòng 2. Đó chính là thao tác "cho qua vòng".
+        var (uow, app, slot) = AfterOnlineTest();
+        uow.Seed(new OnlineTestSubmission { ApplicationId = app.Id, RoundNumber = 1, SubmittedBy = submittedBy });
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, slot.Id, round: 2));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(2, Assert.Single(uow.Repo<InterviewBooking>().Items).RoundNumber);
+    }
+
+    [Fact]
+    public async Task Chua_co_bai_trac_nghiem_thi_khong_nhay_qua_duoc_vong_do()
+    {
+        var (uow, app, slot) = AfterOnlineTest();
+
+        var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, slot.Id, round: 2));
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("trắc nghiệm", res.Error);
+        Assert.Empty(uow.Repo<InterviewBooking>().Items);
     }
 
     [Fact]

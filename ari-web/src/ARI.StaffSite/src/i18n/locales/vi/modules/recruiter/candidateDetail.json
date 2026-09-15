@@ -18,8 +18,6 @@
   "round": "Vòng {{number}}",
   "practice": "Thử",
   "real": "Thật",
-  "screening": "Sơ loại",
-  "technical": "Chuyên môn",
   "durationMinutes": "{{minutes}} phút",
   "noDuration": "—",
   "actions": "Thao tác",
@@ -41,5 +39,11 @@
   "codeError": "Không thể cấp mã phỏng vấn.",
   "hrReviewed": "Nhân sự đã duyệt",
   "pass": "Đạt",
-  "notPass": "Không đạt"
+  "notPass": "Không đạt",
+  "roundTypes": {
+    "screening": "Sơ loại",
+    "technical": "Chuyên môn",
+    "onlineTest": "Trắc nghiệm",
+    "other": "Phỏng vấn"
+  }
 }

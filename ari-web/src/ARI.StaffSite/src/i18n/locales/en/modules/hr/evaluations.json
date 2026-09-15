@@ -25,14 +25,13 @@
   "vocabulary": "Vocabulary",
   "questionAnalysis": "Per-Question Analysis",
   "aiComment": "AI Comment",
-  "recordingTranscript": "Interview recording",
+  "recordingTranscript": "The interview: video & transcript",
   "recordingExpiresAt": "Video is deleted automatically after {{date}}",
   "recordingDeleted": "Video was automatically deleted on {{date}} per the retention policy.",
   "recordingNone": "No recording available for this interview.",
   "aiVerdict": "AI Verdict",
   "recommendation": "Recommendation",
   "hrDecision": "HR Decision",
-  "hrDecisionHint": "Confirm AI verdict or override (reason required).",
   "confirming": "Confirming...",
   "confirmAi": "Confirm AI",
   "override": "Override",
@@ -82,6 +81,22 @@
       "super_admin": "Super Admin (on their behalf)"
     },
     "awaitingDecision": "Waiting for {{name}} to make the call. You can read the report but you are not the decision maker.",
-    "awaitingAdminDecision": "Waiting for an HR Admin to make the call. You can read the report but you are not the decision maker."
+    "awaitingAdminDecision": "This job has no active Hiring Manager — an HR Leader needs to assign / transfer one, or decide on their behalf with a reason. You can read the report but you are not the decision maker.",
+    "unavailableHint": "This job has no active Hiring Manager (never assigned, or the account was locked). You can decide on their behalf with a reason — or assign / transfer a Hiring Manager first."
+  },
+  "session": {
+    "slot": "Interview slot",
+    "slotValue": "Slot {{date}} · {{from}}–{{to}}",
+    "noSlot": "No booked slot found",
+    "started": "Held",
+    "startedValue": "Started {{from}} · ended {{to}}",
+    "duration": "Duration",
+    "durationValue": "{{minutes}} min",
+    "transcriptTitle": "Transcript ({{count}} turns)",
+    "transcriptEmpty": "No question–answer turn was recorded for this interview.",
+    "aiAsked": "AI asked · question {{number}}",
+    "candidateSaid": "Candidate answered",
+    "showAll": "Show all {{count}} turns",
+    "collapse": "Collapse"
   }
 }

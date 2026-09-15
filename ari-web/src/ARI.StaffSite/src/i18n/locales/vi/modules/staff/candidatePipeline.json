@@ -6,8 +6,11 @@
     "invite": "Mời phỏng vấn",
     "viewApplication": "Xem hồ sơ đầy đủ",
     "schedule": "Xếp lịch",
-    "hmApprove": "Duyệt & gửi lịch rảnh",
-    "hmReject": "Từ chối"
+    "hmApprove": "Duyệt",
+    "hmReject": "Từ chối",
+    "inviteNextRound": "Mời vào vòng {{round}}",
+    "scheduleNextRound": "Xếp lịch vòng {{round}}",
+    "scheduleMixedRounds": "Các hồ sơ đã chọn cần xếp lịch cho những vòng khác nhau — hãy chọn riêng từng nhóm."
   },
   "pipeline": {
     "rejected": "Không phù hợp",
@@ -26,6 +29,9 @@
     "colArea": "Khu vực",
     "colAge": "Độ tuổi",
     "colMatch": "Điểm CV",
+    "colTestScore": "Điểm bài thi",
+    "testNotTaken": "Chưa thi",
+    "testResults": "Bảng điểm ứng viên",
     "colStatus": "Trạng thái",
     "ageValue": "{{count}} tuổi",
     "appliedAt": "Ngày ứng tuyển",
@@ -39,7 +45,11 @@
       "screening": "Sơ loại",
       "technical": "Chuyên môn",
       "onlineTest": "Trắc nghiệm"
-    }
+    },
+    "testPassed": "Đạt",
+    "testFailed": "Chưa đạt",
+    "viewAnswers": "Xem bài làm",
+    "testExpiredAuto": "Hết hạn · hệ thống tự nộp"
   },
   "stage": {
     "cv_pending": "Chờ sàng CV",
@@ -54,6 +64,44 @@
     "interview_active": "Đang phỏng vấn",
     "interview_done": "Đã phỏng vấn xong",
     "pending_result": "Chờ chốt kết quả",
-    "missed": "Không dự buổi đã hẹn"
+    "missed": "Không dự buổi đã hẹn",
+    "test_expired": "Không vào làm bài (hết hạn)"
+  },
+  "code": {
+    "title": "Mã vào phòng phỏng vấn · Vòng {{round}}",
+    "remote": "Làm từ nhà",
+    "onsite": "Tại văn phòng",
+    "loading": "Đang tải mã phỏng vấn…",
+    "loadError": "Không tải được mã phỏng vấn.",
+    "issueError": "Không cấp được mã phỏng vấn.",
+    "issue": "Cấp mã phỏng vấn",
+    "regenerate": "Cấp mã mới",
+    "confirmRegenerate": "Mã {{code}} sẽ hết hiệu lực ngay, ứng viên phải dùng mã mới. Tiếp tục?",
+    "copyCode": "Sao chép mã",
+    "copyLink": "Sao chép link vào phòng",
+    "openKiosk": "Mở trang Kiosk",
+    "copied": "Đã sao chép",
+    "expiresAt": "Hết hạn lúc {{time}} · chỉ dùng một lần",
+    "expired": "Mã trước đã hết hạn — cấp mã mới cho ứng viên.",
+    "remoteHint": "Ứng viên làm vòng này từ nhà. Cấp mã rồi gửi link vào phòng (đã kèm mã) cho ứng viên — mã cũng hiện trong Portal của họ.",
+    "onsiteHint": "Ứng viên làm vòng này tại văn phòng. Khi ứng viên check-in: mở sẵn trang Kiosk trên máy phỏng vấn, cấp mã rồi đưa cho ứng viên nhập.",
+    "nextStep": "Nhập mã xong, ứng viên vào phòng chờ — Hiring Manager vào phòng và cho vào thì buổi phỏng vấn mới bắt đầu."
+  },
+  "answerSheet": {
+    "title": "Bài làm trắc nghiệm",
+    "close": "Đóng",
+    "loading": "Đang tải bài làm…",
+    "loadError": "Không tải được bài làm.",
+    "notTaken": "Ứng viên chưa nộp bài.",
+    "passed": "Đạt điểm sàn",
+    "notPassed": "Chưa đạt điểm sàn",
+    "passScore": "Điểm sàn {{score}}/100",
+    "correctCount": "Đúng {{correct}}/{{total}} câu",
+    "tabSwitch": "Rời bài thi {{count}} lần",
+    "right": "Đúng",
+    "wrong": "Sai",
+    "blank": "Bỏ trống",
+    "picked": "đã khoanh",
+    "expiredNotice": "Ứng viên được hẹn giờ nhưng không vào làm bài. Khi hết hạn, hệ thống tự động nộp một bài trống — vì vậy mọi câu bên dưới đều bỏ trắng."
   }
 }

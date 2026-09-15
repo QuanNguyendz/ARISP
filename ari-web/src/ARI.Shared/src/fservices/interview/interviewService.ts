@@ -54,6 +54,24 @@ export interface InterviewCodeSummary {
   candidateName: string;
 }
 
+/**
+ * Mã vào phòng phỏng vấn của MỘT hồ sơ, ở vòng đang có lịch — thứ Recruiter cấp ngay trên danh sách
+ * ứng viên. `isRemote` = vòng làm TỪ NHÀ (sơ loại): gửi `entryUrl` (trang Kiosk đã điền sẵn mã) cho
+ * ứng viên. Còn lại là vòng TẠI VĂN PHÒNG: mở `kioskUrl` sẵn trên máy rồi đưa mã tận tay.
+ */
+export interface ApplicationInterviewCode {
+  roundNumber?: number | null;
+  roundType?: string | null;
+  isRemote: boolean;
+  canIssue: boolean;
+  /** Vì sao chưa cấp được (khi `canIssue` = false). */
+  blockedReason?: string | null;
+  code?: string | null;
+  expiresAt?: string | null;
+  kioskUrl?: string | null;
+  entryUrl?: string | null;
+}
+
 /** Kết quả nhập Interview Code tại Kiosk (ADR-052). */
 export interface KioskSessionInfo {
   valid: boolean;
@@ -150,6 +168,26 @@ export const interviewService = {
   // Staff: sinh Interview Code hàng loạt cho danh sách hồ sơ
   async generateCodeBatch(applicationIds: string[], roundNumber?: number): Promise<Array<{ code: string; applicationId: string }>> {
     const { data } = await apiClient.post('/interview/generate-code-batch', { applicationIds, roundNumber });
+    return data;
+  },
+
+  /** Staff: trạng thái mã của vòng đang có lịch (chủ tin / quản trị viên). */
+  async getApplicationCode(applicationId: string): Promise<ApplicationInterviewCode> {
+    const { data } = await apiClient.get<ApplicationInterviewCode>(
+      `/applications/${applicationId}/interview-code`
+    );
+    return data;
+  },
+
+  /**
+   * Staff: cấp mã cho vòng đang có lịch. `regenerate = false` mà đang có mã thì server trả lại CHÍNH
+   * mã đó; `true` thì cấp mã mới và mã cũ hết hiệu lực ngay.
+   */
+  async issueApplicationCode(applicationId: string, regenerate = false): Promise<ApplicationInterviewCode> {
+    const { data } = await apiClient.post<ApplicationInterviewCode>(
+      `/applications/${applicationId}/interview-code`,
+      { regenerate }
+    );
     return data;
   },
 

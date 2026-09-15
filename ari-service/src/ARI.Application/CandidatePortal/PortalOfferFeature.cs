@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
 using ARI.Application.Offers;
 using ARI.Domain.Constants;
@@ -136,9 +137,12 @@ namespace ARI.Application.CandidatePortal
             _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(app);
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+            var hm = job == null ? null : await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, job.Id, ct);
 
-            // Báo cho người tạo thư mời + chủ tin.
-            foreach (var recipient in new[] { offer.CreatedByUserId, job?.CreatedByUserId }
+            // Báo cho người tạo thư mời + chủ tin + Hiring Manager (người đề xuất tuyển — kết cục của thư
+            // là thứ họ cần biết nhất). Link theo workspace của từng người: trước đây ai cũng nhận
+            // `/hr/offers`, Recruiter hay HM bấm vào là gặp trang 403.
+            foreach (var recipient in new[] { offer.CreatedByUserId, job?.CreatedByUserId, hm?.UserId }
                          .Where(id => id is { } g && g != Guid.Empty).Select(id => id!.Value).Distinct())
             {
                 await _unitOfWork.Repository<Notification>().AddAsync(new Notification
@@ -148,7 +152,7 @@ namespace ARI.Application.CandidatePortal
                     Title = accepted ? "Ứng viên đã nhận việc" : "Ứng viên từ chối thư mời",
                     Body = $"{app.CandidateName} — vị trí \"{job?.Title}\"."
                            + (offer.CandidateResponseNote != null ? $" Lý do: {offer.CandidateResponseNote}" : string.Empty),
-                    Link = "/hr/offers",
+                    Link = await StaffLinks.OffersAsync(_unitOfWork, recipient, ct),
                     DedupKey = $"offer_responded:{offer.Id}:{recipient}",
                     IsRead = false,
                 }, ct);

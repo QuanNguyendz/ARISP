@@ -20,8 +20,8 @@ import {
   X,
 } from 'lucide-react'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
+import EvaluationSessionPanel from '@/components/evaluations/EvaluationSessionPanel'
 import { useAuthStore } from '@ari/shared/store/auth'
-import { resolveAssetUrl } from '@ari/shared/config/constants'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
 import { PageHeader, StatsGrid, Pagination } from '@ari/shared/ui'
@@ -289,13 +289,12 @@ export default function EvaluationReviewPage() {
   }
 
   /**
-   * Tin có Hiring Manager mà người đang xem KHÔNG phải người đó → đây là "chốt thay", lý do bắt
-   * buộc (server đòi tối thiểu 10 ký tự). Tin chưa gán Hiring Manager thì mọi thứ như trước
-   * ADR-061: quản trị viên chốt bình thường, không cần lý do gì.
+   * Người đang xem KHÔNG phải Hiring Manager chính của tin → đây là "chốt thay", lý do bắt buộc (server
+   * đòi tối thiểu 10 ký tự). ADR-068 bỏ ngoại lệ "tin chưa gán HM thì chốt tự do": mọi tin đều có HM, nên
+   * thiếu HM (tin cũ) hay HM bị khoá cũng là chốt thay — có lý do, có dấu vết.
    */
   const needsFallbackReason =
-    !!selectedEvaluation?.requiresHmApproval &&
-    selectedEvaluation.hiringManagerUserId !== currentUser?.id
+    !!selectedEvaluation && selectedEvaluation.hiringManagerUserId !== currentUser?.id
 
   const fallbackReasonReady = !needsFallbackReason || fallbackReason.trim().length >= 10
 
@@ -986,38 +985,9 @@ export default function EvaluationReviewPage() {
               </div>
             )}
 
-          {/* Bản ghi hình buổi phỏng vấn thật (ADR-052) — tự xoá khi hết hạn lưu.
-              Trước đây khối này là placeholder chết: nút Play và link "xem transcript" đều
-              không gắn onClick, nên nhân sự bấm mãi không ra gì. */}
-          <div className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card">
-            <h2 className="font-display text-lg font-bold mb-4 text-ink-900 dark:text-white">
-              {t('recordingTranscript')}
-            </h2>
-            {selectedEvaluation.recordingUrl ? (
-              <>
-                <video
-                  src={resolveAssetUrl(selectedEvaluation.recordingUrl)}
-                  controls
-                  className="aspect-video w-full rounded-xl bg-ink-900"
-                />
-                {selectedEvaluation.recordingExpiresAt && (
-                  <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
-                    {t('recordingExpiresAt', {
-                      date: new Date(selectedEvaluation.recordingExpiresAt).toLocaleString(),
-                    })}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="aspect-video rounded-xl bg-ink-100 dark:bg-white/5 grid place-items-center px-6 text-center text-sm text-ink-500 dark:text-ink-400">
-                {selectedEvaluation.recordingDeletedAt
-                  ? t('recordingDeleted', {
-                      date: new Date(selectedEvaluation.recordingDeletedAt).toLocaleDateString(),
-                    })
-                  : t('recordingNone')}
-              </div>
-            )}
-          </div>
+          {/* Buổi phỏng vấn mà báo cáo này chấm: ca · giờ diễn ra · video · transcript đầy đủ (ADR-069).
+              Trước đây khối này chỉ có video dù tiêu đề hứa cả bản ghi — transcript không có ở đâu. */}
+          <EvaluationSessionPanel evaluation={selectedEvaluation} />
         </div>
 
         {/* RIGHT: verdict & decision */}
@@ -1063,11 +1033,11 @@ export default function EvaluationReviewPage() {
                 {t('hrDecision')}
               </h3>
               <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                {selectedEvaluation.requiresHmApproval
+                {selectedEvaluation.hiringManagerState === 'active'
                   ? t('hm.ownerHint', {
                       name: selectedEvaluation.hiringManagerName || t('hm.theHiringManager'),
                     })
-                  : t('hrDecisionHint')}
+                  : t('hm.unavailableHint')}
               </p>
 
               {/* ADR-061: quyết định tuyển là của Hiring Manager. Quản trị viên vẫn chốt được —
