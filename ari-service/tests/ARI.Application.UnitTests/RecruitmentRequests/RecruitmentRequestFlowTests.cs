@@ -44,11 +44,11 @@ public class RecruitmentRequestFlowTests
         decimal? min = 20_000_000, decimal? max = 30_000_000, string? requirements = SampleRequirements,
         string? priority = RecruitmentPriority.Medium, DateTimeOffset? startDate = null,
         string? reason = "Mở rộng đội", string? description = "Cần kỹ sư .NET", bool negotiable = false,
-        IReadOnlyList<string>? rounds = null) =>
+        IReadOnlyList<string>? rounds = null, string? currency = SalaryCurrencies.Vnd) =>
         new("Backend Developer", 2, priority, reason, description, requirements,
             rounds ?? new[] { InterviewRoundTypes.OnlineTest, InterviewRoundTypes.Technical },
             "full_time", "onsite", "Hà Nội", "senior",
-            startDate ?? DateTimeOffset.UtcNow.AddMonths(1), min, max, "VND", negotiable);
+            startDate ?? DateTimeOffset.UtcNow.AddMonths(1), min, max, currency, negotiable);
 
     /// <summary>
     /// Lập phiếu. Chỉ Hiring Manager làm được, và đội lấy thẳng từ tài khoản của họ (ADR-065).
@@ -389,5 +389,41 @@ public class RecruitmentRequestFlowTests
         Assert.True(res.IsFailure);
         Assert.Contains("lương tối thiểu", res.Error, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(uow.Repo<RecruitmentRequest>().Items);
+    }
+
+    // ---------- Đơn vị tiền: chỉ VND / USD ----------
+
+    [Theory]
+    [InlineData("EUR")]
+    [InlineData("VNĐ")]
+    [InlineData("triệu")]
+    public async Task Don_vi_tien_ngoai_VND_USD_thi_bi_chan(string currency)
+    {
+        // Ô trên biểu mẫu đã là danh sách chọn, nhưng request tự dựng vẫn gửi được chuỗi bất kỳ.
+        var uow = Seed();
+
+        var res = await new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())
+            .Handle(new CreateRecruitmentRequestCommand(Input(currency: currency), _hmId, RoleNames.HiringManager),
+                CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(SalaryCurrencies.InvalidMessage, res.Error);
+        Assert.Empty(uow.Repo<RecruitmentRequest>().Items);
+    }
+
+    [Theory]
+    [InlineData(" usd ", "USD")]
+    [InlineData("vnd", "VND")]
+    [InlineData(null, "VND")]
+    public async Task Don_vi_tien_duoc_chuan_hoa_truoc_khi_luu(string? currency, string expected)
+    {
+        var uow = Seed();
+
+        var res = await new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())
+            .Handle(new CreateRecruitmentRequestCommand(Input(currency: currency), _hmId, RoleNames.HiringManager),
+                CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(expected, Assert.Single(uow.Repo<RecruitmentRequest>().Items).SalaryCurrency);
     }
 }

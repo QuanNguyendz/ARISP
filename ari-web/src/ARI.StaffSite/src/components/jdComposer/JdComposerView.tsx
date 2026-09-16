@@ -11,7 +11,13 @@ import {
   type JdGeneratedFile,
 } from '@ari/shared/fservices/jdDocument'
 import { ROLE, normalizeRole } from '@ari/shared/utils/roles'
-import { EMPLOYMENT_TYPES, WORK_MODES, EXPERIENCE_LEVELS } from '@ari/shared/utils/jobOptions'
+import {
+  EMPLOYMENT_TYPES,
+  WORK_MODES,
+  EXPERIENCE_LEVELS,
+  SALARY_CURRENCIES,
+  normalizeSalaryCurrency,
+} from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
 
 /**
@@ -43,7 +49,7 @@ const toInput = (d: JdDocument) => ({
   vacancies: d.vacancies,
   salaryMin: d.salaryMin,
   salaryMax: d.salaryMax,
-  salaryCurrency: d.salaryCurrency,
+  salaryCurrency: normalizeSalaryCurrency(d.salaryCurrency),
   applicationDeadline: d.applicationDeadline,
   sections: d.sections,
 })
@@ -326,10 +332,13 @@ export default function JdComposerView() {
                 </div>
                 <div>
                   <label className={labelCls}>{t('basics.currency')}</label>
-                  <input
-                    value={doc.salaryCurrency ?? 'VND'}
-                    onChange={(e) => patch({ salaryCurrency: e.target.value })}
-                    className={inputCls}
+                  <Select
+                    value={normalizeSalaryCurrency(doc.salaryCurrency)}
+                    onChange={(v) => patch({ salaryCurrency: v })}
+                    ariaLabel={t('basics.currency')}
+                    className="w-full"
+                    buttonClassName="px-3 py-2.5 text-sm"
+                    options={SALARY_CURRENCIES}
                   />
                 </div>
               </div>

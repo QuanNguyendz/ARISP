@@ -18,6 +18,11 @@ import { jdDocumentService, type JdDocument } from '@ari/shared/fservices/jdDocu
 import { jdTemplateService, type JdTemplate } from '@ari/shared/fservices/jdTemplate'
 import jobService from '@ari/shared/fservices/job'
 import { ErrorAlert, Select } from '@ari/shared/ui'
+import {
+  SALARY_CURRENCIES,
+  DEFAULT_SALARY_CURRENCY,
+  normalizeSalaryCurrency,
+} from '@ari/shared/utils/jobOptions'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
 
 interface CreateJobPostingPageProps {
@@ -166,7 +171,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
   const [salaryIsNegotiable, setSalaryIsNegotiable] = useState(true)
   const [salaryMin, setSalaryMin] = useState<number | ''>('')
   const [salaryMax, setSalaryMax] = useState<number | ''>('')
-  const [salaryCurrency, setSalaryCurrency] = useState('VND')
+  const [salaryCurrency, setSalaryCurrency] = useState(DEFAULT_SALARY_CURRENCY)
   const [vacancies, setVacancies] = useState<number | ''>('')
   const [isUrgent, setIsUrgent] = useState(false)
   const [isPublicListing, setIsPublicListing] = useState(true)
@@ -221,7 +226,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setSalaryIsNegotiable(job.salaryIsNegotiable ?? true)
           setSalaryMin(job.salaryMin ?? '')
           setSalaryMax(job.salaryMax ?? '')
-          setSalaryCurrency(job.salaryCurrency || 'VND')
+          setSalaryCurrency(normalizeSalaryCurrency(job.salaryCurrency))
           setVacancies(job.vacancies ?? '')
           setIsUrgent(job.isUrgent || false)
           setIsPublicListing(job.isPublicListing ?? true)
@@ -372,7 +377,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             setSalaryIsNegotiable(false)
             setSalaryMin(jd.salaryMin ?? '')
             setSalaryMax(jd.salaryMax ?? '')
-            if (jd.salaryCurrency) setSalaryCurrency(jd.salaryCurrency)
+            setSalaryCurrency(normalizeSalaryCurrency(jd.salaryCurrency))
           }
           setJdFileUrl(jd.generatedFileStorageKey)
           setJdFileViewUrl(jd.generatedFileViewUrl ?? undefined)
@@ -429,7 +434,9 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
           setSalaryIsNegotiable(false)
           setSalaryMin(rr.salaryMin ?? '')
           setSalaryMax(rr.salaryMax ?? '')
-          if (rr.salaryCurrency) setSalaryCurrency(rr.salaryCurrency)
+          // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
+          // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
+          setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
         }
       } catch {
         // Không chặn việc dựng tin: phiếu tải hỏng thì Recruiter vẫn gõ tay được, và server vẫn
@@ -871,10 +878,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                     onChange={setSalaryCurrency}
                     className="min-w-0 sm:col-span-2 md:col-span-1"
                     buttonClassName="px-4 py-2.5 text-sm"
-                    options={[
-                      { value: 'VND', label: 'VND' },
-                      { value: 'USD', label: 'USD' },
-                    ]}
+                    ariaLabel={t('form.currency')}
+                    options={SALARY_CURRENCIES}
                   />
                 </div>
               )}

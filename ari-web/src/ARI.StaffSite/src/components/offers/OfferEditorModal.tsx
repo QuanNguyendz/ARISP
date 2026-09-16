@@ -6,6 +6,11 @@ import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
 import { offerService, OFFER_STATUS, type StaffOffer } from '@ari/shared/fservices/offer'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { normalizeRole, ROLE } from '@ari/shared/utils/roles'
+import {
+  SALARY_CURRENCIES,
+  DEFAULT_SALARY_CURRENCY,
+  normalizeSalaryCurrency,
+} from '@ari/shared/utils/jobOptions'
 import { OFFERS_NS, offerStatusBadgeClass, formatSalary } from '../hiring/hiringConfig'
 
 interface OfferEditorModalProps {
@@ -80,7 +85,7 @@ export default function OfferEditorModal({
   const [form, setForm] = useState({
     position: '',
     salaryAmount: '',
-    salaryCurrency: 'VND',
+    salaryCurrency: DEFAULT_SALARY_CURRENCY,
     salaryPeriod: 'month',
     bonus: '',
     benefits: '',
@@ -101,7 +106,7 @@ export default function OfferEditorModal({
     setForm({
       position: offer.position ?? '',
       salaryAmount: offer.salaryAmount != null ? String(offer.salaryAmount) : '',
-      salaryCurrency: offer.salaryCurrency ?? 'VND',
+      salaryCurrency: normalizeSalaryCurrency(offer.salaryCurrency),
       salaryPeriod: offer.salaryPeriod ?? 'month',
       bonus: offer.bonus ?? '',
       benefits: offer.benefits ?? '',
@@ -285,13 +290,19 @@ export default function OfferEditorModal({
                   <label htmlFor="offer-currency" className={LABEL}>
                     {t('fields.currency')}
                   </label>
-                  <input
+                  <select
                     id="offer-currency"
                     className={FIELD}
                     value={form.salaryCurrency}
                     onChange={set('salaryCurrency')}
                     disabled={!editable}
-                  />
+                  >
+                    {SALARY_CURRENCIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="offer-period" className={LABEL}>
