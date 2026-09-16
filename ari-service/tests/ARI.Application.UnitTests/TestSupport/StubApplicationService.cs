@@ -25,6 +25,13 @@ public sealed class StubApplicationService : IApplicationService
     public Result<ApplicationResponse> GetByIdResult { get; set; } = Result.Success(new ApplicationResponse());
     public Exception? GetByIdThrows { get; set; }
 
+    // --- RejectApplication (wrapper RejectApplicationCommandHandler gác quyền rồi forward xuống service) ---
+    public Result<bool> RejectResult { get; set; } = Result.Success(true);
+    public Exception? RejectThrows { get; set; }
+    public Guid? LastRejectId { get; private set; }
+    public ARI.Application.Emails.EmailOverride? LastRejectOverride { get; private set; }
+    public Guid? LastRejectActor { get; private set; }
+
     public Task<Result<ApplicationResponse>> UpdateApplicationStatusAsync(Guid id, string newStatus, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -49,6 +56,14 @@ public sealed class StubApplicationService : IApplicationService
     public Task<Result<bool>> AcceptApplicationAsync(Guid applicationId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> RejectApplicationAsync(
         Guid applicationId, CancellationToken ct = default,
-        ARI.Application.Emails.EmailOverride? emailOverride = null, Guid? actorUserId = null) => throw new NotImplementedException();
+        ARI.Application.Emails.EmailOverride? emailOverride = null, Guid? actorUserId = null)
+    {
+        ct.ThrowIfCancellationRequested();
+        LastRejectId = applicationId;
+        LastRejectOverride = emailOverride;
+        LastRejectActor = actorUserId;
+        if (RejectThrows != null) throw RejectThrows;
+        return Task.FromResult(RejectResult);
+    }
     public Task<Result<bool>> CheckPracticeEligibilityAsync(Guid applicationId, int roundNumber = 1, CancellationToken ct = default) => throw new NotImplementedException();
 }
