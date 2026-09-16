@@ -200,6 +200,8 @@ namespace ARI.Application.Offers
                     "Hồ sơ này đã có một thư mời đang hiệu lực. Hãy thu hồi thư cũ trước khi tạo thư mới.");
 
             var r = request.Request;
+            if (!SalaryCurrencies.IsAllowed(r.SalaryCurrency))
+                return Result.Failure<OfferDto>(SalaryCurrencies.InvalidMessage);
 
             // Điền sẵn từ đề xuất của người chốt kết quả (ADR-061, Phase 3c) — công sức HM đã bỏ ra
             // khi chốt không nên phải gõ lại.
@@ -212,7 +214,8 @@ namespace ARI.Application.Offers
                 Status = OfferStatus.Draft,
                 Position = r.Position ?? job.Title,
                 SalaryAmount = r.SalaryAmount ?? suggestion?.SuggestedSalaryMax ?? suggestion?.SuggestedSalaryMin,
-                SalaryCurrency = r.SalaryCurrency ?? suggestion?.SuggestedSalaryCurrency ?? "VND",
+                SalaryCurrency = SalaryCurrencies.Normalize(
+                    string.IsNullOrWhiteSpace(r.SalaryCurrency) ? suggestion?.SuggestedSalaryCurrency : r.SalaryCurrency),
                 SalaryPeriod = r.SalaryPeriod ?? "month",
                 Bonus = r.Bonus,
                 Benefits = r.Benefits,
@@ -281,9 +284,14 @@ namespace ARI.Application.Offers
                 return Result.Failure<OfferDto>("Chỉ sửa được thư mời khi còn là bản nháp.");
 
             var r = request.Request;
+            if (!SalaryCurrencies.IsAllowed(r.SalaryCurrency))
+                return Result.Failure<OfferDto>(SalaryCurrencies.InvalidMessage);
+
             offer.Position = r.Position ?? offer.Position;
             offer.SalaryAmount = r.SalaryAmount ?? offer.SalaryAmount;
-            offer.SalaryCurrency = r.SalaryCurrency ?? offer.SalaryCurrency;
+            offer.SalaryCurrency = string.IsNullOrWhiteSpace(r.SalaryCurrency)
+                ? offer.SalaryCurrency
+                : SalaryCurrencies.Normalize(r.SalaryCurrency);
             offer.SalaryPeriod = r.SalaryPeriod ?? offer.SalaryPeriod;
             offer.Bonus = r.Bonus;
             offer.Benefits = r.Benefits;

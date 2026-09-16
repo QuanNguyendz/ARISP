@@ -1734,6 +1734,9 @@ namespace ARI.Application.Services
                     return Result.Failure<bool>("Override reason is mandatory when changing the AI verdict.");
             }
 
+            if (!SalaryCurrencies.IsAllowed(request.SuggestedSalaryCurrency))
+                return Result.Failure<bool>(SalaryCurrencies.InvalidMessage);
+
             var review = new HrReview
             {
                 EvaluationId = evaluation.Id,
@@ -1749,7 +1752,9 @@ namespace ARI.Application.Services
                 SuggestedLevel = request.SuggestedLevel,
                 SuggestedSalaryMin = request.SuggestedSalaryMin,
                 SuggestedSalaryMax = request.SuggestedSalaryMax,
-                SuggestedSalaryCurrency = request.SuggestedSalaryCurrency,
+                SuggestedSalaryCurrency = string.IsNullOrWhiteSpace(request.SuggestedSalaryCurrency)
+                    ? null
+                    : SalaryCurrencies.Normalize(request.SuggestedSalaryCurrency),
                 Strengths = request.Strengths,
                 Concerns = request.Concerns,
                 ShareRecording = request.ShareRecording,

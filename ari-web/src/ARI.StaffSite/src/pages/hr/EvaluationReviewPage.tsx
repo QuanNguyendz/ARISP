@@ -24,8 +24,9 @@ import EvaluationSessionPanel from '@/components/evaluations/EvaluationSessionPa
 import { useAuthStore } from '@ari/shared/store/auth'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
 import { EvaluationListSkeleton, HrStatsSkeleton } from './_skeletons'
-import { PageHeader, StatsGrid, Pagination } from '@ari/shared/ui'
+import { PageHeader, StatsGrid, Pagination, Select } from '@ari/shared/ui'
 import { toCriterionRows } from '@ari/shared/utils'
+import { SALARY_CURRENCIES, DEFAULT_SALARY_CURRENCY } from '@ari/shared/utils/jobOptions'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 
 /**
@@ -110,7 +111,7 @@ export default function EvaluationReviewPage() {
     level: '',
     salaryMin: '',
     salaryMax: '',
-    currency: 'VND',
+    currency: DEFAULT_SALARY_CURRENCY,
     strengths: '',
     concerns: '',
   })
@@ -1211,11 +1212,12 @@ export default function EvaluationReviewPage() {
                           >
                             {t('hm.currency')}
                           </label>
-                          <input
+                          <Select
                             id="sg-cur"
                             value={suggestion.currency}
-                            onChange={(e) => setSuggestion((v) => ({ ...v, currency: e.target.value }))}
-                            className="w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-ink-900 dark:text-white outline-none focus:border-brand-500"
+                            onChange={(currency) => setSuggestion((v) => ({ ...v, currency }))}
+                            className="w-full"
+                            options={SALARY_CURRENCIES}
                           />
                         </div>
                       </div>

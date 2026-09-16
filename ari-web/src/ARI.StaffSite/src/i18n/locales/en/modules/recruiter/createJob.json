@@ -48,6 +48,7 @@
     "salaryNegotiable": "Negotiable",
     "salaryMin": "Minimum",
     "salaryMax": "Maximum",
+    "currency": "Currency",
     "aiInterviewRounds": "AI Interview Rounds",
     "addRound": "Add Round",
     "round": "Round {{number}}",

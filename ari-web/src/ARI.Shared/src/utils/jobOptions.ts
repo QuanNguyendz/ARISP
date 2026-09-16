@@ -43,6 +43,28 @@ export const EXPERIENCE_LEVELS: JobOption[] = [
   { value: 'manager', label: 'Manager' },
 ]
 
+/**
+ * Đơn vị tiền của mọi con số lương — phiếu yêu cầu, trình soạn JD, tin tuyển dụng, đề xuất lương của
+ * HM và thư mời. Chỉ hai giá trị; server chặn mọi giá trị khác (`SalaryCurrencies`).
+ */
+export const SALARY_CURRENCIES: JobOption[] = [
+  { value: 'VND', label: 'VND' },
+  { value: 'USD', label: 'USD' },
+]
+
+export const DEFAULT_SALARY_CURRENCY = 'VND'
+
+/**
+ * Giá trị đang lưu → một lựa chọn hợp lệ của `SALARY_CURRENCIES`.
+ *
+ * Trước đây các ô này là ô gõ tự do, nên dữ liệu cũ có thể là "usd" hay " VND ". Không chuẩn hoá thì
+ * danh sách chọn hiện trống và lượt lưu kế tiếp bị server từ chối.
+ */
+export function normalizeSalaryCurrency(value?: string | null): string {
+  const v = (value ?? '').trim().toUpperCase()
+  return SALARY_CURRENCIES.some((o) => o.value === v) ? v : DEFAULT_SALARY_CURRENCY
+}
+
 /** Nhãn hiển thị của một giá trị; không nhận ra thì trả lại nguyên giá trị thay vì để trống. */
 export function jobOptionLabel(options: JobOption[], value?: string | null): string {
   if (!value) return ''

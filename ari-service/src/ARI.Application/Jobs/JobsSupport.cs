@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ARI.Application.DTOs;
+using ARI.Domain.Constants;
 
 namespace ARI.Application.Jobs
 {
@@ -43,6 +44,9 @@ namespace ARI.Application.Jobs
 
             if (request.SalaryIsNegotiable && (request.SalaryMin.HasValue || request.SalaryMax.HasValue))
                 return "SalaryMin and SalaryMax must be null when SalaryIsNegotiable is true.";
+
+            if (!SalaryCurrencies.IsAllowed(request.SalaryCurrency))
+                return SalaryCurrencies.InvalidMessage;
 
             var allowedCategories = new[] { "backend", "frontend", "devops", "qa", "data", "ai_ml", "mobile", "pm", "designer", "other" };
             if (!string.IsNullOrWhiteSpace(request.JobCategory) && !allowedCategories.Contains(request.JobCategory.ToLower()))

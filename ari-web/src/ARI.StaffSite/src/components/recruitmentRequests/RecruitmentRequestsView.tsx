@@ -28,6 +28,9 @@ import {
   EMPLOYMENT_TYPES,
   WORK_MODES,
   EXPERIENCE_LEVELS,
+  SALARY_CURRENCIES,
+  DEFAULT_SALARY_CURRENCY,
+  normalizeSalaryCurrency,
   jobOptionLabel,
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
@@ -117,7 +120,7 @@ const emptyInput = (): RecruitmentRequestInput => ({
   experienceLevel: 'middle',
   salaryMin: undefined,
   salaryMax: undefined,
-  salaryCurrency: 'VND',
+  salaryCurrency: DEFAULT_SALARY_CURRENCY,
 })
 
 /** Định dạng dải lương cho danh sách. Thoả thuận = chưa điền con số nào. */
@@ -610,11 +613,14 @@ function RequestFormModal({
             </div>
             <div>
               <label className={labelCls}>{t('form.currency')}</label>
-              <input
+              <Select
                 disabled={negotiable}
-                value={form.salaryCurrency ?? 'VND'}
-                onChange={(e) => setForm({ ...form, salaryCurrency: e.target.value })}
-                className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-50`}
+                value={normalizeSalaryCurrency(form.salaryCurrency)}
+                onChange={(v) => setForm({ ...form, salaryCurrency: v })}
+                ariaLabel={t('form.currency')}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
+                options={SALARY_CURRENCIES}
               />
             </div>
           </div>
@@ -815,7 +821,7 @@ function RequestDetailPanel({
           salaryNegotiable: detail.salaryMin == null && detail.salaryMax == null,
           salaryMin: detail.salaryMin ?? undefined,
           salaryMax: detail.salaryMax ?? undefined,
-          salaryCurrency: detail.salaryCurrency ?? 'VND',
+          salaryCurrency: normalizeSalaryCurrency(detail.salaryCurrency),
         }}
         onClose={() => setMode('view')}
         onSaved={() => {

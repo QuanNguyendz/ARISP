@@ -1,0 +1,18 @@
+# ============================================
+# Chạy RIÊNG rag-service bằng Docker, khi API chạy trên máy (dotnet run / Visual Studio).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.rag-local.yml up -d --build rag-service
+#
+# Vì sao cần file này: `docker/.env` trỏ DATABASE_* vào database khác với database mà API local
+# đang dùng. Hai bên lệch database thì truy hồi RAG trả rỗng mà không báo lỗi gì
+# (docs/rag-service-local-setup.md, mục 1).
+#
+# `rag.local.env` (đã gitignore) ghi đè DATABASE_* cho đúng database của API. File nạp SAU sẽ
+# thắng, nên thứ tự dưới đây là có chủ ý.
+# ============================================
+
+services:
+  rag-service:
+    env_file:
+      - .env
+      - rag.local.env

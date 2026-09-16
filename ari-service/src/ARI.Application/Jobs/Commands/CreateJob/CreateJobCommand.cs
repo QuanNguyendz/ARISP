@@ -108,7 +108,7 @@ namespace ARI.Application.Jobs.Commands.CreateJob
                 WorkMode = request.WorkMode,
                 SalaryMin = request.SalaryMin,
                 SalaryMax = request.SalaryMax,
-                SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency,
+                SalaryCurrency = SalaryCurrencies.Normalize(request.SalaryCurrency),
                 SalaryIsNegotiable = request.SalaryIsNegotiable,
                 EmploymentType = request.EmploymentType,
                 ExperienceLevel = request.ExperienceLevel,

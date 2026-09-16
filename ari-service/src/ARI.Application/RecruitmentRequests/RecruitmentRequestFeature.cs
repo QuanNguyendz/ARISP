@@ -177,6 +177,9 @@ namespace ARI.Application.RecruitmentRequests
             if (input.SalaryMin.HasValue && input.SalaryMax.HasValue && input.SalaryMin > input.SalaryMax)
                 return Result.Failure("Lương tối thiểu không được lớn hơn lương tối đa.");
 
+            if (!SalaryCurrencies.IsAllowed(input.SalaryCurrency))
+                return Result.Failure(SalaryCurrencies.InvalidMessage);
+
             // "Thoả thuận" SUY RA từ dữ liệu (cả hai ô lương trống), không có cột riêng — cột `bool`
             // sẽ biểu diễn được trạng thái mâu thuẫn "tích thoả thuận nhưng vẫn có số", mà trạng thái
             // nào biểu diễn được thì sẽ có lúc xảy ra.
@@ -220,7 +223,7 @@ namespace ARI.Application.RecruitmentRequests
             // trạng thái mâu thuẫn mà cách suy ra này sinh ra để loại bỏ.
             entity.SalaryMin = input.SalaryNegotiable ? null : input.SalaryMin;
             entity.SalaryMax = input.SalaryNegotiable ? null : input.SalaryMax;
-            entity.SalaryCurrency = Trim(input.SalaryCurrency) ?? "VND";
+            entity.SalaryCurrency = SalaryCurrencies.Normalize(input.SalaryCurrency);
             entity.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
