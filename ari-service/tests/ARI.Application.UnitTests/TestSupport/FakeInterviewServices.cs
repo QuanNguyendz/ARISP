@@ -99,6 +99,11 @@ public sealed class FakeInterviewService : IInterviewService
     public Exception? HrReviewThrows { get; set; }
     public (Guid Hr, ConfirmReviewRequest Request, string? BaseUrl)? LastHrReview { get; private set; }
 
+    // Chấm lại phiên (DEV-ONLY, ADR-053) — wrapper mỏng RegradeSessionCommandHandler forward xuống đây.
+    public Result<bool> RegradeResult { get; set; } = Result.Success(true);
+    public Exception? RegradeThrows { get; set; }
+    public (Guid Session, string? Language)? LastRegrade { get; private set; }
+
     public Task<List<HrInterviewSessionItem>> GetSessionsForHrAsync(Guid? applicationId = null, CancellationToken ct = default)
     {
         LastHrApplicationId = applicationId;
@@ -160,6 +165,11 @@ public sealed class FakeInterviewService : IInterviewService
     public Task AnalyzeAnswerAndAdaptAsync(Guid sessionId, Guid questionId, string transcript, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<bool>> PracticeTimeoutCloseAsync(Guid sessionId, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<int>> RecordCheatSignalAsync(Guid sessionId, string signalType, string? payloadJson, CancellationToken ct = default) => throw new NotImplementedException();
-    public Task<Result<bool>> RegenerateEvaluationAsync(Guid sessionId, string? reportLanguage = null, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<bool>> RegenerateEvaluationAsync(Guid sessionId, string? reportLanguage = null, CancellationToken ct = default)
+    {
+        LastRegrade = (sessionId, reportLanguage);
+        if (RegradeThrows != null) throw RegradeThrows;
+        return Task.FromResult(RegradeResult);
+    }
     public Task<Result<RecordingUploadResponse>> SaveRecordingAsync(Guid sessionId, byte[] content, string fileName, string contentType, CancellationToken ct = default) => throw new NotImplementedException();
 }
