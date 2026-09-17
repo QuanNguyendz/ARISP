@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Text;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Fonts;
-using PdfSharpCore.Utils;
 
 namespace ARI.Infrastructure.Documents
 {
@@ -19,8 +18,8 @@ namespace ARI.Infrastructure.Documents
         private static bool _fontReady;
 
         /// <summary>
-        /// Nạp <c>FontResolver</c> của PdfSharpCore — bắt buộc để chạy trên Linux (container không
-        /// có phông hệ thống của Windows). Idempotent, gọi bao nhiêu lần cũng được.
+        /// Nạp <see cref="BundledFontResolver"/> (phông nhúng) — container Linux không có phông hệ thống
+        /// nào, nên bộ phân giải mặc định đọc phông của máy là PDF không xuất được. Idempotent.
         /// </summary>
         public static void EnsureFontResolver()
         {
@@ -28,7 +27,9 @@ namespace ARI.Infrastructure.Documents
             lock (FontLock)
             {
                 if (_fontReady) return;
-                GlobalFontSettings.FontResolver ??= new FontResolver();
+                // Gán thẳng, không đọc trước: getter của PdfSharpCore tự dựng bộ phân giải đọc phông hệ
+                // thống khi chưa có — `??=` vì thế không bao giờ gán được bộ phông nhúng.
+                GlobalFontSettings.FontResolver = new BundledFontResolver();
                 _fontReady = true;
             }
         }

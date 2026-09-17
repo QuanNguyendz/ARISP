@@ -1,13 +1,13 @@
 # ARISP — Unit Test Plan & Coverage Inventory
 
-> Nguồn: `ari-service/tests/ARI.Application.UnitTests` + `ARI.Domain.UnitTests`. Cập nhật: 2026-08-09.
+> Nguồn: `ari-service/tests/ARI.Application.UnitTests` + `ARI.Domain.UnitTests`. Cập nhật: 2026-08-09; mục A9 và các dòng liên quan chấm CV cập nhật 2026-09-17 (ADR-070).
 > Tên test method & assert giữ nguyên tiếng Anh (trích từ code); mô tả nhóm bằng tiếng Việt.
 
 ## Tổng quan
 
 | Chỉ số | Số lượng |
 |---|---|
-| **Test case ĐÃ có** | **356** |
+| **Test case ĐÃ có** | **420** |
 | **Test case ĐỀ XUẤT (còn thiếu)** | **131** |
 | Handler đã có test | ~35 |
 | Handler chính còn thiếu test | ~40 |
@@ -24,6 +24,7 @@
 | Job postings | 6 | 71 |
 | Scheduling | 9 | 59 |
 | Auth + Common + Domain | 4 | 12 |
+| Chấm CV theo bộ tiêu chí (ADR-070) | 5 | 64 |
 
 ### Phân bố "còn thiếu" theo ưu tiên
 
@@ -31,11 +32,11 @@
 |---|---|
 | 🔴 High | Sinh Evaluation buổi thật, Recording, Cheat signal, Reschedule, Online Test staff (Update/Settings/Result/Import), ApplyToJob, VerifyCvInfo, GetMyEvaluation, toàn bộ Auth core, CreateStaffUser, ApproveAccountRequest, DeactivateUser, UploadPlaybook |
 | 🟡 Medium | SendBookingReminder, GenerateCodeBatch, GetInterviewJobs, GetCandidatesInSlot, GetMediaConfig, SynthesizeSpeech, GetOnlineTestBank, DeleteQuestion, SendInterviewInvite, GetHrDashboard, Reject/Activate/Delete/UpdateRole/UpdateSystemSettings |
-| ⚪ Low | GetSlotsForJob, Export, AnalyzeCv, Refresh/Forgot/Reset/Logout/Resend, ApproveUser, GetAuditLogs/GetUsers/GetPendingUsers/GetAdminStats, DeletePlaybook/GetPlaybooks |
+| ⚪ Low | GetSlotsForJob, Export, Refresh/Forgot/Reset/Logout/Resend, ApproveUser, GetAuditLogs/GetUsers/GetPendingUsers/GetAdminStats, DeletePlaybook/GetPlaybooks |
 
 ---
 
-# PHẦN A — TEST CASE ĐÃ CÓ (356)
+# PHẦN A — TEST CASE ĐÃ CÓ (420)
 
 ## A1. Online Test — candidate + create (24)
 
@@ -95,8 +96,8 @@
 | Source_is_recorded | Lưu source (vd self_applied). |
 | Cv_text_is_ingested_to_rag | Ingest CV vào RAG 1 lần, sourceType 'cv'. |
 | No_cv_text_skips_rag | Không có CV text → không ingest. |
-| Auto_links_matching_analysis_by_hash | Hash CV khớp → auto link CV-JD analysis. |
-| Non_matching_hash_leaves_analysis_unlinked | Hash không khớp → CvJdAnalysisId null. |
+| Cv_file_is_queued_for_scoring_and_nothing_is_linked_inline | Có file CV → đưa hồ sơ vào hàng đợi chấm (ADR-070); không gắn bản phân tích ngay trong request. |
+| Without_a_cv_file_nothing_is_queued | Không có file CV → không vào hàng đợi. |
 | Notifies_hr_group_and_recruiter | Gửi ReceiveNewApplication cho hr_admin + recruiter chủ tin. |
 | Self_applied_candidate_gets_notification_record_and_realtime | Self-apply → lưu notification 'applied' + realtime. |
 | Anonymous_application_creates_no_candidate_notification | Không có account → không tạo notification candidate. |
@@ -342,7 +343,7 @@
 | No_cv_in_profile_returns_none | Không CV → HasCv=false, status 'none'. |
 | Unreadable_cv_returns_failed | CV không đọc được → status 'failed', AiAvailable=false. |
 | Cached_completed_analysis_is_reused | Cache completed khớp hash → reuse, MatchScore 88. |
-| Cached_failed_analysis_returns_failed | Cache failed → 'failed' + message. |
+| Cached_invalid_cv_returns_failed | Bản `invalid_cv` (ADR-070) → 'failed' + message, không hiện điểm. |
 
 ### GetJobByIdQueryHandler (8)
 | Test | Kiểm chứng |
@@ -385,7 +386,7 @@
 ### SubmitApplicationCommandHandler (5)
 | Test | Kiểm chứng |
 |---|---|
-| Parses_hashes_saves_and_delegates_to_service | Parse CV, MD5 hash, lưu file, delegate service source 'job_board'. |
+| Parses_hashes_saves_and_delegates_to_service | Parse CV, lưu file, delegate service source 'job_board'. *(Từ ADR-070 server tự băm CV khi chấm — DTO nộp hồ sơ không còn `CvFileHash`.)* |
 | Parse_failure_returns_error_without_saving_or_delegating | Parse lỗi → fail, không lưu/không delegate. |
 | Storage_failure_returns_server_error | Lưu lỗi → ServerError, không delegate. |
 | Db_failure_cleans_up_saved_file | DB fail → xoá file đã lưu. |
@@ -612,6 +613,95 @@
 | AppRoles_values_are_stable | AppRoles constants đúng giá trị. |
 | New_user_defaults_active_recruiter | User mới IsActive, Role 'recruiter', DeletedAt null. |
 | New_job_posting_is_soft_deletable | JobPosting hỗ trợ ISoftDelete. |
+
+## A9. Chấm CV theo bộ tiêu chí — ADR-070 (64)
+
+> File: `tests/ARI.Application.UnitTests/CvScoring/*`. Fake dùng chung ở `CvAnalysisFakes.cs`
+> (`FakeGeminiProvider` đếm lượt gọi AI, `RecordingCvScoringQueue`, `CvScoringKit`).
+
+### CvScoringService (15)
+| Test | Kiểm chứng |
+|---|---|
+| Job_not_found_fails_without_calling_ai | Tin lạ → fail, 0 lượt AI. |
+| Without_a_rubric_nothing_is_scored_and_ai_is_never_called | Tin chưa có bộ tiêu chí → mã `cv_rubric_required`, 0 lượt AI, không lưu. |
+| Org_template_and_interview_rubric_do_not_count_as_the_job_cv_rubric | Mẫu cấp công ty và `interview_rubric` không được coi là bộ tiêu chí CV của tin. |
+| Score_is_the_weighted_average_computed_by_the_backend | Điểm = Σ điểm×trọng số ÷ Σ trọng số do backend tính. |
+| Missing_criterion_is_excluded_from_both_sides_and_kept_in_the_snapshot | Tiêu chí AI bỏ sót bị loại khỏi tử lẫn mẫu, vẫn ghi trong ảnh chụp. |
+| No_scored_criterion_fails_and_saves_nothing | AI không chấm được tiêu chí nào → fail, không lưu, không lấy điểm AI. |
+| Rubric_names_weights_and_keys_reach_the_ai | Tên, trọng số, khoá tiêu chí có trong yêu cầu gửi AI. |
+| Original_jd_pdf_is_attached | File JD gốc PDF được gửi kèm. |
+| Docx_jd_is_sent_as_extracted_text | JD DOCX được parse ra text. |
+| Same_file_and_rubric_is_reused_without_calling_ai | Cùng (tin, CV, phiên bản) → dùng lại, 0 lượt AI. |
+| New_rubric_version_rescores_the_same_file | Phiên bản bộ tiêu chí mới → chấm lại cùng file. |
+| Invalid_cv_is_saved_as_invalid_cv_and_reused | File không phải CV → lưu `invalid_cv`, lần sau dùng lại. |
+| Ai_failure_saves_nothing_and_is_remembered_for_backoff | AI lỗi → không lưu, ghi nhận để lùi thời gian thử lại. |
+| Unreadable_non_pdf_cv_fails_without_calling_ai | CV không đọc được (không phải PDF) → fail, 0 lượt AI. |
+| Html_description_is_flattened_for_the_prompt | Mô tả HTML của tin được làm phẳng thành text. |
+
+### CvRubricEditing — chuẩn hoá bộ tiêu chí (11)
+| Test | Kiểm chứng |
+|---|---|
+| Slug_is_ascii_snake_case_and_valid | Tên tiếng Việt → khoá ASCII snake_case hợp lệ. |
+| New_criteria_get_generated_unique_keys | Tiêu chí mới được sinh khoá không trùng. |
+| Existing_keys_are_kept_when_renaming | Đổi tên không đổi khoá cũ. |
+| Weights_must_total_100 | Tổng ≠ 100 → lỗi. |
+| Each_criterion_needs_a_scoring_guide_or_a_level | Mỗi tiêu chí cần chuẩn chấm hoặc ít nhất một mức neo. |
+| Empty_levels_are_dropped_and_blank_rows_ignored | Mức neo rỗng bị bỏ, dòng trống bị bỏ qua. |
+| Missing_name_is_reported | Thiếu tên → lỗi. |
+| Rebalance_sums_to_exactly_100 | Chia lại trọng số (phần dư lớn nhất) ra đúng 100. |
+| Levels_reach_the_prompt_text | Mức neo có trong prompt. |
+| Sheet_round_trips_levels_and_generates_missing_keys | Excel khứ hồi giữ mức neo, mã trống được tự sinh. |
+| Cv_template_parses_into_a_valid_rubric | File mẫu tự sinh đọc lại thành bộ hợp lệ. |
+
+### Cổng bắt buộc bộ tiêu chí (13)
+| Test | Kiểm chứng |
+|---|---|
+| Request_without_rubric_is_refused | Phiếu không có bộ tiêu chí → bị chặn. |
+| Request_with_weights_not_summing_to_100_is_refused | Phiếu có tổng ≠ 100 → bị chặn. |
+| Request_stores_a_keyed_rubric_snapshot | Phiếu lưu ảnh chụp bộ tiêu chí đã có khoá. |
+| Legacy_request_without_rubric_cannot_be_approved | Phiếu cũ không bộ tiêu chí → không duyệt được. |
+| Legacy_rejected_request_cannot_be_resubmitted_until_edited | Phiếu cũ bị trả → không gửi lại được cho tới khi bổ sung. |
+| Creating_a_job_copies_the_request_rubric | Dựng tin chép bộ tiêu chí của phiếu. |
+| Job_without_rubric_cannot_be_sent_for_sign_off | Tin không bộ tiêu chí → không sang `pending`. |
+| Admin_bypass_does_not_bypass_the_rubric | Admin vượt chữ ký HM vẫn bị chặn nếu thiếu bộ tiêu chí. |
+| With_a_rubric_the_job_can_be_sent_for_sign_off | Có bộ tiêu chí → gửi duyệt được. |
+| Job_level_cv_rubric_cannot_be_uploaded_as_a_playbook | Upload `cv_rubric` cấp tin qua playbook → bị từ chối. |
+| Org_cv_rubric_is_still_uploadable_as_a_template | `cv_rubric` cấp công ty vẫn upload được (làm mẫu). |
+| Live_job_rubric_cannot_be_deleted | Xoá bộ tiêu chí đang sống → `Conflict`. |
+| Job_playbook_list_leaves_the_cv_rubric_to_its_own_panel | Danh sách playbook theo tin không liệt kê `cv_rubric`. |
+
+### CvRubricService + màn tin (14)
+| Test | Kiểm chứng |
+|---|---|
+| First_save_creates_a_live_rubric_file_and_queues_rescoring | Lưu lần đầu → tạo bản sống + file xlsx + đưa tin vào hàng chấm. |
+| New_version_soft_deletes_the_old_one_after_removing_its_chunks | Bản mới: gỡ chunk bản cũ rồi mới xoá mềm. |
+| Saving_the_same_rubric_is_a_no_op | Lưu y hệt → không tạo phiên bản, không chấm lại. |
+| Rag_failure_on_old_version_keeps_it_live | Gỡ chunk lỗi → bản cũ vẫn sống, không có bản mới. |
+| Invalid_criteria_are_rejected | Bộ không hợp lệ → bị từ chối. |
+| Request_rubric_is_copied_with_the_requester_as_author | Chép từ phiếu, người lưu là HM lập phiếu. |
+| Legacy_request_without_rubric_copies_nothing | Phiếu cũ không bộ tiêu chí → không chép gì. |
+| Recruiter_owner_cannot_save | Recruiter chủ tin không lưu được. |
+| Primary_hiring_manager_saves_and_the_owner_is_notified | HM chính lưu được, Recruiter chủ tin nhận thông báo. |
+| Hiring_manager_cannot_save_an_invalid_rubric | HM lưu bộ sai → bị chặn. |
+| Suggestion_is_rebalanced_and_keyed | AI gợi ý → trọng số tổng 100, có khoá. |
+| Suggestion_needs_some_content | Thiếu vị trí/mô tả → không gọi AI. |
+| Sheet_import_returns_a_draft_with_warnings_instead_of_failing | Nhập Excel có lỗi → trả bản nháp kèm cảnh báo. |
+| Templates_are_org_level_cv_rubrics_only | Mẫu công ty chỉ gồm `cv_rubric` cấp `org`. |
+
+### CvApplicationScorer + bảng giải thích điểm (11)
+| Test | Kiểm chứng |
+|---|---|
+| Stale_means_unscored_or_scored_with_an_old_rubric | "Cần chấm" = chưa có điểm hoặc điểm theo phiên bản cũ. |
+| Jobs_without_a_rubric_have_nothing_to_score | Tin không bộ tiêu chí → lượt quét không chọn hồ sơ nào. |
+| Scoring_links_the_result_and_notifies | Chấm xong → gắn `CvJdAnalysisId` + bắn sự kiện. |
+| Already_current_application_is_skipped | Hồ sơ đã có điểm đúng phiên bản → bỏ qua. |
+| Missing_file_backs_off_without_calling_ai | Thiếu file CV → lùi thời gian, 0 lượt AI. |
+| Hiring_manager_is_reminded_once_for_an_active_job_without_rubric | Tin `active` thiếu bộ tiêu chí → HM nhận đúng một thông báo. |
+| No_reminder_when_the_job_has_a_rubric_or_no_applications | Có bộ tiêu chí hoặc chưa có hồ sơ → không nhắc. |
+| State_resolution_covers_every_case | `scored` / `pending_rubric` / `queued` / `rescoring` / `invalid_cv` đúng từng trường hợp. |
+| Breakdown_shows_the_formula_with_real_numbers | Bảng điểm có phép tính bằng số thật, phần góp từng tiêu chí. |
+| Breakdown_hides_legacy_ai_scores | Điểm cũ do AI tự cho (không bộ tiêu chí) không hiện. |
+| Breakdown_explains_an_invalid_cv | `invalid_cv` hiện lời giải thích, không hiện 0 điểm. |
 
 ---
 
@@ -869,11 +959,8 @@
 | Non-owner → Forbidden; job lạ → NotFound. |
 | Job(owner,'Backend Developer') + 1 submission → Success; ContentType xlsx; FileName 'bang-diem-trac-nghiem-backend-developer-{yyyyMMdd}.xlsx'; Content mở lại được (TabSwitch 0 → '-'). |
 
-### B27. AnalyzeCvCommand (`AnalyzeCvCommand.cs`)
-| Test / Kỳ vọng |
-|---|
-| Delegate: gọi AnalyzeAndCacheAsync đúng (jobId, stream, fileName, ct); trả nguyên Result.Success. |
-| Service Failure → propagate nguyên message, không throw. |
+### B27. ~~AnalyzeCvCommand~~ — đã gỡ (ADR-070)
+Endpoint `POST /api/cv-analysis/analyze` cùng cả `CvAnalysisController` bị xoá; không còn gì để test. Luồng chấm thay thế được phủ ở mục A9.
 
 ### B28. Auth phụ (`Auth/Commands/*`)
 | Handler | Test / Kỳ vọng |

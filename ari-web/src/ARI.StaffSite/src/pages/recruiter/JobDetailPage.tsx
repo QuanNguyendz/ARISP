@@ -53,6 +53,7 @@ import { JobDetailSkeleton } from './_skeletons'
  */
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
+import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
@@ -78,6 +79,7 @@ function getDeadlineText(
 
 export default function RecruiterJobDetailPage() {
   const { t } = useTranslation('modules/recruiter/jobDetail')
+  const { t: tRubric } = useTranslation('modules/staff/cvScoring')
   const { id } = useParams<{ id: string }>()
   const { openDocument } = useDocumentViewer()
   const queryClient = useQueryClient()
@@ -491,6 +493,17 @@ export default function RecruiterJobDetailPage() {
           </div>
         </div>
 
+        {/* ADR-070: nói trước vì sao "Gửi duyệt" sẽ bị chặn, thay vì để Recruiter bấm rồi mới thấy lỗi. */}
+        {canSubmit && job.hasCvRubric === false && (
+          <a
+            href="#cv-rubric"
+            className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {tRubric('jobChip.missing')}
+          </a>
+        )}
+
         {job.status === 'rejected' && job.rejectionReason && (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -590,6 +603,12 @@ export default function RecruiterJobDetailPage() {
 
       {/* Playbook của tin (ADR-069): Hiring Manager chính thêm/xoá; chủ tin CHỈ ĐỌC — người vận hành
           phễu cần biết AI sẽ hỏi theo tài liệu nào, nhưng không quyết định nội dung đó. */}
+      {/* Bộ tiêu chí chấm CV (ADR-070): HM khai trên phiếu và sửa ở màn tin; chủ tin CHỈ ĐỌC. Thiếu bộ này
+          thì tin không gửi duyệt được — nên đặt ngay trên khối playbook để Recruiter thấy vì sao. */}
+      <div className="mb-6">
+        <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+      </div>
+
       <div className="mb-6">
         <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
       </div>

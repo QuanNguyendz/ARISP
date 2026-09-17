@@ -83,6 +83,9 @@ namespace ARI.Application.Playbooks
         /// Bộ tiêu chí chấm điểm áp dụng cho (tin, vòng). Thứ tự ưu tiên: <b>vòng → tin → công ty</b>
         /// — vòng chuyên môn có thể có bộ riêng, không khai thì dùng bộ của tin, không nữa thì bộ chung
         /// của doanh nghiệp. Trả về danh sách rỗng nếu chưa khai bộ nào (nơi gọi tự quyết định fallback).
+        ///
+        /// Dùng cho bộ tiêu chí PHỎNG VẤN. Bộ tiêu chí chấm CV không đi qua đây (ADR-070): nó bắt buộc ở cấp
+        /// tin và không có đường lùi về bộ công ty — xem <c>CvScoring.CvRubricStore</c>.
         /// </summary>
         public static async Task<List<RubricCriterion>> ResolveRubricAsync(
             IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, string documentType,

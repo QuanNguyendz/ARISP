@@ -42,7 +42,12 @@ namespace ARI.Application.RecruitmentRequests
         /// việc cả hai ô lương trống. Cờ ở đây chỉ để phân biệt "cố ý thoả thuận" với "quên điền"
         /// ngay lúc kiểm dữ liệu; sau đó nó biến mất.
         /// </summary>
-        bool SalaryNegotiable = false);
+        bool SalaryNegotiable = false,
+
+        /// <summary>
+        /// Bộ tiêu chí chấm CV (ADR-070) — BẮT BUỘC. Tiêu chí mới để trống <c>Key</c>, hệ thống tự sinh.
+        /// </summary>
+        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput>? CvRubric = null);
 
     /// <summary>Một dòng trong danh sách phiếu.</summary>
     public record RecruitmentRequestListItemDto(
@@ -133,5 +138,8 @@ namespace ARI.Application.RecruitmentRequests
         /// Một cờ cho cả hai nút vì chúng cùng một điều kiện. Tách đôi là mở đường cho trạng thái "mở lại
         /// được nhưng không đóng được" — vô nghĩa, mà trạng thái nào biểu diễn được thì sẽ có lúc xảy ra.
         /// </summary>
-        bool CanRevoke);
+        bool CanRevoke,
+
+        /// <summary>Bộ tiêu chí chấm CV HM khai trên phiếu (ADR-070). Rỗng với phiếu lập trước đó.</summary>
+        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput> CvRubric);
 }

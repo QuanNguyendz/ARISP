@@ -62,14 +62,15 @@ internal static class JobBoardData
         SkillsJson = skillsJson,
     };
 
-    public static CvJdAnalysis Analysis(Guid jobId, string cvHash, string status = "completed", int score = 88) => new()
+    public static CvJdAnalysis Analysis(Guid jobId, string cvHash, Guid rubricId, string status = "completed", int score = 88) => new()
     {
         JobPostingId = jobId,
         CvHash = cvHash,
+        RubricDocumentId = rubricId,
         Status = status,
         MatchScore = score,
         Summary = "Phù hợp",
         AiModel = "Gemini",
-        ErrorMessage = status == "failed" ? "CV không hợp lệ." : null,
+        ErrorMessage = status == "invalid_cv" ? "File tải lên không phải là CV." : null,
     };
 }

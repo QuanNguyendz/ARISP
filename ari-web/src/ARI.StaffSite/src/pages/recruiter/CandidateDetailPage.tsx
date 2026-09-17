@@ -17,9 +17,12 @@ import {
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
 import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
+import { affectsApplication, onApplicationsChanged } from '@ari/shared/realtime/applicationRealtime'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
+import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
 import { interviewService } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
@@ -66,6 +69,27 @@ export default function RecruiterCandidateDetailPage() {
         }
       })()
   }, [id, t])
+
+  // Realtime: hồ sơ này đổi (duyệt, xếp lịch, điểm CV chấm nền xong…) → tải lại ngầm, không bật khung tải.
+  useEffect(() => {
+    if (!id) return
+    let active = true
+    const off = onApplicationsChanged((detail) => {
+      if (!affectsApplication(detail, id)) return
+      applicationService
+        .getHrApplicationById(id)
+        .then((data) => {
+          if (active) setApp(data)
+        })
+        .catch(() => {
+          /* giữ hồ sơ đang hiển thị nếu lượt tải ngầm lỗi */
+        })
+    })
+    return () => {
+      active = false
+      off()
+    }
+  }, [id])
 
   const genCode = async () => {
     if (!id) return
@@ -171,12 +195,16 @@ export default function RecruiterCandidateDetailPage() {
             </div>
           </div>
         </div>
-        {app.matchScore != null && (
+        {(app.matchScore != null || app.cvScoreStatus) && (
           <div className="flex items-center justify-between gap-2 self-stretch rounded-xl bg-ink-50 px-3 py-2 dark:bg-white/[0.03] sm:flex-col sm:items-center sm:justify-center sm:bg-transparent sm:px-0 sm:py-0 sm:dark:bg-transparent">
             <span className="text-xs text-ink-400 sm:hidden">{t('matchCVJD')}</span>
-            <div className={`text-2xl font-bold sm:text-3xl ${scoreColor(app.matchScore)}`}>
-              {formatScore(app.matchScore)}
-            </div>
+            {app.matchScore != null ? (
+              <div className={`text-2xl font-bold sm:text-3xl ${scoreColor(app.matchScore)}`}>
+                {formatScore(app.matchScore)}
+              </div>
+            ) : (
+              <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />
+            )}
             <div className="hidden text-xs text-ink-400 sm:block">{t('matchCVJD')}</div>
           </div>
         )}
@@ -185,6 +213,10 @@ export default function RecruiterCandidateDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left */}
         <div className="space-y-6 lg:col-span-2">
+          {/* Điểm CV kèm cách tính (ADR-070) — Recruiter sàng hồ sơ bằng con số này, nên phải thấy từng
+              tiêu chí, trọng số và bằng chứng trong CV. */}
+          <CvScoreBreakdown score={app.cvScore} />
+
           {/* Kết quả phỏng vấn theo vòng (ADR-069): ca đã gán · diễn biến · báo cáo AI · video · transcript,
               kèm nút tới đúng báo cáo. Thay cho hai khối cũ (danh sách đánh giá + danh sách phiên) vốn không
               có video/transcript, không nói được "AI đang chấm", và một khối không bấm vào đâu được. */}

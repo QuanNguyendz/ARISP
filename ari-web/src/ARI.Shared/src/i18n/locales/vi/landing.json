@@ -169,6 +169,7 @@
       "geminiNote": "Phân tích bởi Gemini 2.5 Flash · chỉ mang tính tham khảo",
       "updateCv": "Cập nhật CV khác",
       "cannotAnalyze": "Chưa thể phân tích CV lúc này. Vui lòng thử lại sau.",
+      "rubricPending": "Tin này chưa sẵn sàng chấm độ phù hợp CV. Bạn vẫn có thể ứng tuyển bình thường.",
       "loadError": "Không tải được phân tích CV. Vui lòng thử lại sau."
     }
   }

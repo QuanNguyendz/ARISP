@@ -38,7 +38,7 @@ app/
 | POST | `/evaluate` | JSON `EvaluationReport` |
 | POST | `/detect-language` | JSON `{language}` |
 | POST | `/assess-language` | JSON `LanguageAssessment` |
-| POST | `/complete-json` | JSON generic (fallback của .NET) |
+| POST | `/complete-json` | JSON generic (fallback của .NET) — nhận kèm `attachments` PDF base64 (ADR-070) |
 
 SSE `/next-question` phát các dòng `data: {"token": "..."}` rồi `data: [DONE]`.
 

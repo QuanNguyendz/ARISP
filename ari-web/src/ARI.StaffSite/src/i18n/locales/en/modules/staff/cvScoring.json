@@ -1,0 +1,180 @@
+{
+  "editor": {
+    "title": "CV scoring rubric",
+    "hint": "Candidate CVs are scored strictly against these criteria: AI gives each criterion 0–100 with quotes from the CV, and the final score is the weighted average. Without a rubric no CV can be scored.",
+    "aiSuggest": "AI suggest",
+    "aiSuggesting": "AI is drafting…",
+    "aiNeedsContent": "Enter the position and a description or candidate requirements before asking AI.",
+    "replaceConfirm": "Replace the current criteria with the new ones?",
+    "replace": "Replace",
+    "templates": "Company templates",
+    "templatesLoading": "Loading templates…",
+    "noTemplates": "No templates yet — HR Leaders add them on the Playbook screen.",
+    "templateItem": "{{name}} · {{count}} criteria",
+    "importExcel": "Import Excel",
+    "exportExcel": "Export Excel",
+    "downloadBlank": "Download template",
+    "addCriterion": "Add criterion",
+    "criterionN": "Criterion {{n}}",
+    "name": "Criterion name",
+    "namePlaceholder": "e.g. .NET backend experience",
+    "weight": "Weight (%)",
+    "guide": "Scoring guide",
+    "guidePlaceholder": "What does a strong candidate show in the CV?",
+    "levelsHint": "Describe each score band concretely (years, technologies, measurable results) so AI scores consistently.",
+    "showLevels": "Score bands ({{count}}/4)",
+    "hideLevels": "Hide score bands",
+    "level": {
+      "excellent": "90–100 · Excellent",
+      "good": "70–89 · Good",
+      "fair": "40–69 · Partial",
+      "poor": "0–39 · Not met"
+    },
+    "levelPlaceholder": {
+      "excellent": "e.g. 4+ years shipping real products, technical leadership",
+      "good": "e.g. 2–4 years in the same domain",
+      "fair": "e.g. Under 2 years or an adjacent domain",
+      "poor": "e.g. Only academic projects"
+    },
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove criterion",
+    "total": "Total weight",
+    "balance": "Split evenly",
+    "problems": {
+      "empty": "At least 1 criterion is required.",
+      "missingName": "A criterion has no name.",
+      "badWeight": "Each weight must be greater than 0.",
+      "total": "Weights must add up to 100 (currently {{total}}).",
+      "missingGuide": "Each criterion needs a scoring guide or at least one score band.",
+      "tooMany": "At most 20 criteria.",
+      "tooManyChecks": "At most 8 checklist items per criterion."
+    },
+    "warnings": "Review before saving:",
+    "empty": "No criteria yet. Use \"AI suggest\", pick a company template, import Excel or add them manually.",
+    "readOnlyEmpty": "No rubric yet.",
+    "error": "Something went wrong. Please try again.",
+    "checks": {
+      "title": "Checklist ({{count}})",
+      "hint": "The AI only answers yes/no per item with a quote; the score inside the band = band floor + share of items met × band width.",
+      "emptyHint": "No checklist yet — the AI will estimate where the score sits inside the band. Add 3–5 signals verifiable from a CV so two CVs in the same band are ranked correctly.",
+      "placeholder": "e.g. 4+ years of production .NET",
+      "item": "Checklist item {{n}}",
+      "add": "Add checklist item",
+      "remove": "Remove checklist item",
+      "readOnlyTitle": "Checklist (decides the score inside the band):"
+    }
+  },
+  "panel": {
+    "title": "CV scoring rubric",
+    "missing": "This job has no rubric — it cannot be submitted or published, and incoming applications are waiting to be scored.",
+    "savedBy": "Saved {{time}} · {{name}}",
+    "pending": "{{count}} applications waiting to be scored with this rubric",
+    "criteriaCount": "{{count}} criteria",
+    "edit": "Edit",
+    "create": "Create rubric",
+    "save": "Save rubric",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "download": "Download Excel",
+    "rescoreWarning": "Saving a new rubric re-scores {{count}} applications of this job. Previous scores are kept as history.",
+    "saved": "Saved. Applications are being re-scored with the new rubric.",
+    "readOnlyHint": "The job's primary Hiring Manager manages this rubric.",
+    "loadError": "Could not load the rubric.",
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
+  "status": {
+    "scored": "Scored",
+    "rescoring": "Re-scoring",
+    "queued": "Scoring CV",
+    "pending_rubric": "Awaiting rubric",
+    "invalid_cv": "Not a CV",
+    "no_cv": "No CV",
+    "scoring_failed": "Scoring failed · will retry",
+    "retryAt": "Retries automatically at {{time}}",
+    "retryingSoon": "Retries on the next scoring sweep"
+  },
+  "breakdown": {
+    "title": "CV score and how it was calculated",
+    "subtitle": "Scored against the rubric the Hiring Manager set for this job",
+    "formula": "Calculation",
+    "rounded": "rounded",
+    "criterion": "Criterion",
+    "weight": "Weight",
+    "score": "Score",
+    "contribution": "Contribution",
+    "contributionValue": "+{{value}}",
+    "details": "Show evidence",
+    "hideDetails": "Hide",
+    "evidence": "Evidence in the CV",
+    "noEvidence": "The CV has no evidence for this criterion.",
+    "reasoning": "Why this score",
+    "guide": "Company scoring guide",
+    "levelApplied": "Band applied",
+    "excludedTitle": "Not counted ({{count}})",
+    "excludedHint": "AI could not score these criteria, so they are excluded from both numerator and denominator — they do not count as 0.",
+    "band": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Partial",
+      "poor": "Not met"
+    },
+    "aiTitle": "AI notes",
+    "skillsMatched": "Matched skills",
+    "skillsGaps": "Missing",
+    "redFlags": "Red flags",
+    "seniority": "Seniority vs JD",
+    "experience": "Experience relevance",
+    "recommendation": "Recommendation (derived from score)",
+    "rec": {
+      "Strong Hire": "Strong fit (80+)",
+      "Hire": "Good fit (65–79)",
+      "Proceed with caution": "Consider (50–64)",
+      "Reject": "Not a fit (below 50)"
+    },
+    "meta": "Scored {{time}} · {{model}}",
+    "rubricMeta": "Current rubric saved {{time}} by {{name}}",
+    "oldRubric": "This score was calculated with a previous rubric version.",
+    "state": {
+      "rescoring": "The Hiring Manager just updated the rubric — this application is being re-scored. Below is the score under the previous rubric.",
+      "queued": "AI is scoring this CV against the job's rubric. The result will appear automatically.",
+      "pending_rubric": "This job has no CV scoring rubric yet, so the application has not been scored. The Hiring Manager needs to add one on the job screen.",
+      "invalid_cv": "AI determined the uploaded file is not a CV.",
+      "no_cv": "This application has no CV file to score.",
+      "scoring_failed": "The CV could not be scored: {{reason}}."
+    },
+    "outOf": "/100",
+    "retryAt": "It will be retried automatically at {{time}} — no action needed.",
+    "retrySoon": "It will be retried on the next scoring sweep — no action needed.",
+    "failedAttempts": "({{count}} attempts so far)",
+    "previousScoreShown": "Below is the score under the previous rubric.",
+    "failureReason": {
+      "ai_unavailable": "the AI service is failing or overloaded",
+      "cv_unreadable": "the CV file could not be read",
+      "no_criterion_scored": "the AI did not score any criterion of the rubric",
+      "unknown": "unknown error"
+    },
+    "checks": {
+      "short": "{{met}}/{{total}} items",
+      "unsupported": "Marked as met by the AI without a supporting quote — not counted.",
+      "unanswered": "Not answered by the AI — left out of the denominator."
+    },
+    "position": {
+      "title": "Score inside the band",
+      "checklist": "{{band}} band ({{min}}–{{max}}) · {{met}}/{{answered}} items met → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
+      "ai": "{{band}} band ({{min}}–{{max}}) · this criterion has no checklist, so the AI estimated the position inside the band.",
+      "aiNoBand": "Score estimated by the AI (scored before checklists existed)."
+    }
+  },
+  "jobChip": {
+    "ready": "CV scoring rubric in place",
+    "missing": "No CV scoring rubric — cannot be submitted yet"
+  },
+  "requestMissing": "This request has no CV scoring rubric (created before rubrics became mandatory) — the Hiring Manager must edit the request to add one before it can be approved.",
+  "createJob": {
+    "title": "CV scoring rubric",
+    "fromRequest": "Set by the Hiring Manager on the request — the job will score CVs with it. The HM can edit it on the job screen.",
+    "missing": "This request has no rubric. You can still create the job, but the Hiring Manager must add a rubric on the job screen before you submit it."
+  }
+}

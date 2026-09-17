@@ -14,8 +14,9 @@ using PdfSharpCore.Utils;
 namespace ARI.Infrastructure.Documents
 {
     /// <summary>
-    /// Đóng dấu duyệt trực quan lên file JD bằng PdfSharpCore (chạy tốt trên Linux nhờ
-    /// FontResolver mặc định kèm sẵn font Arial — hỗ trợ ký tự tiếng Việt).
+    /// Đóng dấu duyệt trực quan lên file JD bằng PdfSharpCore. "Arial" phân giải sang Liberation Sans
+    /// nhúng trong assembly (<see cref="BundledFontResolver"/>) — cùng số đo chữ, đủ dấu tiếng Việt,
+    /// chạy được trong container Linux không có phông hệ thống.
     /// PDF gốc: vẽ dấu lên trang đầu. DOCX: render text thành PDF mới rồi đóng dấu.
     /// </summary>
     public class JdStampService : IJdStampService

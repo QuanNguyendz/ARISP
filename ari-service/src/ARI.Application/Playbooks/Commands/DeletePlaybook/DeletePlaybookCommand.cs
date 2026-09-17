@@ -39,6 +39,12 @@ namespace ARI.Application.Playbooks.Commands.DeletePlaybook
                 && (doc.Scope == PlaybookScope.ScopeOrg || doc.ScopeRefId != jobId))
                 return Result.Failure("Không tìm thấy playbook.", CommonErrorCodes.NotFound);
 
+            // ADR-070: tin phải luôn có bộ tiêu chí chấm CV — không xoá được bản đang dùng, chỉ thay bằng bản mới.
+            if (doc.DocumentType == ScoringRubric.TypeCvRubric && doc.Scope != PlaybookScope.ScopeOrg)
+                return Result.Failure(
+                    "Không xoá được bộ tiêu chí chấm CV đang dùng. Hãy sửa và lưu bộ tiêu chí mới ở màn tin.",
+                    CommonErrorCodes.Conflict);
+
             // Cùng luật với lúc thêm: playbook công ty là của HR Leader, playbook theo tin là của HM chính.
             // Trước đây lệnh này không kiểm gì ngoài policy ở controller.
             var (accessError, accessCode) = await PlaybookAccess.CheckWriteAsync(

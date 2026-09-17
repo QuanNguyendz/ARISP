@@ -48,7 +48,7 @@ public class RecruitmentRequestFlowTests
         new("Backend Developer", 2, priority, reason, description, requirements,
             rounds ?? new[] { InterviewRoundTypes.OnlineTest, InterviewRoundTypes.Technical },
             "full_time", "onsite", "Hà Nội", "senior",
-            startDate ?? DateTimeOffset.UtcNow.AddMonths(1), min, max, currency, negotiable);
+            startDate ?? DateTimeOffset.UtcNow.AddMonths(1), min, max, currency, negotiable, ARI.Application.UnitTests.CvScoring.CvScoringKit.SampleRubric());
 
     /// <summary>
     /// Lập phiếu. Chỉ Hiring Manager làm được, và đội lấy thẳng từ tài khoản của họ (ADR-065).
@@ -74,6 +74,7 @@ public class RecruitmentRequestFlowTests
             Headcount = 2,
             Priority = RecruitmentPriority.Medium,
             Status = RecruitmentRequestStatus.Pending,
+            CvRubricJson = ARI.Application.UnitTests.CvScoring.CvScoringKit.SampleRubricJson(),
         };
         uow.Seed(req);
         return req;

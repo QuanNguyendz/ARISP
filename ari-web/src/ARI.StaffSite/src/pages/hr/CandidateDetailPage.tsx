@@ -14,14 +14,16 @@ import {
   CheckCircle2,
   CalendarClock,
   UserCheck,
-  Scale,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
 import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
+import { affectsApplication, onApplicationsChanged } from '@ari/shared/realtime/applicationRealtime'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
+import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
 import { interviewService } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { CandidateOnlineProfileModal } from './CandidatesPage'
@@ -70,6 +72,27 @@ export default function HrCandidateDetailPage() {
         }
       })()
   }, [id, t])
+
+  // Realtime: hồ sơ này đổi (duyệt, xếp lịch, điểm CV chấm nền xong…) → tải lại ngầm, không bật khung tải.
+  useEffect(() => {
+    if (!id) return
+    let active = true
+    const off = onApplicationsChanged((detail) => {
+      if (!affectsApplication(detail, id)) return
+      applicationService
+        .getHrApplicationById(id)
+        .then((data) => {
+          if (active) setApp(data)
+        })
+        .catch(() => {
+          /* giữ hồ sơ đang hiển thị nếu lượt tải ngầm lỗi */
+        })
+    })
+    return () => {
+      active = false
+      off()
+    }
+  }, [id])
 
   const genCode = async () => {
     if (!id) return
@@ -174,54 +197,25 @@ export default function HrCandidateDetailPage() {
             </div>
           </div>
         </div>
-        {app.matchScore != null && (
+        {(app.matchScore != null || app.cvScoreStatus) && (
           <div className="text-center">
-            <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
-              {formatScore(app.matchScore)}
-            </div>
+            {app.matchScore != null ? (
+              <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
+                {formatScore(app.matchScore)}
+              </div>
+            ) : (
+              <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />
+            )}
             <div className="text-xs text-ink-400">{t('matchCVJD')}</div>
           </div>
         )}
       </div>
 
-      {/* Điểm tổng CV đến từ đâu (ADR-060): khi tin đã khai bộ tiêu chí chấm CV, hiện luôn từng
-          tiêu chí + trọng số — trước đây HR chỉ thấy một con số phần trăm không giải thích được. */}
-      {!!app.cvCriterionScores?.length && (
-        <div className="mb-6 rounded-2xl border border-ink-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-white/5 sm:p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-            <Scale className="h-5 w-5 text-ai-600 dark:text-ai-400" /> {t('cvCriteriaTitle')}
-          </h2>
-          <div className="space-y-3">
-            {app.cvCriterionScores.map((c) => {
-              const pct = Math.max(0, Math.min(100, Math.round(c.score)))
-              return (
-                <div key={c.key}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-ink-600 dark:text-ink-300">
-                      {c.label?.trim() || c.key}
-                      {c.weight != null && (
-                        <span className="ml-1.5 text-xs text-ink-400 dark:text-ink-500">
-                          {c.weight}%
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-semibold text-ink-900 dark:text-white">{pct}/100</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-ink-100 dark:bg-white/10">
-                    <div
-                      className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-brand-500' : 'bg-amber-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* Điểm CV kèm cách tính (ADR-070): từng tiêu chí, trọng số, bằng chứng — không chỉ một con số. */}
+          <CvScoreBreakdown score={app.cvScore} />
+
           {/* Kết quả phỏng vấn theo vòng (ADR-069): ca đã gán · diễn biến · báo cáo AI · video · transcript,
               kèm nút tới đúng báo cáo. Thay cho hai khối cũ (danh sách đánh giá + danh sách phiên) vốn không
               có video/transcript, không nói được "AI đang chấm", và một khối không bấm vào đâu được. */}

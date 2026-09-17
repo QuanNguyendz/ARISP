@@ -86,7 +86,8 @@ internal static class InterviewServiceFactory
         public Task<EvaluationReport> GenerateEvaluationAsync(SessionContext ctx, CancellationToken ct) => throw new NotImplementedException();
         public Task<string> DetectLanguageRequirementAsync(string jdText, CancellationToken ct) => throw new NotImplementedException();
         public Task<LanguageAssessment> AssessLanguageProficiencyAsync(SessionContext ctx, CancellationToken ct) => throw new NotImplementedException();
-        public Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<string> CompleteJsonAsync(string systemInstruction, string userContent,
+            IReadOnlyList<AiAttachment>? attachments = null, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
 

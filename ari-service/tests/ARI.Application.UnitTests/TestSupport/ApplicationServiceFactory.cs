@@ -16,7 +16,16 @@ internal static class ApplicationServiceFactory
 {
     public static ApplicationService Create(
         IUnitOfWork uow, INotificationService notif, IEmailService email, IRagIngestionService rag)
-        => new(uow, rag, email, notif, new TestScopeFactory(uow), new MemoryCache(new MemoryCacheOptions()), Configuration());
+        => Create(uow, notif, email, rag, new ARI.Application.UnitTests.CvScoring.RecordingCvScoringQueue());
+
+    public static ApplicationService Create(
+        IUnitOfWork uow, INotificationService notif, IEmailService email, IRagIngestionService rag, ICvScoringQueue queue)
+        => Create(uow, notif, email, rag, queue, new ARI.Application.CvScoring.CvScoringInFlight());
+
+    public static ApplicationService Create(
+        IUnitOfWork uow, INotificationService notif, IEmailService email, IRagIngestionService rag, ICvScoringQueue queue,
+        ARI.Application.CvScoring.CvScoringInFlight inFlight)
+        => new(uow, rag, email, notif, new TestScopeFactory(uow), new MemoryCache(new MemoryCacheOptions()), Configuration(), queue, inFlight);
 
     /// <summary>Chỉ cần base URL portal để link trong email không trỏ về máy dev.</summary>
     private static IConfiguration Configuration() =>

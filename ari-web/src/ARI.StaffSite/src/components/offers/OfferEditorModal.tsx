@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { X, Send, Check, Undo2, Save, ShieldAlert } from 'lucide-react'
 import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
+import Select from '@ari/shared/ui/Select'
 import { offerService, OFFER_STATUS, type StaffOffer } from '@ari/shared/fservices/offer'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { normalizeRole, ROLE } from '@ari/shared/utils/roles'
@@ -290,35 +291,31 @@ export default function OfferEditorModal({
                   <label htmlFor="offer-currency" className={LABEL}>
                     {t('fields.currency')}
                   </label>
-                  <select
+                  <Select
                     id="offer-currency"
-                    className={FIELD}
-                    value={form.salaryCurrency}
-                    onChange={set('salaryCurrency')}
+                    value={normalizeSalaryCurrency(form.salaryCurrency)}
+                    onChange={(salaryCurrency) => setForm((f) => ({ ...f, salaryCurrency }))}
                     disabled={!editable}
-                  >
-                    {SALARY_CURRENCIES.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                    className="w-full"
+                    options={SALARY_CURRENCIES}
+                  />
                 </div>
                 <div>
                   <label htmlFor="offer-period" className={LABEL}>
                     {t('fields.period')}
                   </label>
-                  <select
+                  <Select
                     id="offer-period"
-                    className={FIELD}
                     value={form.salaryPeriod}
-                    onChange={set('salaryPeriod')}
+                    onChange={(salaryPeriod) => setForm((f) => ({ ...f, salaryPeriod }))}
                     disabled={!editable}
-                  >
-                    <option value="month">{t('fields.periods.month')}</option>
-                    <option value="year">{t('fields.periods.year')}</option>
-                    <option value="hour">{t('fields.periods.hour')}</option>
-                  </select>
+                    className="w-full"
+                    options={[
+                      { value: 'month', label: t('fields.periods.month') },
+                      { value: 'year', label: t('fields.periods.year') },
+                      { value: 'hour', label: t('fields.periods.hour') },
+                    ]}
+                  />
                 </div>
               </div>
 

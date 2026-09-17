@@ -24,7 +24,8 @@ import type { PlaybookItem } from '@/fservices/playbook/playbookService'
 const JOB_PLAYBOOKS_NS = 'modules/staff/jobPlaybooks'
 
 /**
- * Loại tài liệu — cùng danh sách với server (`PlaybookAccess.DocumentTypes`). Thứ tự theo mức hay dùng
+ * Loại tài liệu — cùng danh sách với server (`PlaybookAccess.DocumentTypes`), TRỪ `cv_rubric`: bộ tiêu chí chấm
+ * CV của tin có panel riêng (ADR-070 — một bản sống, lưu bản mới là chấm lại mọi hồ sơ). Thứ tự theo mức hay dùng
  * ở cấp TIN: ngân hàng câu hỏi và câu bắt buộc lên đầu; văn phong/văn hoá thường là playbook công ty.
  */
 const DOC_TYPES = [
@@ -36,7 +37,6 @@ const DOC_TYPES = [
   'red_flag',
   'round_playbook',
   'interview_rubric',
-  'cv_rubric',
   'style_guide',
   'culture_guide',
   'compliance',

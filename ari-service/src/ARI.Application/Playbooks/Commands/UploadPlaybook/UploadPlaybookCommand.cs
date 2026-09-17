@@ -61,6 +61,12 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                     ? "Bộ tiêu chí chấm điểm phải là file Excel (.xlsx) theo mẫu. Hãy tải file mẫu rồi điền vào."
                     : "Định dạng không hợp lệ. Chấp nhận .pdf, .docx, .txt, .md");
 
+            // ADR-070: bộ tiêu chí chấm CV của TIN có vòng đời riêng (một bản sống, lưu bản mới là chấm lại mọi
+            // hồ sơ) nên chỉ đi qua trình soạn ở màn tin. Ở cấp công ty, nó là MẪU để HM chép.
+            if (documentType == ScoringRubric.TypeCvRubric && scope != PlaybookScope.ScopeOrg)
+                return Result.Failure<UploadedPlaybookDto>(
+                    "Bộ tiêu chí chấm CV của tin được khai trong mục \"Bộ tiêu chí chấm CV\" ở màn tin (nhập được cả file Excel ở đó).");
+
             // Playbook công ty không gắn tin nào; playbook vòng phải gắn đúng một vòng hội thoại có thật.
             var scopeRefId = scope == PlaybookScope.ScopeOrg ? null : request.ScopeRefId;
             var roundNumber = scope == PlaybookScope.ScopeRound ? request.RoundNumber : null;

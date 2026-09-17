@@ -154,7 +154,8 @@ internal sealed class StubAiProvider : IAIProvider
     }
     public Task<string> DetectLanguageRequirementAsync(string jdText, CancellationToken ct) => Task.FromResult("vi");
     public Task<LanguageAssessment> AssessLanguageProficiencyAsync(SessionContext ctx, CancellationToken ct) => Task.FromResult(Language);
-    public Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default) => Task.FromResult("{}");
+    public Task<string> CompleteJsonAsync(string systemInstruction, string userContent,
+        IReadOnlyList<AiAttachment>? attachments = null, CancellationToken ct = default) => Task.FromResult("{}");
 }
 
 /// <summary>TTS điều khiển được: trả base64 cấu hình sẵn + đếm số lần gọi.</summary>

@@ -227,8 +227,19 @@ namespace ARI.Infrastructure.Data
                 .Property(c => c.RawResponse)
                 .HasColumnType("jsonb");
 
+            // MỘT lần chấm cho mỗi (tin, file CV, phiên bản bộ tiêu chí) — ADR-070. Trước đây index này
+            // không UNIQUE: luồng xem tin và luồng nộp hồ sơ cùng chạy nền thì ghi hai dòng cho một CV,
+            // và mỗi nơi đọc `FirstOrDefault` ra một dòng khác nhau. NULLS NOT DISTINCT để các bản chấm
+            // cũ (rubric_document_id NULL) cũng không trùng được.
             modelBuilder.Entity<CvJdAnalysis>()
-                .HasIndex(c => new { c.JobPostingId, c.CvHash });
+                .HasIndex(c => new { c.JobPostingId, c.CvHash, c.RubricDocumentId })
+                .IsUnique()
+                .AreNullsDistinct(false)
+                .HasDatabaseName("ux_cv_jd_analyses_job_cv_rubric");
+
+            modelBuilder.Entity<RecruitmentRequest>()
+                .Property(r => r.CvRubricJson)
+                .HasColumnType("jsonb");
 
             // Mỗi ứng viên chỉ lưu một job một lần (bookmark). Partial index trên các bản ghi
             // còn hiệu lực (deleted_at IS NULL) để có thể lưu lại sau khi đã bỏ lưu (soft delete).
@@ -485,6 +496,12 @@ namespace ARI.Infrastructure.Data
             modelBuilder.Entity<CvJdAnalysis>()
                 .HasOne<JobPosting>().WithMany().HasForeignKey(c => c.JobPostingId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // Bộ tiêu chí đã dùng để chấm (ADR-070). playbook_documents chỉ xoá mềm, nên khoá ngoại
+            // không bao giờ chặn thao tác thường ngày; nó chỉ bảo đảm điểm luôn tra ngược được về bộ
+            // tiêu chí sinh ra nó.
+            modelBuilder.Entity<CvJdAnalysis>()
+                .HasOne<PlaybookDocument>().WithMany().HasForeignKey(c => c.RubricDocumentId)
+                .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<SavedJob>()
                 .HasOne<JobPosting>().WithMany().HasForeignKey(s => s.JobPostingId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -719,6 +736,15 @@ namespace ARI.Infrastructure.Data
             // --- Playbook theo phạm vi (đa hình, không có khoá ngoại nên phải tự khai index).
             modelBuilder.Entity<PlaybookDocument>()
                 .HasIndex(p => new { p.Scope, p.ScopeRefId }).HasDatabaseName("idx_playbook_documents_scope");
+
+            // MỖI tin đúng một bộ tiêu chí chấm CV còn sống (ADR-070). Lưu phiên bản mới là xoá mềm bản
+            // cũ trong cùng giao dịch; hai lần lưu đồng thời thì một lần phải hỏng, nếu không
+            // `ResolveRubricAsync` sẽ chọn ngẫu nhiên một trong hai và hai hồ sơ bị chấm theo hai chuẩn.
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasIndex(p => p.ScopeRefId)
+                .IsUnique()
+                .HasFilter("scope = 'job_posting' AND document_type = 'cv_rubric' AND deleted_at IS NULL")
+                .HasDatabaseName("ux_playbook_documents_job_cv_rubric");
 
             // --- Job retry webhook nền.
             modelBuilder.Entity<WebhookDelivery>()

@@ -7,6 +7,7 @@ using ARI.Application.Admin;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
+using ARI.Application.Playbooks;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
@@ -168,8 +169,14 @@ namespace ARI.Application.RecruitmentRequests
             var rounds = InterviewRoundTypes.Sanitize(input.RequestedRounds);
             if (rounds.Count == 0)
                 return Result.Failure("Hãy chọn ít nhất một vòng phỏng vấn cho vị trí này.");
-            if (rounds.Count > InterviewRoundTypes.MaxRounds)
-                return Result.Failure($"Tối đa {InterviewRoundTypes.MaxRounds} vòng phỏng vấn cho một vị trí.");
+            if (InterviewRoundTypes.HasDuplicates(rounds))
+                return Result.Failure("Mỗi loại vòng chỉ chọn một lần: tối đa một vòng trắc nghiệm, một vòng sơ loại và một vòng chuyên môn.");
+
+            // ADR-070: "ứng viên thế nào là phù hợp" là quyết định của người có nhu cầu tuyển, và tin không
+            // có bộ tiêu chí thì không chấm được CV nào — nên bắt buộc ngay trên phiếu.
+            var rubricError = RubricError(input.CvRubric);
+            if (rubricError != null)
+                return Result.Failure(rubricError);
 
             if (input.SalaryMin.HasValue && input.SalaryMin < 0)
                 return Result.Failure("Mức lương không được âm.");
@@ -193,6 +200,25 @@ namespace ARI.Application.RecruitmentRequests
             return Result.Success();
         }
 
+        /// <summary>Lỗi của bộ tiêu chí chấm CV trên phiếu, hoặc null nếu hợp lệ.</summary>
+        public static string? RubricError(IReadOnlyList<CvRubricCriterionInput>? rubric)
+        {
+            if (rubric == null || rubric.Count == 0)
+                return "Hãy khai bộ tiêu chí chấm CV cho vị trí này (có thể bấm \"AI gợi ý\" để có bản nháp).";
+
+            var normalized = CvRubricEditing.Normalize(rubric);
+            return normalized.IsValid
+                ? null
+                : "Bộ tiêu chí chấm CV chưa hợp lệ: " + string.Join(" · ", normalized.Errors.Take(5));
+        }
+
+        /// <summary>Phiếu đã có bộ tiêu chí chấm CV hợp lệ chưa (phiếu lập trước ADR-070 thì chưa).</summary>
+        public static bool HasRubric(RecruitmentRequest req)
+            => ScoringRubric.Validate(ScoringRubric.Deserialize(req.CvRubricJson)).Count == 0;
+
+        public const string MissingRubricMessage =
+            "Phiếu chưa có bộ tiêu chí chấm CV. Hiring Manager cần sửa phiếu để bổ sung trước.";
+
         public static void Apply(RecruitmentRequest entity, RecruitmentRequestInput input)
         {
             entity.Title = input.Title.Trim();
@@ -214,6 +240,11 @@ namespace ARI.Application.RecruitmentRequests
             entity.RequestedRounds = rounds.Count == 0
                 ? null
                 : System.Text.Json.JsonSerializer.Serialize(rounds);
+
+            // Ảnh chụp bộ tiêu chí (ADR-070) — đã qua cùng một bộ chuẩn hoá với màn tin, nên mã tiêu chí
+            // sinh ra ở đây chính là mã tin sẽ dùng.
+            var rubric = CvRubricEditing.Normalize(input.CvRubric);
+            entity.CvRubricJson = rubric.Criteria.Count == 0 ? null : ScoringRubric.Serialize(rubric.Criteria);
             entity.EmploymentType = Trim(input.EmploymentType);
             entity.WorkMode = Trim(input.WorkMode);
             entity.Location = Trim(input.Location);
@@ -436,6 +467,9 @@ namespace ARI.Application.RecruitmentRequests
             if (!RecruitmentRequestStatus.Is(req.Status, RecruitmentRequestStatus.Rejected))
                 return Result.Failure("Chỉ gửi lại được phiếu đang bị trả về.");
 
+            if (!RecruitmentRequestSupport.HasRubric(req))
+                return Result.Failure("Hãy sửa phiếu để bổ sung bộ tiêu chí chấm CV trước khi gửi lại.");
+
             req.Status = RecruitmentRequestStatus.Pending;
             req.SubmissionCount += 1;
             // Giữ nguyên ReviewReason: lý do bị trả về lần trước là bối cảnh HR Leader cần khi xem
@@ -532,6 +566,11 @@ namespace ARI.Application.RecruitmentRequests
 
             if (!RecruitmentRequestStatus.Is(req.Status, RecruitmentRequestStatus.Pending))
                 return Result.Failure("Chỉ duyệt được phiếu đang chờ duyệt.");
+
+            // ADR-070: phiếu lập trước khi bộ tiêu chí thành bắt buộc — duyệt nó là sinh ra một tin không
+            // gửi duyệt được. Trả lại cho HM bổ sung.
+            if (!RecruitmentRequestSupport.HasRubric(req))
+                return Result.Failure(RecruitmentRequestSupport.MissingRubricMessage);
 
             // Phân công là PHẦN CỦA thao tác duyệt, không phải bước rời. Duyệt xong mà không có ai
             // phụ trách thì phiếu nằm im — đúng lỗi ADR-059 đã chữa cho "duyệt CV mà chưa gán ca".

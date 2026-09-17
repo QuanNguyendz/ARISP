@@ -85,6 +85,19 @@ namespace ARI.Domain.Entities
         /// </summary>
         public string? RequestedRounds { get; set; }
 
+        /// <summary>
+        /// Bộ tiêu chí chấm CV do HM khai ngay trên phiếu (ADR-070) — mảng JSON
+        /// <c>[{key,name,weight,description,levels}]</c>, cùng định dạng <c>PlaybookDocument.RubricJson</c>.
+        ///
+        /// Nằm trên PHIẾU vì "ứng viên thế nào là phù hợp" là quyết định chuyên môn của người có nhu cầu
+        /// tuyển, và nó phải có trước khi có tin: tin không có bộ tiêu chí thì không chấm được CV nào.
+        ///
+        /// Cũng là ẢNH CHỤP một chiều như <see cref="RequestedRounds"/>: lúc dựng tin, nội dung này được
+        /// chép thành bộ tiêu chí của tin rồi sống đời riêng — sửa bộ tiêu chí của tin không sửa ngược lại
+        /// phiếu. <c>null</c> cho phiếu lập trước ADR-070.
+        /// </summary>
+        public string? CvRubricJson { get; set; }
+
         public string? EmploymentType { get; set; }
         public string? WorkMode { get; set; }
         public string? Location { get; set; }

@@ -182,6 +182,12 @@ namespace ARI.Application.DTOs
         /// </summary>
         public Guid? RecruitmentRequestId { get; set; }
 
+        /// <summary>
+        /// Tin đã có bộ tiêu chí chấm CV chưa (ADR-070) — thiếu thì không gửi duyệt/đăng được. Chỉ điền cho
+        /// nhân sự; null ở Job Board công khai.
+        /// </summary>
+        public bool? HasCvRubric { get; set; }
+
         public static JobPostingResponse FromEntity(JobPosting job, List<RoundConfigDto> roundConfigs) =>
             new()
             {

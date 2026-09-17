@@ -18,7 +18,7 @@ namespace ARI.Application.UnitTests.Dev;
 public class SeedPracticeCommandHandlerTests
 {
     private static SeedPracticeCommandHandler Handler(InMemoryUnitOfWork uow)
-        => new(uow, new FakePasswordHasher());
+        => new(uow, new FakePasswordHasher(), ARI.Application.UnitTests.CvScoring.CvScoringKit.RubricService(uow));
 
     [Fact]
     public async Task UTCID01_Fresh_seed_builds_eligible_application()

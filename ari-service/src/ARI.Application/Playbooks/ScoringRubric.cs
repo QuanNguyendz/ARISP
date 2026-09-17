@@ -18,6 +18,44 @@ namespace ARI.Application.Playbooks
         public decimal Weight { get; set; }
         /// <summary>Chuẩn chấm: thế nào là tốt, thế nào là kém. Đưa vào prompt + RAG.</summary>
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Mức neo (ADR-070): mô tả cụ thể từng dải điểm. Không bắt buộc, nhưng có neo thì hai lần chấm
+        /// cùng một CV ra cùng một dải — thiếu neo, "7/10" của model là cảm tính.
+        /// </summary>
+        public RubricLevels? Levels { get; set; }
+
+        /// <summary>
+        /// Ý kiểm: vài dấu hiệu CÓ/KHÔNG kiểm được từ CV (vd "Có ≥ 4 năm .NET production"). AI chỉ chọn DẢI điểm
+        /// và trả lời từng ý; vị trí điểm TRONG dải do backend tính theo số ý đạt — nên hai CV cùng dải khác nhau
+        /// vài điểm luôn chỉ ra được là khác nhau ở ý nào. Không có ý kiểm thì AI tự ước lượng vị trí trong dải.
+        /// </summary>
+        public List<RubricCheck>? Checks { get; set; }
+    }
+
+    /// <summary>Một ý kiểm của tiêu chí. <see cref="Key"/> do hệ thống sinh (<c>k1</c>, <c>k2</c>…) và giữ nguyên khi sửa chữ.</summary>
+    public class RubricCheck
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+    }
+
+    /// <summary>Bốn dải điểm cố định — người khai chỉ viết lời, không tự đặt ngưỡng.</summary>
+    public class RubricLevels
+    {
+        /// <summary>90–100.</summary>
+        public string? Excellent { get; set; }
+        /// <summary>70–89.</summary>
+        public string? Good { get; set; }
+        /// <summary>40–69.</summary>
+        public string? Fair { get; set; }
+        /// <summary>0–39.</summary>
+        public string? Poor { get; set; }
+
+        [JsonIgnore]
+        public bool IsEmpty =>
+            string.IsNullOrWhiteSpace(Excellent) && string.IsNullOrWhiteSpace(Good)
+            && string.IsNullOrWhiteSpace(Fair) && string.IsNullOrWhiteSpace(Poor);
     }
 
     /// <summary>
@@ -39,7 +77,52 @@ namespace ARI.Application.Playbooks
 
         public const int MaxCriteria = 20;
 
+        /// <summary>Tối đa ý kiểm mỗi tiêu chí — nhiều hơn thì mỗi ý nặng quá nhẹ và HM khó giữ các ý độc lập.</summary>
+        public const int MaxChecks = 8;
+        public const int MaxCheckLength = 200;
+
         private static readonly Regex KeyPattern = new("^[a-z][a-z0-9_]{1,39}$", RegexOptions.Compiled);
+        private static readonly Regex CheckKeyPattern = new("^[a-z][a-z0-9_]{0,19}$", RegexOptions.Compiled);
+
+        public static bool IsValidCheckKey(string? key) => !string.IsNullOrWhiteSpace(key) && CheckKeyPattern.IsMatch(key);
+
+        // ---------- Dải điểm cố định (mức neo) ----------
+        public const string BandExcellent = "excellent";
+        public const string BandGood = "good";
+        public const string BandFair = "fair";
+        public const string BandPoor = "poor";
+
+        /// <summary>Khoảng điểm của một dải: excellent 90–100 · good 70–89 · fair 40–69 · poor 0–39.</summary>
+        public static (decimal Min, decimal Max)? BandRange(string? band) => band switch
+        {
+            BandExcellent => (90m, 100m),
+            BandGood => (70m, 89m),
+            BandFair => (40m, 69m),
+            BandPoor => (0m, 39m),
+            _ => null,
+        };
+
+        public static string BandOf(decimal score) => score switch
+        {
+            >= 90 => BandExcellent,
+            >= 70 => BandGood,
+            >= 40 => BandFair,
+            _ => BandPoor,
+        };
+
+        /// <summary>Tên dải AI trả về → một trong bốn dải chuẩn (chấp nhận viết hoa, "90-100"…). Không nhận ra → null.</summary>
+        public static string? NormalizeBand(string? band)
+        {
+            var b = band?.Trim().ToLowerInvariant().Replace('–', '-').Replace(" ", string.Empty);
+            return b switch
+            {
+                BandExcellent or "90-100" => BandExcellent,
+                BandGood or "70-89" => BandGood,
+                BandFair or "40-69" => BandFair,
+                BandPoor or "0-39" => BandPoor,
+                _ => null,
+            };
+        }
 
         private static readonly JsonSerializerOptions JsonOpts = new()
         {
@@ -83,6 +166,20 @@ namespace ARI.Application.Playbooks
 
                 if (c.Weight <= 0)
                     errors.Add($"Tiêu chí '{c.Key}' phải có trọng số lớn hơn 0.");
+
+                if (c.Checks is { Count: > 0 } checks)
+                {
+                    if (checks.Count > MaxChecks)
+                        errors.Add($"Tiêu chí '{c.Key}' có {checks.Count} ý kiểm — tối đa {MaxChecks}.");
+                    var seenChecks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var chk in checks)
+                    {
+                        if (string.IsNullOrWhiteSpace(chk.Text))
+                            errors.Add($"Tiêu chí '{c.Key}' có ý kiểm để trống.");
+                        if (!IsValidCheckKey(chk.Key) || !seenChecks.Add(chk.Key))
+                            errors.Add($"Ý kiểm '{chk.Key}' của tiêu chí '{c.Key}' sai mã hoặc trùng mã.");
+                    }
+                }
             }
 
             var total = criteria.Sum(c => c.Weight);
@@ -165,10 +262,28 @@ namespace ARI.Application.Playbooks
             return JsonSerializer.Serialize(snapshot, JsonOpts);
         }
 
-        /// <summary>Mô tả rubric cho prompt AI: mỗi dòng một tiêu chí kèm trọng số + chuẩn chấm.</summary>
+        /// <summary>
+        /// Mô tả rubric cho prompt AI: mỗi dòng một tiêu chí kèm trọng số + chuẩn chấm, và nếu có thì
+        /// các mức neo ở dòng dưới — model chấm theo đúng lời doanh nghiệp viết cho từng dải điểm.
+        /// </summary>
         public static string ToPromptText(IReadOnlyList<RubricCriterion> criteria)
             => string.Join("\n", criteria.Select(c =>
-                $"- {c.Key} | {c.Name} | trọng số {c.Weight:0.##}%"
-                + (string.IsNullOrWhiteSpace(c.Description) ? string.Empty : $" | chuẩn chấm: {c.Description}")));
+            {
+                var line = $"- {c.Key} | {c.Name} | trọng số {c.Weight:0.##}%"
+                           + (string.IsNullOrWhiteSpace(c.Description) ? string.Empty : $" | chuẩn chấm: {c.Description}");
+                if (c.Levels is { IsEmpty: false } lv)
+                {
+                    if (!string.IsNullOrWhiteSpace(lv.Excellent)) line += $"\n    90–100: {lv.Excellent}";
+                    if (!string.IsNullOrWhiteSpace(lv.Good)) line += $"\n    70–89: {lv.Good}";
+                    if (!string.IsNullOrWhiteSpace(lv.Fair)) line += $"\n    40–69: {lv.Fair}";
+                    if (!string.IsNullOrWhiteSpace(lv.Poor)) line += $"\n    0–39: {lv.Poor}";
+                }
+                if (c.Checks is { Count: > 0 } checks)
+                {
+                    line += "\n    ý kiểm (trả lời có/không từng ý):";
+                    foreach (var chk in checks) line += $"\n      [{chk.Key}] {chk.Text}";
+                }
+                return line;
+            }));
     }
 }

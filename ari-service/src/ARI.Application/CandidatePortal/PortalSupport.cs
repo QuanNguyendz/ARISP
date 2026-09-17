@@ -16,11 +16,6 @@ namespace ARI.Application.CandidatePortal
     {
         public static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-        public static string ComputeHash(byte[] bytes)
-        {
-            return Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
-        }
-
         public static List<string> DeserializeStringList(string? json)
         {
             if (string.IsNullOrWhiteSpace(json)) return new List<string>();

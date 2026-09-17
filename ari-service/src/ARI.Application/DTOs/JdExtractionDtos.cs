@@ -48,6 +48,13 @@ namespace ARI.Application.DTOs
         [JsonPropertyName("language_requirement")]
         public string? LanguageRequirement { get; set; }
 
+        /// <summary>
+        /// Ngôn ngữ nên dùng cho các vòng phỏng vấn AI: <c>vi</c> | <c>en</c>. Điền sẵn ô ngôn ngữ từng vòng ở màn
+        /// tạo tin — model đọc được cả ngôn ngữ viết JD lẫn yêu cầu ngoại ngữ, phép đếm từ tiếng Anh thì không.
+        /// </summary>
+        [JsonPropertyName("interview_language")]
+        public string? InterviewLanguage { get; set; }
+
         [JsonPropertyName("salary_min")]
         public decimal? SalaryMin { get; set; }
 
@@ -103,6 +110,9 @@ namespace ARI.Application.DTOs
         public string? Location { get; set; }
         public List<string> Skills { get; set; } = new();
         public string? LanguageRequirement { get; set; }
+
+        /// <summary><c>vi</c> | <c>en</c> hoặc null khi AI không trả lời được — màn tạo tin giữ mặc định.</summary>
+        public string? InterviewLanguage { get; set; }
         public decimal? SalaryMin { get; set; }
         public decimal? SalaryMax { get; set; }
     }
