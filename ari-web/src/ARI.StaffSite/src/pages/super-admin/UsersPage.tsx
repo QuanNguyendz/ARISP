@@ -13,6 +13,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react'
 import { PageHeader, StatsGrid, EmptyState, ErrorAlert, Select } from '@ari/shared/ui'
 import { useAuthStore } from '@ari/shared/store/auth'
@@ -30,6 +32,7 @@ import {
 } from '@ari/shared/utils/roles'
 import { departmentService, type Department } from '@ari/shared/fservices/department'
 import { StatsGridSkeleton, TableSkeleton } from './_skeletons'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 const PAGE_SIZE = 10
 
@@ -76,6 +79,13 @@ export default function UsersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [lockTarget, setLockTarget] = useState<AdminUser | null>(null)
 
+  // Đổi vai trò là thao tác MỘT CÚ CHẠM trên ô select giữa bảng, mà hệ quả thì không nhỏ: thôi vai
+  // Hiring Manager là mọi tin người đó phụ trách ĐÓNG CỔNG cho tới khi HR Admin chuyển HM (ADR-068).
+  // Giữ lựa chọn ở đây thay vì gọi API ngay, để ô select vẫn hiện vai trò CŨ cho tới khi xác nhận.
+  const [roleTarget, setRoleTarget] = useState<{ user: AdminUser; role: AssignableStaffRole } | null>(
+    null
+  )
+
   // Chỉ đội đang hoạt động: đội đã tắt vẫn hiện được TÊN ở dòng cũ (server trả kèm), nhưng không
   // gán mới vào được.
   const [departments, setDepartments] = useState<Department[]>([])
@@ -106,7 +116,7 @@ export default function UsersPage() {
       setUsers(res.items)
       setTotal(res.totalCount)
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -163,7 +173,7 @@ export default function UsersPage() {
       await adminService.activateUser(u.id)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.unlockFailed'))
+      setError(resolveApiError(e, t, 'errors.unlockFailed'))
     } finally {
       setBusyId(null)
     }
@@ -179,7 +189,7 @@ export default function UsersPage() {
       setLockTarget(null)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.lockFailed'))
+      setError(resolveApiError(e, t, 'errors.lockFailed'))
     } finally {
       setBusyId(null)
     }
@@ -192,20 +202,24 @@ export default function UsersPage() {
       await adminService.updateDepartment(u.id, departmentId)
       await loadUsers()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.departmentChangeFailed'))
+      setError(resolveApiError(e, t, 'errors.departmentChangeFailed'))
     } finally {
       setBusyId(null)
     }
   }
 
-  const handleChangeRole = async (u: AdminUser, role: AssignableStaffRole) => {
-    setBusyId(u.id)
+  const confirmChangeRole = async () => {
+    if (!roleTarget) return
+    const { user, role } = roleTarget
+    setBusyId(user.id)
     setError('')
     try {
-      await adminService.updateRole(u.id, role)
+      await adminService.updateRole(user.id, role)
+      setRoleTarget(null)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.roleChangeFailed'))
+      setError(resolveApiError(e, t, 'errors.roleChangeFailed'))
+      setRoleTarget(null)
     } finally {
       setBusyId(null)
     }
@@ -219,7 +233,7 @@ export default function UsersPage() {
       await adminService.deleteUser(u.id)
       await refreshAll()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.deleteFailed'))
+      setError(resolveApiError(e, t, 'errors.deleteFailed'))
     } finally {
       setBusyId(null)
     }
@@ -354,7 +368,11 @@ export default function UsersPage() {
                           <Select
                             value={u.role.toLowerCase().replace(/\s+/g, '_')}
                             disabled={busyId === u.id}
-                            onChange={(v) => handleChangeRole(u, v as AssignableStaffRole)}
+                            // Chọn xong chưa đổi gì: mở hộp xác nhận trước. Ô select vẫn hiện vai trò
+                            // cũ vì giá trị của nó lấy từ `u.role`, nên bấm Huỷ là không còn dấu vết.
+                            onChange={(v) =>
+                              setRoleTarget({ user: u, role: v as AssignableStaffRole })
+                            }
                             className="w-full max-w-[160px]"
                             buttonClassName="rounded-lg px-2 py-1 text-xs"
                             options={assignableRoleOptions(t)}
@@ -495,6 +513,119 @@ export default function UsersPage() {
           onConfirm={doLock}
         />
       )}
+
+      {roleTarget && (
+        <RoleChangeModal
+          userName={roleTarget.user.fullName || roleTarget.user.email}
+          fromRole={roleTarget.user.role}
+          toRole={roleTarget.role}
+          submitting={busyId === roleTarget.user.id}
+          onCancel={() => setRoleTarget(null)}
+          onConfirm={confirmChangeRole}
+        />
+      )}
+    </div>
+  )
+}
+
+// ===== Role Change Modal =====
+/**
+ * Xác nhận trước khi đổi vai trò.
+ *
+ * Không phải nghi thức thừa: ô select nằm giữa bảng, trượt chuột một nhịp là đổi quyền của một người
+ * mà không có bước nào để dừng lại. Hộp này nói rõ ĐỔI TỪ ĐÂU SANG ĐÂU — thông tin mà chính ô select
+ * không đưa ra được, vì sau khi chọn nó chỉ còn hiện giá trị mới.
+ *
+ * Cảnh báo riêng cho ca thôi vai Hiring Manager (ADR-068): mọi tin người đó đang phụ trách sẽ ĐÓNG
+ * CỔNG cho tới khi HR Admin chuyển HM. Máy chủ không chặn thao tác này, chỉ báo cho quản trị viên —
+ * nên chỗ duy nhất nói trước được hậu quả là đây.
+ */
+function RoleChangeModal({
+  userName,
+  fromRole,
+  toRole,
+  submitting,
+  onCancel,
+  onConfirm,
+}: {
+  userName: string
+  fromRole: string
+  toRole: AssignableStaffRole
+  submitting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useTranslation('modules/super-admin/users')
+  const losingHiringManager =
+    fromRole.toLowerCase().replace(/\s+/g, '_') === ROLE.HiringManager && toRole !== ROLE.HiringManager
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative w-full max-w-md rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 p-6 shadow-xl"
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
+              {t('roleModal.title')}
+            </h3>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+              {t('roleModal.description', { name: userName })}
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-white/5 px-4 py-3">
+          <span
+            className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(fromRole)}`}
+          >
+            {roleLabel(fromRole)}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-400" />
+          <span
+            className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(toRole)}`}
+          >
+            {roleLabel(toRole)}
+          </span>
+        </div>
+
+        {losingHiringManager && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-3 text-xs text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t('roleModal.hiringManagerWarning')}</span>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-xl border border-ink-200 dark:border-white/10 px-4 py-2.5 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10"
+          >
+            {t('roleModal.cancel')}
+          </button>
+          <button
+            disabled={submitting}
+            onClick={onConfirm}
+            className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            {t('roleModal.confirm')}
+          </button>
+        </div>
+      </motion.div>
     </div>
   )
 }
@@ -602,7 +733,7 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
       })
       onCreated()
     } catch (e: any) {
-      setErr(e?.response?.data?.message || t('errors.createFailed'))
+      setErr(resolveApiError(e, t, 'errors.createFailed'))
     } finally {
       setSubmitting(false)
     }

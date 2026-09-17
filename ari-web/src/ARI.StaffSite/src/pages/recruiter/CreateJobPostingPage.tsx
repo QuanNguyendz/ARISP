@@ -27,6 +27,7 @@ import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shar
 import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
 import { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import CvRubricChips from '@/components/cvRubric/CvRubricChips'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 interface CreateJobPostingPageProps {
   mode: 'create' | 'edit'
@@ -344,7 +345,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             : { type: 'warn', text: t('jdUpload.warning') },
       )
     } catch (err: any) {
-      setError(err?.response?.data?.message || t('validation.analyzeError'))
+      setError(resolveApiError(err, t, 'validation.analyzeError'))
     } finally {
       setAnalyzing(false)
     }
@@ -577,7 +578,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
       navigate(jobHref)
     } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || t('validation.saveError'))
+      setError(resolveApiError(err, t, 'validation.saveError'))
     } finally {
       setSubmitting(false)
     }

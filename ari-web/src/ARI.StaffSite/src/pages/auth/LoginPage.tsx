@@ -6,6 +6,7 @@ import { authService } from '@ari/shared/fservices/auth'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
 import { PasswordToggle } from '@ari/shared/ui'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -121,7 +122,7 @@ export default function LoginPage() {
       const from = (location.state as any)?.from?.pathname
       navigate(from || dashboard, { replace: true })
     } catch (err: any) {
-      setError(err.message || tErrors('auth.invalidCredentials'))
+      setError(resolveApiError(err, tErrors, 'auth.invalidCredentials'))
       setOauthLoading(false)
     } finally {
       setIsLoading(false)

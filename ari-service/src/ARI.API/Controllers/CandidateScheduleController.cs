@@ -41,9 +41,9 @@ namespace ARI.API.Controllers
 
         private IActionResult MapFailure(Result result) => result.ErrorCode switch
         {
-            CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-            CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-            _ => BadRequest(new { message = result.Error }),
+            CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+            CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error, code = result.ErrorCode }),
+            _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
         };
 
         /// <summary>Lịch phỏng vấn của ứng viên đang đăng nhập (sắp tới / đã qua / chờ xếp lại).</summary>

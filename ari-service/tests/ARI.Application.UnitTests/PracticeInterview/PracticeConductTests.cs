@@ -34,7 +34,7 @@ public class PracticeConductTests
             .StartSessionAsync(Start(Guid.NewGuid()), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Application not found", res.Error);
+        Assert.Contains("Không tìm thấy hồ sơ ứng tuyển", res.Error);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class PracticeConductTests
         var res = await Svc(uow, new(), new(), new()).StartSessionAsync(Start(app.Id), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Job posting not found", res.Error);
+        Assert.Contains("Không tìm thấy tin tuyển dụng", res.Error);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class PracticeConductTests
             .SaveAnswerAsync(Guid.NewGuid(), Guid.NewGuid(), "x", null, CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Session not found", res.Error);
+        Assert.Contains("Không tìm thấy phiên phỏng vấn", res.Error);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public class PracticeConductTests
         var res = await Svc(uow, new(), new(), new()).SaveAnswerAsync(session.Id, Guid.NewGuid(), "x", null, CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("not active", res.Error);
+        Assert.Contains("không còn hoạt động", res.Error);
     }
 
     // ---------- GenerateAndSendNextQuestionAsync ----------
@@ -209,7 +209,7 @@ public class PracticeConductTests
         var res = await Svc(uow, new(), new(), new()).GenerateAndSendNextQuestionAsync(session.Id, CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("not active", res.Error);
+        Assert.Contains("không còn hoạt động", res.Error);
     }
 
     [Fact]

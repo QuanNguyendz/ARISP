@@ -29,7 +29,7 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationsByApplication
             var (application, job, level) = await JobAccess.EvaluateApplicationAsync(
                 _unitOfWork, request.ApplicationId, request.UserId, request.Role, ct);
             if (application == null)
-                return Result.Failure<List<EvaluationListItemResponse>>("Application not found.");
+                return Result.Failure<List<EvaluationListItemResponse>>("Không tìm thấy hồ sơ ứng tuyển.");
             if (job == null)
                 return Result.Failure<List<EvaluationListItemResponse>>("Job posting associated with this application was not found.");
             if (level < JobAccessLevel.TeamMember)

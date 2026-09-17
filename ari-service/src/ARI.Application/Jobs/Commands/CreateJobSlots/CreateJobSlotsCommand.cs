@@ -26,7 +26,7 @@ namespace ARI.Application.Jobs.Commands.CreateJobSlots
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(command.JobId, ct);
             if (job == null)
-                return Result.Failure("Job posting not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
             foreach (var slotDto in command.Slots)
             {

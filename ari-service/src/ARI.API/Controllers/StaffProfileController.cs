@@ -37,7 +37,7 @@ namespace ARI.API.Controllers
             if (userId == null) return Unauthorized();
 
             var result = await _sender.Send(new GetStaffProfileQuery(userId.Value));
-            if (result.IsFailure) return NotFound(new { message = result.Error });
+            if (result.IsFailure) return NotFound(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -52,8 +52,8 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new UpdateStaffProfileCommand(userId.Value, request.FullName));
             if (result.IsFailure)
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -70,9 +70,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
                     "wrong_current_password" => BadRequest(new { message = result.Error, code = "wrong_current_password" }),
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -86,7 +86,7 @@ namespace ARI.API.Controllers
             if (userId == null) return Unauthorized();
 
             var result = await _sender.Send(new GetStaffSettingsQuery(userId.Value));
-            if (result.IsFailure) return NotFound(new { message = result.Error });
+            if (result.IsFailure) return NotFound(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -98,7 +98,7 @@ namespace ARI.API.Controllers
             if (userId == null) return Unauthorized();
 
             var result = await _sender.Send(new UpdateStaffSettingsCommand(userId.Value, settings));
-            if (result.IsFailure) return NotFound(new { message = result.Error });
+            if (result.IsFailure) return NotFound(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -114,7 +114,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> GetRecruiters(CancellationToken ct)
         {
             var result = await _sender.Send(new GetRecruitersQuery(), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -125,7 +125,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> GetRecruiterJobs(Guid id, CancellationToken ct)
         {
             var result = await _sender.Send(new GetRecruiterJobsQuery(id), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -146,8 +146,8 @@ namespace ARI.API.Controllers
 
             if (result.IsFailure)
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = result.Value });
         }

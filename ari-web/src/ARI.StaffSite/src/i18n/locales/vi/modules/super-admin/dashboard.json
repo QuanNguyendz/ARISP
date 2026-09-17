@@ -11,7 +11,7 @@
   },
   "pendingUsers": {
     "title": "Yêu cầu tạo tài khoản",
-    "subtitle": "HR Leader gửi · chờ bạn duyệt",
+    "subtitle": "HR Admin gửi · chờ bạn duyệt",
     "viewAll": "Xem tất cả",
     "empty": "Không có yêu cầu nào chờ duyệt",
     "by": "bởi {{name}}",

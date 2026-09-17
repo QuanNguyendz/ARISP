@@ -33,7 +33,7 @@ public class ApproveUserCommandHandlerTests
         var res = await Handler(uow).Handle(new ApproveUserCommand(UserId, ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found.", res.Error);
+        Assert.Equal("Không tìm thấy người dùng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
@@ -46,11 +46,11 @@ public class ApproveUserCommandHandlerTests
         var res = await Handler(uow).Handle(new ApproveUserCommand(Guid.Empty, ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found.", res.Error);
+        Assert.Equal("Không tìm thấy người dùng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
-    // UTCID03 — user đã active → "User already active." (Abnormal)
+    // UTCID03 — user đã active → "Tài khoản đang hoạt động." (Abnormal)
     [Fact]
     public async Task UTCID03_Already_active_is_rejected()
     {
@@ -59,7 +59,7 @@ public class ApproveUserCommandHandlerTests
         var res = await Handler(uow).Handle(new ApproveUserCommand(UserId, ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("User already active.", res.Error);
+        Assert.Equal("Tài khoản đang hoạt động.", res.Error);
         Assert.Null(res.ErrorCode);
         Assert.Equal(0, uow.SaveChangesCount);
     }

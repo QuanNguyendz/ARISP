@@ -34,7 +34,7 @@ public class UpdateJobStatusCommandHandlerTests
         Ctx c, Guid jobId, UpdateJobStatusRequest req, Guid userId, string role, bool withRubric = true)
     {
         if (withRubric) ARI.Application.UnitTests.CvScoring.CvScoringKit.EnsureRubricsForAllJobs(c.Uow);
-        return new UpdateJobStatusCommandHandler(c.Uow, c.Storage, c.Stamp, c.Parser, c.Notif, c.Email, NullLogger<UpdateJobStatusCommandHandler>.Instance)
+        return new UpdateJobStatusCommandHandler(c.Uow, c.Storage, c.Stamp, c.Parser, c.Notif, c.Email, TestConfig.Frontend(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, req, userId, role), CancellationToken.None);
     }
 
@@ -45,7 +45,7 @@ public class UpdateJobStatusCommandHandlerTests
     public async Task UTCID01_Status_required()
     {
         var res = await Run(NewCtx(), Guid.NewGuid(), Req(" "), OwnerA, AppRoles.Recruiter);
-        Assert.Equal("Status is required.", res.Error);
+        Assert.Equal("Vui lòng chọn trạng thái.", res.Error);
     }
 
     // UTCID02 — status không được hỗ trợ
@@ -70,7 +70,7 @@ public class UpdateJobStatusCommandHandlerTests
     {
         var res = await Run(NewCtx(), Guid.NewGuid(), Req("pending"), OwnerA, AppRoles.Recruiter);
         Assert.True(res.IsFailure);
-        Assert.Equal("Job posting not found.", res.Error);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 
@@ -273,5 +273,29 @@ public class UpdateJobStatusCommandHandlerTests
 
         Assert.True(res.IsSuccess);
         Assert.Equal("closed", job.Status);
+    }
+
+    // ---------- Link trong thư báo kết quả duyệt ----------
+
+    [Fact]
+    public async Task Thu_bao_duyet_dung_goc_URL_theo_moi_truong()
+    {
+        // Hai lá thư này từng ghi cứng `http://localhost:3001`: trên production nút bấm dẫn về máy
+        // của chính người nhận — không lỗi, không log, chỉ là một trang trắng. Không ai phát hiện
+        // được cho tới khi có người bấm thử.
+        var c = NewCtx();
+        var creator = JobPostingData.Staff(OwnerA, role: "recruiter");
+        var job = JobPostingData.Job(owner: OwnerA, status: "pending");
+        job.HmSignOffStatus = HmSignOffStatus.Pending;
+        c.Uow.Seed(job).Seed(creator).Seed(JobPostingData.Staff(HrA, role: "hr_admin"));
+        HiringManagerSeed.Primary(c.Uow, job.Id);
+
+        var req = Req("active");
+        req.HmBypassReason = "Hiring Manager nghỉ phép, vị trí cần đăng gấp";
+        Assert.True((await Run(c, job.Id, req, HrA, AppRoles.HrAdmin)).IsSuccess);
+
+        var mail = Assert.Single(c.Email.Sent, m => m.To == creator.Email);
+        Assert.Contains($"href='{TestConfig.StaffBaseUrl}/", mail.Html);
+        Assert.DoesNotContain("localhost", mail.Html);
     }
 }

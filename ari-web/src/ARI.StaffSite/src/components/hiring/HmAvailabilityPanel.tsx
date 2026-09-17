@@ -11,6 +11,7 @@ import HmAvailabilityFields, {
   toPayload,
   type DraftWindow,
 } from './HmAvailabilityFields'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /** `id` của thẻ này — hộp thoại duyệt hồ sơ cuộn tới đây khi HM chưa khai lịch vòng 1. */
 export const HM_AVAILABILITY_ANCHOR = 'hm-availability'
@@ -145,7 +146,7 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
       await load(round)
     } catch (e) {
       const x = e as { response?: { data?: { message?: string } } }
-      setError(x?.response?.data?.message || t('availability.saveError'))
+      setError(resolveApiError(x, t, 'availability.saveError'))
     } finally {
       setBusy(false)
     }
@@ -164,7 +165,7 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
       await load(round)
     } catch (e) {
       const x = e as { response?: { data?: { message?: string } } }
-      setError(x?.response?.data?.message || t('availability.dropError'))
+      setError(resolveApiError(x, t, 'availability.dropError'))
     } finally {
       setBusy(false)
     }

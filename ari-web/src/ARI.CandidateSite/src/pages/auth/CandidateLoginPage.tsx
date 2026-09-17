@@ -15,6 +15,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { authService } from '@ari/shared/fservices/auth'
 import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
 import PasswordToggle from '@ari/shared/ui/PasswordToggle'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -115,7 +116,7 @@ export default function CandidateLoginPage() {
       if (err.code === 'passwordless_google') {
         setNeedsPasswordSetup(true)
       }
-      setError(err.message || tErrors('server.internal'))
+      setError(resolveApiError(err, tErrors, 'server.internal'))
     } finally {
       setIsLoading(false)
     }
@@ -129,7 +130,7 @@ export default function CandidateLoginPage() {
       const res = await authService.resendVerification(email)
       setResendMessage(res.message)
     } catch (err: any) {
-      setResendMessage(err.message || t('candidateLogin.resendFailed'))
+      setResendMessage(resolveApiError(err, t, 'candidateLogin.resendFailed'))
     } finally {
       setResending(false)
     }

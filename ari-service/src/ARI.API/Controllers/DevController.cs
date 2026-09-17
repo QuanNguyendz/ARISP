@@ -44,7 +44,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new SeedPracticeCommand(fresh), ct);
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             var v = result.Value;
             return Ok(new
@@ -73,7 +73,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new SeedInterviewJobCommand(fresh), ct);
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             var v = result.Value;
             return Ok(new
@@ -122,7 +122,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new RegradeSessionCommand(sessionId, lang), ct);
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { success = true, message = "Đã chấm lại phiên. Mở lại trang xem lại để kiểm tra." });
         }

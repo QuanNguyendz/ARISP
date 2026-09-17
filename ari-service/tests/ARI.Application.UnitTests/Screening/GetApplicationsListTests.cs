@@ -28,7 +28,7 @@ public class GetApplicationsListTests
         var res = await Svc(new InMemoryUnitOfWork()).GetApplicationsByJobAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Job posting not found", res.Error);
+        Assert.Contains("Không tìm thấy tin tuyển dụng", res.Error);
     }
 
     [Fact]

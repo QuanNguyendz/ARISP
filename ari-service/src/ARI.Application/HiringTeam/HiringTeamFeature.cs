@@ -200,7 +200,7 @@ namespace ARI.Application.HiringTeam
             // vá. Đổi HM chính chỉ đi qua lệnh chuyển HM của HR Leader.
             if (existing is { IsPrimary: true, DeletedAt: null })
                 return Result.Failure<HiringTeamMemberDto>(
-                    "Người này đang là Hiring Manager chính của tin. Đổi Hiring Manager chính qua thao tác chuyển HM của HR Leader.",
+                    "Người này đang là Hiring Manager chính của tin. Đổi Hiring Manager chính qua thao tác chuyển HM của HR Admin.",
                     CommonErrorCodes.Conflict);
 
             JobHiringTeamMember member;
@@ -300,7 +300,7 @@ namespace ARI.Application.HiringTeam
             // và chuyển là việc của HR Leader.
             if (member.IsPrimary)
                 return Result<bool>.Failure(
-                    "Không gỡ được Hiring Manager chính của tin. HR Leader cần chuyển tin cho Hiring Manager khác trước.",
+                    "Không gỡ được Hiring Manager chính của tin. HR Admin cần chuyển tin cho Hiring Manager khác trước.",
                     CommonErrorCodes.Conflict);
 
             // Xoá mềm: dòng này là dấu vết ai từng duyệt shortlist / chốt kết quả của tin.
@@ -364,7 +364,7 @@ namespace ARI.Application.HiringTeam
         {
             if (!RoleNames.IsAdmin(request.ActorRole))
                 return Result.Failure<HiringTeamMemberDto>(
-                    "Chỉ HR Leader hoặc Super Admin mới gán / chuyển được Hiring Manager chính của tin.",
+                    "Chỉ HR Admin hoặc Super Admin mới gán / chuyển được Hiring Manager chính của tin.",
                     CommonErrorCodes.Forbidden);
             if (request.ActorId is not { } actorId || actorId == Guid.Empty)
                 return Result.Failure<HiringTeamMemberDto>("Không xác định được người thực hiện.", CommonErrorCodes.Forbidden);

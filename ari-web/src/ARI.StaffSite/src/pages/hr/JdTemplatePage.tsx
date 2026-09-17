@@ -16,6 +16,7 @@ import {
 } from '@ari/shared/fservices/jdTemplate'
 import JdPaperPreview from '@/components/jdPreview/JdPaperPreview'
 import { useContainerWidth } from '@/components/jdPreview/useContainerWidth'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Cấu hình mẫu bản mô tả công việc của công ty (ADR-064) — màn riêng của HR Leader.
@@ -50,7 +51,7 @@ export default function JdTemplatePage() {
     try {
       setTemplate(await jdTemplateService.get())
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -101,7 +102,7 @@ export default function JdTemplatePage() {
       setSaved(true)
       await load()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.saveFailed'))
+      setError(resolveApiError(e, t, 'errors.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -116,7 +117,7 @@ export default function JdTemplatePage() {
       const url = await jdTemplateService.uploadLogo(file)
       patch({ logoUrl: url })
     } catch (err: any) {
-      setError(err?.response?.data?.message || t('errors.logoFailed'))
+      setError(resolveApiError(err, t, 'errors.logoFailed'))
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''

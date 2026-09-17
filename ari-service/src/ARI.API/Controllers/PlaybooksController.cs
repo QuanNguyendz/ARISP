@@ -79,7 +79,7 @@ namespace ARI.API.Controllers
 
             var bytes = await PlaybookUpload.ReadAsync(file, ct);
             var result = await _sender.Send(new ParseCvRubricSheetCommand(bytes), ct);
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
         /// <summary>Xuất bản nháp đang soạn ra file Excel.</summary>
@@ -89,7 +89,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new ExportCvRubricSheetQuery(body?.Criteria ?? new()), ct);
             return result.IsFailure
-                ? BadRequest(new { message = result.Error })
+                ? BadRequest(new { message = result.Error, code = result.ErrorCode })
                 : File(result.Value!, RubricSheet.XlsxContentType, "bo-tieu-chi-cham-cv.xlsx");
         }
 
@@ -111,7 +111,7 @@ namespace ARI.API.Controllers
         {
             if (body == null) return BadRequest(new { message = "Thiếu nội dung để gợi ý." });
             var result = await _sender.Send(new SuggestCvRubricCommand(body), ct);
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
         /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD; riêng bộ tiêu chí chấm điểm là .xlsx).</summary>

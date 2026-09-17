@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
-import { Shield, Webhook, MapPin, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
+import { Shield, MapPin, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
 import { PageHeader, ErrorAlert } from '@ari/shared/ui'
 import { adminService, type SystemSettingItem } from '@/fservices/admin'
 import { SettingsSkeleton } from './_skeletons'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
-type TabId = 'auth' | 'interview' | 'integrations'
+type TabId = 'auth' | 'interview'
 
 const SETTING_KEYS = {
   allowedEmailDomains: 'allowed_email_domains',
@@ -14,10 +15,9 @@ const SETTING_KEYS = {
   interviewLocationAddress: 'interview_location_address',
   interviewLocationDirections: 'interview_location_directions',
   interviewLocationMapUrl: 'interview_location_map_url',
-  atsWebhookUrl: 'ats_webhook_url',
-  atsWebhookSecret: 'ats_webhook_secret',
-  slackWebhookUrl: 'slack_webhook_url',
-  teamsWebhookUrl: 'teams_webhook_url',
+  // CỐ Ý không có webhook ATS / Slack / Teams: dự án không tích hợp hệ thống ngoài nào. Bốn ô đó
+  // từng nằm ở đây nhưng không endpoint nào đọc tới — một màn cấu hình nhận giá trị rồi không dùng
+  // còn tệ hơn là không có màn nào, vì nó khiến người cấu hình tin rằng tích hợp đang chạy.
 } as const
 
 export default function SuperAdminSettingsPage() {
@@ -48,7 +48,7 @@ export default function SuperAdminSettingsPage() {
             .filter(Boolean)
         )
       } catch (e: any) {
-        setError(e?.response?.data?.message || t('errors.loadFailed'))
+        setError(resolveApiError(e, t, 'errors.loadFailed'))
       } finally {
         setLoading(false)
       }
@@ -79,17 +79,11 @@ export default function SuperAdminSettingsPage() {
       SETTING_KEYS.interviewLocationAddress,
       SETTING_KEYS.interviewLocationDirections,
       SETTING_KEYS.interviewLocationMapUrl,
-      SETTING_KEYS.atsWebhookUrl,
-      SETTING_KEYS.atsWebhookSecret,
-      SETTING_KEYS.slackWebhookUrl,
-      SETTING_KEYS.teamsWebhookUrl,
     ].forEach((k) => {
       items.push({
         key: k,
         value: values[k] || '',
-        description: k.startsWith('interview_')
-          ? t(`interview.descriptions.${k}`)
-          : t(`integrations.descriptions.${k}`),
+        description: t(`interview.descriptions.${k}`),
       })
     })
     return items
@@ -104,7 +98,7 @@ export default function SuperAdminSettingsPage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.saveFailed'))
+      setError(resolveApiError(e, t, 'errors.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -113,7 +107,6 @@ export default function SuperAdminSettingsPage() {
   const tabs = [
     { id: 'auth' as const, label: t('tabs.auth'), icon: Shield },
     { id: 'interview' as const, label: t('tabs.interview'), icon: MapPin },
-    { id: 'integrations' as const, label: t('tabs.integrations'), icon: Webhook },
   ]
 
   const inputClass =
@@ -327,58 +320,6 @@ export default function SuperAdminSettingsPage() {
               </div>
             )}
 
-            {tab === 'integrations' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-ink-900 dark:text-white">
-                    {t('integrations.title')}
-                  </h3>
-                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    {t('integrations.description')}
-                  </p>
-                </div>
-
-                {[
-                  {
-                    key: SETTING_KEYS.atsWebhookUrl,
-                    label: t('integrations.atsWebhookUrl'),
-                    placeholder: t('integrations.placeholders.atsWebhookUrl'),
-                  },
-                  {
-                    key: SETTING_KEYS.atsWebhookSecret,
-                    label: t('integrations.atsWebhookSecret'),
-                    placeholder: t('integrations.placeholders.atsWebhookSecret'),
-                    type: 'password',
-                  },
-                  {
-                    key: SETTING_KEYS.slackWebhookUrl,
-                    label: t('integrations.slackWebhookUrl'),
-                    placeholder: t('integrations.placeholders.slackWebhookUrl'),
-                  },
-                  {
-                    key: SETTING_KEYS.teamsWebhookUrl,
-                    label: t('integrations.teamsWebhookUrl'),
-                    placeholder: t('integrations.placeholders.teamsWebhookUrl'),
-                  },
-                ].map((f) => (
-                  <div key={f.key}>
-                    <label className="mb-1.5 block text-sm font-medium text-ink-600 dark:text-ink-300">
-                      {f.label}
-                    </label>
-                    <input
-                      type={f.type || 'text'}
-                      value={values[f.key] || ''}
-                      onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-                      placeholder={f.placeholder}
-                      className={inputClass}
-                    />
-                    <p className="mt-1 text-xs text-ink-400">
-                      {t(`integrations.descriptions.${f.key}`)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
           </motion.div>
         </div>
       )}

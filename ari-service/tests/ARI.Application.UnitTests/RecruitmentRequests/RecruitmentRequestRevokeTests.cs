@@ -41,7 +41,7 @@ public class RecruitmentRequestRevokeTests
                        IsActive = true, DepartmentId = Engineering.Id },
             new User { Id = _otherHmId, Email = "hm2@x.io", Role = RoleNames.HiringManager, FullName = "HM khác",
                        IsActive = true, DepartmentId = Engineering.Id },
-            new User { Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Leader", IsActive = true },
+            new User { Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Admin", IsActive = true },
             new User { Id = _recruiterId, Email = "rec@x.io", Role = RoleNames.Recruiter, FullName = "Recruiter", IsActive = true });
         return uow;
     }

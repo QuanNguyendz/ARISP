@@ -1,11 +1,11 @@
 {
   "title": "Job playbooks",
-  "description": "Documents the AI uses when interviewing for this job only — question bank, must-ask questions, expected answers, scoring rubric. Apply to the whole job or a single round, on top of the company playbooks owned by the HR Leader.",
+  "description": "Documents the AI uses when interviewing for this job only — question bank, must-ask questions, expected answers, scoring rubric. Apply to the whole job or a single round, on top of the company playbooks owned by the HR Admin.",
   "add": "Add",
   "loading": "Loading...",
   "empty": "This job has no playbook of its own — the AI uses only the JD, the CV and the company playbooks.",
   "emptyManage": "No job playbook yet. Add a question bank or must-ask questions so the AI interviews on what matters for this role.",
-  "readOnlyHint": "Only the job's primary Hiring Manager (or the HR Leader) can add or delete playbooks.",
+  "readOnlyHint": "Only the job's primary Hiring Manager (or the HR Admin) can add or delete playbooks.",
   "wholeJob": "Whole job",
   "roundLabel": "Round {{number}}",
   "orphanRound": "Rounds no longer in this job",

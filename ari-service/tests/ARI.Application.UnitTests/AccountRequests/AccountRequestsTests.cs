@@ -375,12 +375,12 @@ public class GetAccountRequestsQueryHandlerTests
         Assert.Empty(res.Value);
     }
 
-    // UTCID02 — Status=" " → pending; resolve tên người gửi "HR Leader"
+    // UTCID02 — Status=" " → pending; resolve tên người gửi "HR Admin"
     [Fact]
     public async Task UTCID02_Whitespace_status_defaults_pending_with_requester_name()
     {
         var uow = new InMemoryUnitOfWork()
-            .Seed(new User { Id = Requester, Email = "leader@example.com", FullName = "HR Leader" })
+            .Seed(new User { Id = Requester, Email = "leader@example.com", FullName = "HR Admin" })
             .Seed(Req("pending", "a@example.com"));
 
         var res = await new GetAccountRequestsQueryHandler(uow)
@@ -389,7 +389,7 @@ public class GetAccountRequestsQueryHandlerTests
         var item = Assert.Single(res.Value);
         Assert.Equal("a@example.com", item.Email);
         Assert.Equal("pending", item.Status);
-        Assert.Equal("HR Leader", item.RequestedBy);
+        Assert.Equal("HR Admin", item.RequestedBy);
     }
 
     // UTCID03 — Status=" PENDING " (trim+lower) → chỉ pending

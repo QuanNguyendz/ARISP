@@ -54,8 +54,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "User approved successfully." });
         }
@@ -72,8 +72,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.Conflict
-                    ? Conflict(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? Conflict(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             return Ok(new
@@ -102,8 +102,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "User role updated successfully." });
         }
@@ -119,8 +119,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "User department updated successfully." });
         }
@@ -132,8 +132,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "Đã khóa tài khoản." });
         }
@@ -145,8 +145,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "Đã mở khóa tài khoản." });
         }
@@ -159,8 +159,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "Đã xóa tài khoản." });
         }
@@ -196,7 +196,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new UpdateSystemSettingsCommand(items, GetActorId()), ct);
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "Đã lưu cài đặt hệ thống." });
         }
@@ -216,9 +216,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
             return Ok(new { message = "Đã duyệt yêu cầu và tạo tài khoản." });
@@ -231,8 +231,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(new { message = "Đã từ chối yêu cầu." });
         }

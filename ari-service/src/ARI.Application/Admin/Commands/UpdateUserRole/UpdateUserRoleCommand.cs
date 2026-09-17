@@ -25,18 +25,18 @@ namespace ARI.Application.Admin.Commands.UpdateUserRole
         public async Task<Result> Handle(UpdateUserRoleCommand request, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(request.Role))
-                return Result.Failure("Role is required.");
+                return Result.Failure("Vui lòng chọn vai trò.");
 
             var normalizedRole = RoleNames.NormalizeDbRole(request.Role);
             if (normalizedRole == null || !RoleNames.AssignableStaff.Contains(normalizedRole))
                 return Result.Failure($"Invalid role. Role must be one of: {string.Join(", ", RoleNames.AssignableStaff)}.");
 
             if (request.ActorId.HasValue && request.ActorId.Value == request.Id)
-                return Result.Failure("You cannot change your own role.");
+                return Result.Failure("Bạn không thể tự đổi vai trò của chính mình.");
 
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             var wasHiringManager = RoleNames.Is(user.Role, RoleNames.HiringManager);
 

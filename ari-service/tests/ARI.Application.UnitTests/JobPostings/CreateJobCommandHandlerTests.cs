@@ -155,7 +155,7 @@ public class CreateJobCommandHandlerTests
         var uow = new InMemoryUnitOfWork();
         var res = await Run(uow, Req(), Guid.NewGuid());
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found for the current token.", res.Error);
+        Assert.Equal("Không tìm thấy tài khoản của phiên đăng nhập hiện tại.", res.Error);
         Assert.Equal(CommonErrorCodes.Unauthorized, res.ErrorCode);
         Assert.Empty(uow.Repo<JobPosting>().Items);
     }
@@ -362,7 +362,7 @@ public class CreateJobCommandHandlerTests
         var res = await Run(uow, new RecordingRagIngestionService(), new RecordingNotificationService(), req, userId);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("chưa được HR Leader duyệt", res.Error);
+        Assert.Contains("chưa được HR Admin duyệt", res.Error);
         Assert.Empty(uow.Repo<JobPosting>().Items);
     }
 

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common.Security;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 
@@ -148,6 +149,48 @@ namespace ARI.Application.Scheduling
         }
 
         /// <summary>
+        /// Khoảng thời gian ứng viên thực sự <b>bận</b> vì một ca — không phải lúc nào cũng bằng khung ca.
+        ///
+        /// <b>Vòng hội thoại:</b> đúng bằng ca. Ứng viên ngồi trong phòng từ đầu tới cuối.
+        ///
+        /// <b>Vòng trắc nghiệm:</b> dài hơn ca, và đây chính là chỗ luật 2 từng thủng. Giờ hẹn thi chỉ
+        /// là lúc <i>mở cửa</i>: ứng viên còn vào được trong suốt <see cref="OnlineTestSupport.EntryWindow"/>
+        /// (1 tiếng), và người vào ở phút cuối vẫn còn nguyên đồng hồ làm bài của mình. Một ca thi khai
+        /// 09:00–10:00 với bài 30 phút nghĩa là ứng viên có thể đang làm bài tới tận 10:35 — nên xếp
+        /// buổi phỏng vấn 10:00 vẫn lọt qua phép so theo khung ca, dù trên thực tế trùng nhau.
+        ///
+        /// So với <see cref="OnlineTestSupport.SubmissionDeadline"/> chứ không tự cộng tay: đó là cùng
+        /// một mốc mà hosted service dùng để nộp bài thay, hai công thức thì sẽ có ngày lệch nhau.
+        /// </summary>
+        public static async Task<Func<AvailabilitySlot, (DateTimeOffset Start, DateTimeOffset End)>>
+            BusyWindowResolverAsync(IUnitOfWork unitOfWork, IEnumerable<AvailabilitySlot> slots, CancellationToken ct)
+        {
+            var jobIds = slots.Select(s => s.JobPostingId).Distinct().ToList();
+
+            var testRounds = (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
+                    r => jobIds.Contains(r.JobPostingId), ct))
+                .Where(r => InterviewInviteEmail.IsOnlineTest(r.RoundType))
+                .Select(r => (r.JobPostingId, r.RoundNumber))
+                .ToHashSet();
+
+            var durations = (await unitOfWork.Repository<JobPosting>().FindAsync(j => jobIds.Contains(j.Id), ct))
+                .ToDictionary(j => j.Id, j => j.OnlineTestDurationMinutes);
+
+            return slot =>
+            {
+                if (!testRounds.Contains((slot.JobPostingId, slot.RoundNumber)))
+                    return (slot.StartTime, slot.EndTime);
+
+                durations.TryGetValue(slot.JobPostingId, out var minutes);
+                var deadline = OnlineTestSupport.SubmissionDeadline(slot.StartTime, minutes);
+
+                // Không bao giờ NGẮN hơn chính khung ca: Recruiter khai ca thi dài hơn cửa vào + thời
+                // lượng thì con số họ khai mới là ý định, và rút ngắn nó đi là tự tạo lỗ thứ hai.
+                return (slot.StartTime, deadline > slot.EndTime ? deadline : slot.EndTime);
+            };
+        }
+
+        /// <summary>
         /// Các luật chống xếp lịch hỏng (ADR-067). Trả về thông báo lỗi, hoặc <c>null</c> nếu xếp được.
         ///
         /// Nằm ở ĐÂY chứ không trong từng handler vì có ba đường cùng ghi một booking — gán ca, dời
@@ -199,16 +242,31 @@ namespace ARI.Application.Scheduling
                 if (others.Count > 0)
                 {
                     var otherSlotIds = others.Select(b => b.AvailabilitySlotId).Distinct().ToList();
-                    var otherSlots = await unitOfWork.Repository<AvailabilitySlot>()
-                        .FindAsync(s => otherSlotIds.Contains(s.Id), ct);
+                    var otherSlots = (await unitOfWork.Repository<AvailabilitySlot>()
+                        .FindAsync(s => otherSlotIds.Contains(s.Id), ct)).ToList();
 
-                    var clash = otherSlots.FirstOrDefault(
-                        s => slot.StartTime < s.EndTime && s.StartTime < slot.EndTime);
+                    // So theo khoảng BẬN chứ không theo khung ca: ca thi còn kéo dài quá giờ đóng ca
+                    // (cửa vào 1 tiếng + thời lượng bài), nên hai khung ca kề nhau vẫn có thể là cùng
+                    // một lúc đối với con người đang ngồi làm bài.
+                    var busyWindow = await BusyWindowResolverAsync(
+                        unitOfWork, otherSlots.Append(slot), ct);
+                    var (myStart, myEnd) = busyWindow(slot);
+
+                    var clash = otherSlots.FirstOrDefault(s =>
+                    {
+                        var (otherStart, otherEnd) = busyWindow(s);
+                        return myStart < otherEnd && otherStart < myEnd;
+                    });
                     if (clash != null)
                     {
+                        var clashType = await RoundTypeAsync(unitOfWork, clash.JobPostingId, clash.RoundNumber, ct);
                         var when = clash.StartTime.ToOffset(TimeSpan.FromHours(7));
-                        return $"Ứng viên đã có buổi phỏng vấn khác trùng khung giờ này "
-                               + $"({when:HH:mm} ngày {when:dd/MM/yyyy} giờ VN). Hãy chọn khung giờ khác.";
+                        return $"Ứng viên đã có {InterviewInviteEmail.SessionNoun(clashType).ToLowerInvariant()} khác "
+                               + $"trùng khung giờ này ({when:HH:mm} ngày {when:dd/MM/yyyy} giờ VN)"
+                               + (InterviewInviteEmail.IsOnlineTest(clashType)
+                                   ? $" — bài thi còn mở tới {busyWindow(clash).End.ToOffset(TimeSpan.FromHours(7)):HH:mm}."
+                                   : ".")
+                               + " Hãy chọn khung giờ khác.";
                     }
                 }
             }

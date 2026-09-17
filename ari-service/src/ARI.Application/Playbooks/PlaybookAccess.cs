@@ -42,9 +42,9 @@ namespace ARI.Application.Playbooks
         };
 
         public const string ForbiddenOrg =
-            "Chỉ HR Leader hoặc Super Admin quản lý playbook cấp công ty.";
+            "Chỉ HR Admin hoặc Super Admin quản lý playbook cấp công ty.";
         public const string ForbiddenJob =
-            "Chỉ Hiring Manager chính của tin (hoặc HR Leader / Super Admin) được thêm hay xoá playbook của tin này.";
+            "Chỉ Hiring Manager chính của tin (hoặc HR Admin / Super Admin) được thêm hay xoá playbook của tin này.";
 
         /// <summary>Chuẩn hoá scope; null = không hợp lệ.</summary>
         public static string? NormalizeScope(string? scope)

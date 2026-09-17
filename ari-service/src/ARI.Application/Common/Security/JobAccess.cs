@@ -235,11 +235,11 @@ namespace ARI.Application.Common.Security
 
         /// <summary>ADR-068 — tin không có Hiring Manager chính (tin cũ chưa được gán).</summary>
         public const string HiringManagerMissing =
-            "Tin này chưa có Hiring Manager phụ trách. HR Leader cần gán Hiring Manager cho tin trước khi đi tiếp.";
+            "Tin này chưa có Hiring Manager phụ trách. HR Admin cần gán Hiring Manager cho tin trước khi đi tiếp.";
 
         /// <summary>ADR-068 — Hiring Manager chính đã bị khoá, xoá hoặc không còn vai trò Hiring Manager.</summary>
         public const string HiringManagerInactive =
-            "Hiring Manager của tin này không còn hoạt động. HR Leader cần chuyển tin cho một Hiring Manager khác.";
+            "Hiring Manager của tin này không còn hoạt động. HR Admin cần chuyển tin cho một Hiring Manager khác.";
     }
 
     /// <summary>Giá trị chuỗi của <see cref="HiringManagerState"/> trong DTO trả về cho frontend.</summary>

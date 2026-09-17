@@ -49,7 +49,7 @@ public class JobSignOffTests
 
             var result = await new UpdateJobStatusCommandHandler(
                     _uow, new RecordingFileStorage(), new RecordingJdStampService(), new StubDocumentParser(),
-                    _notif, new RecordingEmailService(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
+                    _notif, new RecordingEmailService(), TestConfig.Frontend(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
                 .Handle(cmd, cancellationToken);
             return (TResponse)(object)result;
         }
@@ -92,7 +92,7 @@ public class JobSignOffTests
     private Task<Result<JobPostingResponse>> Resubmit(InMemoryUnitOfWork uow, Guid jobId)
         => new UpdateJobStatusCommandHandler(
                 uow, new RecordingFileStorage(), new RecordingJdStampService(), new StubDocumentParser(),
-                new RecordingNotificationService(), new RecordingEmailService(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
+                new RecordingNotificationService(), new RecordingEmailService(), TestConfig.Frontend(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, new UpdateJobStatusRequest { Status = "pending" }, _ownerId, AppRoles.Recruiter),
                 CancellationToken.None);
 

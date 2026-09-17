@@ -1,13 +1,13 @@
 {
   "title": "Duyệt tài khoản mới",
-  "description": "Yêu cầu tạo tài khoản do HR Leader gửi — duyệt để tạo tài khoản hoạt động",
+  "description": "Yêu cầu tạo tài khoản do HR Admin gửi — duyệt để tạo tài khoản hoạt động",
   "by": "Yêu cầu bởi {{name}}",
   "processing": "Đang xử lý...",
   "approve": "Duyệt",
   "reject": "Từ chối",
   "empty": {
     "title": "Không có yêu cầu chờ duyệt",
-    "description": "Khi HR Leader gửi yêu cầu tạo tài khoản, chúng sẽ xuất hiện ở đây."
+    "description": "Khi HR Admin gửi yêu cầu tạo tài khoản, chúng sẽ xuất hiện ở đây."
   },
   "rejectModal": {
     "title": "Từ chối yêu cầu",

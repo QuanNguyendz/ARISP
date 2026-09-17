@@ -32,7 +32,7 @@ public class RecruitmentRequestFlowTests
             // ADR-065: HM phải được gán đội, nếu không lập phiếu bị chặn hẳn.
             new User { Id = _hmId, Email = "hm@x.io", Role = RoleNames.HiringManager, FullName = "HM", IsActive = true,
                        DepartmentId = Engineering.Id },
-            new User { Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Leader", IsActive = true },
+            new User { Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Admin", IsActive = true },
             new User { Id = _recruiterId, Email = "rec@x.io", Role = RoleNames.Recruiter, FullName = "Recruiter", IsActive = true });
         return uow;
     }
@@ -141,7 +141,7 @@ public class RecruitmentRequestFlowTests
     [Fact]
     public async Task Khong_ai_tu_duyet_duoc_phieu_cua_chinh_minh()
     {
-        // Chốt chặn này vẫn cần dù đường "HR Leader tự lập phiếu" đã bị đóng hẳn: một phiếu do
+        // Chốt chặn này vẫn cần dù đường "HR Admin tự lập phiếu" đã bị đóng hẳn: một phiếu do
         // chính người duyệt đứng tên vẫn tồn tại được — dữ liệu lập trước lúc đóng, hoặc một tài khoản
         // đổi vai từ Hiring Manager sang HR Leader. Chặn theo NGƯỜI nên cả hai trường hợp đều kín.
         var uow = Seed();
@@ -307,6 +307,57 @@ public class RecruitmentRequestFlowTests
 
         Assert.True(res.IsFailure);
         Assert.Contains("Ngày dự kiến bắt đầu", res.Error);
+    }
+
+    [Fact]
+    public async Task Ngay_du_kien_bat_dau_trong_qua_khu_thi_bi_chan()
+    {
+        var uow = Seed();
+
+        var res = await new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())
+            .Handle(new CreateRecruitmentRequestCommand(
+                Input(startDate: DateTimeOffset.UtcNow.AddMonths(-1)), _hmId, RoleNames.HiringManager),
+                CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("quá khứ", res.Error);
+        Assert.Empty(uow.Repo<RecruitmentRequest>().Items);
+    }
+
+    [Fact]
+    public async Task Sua_phieu_cung_khong_lui_duoc_ngay_bat_dau_ve_qua_khu()
+    {
+        // Cùng đường validate với lúc tạo, nhưng phải có test riêng: ca người dùng gặp là ở màn SỬA
+        // (phiếu nằm chờ vài tuần rồi mở ra), không phải lúc lập phiếu.
+        var uow = Seed();
+        var id = (await Create(uow)).Value;
+
+        var res = await new UpdateRecruitmentRequestCommandHandler(uow).Handle(
+            new UpdateRecruitmentRequestCommand(
+                id, Input(startDate: DateTimeOffset.UtcNow.AddDays(-19)), _hmId, RoleNames.HiringManager),
+            CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("quá khứ", res.Error);
+    }
+
+    [Fact]
+    public async Task Chon_dung_hom_nay_thi_van_lap_duoc_phieu()
+    {
+        // Ô `<input type="date">` gửi lên nửa đêm theo múi giờ TRÌNH DUYỆT: người ở UTC+7 chọn hôm
+        // nay thì tới máy chủ thành 17:00 hôm trước (UTC). Không có khoảng nới một ngày, luật chặn
+        // quá khứ sẽ đánh trượt đúng lựa chọn hợp lệ nhất của người dùng.
+        var uow = Seed();
+
+        var res = await new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())
+            .Handle(new CreateRecruitmentRequestCommand(
+                // Nửa đêm hôm nay ở UTC+7 = 17:00 hôm qua theo UTC. Dựng tường minh chứ không qua
+                // `DateTimeOffset.UtcNow.Date` — cái đó lấy offset của MÁY chạy test.
+                Input(startDate: new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero).AddHours(-7)),
+                _hmId, RoleNames.HiringManager),
+                CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
     }
 
     [Theory]

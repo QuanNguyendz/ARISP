@@ -6,7 +6,6 @@
   "saveSuccess": "System settings saved.",
   "tabs": {
     "auth": "Login & Email Domains",
-    "integrations": "Integrations & Webhook",
     "interview": "Interview"
   },
   "auth": {
@@ -18,7 +17,7 @@
     "infoLine2": "Leave empty = allow all domains. After passing the domain check, accounts must still be pre-provisioned in the system.",
     "placeholder": "e.g. company.com",
     "addButton": "Add",
-    "empty": "No domains yet. When empty, all email domains will be blocked from Google sign-in.",
+    "empty": "No domains yet - leaving this empty ALLOWS every email domain to sign in with Google (the account must still be pre-provisioned by a Super Admin).",
     "removeDomainAria": "Remove {{domain}}",
     "invalidDomain": "\"{{domain}}\" is not a valid domain."
   },
@@ -38,26 +37,6 @@
       "interview_location_address": "Office address printed in interview invitations",
       "interview_location_directions": "Directions printed in interview invitations",
       "interview_location_map_url": "Map link attached to interview invitations"
-    }
-  },
-  "integrations": {
-    "title": "Webhook & Integrations",
-    "description": "Configure event destinations for ATS and internal notification channels.",
-    "atsWebhookUrl": "ATS Webhook URL",
-    "atsWebhookSecret": "ATS Webhook Secret",
-    "slackWebhookUrl": "Slack Incoming Webhook",
-    "teamsWebhookUrl": "Microsoft Teams Webhook",
-    "descriptions": {
-      "atsWebhookUrl": "Webhook URL to send recruitment events to the ATS system.",
-      "atsWebhookSecret": "Secret key used to sign ATS webhook payloads.",
-      "slackWebhookUrl": "Incoming webhook to send notifications to Slack.",
-      "teamsWebhookUrl": "Incoming webhook to send notifications to Microsoft Teams."
-    },
-    "placeholders": {
-      "atsWebhookUrl": "https://ats.example.com/hooks/arisp",
-      "atsWebhookSecret": "••••••••",
-      "slackWebhookUrl": "https://hooks.slack.com/services/...",
-      "teamsWebhookUrl": "https://outlook.office.com/webhook/..."
     }
   },
   "errors": {

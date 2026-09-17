@@ -28,7 +28,7 @@ namespace ARI.Application.Admin.Commands.DeleteUser
 
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             // ADR-068: tin người này đang làm Hiring Manager chính sẽ đóng cổng — báo HR Leader chuyển HM.
             var heldJobs = await HiringManagerAlerts.OpenJobsHeldByAsync(_unitOfWork, user.Id, ct);

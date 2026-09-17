@@ -93,10 +93,10 @@
   },
   "hrFeedback": {
     "title": "HR Feedback",
-    "hrLeader": "HR Leader"
+    "hrLeader": "HR Admin"
   },
   "pendingHrReview": {
-    "title": "Results pending HR Leader confirmation",
+    "title": "Results pending HR Admin confirmation",
     "description": "AI has completed scoring for round {round}. You will receive a notification as soon as HR confirms and shares the results."
   },
   "noReport": {

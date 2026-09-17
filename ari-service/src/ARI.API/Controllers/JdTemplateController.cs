@@ -39,7 +39,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> Get(CancellationToken ct)
         {
             var result = await _sender.Send(new GetJdTemplateQuery(), ct);
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
         [HttpPut]
@@ -47,7 +47,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> Update([FromBody] UpdateJdTemplateInput input, CancellationToken ct)
         {
             var result = await _sender.Send(new UpdateJdTemplateCommand(input, _currentUser.UserId), ct);
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : NoContent();
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : NoContent();
         }
 
         [HttpPost("logo")]
@@ -68,7 +68,7 @@ namespace ARI.API.Controllers
                 new UploadCompanyLogoCommand(mem.ToArray(), file.FileName, file.ContentType, _currentUser.UserId), ct);
 
             return result.IsFailure
-                ? BadRequest(new { message = result.Error })
+                ? BadRequest(new { message = result.Error, code = result.ErrorCode })
                 : Ok(new { logoUrl = result.Value });
         }
     }

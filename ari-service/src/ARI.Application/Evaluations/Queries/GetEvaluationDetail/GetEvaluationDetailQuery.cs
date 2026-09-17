@@ -45,18 +45,18 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             }
 
             if (evaluation == null)
-                return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
+                return Result.Failure<EvaluationDetailResponse>("Không tìm thấy bản đánh giá.");
 
             // Buổi thử chỉ thuộc về ứng viên — với nhân sự nội bộ thì coi như không tồn tại (ADR-051).
             if (evaluation.SessionType == "practice")
-                return Result.Failure<EvaluationDetailResponse>("Evaluation not found.");
+                return Result.Failure<EvaluationDetailResponse>("Không tìm thấy bản đánh giá.");
 
             var (application, job, level) = await JobAccess.EvaluateApplicationAsync(
                 _unitOfWork, evaluation.ApplicationId, request.UserId, request.Role, ct);
             if (application == null)
-                return Result.Failure<EvaluationDetailResponse>("Application associated with this evaluation was not found.");
+                return Result.Failure<EvaluationDetailResponse>("Không tìm thấy hồ sơ ứng tuyển của bản đánh giá này.");
             if (job == null)
-                return Result.Failure<EvaluationDetailResponse>("Job posting associated with this evaluation was not found.");
+                return Result.Failure<EvaluationDetailResponse>("Không tìm thấy tin tuyển dụng của bản đánh giá này.");
             if (level < JobAccessLevel.TeamMember)
                 return Result.Failure<EvaluationDetailResponse>(JobAccessErrors.EvaluationForbidden, CommonErrorCodes.Forbidden);
 

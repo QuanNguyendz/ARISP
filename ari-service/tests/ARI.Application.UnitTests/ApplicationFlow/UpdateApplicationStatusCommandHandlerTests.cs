@@ -59,12 +59,12 @@ public class UpdateApplicationStatusCommandHandlerTests
     [Fact]
     public async Task UTCID02_Not_found_failure_passthrough()
     {
-        var svc = new StubApplicationService { UpdateResult = Result.Failure<ApplicationResponse>("Application not found.") };
+        var svc = new StubApplicationService { UpdateResult = Result.Failure<ApplicationResponse>("Không tìm thấy hồ sơ ứng tuyển.") };
 
         var res = await Handler(svc, Seeded()).Handle(Cmd("interview"), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Application not found.", res.Error);
+        Assert.Equal("Không tìm thấy hồ sơ ứng tuyển.", res.Error);
     }
 
     // UTCID03 — Status rỗng; service trả validation failure → trả nguyên

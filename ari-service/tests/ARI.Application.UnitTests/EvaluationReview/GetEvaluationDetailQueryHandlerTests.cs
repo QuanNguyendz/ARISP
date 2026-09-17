@@ -32,7 +32,7 @@ public class GetEvaluationDetailQueryHandlerTests
         var res = await Run(new InMemoryUnitOfWork(), Guid.NewGuid());
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Evaluation not found", res.Error);
+        Assert.Contains("Không tìm thấy bản đánh giá", res.Error);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class GetEvaluationDetailQueryHandlerTests
         var res = await Run(uow, eval.Id);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Evaluation not found", res.Error); // ẩn buổi thử khỏi HR
+        Assert.Contains("Không tìm thấy bản đánh giá", res.Error); // ẩn buổi thử khỏi HR
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class GetEvaluationDetailQueryHandlerTests
         var res = await Run(uow, eval.Id);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Application associated", res.Error);
+        Assert.Contains("hồ sơ ứng tuyển của bản đánh giá", res.Error);
     }
 
     [Fact]

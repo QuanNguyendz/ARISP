@@ -25,6 +25,7 @@ import { CardGridSkeleton } from './_skeletons'
 import { playbookService, isRubricDocType } from '@/fservices/playbook/playbookService'
 import type { PlaybookItem } from '@/fservices/playbook/playbookService'
 import jobService from '@ari/shared/fservices/job'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Playbook của HR Leader (ADR-025 · ADR-069).
@@ -93,7 +94,7 @@ export default function HrPlaybooksPage() {
       setDocs(items)
       setJobTitles(Object.fromEntries(jobs.map((j) => [j.id, j.title])))
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('loadingError'))
+      setError(resolveApiError(e, t, 'loadingError'))
     } finally {
       setLoading(false)
     }
@@ -125,7 +126,7 @@ export default function HrPlaybooksPage() {
       await playbookService.deletePlaybook(id)
       setDocs((prev) => prev.filter((d) => d.id !== id))
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('deleteError'))
+      setError(resolveApiError(e, t, 'deleteError'))
     } finally {
       setDeletingId(null)
     }
@@ -341,7 +342,7 @@ function UploadModal({
       const doc = await playbookService.uploadPlaybook({ file, scope: 'org', documentType })
       onUploaded(doc)
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('uploadError'))
+      setError(resolveApiError(e, t, 'uploadError'))
     } finally {
       setSubmitting(false)
     }

@@ -11,6 +11,7 @@ using ARI.Application.Interfaces;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace ARI.Application.Jobs.Commands.UpdateJobStatus
@@ -36,6 +37,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
         private readonly IDocumentParserService _documentParser;
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<UpdateJobStatusCommandHandler> _logger;
 
         public UpdateJobStatusCommandHandler(
@@ -45,6 +47,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             IDocumentParserService documentParser,
             INotificationService notificationService,
             IEmailService emailService,
+            IConfiguration configuration,
             ILogger<UpdateJobStatusCommandHandler> logger)
         {
             _unitOfWork = unitOfWork;
@@ -53,6 +56,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             _documentParser = documentParser;
             _notificationService = notificationService;
             _emailService = emailService;
+            _configuration = configuration;
             _logger = logger;
         }
 
@@ -62,7 +66,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             var userId = command.UserId;
 
             if (string.IsNullOrWhiteSpace(request.Status))
-                return Result.Failure<JobPostingResponse>("Status is required.");
+                return Result.Failure<JobPostingResponse>("Vui lòng chọn trạng thái.");
 
             var targetStatus = request.Status.Trim().ToLowerInvariant();
             var allowedStatuses = new[] { "draft", "pending", "active", "rejected", "closed", "archived" };
@@ -75,7 +79,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(command.Id, ct);
             if (job == null)
-                return Result.Failure<JobPostingResponse>("Job posting not found.", CommonErrorCodes.NotFound);
+                return Result.Failure<JobPostingResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
             var currentStatus = job.Status?.Trim().ToLowerInvariant();
 
@@ -226,7 +230,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                     var approver = await _unitOfWork.Repository<User>().GetByIdAsync(userId, ct);
                     var approverName = approver != null
                         ? (string.IsNullOrWhiteSpace(approver.FullName) ? approver.Email : approver.FullName)
-                        : "HR Leader";
+                        : "HR Admin";
 
                     job.ApprovedByUserId = userId;
                     job.ApprovedAt = DateTimeOffset.UtcNow;
@@ -462,6 +466,12 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
 
             // Link tới trang chi tiết tin theo workspace của người tạo.
             var link = StaffLinks.Job(creator.Role, job.Id);
+
+            // Gốc URL của cổng nhân sự theo ĐÚNG môi trường đang chạy. Hai lá thư dưới đây từng ghi
+            // cứng `http://localhost:3001` — trên production nút bấm dẫn về máy người nhận, không lỗi,
+            // không log, chỉ là một trang không mở được. Chuông trong ứng dụng dùng `link` tương đối
+            // nên vẫn đúng; chỉ thư điện tử mới cần gốc tuyệt đối (xem `FrontendUrls`).
+            var staffBaseUrl = FrontendUrls.Staff(_configuration);
             var now = DateTimeOffset.UtcNow;
 
             var creatorSettings = !string.IsNullOrEmpty(creator.SettingsJson)
@@ -499,7 +509,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             <p style='color: #475569; font-size: 15px;'>Xin chào <strong>{creator.FullName ?? creator.Email}</strong>,</p>
             <p style='color: #475569; font-size: 15px;'>Tin tuyển dụng <strong>{job.Title}</strong> của bạn đã được <strong>{reviewerName}</strong> phê duyệt và đăng công khai trên Job Board.</p>
             <div style='text-align: center; margin: 28px 0;'>
-                <a href='http://localhost:3001{link}' style='background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem tin tuyển dụng</a>
+                <a href='{staffBaseUrl}{link}' style='background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xem tin tuyển dụng</a>
             </div>
             <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
             <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ HR ARISP.</p>
@@ -513,7 +523,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             </div>
             <p style='color: #475569; font-size: 15px;'>Vui lòng kiểm tra và cập nhật lại thông tin bài đăng:</p>
             <div style='text-align: center; margin: 28px 0;'>
-                <a href='http://localhost:3001{link}' style='background-color: #dc2626; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Chỉnh sửa tin tuyển dụng</a>
+                <a href='{staffBaseUrl}{link}' style='background-color: #dc2626; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Chỉnh sửa tin tuyển dụng</a>
             </div>
             <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' />
             <p style='color: #94a3b8; font-size: 13px; margin: 0;'>Thư điện tử tự động từ Đội ngũ HR ARISP.</p>

@@ -26,7 +26,7 @@ public class UpdateUserRoleCommandHandlerTests
     private static User TargetUser(string role = "recruiter")
         => new() { Id = UserId, Email = "user@example.com", Role = role, FullName = "Target User", IsActive = true };
 
-    // UTCID01 — Role=null → "Role is required." (Boundary)
+    // UTCID01 — Role=null → "Vui lòng chọn vai trò." (Boundary)
     [Fact]
     public async Task UTCID01_Null_role_is_required()
     {
@@ -35,12 +35,12 @@ public class UpdateUserRoleCommandHandlerTests
         var res = await Handler(uow).Handle(new UpdateUserRoleCommand(UserId, null, ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Role is required.", res.Error);
+        Assert.Equal("Vui lòng chọn vai trò.", res.Error);
         Assert.Null(res.ErrorCode);
         Assert.Equal(0, uow.SaveChangesCount);
     }
 
-    // UTCID02 — Role="   " (whitespace) → "Role is required." (Boundary)
+    // UTCID02 — Role="   " (whitespace) → "Vui lòng chọn vai trò." (Boundary)
     [Fact]
     public async Task UTCID02_Whitespace_role_is_required()
     {
@@ -49,7 +49,7 @@ public class UpdateUserRoleCommandHandlerTests
         var res = await Handler(uow).Handle(new UpdateUserRoleCommand(UserId, "   ", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Role is required.", res.Error);
+        Assert.Equal("Vui lòng chọn vai trò.", res.Error);
         Assert.Null(res.ErrorCode);
     }
 
@@ -79,7 +79,7 @@ public class UpdateUserRoleCommandHandlerTests
         var res = await Handler(uow).Handle(new UpdateUserRoleCommand(ActorA, "recruiter", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("You cannot change your own role.", res.Error);
+        Assert.Equal("Bạn không thể tự đổi vai trò của chính mình.", res.Error);
         Assert.Null(res.ErrorCode);
     }
 
@@ -92,7 +92,7 @@ public class UpdateUserRoleCommandHandlerTests
         var res = await Handler(uow).Handle(new UpdateUserRoleCommand(UserId, "recruiter", ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found.", res.Error);
+        Assert.Equal("Không tìm thấy người dùng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 

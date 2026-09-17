@@ -45,7 +45,7 @@ namespace ARI.Application.RecruitmentRequests
                 return (null, "Không tìm thấy phiếu yêu cầu tuyển dụng.", CommonErrorCodes.NotFound);
 
             if (!RecruitmentRequestStatus.Is(request.Status, RecruitmentRequestStatus.Approved))
-                return (null, "Phiếu yêu cầu tuyển dụng này chưa được HR Leader duyệt.", null);
+                return (null, "Phiếu yêu cầu tuyển dụng này chưa được HR Admin duyệt.", null);
 
             if (!CanExecute(request, actorId, actorRole))
                 return (null, "Phiếu này được phân công cho Recruiter khác.", CommonErrorCodes.Forbidden);

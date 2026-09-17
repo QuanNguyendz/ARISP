@@ -12,10 +12,34 @@ export interface RegisterRequest {
 
 const USE_FAKE_AUTH = import.meta.env.VITE_ENABLE_FAKE_AUTH === 'true'
 
+/**
+ * Lỗi HTTP có mang theo MÃ và TRẠNG THÁI, để `resolveApiError` dịch được sang ngôn ngữ giao diện.
+ *
+ * `fetch` không dựng sẵn hình dạng lỗi như axios, nên trước đây cả thân lỗi bị nén xuống một chuỗi
+ * `Error.message` — mã lỗi biến mất trên đường đi, và khi server không gửi `message` thì thứ hiện ra
+ * màn hình là đúng hai chữ "HTTP 500". Giữ nguyên `message` cho code cũ đang đọc `err.message`, và
+ * gắn thêm `code`/`response` cho đường mới.
+ */
+export interface ApiHttpError extends Error {
+  code?: string
+  response: { status: number; data: unknown }
+}
+
+function buildHttpError(status: number, data: unknown): ApiHttpError {
+  const body = (typeof data === 'object' && data !== null ? data : {}) as {
+    message?: string
+    code?: string
+  }
+  const error = new Error(body.message || `HTTP ${status}`) as ApiHttpError
+  if (body.code) error.code = body.code
+  error.response = { status, data }
+  return error
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || `HTTP ${response.status}`)
+    const data = await response.json().catch(() => ({}))
+    throw buildHttpError(response.status, data)
   }
   return response.json()
 }
@@ -77,10 +101,7 @@ export const authService = {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-      const err = new Error(error.message || `HTTP ${response.status}`) as Error & { code?: string }
-      if (error.code) err.code = error.code
-      throw err
+      throw buildHttpError(response.status, await response.json().catch(() => ({})))
     }
 
     return response.json() as Promise<AuthResponse>

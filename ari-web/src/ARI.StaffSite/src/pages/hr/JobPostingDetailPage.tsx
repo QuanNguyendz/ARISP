@@ -37,6 +37,7 @@ import { appStatusLabel } from '../recruiter/_jobUi'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Trạng thái mà nút Duyệt / Loại ở vòng CV còn thao tác được — giống hệt màn Recruiter.
@@ -223,7 +224,7 @@ export default function JobPostingDetailPage() {
       await loadApps()
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } }
-      setActionError(e?.response?.data?.message || t('errors.acceptApplication'))
+      setActionError(resolveApiError(e, t, 'errors.acceptApplication'))
     } finally {
       setProcessingAppId(null)
     }
@@ -271,7 +272,7 @@ export default function JobPostingDetailPage() {
       // Ưu tiên thông báo của server: nó nói rõ vì sao không duyệt được (vd ngân hàng đề trắc
       // nghiệm chưa đủ câu), còn chuỗi mặc định chỉ nói "duyệt thất bại".
       const e = err as { response?: { data?: { message?: string } } }
-      setActionError(e?.response?.data?.message || t('errors.approveJob'))
+      setActionError(resolveApiError(e, t, 'errors.approveJob'))
     } finally {
       setBusy(false)
     }
@@ -632,7 +633,7 @@ export default function JobPostingDetailPage() {
           <div className="mb-6 flex items-center gap-2 rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-400">
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>
-              {t('approvedBanner.label')} <b>{job.approverName || 'HR Leader'}</b>{' '}
+              {t('approvedBanner.label')} <b>{job.approverName || 'HR Admin'}</b>{' '}
               {t('approvedBanner.at')} {formatDateTime24(job.approvedAt)}.
             </span>
           </div>

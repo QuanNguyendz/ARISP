@@ -38,10 +38,10 @@ namespace ARI.API.Controllers
         {
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
 
@@ -55,7 +55,7 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new GenerateInterviewCodeCommand(request.ApplicationId, request.RoundNumber, GetCurrentUserId()), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             return Ok(new
@@ -76,7 +76,7 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new GenerateInterviewCodeBatchCommand(request.ApplicationIds, request.RoundNumber, GetCurrentUserId()), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             // Map định dạng trả về mảng danh sách: [ { code, applicationId }, ... ]
@@ -275,7 +275,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> StartSession([FromBody] StartSessionRequest request)
         {
             var result = await _sender.Send(new StartInterviewSessionCommand(request));
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -290,7 +290,7 @@ namespace ARI.API.Controllers
             if (!IsAuthorizedForSession(id)) return Forbid();
             var (accountId, email) = GetCandidateIdentity();
             var result = await _sender.Send(new GetMediaConfigQuery(id, accountId, email, IsKioskSession(id)), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -305,7 +305,7 @@ namespace ARI.API.Controllers
             if (!IsAuthorizedForSession(id)) return Forbid();
             var (accountId, email) = GetCandidateIdentity();
             var result = await _sender.Send(new SynthesizeSpeechCommand(id, request?.Text ?? string.Empty, accountId, email, IsKioskSession(id)), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { audio = result.Value });
         }
 
@@ -315,7 +315,7 @@ namespace ARI.API.Controllers
         {
             if (!IsAuthorizedForSession(id)) return Forbid();
             var result = await _sender.Send(new SubmitAnswerCommand(id, request.QuestionId, request.Transcript, request.ResponseTimeMs));
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -325,7 +325,7 @@ namespace ARI.API.Controllers
         {
             if (!IsAuthorizedForSession(id)) return Forbid();
             var result = await _sender.Send(new EndInterviewSessionCommand(id, status));
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { success = true });
         }
 
@@ -342,7 +342,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new ReportCheatSignalCommand(
                 id, request?.SignalType ?? string.Empty, request?.Payload), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { count = result.Value });
         }
 
@@ -365,7 +365,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new UploadRecordingCommand(
                 id, ms.ToArray(), file.FileName, file.ContentType ?? "video/webm"), ct);
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -386,7 +386,7 @@ namespace ARI.API.Controllers
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
             var result = await _sender.Send(new ConfirmHrReviewCommand(userId, request));
-            if (result.IsFailure) return BadRequest(new { message = result.Error });
+            if (result.IsFailure) return BadRequest(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { success = true });
         }
 
