@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, Check, Loader2, X } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
 import type { OnlineTestAnswerSheet } from '@ari/shared/types/onlineTest'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Bài làm chi tiết của một ứng viên ở vòng trắc nghiệm.
@@ -37,7 +38,7 @@ export default function OnlineTestAnswerSheetModal({ applicationId, candidateNam
         if (alive) setSheet(data)
       } catch (e) {
         const x = e as { response?: { data?: { message?: string } } }
-        if (alive) setError(x?.response?.data?.message || t('answerSheet.loadError'))
+        if (alive) setError(resolveApiError(x, t, 'answerSheet.loadError'))
       } finally {
         if (alive) setLoading(false)
       }

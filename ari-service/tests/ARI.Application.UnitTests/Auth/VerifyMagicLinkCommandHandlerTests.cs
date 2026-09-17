@@ -50,7 +50,7 @@ public class VerifyMagicLinkCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email));
         var res = await Handler(uow, new FakeTokenService()).Handle(Cmd(email: " "), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Candidate account not found.", res.Error);
+        Assert.Equal("Không tìm thấy tài khoản ứng viên.", res.Error);
         Assert.Equal(AuthErrorCodes.NotFound, res.ErrorCode);
     }
 

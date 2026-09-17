@@ -18,6 +18,7 @@ import { RescheduleModal } from './RescheduleModal'
 import { canReschedule, declineReasonLabelKey, isRejected, stateOf } from './candidateState'
 import { fmtDur, initials } from './format'
 import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 export function CandidateRow({
   c,
@@ -60,7 +61,7 @@ export function CandidateRow({
       onReload()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(err?.response?.data?.message || t('candidate.genCodeError'))
+      setToast(resolveApiError(err, t, 'candidate.genCodeError'))
       setTimeout(() => setToast(null), 3000)
     } finally {
       setGeneratingCode(false)
@@ -84,7 +85,7 @@ export function CandidateRow({
       setToast(res.message || t('candidate.remindSuccess'))
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(err?.response?.data?.message || t('candidate.remindError'))
+      setToast(resolveApiError(err, t, 'candidate.remindError'))
     } finally {
       setSendingReminder(false)
       setTimeout(() => setToast(null), 3000)

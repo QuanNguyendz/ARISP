@@ -31,6 +31,7 @@ import CriterionBar from '@components/CriterionBar'
 import { formatDate, formatDuration, langLevel } from './_reportUi'
 import { formatTime24, HOUR_CYCLE_24 } from '@ari/shared/utils/time24'
 import type { MyApplicationDetail, MyApplicationSession } from '@ari/shared/types/application'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Bài trắc nghiệm đã hết hạn mà ứng viên không vào làm.
@@ -672,7 +673,7 @@ export default function ApplicationDetailPage() {
       })
       .catch(
         (err: any) =>
-          active && setError(err?.response?.data?.message || err?.message || t('loadError'))
+          active && setError(resolveApiError(err, t, 'loadError'))
       )
       .finally(() => active && setLoading(false))
 

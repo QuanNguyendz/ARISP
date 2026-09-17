@@ -439,6 +439,60 @@ public class SlotConflictRulesTests
     }
 
     [Fact]
+    public async Task Ca_thi_chan_buoi_phong_van_ngay_SAU_khi_ca_thi_ket_thuc()
+    {
+        // Giờ hẹn thi chỉ là lúc MỞ CỬA: ứng viên còn vào được suốt 1 tiếng sau đó, và người vào ở
+        // phút cuối vẫn còn nguyên đồng hồ làm bài. Ca thi 09:00–10:00 với bài 30 phút nghĩa là có
+        // thể đang làm bài tới ~10:35 — nên buổi phỏng vấn 10:00 KHÔNG xếp được, dù hai khung ca chỉ
+        // chạm nhau chứ không chồng lấn. So theo khung ca là đúng chỗ luật 2 từng thủng.
+        var uow = new InMemoryUnitOfWork();
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var job = SchedulingData.Job(owner: _staffId);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+
+        var testSlot = SchedulingData.Slot(job.Id, round: 3, capacity: 5, start: start);
+        var interviewSlot = SchedulingData.Slot(job.Id, round: 1, start: start.AddHours(1));
+
+        uow.Seed(job).Seed(app).Seed(testSlot).Seed(interviewSlot);
+        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" });
+        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 3, RoundType = "online_test" });
+        WithHiringManager(uow, job.Id, start, start.AddHours(6));
+        _ = new SlotSqlEmulator(uow);
+
+        Assert.True((await Assign(uow, app.Id, testSlot.Id, round: 3)).IsSuccess);
+
+        var res = await Assign(uow, app.Id, interviewSlot.Id, round: 1);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("trùng khung giờ", res.Error);
+        Assert.Contains("bài thi còn mở tới", res.Error); // nói rõ vì sao hai ca không chồng nhau lại xung đột
+    }
+
+    [Fact]
+    public async Task Buoi_phong_van_xong_han_thi_van_xep_duoc_ca_thi_sau_do()
+    {
+        // Mặt kia của cùng một luật: nới khoảng bận của bài thi không được biến thành "cấm cả ngày".
+        // Ca phỏng vấn 09:00–10:00 rồi ca thi 11:00 thì không ai bận hai chỗ.
+        var uow = new InMemoryUnitOfWork();
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var job = SchedulingData.Job(owner: _staffId);
+        var app = SchedulingData.Application(job.Id, Guid.NewGuid());
+
+        var interviewSlot = SchedulingData.Slot(job.Id, round: 1, start: start);
+        var testSlot = SchedulingData.Slot(job.Id, round: 3, capacity: 5, start: start.AddHours(2));
+
+        uow.Seed(job).Seed(app).Seed(interviewSlot).Seed(testSlot);
+        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" });
+        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 3, RoundType = "online_test" });
+        WithHiringManager(uow, job.Id, start, start.AddHours(6));
+        _ = new SlotSqlEmulator(uow);
+
+        Assert.True((await Assign(uow, app.Id, interviewSlot.Id, round: 1)).IsSuccess);
+
+        Assert.True((await Assign(uow, app.Id, testSlot.Id, round: 3)).IsSuccess);
+    }
+
+    [Fact]
     public async Task Khung_gio_cua_VONG_KHAC_khong_dung_cho_vong_nay()
     {
         // HM dự buổi thật của từng vòng, mà các vòng cách nhau nhiều ngày — một danh sách rảnh dùng

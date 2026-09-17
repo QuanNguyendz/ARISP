@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
 import PasswordToggle from '@ari/shared/ui/PasswordToggle'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 // Quy tắc mật khẩu mirror theo backend (AuthController.IsValidCandidatePassword)
 const SPECIAL_CHARS = '!@#$%^&*'
@@ -137,7 +138,7 @@ export default function ResetPasswordPage() {
       await (isStaff ? authService.staffResetPassword(payload) : authService.resetPassword(payload))
       setDone(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('resetPassword.serverError'))
+      setError(resolveApiError(err, t, 'resetPassword.serverError'))
     } finally {
       setLoading(false)
     }

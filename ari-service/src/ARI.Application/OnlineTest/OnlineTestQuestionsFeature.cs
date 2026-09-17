@@ -76,6 +76,13 @@ namespace ARI.Application.OnlineTest
             if (job == null) return Result.Failure<OnlineTestQuestionDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
             if (!ok) return Result.Failure<OnlineTestQuestionDto>("Bạn không có quyền thêm câu hỏi cho tin này.", CommonErrorCodes.Forbidden);
 
+            // Cùng luật chống trùng với đường nhập Excel. Chặn ở CẢ HAI cửa ghi chứ không riêng cửa
+            // nhập file: một ngân hàng sạch mà thêm tay vẫn nhân bản được thì luật kia chỉ dọn được
+            // một nửa, và bản sao thêm tay khó thấy hơn hẳn vì không có bảng kết quả nào báo lại.
+            var existing = await OnlineTestSupport.ExistingQuestionKeysAsync(_unitOfWork, command.JobPostingId, ct);
+            if (existing.Contains(OnlineTestSupport.DuplicateKey(command.Request.QuestionText)))
+                return Result.Failure<OnlineTestQuestionDto>(OnlineTestSupport.DuplicateMessage, "duplicate_question");
+
             var correct = NormalizeCorrect(command.Request);
             var entity = new OnlineTestQuestion
             {
@@ -145,6 +152,13 @@ namespace ARI.Application.OnlineTest
 
             var (ok, _) = await OnlineTestSupport.CanManageAsync(_unitOfWork, entity.JobPostingId, command.UserId, command.Role, ct);
             if (!ok) return Result.Failure<OnlineTestQuestionDto>("Bạn không có quyền sửa câu hỏi này.", CommonErrorCodes.Forbidden);
+
+            // Loại chính câu đang sửa ra khỏi phép so — không thì chỉ sửa phương án mà giữ nguyên đề
+            // bài đã bị chặn vì "trùng với chính mình".
+            var existing = await OnlineTestSupport.ExistingQuestionKeysAsync(
+                _unitOfWork, entity.JobPostingId, ct, excludeId: entity.Id);
+            if (existing.Contains(OnlineTestSupport.DuplicateKey(command.Request.QuestionText)))
+                return Result.Failure<OnlineTestQuestionDto>(OnlineTestSupport.DuplicateMessage, "duplicate_question");
 
             var correct = CreateOnlineTestQuestionCommandHandler.NormalizeCorrect(command.Request);
             entity.QuestionText = command.Request.QuestionText.Trim();

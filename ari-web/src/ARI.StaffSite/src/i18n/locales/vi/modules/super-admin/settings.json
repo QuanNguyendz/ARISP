@@ -6,7 +6,6 @@
   "saveSuccess": "Đã lưu cài đặt hệ thống.",
   "tabs": {
     "auth": "Đăng nhập & miền email",
-    "integrations": "Tích hợp & Webhook",
     "interview": "Phỏng vấn"
   },
   "auth": {
@@ -18,7 +17,7 @@
     "infoLine2": "Để trống = cho phép mọi miền. Sau khi qua cửa miền, tài khoản vẫn phải được cấp trước trong hệ thống.",
     "placeholder": "vd: congty.com",
     "addButton": "Thêm",
-    "empty": "Chưa có miền nào. Khi trống, mọi miền email sẽ bị chặn đăng nhập qua Google.",
+    "empty": "Chưa có miền nào — để trống nghĩa là CHO PHÉP mọi miền email đăng nhập qua Google (tài khoản vẫn phải được Super Admin cấp trước).",
     "removeDomainAria": "Xóa {{domain}}",
     "invalidDomain": "\"{{domain}}\" không phải miền hợp lệ."
   },
@@ -38,26 +37,6 @@
       "interview_location_address": "Địa chỉ văn phòng in trong thư mời phỏng vấn",
       "interview_location_directions": "Chỉ dẫn đường đi in trong thư mời phỏng vấn",
       "interview_location_map_url": "Link bản đồ đính kèm trong thư mời phỏng vấn"
-    }
-  },
-  "integrations": {
-    "title": "Webhook & tích hợp",
-    "description": "Cấu hình điểm gửi sự kiện tới ATS và kênh thông báo nội bộ.",
-    "atsWebhookUrl": "ATS Webhook URL",
-    "atsWebhookSecret": "ATS Webhook Secret",
-    "slackWebhookUrl": "Slack Incoming Webhook",
-    "teamsWebhookUrl": "Microsoft Teams Webhook",
-    "descriptions": {
-      "atsWebhookUrl": "URL webhook gửi sự kiện tuyển dụng sang hệ thống ATS.",
-      "atsWebhookSecret": "Khóa bí mật ký payload webhook ATS.",
-      "slackWebhookUrl": "Incoming webhook để gửi thông báo tới Slack.",
-      "teamsWebhookUrl": "Incoming webhook để gửi thông báo tới Microsoft Teams."
-    },
-    "placeholders": {
-      "atsWebhookUrl": "https://ats.example.com/hooks/arisp",
-      "atsWebhookSecret": "••••••••",
-      "slackWebhookUrl": "https://hooks.slack.com/services/...",
-      "teamsWebhookUrl": "https://outlook.office.com/webhook/..."
     }
   },
   "errors": {

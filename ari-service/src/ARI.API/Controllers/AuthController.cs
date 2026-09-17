@@ -66,7 +66,7 @@ namespace ARI.API.Controllers
                     // trước đây nhánh này là nhánh DUY NHẤT không trả code nên FE không phân biệt được.
                     AuthErrorCodes.PasswordlessGoogle => BadRequest(new { message = result.Error, code = "passwordless_google" }),
                     AuthErrorCodes.EmailNotVerified => StatusCode(403, new { message = result.Error, code = "email_not_verified" }),
-                    _ => Unauthorized(new { message = result.Error }),
+                    _ => Unauthorized(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
             return Ok(result.Value);
@@ -89,9 +89,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    AuthErrorCodes.InvalidCredentials or AuthErrorCodes.AccountDisabled => Unauthorized(new { message = result.Error }),
+                    AuthErrorCodes.InvalidCredentials or AuthErrorCodes.AccountDisabled => Unauthorized(new { message = result.Error, code = result.ErrorCode }),
                     // SsoOnly + lỗi validation (không có ErrorCode) → 400 như cũ
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
             return Ok(result.Value);
@@ -248,8 +248,8 @@ namespace ARI.API.Controllers
             {
                 // Lỗi validation (thiếu token, không có ErrorCode) → 400; token sai/hết hạn → 401
                 return result.ErrorCode is null
-                    ? BadRequest(new { message = result.Error })
-                    : Unauthorized(new { message = result.Error });
+                    ? BadRequest(new { message = result.Error, code = result.ErrorCode })
+                    : Unauthorized(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(result.Value);
         }
@@ -265,8 +265,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode is null
-                    ? BadRequest(new { message = result.Error })
-                    : Unauthorized(new { message = result.Error });
+                    ? BadRequest(new { message = result.Error, code = result.ErrorCode })
+                    : Unauthorized(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(result.Value);
         }
@@ -322,7 +322,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new RegisterCandidateCommand(request.Email, request.Password, request.FullName, request.Phone));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản." });
         }
@@ -340,7 +340,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new VerifyCandidateEmailCommand(email, token));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = result.Value });
         }
@@ -355,7 +355,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new ResendCandidateVerificationCommand(request.Email));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "Nếu tài khoản tồn tại và chưa xác minh, email xác minh đã được gửi lại." });
         }
@@ -375,8 +375,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == AuthErrorCodes.NotFound
-                    ? NotFound(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? NotFound(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             return Ok(new
@@ -399,7 +399,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new CandidateForgotPasswordCommand(request.Email));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
         }
@@ -413,7 +413,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new CandidateResetPasswordCommand(request.Email, request.Token, request.NewPassword));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
         }
@@ -427,7 +427,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new StaffForgotPasswordCommand(request.Email));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
         }
@@ -441,7 +441,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new StaffResetPasswordCommand(request.Email, request.Token, request.NewPassword));
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { message = "Password has been reset successfully. You can now login with your new password." });
         }

@@ -56,6 +56,13 @@
     "cancel": "Hủy",
     "confirm": "Khóa tài khoản"
   },
+  "roleModal": {
+    "title": "Đổi vai trò",
+    "description": "Xác nhận đổi vai trò của \"{{name}}\". Thao tác được ghi vào Audit Log.",
+    "hiringManagerWarning": "Người này đang là Hiring Manager. Thôi vai trò sẽ làm MỌI tin họ phụ trách đóng cổng duyệt cho tới khi HR Admin chuyển Hiring Manager sang người khác.",
+    "cancel": "Hủy",
+    "confirm": "Đổi vai trò"
+  },
   "createModal": {
     "title": "Tạo tài khoản staff",
     "description": "Mật khẩu tạm sẽ được gửi qua email cho nhân viên.",

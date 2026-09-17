@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Mail, KeyRound, MailCheck, Clock, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 const RESEND_COOLDOWN = 30
 
@@ -99,7 +100,7 @@ export default function ForgotPasswordPage() {
       setSent(true)
       startCooldown()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('forgotPassword.sendError'))
+      setError(resolveApiError(err, t, 'forgotPassword.sendError'))
     } finally {
       setLoading(false)
     }

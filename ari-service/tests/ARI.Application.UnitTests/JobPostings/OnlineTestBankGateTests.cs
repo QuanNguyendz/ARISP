@@ -26,7 +26,7 @@ public class OnlineTestBankGateTests
         return new UpdateJobStatusCommandHandler(
                 uow, new RecordingFileStorage(), new RecordingJdStampService(), new StubDocumentParser(),
                 new RecordingNotificationService(), new RecordingEmailService(),
-                NullLogger<UpdateJobStatusCommandHandler>.Instance)
+                TestConfig.Frontend(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, JobPostingData.StatusRequest(status), userId, role), CancellationToken.None);
     }
 

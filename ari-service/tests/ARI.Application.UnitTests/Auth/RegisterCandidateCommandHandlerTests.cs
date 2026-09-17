@@ -90,7 +90,7 @@ public class RegisterCandidateCommandHandlerTests
         Assert.Single(uow.Repo<CandidateAccount>().Items);
     }
 
-    // UTCID05 — email đã đăng ký → "Email already registered."
+    // UTCID05 — email đã đăng ký → "Email này đã được đăng ký."
     [Fact]
     public async Task UTCID05_Duplicate_email()
     {
@@ -100,13 +100,13 @@ public class RegisterCandidateCommandHandlerTests
         var res = await Handler(uow, new FakePasswordHasher(), email).Handle(Cmd(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Email already registered.", res.Error);
+        Assert.Equal("Email này đã được đăng ký.", res.Error);
         Assert.Single(uow.Repo<CandidateAccount>().Items);
         Assert.Empty(email.Items);
         Assert.Equal(0, uow.SaveChangesCount);
     }
 
-    // UTCID06 — email trùng sau chuẩn hoá → "Email already registered."
+    // UTCID06 — email trùng sau chuẩn hoá → "Email này đã được đăng ký."
     [Fact]
     public async Task UTCID06_Normalized_duplicate_email()
     {
@@ -116,7 +116,7 @@ public class RegisterCandidateCommandHandlerTests
             .Handle(Cmd(email: " CANDIDATE@EXAMPLE.COM ", phone: null), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Email already registered.", res.Error);
+        Assert.Equal("Email này đã được đăng ký.", res.Error);
     }
 
     // UTCID07 — mật khẩu < 8 ký tự

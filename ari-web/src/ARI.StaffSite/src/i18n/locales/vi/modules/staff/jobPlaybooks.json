@@ -1,11 +1,11 @@
 {
   "title": "Playbook của tin",
-  "description": "Tài liệu AI dùng khi phỏng vấn cho riêng tin này — ngân hàng câu hỏi, câu bắt buộc hỏi, đáp án tham khảo, bộ tiêu chí chấm. Áp cho cả tin hoặc cho từng vòng, cộng thêm playbook cấp công ty của HR Leader.",
+  "description": "Tài liệu AI dùng khi phỏng vấn cho riêng tin này — ngân hàng câu hỏi, câu bắt buộc hỏi, đáp án tham khảo, bộ tiêu chí chấm. Áp cho cả tin hoặc cho từng vòng, cộng thêm playbook cấp công ty của HR Admin.",
   "add": "Thêm",
   "loading": "Đang tải...",
   "empty": "Tin này chưa có playbook riêng — AI chỉ dùng JD, CV và playbook cấp công ty.",
   "emptyManage": "Chưa có playbook riêng. Thêm ngân hàng câu hỏi hoặc câu bắt buộc hỏi để AI phỏng vấn đúng trọng tâm vị trí.",
-  "readOnlyHint": "Chỉ Hiring Manager chính của tin (hoặc HR Leader) được thêm hay xoá playbook.",
+  "readOnlyHint": "Chỉ Hiring Manager chính của tin (hoặc HR Admin) được thêm hay xoá playbook.",
   "wholeJob": "Cả tin",
   "roundLabel": "Vòng {{number}}",
   "orphanRound": "Vòng không còn trong tin",

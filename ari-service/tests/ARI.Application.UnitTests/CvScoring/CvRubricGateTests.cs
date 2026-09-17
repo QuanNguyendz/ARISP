@@ -143,7 +143,7 @@ public class CvRubricGateTests
         InMemoryUnitOfWork uow, Guid jobId, UpdateJobStatusRequest req, Guid actor, string role)
         => new UpdateJobStatusCommandHandler(uow, new RecordingFileStorage(), new RecordingJdStampService(),
                 new StubDocumentParser(), new RecordingNotificationService(), new RecordingEmailService(),
-                NullLogger<UpdateJobStatusCommandHandler>.Instance)
+                TestConfig.Frontend(), NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, req, actor, role), CancellationToken.None);
 
     [Fact]

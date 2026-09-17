@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
 import PasswordToggle from '@ari/shared/ui/PasswordToggle'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -105,7 +106,7 @@ export default function CandidateRegisterPage() {
       await authService.candidateRegister({ email, password, fullName })
       navigate(`/auth/candidate-login?verify=sent&email=${encodeURIComponent(email)}`)
     } catch (err: any) {
-      setError(err.message || t('candidateRegister.registerFailed'))
+      setError(resolveApiError(err, t, 'candidateRegister.registerFailed'))
     } finally {
       setIsLoading(false)
     }

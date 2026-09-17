@@ -19,6 +19,7 @@ import {
   normalizeSalaryCurrency,
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Trình soạn bản mô tả công việc theo mẫu công ty (ADR-064).
@@ -103,7 +104,7 @@ export default function JdComposerView() {
       setDoc(jd)
       setSavedFingerprint(fingerprint(jd))
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -157,7 +158,7 @@ export default function JdComposerView() {
       setSavedFingerprint(fingerprint(doc))
       return file
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.generateFailed'))
+      setError(resolveApiError(e, t, 'errors.generateFailed'))
       return null
     } finally {
       setBusy(null)

@@ -1,13 +1,13 @@
 {
   "title": "Approve New Accounts",
-  "description": "Account creation requests sent by HR Leader — approve to create active accounts",
+  "description": "Account creation requests sent by HR Admin — approve to create active accounts",
   "by": "Requested by {{name}}",
   "processing": "Processing...",
   "approve": "Approve",
   "reject": "Reject",
   "empty": {
     "title": "No pending requests",
-    "description": "When HR Leader sends account creation requests, they will appear here."
+    "description": "When HR Admin sends account creation requests, they will appear here."
   },
   "rejectModal": {
     "title": "Reject Request",

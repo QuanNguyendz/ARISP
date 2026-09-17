@@ -31,7 +31,7 @@ namespace ARI.Application.Admin.Commands.UpdateUserDepartment
         {
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             // Gỡ khỏi đội thì cho phép (người rời công ty, đội giải thể). Gán MỚI thì đội phải còn
             // hoạt động: gán vào đội đã tắt là dựng sẵn một tài khoản không lập được phiếu, mà chỗ

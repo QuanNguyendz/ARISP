@@ -30,7 +30,7 @@ namespace ARI.Application.Jobs.Queries.GetJobById
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(request.Id, ct);
             if (job == null)
-                return Result.Failure<JobPostingResponse>("Job posting not found.", CommonErrorCodes.NotFound);
+                return Result.Failure<JobPostingResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
             var isStaff = request.IsStaff;
 
@@ -46,7 +46,7 @@ namespace ARI.Application.Jobs.Queries.GetJobById
             }
 
             if (!isStaff && (job.Status != "active" || !job.IsPublicListing))
-                return Result.Failure<JobPostingResponse>("Job posting not found or access denied.", CommonErrorCodes.NotFound);
+                return Result.Failure<JobPostingResponse>("Không tìm thấy tin tuyển dụng, hoặc bạn không có quyền xem tin này.", CommonErrorCodes.NotFound);
 
             var rounds = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
                 r => r.JobPostingId == request.Id,

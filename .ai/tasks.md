@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-18
 
 ---
 
@@ -48,6 +48,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ## Backlog (Chưa bắt đầu)
 
 ### Nợ kỹ thuật đã biết
+- [ ] **Gán mã lỗi cho phần còn lại của 537 `Result.Failure`** để câu báo lỗi đổi theo ngôn ngữ giao diện. Hạ tầng đã xong ngày 2026-09-18 (`code` đi kèm mọi thân lỗi controller; `resolveApiError` ở `@ari/shared/utils/apiError` dịch theo mã rồi mới rơi về câu server). Việc còn lại là **đặt tên mã** cho từng nhóm nghiệp vụ (lịch, offer, playbook, online test…), thêm câu vi/en vào `locales/*/errors.json` và khai vào bảng `CODE_KEYS`. Làm dần theo module được — mã chưa khai thì rơi về câu tiếng Việt của server chứ không vỡ.
 - [ ] **Rà nốt lớp CỘT giữa model EF và migration** (phần ADR-056 tự loại khỏi phạm vi: "0 thao tác chạm cột/dữ liệu"). Vụ `reminder_1h_sent` (đã sửa 2026-08-14) cho thấy `HasColumnName`/kiểu dữ liệu khai trong `OnModelCreating` có thể **không có migration tương ứng** — Supabase trước đây được sửa tay nên trùng khớp che mất lỗi, DB dựng từ số 0 thì lộ. Cách rà: dựng container `pgvector:pg17` trắng → `dotnet ef database update` → so `information_schema.columns` với model (`dotnet ef dbcontext script` hoặc so snapshot), tìm cột lệch tên/kiểu/nullable còn lại.
 
 ### FE UI Redesign (mới) – từ mockup `design/mockups/`
@@ -383,6 +384,24 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-18: **Một lượt sửa 10 lỗi / yêu cầu người dùng báo từ bản chạy thử** (nhánh `feature/be/cv-rubric-mandatory`).
+  1. **Ngày dự kiến bắt đầu trên phiếu chọn được ngày quá khứ.** Chặn ở cả hai tầng: `RecruitmentRequestSupport.ValidateInput` (nới đúng 1 ngày vì ô `<input type="date">` gửi nửa đêm theo múi giờ trình duyệt) + `min` và cảnh báo inline ở `RecruitmentRequestsView`. 3 test mới.
+  2. **Import câu hỏi trắc nghiệm trùng.** Thêm `OnlineTestSupport.DuplicateKey` / `ExistingQuestionKeysAsync` (chuẩn hoá khoảng trắng + hoa/thường, giữ dấu tiếng Việt). Import bỏ qua dòng trùng và báo riêng (`Duplicates`, màu hổ phách, khác danh sách lỗi đỏ); cửa **thêm tay** và **sửa** cũng chặn. 3 test mới.
+  3. **Ứng viên thi trắc nghiệm vẫn xếp được buổi phỏng vấn sát giờ.** Luật 2 của `ValidateAssignmentAsync` trước đây so theo KHUNG CA; ca thi thực tế kéo dài tới `SubmissionDeadline` (cửa vào 1h + thời lượng bài + ân hạn). Thêm `SchedulingSupport.BusyWindowResolverAsync`, thông báo nói rõ "bài thi còn mở tới HH:mm". 2 test mới.
+  4. **"HR Leader" → "HR Admin"** ở mọi chỗ HIỂN THỊ: 28 file i18n (vi + en), 2 chuỗi TSX, 8 file backend (chỉ trong chuỗi, không động comment) + test tương ứng.
+  5. **Link trong thư báo kết quả duyệt tin ghi cứng `http://localhost:3001`.** Chuyển sang `FrontendUrls.Staff(_configuration)`; thêm `TestConfig` dùng gốc không phải localhost để test bắt được lỗi này. 1 test mới.
+  6. **Đổi vai trò ở màn Quản lý người dùng thêm pop-up xác nhận** (`RoleChangeModal`): hiện "từ → sang", cảnh báo riêng khi thôi vai Hiring Manager (ADR-068: các tin họ phụ trách đóng cổng).
+  7. **Xoá tab "Tích hợp & Webhook"** ở Cài đặt hệ thống — dự án không tích hợp ATS/Slack/Teams, không endpoint nào đọc bốn khoá đó.
+  8. **Google Sign-In chặn tài khoản staff dùng gmail dù ô miền để trống.** `CompleteExternalStaffSignIn` đọc theo **sự tồn tại của hàng** `allowed_email_domains`, không theo việc hàng rỗng — trước đây ô trống bị coi là "chưa cấu hình" và rơi về `appsettings.json` (`"fpt.edu.vn, arisp.com"`). Sửa luôn câu chữ mâu thuẫn trên màn Cài đặt. 2 test mới + sửa 1 test cũ vốn kiểm nhầm.
+  9. **Thông báo lỗi dễ hiểu + đúng ngôn ngữ giao diện.**
+     - `ErrorHandlingMiddleware`: thân lỗi 500 đổi sang camelCase `message` (trước là `Message` nên **mọi** màn hiện "HTTP 500"), thêm `code`, không đẩy `exception.Message` ra ngoài Development.
+     - 140 thân lỗi controller nay kèm `code = result.ErrorCode`.
+     - 30 câu lỗi còn sót tiếng Anh → tiếng Việt (54 chỗ trong src, 63 chỗ trong test).
+     - FE: `@ari/shared/utils/apiError` — `resolveApiError(error, t, fallbackKey)` theo thứ tự mã lỗi → khoá của màn → câu server (nếu là câu cho người đọc) → câu chung theo mã HTTP. 58 chỗ bắt lỗi đã chuyển sang dùng chung; `authService` giữ lại `code`/`status` thay vì nén thành chuỗi.
+     - **Còn lại:** phần lớn trong 537 `Result.Failure` chưa có mã riêng, nên câu của chúng vẫn là tiếng Việt từ server kể cả khi UI để tiếng Anh. Gán mã cho từng nhóm nghiệp vụ là việc tiếp theo (xem Backlog).
+  10. **Xoá nút "Quay lại"** ở trang Điều khoản / Chính sách bảo mật — hai trang này hay được mở ở tab mới nên `history.back()` dẫn đi một nơi người dùng chưa từng ở; logo vẫn là đường về trang chủ.
+  - **Kiểm chứng:** `dotnet test` Application **2026/2026**; frontend `npm run build` sạch cả hai site; `check:i18n` đạt; lint 103 cảnh báo — **bằng đúng mức trước khi sửa**. Chưa chạy E2E trình duyệt.
 
 - [x] 2026-09-17: **Sửa lỗi production "Không xuất được file JD" dạng PDF + bốn chỉnh sửa màn phiếu / tạo tin, trước khi đẩy lên `develop` → `main`.**
   - **PDF trên Linux:**

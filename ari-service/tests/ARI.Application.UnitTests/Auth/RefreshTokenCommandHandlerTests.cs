@@ -90,7 +90,7 @@ public class RefreshCandidateTokenCommandHandlerTests
         Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
     }
 
-    // UTCID06 — candidate mà token trỏ tới không tồn tại → "Candidate not found."
+    // UTCID06 — candidate mà token trỏ tới không tồn tại → "Không tìm thấy ứng viên."
     [Fact]
     public async Task UTCID06_Orphan_token_candidate_missing()
     {
@@ -98,7 +98,7 @@ public class RefreshCandidateTokenCommandHandlerTests
 
         var res = await Handler(uow, new FakeTokenService()).Handle(new RefreshCandidateTokenCommand("orphan-token"), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Candidate not found.", res.Error);
+        Assert.Equal("Không tìm thấy ứng viên.", res.Error);
         Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
     }
 
@@ -270,14 +270,14 @@ public class RefreshStaffTokenCommandHandlerTests
         Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
     }
 
-    // UTCID07 — user mà token trỏ tới không tồn tại → "User not found."
+    // UTCID07 — user mà token trỏ tới không tồn tại → "Không tìm thấy người dùng."
     [Fact]
     public async Task UTCID07_Orphan_token_user_missing()
     {
         var uow = new InMemoryUnitOfWork().Seed(Tok(Guid.NewGuid(), raw: "orphan-token"));
         var res = await Handler(uow, new FakeTokenService()).Handle(new RefreshStaffTokenCommand("orphan-token"), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found.", res.Error);
+        Assert.Equal("Không tìm thấy người dùng.", res.Error);
         Assert.Equal(AuthErrorCodes.InvalidCredentials, res.ErrorCode);
     }
 

@@ -44,10 +44,10 @@ namespace ARI.API.Controllers
         {
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
                 CommonErrorCodes.Forbidden => Forbid(),
-                CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
 

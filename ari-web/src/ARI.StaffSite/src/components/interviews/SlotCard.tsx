@@ -23,6 +23,7 @@ import { interviewKeys } from './interviewQueryKeys'
 import { isSelectable, needsCode } from './candidateState'
 import { fmtDate, fmtTime } from './format'
 import { INTERVIEWS_NS, type WorkspaceConfig } from './workspaceConfig'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 export function SlotCard({
   slot,
@@ -80,7 +81,7 @@ export function SlotCard({
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } }
-      flash(err?.response?.data?.message || t('slot.batchCodeError'))
+      flash(resolveApiError(err, t, 'slot.batchCodeError'))
     },
   })
 

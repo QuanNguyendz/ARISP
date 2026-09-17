@@ -54,6 +54,7 @@ import { JobDetailSkeleton } from './_skeletons'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
@@ -195,7 +196,7 @@ export default function RecruiterJobDetailPage() {
       setSelectedIds([])
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || t('messages.acceptError'))
+      setMutationError(resolveApiError(err, t, 'messages.acceptError'))
     } finally {
       setBatchProcessing(false)
     }
@@ -224,7 +225,7 @@ export default function RecruiterJobDetailPage() {
       setSelectedIds([])
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || t('messages.rejectError'))
+      setMutationError(resolveApiError(err, t, 'messages.rejectError'))
     } finally {
       setBatchProcessing(false)
     }
@@ -261,7 +262,7 @@ export default function RecruiterJobDetailPage() {
       await load()
       await refetchJob()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('statusError'))
+      setMutationError(resolveApiError(e, t, 'statusError'))
     } finally {
       setBusy(false)
     }
@@ -283,7 +284,7 @@ export default function RecruiterJobDetailPage() {
       setNotice(t('messages.sentToHiringManager'))
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || t('messages.acceptError'))
+      setMutationError(resolveApiError(err, t, 'messages.acceptError'))
     } finally {
       setProcessingAppId(null)
     }
@@ -300,7 +301,7 @@ export default function RecruiterJobDetailPage() {
       setNotice(t('messages.singleRejected'))
       await load()
     } catch (err: any) {
-      setMutationError(err?.response?.data?.message || t('messages.rejectError'))
+      setMutationError(resolveApiError(err, t, 'messages.rejectError'))
     } finally {
       setProcessingAppId(null)
     }

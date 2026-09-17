@@ -6,6 +6,7 @@ import { PageHeader, EmptyState, ErrorAlert, Select } from '@ari/shared/ui'
 import { adminService, type AuditLogEntry } from '@/fservices/admin'
 import { auditActionLabel, timeAgo } from '@/utils/adminLabels'
 import { LogListSkeleton } from './_skeletons'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 const PAGE_SIZE = 20
 
@@ -62,7 +63,7 @@ export default function AuditLogsPage() {
       setLogs(res.items)
       setTotal(res.totalCount)
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }

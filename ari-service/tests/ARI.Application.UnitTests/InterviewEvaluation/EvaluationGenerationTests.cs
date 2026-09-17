@@ -207,6 +207,6 @@ public class EvaluationGenerationTests
             .EndSessionAsync(Guid.NewGuid(), "completed", CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Session not found", res.Error);
+        Assert.Contains("Không tìm thấy phiên phỏng vấn", res.Error);
     }
 }

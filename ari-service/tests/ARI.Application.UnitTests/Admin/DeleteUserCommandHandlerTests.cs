@@ -46,7 +46,7 @@ public class DeleteUserCommandHandlerTests
         var res = await Handler(uow).Handle(new DeleteUserCommand(UserId, ActorA), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("User not found.", res.Error);
+        Assert.Equal("Không tìm thấy người dùng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 

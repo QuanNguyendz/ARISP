@@ -176,8 +176,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.ServerError
-                    ? StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             return Ok(result.Value);
@@ -199,7 +199,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new GetApplicationsQuery(uid, _currentUserService.Role, mine), ct);
             if (result.IsFailure)
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(result.Value);
         }
@@ -212,7 +212,7 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new GetPracticeEligibilityQuery(id, roundNumber), ct);
             if (result.IsFailure)
             {
-                return BadRequest(new { message = result.Error });
+                return BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             return Ok(new { eligible = result.Value });

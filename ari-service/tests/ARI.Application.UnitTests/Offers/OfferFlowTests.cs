@@ -339,7 +339,7 @@ public class OfferFlowTests
 
         Assert.True(res.IsFailure);
         Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
-        Assert.Contains("HR Leader là người quyết định cuối cùng", res.Error);
+        Assert.Contains("HR Admin là người quyết định cuối cùng", res.Error);
         Assert.Equal(OfferStatus.PendingApproval, offer.Status);   // vẫn nằm chờ, không bị chốt
     }
 

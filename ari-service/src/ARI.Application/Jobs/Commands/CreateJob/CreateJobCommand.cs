@@ -50,7 +50,7 @@ namespace ARI.Application.Jobs.Commands.CreateJob
 
             var creator = await _unitOfWork.Repository<User>().GetByIdAsync(command.UserId, ct);
             if (creator == null)
-                return Result.Failure<JobPostingResponse>("User not found for the current token.", CommonErrorCodes.Unauthorized);
+                return Result.Failure<JobPostingResponse>("Không tìm thấy tài khoản của phiên đăng nhập hiện tại.", CommonErrorCodes.Unauthorized);
 
             // === ADR-063: mọi tin phải bắt nguồn từ một phiếu yêu cầu tuyển dụng đã duyệt ===
             //

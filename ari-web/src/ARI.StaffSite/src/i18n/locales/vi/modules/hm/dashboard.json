@@ -49,11 +49,11 @@
   },
   "offers": {
     "title": "Thư mời nhận việc",
-    "hint": "Bạn soạn và gửi duyệt, HR Leader chốt mức lương rồi Recruiter gửi ứng viên.",
+    "hint": "Bạn soạn và gửi duyệt, HR Admin chốt mức lương rồi Recruiter gửi ứng viên.",
     "toDraft": "Đã qua hết các vòng · {{job}} — soạn thư mời",
     "drafts_one": "{{count}} bản nháp chưa gửi duyệt",
     "drafts_other": "{{count}} bản nháp chưa gửi duyệt",
-    "awaitingHrLeader_one": "{{count}} thư đang chờ HR Leader chốt",
-    "awaitingHrLeader_other": "{{count}} thư đang chờ HR Leader chốt"
+    "awaitingHrLeader_one": "{{count}} thư đang chờ HR Admin chốt",
+    "awaitingHrLeader_other": "{{count}} thư đang chờ HR Admin chốt"
   }
 }

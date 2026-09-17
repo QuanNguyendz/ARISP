@@ -214,15 +214,51 @@ public class CompleteExternalStaffSignInCommandHandlerTests
         Assert.Equal(0, token.StaffCount);
     }
 
-    // UTCID03 — DB setting rỗng; config Authentication:AllowedDomains cho phép → Success
+    // UTCID03 — CHƯA từng cấu hình trong DB; config Authentication:AllowedDomains cho phép → Success
     [Fact]
     public async Task UTCID03_Config_authentication_domain()
     {
-        var uow = new InMemoryUnitOfWork().Seed(DomainSetting("")).Seed(StaffUser("staff@company.com"));
+        // Không seed `allowed_email_domains`: đây là máy vừa dựng, chưa ai mở màn Cài đặt hệ thống.
+        // Chỉ ở trạng thái đó appsettings mới được quyền nói.
+        var uow = new InMemoryUnitOfWork().Seed(StaffUser("staff@company.com"));
         var config = Config(("Authentication:AllowedDomains", "company.com"));
         var res = await Handler(uow, new FakeTokenService(), config).Handle(new CompleteExternalStaffSignInCommand("staff@company.com"), CancellationToken.None);
         Assert.True(res.IsSuccess);
         Assert.Equal("Recruiter", res.Value.Role);
+    }
+
+    // UTCID03b — Super Admin XOÁ TRẮNG ô cấu hình → cho phép mọi miền, KHÔNG rơi về appsettings
+    [Fact]
+    public async Task UTCID03b_Empty_db_setting_allows_every_domain()
+    {
+        // Ca người dùng báo: appsettings mặc định có sẵn "fpt.edu.vn, arisp.com", nên ô trống bị hiểu
+        // nhầm là "chưa cấu hình" và tài khoản gmail bị chặn — dù màn Cài đặt ghi rõ "để trống = cho
+        // phép mọi miền", và dù chính tài khoản đó đăng nhập bằng mật khẩu thì vào được.
+        var uow = new InMemoryUnitOfWork()
+            .Seed(DomainSetting(""))
+            .Seed(StaffUser("daze.official2025@gmail.com"));
+        var config = Config(("Authentication:AllowedDomains", "fpt.edu.vn, arisp.com"));
+
+        var res = await Handler(uow, new FakeTokenService(), config)
+            .Handle(new CompleteExternalStaffSignInCommand("daze.official2025@gmail.com"), CancellationToken.None);
+
+        Assert.True(res.IsSuccess);
+    }
+
+    // UTCID03c — ô cấu hình CÓ giá trị thì vẫn chặn đúng, và appsettings không nới thêm được miền nào
+    [Fact]
+    public async Task UTCID03c_Db_setting_wins_over_appsettings()
+    {
+        var uow = new InMemoryUnitOfWork()
+            .Seed(DomainSetting("company.com"))
+            .Seed(StaffUser("staff@fpt.edu.vn"));
+        var config = Config(("Authentication:AllowedDomains", "fpt.edu.vn"));
+
+        var res = await Handler(uow, new FakeTokenService(), config)
+            .Handle(new CompleteExternalStaffSignInCommand("staff@fpt.edu.vn"), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(AuthErrorCodes.DomainNotAllowed, res.ErrorCode);
     }
 
     // UTCID04 — thiếu Authentication:AllowedDomains; Auth:AllowedDomains cho phép → Success

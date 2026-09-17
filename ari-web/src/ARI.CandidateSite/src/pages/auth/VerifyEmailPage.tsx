@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 type VerifyState =
   | { kind: 'loading' }
@@ -34,7 +35,7 @@ export default function VerifyEmailPage() {
       .verifyEmail(email, token)
       .then((res) => setState({ kind: 'success', message: res.message }))
       .catch((err: any) =>
-        setState({ kind: 'error', message: err.message || t('verifyEmail.verifyFailed') })
+        setState({ kind: 'error', message: resolveApiError(err, t, 'verifyEmail.verifyFailed') })
       )
   }, [email, token, t])
 
@@ -46,7 +47,7 @@ export default function VerifyEmailPage() {
       const res = await authService.resendVerification(email)
       setResendMessage(res.message)
     } catch (err: any) {
-      setResendMessage(err.message || t('verifyEmail.resendFailed'))
+      setResendMessage(resolveApiError(err, t, 'verifyEmail.resendFailed'))
     } finally {
       setResending(false)
     }

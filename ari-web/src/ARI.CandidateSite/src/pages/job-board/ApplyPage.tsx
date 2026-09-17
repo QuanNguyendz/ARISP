@@ -25,6 +25,7 @@ import { applicationService } from '@ari/shared/fservices/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import type { JobPosting } from '@ari/shared/types/job'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /** Nhãn bắt buộc — dấu * đỏ. */
 function Req() {
@@ -169,7 +170,7 @@ export default function ApplyPage() {
         navigate('/auth/candidate-login')
         return
       }
-      setSubmitError(e?.response?.data?.message || t('submit.submitError'))
+      setSubmitError(resolveApiError(e, t, 'submit.submitError'))
     } finally {
       setSubmitting(false)
     }

@@ -39,7 +39,7 @@ namespace ARI.Application.Auth.Commands.RegisterCandidate
             var email = AuthSupport.NormalizeEmail(request.Email);
             var existing = await _unitOfWork.Repository<CandidateAccount>().FindAsync(c => c.Email.ToLower() == email, ct);
             if (existing.Any())
-                return Result.Failure("Email already registered.");
+                return Result.Failure("Email này đã được đăng ký.");
 
             if (!AuthSupport.IsStrongPassword(request.Password, out var validationError))
                 return Result.Failure(validationError);

@@ -7,6 +7,7 @@ import { interviewService, type SlotCandidate } from '@ari/shared/fservices/inte
 import { interviewKeys } from './interviewQueryKeys'
 import { fmtDate, fmtTime } from './format'
 import { INTERVIEWS_NS } from './workspaceConfig'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Dời một hoặc nhiều ứng viên sang ca khác.
@@ -88,7 +89,7 @@ export function RescheduleModal({
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setError(e?.response?.data?.message || t('reschedule.error'))
+      setError(resolveApiError(e, t, 'reschedule.error'))
     } finally {
       setSubmitting(false)
     }

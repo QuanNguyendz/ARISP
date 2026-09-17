@@ -72,9 +72,9 @@ namespace ARI.API.Controllers
         {
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
 

@@ -7,6 +7,7 @@ import {
   type Department,
   type DepartmentInput,
 } from '@ari/shared/fservices/department'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Quản lý đội/bộ phận (ADR-065) — màn riêng của Super Admin.
@@ -39,7 +40,7 @@ export default function DepartmentsPage() {
     try {
       setItems(await departmentService.list())
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -155,7 +156,7 @@ function DepartmentModal({
       else await departmentService.create(payload)
       onSaved()
     } catch (e: any) {
-      setErr(e?.response?.data?.message || t('errors.saveFailed'))
+      setErr(resolveApiError(e, t, 'errors.saveFailed'))
     } finally {
       setSubmitting(false)
     }

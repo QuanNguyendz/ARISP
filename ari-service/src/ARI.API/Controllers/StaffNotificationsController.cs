@@ -65,7 +65,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new MarkStaffNotificationReadCommand(userId, id), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { read = true });
         }
 
@@ -78,7 +78,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new DeleteStaffNotificationCommand(userId, id), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { deleted = true });
         }
 

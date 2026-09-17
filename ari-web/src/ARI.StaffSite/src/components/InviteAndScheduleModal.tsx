@@ -272,7 +272,7 @@ export default function InviteAndScheduleModal({
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
               Hiring Manager chưa khai khung giờ có mặt được cho vòng {effectiveRound}, nên chưa ca nào
               xếp được. Hãy đề nghị họ khai ở mục “Lịch tôi có mặt được” trên màn tin. Tin chưa có Hiring
-              Manager (hoặc Hiring Manager đã bị khoá) thì HR Leader cần gán / chuyển Hiring Manager trước.
+              Manager (hoặc Hiring Manager đã bị khoá) thì HR Admin cần gán / chuyển Hiring Manager trước.
             </div>
           )}
 

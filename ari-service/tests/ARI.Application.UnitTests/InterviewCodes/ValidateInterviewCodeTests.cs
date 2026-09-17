@@ -119,7 +119,7 @@ public class ValidateInterviewCodeTests
     public async Task Start_session_failure_rolls_back_used_flag()
     {
         var (uow, _, token, svc) = Build();
-        // Job KHÔNG seed → StartSessionAsync trả "Job posting not found." → phải hoàn tác UsedAt.
+        // Job KHÔNG seed → StartSessionAsync trả "Không tìm thấy tin tuyển dụng." → phải hoàn tác UsedAt.
         var app = InterviewCodeData.App(Guid.NewGuid());
         var code = InterviewCodeData.Code(app.Id, "ABC234");
         uow.Seed(app).Seed(code);

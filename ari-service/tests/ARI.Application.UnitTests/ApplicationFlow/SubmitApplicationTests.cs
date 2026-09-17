@@ -41,7 +41,7 @@ public class SubmitApplicationTests
         var res = await Run(c, ApplicationData.SubmitRequest(Guid.NewGuid()));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Job posting not found", res.Error);
+        Assert.Contains("Không tìm thấy tin tuyển dụng", res.Error);
         Assert.Empty(c.Uow.Repo<Domain.Entities.Application>().Items);
     }
 

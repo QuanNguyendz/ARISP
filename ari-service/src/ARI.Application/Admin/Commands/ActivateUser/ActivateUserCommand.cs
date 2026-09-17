@@ -23,7 +23,7 @@ namespace ARI.Application.Admin.Commands.ActivateUser
         {
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             if (user.IsActive)
                 return Result.Failure("Tài khoản đã đang hoạt động.");

@@ -149,6 +149,14 @@ export interface OnlineTestImportResult {
   imported: number
   failed: number
   errors: OnlineTestImportRowError[]
+
+  /**
+   * Dòng bị BỎ QUA vì câu hỏi đã có trong ngân hàng (hoặc lặp trong chính file).
+   *
+   * Tách khỏi `errors` vì đây không phải file sai: file đúng, câu đó chỉ đã có sẵn. Nhập lại đúng
+   * file vừa nhập là thao tác người dùng hay làm nhất, và trước đây nó nhân đôi cả ngân hàng đề.
+   */
+  duplicates: OnlineTestImportRowError[]
 }
 
 /**

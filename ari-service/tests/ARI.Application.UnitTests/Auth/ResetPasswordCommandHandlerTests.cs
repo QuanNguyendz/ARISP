@@ -30,23 +30,23 @@ public class CandidateResetPasswordCommandHandlerTests
     private static CandidateResetPasswordCommand Cmd(string password = StrongPassword, string email = Email, string token = Token)
         => new(email, token, password);
 
-    // UTCID01 — candidate không tồn tại → "Invalid email or recovery token."
+    // UTCID01 — candidate không tồn tại → "Email hoặc mã khôi phục không đúng."
     [Fact]
     public async Task UTCID01_Unknown_candidate()
     {
         var res = await Handler(new InMemoryUnitOfWork(), new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid email or recovery token.", res.Error);
+        Assert.Equal("Email hoặc mã khôi phục không đúng.", res.Error);
     }
 
-    // UTCID02 — không có token khớp → "Invalid, expired, or already used recovery token."
+    // UTCID02 — không có token khớp → "Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng."
     [Fact]
     public async Task UTCID02_No_matching_token()
     {
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Candidate(email: Email));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID03 — token hết hạn
@@ -57,7 +57,7 @@ public class CandidateResetPasswordCommandHandlerTests
             .Seed(Link(expiresAt: DateTimeOffset.UtcNow.AddHours(-1)));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID04 — token đã dùng
@@ -68,7 +68,7 @@ public class CandidateResetPasswordCommandHandlerTests
             .Seed(Link(usedAt: DateTimeOffset.UtcNow));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID05 — token sai audience (staff) → không khớp cổng candidate
@@ -79,7 +79,7 @@ public class CandidateResetPasswordCommandHandlerTests
             .Seed(Link(audience: MagicLinkAudience.Staff));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID06 — mật khẩu < 8 ký tự
@@ -204,7 +204,7 @@ public class StaffResetPasswordCommandHandlerTests
     {
         var res = await Handler(new InMemoryUnitOfWork(), new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid email or recovery token.", res.Error);
+        Assert.Equal("Email hoặc mã khôi phục không đúng.", res.Error);
     }
 
     // UTCID02 — staff inactive
@@ -214,7 +214,7 @@ public class StaffResetPasswordCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: Email, active: false)).Seed(Link());
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid email or recovery token.", res.Error);
+        Assert.Equal("Email hoặc mã khôi phục không đúng.", res.Error);
     }
 
     // UTCID03 — không có MagicLink
@@ -224,7 +224,7 @@ public class StaffResetPasswordCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: Email, active: true));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID04 — MagicLink hết hạn
@@ -234,7 +234,7 @@ public class StaffResetPasswordCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: Email, active: true)).Seed(Link(expiresAt: DateTimeOffset.UtcNow.AddHours(-1)));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID05 — MagicLink đã dùng
@@ -244,7 +244,7 @@ public class StaffResetPasswordCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: Email, active: true)).Seed(Link(usedAt: DateTimeOffset.UtcNow));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID06 — MagicLink sai audience (candidate)
@@ -254,7 +254,7 @@ public class StaffResetPasswordCommandHandlerTests
         var uow = new InMemoryUnitOfWork().Seed(AuthData.Staff(email: Email, active: true)).Seed(Link(audience: MagicLinkAudience.Candidate));
         var res = await Handler(uow, new FakePasswordHasher()).Handle(Cmd(), CancellationToken.None);
         Assert.True(res.IsFailure);
-        Assert.Equal("Invalid, expired, or already used recovery token.", res.Error);
+        Assert.Equal("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.", res.Error);
     }
 
     // UTCID07 — mật khẩu < 8 ký tự
