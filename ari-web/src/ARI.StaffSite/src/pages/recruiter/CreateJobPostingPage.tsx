@@ -6,7 +6,7 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import {
   ArrowLeft, Trash2, Loader2, PlusCircle, Check, UploadCloud, Sparkles, FileText, X, AlertCircle,
-  AlertTriangle, Eye, ClipboardList,
+  AlertTriangle, Eye, ClipboardList, Scale, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
@@ -24,6 +24,9 @@ import {
   normalizeSalaryCurrency,
 } from '@ari/shared/utils/jobOptions'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
+import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
+import { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
+import CvRubricChips from '@/components/cvRubric/CvRubricChips'
 
 interface CreateJobPostingPageProps {
   mode: 'create' | 'edit'
@@ -39,6 +42,25 @@ const card = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white da
 
 // Dấu * bắt buộc — luôn hiển thị màu đỏ.
 const RequiredStar = () => <span className="text-red-500 ml-0.5">*</span>
+
+/** `2026-09-30T00:00:00+07:00` → `2026-09-30` theo giờ máy người dùng, cho ô nhập ngày. */
+function toDateInput(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Cấu hình vòng dựng từ danh sách loại vòng trên phiếu — thứ tự trên phiếu chính là số vòng. */
+function roundsFromRequest(types: string[], language: string): RoundConfig[] {
+  return types.map((type, i) => ({
+    roundNumber: i + 1,
+    roundType: type,
+    interviewLanguage: language,
+    interviewCodeTtlHours: 2,
+    maxDurationMinutes: type === 'online_test' ? 30 : MAX_ROUND_MINUTES,
+  }))
+}
 
 /** Thoát HTML — nội dung phiếu là văn bản người dùng gõ, mà ô JD là trình soạn rich-text. */
 const escapeHtml = (s: string) =>
@@ -148,6 +170,36 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     ? '/hr/recruitment-requests'
     : '/recruiter/recruitment-requests'
   const [requestsLoading, setRequestsLoading] = useState(mode === 'create')
+
+  /**
+   * Bộ tiêu chí chấm CV HM khai trên phiếu (ADR-070) — tạo tin xong server tự chép sang tin. Hiện ở đây CHỈ
+   * ĐỌC để Recruiter biết tin sẽ chấm CV theo gì, và biết trước khi phiếu cũ chưa có bộ tiêu chí.
+   */
+  const [requestRubric, setRequestRubric] = useState<CvRubricCriterion[] | null>(null)
+  // Luôn mở ra ở dạng thu gọn (chip tên + trọng số): bản đầy đủ dài cả màn hình mà Recruiter chỉ cần đọc kỹ
+  // khi thật sự cần. Đổi phiếu thì thu gọn lại.
+  const [requestRubricOpen, setRequestRubricOpen] = useState(false)
+  const { t: tRubric } = useTranslation(CV_SCORING_NS)
+
+  useEffect(() => {
+    setRequestRubricOpen(false)
+    if (mode !== 'create' || !recruitmentRequestId) {
+      setRequestRubric(null)
+      return
+    }
+    let cancelled = false
+    recruitmentRequestService
+      .getById(recruitmentRequestId)
+      .then((rr) => {
+        if (!cancelled) setRequestRubric(rr.cvRubric ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setRequestRubric(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, recruitmentRequestId])
 
   /** Tin này dựng từ bản JD soạn theo mẫu công ty (ADR-064) — dùng để nói rõ trên giao diện. */
   const [fromJdComposer, setFromJdComposer] = useState(false)
@@ -271,6 +323,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       if (r.location) setLocation(r.location)
       if (r.skills?.length) setSkills(r.skills)
       if (r.languageRequirement) setLanguageRequirement(r.languageRequirement)
+      applyInterviewLanguage(r.interviewLanguage)
       if (r.salaryMin != null || r.salaryMax != null) {
         setSalaryIsNegotiable(false)
         if (r.salaryMin != null) setSalaryMin(r.salaryMin)
@@ -310,13 +363,27 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     }
   }
 
-  const addRound = () =>
-    setRounds([...rounds, { roundNumber: rounds.length + 1, roundType: 'technical', interviewLanguage: 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES }])
+  /**
+   * Người dùng đã tự chỉnh cấu hình vòng chưa. Ngôn ngữ phỏng vấn do AI đọc JD trả về SAU khi biểu mẫu đã
+   * điền xong — lúc đó chỉ được điền vào cấu hình còn nguyên như lúc điền sẵn, không đè lên thứ người dùng đã chọn.
+   */
+  const roundsTouchedRef = useRef(false)
+  const applyInterviewLanguage = (language?: string | null) => {
+    if ((language !== 'vi' && language !== 'en') || roundsTouchedRef.current) return
+    setRounds((prev) => prev.map((r) => ({ ...r, interviewLanguage: language })))
+  }
+
+  const addRound = () => {
+    roundsTouchedRef.current = true
+    setRounds([...rounds, { roundNumber: rounds.length + 1, roundType: 'technical', interviewLanguage: rounds[rounds.length - 1]?.interviewLanguage ?? 'vi', interviewCodeTtlHours: 2, maxDurationMinutes: MAX_ROUND_MINUTES }])
+  }
   const removeRound = (n: number) => {
     if (rounds.length <= 1) return
+    roundsTouchedRef.current = true
     setRounds(rounds.filter((r) => r.roundNumber !== n).map((r, i) => ({ ...r, roundNumber: i + 1 })))
   }
   const changeRound = (i: number, field: keyof RoundConfig, value: any) => {
+    roundsTouchedRef.current = true
     const u = [...rounds]
     u[i] = { ...u[i], [field]: value }
     setRounds(u)
@@ -343,104 +410,94 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     }
   }, [mode])
 
-  // Điền sẵn từ phiếu: vị trí, bộ phận, dải lương, địa điểm... là những thứ HM đã nêu và HR Leader
-  // đã duyệt. Bắt Recruiter gõ lại là mời sai lệch giữa tin đăng và phiếu được duyệt.
+  // Điền sẵn từ phiếu: vị trí, bộ phận, dải lương, địa điểm, VÒNG PHỎNG VẤN... là những thứ HM đã nêu và
+  // HR Leader đã duyệt. Bắt Recruiter gõ lại là mời sai lệch giữa tin đăng và phiếu được duyệt.
   //
   // GHI ĐÈ khi đổi phiếu, không phải "chỉ điền khi trống": đổi phiếu nghĩa là người dùng vừa nhận
   // ra chọn nhầm, mà giữ lại nội dung của phiếu cũ thì tin sẽ mang nửa nọ nửa kia. Ô nào không do
-  // phiếu sinh ra (kỹ năng, vòng phỏng vấn, hạn nộp…) vẫn giữ nguyên.
+  // phiếu sinh ra (kỹ năng, hạn nộp khi chưa soạn JD…) vẫn giữ nguyên.
+  //
+  // Phiếu và bản JD nạp SONG SONG rồi áp theo lớp: phiếu trước (vòng phỏng vấn chỉ có trên phiếu), bản JD
+  // đè lên những ô nó có. Bản đầu `return` ngay khi có JD nên tin dựng từ JD mất sạch các vòng HM đã khai.
   useEffect(() => {
     if (mode !== 'create' || !recruitmentRequestId) return
     let cancelled = false
     void (async () => {
-      // ADR-064: nếu phiếu đã có bản JD soạn theo mẫu công ty VÀ đã xuất file thì dùng bản đó —
-      // nó đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ HM sẽ mở ra để
-      // ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
-      try {
-        // Nạp kèm MẪU để biết tên và thứ tự từng mục. Mẫu hỏng thì vẫn dựng được mô tả (rơi về thứ
-        // tự có sẵn trong bản JD), nên không để nó làm hỏng cả luồng.
-        const [jd, tpl] = await Promise.all([
-          jdDocumentService.get(recruitmentRequestId),
-          jdTemplateService.get().catch(() => null),
-        ])
-        if (cancelled) return
-        if (jd.generatedFileStorageKey) {
-          setTitle(jd.title)
-          setDepartment(jd.department || '')
-          setJobDescription(jdHtmlFromDocument(jd, tpl))
-          if (jd.employmentType) setEmploymentType(jd.employmentType)
-          if (jd.workMode) setWorkMode(jd.workMode)
-          if (jd.experienceLevel) setExperienceLevel(jd.experienceLevel)
-          if (jd.location) setLocation(jd.location)
-          if (jd.vacancies) setVacancies(jd.vacancies)
-          if (jd.salaryMin != null || jd.salaryMax != null) {
-            setSalaryIsNegotiable(false)
-            setSalaryMin(jd.salaryMin ?? '')
-            setSalaryMax(jd.salaryMax ?? '')
-            setSalaryCurrency(normalizeSalaryCurrency(jd.salaryCurrency))
-          }
-          setJdFileUrl(jd.generatedFileStorageKey)
-          setJdFileViewUrl(jd.generatedFileViewUrl ?? undefined)
-          setJdFileName(jd.generatedFileName ?? undefined)
-          setJdFileFormat(jd.generatedFormat ?? undefined)
-          setFromJdComposer(true)
+      const [rr, composed] = await Promise.all([
+        // Không chặn việc dựng tin: phiếu tải hỏng thì Recruiter vẫn gõ tay được, server kiểm lại lúc lưu.
+        recruitmentRequestService.getById(recruitmentRequestId).catch(() => null),
+        // ADR-064: bản JD soạn theo mẫu công ty. Chưa soạn hoặc không có quyền đọc thì bỏ qua. Nạp kèm MẪU
+        // để biết tên và thứ tự từng mục — mẫu hỏng thì vẫn dựng được mô tả theo thứ tự có sẵn trong bản JD.
+        Promise.all([jdDocumentService.get(recruitmentRequestId), jdTemplateService.get().catch(() => null)])
+          .then(([jd, tpl]) => ({ jd, tpl }))
+          .catch(() => null),
+      ])
+      if (cancelled) return
 
-          // Kỹ năng là những thẻ ngắn nằm rải trong văn xuôi của mục Yêu cầu — chỗ duy nhất ở bước này
-          // thực sự cần suy luận, nên mới gọi AI. Best-effort: hỏng thì người dùng gõ tay như trước,
-          // không chặn việc tạo tin. Chỉ điền vào ô CÒN TRỐNG — không đè lên thứ người dùng đã gõ.
-          void jdDocumentService
-            .suggestSkills(recruitmentRequestId)
-            .then((s) => {
-              if (cancelled) return
-              if (s.skills?.length) setSkills((prev) => (prev.length ? prev : s.skills))
-              if (s.jobCategory) setJobCategory((prev) => prev || s.jobCategory!)
-            })
-            .catch(() => {})
+      // Cấu hình vòng theo ĐÚNG danh sách trên phiếu (ADR-063 mở rộng): quy trình tuyển của một vị trí là
+      // quyết định chuyên môn của Hiring Manager, Recruiter dựng tin là thi hành nó. Vẫn sửa được bên dưới —
+      // đây là ĐIỀN SẴN, không phải khoá cứng; phiếu cũ không khai vòng nào thì giữ nguyên bộ mặc định.
+      roundsTouchedRef.current = false
+      if (rr?.requestedRounds?.length) setRounds(roundsFromRequest(rr.requestedRounds, 'vi'))
 
-          return
+      const jd = composed?.jd
+      // Bản JD đã XUẤT FILE đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ HM sẽ mở ra
+      // để ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
+      if (jd?.generatedFileStorageKey) {
+        setTitle(jd.title)
+        setDepartment(jd.department || '')
+        setJobDescription(jdHtmlFromDocument(jd, composed?.tpl))
+        if (jd.employmentType) setEmploymentType(jd.employmentType)
+        if (jd.workMode) setWorkMode(jd.workMode)
+        if (jd.experienceLevel) setExperienceLevel(jd.experienceLevel)
+        if (jd.location) setLocation(jd.location)
+        if (jd.vacancies) setVacancies(jd.vacancies)
+        else if (rr?.headcount) setVacancies(rr.headcount)
+        if (jd.applicationDeadline) setApplicationDeadline(toDateInput(jd.applicationDeadline))
+        if (jd.salaryMin != null || jd.salaryMax != null) {
+          setSalaryIsNegotiable(false)
+          setSalaryMin(jd.salaryMin ?? '')
+          setSalaryMax(jd.salaryMax ?? '')
+          setSalaryCurrency(normalizeSalaryCurrency(jd.salaryCurrency))
         }
-      } catch {
-        // Chưa soạn JD, hoặc không có quyền đọc — rơi về điền sẵn từ phiếu ngay dưới.
+        setJdFileUrl(jd.generatedFileStorageKey)
+        setJdFileViewUrl(jd.generatedFileViewUrl ?? undefined)
+        setJdFileName(jd.generatedFileName ?? undefined)
+        setJdFileFormat(jd.generatedFormat ?? undefined)
+        setFromJdComposer(true)
+
+        // Kỹ năng, yêu cầu ngoại ngữ và ngôn ngữ phỏng vấn nằm rải trong văn xuôi của bản JD — chỗ duy nhất ở
+        // bước này thực sự cần suy luận, nên mới gọi AI. Best-effort: hỏng thì người dùng gõ tay như trước,
+        // không chặn việc tạo tin. Chỉ điền vào ô CÒN TRỐNG / cấu hình vòng chưa ai chỉnh.
+        void jdDocumentService
+          .suggestSkills(recruitmentRequestId)
+          .then((s) => {
+            if (cancelled) return
+            if (s.skills?.length) setSkills((prev) => (prev.length ? prev : s.skills))
+            if (s.jobCategory) setJobCategory((prev) => prev || s.jobCategory!)
+            if (s.languageRequirement) setLanguageRequirement((prev) => prev || s.languageRequirement!)
+            applyInterviewLanguage(s.interviewLanguage)
+          })
+          .catch(() => {})
+        return
       }
 
-      try {
-        const rr = await recruitmentRequestService.getById(recruitmentRequestId)
-        if (cancelled) return
-        setTitle(rr.title)
-        setDepartment(rr.department || '')
-        setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
-        if (rr.employmentType) setEmploymentType(rr.employmentType)
-        if (rr.workMode) setWorkMode(rr.workMode)
-        if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
-        if (rr.location) setLocation(rr.location)
-        if (rr.headcount) setVacancies(rr.headcount)
-
-        // Cấu hình vòng theo ĐÚNG danh sách trên phiếu (ADR-063 mở rộng): quy trình tuyển của một
-        // vị trí là quyết định chuyên môn của Hiring Manager, Recruiter dựng tin là thi hành nó.
-        // Vẫn sửa được bên dưới — đây là ĐIỀN SẴN, không phải khoá cứng; phiếu cũ không khai vòng
-        // nào thì giữ nguyên bộ mặc định.
-        if (rr.requestedRounds?.length) {
-          setRounds(
-            rr.requestedRounds.map((type, i) => ({
-              roundNumber: i + 1,
-              roundType: type,
-              interviewLanguage: 'vi',
-              interviewCodeTtlHours: 2,
-              maxDurationMinutes: type === 'online_test' ? 30 : MAX_ROUND_MINUTES,
-            }))
-          )
-        }
-        if (rr.salaryMin != null || rr.salaryMax != null) {
-          setSalaryIsNegotiable(false)
-          setSalaryMin(rr.salaryMin ?? '')
-          setSalaryMax(rr.salaryMax ?? '')
-          // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
-          // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
-          setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
-        }
-      } catch {
-        // Không chặn việc dựng tin: phiếu tải hỏng thì Recruiter vẫn gõ tay được, và server vẫn
-        // kiểm lại phiếu lúc lưu.
+      if (!rr) return
+      setTitle(rr.title)
+      setDepartment(rr.department || '')
+      setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
+      if (rr.employmentType) setEmploymentType(rr.employmentType)
+      if (rr.workMode) setWorkMode(rr.workMode)
+      if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
+      if (rr.location) setLocation(rr.location)
+      if (rr.headcount) setVacancies(rr.headcount)
+      if (rr.salaryMin != null || rr.salaryMax != null) {
+        setSalaryIsNegotiable(false)
+        setSalaryMin(rr.salaryMin ?? '')
+        setSalaryMax(rr.salaryMax ?? '')
+        // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
+        // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
+        setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
       }
     })()
     return () => {
@@ -617,6 +674,54 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
               {recruitmentRequestId && (
                 <p className="mt-2 text-xs text-ink-400">{t('recruitmentRequest.prefillHint')}</p>
+              )}
+
+              {recruitmentRequestId && requestRubric && (
+                <div className="mt-4 border-t border-ink-100 pt-4 dark:border-white/10">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
+                      <Scale className="h-4 w-4 text-ai-600 dark:text-ai-400" /> {tRubric('createJob.title')}
+                      {requestRubric.length > 0 && (
+                        <span className="whitespace-nowrap rounded-full bg-ai-100 px-2 py-0.5 text-[10px] font-semibold text-ai-700 dark:bg-ai-500/20 dark:text-ai-300">
+                          {tRubric('panel.criteriaCount', { count: requestRubric.length })}
+                        </span>
+                      )}
+                    </div>
+                    {requestRubric.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setRequestRubricOpen((v) => !v)}
+                        aria-expanded={requestRubricOpen}
+                        aria-controls="request-cv-rubric-body"
+                        aria-label={requestRubricOpen ? tRubric('panel.collapse') : tRubric('panel.expand')}
+                        title={requestRubricOpen ? tRubric('panel.collapse') : tRubric('panel.expand')}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-200 text-ink-500 hover:bg-ink-50 hover:text-ink-700 dark:border-white/10 dark:text-ink-400 dark:hover:bg-white/10 dark:hover:text-ink-200"
+                      >
+                        {requestRubricOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                  {requestRubric.length > 0 ? (
+                    <>
+                      <p className="mb-3 mt-1 text-xs text-ink-500 dark:text-ink-400">{tRubric('createJob.fromRequest')}</p>
+                      {requestRubricOpen ? (
+                        <div id="request-cv-rubric-body">
+                          <ReadOnlyRubric criteria={requestRubric} />
+                        </div>
+                      ) : (
+                        <CvRubricChips
+                          criteria={requestRubric}
+                          onExpand={() => setRequestRubricOpen(true)}
+                          title={tRubric('panel.expand')}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                      {tRubric('createJob.missing')}
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}

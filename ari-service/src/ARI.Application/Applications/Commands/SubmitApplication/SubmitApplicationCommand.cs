@@ -43,14 +43,6 @@ namespace ARI.Application.Applications.Commands.SubmitApplication
         {
             var (cvBytes, extension) = (command.CvBytes, command.Extension);
 
-            // Compute CV Hash for Match Analysis Cache
-            string cvFileHash;
-            using (var md5 = System.Security.Cryptography.MD5.Create())
-            {
-                var hashBytes = md5.ComputeHash(cvBytes);
-                cvFileHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-            }
-
             // Extract CV text using the real document parser service (parse trước khi tốn công lưu).
             string cvText;
             try
@@ -96,7 +88,6 @@ namespace ARI.Application.Applications.Commands.SubmitApplication
                 CandidatePhone = command.CandidatePhone,
                 CvFileUrl = cvFileUrl,
                 CvText = cvText,
-                CvFileHash = cvFileHash
             };
 
             var result = await _applicationService.SubmitApplicationAsync(serviceRequest, "job_board");

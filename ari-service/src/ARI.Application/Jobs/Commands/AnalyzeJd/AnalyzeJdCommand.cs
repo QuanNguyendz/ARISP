@@ -133,6 +133,7 @@ namespace ARI.Application.Jobs.Commands.AnalyzeJd
                 Location = data.Location,
                 Skills = data.Skills ?? new List<string>(),
                 LanguageRequirement = data.LanguageRequirement,
+                InterviewLanguage = OnlineTest.OnlineTestLanguageGuard.Normalize(data.InterviewLanguage),
                 SalaryMin = data.SalaryMin,
                 SalaryMax = data.SalaryMax
             };

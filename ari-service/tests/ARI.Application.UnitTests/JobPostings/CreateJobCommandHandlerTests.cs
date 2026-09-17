@@ -42,7 +42,9 @@ public class CreateJobCommandHandlerTests
     private static Task<Result<JobPostingResponse>> Run(
         InMemoryUnitOfWork uow, RecordingRagIngestionService rag, RecordingNotificationService notif,
         CreateJobPostingRequest req, Guid userId)
-        => new CreateJobCommandHandler(uow, rag, notif, NullLogger<CreateJobCommandHandler>.Instance)
+        => new CreateJobCommandHandler(uow, rag, notif,
+                ARI.Application.UnitTests.CvScoring.CvScoringKit.RubricService(uow),
+                NullLogger<CreateJobCommandHandler>.Instance)
             .Handle(new CreateJobCommand(req, userId), CancellationToken.None);
 
     private static CreateJobPostingRequest Req() => JobPostingData.Request();

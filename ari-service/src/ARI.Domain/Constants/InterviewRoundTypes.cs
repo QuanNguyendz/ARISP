@@ -26,9 +26,6 @@ namespace ARI.Domain.Constants
         /// <summary>Thứ tự này cũng là thứ tự gợi ý khi dựng tin: thi sàng lọc trước, chuyên môn sau.</summary>
         public static readonly string[] All = { OnlineTest, Screening, Technical };
 
-        /// <summary>Trần số vòng của một tin — nhiều hơn thì phễu dài tới mức không ai đi hết.</summary>
-        public const int MaxRounds = 5;
-
         private static readonly HashSet<string> Known =
             new(All, StringComparer.OrdinalIgnoreCase);
 
@@ -54,7 +51,8 @@ namespace ARI.Domain.Constants
 
         /// <summary>
         /// Lọc + chuẩn hoá một danh sách vòng người dùng gửi lên. Giữ nguyên THỨ TỰ (thứ tự chính là
-        /// số vòng), bỏ giá trị lạ, bỏ trùng liền kề không có ý nghĩa gì nên giữ nguyên cả trùng.
+        /// số vòng) và bỏ giá trị lạ. KHÔNG tự bỏ trùng — trùng là lỗi nhập, để lớp gọi báo lại bằng
+        /// <see cref="HasDuplicates"/> thay vì âm thầm xoá một vòng người dùng đã chọn.
         /// </summary>
         public static List<string> Sanitize(IEnumerable<string>? values) =>
             (values ?? Array.Empty<string>())
@@ -62,5 +60,13 @@ namespace ARI.Domain.Constants
                 .Where(v => v != null)
                 .Select(v => v!)
                 .ToList();
+
+        /// <summary>
+        /// Phiếu khai mỗi LOẠI vòng nhiều nhất một lần (tối đa <see cref="All"/>.Length vòng): hai vòng
+        /// chuyên môn cùng loại thì Recruiter không biết vòng nào hỏi gì, và danh sách chọn trên phiếu
+        /// cũng chỉ cho thêm mỗi loại một lần.
+        /// </summary>
+        public static bool HasDuplicates(IReadOnlyCollection<string> sanitized) =>
+            sanitized.Distinct(StringComparer.Ordinal).Count() != sanitized.Count;
     }
 }

@@ -376,8 +376,8 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 | `SystemSettingService` | Quản trị và truy xuất cấu hình hệ thống toàn cục (`allowed_email_domains`, global webhooks) |
 | `JobPostingService` | CRUD Job Posting, round config, interview mode (default `onsite`), availability slots, persona, **JD file upload (PDF/DOCX)** |
 | `ApplicationService` | Candidate application (CV + info), invite flow, practice session eligibility check (**1 lượt / vòng**, theo `(application_id, round_number)`), **đính kèm CV-JD Analysis vào Application** |
-| `CvJdAnalysisService` | **[NEW]** Nhận CV file + JD (file/text) → gọi Gemini API phân tích → trả matchScore + summary. Cache kết quả per CV hash + JobPosting |
-| `IGeminiProvider` | **[NEW]** Interface abstract cho Google Gemini API. Method: `AnalyzeCvJdMatchAsync(cvFile, jdContent, ct)` |
+| `ICvScoringService` (ADR-070) | Chấm CV theo **bộ tiêu chí của tin** (không có bộ tiêu chí → không gọi AI). Khoá dùng lại `(tin, MD5 CV, phiên bản bộ tiêu chí)`. Hàng đợi `ICvScoringQueue` + `CvScoringHostedService` chấm nền và tự chấm lại. *(Thay `CvJdAnalysisService` cũ.)* |
+| `IGeminiProvider` | Interface abstract cho Google Gemini API: `AnalyzeCvJdMatchAsync(CvScoringAiRequest)` (CV + file JD gốc, chấm từng tiêu chí), `SuggestCvRubricAsync` (gợi ý bộ tiêu chí), trích xuất JD (ADR-042) |
 | `JobBoardService` | Job listing (public view of Job Postings), candidate self-apply, job search & filter |
 | `OnlineTestService` | Quản lý câu hỏi trắc nghiệm (`online_test_questions`), lưu kết quả nộp bài (`online_test_submissions`), tự động chấm điểm và đánh giá đạt/trượt |
 | `InterviewCodeService` | Generate, validate, expire Interview Code (on-site flow Kiosk) |
@@ -414,6 +414,7 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 - **Mục đích:** Cung cấp cho candidate một **bản đánh giá nhanh** về mức độ phù hợp trước khi ứng tuyển. Dù điểm cao hay thấp, candidate vẫn có thể ứng tuyển.
 - **Reuse principle:** Kết quả phân tích được lưu vào bảng `cv_jd_analyses`. Khi candidate submit Application, hệ thống link `analysis_id` vào Application – HR nhận được kết quả y hệt mà không cần chạy lại Gemini.
 - **Auto-analysis on apply:** Nếu candidate ứng tuyển mà chưa từng chạy analysis, hệ thống tự động gọi Gemini 1 lần rồi đính kèm.
+- **⚠ Đã thay đổi bởi ADR-070:** không còn `matchScore` do AI tự cho — AI chấm TỪNG tiêu chí của bộ tiêu chí bắt buộc của tin, backend cộng có trọng số; tin chưa có bộ tiêu chí thì **không chấm**. Nộp hồ sơ đưa vào hàng đợi chấm nền thay cho `Task.Run`. Output bên dưới là dạng cũ, giữ để tra lịch sử.
 - **Input:** CV file (PDF/DOCX) + JD file gốc (PDF/DOCX) hoặc JD text.
 - **Output (JSON):**
   ```json
@@ -632,7 +633,7 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   3. **Pipeline Behaviours:** UnhandledException → Logging (pre-processor) → **Validation trả `Result.Failure` thay vì throw** (deviation JT có chủ đích — giữ Result Pattern rule) → Performance (warn >500ms). `Result.ErrorCode` (additive) để controller map failure → đúng 401/403/404/409/500 cũ.
   4. **DI theo JT:** `AddApplication()` / `AddInfrastructure()` / `AddWebServices()`; `Program.cs` 521 → ~60 dòng; `AriDbContextInitialiser` (migrate-retry); `ValidateScopes/ValidateOnBuild` ở Development.
   5. **Schema 100% do migrations sở hữu:** raw SQL bootstrap gộp vào migration `ReconcileStartupBootstrap` (idempotent `IF NOT EXISTS` — an toàn DB bootstrap đầy đủ/dở dang/trống); 16 index bootstrap khai báo tường minh trong `OnModelCreating`; hợp nhất index trùng `IX_applications_cv_jd_analysis_id`.
-  6. **Service dùng chung sau interface** (rule: 1 consumer → absorb vào handler; ≥2 consumers hoặc hub → giữ service): `IInterviewService` (**SessionHub gọi TRỰC TIẾP, không qua MediatR — critical path ADR-006**), `IInterviewCodeService`, `ICvJdAnalysisService`, `IApplicationService` (deviation: giữ nguyên thay vì dissolve — logic vốn đã ở Application layer; dissolve toàn phần là follow-up). Đã XÓA: `EvaluationService`, `PlaybookService` (1 consumer). Mới: `ITokenService`/`JwtTokenService`, `IPasswordHasher`/`BcryptPasswordHasher` (Infrastructure/Identity), `TokenHashing` (Sha256Base64 cho refresh token, Sha256Hex cho invite token — 2 format cùng tồn tại trong DB).
+  6. **Service dùng chung sau interface** (rule: 1 consumer → absorb vào handler; ≥2 consumers hoặc hub → giữ service): `IInterviewService` (**SessionHub gọi TRỰC TIẾP, không qua MediatR — critical path ADR-006**), `IInterviewCodeService`, `ICvJdAnalysisService` (ADR-070 thay bằng `ICvScoringService`), `IApplicationService` (deviation: giữ nguyên thay vì dissolve — logic vốn đã ở Application layer; dissolve toàn phần là follow-up). Đã XÓA: `EvaluationService`, `PlaybookService` (1 consumer). Mới: `ITokenService`/`JwtTokenService`, `IPasswordHasher`/`BcryptPasswordHasher` (Infrastructure/Identity), `TokenHashing` (Sha256Base64 cho refresh token, Sha256Hex cho invite token — 2 format cùng tồn tại trong DB).
 - **Không làm (follow-up):** tách `IEntityTypeConfiguration` khỏi `OnModelCreating` (convention loop snake_case chạy trước override là load-bearing — cần fingerprint verification riêng); dissolve toàn phần `ApplicationService`; move các file `DTOs/` còn lại vào feature folders.
 - **Verify từng phase:** build xanh, swagger.json diff = RỖNG so baseline (98 paths — chống vỡ FE), model fingerprint trước/sau rename identical, migration reconcile áp lên dev DB đúng 1 row history + scaffold thử ra migration rỗng, smoke ~90 cases so status/body verbatim bằng JWT tự mint.
 
@@ -1017,6 +1018,8 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 
   6. **Chưa khai rubric → giữ nguyên hành vi cũ.** Không rubric thì điểm và verdict của AI đi thẳng như trước. Tính năng này không được làm hỏng những tin chưa kịp cấu hình.
 
+  > **Bổ sung bởi ADR-070 (2026-09-17) — riêng phần CHẤM CV:** mục 4, 5, 6 và đoạn "AI không chấm nổi tiêu chí nào → giữ điểm AI" **không còn áp cho CV**. Bộ tiêu chí CV chỉ đọc ở **cấp tin** (không rơi về vòng/công ty — `cv_rubric` cấp công ty nay chỉ là **mẫu**), tin chưa có bộ tiêu chí thì **không chấm**, và AI không chấm được tiêu chí nào thì lần chấm **thất bại** chứ không lấy điểm của AI. Chấm **phỏng vấn** (`interview_rubric`) giữ nguyên như ADR-060.
+
 - **Vì sao chụp ảnh nhãn + trọng số thay vì tham chiếu rubric sống.** Điểm lưu dạng `{"technical":{"score":88,"label":"Chuyên môn","weight":40}}` chứ không phải `{"technical":88}` + trỏ tới `playbook_documents`. Rubric là **tài liệu sống**: HR sửa trọng số hoặc xoá bộ cũ là chuyện thường. Nếu chỉ giữ khoá, một bản đánh giá 3 tháng trước sẽ hiện điểm 74 **cạnh bộ trọng số hiện tại** — không giải thích ra được 74 từ đâu, và không cách nào phát hiện là nó đã lệch. Ảnh chụp làm bản đánh giá **tự giải thích được vĩnh viễn**, đổi lại một ít dữ liệu lặp.
 
 - **Vì sao tiêu chí AI không chấm bị loại khỏi CẢ tử lẫn mẫu** (không tính 0 điểm). Model bỏ sót một tiêu chí là lỗi của model, không phải bằng chứng ứng viên kém ở đó. Tính 0 sẽ **đánh trượt oan** — với rubric 60/40, thiếu một mục kéo 90 điểm xuống 54. Nếu AI không chấm nổi tiêu chí nào, backend **giữ nguyên điểm của AI + ghi log cảnh báo**, không âm thầm cho 0.
@@ -1347,9 +1350,13 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 
   4. **Không thêm thư viện nào.** DOCX dùng `DocumentFormat.OpenXml` (đã có từ ADR-049), PDF dùng `PdfSharpCore` (đã có từ `JdStampService`). Nhân dịp này tách `EnsureFontResolver` + `WrapParagraph` ra `PdfText` dùng chung — chép sang bộ dựng thứ hai là có hai bản tự xuống dòng, và lần sửa sau chỉ một bản được sửa.
 
+     > **Bổ sung 2026-09-17 — phông NHÚNG cho PDF.** Production xuất DOCX được mà PDF thì không: `PdfSharpCore.Utils.FontResolver` mặc định quét phông của hệ điều hành, image `mcr.microsoft.com/dotnet/aspnet:8.0` (Debian) không có phông nào → `No Fonts installed on this device!`. Máy dev Windows chạy được nhờ Arial của máy, nên lỗi chỉ lộ sau khi deploy. **Quyết định:** nhúng Liberation Sans/Serif (SIL OFL 1.1, cùng số đo chữ với Arial/Times New Roman, đủ dấu tiếng Việt) làm `EmbeddedResource` trong `ARI.Infrastructure/Documents/Fonts/`, `BundledFontResolver` phân giải MỌI tên phông trong mẫu (họ serif → Liberation Serif, còn lại → Liberation Sans) — **không** cài phông vào Dockerfile, vì PDF khi đó phụ thuộc image và máy dev vẫn ra khác production. Bẫy: getter `GlobalFontSettings.FontResolver` tự dựng bộ mặc định khi chưa có, nên `??=` không bao giờ gán — phải gán thẳng. Test `ARI.Infrastructure.UnitTests/JdPdfFontTests` (project test mới) đọc lại PDF bằng PdfPig và khẳng định phông là Liberation; đã chạy trong container `dotnet/sdk:8.0` không có phông hệ thống.
+
   5. **Nội dung JD được LƯU, không chỉ xuất file rồi quên.** HM từ chối ký duyệt kèm lý do là luồng đã có (ADR-061). Không lưu nội dung thì mỗi lần bị trả về, Recruiter phải soạn lại từ đầu — đúng thứ khiến vòng sửa–duyệt đắt tới mức người ta né tránh nó. Bảng `jd_documents`, **một bản trên mỗi phiếu** (unique index có filter).
 
   6. **File tự đính kèm sang màn tạo tin**, không bắt tải xuống rồi tải lên lại. Màn tạo tin ưu tiên bản JD đã soạn: điền các trường **thẳng từ nội dung có cấu trúc** (không cần Gemini đoán lại từ file) và gán sẵn file đã sinh. Đường upload tay + `analyze-jd` **giữ nguyên** cho tin không đi qua trình soạn.
+
+     > **Bổ sung 2026-09-17 — điền sẵn theo LỚP.** Bản đầu thấy có JD là `return`, nên tin dựng từ JD mất sạch các vòng HM khai trên phiếu. Nay phiếu và bản JD nạp song song: **phiếu trước** (vòng phỏng vấn chỉ có trên phiếu; số lượng khi JD bỏ trống), **JD đè lên** những ô nó có (kể cả hạn nộp). Phần phải suy luận từ văn xuôi của JD đi qua một lượt Gemini (`POST /recruitment-requests/{id}/jd/skills`, cũng là prompt của `analyze-jd`): kỹ năng, nhóm nghề, **yêu cầu ngoại ngữ** và **ngôn ngữ phỏng vấn** (`interview_language` `vi`|`en`, chuẩn hoá qua `OnlineTestLanguageGuard.Normalize`) — chỉ điền ô còn trống, và ngôn ngữ vòng chỉ áp khi người dùng chưa chỉnh cấu hình vòng. Phiếu khai **mỗi loại vòng một lần** (tối đa 3 — `InterviewRoundTypes.HasDuplicates`, server báo lỗi chứ không âm thầm bỏ bớt; bỏ `MaxRounds = 5`).
 
   7. **HM xem được file JD ngay trên màn ký duyệt.** Không cần đổi DTO: `GetJobByIdQuery` vốn đã đổi `JdFileUrl` từ storageKey sang URL xem được cho staff, và `DocumentViewer` render được **cả PDF lẫn DOCX** trong trình duyệt (`docx-preview`). Chỉ thiếu phần giao diện — nay đã có.
 
@@ -1797,3 +1804,193 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   - **Chưa kiểm trên trình duyệt với dữ liệu thật** — cần API khởi động lại để thử luồng.
   - **Transcript không có mốc thời gian trên video** (không nhảy tới đoạn video của từng câu): câu hỏi/trả lời có
     giờ, video chưa có mốc bắt đầu chính xác so với phiên — để sau.
+
+---
+
+### ADR-070: Bộ tiêu chí chấm CV bắt buộc từ phiếu yêu cầu; Hiring Manager soạn trên web; điểm CV giải thích được từng phần
+
+- **Ngày:** 2026-09-17
+- **Trạng thái:** Đã triển khai. **Thay** phần chấm CV của ADR-030 (điểm do AI tự cho) và mục 4–6 của ADR-060
+  *cho riêng CV*. **Bổ sung** ADR-063 (phiếu mang thêm bộ tiêu chí) và ADR-069 (bộ tiêu chí sống ở màn tin, HM chính quản lý).
+
+- **Bối cảnh.** Vẽ lại luồng ra Match Score CV–JD (`docs/diagrams/arisp-cv-jd-match-score.drawio`) lộ ra năm điểm lệch và ba lỗ hổng:
+
+  | # | Chỗ lệch | Hậu quả |
+  |---|---|---|
+  | 1 | File JD gốc không tới tay AI | Lệch quy tắc 17 — AI chấm theo vài trường text của tin |
+  | 2 | Dự phòng GPT-4o-mini chỉ nhận text | Gemini lỗi thì CV dạng PDF chấm "mù" |
+  | 3 | Index `(job, cv_hash)` không UNIQUE | Hai luồng chạy song song sinh hai bản, đốt quota hai lần |
+  | 4 | `DELETE /api/cv-analysis/clear-cache` để `[AllowAnonymous]` | Ai cũng xoá được cache (và lỗi FK khi đã có hồ sơ trỏ tới) |
+  | 5 | Nộp hồ sơ gắn cả bản `failed` | Hồ sơ hiện "0 điểm" cho một file không phải CV |
+  | — | `POST /api/cv-analysis/analyze` | Ứng viên bất kỳ đốt quota Gemini bằng file tuỳ ý; FE không dùng |
+  | — | `GET /api/applications/{id}/cv-analysis` | Không kiểm phạm vi tin (quy tắc 19) |
+
+  Sâu hơn: **tin không khai `cv_rubric` thì con số hiện cho HM/Recruiter là cảm tính của model**, và dù có khai thì
+  màn hồ sơ chỉ in một con số — không ai kiểm được con số ấy từ đâu ra.
+
+- **Quyết định.**
+  1. **Bộ tiêu chí chấm CV là BẮT BUỘC và bắt đầu từ phiếu.** HM khai trên Recruitment Request
+     (`recruitment_requests.cv_rubric_json`, ảnh chụp một chiều như `RequestedRounds`); tạo/sửa/gửi lại/duyệt phiếu
+     đều chặn nếu thiếu hoặc sai. Dựng tin thì `CreateJobCommand` chép sang tin qua **một đường ghi duy nhất**
+     `CvRubricService.SaveForJobAsync`. `UpdateJobStatusCommand` chặn **mọi lối sang `pending`/`active`** khi tin chưa có
+     bộ tiêu chí (mã `cv_rubric_required`) — kể cả admin vượt chữ ký HM, vì vượt cổng cũng không làm ra được điểm.
+  2. **Không có bộ tiêu chí → không gọi AI.** Không còn nhánh "AI tự cho `match_score`". `ICvScoringService.ScoreAsync`
+     trả `cv_rubric_required` trước khi chạm tới AI; AI không chấm được tiêu chí nào → **thất bại, không lưu**.
+     Bộ tiêu chí CV chỉ đọc ở **cấp tin** (`CvRubricStore`); `cv_rubric` cấp công ty nay chỉ là **mẫu**; upload
+     `cv_rubric` ở phạm vi tin/vòng bị từ chối (phải qua trình soạn); xoá bộ đang sống trả `409` (muốn đổi thì lưu bản mới).
+  3. **Mỗi tin đúng một bộ sống, mỗi lần lưu là một PHIÊN BẢN.** Partial UNIQUE
+     `ux_playbook_documents_job_cv_rubric`. Lưu y hệt bộ đang dùng thì không tạo phiên bản. Bản cũ: gỡ chunk trước,
+     xoá mềm sau (ADR-025); chèn hỏng vì người khác vừa lưu → trả lại bản cũ + `409`. Lưu xong báo Recruiter chủ tin.
+  4. **Khoá dùng lại = `(tin, MD5 của CV, phiên bản bộ tiêu chí)`**, UNIQUE `NULLS NOT DISTINCT`
+     (`ux_cv_jd_analyses_job_cv_rubric`, cột mới `cv_jd_analyses.rubric_document_id`). Đổi bộ tiêu chí thì khoá đổi →
+     tự thành "cần chấm lại"; **dòng cũ không bị xoá** nên lịch sử điểm còn nguyên, hồ sơ chuyển sang trỏ dòng mới.
+     Trạng thái `failed` đổi thành **`invalid_cv`** (dùng lại được, không bao giờ hiện thành điểm).
+  5. **AI chỉ chấm từng tiêu chí, kèm bằng chứng.** Gemini nhận CV + **file JD gốc** (PDF gửi nguyên, DOCX parse ra
+     text, có cache) + bộ tiêu chí kèm **mức neo** + ngữ cảnh playbook (chỉ `competency_framework`/`red_flag`/`compliance`);
+     trả `criteria[{key, score, evidence, reasoning}]` — `evidence` trích nguyên văn CV. Bỏ `match_score` và câu mặc
+     định "40/40/20"; luật Senior/fresher thành "tiêu chí kinh nghiệm không vượt 30". Thiếu khoá tiêu chí → coi là lỗi
+     → sang dự phòng.
+  6. **Dự phòng đọc được PDF.** `IAIProvider.CompleteJsonAsync(..., attachments)` → rag-service `/complete-json`
+     dựng content block `file` (base64) cho GPT-4o-mini.
+  7. **Chấm nền bằng hàng đợi tự lành.** `ICvScoringQueue` (Channel) + `CvScoringHostedService`: tối đa
+     `CvScoring:MaxConcurrency` (mặc định 3) lượt song song; mỗi `CvScoring:SweepMinutes` (mặc định 10) quét hồ sơ của
+     tin đã có bộ tiêu chí mà thiếu điểm hoặc điểm theo phiên bản cũ. Thay `Task.Run` lúc nộp hồ sơ. Khoá trong tiến
+     trình `CvScoringInFlight` dùng chung với Portal; lỗi thì lùi 15 phút → tối đa 6 giờ. Tin chưa có bộ tiêu chí: hồ
+     sơ nằm chờ (`pending_rubric`), HM nhận **một** thông báo mỗi tin (`cv_rubric_missing:{jobId}`); Portal trả `rubric_pending`.
+  8. **Điểm giải thích được.** `ApplicationResponse.CvScore` (`CvScoreBreakdownBuilder`): trạng thái
+     (`scored`/`pending_rubric`/`queued`/`rescoring`/`invalid_cv`), phép tính bằng số thật (`Σ điểm×trọng số ÷ Σ trọng số`
+     → làm tròn), từng tiêu chí (trọng số, điểm, phần góp, dải điểm, bằng chứng, lý do, chuẩn chấm, mức neo đã áp),
+     tiêu chí bị loại khỏi phép tính, nhận xét AI, phiên bản bộ tiêu chí + model. Hiện ở màn hồ sơ của HM, Recruiter,
+     HR (`CvScoreBreakdown`); danh sách hồ sơ hiện badge trạng thái thay cho ô trống/0. Nhãn khuyến nghị suy từ điểm
+     (80/65/50). Điểm chỉ hiện khi đúng phiên bản bộ tiêu chí đang sống (`CvScoreState.IsDisplayable`).
+  9. **Gỡ hẳn** `CvAnalysisController`, thư mục `Application/CvAnalysis/`, `CvJdAnalysisService`/`ICvJdAnalysisService`,
+     `PortalSupport.ComputeHash` — xử lý điểm lệch 4 và hai lỗ hổng. `CvFileHash` rời khỏi DTO nộp hồ sơ (server tự băm).
+
+- **Cách HM nhập bộ tiêu chí — lý do chọn "trình soạn web + AI gợi ý + mẫu công ty + Excel".**
+  - **Trình soạn web là đường chính** (`CvRubricEditor`, dùng ở form phiếu và hộp thoại ở màn tin): HM không phải
+    nhớ mã tiêu chí — `key` **tự sinh từ tên** (bỏ dấu → snake_case) và **giữ nguyên khi sửa**, thanh tổng trọng số
+    cập nhật trực tiếp, nút "Chia đều", báo lỗi ngay tại dòng. Excel-only (ADR-060) bắt HM tải mẫu → điền → upload → đọc
+    lỗi theo dòng → sửa → upload lại: đúng thứ khiến rubric không ai khai.
+  - **AI gợi ý bản nháp** (`POST /api/playbooks/cv-rubric/suggest`, Gemini) từ chính nội dung phiếu/tin — trọng số làm
+    tròn theo phần dư lớn nhất cho đủ 100. Chỉ là NHÁP, không lưu: HM vẫn là người quyết định chuyên môn.
+  - **Mẫu công ty** (`GET /api/playbooks/cv-rubric/templates`) = các `cv_rubric` cấp `org` HR Leader tải lên — chuẩn hoá giữa các đội.
+  - **Excel vẫn nhập/xuất được** (`parse-sheet`, `export-sheet`, `GET /api/jobs/{id}/cv-rubric/export`), cột E–H là mức
+    neo, mã để trống thì tự sinh — cho người quen soạn bảng và để lưu trữ/gửi duyệt ngoài hệ thống.
+  - **Mức neo 4 dải cố định** (90–100 / 70–89 / 40–69 / 0–39): HM chỉ viết lời, không tự đặt ngưỡng. Có neo thì hai lần
+    chấm cùng CV rơi vào cùng dải; không có neo thì "75" là cảm tính của model.
+  - **Mọi cửa (phiếu, màn tin, Excel, AI) đi qua `CvRubricEditing.Normalize`** — một bộ luật.
+
+- **Lý do.**
+  - **Vì sao bắt từ phiếu, không từ bước dựng tin.** Người biết "CV thế nào là đạt" là HM, và phiếu là chỗ duy nhất HM
+    chắc chắn đi qua. Để Recruiter khai lúc dựng tin là giao quyết định chuyên môn cho người vận hành phễu.
+  - **Vì sao cho sửa sau khi đăng + chấm lại tất cả.** Không cho sửa thì bộ tiêu chí sai đầu tiên sống mãi. Chấm lại
+    TẤT CẢ (thay vì chỉ hồ sơ mới) để mọi hồ sơ của một tin luôn so được với nhau trên cùng một thước đo.
+  - **Vì sao tin cũ vẫn nhận hồ sơ.** Chặn nộp hồ sơ là phạt ứng viên vì lỗi cấu hình nội bộ; hoãn chấm + nhắc HM
+    giữ được ứng viên mà không bao giờ hiện một con số không có căn cứ.
+  - **Vì sao khoá theo phiên bản chứ không xoá điểm cũ khi lưu.** Xoá là mất lịch sử và tạo cửa sổ hồ sơ "không có gì";
+    đổi khoá thì hàng đợi tự tìm ra việc cần làm, kể cả sau khi service khởi động lại.
+
+- **Hệ quả.**
+  - Migration `CvRubricMandatoryScoring`: thêm 2 cột, đổi `failed` → `invalid_cv`, **khử trùng** `cv_jd_analyses`
+    (gắn lại `applications.cv_jd_analysis_id` về dòng giữ lại), xoá mềm bộ `cv_rubric` thừa của cùng tin, rồi mới tạo 2
+    UNIQUE; `RAISE NOTICE` liệt kê tin đang `active` chưa có bộ tiêu chí. `Down()` đối xứng. Không có bảng mới (quy tắc 24
+    không phát sinh).
+  - Seed dev (`seed-interview-job`, `seed-practice`) tạo sẵn bộ tiêu chí cho tin.
+  - **Realtime của điểm CV (bổ sung 2026-09-17).** Chấm nền xong chỉ đổi dòng `applications`; trigger ADR-057 đã phát
+    đúng người (chủ tin + đội tuyển dụng + HR), nhưng màn tin của HM đọc hồ sơ bằng khoá `['job-applications', id]` mà
+    không nhánh realtime nào nhắc tới, và bốn màn còn giữ state cục bộ (tin + danh sách ứng viên + hồ sơ của HR, hồ sơ
+    của Recruiter) không nghe sự kiện hồ sơ → HM phải F5 mới thấy điểm. Sửa tận gốc: **một chỗ duy nhất**
+    `invalidateApplicationQueries` (`ARI.Shared/realtime/applicationRealtime.ts`) liệt kê mọi khoá đọc hồ sơ, mọi nhánh
+    sự kiện về hồ sơ đi qua nó; màn state cục bộ nghe `STAFF_APPLICATIONS_REFRESH_EVENT` và tải lại **ngầm**. Sự kiện
+    được **gom** (300 ms, tối đa 1,5 s) vì chấm lại cả tin là một loạt sự kiện liền nhau. Màn tin HM dùng lại khoá
+    `['job', id, 'applications']` như Recruiter. Lưu bộ tiêu chí chưa đổi dòng `applications` nào nên
+    `SaveJobCvRubricCommand` đẩy tay `ReceiveApplicationStatusUpdate` tới chủ tin + đội + HR → "Đang chấm lại" hiện
+    ngay ở mọi màn đang mở. Kiểm chứng trên trình duyệt thật: 3 tab (HM tin · HR tin · HR hồ sơ) tự chuyển *đang chấm →
+    điểm → đang chấm lại → điểm mới* không tải lại trang (27/27); phép thử ngược với khoá cũ cho thấy tab HM đứng im.
+  - **Trạng thái `scoring_failed` (bổ sung 2026-09-17).** Lượt chấm hỏng không ghi DB, nên trước đây màn nhân sự đứng mãi ở
+    "Đang chấm CV". Nay `CvScoringInFlight` giữ lỗi gần nhất theo khoá (hồ sơ, phiên bản bộ tiêu chí) kèm **mã lý do**
+    (`ai_unavailable` · `cv_unreadable` · `no_criterion_scored` — giao diện nói bằng lời của mình, không in lỗi của nhà
+    cung cấp AI) và mốc thử lại; `CvScoreState.Resolve(…, failure)` chỉ đổi hai trạng thái chờ (`queued`/`rescoring`)
+    thành `scoring_failed` — chấm lại hỏng thì **giữ điểm theo bộ cũ**, đã có điểm đúng bộ thì lỗi cũ không che. Lỗi
+    không đổi dòng nào nên `CvApplicationScorer` **đẩy tay** `ReceiveApplicationStatusUpdate` tới chủ tin + đội + HR.
+    Trạng thái nằm trong bộ nhớ tiến trình (không cột mới): khởi động lại thì lượt quét chấm lại ngay — đúng với thực
+    tế. Kiểm chứng trình duyệt thật với Gemini + GPT-4o-mini cùng hỏng: 3 tab tự chuyển "Chấm lỗi" sau ~4 s, giữ điểm
+    cũ, ghi lý do + giờ thử lại, không tải lại trang (21/21).
+  - Cạm bẫy đã gặp: `RubricLevels.IsEmpty` lọt vào JSON lưu DB (thiếu `[JsonIgnore]`) — e2e bắt được; xoá khoá khỏi
+    `ConcurrentDictionary` trong khi luồng khác đang chờ semaphore gây chấm trùng → khoá đếm tham chiếu; panel ở cột hẹp
+    bóp ô tên tiêu chí còn một ký tự → soạn trong hộp thoại rộng (portal ra `body`).
+
+- **Kiểm chứng.** `dotnet test`: Application **1982/1982**, Domain **63/63** (test mới: không bộ tiêu chí thì không gọi AI,
+  khoá dùng lại theo phiên bản, `invalid_cv`, JD PDF được đính kèm, chuẩn hoá/giữ key, cổng phiếu + cổng `pending`/`active`
+  kể cả admin, chép bộ tiêu chí khi dựng tin, không xoá được bộ sống, lượt quét chọn đúng hồ sơ). pytest rag-service
+  **34/34** (đính kèm file). FE: `tsc` sạch, lint không thêm cảnh báo, vitest **64/64**, `check:i18n` đạt (39 namespace),
+  build hai site. Migration áp lên DB tạm: khử trùng + gắn lại hồ sơ đúng, UNIQUE chặn trùng, Down/Up chạy được. E2E
+  trên API cô lập với **Gemini thật**: AI gợi ý (tổng 100), Excel khứ hồi, Portal và nộp hồ sơ dùng chung một dòng phân
+  tích, phép tính khớp, lưu bộ mới → chấm lại + giữ lịch sử, các lối bị chặn trả đúng mã, tin cũ `pending_rubric` + nhắc
+  HM một lần. Dự phòng: khoá Gemini sai → GPT-4o-mini chấm được CV PDF. Chụp màn hình HM/HR bằng Edge headless.
+
+- **Chấp nhận đánh đổi.**
+  - **Lưu bộ tiêu chí = một lượt gọi AI cho MỖI hồ sơ của tin.** Tin nhiều hồ sơ sửa nhiều lần là tốn quota; giảm nhẹ
+    bằng "lưu y hệt thì không tạo phiên bản" và giới hạn song song.
+  - **Khoá chống chấm trùng chỉ trong một tiến trình**; nhiều instance API thì UNIQUE ở DB là chốt cuối (bên thua đọc lại
+    dòng đã có) — vẫn có thể tốn thêm một lượt gọi AI.
+  - **`suggest` chưa giới hạn số lượt** (dự án chưa có rate limiting) — chỉ khoá theo vai: policy `HiringDecision`
+    (HM + quản trị viên, đúng tập người soạn được bộ tiêu chí), cùng lý lẽ với `analyze-jd` (ADR-042).
+  - **Tin `active` cũ không bị gỡ xuống**; chỉ hoãn chấm và nhắc HM — HM chưa khai thì hồ sơ chờ mãi.
+
+---
+
+### ADR-071: Điểm TRONG dải do ý kiểm quyết định — AI trả lời có/không, backend tính vị trí
+
+- **Ngày:** 2026-09-17
+- **Trạng thái:** Đã triển khai. **Bổ sung** ADR-070 (mức neo 4 dải) — không đổi luật "không bộ tiêu chí thì không chấm".
+
+- **Bối cảnh.** ADR-070 cho AI đối chiếu bằng chứng với mức neo để chọn DẢI (90–100 / 70–89 / 40–69 / 0–39), rồi
+  prompt chỉ nói *"choose the band … then a number inside that band"*. Câu hỏi của người dùng: vì sao CV này 95 còn CV
+  kia 90 trong cùng dải? Câu trả lời thật là **không có luật nào** — số trong dải là cảm giác của model: cùng một CV
+  chấm lại gần như ra cùng số (`temperature 0`), nhưng thứ tự giữa hai CV khác nhau trong cùng dải không được bảo đảm;
+  model còn hay chọn số tròn 5, nên "độ chính xác tới từng điểm" phần nhiều là ảo giác. Chênh 5 điểm ở tiêu chí nặng
+  35% đủ đổi nhãn khuyến nghị khi tổng sát ngưỡng 80/65/50.
+
+- **Quyết định** (người dùng chọn phương án C trong 4 phương án: luật vị trí trong prompt · 3 mức mỗi dải · **ý kiểm**
+  · chấm nhiều lần lấy trung vị).
+  1. **Mỗi tiêu chí có thêm ý kiểm** (`RubricCriterion.Checks`, tối đa 8, mỗi ý ≤ 200 ký tự): các dấu hiệu CÓ/KHÔNG
+     kiểm được từ CV (vd "Có ≥ 4 năm .NET production", "Từng dẫn dắt kỹ thuật"). Mã `k1`, `k2`… do hệ thống sinh và
+     **giữ nguyên khi sửa chữ** (cùng luật với mã tiêu chí); ý trống / trùng chữ bị bỏ.
+  2. **AI chỉ làm việc định tính:** chọn `band` và trả lời `checks: [{key, met, evidence}]`. Tiêu chí có ý kiểm thì
+     `score` để null.
+  3. **Backend tính vị trí** (`CvCriterionScoring.Resolve`):
+     `điểm = đáy dải + (ý đạt ÷ ý đã trả lời) × (đỉnh − đáy)`, làm tròn số nguyên — dải 90–100 đạt 2/4 → 95; dải
+     70–89 đạt 3/4 → 84. Đúng tinh thần ADR-060: phán đoán giao AI, số học giữ ở backend.
+  4. **Hai luật chặn:** ý AI đánh "đạt" mà **không trích được bằng chứng thì không tính** (chống bịa); ý AI bỏ sót
+     bị **loại khỏi cả tử lẫn mẫu** (cùng luật với tiêu chí bị bỏ sót).
+  5. **Tương thích ngược:** tiêu chí chưa có ý kiểm (bộ lập trước) vẫn để AI ước lượng số, nhưng **kẹp vào dải AI đã
+     chọn** và prompt có luật vị trí (đáy = vừa đạt mô tả dải · giữa = đạt rõ, nhiều bằng chứng · đỉnh = gần mô tả dải
+     trên). AI quên ghi dải → suy dải từ số. Bản chấm cũ không ghi nguồn → hiện là "AI ước lượng".
+  6. **Ý kiểm không bắt buộc** — trình soạn nhắc khi tiêu chí chưa có ý kiểm; "AI gợi ý" sinh sẵn 3–5 ý mỗi tiêu chí;
+     mẫu Excel có ví dụ (cột I, mỗi dòng trong ô một ý); dev seed có ý kiểm.
+  7. **Giải thích được:** ảnh chụp bảng điểm lưu `band`, `scoreSource` (`checklist` | `ai`), từng ý + trích dẫn;
+     `CvScoreCriterionDto` trả `BandMin/BandMax`, `ChecksMet/ChecksAnswered`, `Checks`. Màn hồ sơ in
+     *"Dải Tốt (70–89) · đạt 3/4 ý kiểm → 70 + 3/4 × 19 = 84,25 → 84"* kèm ✓/✗ và trích dẫn từng ý.
+
+- **Lý do chọn ý kiểm thay vì ba phương án kia.** AI trả lời "CV có nêu dẫn dắt kỹ thuật không, trích câu nào" đáng
+  tin hơn nhiều so với "nghĩ ra một con số" — và câu trả lời kiểm chứng được bằng mắt. Luật vị trí trong prompt vẫn
+  là cảm giác có thước đo; 3 mức mỗi dải bỏ được độ chính xác giả nhưng không nói được *vì sao*; chấm nhiều lần tốn
+  gấp ba mà không giải quyết thứ tự giữa các CV.
+
+- **Hệ quả.** Không đổi schema DB (ý kiểm nằm trong `RubricJson` / `criterion_scores` jsonb). Bộ đọc JSON nhận
+  boolean lỏng (`"có"`, `"yes"`, `1`) để một ý viết lệch kiểu không làm hỏng cả lượt chấm. `interview_rubric` không
+  đổi hành vi (không có ý kiểm).
+
+- **Kiểm chứng.** `dotnet test` Application **2013/2013** (+22: công thức 7 dải/tỉ lệ, hai CV cùng dải xếp theo ý,
+  ý đạt không trích dẫn không tính, ý bỏ sót loại khỏi mẫu, kẹp dải khi không có ý kiểm, boolean lỏng, chuẩn hoá /
+  giữ mã / trùng chữ / quá 8 ý, Excel khứ hồi, prompt, AI gợi ý, từ đầu tới cuối chấm → ảnh chụp → bảng giải thích).
+  FE vitest **81/81**, `tsc`/lint sạch, `check:i18n` đạt, build. **E2E với Gemini thật (19/19):** AI trả lời đủ mọi
+  ý, mọi ý đạt có trích dẫn, điểm khớp công thức; hai CV cùng dải Xuất sắc — 5 năm + tech lead (2/4 ý) → **95**,
+  7 năm + tech lead + 3 triệu người dùng + số liệu (4/4) → **100**; AI gợi ý sinh 3–4 ý mỗi tiêu chí.
+
+- **Chấp nhận đánh đổi.**
+  - **Dải vẫn do AI chọn** — ý kiểm chỉ khoá vị trí TRONG dải. Hai CV sát ranh giới hai dải vẫn có thể lệch dải.
+  - **Ý kiểm tốt phụ thuộc HM viết tốt:** ý mơ hồ ("kinh nghiệm tốt") thì trả lời có/không cũng mơ hồ. AI gợi ý và
+    placeholder hướng về dấu hiệu đo được.
+  - Mỗi ý nặng bằng nhau trong dải (không có trọng số con) — giữ đơn giản để HM đọc lại được phép tính.

@@ -184,6 +184,13 @@ export default function JobDetailPage() {
 
   // Phân tích độ phù hợp CV–JD theo CV trong hồ sơ ứng viên đang đăng nhập.
   const [match, setMatch] = useState<CvMatchResult | null>(null)
+
+  // Khi chưa có kết quả: tin chưa có bộ tiêu chí chấm CV (ADR-070) thì nói rõ là vẫn ứng tuyển được;
+  // các trường hợp khác dùng lời server trả (lỗi cụ thể) hoặc câu chung.
+  const matchFallbackText = (m: CvMatchResult) =>
+    m.status === 'rubric_pending'
+      ? t('jobDetail.match.rubricPending')
+      : m.message || t('jobDetail.match.cannotAnalyze')
   const [matchLoading, setMatchLoading] = useState(false)
   const [matchAuthError, setMatchAuthError] = useState(false)
 
@@ -556,7 +563,7 @@ export default function JobDetailPage() {
                     {match.analysis.skillsGaps.length > 0 && (
                       <div className="mt-3">
                         <div className="mb-1.5 text-xs font-semibold text-ink-500">
-                          {t('jobDetail.match.skillsGaps')}
+                          {t('jobDetail.match.skillsMissing')}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {match.analysis.skillsGaps.map((s, i) => (
@@ -575,7 +582,7 @@ export default function JobDetailPage() {
                         {parseMatchSummary(match.analysis.summary).strengths && (
                           <div className="mb-2">
                             <span className="font-semibold text-emerald-700">
-                              {t('jobDetail.match.strengthsLabel')}
+                              {t('jobDetail.match.strengths')}
                             </span>{' '}
                             {parseMatchSummary(match.analysis.summary).strengths}
                           </div>
@@ -583,7 +590,7 @@ export default function JobDetailPage() {
                         {parseMatchSummary(match.analysis.summary).gaps && (
                           <div>
                             <span className="font-semibold text-amber-700">
-                              {t('jobDetail.match.gapsLabel')}
+                              {t('jobDetail.match.considerations')}
                             </span>{' '}
                             {parseMatchSummary(match.analysis.summary).gaps}
                           </div>
@@ -592,7 +599,7 @@ export default function JobDetailPage() {
                     )}
                   </>
                 ) : (
-                  <p className="mt-3 text-sm text-ink-500">{t('jobDetail.match.noAnalysis')}</p>
+                  <p className="mt-3 text-sm text-ink-500">{matchFallbackText(match)}</p>
                 )}
               </div>
             ) : (
@@ -786,7 +793,7 @@ export default function JobDetailPage() {
                   </>
                 ) : (
                   <p className="mt-4 text-sm text-ink-500">
-                    {match.message || t('jobDetail.match.cannotAnalyze')}
+                    {matchFallbackText(match)}
                   </p>
                 )}
               </div>

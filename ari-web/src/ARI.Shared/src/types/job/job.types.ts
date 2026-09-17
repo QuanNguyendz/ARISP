@@ -131,6 +131,8 @@ export interface JobPosting {
   hiringManagerName?: string | null
   /** Phiếu yêu cầu tuyển dụng của tin — để mở lại trình soạn JD khi HM yêu cầu sửa. Chỉ nhân sự nhận được. */
   recruitmentRequestId?: string | null
+  /** Tin đã có bộ tiêu chí chấm CV chưa (ADR-070) — thiếu thì không gửi duyệt / đăng được. Chỉ nhân sự nhận được. */
+  hasCvRubric?: boolean | null
 }
 
 export type HmSignOffStatus = 'pending' | 'approved' | 'rejected' | 'bypassed'
@@ -201,6 +203,8 @@ export interface AnalyzeJdResult {
   location?: string
   skills: string[]
   languageRequirement?: string
+  /** Ngôn ngữ nên dùng cho các vòng phỏng vấn AI (`vi` | `en`), AI đọc từ JD — điền sẵn ô ngôn ngữ từng vòng. */
+  interviewLanguage?: 'vi' | 'en' | null
   salaryMin?: number
   salaryMax?: number
 }

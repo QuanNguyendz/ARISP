@@ -8,6 +8,7 @@ import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
 import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
 import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card'
@@ -79,19 +80,6 @@ export default function HmCandidateDetailPage() {
                 </div>
               </dl>
 
-              {typeof app.matchScore === 'number' && (
-                <div className="mt-4 border-t border-ink-100 dark:border-white/10 pt-4">
-                  <p className="text-sm font-medium text-ink-900 dark:text-white">
-                    {t('matchScore', { score: app.matchScore })}
-                  </p>
-                  {app.cvJdSummary && (
-                    <p className="mt-1.5 text-sm text-ink-600 dark:text-ink-400">
-                      {app.cvJdSummary}
-                    </p>
-                  )}
-                </div>
-              )}
-
               {app.cvFileUrl && (
                 <a
                   href={app.cvFileUrl}
@@ -103,6 +91,10 @@ export default function HmCandidateDetailPage() {
                 </a>
               )}
             </section>
+
+            {/* Điểm CV kèm cách tính (ADR-070) — HM duyệt hồ sơ dựa trên con số này, nên phải thấy nó được
+                cộng từ tiêu chí nào, với bằng chứng nào trong CV. */}
+            <CvScoreBreakdown score={app.cvScore} />
 
             {/* Kết quả phỏng vấn theo vòng (ADR-069): ca · diễn biến · báo cáo AI · video · transcript. Trước đây
                 chỉ là danh sách đánh giá — trống trơn trong lúc AI còn đang chấm buổi vừa xong. */}

@@ -120,6 +120,17 @@ namespace ARI.Application.Interfaces
         /// Sinh JSON có cấu trúc một lần theo schema mô tả trong <paramref name="systemInstruction"/>.
         /// Dùng làm fallback khi nhà cung cấp chính (Gemini) lỗi/quá tải. Trả về chuỗi JSON thô.
         /// </summary>
-        Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default);
+        /// <param name="attachments">
+        /// File gốc gửi kèm (hiện chỉ PDF) — ADR-070. Trước đây đường dự phòng chỉ nhận text trích từ
+        /// file, nên CV dạng ảnh scan tới tay model gần như rỗng mà vẫn được chấm.
+        /// </param>
+        Task<string> CompleteJsonAsync(
+            string systemInstruction,
+            string userContent,
+            IReadOnlyList<AiAttachment>? attachments = null,
+            CancellationToken ct = default);
     }
+
+    /// <summary>Một file gửi kèm lời gọi model (base64 để đi qua JSON tới rag-service).</summary>
+    public record AiAttachment(string FileName, string MimeType, byte[] Bytes);
 }

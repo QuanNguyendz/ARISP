@@ -43,8 +43,12 @@ namespace ARI.Application
             // Service 1-consumer đang được absorb dần vào handlers theo từng wave CQRS.
             services.AddScoped<ApplicationService>();
             services.AddScoped<Interfaces.IApplicationService>(sp => sp.GetRequiredService<ApplicationService>());
-            services.AddScoped<CvJdAnalysisService>();
-            services.AddScoped<Interfaces.ICvJdAnalysisService>(sp => sp.GetRequiredService<CvJdAnalysisService>());
+            // Chấm CV theo bộ tiêu chí bắt buộc (ADR-070). Khoá "đang chấm" là singleton vì nó phải
+            // chung cho mọi request và cho hàng đợi nền trong cùng tiến trình.
+            services.AddSingleton<CvScoring.CvScoringInFlight>();
+            services.AddScoped<CvScoring.ICvScoringService, CvScoring.CvScoringService>();
+            services.AddScoped<CvScoring.CvRubricService>();
+            services.AddScoped<CvScoring.CvApplicationScorer>();
             services.AddScoped<InterviewService>();
             services.AddScoped<Interfaces.IInterviewService>(sp => sp.GetRequiredService<InterviewService>());
             services.AddScoped<InterviewCodeService>();

@@ -29,7 +29,7 @@
     "expectedAnswer": "Expected Answer",
     "mustAsk": "Must-Ask Questions",
     "roundPlaybook": "Round Playbook",
-    "cvRubric": "CV Scoring Rubric",
+    "cvRubric": "CV rubric template",
     "interviewRubric": "Interview Scoring Rubric"
   },
   "uploadTitle": "Add company playbook",

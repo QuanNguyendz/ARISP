@@ -165,6 +165,12 @@ ON CONFLICT (email) DO NOTHING;
 - Lý do và Mô tả sơ bộ: vài dòng.
 - Yêu cầu ứng viên: **mỗi dòng một ý**, gõ 3 dòng.
 - Vòng phỏng vấn: **giữ nguyên** `Trắc nghiệm → Sơ loại → Chuyên môn`.
+- **Bộ tiêu chí chấm CV** (bắt buộc — ADR-070):
+  1. Bấm **AI gợi ý** (cần `GEMINI_API_KEY`). Không có key thì bấm **Thêm tiêu chí** hai lần và gõ tay:
+     `Kinh nghiệm backend` 60 và `Kỹ năng bắt buộc` 40, mỗi dòng một câu *Chuẩn chấm*.
+  2. Mở **Mức neo** ở tiêu chí đầu, điền dải *70–89 · Tốt*, ví dụ `2–4 năm backend production`.
+     Ở khối **Ý kiểm** của tiêu chí đó, thêm 3 ý kiểm được từ CV, ví dụ `Có ≥ 4 năm backend production`, `Từng dẫn dắt kỹ thuật`, `Có số liệu kết quả đo được`.
+  3. Thử sai: đổi 40 thành `30` (tổng 90) rồi bấm **Gửi phiếu** → bị chặn. Sửa lại cho tổng = 100.
 
 Bấm **Gửi phiếu**.
 
@@ -173,6 +179,9 @@ Bấm **Gửi phiếu**.
 - [ ] ✅ **A1c** — Bỏ tích *Thoả thuận* và để trống cả hai ô lương → **bị chặn**.
 - [ ] ✅ **A1d** — Đăng nhập `hr.dev`: **chuông có thông báo** phiếu mới.
 - [ ] ✅ **A1e** — Mở lại phiếu bằng `hm.dev`: **không có** nút *Duyệt & phân công* hay *Trả lại*, vì không ai tự duyệt phiếu của mình.
+- [ ] ✅ **A1f** — **AI gợi ý** điền sẵn 3–6 tiêu chí, thanh **Tổng trọng số** hiện `100%`. Xoá hết tiêu chí rồi gửi → **bị chặn**.
+- [ ] ✅ **A1g** — Tổng 90 thì thanh tổng đổi màu và phiếu **không gửi được**. Không cần gõ mã tiêu chí.
+- [ ] ✅ **A1h** — Chi tiết phiếu hiện khối **Bộ tiêu chí chấm CV**: từng tiêu chí, trọng số và mức neo đã điền.
 
 ### A2 · HR Leader trả phiếu về — `RejectRecruitmentRequestCommand`
 **Đăng nhập:** `hr.dev` → **Phiếu yêu cầu tuyển dụng** → mở phiếu → **Trả lại**
@@ -196,6 +205,7 @@ Bấm **Gửi phiếu**.
 
 - [ ] ✅ **A4** — Nút duyệt **mờ khi chưa chọn Recruiter**. Duyệt xong, phiếu sang **Đã duyệt** và hiện *Phụ trách: Recruiter Dev*.
 - [ ] ✅ **A4b** — `recruiter.dev` nhận chuông *"Bạn được phân công một yêu cầu tuyển dụng"*.
+- [ ] ✅ **A4c** — Trước khi duyệt, HR Leader **đọc được** bộ tiêu chí trên phiếu (chỉ đọc, không có nút sửa).
 
 ---
 
@@ -223,6 +233,7 @@ Trong trình soạn → **Dựng tin từ JD này** → kiểm biểu mẫu → 
 - [ ] ✅ **B2b (System)** — Mở tin vừa tạo: thẻ **Đội tuyển dụng** đã có `HM Dev` kèm chip **Người quyết định**, dù **không ai gán tay**.
 - [ ] ✅ **B2c (System)** — Cửa sổ uvicorn hiện dòng `POST /ingest` (JD được nạp vào RAG).
 - [ ] ✅ **B2d** — Quay lại phiếu: nút dựng tin **biến mất**, thay bằng *"Phiếu này đã có tin tuyển dụng."*
+- [ ] ✅ **B2e** — Biểu mẫu tạo tin có khối **Bộ tiêu chí chấm CV** chỉ đọc, ghi *"Hiring Manager đã khai trên phiếu…"*. Mở tin vừa tạo: thẻ **Bộ tiêu chí chấm CV** có đúng các tiêu chí đó, dòng *Lưu lúc … · HM Dev*.
 
 ### B3 · Gửi HM ký khi ngân hàng đề còn trống → phải bị chặn
 **Vẫn là** `recruiter.dev` → **Tin tuyển dụng** → mở tin → **Gửi HM ký duyệt**
@@ -271,6 +282,9 @@ Recruiter chủ tin cũng làm được, qua nút **Ngân hàng câu hỏi**.
 > Thiếu **Tiêu chí chấm phỏng vấn** (ở cấp tin hoặc cấp công ty) thì sau buổi phỏng vấn **không sinh
 > được báo cáo đánh giá**, và giao diện **không báo lỗi gì**.
 
+> **Bộ tiêu chí chấm CV không nằm ở đây** — nó có thẻ riêng *Bộ tiêu chí chấm CV* (xem H18). Danh sách loại
+> tài liệu của thẻ này không còn mục chấm CV.
+
 1. Loại tài liệu `Tiêu chí chấm phỏng vấn` → **Tải file mẫu**. Sửa thành 2 tiêu chí: `technical` 60 và `communication` 40.
 2. Thử sai trước: đổi 40 thành `50` (tổng 110) → **Tải lên** → **bị từ chối**.
 3. Sửa lại cho tổng = 100 → Áp cho `Cả tin (mọi vòng)` → **Tải lên**.
@@ -297,11 +311,13 @@ Recruiter chủ tin cũng làm được, qua nút **Ngân hàng câu hỏi**.
 ### C1 · Ứng viên nộp hồ sơ — `SubmitApplicationCommand`
 **Đăng nhập (:3000):** `practice.dev` → mở tin `Senior Backend Engineer`
 
-1. (Tuỳ chọn) Tải CV lên để xem **điểm phù hợp CV–JD** (cần `GEMINI_API_KEY`).
+1. (Tuỳ chọn) Tải CV lên để xem **điểm phù hợp CV–JD**. Cần `GEMINI_API_KEY`; thiếu thì hệ thống chuyển sang GPT-4o-mini qua rag-service.
 2. **Ứng tuyển** → tải CV lên → **Gửi hồ sơ ứng tuyển**.
 
 - [ ] ✅ **C1** — Hồ sơ hiện trong **Việc đã ứng tuyển**.
-- [ ] ✅ **C1b (System)** — Ở màn tin của Recruiter, hồ sơ nằm cột **Mới ứng tuyển** và có **Điểm CV**. Nếu chưa có `GEMINI_API_KEY` thì cột này trống; ghi nhận rồi đi tiếp.
+- [ ] ✅ **C1b (System)** — Ở màn tin của Recruiter, hồ sơ nằm cột **Mới ứng tuyển**. Cột **Điểm CV** hiện *Đang chấm CV* rồi **tự** thành con số khi AI chấm xong — không cần tải lại trang (hàng đợi nền + realtime). Không có key AI nào dùng được thì dừng ở *Đang chấm CV*; ghi nhận rồi đi tiếp.
+- [ ] ✅ **C1c** — Mở hồ sơ bằng `recruiter.dev` và `hm.dev`: thẻ **Điểm CV và cách tính** có dòng **Phép tính** bằng số thật, ví dụ `(85×60 + 70×40) ÷ (60 + 40) = 79 → làm tròn 79`. Bấm một tiêu chí → thấy khối **Điểm trong dải** (ví dụ `Dải Tốt (70–89) · đạt 2/3 ý kiểm → 70 + 2/3 × 19 = 82,67 → 83`, từng ý ✓/✗ kèm trích dẫn), **Bằng chứng trong CV**, **Lý do chấm**, **Chuẩn chấm của doanh nghiệp** và **Dải điểm áp dụng**.
+- [ ] ✅ **C1d** — Điểm ứng viên thấy ở trang tin (:3000) **bằng đúng** điểm nhân sự thấy: cùng một bản chấm, AI không chạy lại.
 
 ### C2 · Recruiter sàng CV, gửi HM duyệt — `RequestHmApprovalCommand`
 **Đăng nhập:** `recruiter.dev` → mở tin → cột **Mới ứng tuyển** → chọn ứng viên → **Duyệt hồ sơ**
@@ -539,6 +555,8 @@ Hồ sơ mới: tạo thêm một tài khoản ứng viên, hoặc gọi lại `
 | H14 | HM chốt **Không đạt** | Báo cáo → chốt Không đạt | Hồ sơ `not_pass`, có thư cảm ơn |
 | H15 | Ứng viên **từ chối thư mời** / thư **quá hạn** | G4 → **Từ chối**, hoặc để quá hạn trả lời | Hồ sơ `offer_declined`. Thư quá hạn thì trạng thái thư là *Hết hạn* |
 | H16 | Chặn giá trị đơn vị tiền lạ | Gọi API tạo phiếu/tin với `"salaryCurrency":"EUR"` | Trả lỗi *"Đơn vị tiền chỉ được chọn VND hoặc USD."* |
+| H17 | Tin **chưa có bộ tiêu chí chấm CV** (tin cũ trước ADR-070) | Dùng tin sandbox của `seed-interview-job` hoặc một tin cũ: xoá mềm bộ tiêu chí bằng SQL (`update playbook_documents set deleted_at = now() where scope_ref_id = '<jobId>' and document_type = 'cv_rubric'`) → ứng viên nộp hồ sơ | Hồ sơ hiện **Chờ tiêu chí** (không phải 0 điểm). Trang tin của ứng viên báo *"Tin này chưa sẵn sàng chấm độ phù hợp CV…"*. `hm.dev` nhận **một** chuông nhắc khai bộ tiêu chí. Tin **nháp** như vậy bấm **Gửi HM ký duyệt** → bị chặn; tin **Chờ duyệt** như vậy thì HR **Đăng vượt cổng HM** cũng bị chặn |
+| H18 | HM **sửa bộ tiêu chí** sau khi đăng → chấm lại | `hm.dev` → màn tin → thẻ **Bộ tiêu chí chấm CV** → **Sửa** → đổi trọng số hoặc thêm tiêu chí → **Lưu bộ tiêu chí** | Hộp thoại báo trước *"Lưu bộ mới sẽ chấm lại N hồ sơ…"*. Sau khi lưu, hồ sơ hiện **Đang chấm lại** rồi ra điểm mới. Recruiter chủ tin nhận chuông. Lưu lại y hệt không làm chấm lại. `recruiter.dev` mở thẻ này **chỉ đọc được** |
 
 ---
 
@@ -551,7 +569,9 @@ Hồ sơ mới: tạo thêm một tài khoản ứng viên, hoặc gọi lại `
 | AI hỏi chung chung, không bám playbook | rag-service đang dùng **database khác** với API. Xem [rag-service-local-setup.md](rag-service-local-setup.md) |
 | Phỏng vấn xong nhưng **không có báo cáo** | Tin chưa có **Tiêu chí chấm phỏng vấn** (bước B9). Log API ghi *"CHƯA khai bộ tiêu chí chấm phỏng vấn"*. Nạp rubric rồi chấm lại bằng `POST /api/dev/regrade-session/{sessionId}` |
 | HM không lập được phiếu | Tài khoản chưa có đội. Làm lại bước 1.3 |
-| **Gửi HM ký duyệt** bị chặn | Ngân hàng đề ít câu hơn *Số câu mỗi bài* (bước B4) |
+| **Gửi HM ký duyệt** bị chặn | Ngân hàng đề ít câu hơn *Số câu mỗi bài* (bước B4), hoặc tin **chưa có bộ tiêu chí chấm CV** (phiếu lập trước ADR-070) — HM khai ở thẻ *Bộ tiêu chí chấm CV* của màn tin |
+| Điểm CV hiện *Chấm lỗi · sẽ thử lại* | Cả Gemini lẫn dự phòng GPT-4o-mini đều lỗi (hoặc không đọc được file CV). Màn hồ sơ ghi lý do + giờ tự thử lại (15 phút, lùi dần tới 6 giờ); không cần thao tác. Xem log API dòng `Chấm CV hồ sơ … thất bại` |
+| Điểm CV hiện *Chờ tiêu chí* | Tin chưa có bộ tiêu chí chấm CV (H17) |
 | Không chọn được ca khi xếp lịch vòng 2/3 | Ca nằm ngoài **Lịch tôi có mặt được** của HM, hoặc trùng giờ với buổi khác của ứng viên |
 | Không tạo được ca | Giờ bắt đầu đã ở quá khứ, vì ca phải nằm trong tương lai |
 | Bài thi báo chưa mở | Chưa tới giờ bắt đầu ca. Bài chỉ mở trong 1 giờ kể từ giờ bắt đầu |

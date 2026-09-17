@@ -23,17 +23,20 @@ namespace ARI.Application.Jobs.Commands.CreateJob
         private readonly IUnitOfWork _unitOfWork;
         private readonly IRagIngestionService _ragIngestion;
         private readonly INotificationService _notificationService;
+        private readonly CvScoring.CvRubricService _cvRubrics;
         private readonly ILogger<CreateJobCommandHandler> _logger;
 
         public CreateJobCommandHandler(
             IUnitOfWork unitOfWork,
             IRagIngestionService ragIngestion,
             INotificationService notificationService,
+            CvScoring.CvRubricService cvRubrics,
             ILogger<CreateJobCommandHandler> logger)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
             _notificationService = notificationService;
+            _cvRubrics = cvRubrics;
             _logger = logger;
         }
 
@@ -153,6 +156,14 @@ namespace ARI.Application.Jobs.Commands.CreateJob
             }
 
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // ADR-070: bộ tiêu chí chấm CV HM khai trên phiếu trở thành bộ tiêu chí của tin. Không chặn tạo
+            // tin nếu bước này hỏng (Recruiter đã soạn xong JD) — cổng gửi duyệt sẽ chặn, và HM khai lại
+            // được ngay ở màn tin.
+            var copied = await _cvRubrics.CopyFromRequestAsync(job, recruitmentRequest, ct);
+            if (copied.IsFailure)
+                _logger.LogWarning("Chép bộ tiêu chí CV từ phiếu {RequestId} sang tin {JobId} thất bại: {Error}",
+                    recruitmentRequest.Id, job.Id, copied.Error);
 
             // Ingest JD vào RAG (chunk+embed+pgvector) để retrieve khi phỏng vấn. Không chặn
             // tạo job nếu RAG service lỗi — chỉ ghi log (có thể re-ingest sau).

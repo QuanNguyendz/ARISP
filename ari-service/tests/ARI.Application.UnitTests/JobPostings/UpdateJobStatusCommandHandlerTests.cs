@@ -30,9 +30,13 @@ public class UpdateJobStatusCommandHandlerTests
     private static Ctx NewCtx() => new(new InMemoryUnitOfWork(), new RecordingFileStorage(), new RecordingJdStampService(),
         new StubDocumentParser(), new RecordingNotificationService(), new RecordingEmailService());
 
-    private static Task<Result<JobPostingResponse>> Run(Ctx c, Guid jobId, UpdateJobStatusRequest req, Guid userId, string role)
-        => new UpdateJobStatusCommandHandler(c.Uow, c.Storage, c.Stamp, c.Parser, c.Notif, c.Email, NullLogger<UpdateJobStatusCommandHandler>.Instance)
+    private static Task<Result<JobPostingResponse>> Run(
+        Ctx c, Guid jobId, UpdateJobStatusRequest req, Guid userId, string role, bool withRubric = true)
+    {
+        if (withRubric) ARI.Application.UnitTests.CvScoring.CvScoringKit.EnsureRubricsForAllJobs(c.Uow);
+        return new UpdateJobStatusCommandHandler(c.Uow, c.Storage, c.Stamp, c.Parser, c.Notif, c.Email, NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, req, userId, role), CancellationToken.None);
+    }
 
     private static UpdateJobStatusRequest Req(string status, string? reason = null) => JobPostingData.StatusRequest(status, reason);
 

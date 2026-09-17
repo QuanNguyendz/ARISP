@@ -114,7 +114,8 @@ namespace ARI.Application.Evaluations.Queries.GetEvaluationDetail
             {
                 var analysis = await _unitOfWork.Repository<CvJdAnalysis>()
                     .GetByIdAsync(application.CvJdAnalysisId.Value, ct);
-                if (analysis != null)
+                // Chỉ điểm chấm theo bộ tiêu chí (ADR-070) — không hiện điểm AI tự cho hay "0" của file không phải CV.
+                if (analysis != null && ARI.Application.CvScoring.CvScoreState.IsDisplayable(analysis.Status, analysis.RubricDocumentId))
                 {
                     response.CvMatchScore = analysis.MatchScore;
                     response.CvMatchSummary = analysis.Summary;

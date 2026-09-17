@@ -29,7 +29,7 @@
     "expectedAnswer": "Đáp án mong đợi",
     "mustAsk": "Câu hỏi bắt buộc",
     "roundPlaybook": "Playbook theo vòng",
-    "cvRubric": "Tiêu chí chấm CV",
+    "cvRubric": "Mẫu bộ tiêu chí chấm CV",
     "interviewRubric": "Tiêu chí chấm phỏng vấn"
   },
   "uploadTitle": "Thêm playbook công ty",

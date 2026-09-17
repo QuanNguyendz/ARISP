@@ -29,7 +29,7 @@ public class RequestedRoundsTests
         new("Backend Developer", 2, RecruitmentPriority.Medium, "Mở rộng đội",
             "Cần kỹ sư .NET", "Thành thạo C#", rounds,
             "full_time", "onsite", "Hà Nội", "senior",
-            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND", false);
+            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND", false, ARI.Application.UnitTests.CvScoring.CvScoringKit.SampleRubric());
 
     private static InMemoryUnitOfWork Seed()
     {
@@ -84,15 +84,18 @@ public class RequestedRoundsTests
         Assert.Contains("ít nhất một vòng", res.Error);
     }
 
-    [Fact]
-    public async Task Qua_nhieu_vong_bi_chan()
+    [Theory]
+    [InlineData("technical", "technical")]
+    [InlineData("screening", "technical", "SCREENING ")]
+    [InlineData("online_test", "screening", "technical", "online_test")]
+    public async Task Moi_loai_vong_chi_chon_mot_lan(params string[] rounds)
     {
-        var many = Enumerable.Repeat(InterviewRoundTypes.Technical, InterviewRoundTypes.MaxRounds + 1).ToList();
-
-        var res = await Create(Seed(), many);
+        // Danh sách chọn trên phiếu chỉ cho thêm mỗi loại một lần; request tự dựng gửi trùng thì báo lỗi
+        // chứ không âm thầm bỏ bớt một vòng người dùng đã chọn.
+        var res = await Create(Seed(), rounds);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Tối đa", res.Error);
+        Assert.Contains("một lần", res.Error);
     }
 
     [Fact]

@@ -63,8 +63,11 @@ internal sealed class FakeJdGeminiProvider : IGeminiProvider
     }
 
     public Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(
-        string jdText, byte[]? cvFileBytes, string? cvMimeType, string? fallbackCvText,
-        string? rubricInstruction = null, CancellationToken ct = default)
+        CvScoringAiRequest request, CancellationToken ct = default)
+        => throw new NotImplementedException();
+
+    public Task<Result<System.Collections.Generic.List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(
+        CvRubricSuggestionInput input, CancellationToken ct = default)
         => throw new NotImplementedException();
 
     public Task<Result<CvReviewResultDto>> ReviewCvAsync(

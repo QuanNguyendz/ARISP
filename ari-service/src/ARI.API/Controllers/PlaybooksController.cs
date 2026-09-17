@@ -3,6 +3,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.CvScoring;
+using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
 using ARI.Application.Playbooks.Commands.DeletePlaybook;
 using ARI.Application.Playbooks;
@@ -58,6 +60,58 @@ namespace ARI.API.Controllers
             var bytes = RubricSheet.BuildTemplate(forCv);
             var fileName = forCv ? "mau-tieu-chi-cham-cv.xlsx" : "mau-tieu-chi-cham-phong-van.xlsx";
             return File(bytes, RubricSheet.XlsxContentType, fileName);
+        }
+
+        // ---------------- Trình soạn bộ tiêu chí chấm CV (ADR-070) — công cụ điền nhanh, không lưu ----------------
+
+        /// <summary>Đọc file Excel thành bản nháp cho trình soạn.</summary>
+        [HttpPost("cv-rubric/parse-sheet")]
+        [Authorize(Policy = "InternalStaff")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ParseCvRubricSheet(IFormFile file, CancellationToken ct)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Hãy chọn file Excel." });
+            if (!string.Equals(Path.GetExtension(file.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Bộ tiêu chí phải là file Excel (.xlsx)." });
+            if (file.Length > PlaybookAccess.MaxFileBytes)
+                return BadRequest(new { message = "Kích thước file không được vượt quá 15MB." });
+
+            var bytes = await PlaybookUpload.ReadAsync(file, ct);
+            var result = await _sender.Send(new ParseCvRubricSheetCommand(bytes), ct);
+            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+        }
+
+        /// <summary>Xuất bản nháp đang soạn ra file Excel.</summary>
+        [HttpPost("cv-rubric/export-sheet")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> ExportCvRubricSheet([FromBody] SaveCvRubricRequest body, CancellationToken ct)
+        {
+            var result = await _sender.Send(new ExportCvRubricSheetQuery(body?.Criteria ?? new()), ct);
+            return result.IsFailure
+                ? BadRequest(new { message = result.Error })
+                : File(result.Value!, RubricSheet.XlsxContentType, "bo-tieu-chi-cham-cv.xlsx");
+        }
+
+        /// <summary>Mẫu bộ tiêu chí của công ty (HR Leader tải lên ở màn Playbook) để HM chép.</summary>
+        [HttpGet("cv-rubric/templates")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetCvRubricTemplates(CancellationToken ct)
+        {
+            var result = await _sender.Send(new GetCvRubricTemplatesQuery(), ct);
+            return Ok(result.Value);
+        }
+
+        /// <summary>AI gợi ý bản nháp bộ tiêu chí từ nội dung phiếu / tin.</summary>
+        // Mỗi lần gọi là một lượt Gemini có tính phí (cùng lý lẽ với analyze-jd), nên chỉ mở cho vai SOẠN được
+        // bộ tiêu chí: HM (phiếu + màn tin) và quản trị viên. Recruiter chỉ đọc bộ tiêu chí.
+        [HttpPost("cv-rubric/suggest")]
+        [Authorize(Policy = "HiringDecision")]
+        public async Task<IActionResult> SuggestCvRubric([FromBody] CvRubricSuggestionInput body, CancellationToken ct)
+        {
+            if (body == null) return BadRequest(new { message = "Thiếu nội dung để gợi ý." });
+            var result = await _sender.Send(new SuggestCvRubricCommand(body), ct);
+            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
         }
 
         /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD; riêng bộ tiêu chí chấm điểm là .xlsx).</summary>

@@ -42,7 +42,11 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **Email Log** | Bản ghi thư đã gửi cho ứng viên (`email_logs`) — lưu **đúng nội dung đã rời hệ thống** (bản đã lọc HTML), không phải bản dựng lại từ mẫu |
 | **AI Interviewer** | AI agent đóng vai nhà phỏng vấn tự động trong Interview Session |
 | **Evaluation Report** | Báo cáo đầy đủ AI xuất sau session: Verdict, Score, Reasoning, per-question analysis |
-| **Scoring Rubric** | Bộ tiêu chí đánh giá tùy chỉnh theo vị trí (technical, communication, culture fit, v.v.) |
+| **Scoring Rubric** | Bộ tiêu chí đánh giá tùy chỉnh theo vị trí (technical, communication, culture fit, v.v.). Hai loại: `interview_rubric` (chấm buổi phỏng vấn, ADR-060) và **Bộ tiêu chí chấm CV** (ADR-070) |
+| **Bộ tiêu chí chấm CV (`cv_rubric`)** | Danh sách tiêu chí + trọng số (tổng 100) + chuẩn chấm + **mức neo** mà AI dùng để chấm CV của một tin (ADR-070). **Bắt buộc**: HM khai ngay trên phiếu yêu cầu, chép sang tin khi dựng tin; tin thiếu bộ tiêu chí không gửi duyệt/đăng được và **không có CV nào được chấm**. Mỗi tin đúng **một bộ sống**; mỗi lần lưu là một **phiên bản** mới. HM chính (hoặc quản trị viên) sửa được ở màn tin. `cv_rubric` cấp công ty chỉ là **mẫu** để chép |
+| **Ý kiểm (Checklist)** | Các dấu hiệu CÓ/KHÔNG kiểm được từ CV trong một tiêu chí (tối đa 8, vd "Có ≥ 4 năm .NET production"). AI chọn dải điểm rồi trả lời từng ý kèm trích dẫn; **điểm trong dải do backend tính**: đáy dải + (ý đạt ÷ ý đã trả lời) × độ rộng dải — dải 90–100 đạt 2/4 → 95. Ý "đạt" không có trích dẫn không được tính (ADR-071) |
+| **Mức neo (Levels)** | Lời mô tả cụ thể cho 4 dải điểm cố định của một tiêu chí: 90–100 xuất sắc · 70–89 tốt · 40–69 đạt một phần · 0–39 chưa đạt. Người khai chỉ viết lời, không tự đặt ngưỡng — để hai lần chấm cùng CV rơi vào cùng dải |
+| **Chấm lại (Rescoring)** | Lưu phiên bản bộ tiêu chí mới → mọi hồ sơ của tin tự được chấm lại theo bộ mới (hàng đợi nền). Điểm cũ **giữ làm lịch sử**, không bị xoá; trong lúc chờ, hồ sơ hiện "Đang chấm lại" thay vì điểm cũ |
 | **JD (Job Description)** | Mô tả công việc – AI dùng để định hướng câu hỏi sát yêu cầu doanh nghiệp |
 | **CV (Resume)** | Hồ sơ ứng viên – AI dùng để cá nhân hóa câu hỏi theo kinh nghiệm thực tế |
 | **Transcript** | Nội dung text được chuyển từ audio của ứng viên (qua Deepgram Nova-3 STT) |
@@ -68,8 +72,9 @@ Thuật ngữ và định nghĩa domain dùng trong dự án.
 | **CheatScore** | Điểm tổng hợp từ các Cheat Signal theo trọng số từng loại, gửi kèm kết quả cho nhân sự. **Là dữ kiện tham khảo cho người chấm, không tự đánh trượt ai** |
 | **Magic Link** | Link xác thực email không cần mật khẩu, **TTL 15 phút, dùng một lần**. Dùng cho Candidate Portal, xác minh email và đặt lại mật khẩu |
 | **Pre-provisioning** | Super Admin tạo sẵn tài khoản nhân sự trong DB — **không có self-register** cho vai trò nội bộ. Email chưa có trong DB thì bị chặn đăng nhập, không tạo tài khoản nháp |
-| **CV-JD Match Analysis** | Tính năng dùng Gemini AI phân tích mức độ phù hợp giữa CV (file) và JD (file/text), trả về matchScore (0–100) + summary. Dành cho candidate xem trước khi ứng tuyển – kết quả gửi y hệt cho HR, không phân tích lại |
-| **Match Score** | Điểm phù hợp (0–100) do Gemini AI chấm khi so sánh CV với JD. Chỉ mang tính tham khảo – candidate luôn có thể ứng tuyển bất kể điểm |
+| **CV-JD Match Analysis** | Gemini AI chấm CV (file) so với JD (file gốc + nội dung tin) **theo Bộ tiêu chí chấm CV của tin** — từng tiêu chí kèm bằng chứng trích từ CV (ADR-070). Một lần cho mỗi (tin, CV, phiên bản bộ tiêu chí); ứng viên xem trước khi ứng tuyển và nhân sự nhận đúng bản đó, không chấm lại. Tin chưa có bộ tiêu chí thì không chấm |
+| **Match Score** | Điểm phù hợp (0–100) = **trung bình có trọng số** của điểm từng tiêu chí, **do backend tính** (AI không tự cho điểm tổng); tiêu chí AI không chấm được bị loại khỏi cả tử lẫn mẫu. HM/Recruiter/HR xem được **phép tính và bằng chứng** từng tiêu chí ở màn hồ sơ. Chỉ mang tính tham khảo – candidate luôn có thể ứng tuyển bất kể điểm |
+| **Trạng thái điểm CV** | `scored` (có điểm) · `pending_rubric` (tin chưa có bộ tiêu chí) · `queued` (đang chờ chấm) · `rescoring` (đang chấm lại theo bộ mới) · `scoring_failed` (lượt chấm hỏng — kèm lý do + giờ hệ thống tự thử lại; đang chấm lại mà hỏng thì vẫn giữ điểm theo bộ cũ) · `invalid_cv` (file không phải CV — không bao giờ hiện thành 0 điểm) |
 | **JD File** | File mô tả công việc gốc (PDF/DOCX) được HR upload kèm Job Posting, bên cạnh text JD. Gemini ưu tiên phân tích từ file gốc |
 | **Skills Gap** | Danh sách kỹ năng mà JD yêu cầu nhưng CV chưa thể hiện – Gemini tự động detect và liệt kê |
 | **Account Request (Yêu cầu tạo tài khoản)** | Đề xuất tạo tài khoản staff do HR Leader gửi (lẻ hoặc hàng loạt cùng `BatchId`), lưu ở bảng `account_requests` status `pending`/`approved`/`rejected`. Super Admin duyệt → tạo `User` active + email mật khẩu tạm, hoặc từ chối kèm lý do (ADR-041) |

@@ -22,6 +22,8 @@ import { roundTypeKey } from '@ari/shared/utils/roundTypes'
 import OnlineTestAnswerSheetModal from './OnlineTestAnswerSheetModal'
 import InterviewCodeCard from './InterviewCodeCard'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import { useCvScoreText } from '@/components/cvScore/useCvScoreText'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
   buildStages,
@@ -746,13 +748,7 @@ function CandidateTable({
                   {age != null ? t('pipeline.ageValue', { count: age }) : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  {a.matchScore != null ? (
-                    <span className="text-sm font-semibold text-ink-900 dark:text-white">
-                      {formatScore(a.matchScore)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-ink-300">—</span>
-                  )}
+                  <CvScoreBadge score={a.matchScore} status={a.cvScoreStatus} retryAt={a.cvScoreRetryAt} />
                 </td>
                 {showTestScore && (
                   <td className="whitespace-nowrap px-4 py-3">
@@ -898,6 +894,7 @@ function CandidateDetail({
   const { t } = useTranslation('modules/staff/candidatePipeline')
   const age = ageFrom(app.candidateDateOfBirth)
   const busy = processingAppId === app.id
+  const cvScoreText = useCvScoreText()
 
   // Vòng CV thì duyệt/loại; đã vào phễu phỏng vấn thì mời lịch/loại. Cùng luật với bảng cũ, chỉ đổi
   // chỗ đặt nút — trang mẹ vẫn là nơi thực thi.
@@ -955,7 +952,7 @@ function CandidateDetail({
         <Row label={t('pipeline.appliedAt')} value={new Date(app.createdAt).toLocaleDateString('vi-VN')} />
         <Row
           label={t('pipeline.colMatch')}
-          value={app.matchScore != null ? formatScore(app.matchScore) : null}
+          value={cvScoreText(app.matchScore, app.cvScoreStatus)}
         />
       </dl>
 

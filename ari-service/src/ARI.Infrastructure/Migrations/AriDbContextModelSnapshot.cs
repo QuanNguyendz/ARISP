@@ -647,6 +647,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("red_flags");
 
+                    b.Property<Guid?>("RubricDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rubric_document_id");
+
+                    b.Property<string>("SeniorityAlignment")
+                        .HasColumnType("text")
+                        .HasColumnName("seniority_alignment");
+
                     b.Property<string>("SkillsGaps")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -673,7 +681,13 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("JobPostingId", "CvHash");
+                    b.HasIndex("RubricDocumentId");
+
+                    b.HasIndex("JobPostingId", "CvHash", "RubricDocumentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_cv_jd_analyses_job_cv_rubric");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("JobPostingId", "CvHash", "RubricDocumentId"), false);
 
                     b.ToTable("cv_jd_analyses", (string)null);
                 });
@@ -2395,6 +2409,11 @@ namespace ARI.Infrastructure.Migrations
                     b.HasIndex("DeletedAt")
                         .HasDatabaseName("idx_playbook_docs_active_deleted");
 
+                    b.HasIndex("ScopeRefId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playbook_documents_job_cv_rubric")
+                        .HasFilter("scope = 'job_posting' AND document_type = 'cv_rubric' AND deleted_at IS NULL");
+
                     b.HasIndex("UploadedByUserId");
 
                     b.HasIndex("Scope", "ScopeRefId")
@@ -2466,6 +2485,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("CvRubricJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("cv_rubric_json");
 
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2934,6 +2957,11 @@ namespace ARI.Infrastructure.Migrations
                         .HasForeignKey("JobPostingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("ARI.Domain.Entities.PlaybookDocument", null)
+                        .WithMany()
+                        .HasForeignKey("RubricDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("ARI.Domain.Entities.EmailLog", b =>

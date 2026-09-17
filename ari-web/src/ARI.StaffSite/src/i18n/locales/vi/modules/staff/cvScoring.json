@@ -1,0 +1,180 @@
+{
+  "editor": {
+    "title": "Bộ tiêu chí chấm CV",
+    "hint": "Hệ thống chấm CV ứng viên theo đúng các tiêu chí này: AI cho mỗi tiêu chí 0–100 điểm kèm trích dẫn từ CV, điểm cuối là trung bình có trọng số. Không có bộ tiêu chí thì không chấm được CV nào.",
+    "aiSuggest": "AI gợi ý",
+    "aiSuggesting": "AI đang soạn…",
+    "aiNeedsContent": "Nhập vị trí và mô tả hoặc yêu cầu ứng viên trước khi nhờ AI gợi ý.",
+    "replaceConfirm": "Thay các tiêu chí đang có bằng bản mới?",
+    "replace": "Thay",
+    "templates": "Mẫu công ty",
+    "templatesLoading": "Đang tải mẫu…",
+    "noTemplates": "Chưa có mẫu nào — HR Leader thêm mẫu ở màn Playbook.",
+    "templateItem": "{{name}} · {{count}} tiêu chí",
+    "importExcel": "Nhập Excel",
+    "exportExcel": "Xuất Excel",
+    "downloadBlank": "Tải file mẫu",
+    "addCriterion": "Thêm tiêu chí",
+    "criterionN": "Tiêu chí {{n}}",
+    "name": "Tên tiêu chí",
+    "namePlaceholder": "VD: Kinh nghiệm backend .NET",
+    "weight": "Trọng số (%)",
+    "guide": "Chuẩn chấm",
+    "guidePlaceholder": "Ứng viên tốt thể hiện điều gì trong CV?",
+    "levelsHint": "Mô tả cụ thể từng dải điểm (số năm, công nghệ, kết quả đo được) để AI chấm nhất quán.",
+    "showLevels": "Mức neo ({{count}}/4)",
+    "hideLevels": "Ẩn mức neo",
+    "level": {
+      "excellent": "90–100 · Xuất sắc",
+      "good": "70–89 · Tốt",
+      "fair": "40–69 · Đạt một phần",
+      "poor": "0–39 · Chưa đạt"
+    },
+    "levelPlaceholder": {
+      "excellent": "VD: Từ 4 năm làm sản phẩm thật, có dẫn dắt kỹ thuật",
+      "good": "VD: 2–4 năm, đúng lĩnh vực",
+      "fair": "VD: Dưới 2 năm hoặc lĩnh vực gần",
+      "poor": "VD: Chỉ có dự án học tập"
+    },
+    "moveUp": "Đưa lên",
+    "moveDown": "Đưa xuống",
+    "remove": "Xoá tiêu chí",
+    "total": "Tổng trọng số",
+    "balance": "Chia đều",
+    "problems": {
+      "empty": "Cần ít nhất 1 tiêu chí.",
+      "missingName": "Có tiêu chí chưa có tên.",
+      "badWeight": "Trọng số mỗi tiêu chí phải lớn hơn 0.",
+      "total": "Tổng trọng số phải bằng 100 (đang là {{total}}).",
+      "missingGuide": "Mỗi tiêu chí cần chuẩn chấm hoặc ít nhất một mức neo.",
+      "tooMany": "Tối đa 20 tiêu chí.",
+      "tooManyChecks": "Mỗi tiêu chí tối đa 8 ý kiểm."
+    },
+    "warnings": "Cần xem lại trước khi lưu:",
+    "empty": "Chưa có tiêu chí nào. Bấm \"AI gợi ý\", chọn mẫu công ty, nhập Excel hoặc thêm tay.",
+    "readOnlyEmpty": "Chưa có bộ tiêu chí.",
+    "error": "Không thực hiện được. Vui lòng thử lại.",
+    "checks": {
+      "title": "Ý kiểm ({{count}})",
+      "hint": "AI chỉ trả lời có/không từng ý kèm trích dẫn; điểm trong dải = đáy dải + tỉ lệ ý đạt × độ rộng dải.",
+      "emptyHint": "Chưa có ý kiểm — AI sẽ tự ước lượng vị trí điểm trong dải. Thêm 3–5 dấu hiệu kiểm được từ CV để hai CV cùng dải được xếp đúng thứ tự.",
+      "placeholder": "VD: Có ≥ 4 năm làm .NET production",
+      "item": "Ý kiểm {{n}}",
+      "add": "Thêm ý kiểm",
+      "remove": "Xoá ý kiểm",
+      "readOnlyTitle": "Ý kiểm (quyết định điểm trong dải):"
+    }
+  },
+  "panel": {
+    "title": "Bộ tiêu chí chấm CV",
+    "missing": "Tin chưa có bộ tiêu chí — chưa gửi duyệt hay đăng được, và hồ sơ nộp vào đang chờ chấm.",
+    "savedBy": "Lưu lúc {{time}} · {{name}}",
+    "pending": "{{count}} hồ sơ đang chờ chấm theo bộ này",
+    "criteriaCount": "{{count}} tiêu chí",
+    "edit": "Sửa",
+    "create": "Khai bộ tiêu chí",
+    "save": "Lưu bộ tiêu chí",
+    "saving": "Đang lưu…",
+    "cancel": "Huỷ",
+    "download": "Tải Excel",
+    "rescoreWarning": "Lưu bộ mới sẽ chấm lại {{count}} hồ sơ của tin theo tiêu chí mới. Điểm cũ vẫn được giữ làm lịch sử.",
+    "saved": "Đã lưu. Các hồ sơ đang được chấm lại theo bộ mới.",
+    "readOnlyHint": "Hiring Manager chính của tin quản lý bộ tiêu chí này.",
+    "loadError": "Không tải được bộ tiêu chí.",
+    "collapse": "Thu gọn",
+    "expand": "Mở rộng"
+  },
+  "status": {
+    "scored": "Đã chấm",
+    "rescoring": "Đang chấm lại",
+    "queued": "Đang chấm CV",
+    "pending_rubric": "Chờ tiêu chí",
+    "invalid_cv": "Không phải CV",
+    "no_cv": "Không có CV",
+    "scoring_failed": "Chấm lỗi · sẽ thử lại",
+    "retryAt": "Hệ thống tự thử lại lúc {{time}}",
+    "retryingSoon": "Hệ thống sẽ thử lại trong lượt quét kế tiếp"
+  },
+  "breakdown": {
+    "title": "Điểm CV và cách tính",
+    "subtitle": "Chấm theo bộ tiêu chí Hiring Manager khai cho tin này",
+    "formula": "Phép tính",
+    "rounded": "làm tròn",
+    "criterion": "Tiêu chí",
+    "weight": "Trọng số",
+    "score": "Điểm",
+    "contribution": "Góp vào tổng",
+    "contributionValue": "+{{value}}",
+    "details": "Xem căn cứ",
+    "hideDetails": "Thu gọn",
+    "evidence": "Bằng chứng trong CV",
+    "noEvidence": "CV không có bằng chứng cho tiêu chí này.",
+    "reasoning": "Lý do chấm",
+    "guide": "Chuẩn chấm của doanh nghiệp",
+    "levelApplied": "Dải điểm áp dụng",
+    "excludedTitle": "Không được tính ({{count}})",
+    "excludedHint": "AI không chấm được các tiêu chí này nên chúng bị loại khỏi cả tử lẫn mẫu — không tính là 0 điểm.",
+    "band": {
+      "excellent": "Xuất sắc",
+      "good": "Tốt",
+      "fair": "Đạt một phần",
+      "poor": "Chưa đạt"
+    },
+    "aiTitle": "Nhận xét của AI",
+    "skillsMatched": "Kỹ năng khớp",
+    "skillsGaps": "Còn thiếu",
+    "redFlags": "Điểm đáng lưu ý",
+    "seniority": "Cấp bậc so với JD",
+    "experience": "Mức phù hợp kinh nghiệm",
+    "recommendation": "Khuyến nghị (suy từ điểm)",
+    "rec": {
+      "Strong Hire": "Rất phù hợp (từ 80)",
+      "Hire": "Phù hợp (65–79)",
+      "Proceed with caution": "Cân nhắc (50–64)",
+      "Reject": "Chưa phù hợp (dưới 50)"
+    },
+    "meta": "Chấm lúc {{time}} · {{model}}",
+    "rubricMeta": "Bộ tiêu chí hiện hành lưu lúc {{time}} bởi {{name}}",
+    "oldRubric": "Điểm này chấm theo phiên bản bộ tiêu chí trước.",
+    "state": {
+      "rescoring": "Hiring Manager vừa cập nhật bộ tiêu chí — hồ sơ đang được chấm lại. Dưới đây là điểm theo bộ cũ.",
+      "queued": "AI đang chấm CV theo bộ tiêu chí của tin. Kết quả sẽ tự hiện khi xong.",
+      "pending_rubric": "Tin chưa có bộ tiêu chí chấm CV nên hồ sơ chưa được chấm. Hiring Manager cần khai bộ tiêu chí ở màn tin.",
+      "invalid_cv": "AI xác định file tải lên không phải là CV.",
+      "no_cv": "Hồ sơ không có file CV để chấm.",
+      "scoring_failed": "Chưa chấm được CV: {{reason}}."
+    },
+    "outOf": "/100",
+    "retryAt": "Hệ thống tự thử lại lúc {{time}} — không cần thao tác gì.",
+    "retrySoon": "Hệ thống sẽ thử lại trong lượt quét kế tiếp — không cần thao tác gì.",
+    "failedAttempts": "(đã thử {{count}} lần)",
+    "previousScoreShown": "Dưới đây là điểm theo bộ tiêu chí trước.",
+    "failureReason": {
+      "ai_unavailable": "dịch vụ AI đang lỗi hoặc quá tải",
+      "cv_unreadable": "không đọc được nội dung file CV",
+      "no_criterion_scored": "AI chưa chấm được tiêu chí nào của bộ tiêu chí",
+      "unknown": "lỗi không xác định"
+    },
+    "checks": {
+      "short": "{{met}}/{{total}} ý",
+      "unsupported": "AI đánh đạt nhưng không trích được bằng chứng — không tính.",
+      "unanswered": "AI không trả lời ý này — không tính vào mẫu số."
+    },
+    "position": {
+      "title": "Điểm trong dải",
+      "checklist": "Dải {{band}} ({{min}}–{{max}}) · đạt {{met}}/{{answered}} ý kiểm → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
+      "ai": "Dải {{band}} ({{min}}–{{max}}) · tiêu chí chưa có ý kiểm nên vị trí trong dải do AI ước lượng.",
+      "aiNoBand": "Điểm do AI ước lượng (bản chấm trước khi có ý kiểm)."
+    }
+  },
+  "jobChip": {
+    "ready": "Đã có bộ tiêu chí chấm CV",
+    "missing": "Chưa có bộ tiêu chí chấm CV — chưa gửi duyệt được"
+  },
+  "requestMissing": "Phiếu chưa có bộ tiêu chí chấm CV (lập trước khi bộ tiêu chí thành bắt buộc) — Hiring Manager cần sửa phiếu để bổ sung trước khi duyệt.",
+  "createJob": {
+    "title": "Bộ tiêu chí chấm CV",
+    "fromRequest": "Hiring Manager đã khai trên phiếu — tin sẽ dùng bộ này để chấm CV. HM sửa được ở màn tin.",
+    "missing": "Phiếu này chưa có bộ tiêu chí. Tin vẫn tạo được, nhưng Hiring Manager phải khai bộ tiêu chí ở màn tin trước khi bạn gửi duyệt."
+  }
+}

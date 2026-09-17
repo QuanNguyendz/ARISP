@@ -50,7 +50,7 @@ public class DepartmentScopeTests
             "Cần kỹ sư .NET", "Thành thạo C#",
             new[] { InterviewRoundTypes.Screening, InterviewRoundTypes.Technical },
             "full_time", "onsite", "Hà Nội", "senior",
-            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND", false);
+            DateTimeOffset.UtcNow.AddMonths(1), 20_000_000, 30_000_000, "VND", false, ARI.Application.UnitTests.CvScoring.CvScoringKit.SampleRubric());
 
     private Task<Result<Guid>> Create(InMemoryUnitOfWork uow, RecruitmentRequestInput input, Guid actor, string role) =>
         new CreateRecruitmentRequestCommandHandler(uow, new RecordingNotificationService())

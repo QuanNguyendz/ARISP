@@ -45,7 +45,37 @@ def get_json_model():
     return _json_chat
 
 
-async def complete_json(system_instruction: str, user_content: str) -> dict:
+SUPPORTED_ATTACHMENT_TYPES = frozenset({"application/pdf"})
+
+
+def build_user_content(user_content: str, attachments=None) -> str | list[dict]:
+    """Nội dung tin nhắn người dùng: chỉ text, hoặc text + các file PDF (ADR-070).
+
+    Dùng content block ``file`` dạng base64 chuẩn của LangChain (``source_type: base64``) —
+    langchain-openai đổi nó thành ``{"type": "file", "file": {"file_data": ...}}`` của Chat
+    Completions. Loại file model không đọc được thì bỏ qua (text trích ra vẫn nằm trong
+    ``user_content``).
+    """
+    files = [
+        a for a in (attachments or [])
+        if a.mime_type in SUPPORTED_ATTACHMENT_TYPES and a.data
+    ]
+    if not files:
+        return user_content
+
+    blocks: list[dict] = [{"type": "text", "text": user_content}]
+    for a in files:
+        blocks.append({
+            "type": "file",
+            "source_type": "base64",
+            "data": a.data,
+            "mime_type": a.mime_type,
+            "filename": a.file_name or "document.pdf",
+        })
+    return blocks
+
+
+async def complete_json(system_instruction: str, user_content: str, attachments=None) -> dict:
     """Gọi 1 lần, trả về dict đã parse từ JSON. Raise nếu mock (caller tự lo fallback)."""
     settings = get_settings()
     if settings.use_mock:
@@ -54,6 +84,9 @@ async def complete_json(system_instruction: str, user_content: str) -> dict:
     from langchain_core.messages import HumanMessage, SystemMessage
 
     resp = await get_json_model().ainvoke(
-        [SystemMessage(content=system_instruction), HumanMessage(content=user_content)]
+        [
+            SystemMessage(content=system_instruction),
+            HumanMessage(content=build_user_content(user_content, attachments)),
+        ]
     )
     return json.loads(resp.content)

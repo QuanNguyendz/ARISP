@@ -29,12 +29,14 @@ import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import InviteAndScheduleModal from '../../components/InviteAndScheduleModal'
 import CandidatePipeline from '@/components/jobCandidates/CandidatePipeline'
 import { STAFF_NOTIF_REFRESH_EVENT } from '@ari/shared/fservices/notification/notificationService'
+import { affectsJob, onApplicationsChanged } from '@ari/shared/realtime/applicationRealtime'
 import type { JobPosting } from '@ari/shared/types/job'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { formatDateTime24 } from '@ari/shared/utils/time24'
 import { appStatusLabel } from '../recruiter/_jobUi'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
+import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
 
 /**
  * Trạng thái mà nút Duyệt / Loại ở vòng CV còn thao tác được — giống hệt màn Recruiter.
@@ -86,16 +88,17 @@ export default function JobPostingDetailPage() {
   const [bypassOpen, setBypassOpen] = useState(false)
   const [bypassReason, setBypassReason] = useState('')
 
-  const loadApps = useCallback(async () => {
+  /** `silent`: tải lại do realtime — không bật khung tải, để danh sách không chớp mỗi lần một hồ sơ đổi. */
+  const loadApps = useCallback(async (silent = false) => {
     if (!id) return
     try {
-      setLoadingApps(true)
+      if (!silent) setLoadingApps(true)
       const appsData = await jobService.getJobApplications(id)
       setApps(appsData)
     } catch (err) {
       console.error(err)
     } finally {
-      setLoadingApps(false)
+      if (!silent) setLoadingApps(false)
     }
   }, [id])
 
@@ -125,6 +128,15 @@ export default function JobPostingDetailPage() {
       window.removeEventListener(STAFF_NOTIF_REFRESH_EVENT, onRefresh)
     }
   }, [load])
+
+  // Hồ sơ của tin đổi (duyệt, xếp lịch, điểm CV chấm nền xong…) → tải lại ngầm danh sách.
+  useEffect(
+    () =>
+      onApplicationsChanged((detail) => {
+        if (affectsJob(detail, id)) void loadApps(true)
+      }),
+    [id, loadApps]
+  )
 
   // Duyệt hàng loạt = gửi cả nhóm sang bàn của Hiring Manager (ADR-067). Tuần tự để một hồ sơ
   // hỏng không kéo đổ cả lô, và đếm riêng số thành công / thất bại.
@@ -835,6 +847,9 @@ export default function JobPostingDetailPage() {
             {/* Playbook của tin (ADR-069) — người soạn là Hiring Manager chính; HR Leader vẫn thêm/xoá
                 được khi cần (HM nghỉ, HM bị khoá). Quyền do server trả về kèm danh sách. */}
             <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
+
+            {/* Bộ tiêu chí chấm CV (ADR-070) — HM chính soạn; HR Leader sửa được khi cần. */}
+            <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
           </div>
         </div>
 

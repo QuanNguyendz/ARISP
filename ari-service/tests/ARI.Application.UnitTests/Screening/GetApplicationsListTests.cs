@@ -64,15 +64,46 @@ public class GetApplicationsListTests
     public async Task By_job_includes_match_score_and_summary()
     {
         var job = ScreeningData.Job();
+        var rubric = ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id);
         var analysis = ScreeningData.Analysis(job.Id, score: 82, summary: "Khớp kỹ năng");
+        analysis.RubricDocumentId = rubric.Id;
         var app = ScreeningData.App(job.Id, analysisId: analysis.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(analysis).Seed(app);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(rubric).Seed(analysis).Seed(app);
 
         var res = await Svc(uow).GetApplicationsByJobAsync(job.Id, CancellationToken.None);
 
         var dto = Assert.Single(res.Value!);
         Assert.Equal(82, dto.MatchScore);
         Assert.Equal("Khớp kỹ năng", dto.CvJdSummary);
+        Assert.Equal("scored", dto.CvScoreStatus);
+    }
+
+    [Fact]
+    public async Task By_job_reports_a_failed_scoring_with_its_retry_time()
+    {
+        var job = ScreeningData.Job();
+        var rubric = ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id);
+        var failed = ScreeningData.App(job.Id, name: "Hỏng");
+        failed.CvFileUrl = "cv/hong.pdf";
+        var waiting = ScreeningData.App(job.Id, name: "Chờ");
+        waiting.CvFileUrl = "cv/cho.pdf";
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(rubric).Seed(failed, waiting);
+        var inFlight = new ARI.Application.CvScoring.CvScoringInFlight();
+        var failure = inFlight.RecordFailure(
+            ARI.Application.CvScoring.CvScoringInFlight.ApplicationKey(failed.Id, rubric.Id), "Lỗi AI",
+            ARI.Application.CvScoring.CvScoringErrors.AiUnavailable);
+        var svc = ApplicationServiceFactory.Create(uow, new RecordingNotificationService(), new RecordingEmailService(),
+            new RecordingRagIngestionService(), new ARI.Application.UnitTests.CvScoring.RecordingCvScoringQueue(), inFlight);
+
+        var res = await svc.GetApplicationsByJobAsync(job.Id, CancellationToken.None);
+
+        var bad = res.Value!.Single(a => a.CandidateName == "Hỏng");
+        Assert.Equal("scoring_failed", bad.CvScoreStatus);
+        Assert.Equal(failure.RetryAfter, bad.CvScoreRetryAt);
+        Assert.Null(bad.MatchScore);
+        var ok = res.Value!.Single(a => a.CandidateName == "Chờ");
+        Assert.Equal("queued", ok.CvScoreStatus);
+        Assert.Null(ok.CvScoreRetryAt);
     }
 
     // ---------- GetAllApplicationsAsync ----------

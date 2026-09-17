@@ -20,6 +20,11 @@
     <PackageReference Include="Pgvector" Version="0.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Phông cho PdfSharpCore: container Linux không có phông hệ thống (BundledFontResolver). -->
+    <EmbeddedResource Include="Documents\Fonts\*.ttf" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

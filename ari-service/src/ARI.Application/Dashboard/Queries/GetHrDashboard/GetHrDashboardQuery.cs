@@ -143,7 +143,9 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
             var scoreByAnalysisId = analysisIds.Count == 0
                 ? new Dictionary<Guid, int>()
                 : (await _unitOfWork.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore }), ct))
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Status, c.RubricDocumentId }), ct))
+                    // Chỉ điểm chấm theo bộ tiêu chí (ADR-070).
+                    .Where(c => ARI.Application.CvScoring.CvScoreState.IsDisplayable(c.Status, c.RubricDocumentId))
                     .ToDictionary(c => c.Id, c => c.MatchScore);
 
             var creatorNameById = creatorIds.Count == 0
