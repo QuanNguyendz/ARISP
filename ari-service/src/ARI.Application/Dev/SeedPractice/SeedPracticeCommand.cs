@@ -36,11 +36,13 @@ namespace ARI.Application.Dev.SeedPractice
 
         private readonly IUnitOfWork _unitOfWork;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly CvScoring.CvRubricService _cvRubrics;
 
-        public SeedPracticeCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
+        public SeedPracticeCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, CvScoring.CvRubricService cvRubrics)
         {
             _unitOfWork = unitOfWork;
             _passwordHasher = passwordHasher;
+            _cvRubrics = cvRubrics;
         }
 
         public async Task<Result<SeedPracticeResult>> Handle(SeedPracticeCommand request, CancellationToken ct)
@@ -108,6 +110,9 @@ namespace ARI.Application.Dev.SeedPractice
 
             // ADR-068: mọi tin đều có Hiring Manager chính, kể cả tin sandbox.
             await DevHiringManagerSeed.EnsureAsync(_unitOfWork, _passwordHasher, job, ct);
+
+            // Bộ tiêu chí chấm CV (ADR-070) — bắt buộc với mọi tin.
+            await DevCvRubricSeed.EnsureAsync(_unitOfWork, _cvRubrics, job, owner.Id, ct);
 
             // 4) Application đủ điều kiện: Status="interview" là trạng thái sau-xếp-lịch mà
             //    StaffScheduling.AssignSlotCommand tạo ra (screening→interview) → PracticeEligible.

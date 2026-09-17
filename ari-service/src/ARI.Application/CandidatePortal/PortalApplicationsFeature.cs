@@ -77,7 +77,7 @@ namespace ARI.Application.CandidatePortal
                 // Batch fetch CV–JD analyses (chỉ match score)
                 var analysisIds = appsList.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
                 var analysisDict = (await _unitOfWork.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(x => analysisIds.Contains(x.Id)).Select(x => new { x.Id, x.MatchScore })))
+                        .QueryAsync(q => q.Where(x => analysisIds.Contains(x.Id)).Select(x => new { x.Id, x.MatchScore, x.Status, x.RubricDocumentId })))
                     .GroupBy(x => x.Id)
                     .ToDictionary(g => g.Key, g => g.First());
 
@@ -155,7 +155,12 @@ namespace ARI.Application.CandidatePortal
                     .Select(a =>
                     {
                         jobsDict.TryGetValue(a.JobPostingId, out var job);
-                        int? matchScore = (a.CvJdAnalysisId.HasValue && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)) ? an.MatchScore : (int?)null;
+                        // Chỉ điểm chấm theo bộ tiêu chí (ADR-070) — không hiện điểm AI cũ hay "0" của file không phải CV.
+                        int? matchScore = a.CvJdAnalysisId.HasValue
+                                          && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)
+                                          && ARI.Application.CvScoring.CvScoreState.IsDisplayable(an.Status, an.RubricDocumentId)
+                            ? an.MatchScore
+                            : (int?)null;
 
                         // Vòng đang hoạt động = vòng mới nhất mà hồ sơ được MỜI hoặc đã có LỊCH giữ chỗ.
                         // Lịch phải được tính: qua vòng trắc nghiệm là Recruiter xếp thẳng lịch vòng kế,
@@ -864,8 +869,6 @@ namespace ARI.Application.CandidatePortal
                 _ => "application/octet-stream"
             };
 
-            var cvHash = PortalSupport.ComputeHash(bytes);
-
             string cvText = string.Empty;
             try
             {
@@ -895,7 +898,6 @@ namespace ARI.Application.CandidatePortal
                 CandidatePhone = command.CandidatePhone.Trim(),
                 CvFileUrl = cvFileUrl,
                 CvText = cvText,
-                CvFileHash = cvHash,
                 CoverLetter = command.CoverLetter?.Trim(),
                 NoticePeriod = command.NoticePeriod.Trim()
             };

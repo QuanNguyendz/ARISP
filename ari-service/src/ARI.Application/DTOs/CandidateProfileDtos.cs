@@ -71,7 +71,10 @@ namespace ARI.Application.DTOs
         public string? Message { get; set; }
         public CvMatchAnalysisDto? Analysis { get; set; }
 
-        /// <summary>none | processing | completed | failed — FE poll khi "processing".</summary>
+        /// <summary>
+        /// none | processing | completed | failed | rubric_pending — FE poll khi "processing".
+        /// <c>rubric_pending</c>: tin chưa có bộ tiêu chí chấm CV (ADR-070), hệ thống không chấm.
+        /// </summary>
         public string Status { get; set; } = "none";
     }
 

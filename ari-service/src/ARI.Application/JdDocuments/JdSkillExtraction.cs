@@ -32,8 +32,11 @@ namespace ARI.Application.JdDocuments
     /// <summary>
     /// Gợi ý điền sẵn. <see cref="Skills"/> rỗng KHÔNG phải lỗi — bản JD có thể không nêu công nghệ
     /// nào cụ thể, và màn tạo tin chỉ việc để người dùng tự gõ như trước.
+    /// <see cref="LanguageRequirement"/> (vd "English (TOEIC > 700)") và <see cref="InterviewLanguage"/>
+    /// (<c>vi</c>|<c>en</c>) điền ô yêu cầu ngôn ngữ và ngôn ngữ từng vòng; null = giữ nguyên ô.
     /// </summary>
-    public record JdSkillSuggestionDto(List<string> Skills, string? JobCategory);
+    public record JdSkillSuggestionDto(
+        List<string> Skills, string? JobCategory, string? LanguageRequirement = null, string? InterviewLanguage = null);
 
     public class ExtractJdSkillsCommandHandler
         : IRequestHandler<ExtractJdSkillsCommand, Result<JdSkillSuggestionDto>>
@@ -81,7 +84,9 @@ namespace ARI.Application.JdDocuments
 
             return Result.Success(new JdSkillSuggestionDto(
                 Clean(extracted.Skills),
-                string.IsNullOrWhiteSpace(extracted.JobCategory) ? null : extracted.JobCategory));
+                string.IsNullOrWhiteSpace(extracted.JobCategory) ? null : extracted.JobCategory,
+                string.IsNullOrWhiteSpace(extracted.LanguageRequirement) ? null : extracted.LanguageRequirement.Trim(),
+                OnlineTest.OnlineTestLanguageGuard.Normalize(extracted.InterviewLanguage)));
         }
 
         /// <summary>

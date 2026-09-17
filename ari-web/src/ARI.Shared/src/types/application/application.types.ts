@@ -284,14 +284,100 @@ export interface MyApplicationDetail {
  * Item hồ sơ ứng tuyển cho danh sách HR/Recruiter — khớp đúng JSON từ GET /applications
  * (ApplicationResponse ở backend). Status là chuỗi thô từ backend, map nhãn ở UI.
  */
-/** Một dòng điểm tiêu chí chấm CV (ADR-060). */
-export interface CvCriterionScore {
+/**
+ * Trạng thái điểm CV của hồ sơ (ADR-070) — do server suy ra:
+ * - `scored`: đã chấm theo bộ tiêu chí hiện hành
+ * - `rescoring`: có điểm theo bộ tiêu chí cũ, đang chấm lại theo bộ mới
+ * - `queued`: chưa có điểm, đang/sắp chấm
+ * - `scoring_failed`: lượt chấm gần nhất hỏng, hệ thống tự thử lại (xem `retryAt`)
+ * - `pending_rubric`: tin chưa có bộ tiêu chí — chờ HM khai
+ * - `invalid_cv`: file không phải CV
+ * - `no_cv`: hồ sơ không có file CV
+ */
+export type CvScoreState =
+  | 'scored'
+  | 'rescoring'
+  | 'queued'
+  | 'scoring_failed'
+  | 'pending_rubric'
+  | 'invalid_cv'
+  | 'no_cv'
+
+/** Lý do một lượt chấm CV hỏng (server phân loại, không in nguyên lỗi của nhà cung cấp AI). */
+export type CvScoreFailureReason = 'ai_unavailable' | 'cv_unreadable' | 'no_criterion_scored'
+
+export type CvScoreBand = 'excellent' | 'good' | 'fair' | 'poor'
+
+export interface CvScoreCriterion {
   key: string
-  score: number
-  /** Tên hiển thị doanh nghiệp đặt — null với bản phân tích cũ. */
-  label?: string | null
-  /** Trọng số (%) — null với bản phân tích cũ. */
+  label: string
   weight?: number | null
+  score?: number | null
+  /** Số điểm tiêu chí góp vào điểm cuối = điểm × trọng số ÷ Σ trọng số. */
+  contribution?: number | null
+  band?: CvScoreBand | null
+  /** Trích nguyên văn từ CV làm căn cứ. */
+  evidence?: string | null
+  reasoning?: string | null
+  description?: string | null
+  levels?: {
+    excellent?: string | null
+    good?: string | null
+    fair?: string | null
+    poor?: string | null
+  } | null
+  /** Khoảng điểm của dải (vd 90–100). */
+  bandMin?: number | null
+  bandMax?: number | null
+  /** `checklist` = vị trí trong dải tính từ ý kiểm · `ai` = AI ước lượng (tiêu chí chưa có ý kiểm). */
+  scoreSource?: 'checklist' | 'ai' | string | null
+  /** Số ý đạt / số ý AI đã trả lời. */
+  checksMet?: number | null
+  checksAnswered?: number | null
+  checks?: CvScoreCheck[]
+}
+
+/** Một ý kiểm đã được AI trả lời. */
+export interface CvScoreCheck {
+  key: string
+  text: string
+  /** true = đạt · false = không đạt · null = AI không trả lời (không tính vào mẫu số). */
+  met?: boolean | null
+  evidence?: string | null
+  /** AI đánh đạt nhưng không trích được bằng chứng — không tính. */
+  unsupported?: boolean
+}
+
+/** Cách ra điểm CV — chỉ có ở màn chi tiết hồ sơ (ADR-070). */
+export interface CvScoreBreakdown {
+  state: CvScoreState
+  total?: number | null
+  /** Kết quả phép chia trước khi làm tròn. */
+  exactTotal?: number | null
+  weightedSum: number
+  totalWeight: number
+  criteria: CvScoreCriterion[]
+  /** Tiêu chí AI không chấm được — bị loại khỏi CẢ tử lẫn mẫu. */
+  excluded: CvScoreCriterion[]
+  scoredAt?: string | null
+  model?: string | null
+  isCurrentRubric: boolean
+  rubricSavedAt?: string | null
+  rubricSavedBy?: string | null
+  invalidReason?: string | null
+  /** Khi `state = scoring_failed`. */
+  failureReason?: CvScoreFailureReason | string | null
+  failedAttempts?: number | null
+  /** Lúc hệ thống tự chấm lại — đã qua nghĩa là đang chờ lượt quét kế tiếp. */
+  retryAt?: string | null
+  summary?: string | null
+  skillsMatched: string[]
+  skillsGaps: string[]
+  redFlags: string[]
+  seniorityAlignment?: string | null
+  experienceRelevance?: string | null
+  /** Nhãn suy từ điểm: Strong Hire | Hire | Proceed with caution | Reject. */
+  recommendation?: string | null
 }
 
 export interface HrApplicationItem {
@@ -307,13 +393,14 @@ export interface HrApplicationItem {
   practiceSessionUsed: boolean
   createdAt: string
   cvJdAnalysisId?: string
+  /** Điểm CV theo bộ tiêu chí (ADR-070). Null khi chưa có điểm hợp lệ — xem `cvScoreStatus`. */
   matchScore?: number | null
+  cvScoreStatus?: CvScoreState | null
+  /** Khi `cvScoreStatus = scoring_failed`: lúc hệ thống tự chấm lại. */
+  cvScoreRetryAt?: string | null
   cvJdSummary?: string
-  /**
-   * Điểm từng tiêu chí chấm CV kèm nhãn + trọng số doanh nghiệp khai (ADR-060).
-   * Rỗng khi tin chưa khai bộ tiêu chí chấm CV — khi đó chỉ hiện điểm tổng như trước.
-   */
-  cvCriterionScores?: CvCriterionScore[]
+  /** Cách ra điểm CV — chỉ có ở màn chi tiết hồ sơ. */
+  cvScore?: CvScoreBreakdown | null
   /** Ứng viên đã đặt lịch phỏng vấn thật → đủ điều kiện cấp Interview Code On-site (ADR-015/016). */
   hasScheduledInterview?: boolean
   currentRound?: number | null

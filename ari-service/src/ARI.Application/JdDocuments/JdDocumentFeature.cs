@@ -110,7 +110,9 @@ namespace ARI.Application.JdDocuments
                 Vacancies = req.Headcount,
                 SalaryMin = req.SalaryMin,
                 SalaryMax = req.SalaryMax,
-                SalaryCurrency = req.SalaryCurrency,
+                // Chuẩn hoá cả ở đây: phiếu lập trước khi ô đơn vị tiền thành danh sách chọn có thể mang
+                // giá trị gõ tay ("vnd", "VNĐ"…), mà bản khởi tạo này đi thẳng ra trình soạn.
+                SalaryCurrency = SalaryCurrencies.Normalize(req.SalaryCurrency),
                 SectionsJson = SerializeSections(sections),
                 CreatedByUserId = actorId,
             };
@@ -144,7 +146,7 @@ namespace ARI.Application.JdDocuments
             doc.Vacancies = input.Vacancies is > 0 ? input.Vacancies : null;
             doc.SalaryMin = input.SalaryMin;
             doc.SalaryMax = input.SalaryMax;
-            doc.SalaryCurrency = Trim(input.SalaryCurrency) ?? "VND";
+            doc.SalaryCurrency = SalaryCurrencies.Normalize(input.SalaryCurrency);
             doc.ApplicationDeadline = input.ApplicationDeadline;
             doc.SectionsJson = SerializeSections(input.Sections ?? new Dictionary<string, string>());
             doc.UpdatedAt = DateTimeOffset.UtcNow;
@@ -236,6 +238,9 @@ namespace ARI.Application.JdDocuments
 
             if (string.IsNullOrWhiteSpace(request.Input.Title))
                 return Result.Failure("Tiêu đề vị trí là bắt buộc.");
+
+            if (!SalaryCurrencies.IsAllowed(request.Input.SalaryCurrency))
+                return Result.Failure(SalaryCurrencies.InvalidMessage);
 
             var (_, jobError) = await JdDocumentSupport.LinkedJobAsync(_unitOfWork, req.Id, ct);
             if (jobError != null) return Result.Failure(jobError, CommonErrorCodes.Conflict);

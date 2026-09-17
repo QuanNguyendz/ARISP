@@ -27,6 +27,9 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
 
     public class UpdateJobStatusCommandHandler : IRequestHandler<UpdateJobStatusCommand, Result<JobPostingResponse>>
     {
+        /// <summary>Mã lỗi khi tin thiếu bộ tiêu chí chấm CV — giao diện dùng để dẫn người dùng tới đúng chỗ khai.</summary>
+        public const string CvRubricRequiredCode = ARI.Application.CvScoring.CvScoringErrors.RubricRequired;
+
         private readonly IUnitOfWork _unitOfWork;
         private readonly IFileStorageService _fileStorage;
         private readonly IJdStampService _jdStampService;
@@ -109,6 +112,13 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                 var bankError = await ValidateOnlineTestBankAsync(job, ct);
                 if (bankError != null)
                     return Result.Failure<JobPostingResponse>(bankError);
+
+                // ADR-070: tin không có bộ tiêu chí chấm CV thì không chấm được hồ sơ nào — chặn ở mọi lối ra
+                // job board, kể cả khi quản trị viên vượt chữ ký HM (vượt chữ ký không làm ra bộ tiêu chí).
+                if (!await ARI.Application.CvScoring.CvRubricStore.HasLiveAsync(_unitOfWork, job.Id, ct))
+                    return Result.Failure<JobPostingResponse>(
+                        "Tin chưa có bộ tiêu chí chấm CV. Hiring Manager cần khai bộ tiêu chí trong màn tin trước khi gửi duyệt hoặc đăng tin.",
+                        CvRubricRequiredCode);
             }
 
             // CASE A: Từ chối ('rejected') -> Bắt buộc Admin + có lý do

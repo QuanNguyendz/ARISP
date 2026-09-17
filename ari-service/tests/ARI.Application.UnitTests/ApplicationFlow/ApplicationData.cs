@@ -27,17 +27,17 @@ internal static class ApplicationData
         Status = status,
     };
 
-    /// <summary>CvFileUrl để null → né nhánh phân tích CV nền (fire-and-forget) trong <c>SubmitApplicationAsync</c>.</summary>
+    /// <summary>CvFileUrl mặc định null → không có gì để chấm; truyền <paramref name="cvFileUrl"/> để kiểm việc đưa vào hàng chấm.</summary>
     public static SubmitApplicationRequest SubmitRequest(
-        Guid jobId, Guid? accountId = null, string? cvText = "Kinh nghiệm 5 năm C#/.NET", string? cvHash = null) => new()
+        Guid jobId, Guid? accountId = null, string? cvText = "Kinh nghiệm 5 năm C#/.NET", string? cvFileUrl = null) => new()
     {
+        CvFileUrl = cvFileUrl,
         JobPostingId = jobId,
         CandidateAccountId = accountId,
         CandidateEmail = "cand@example.io",
         CandidateName = "Nguyen Van A",
         CandidatePhone = "0900000000",
         CvText = cvText,
-        CvFileHash = cvHash,
         CoverLetter = "Tôi rất phù hợp",
         NoticePeriod = "30 ngày",
     };
@@ -49,6 +49,7 @@ internal static class ApplicationData
         MatchScore = score,
         Summary = "Phù hợp",
         Status = "completed",
+        RubricDocumentId = Guid.NewGuid(), // chấm theo bộ tiêu chí (ADR-070) → điểm được hiện
     };
 
     public static InterviewSession PracticeSession(Guid appId, int round = 1) => new()

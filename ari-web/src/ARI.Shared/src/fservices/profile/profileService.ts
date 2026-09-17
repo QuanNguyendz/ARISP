@@ -87,7 +87,10 @@ export interface CvMatchResult {
   aiAvailable: boolean
   message?: string | null
   analysis?: CvMatchAnalysis | null
-  /** none | processing | completed | failed — FE poll tiếp khi "processing". */
+  /**
+   * none | processing | completed | failed | rubric_pending — FE poll tiếp khi "processing".
+   * `rubric_pending`: tin chưa có bộ tiêu chí chấm CV (ADR-070), hệ thống không chấm; vẫn ứng tuyển được.
+   */
   status?: string
 }
 

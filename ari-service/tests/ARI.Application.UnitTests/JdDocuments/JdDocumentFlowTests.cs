@@ -167,6 +167,31 @@ public class JdDocumentFlowTests
         Assert.Contains("description", doc.SectionsJson);
     }
 
+    [Fact]
+    public async Task Don_vi_tien_ngoai_VND_USD_thi_khong_luu_duoc()
+    {
+        var (uow, req) = Seed();
+
+        var res = await Save(uow, req.Id, _recruiterId, RoleNames.Recruiter, Input() with { SalaryCurrency = "EUR" });
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(SalaryCurrencies.InvalidMessage, res.Error);
+        Assert.Empty(uow.Repo<JdDocument>().Items);
+    }
+
+    [Fact]
+    public async Task Don_vi_tien_go_tay_tren_phieu_cu_duoc_chuan_hoa_khi_dien_san()
+    {
+        // Phiếu lập trước khi ô đơn vị tiền thành danh sách chọn có thể mang "usd" viết thường.
+        var (uow, req) = Seed();
+        req.SalaryCurrency = " usd ";
+
+        var res = await Get(uow, req.Id, _recruiterId, RoleNames.Recruiter);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(SalaryCurrencies.Usd, res.Value.SalaryCurrency);
+    }
+
     // ---------- Xuất file ----------
 
     [Fact]

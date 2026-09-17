@@ -169,6 +169,7 @@
       "geminiNote": "Analyzed by Gemini 2.5 Flash · for reference only",
       "updateCv": "Update CV",
       "cannotAnalyze": "Unable to analyze CV at this time. Please try again later.",
+      "rubricPending": "CV matching isn't available for this job yet. You can still apply as usual.",
       "loadError": "Unable to load CV analysis. Please try again later."
     }
   }

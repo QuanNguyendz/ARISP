@@ -114,7 +114,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             job.WorkMode = request.WorkMode;
             job.SalaryMin = request.SalaryMin;
             job.SalaryMax = request.SalaryMax;
-            job.SalaryCurrency = string.IsNullOrWhiteSpace(request.SalaryCurrency) ? "VND" : request.SalaryCurrency;
+            job.SalaryCurrency = SalaryCurrencies.Normalize(request.SalaryCurrency);
             job.SalaryIsNegotiable = request.SalaryIsNegotiable;
             job.EmploymentType = request.EmploymentType;
             job.ExperienceLevel = request.ExperienceLevel;

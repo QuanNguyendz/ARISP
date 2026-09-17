@@ -77,6 +77,7 @@ namespace ARI.Application.Jobs.Queries.GetJobById
                 jobResponse.HmSignOffStatus = job.HmSignOffStatus;
                 jobResponse.HmSignOffReason = job.HmSignOffReason;
                 jobResponse.RecruitmentRequestId = job.RecruitmentRequestId;
+                jobResponse.HasCvRubric = await ARI.Application.CvScoring.CvRubricStore.HasLiveAsync(_unitOfWork, job.Id, ct);
                 jobResponse.HiringManagerState = Common.Security.HiringManagerStateNames.Of(hmState);
                 if (primaryHm != null)
                 {

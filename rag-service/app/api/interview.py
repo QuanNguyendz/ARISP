@@ -86,4 +86,4 @@ async def detect_language(req: DetectLanguageRequest) -> DetectLanguageResponse:
 
 @router.post("/complete-json")
 async def complete_json(req: CompleteJsonRequest) -> dict:
-    return await llm_complete_json(req.system_instruction, req.user_content)
+    return await llm_complete_json(req.system_instruction, req.user_content, req.attachments)

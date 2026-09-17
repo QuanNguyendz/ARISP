@@ -14,7 +14,8 @@ namespace ARI.Application.UnitTests.JobBoard;
 
 /// <summary>
 /// AI CV Suggestions (UC-27, <see cref="GetCvMatchQueryHandler"/>) — các nhánh xác định (không chạy nền):
-/// tài khoản không tồn tại, chưa có CV, file không đọc được, và tái dùng kết quả cache completed/failed.
+/// tài khoản không tồn tại, chưa có CV, file không đọc được, và tái dùng kết quả completed/invalid_cv theo
+/// bộ tiêu chí của tin (ADR-070).
 /// </summary>
 public class GetCvMatchQueryHandlerTests
 {
@@ -23,8 +24,11 @@ public class GetCvMatchQueryHandlerTests
     private static string Md5Hex(byte[] bytes) => Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
 
     private static Task<Result<CvMatchResponse>> Run(InMemoryUnitOfWork uow, RecordingFileStorage storage, Guid jobId, Guid candidateId)
-        => new GetCvMatchQueryHandler(uow, storage, new ThrowingScopeFactory())
+        => ARI.Application.UnitTests.CandidatePortal.CvMatchHandlerFactory.Create(uow, storage)
             .Handle(new GetCvMatchQuery(jobId, candidateId), CancellationToken.None);
+
+    private static ARI.Domain.Entities.PlaybookDocument Rubric(Guid jobId)
+        => ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(jobId);
 
     [Fact]
     public async Task Unknown_candidate_is_unauthorized()
@@ -67,9 +71,11 @@ public class GetCvMatchQueryHandlerTests
     {
         var candidateId = Guid.NewGuid();
         var jobId = Guid.NewGuid();
+        var rubric = Rubric(jobId);
         var uow = new InMemoryUnitOfWork()
             .Seed(JobBoardData.Candidate(candidateId, cvUrl: "cv/profile.pdf"))
-            .Seed(JobBoardData.Analysis(jobId, Md5Hex(CvBytes), status: "completed", score: 88));
+            .Seed(rubric)
+            .Seed(JobBoardData.Analysis(jobId, Md5Hex(CvBytes), rubric.Id, status: "completed", score: 88));
         var storage = new RecordingFileStorage { FileBytes = CvBytes };
 
         var res = await Run(uow, storage, jobId, candidateId);
@@ -80,13 +86,15 @@ public class GetCvMatchQueryHandlerTests
     }
 
     [Fact]
-    public async Task Cached_failed_analysis_returns_failed()
+    public async Task Cached_invalid_cv_returns_failed()
     {
         var candidateId = Guid.NewGuid();
         var jobId = Guid.NewGuid();
+        var rubric = Rubric(jobId);
         var uow = new InMemoryUnitOfWork()
             .Seed(JobBoardData.Candidate(candidateId, cvUrl: "cv/profile.pdf"))
-            .Seed(JobBoardData.Analysis(jobId, Md5Hex(CvBytes), status: "failed"));
+            .Seed(rubric)
+            .Seed(JobBoardData.Analysis(jobId, Md5Hex(CvBytes), rubric.Id, status: "invalid_cv"));
         var storage = new RecordingFileStorage { FileBytes = CvBytes };
 
         var res = await Run(uow, storage, jobId, candidateId);

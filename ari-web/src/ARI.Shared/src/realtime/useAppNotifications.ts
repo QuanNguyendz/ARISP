@@ -9,6 +9,7 @@ import {
 } from '@ari/shared/fservices/notification/notificationService'
 
 import { API_BASE_URL } from '@ari/shared/config/constants'
+import { createApplicationChangeBatcher, type ApplicationChangeBatcher } from './applicationRealtime'
 
 /** Yêu cầu layout nhân sự tải lại chuông thông báo tức thời. */
 const refreshStaffBell = () => window.dispatchEvent(new Event(STAFF_NOTIF_REFRESH_EVENT))
@@ -43,9 +44,14 @@ type DbChangePayload = {
  * (EF, sửa SQL tay, rag-service, job nền), khác với các case bên dưới vốn chỉ chạy khi command nhớ
  * gọi Publish. Hai nhánh chồng nhau là bình thường: react-query gộp các lần refetch trùng khoá.
  */
-const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
+const handleDbChange = (
+  queryClient: QueryClient,
+  applications: ApplicationChangeBatcher,
+  payload: DbChangePayload
+) => {
   if (payload?.op === 'resync') {
     queryClient.invalidateQueries()
+    applications.push() // màn dùng state cục bộ cũng phải nạp lại
     refreshStaffBell()
     refreshCandidateData()
     refreshOnlineTestResults()
@@ -62,12 +68,10 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
       refreshCandidateData()
       break
 
+    // Chấm CV nền xong cũng đi đường này: hồ sơ trỏ sang bản chấm mới (ADR-070). Mọi khoá của dữ liệu
+    // hồ sơ nằm ở `invalidateApplicationQueries` — không liệt kê lại ở đây.
     case 'applications':
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-      queryClient.invalidateQueries({ queryKey: ['application', applicationId ?? id] })
-      queryClient.invalidateQueries({ queryKey: ['job', jobPostingId, 'applications'] })
-      queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
-      queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+      applications.push({ jobPostingId, applicationId: applicationId ?? id })
       refreshCandidateData()
       break
 
@@ -80,8 +84,7 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
       break
 
     case 'interview_bookings':
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-      queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
+      applications.push({ jobPostingId, applicationId })
       queryClient.invalidateQueries({ queryKey: ['my-schedule'] })
       queryClient.invalidateQueries({ queryKey: ['candidate-schedule'] })
       // Màn Phỏng vấn của nhân sự: booking đổi là số chỗ của ca đổi theo. Payload của trigger chỉ
@@ -131,25 +134,23 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
     case 'interview_sessions':
       queryClient.invalidateQueries({ queryKey: ['slot-candidates'] })
       queryClient.invalidateQueries({ queryKey: ['evaluations'] })
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      applications.push({ jobPostingId, applicationId })
       break
 
     case 'online_test_submissions':
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-      queryClient.invalidateQueries({ queryKey: ['job', jobPostingId, 'applications'] })
+      applications.push({ jobPostingId, applicationId })
       refreshOnlineTestResults()
       refreshCandidateData()
       break
 
     case 'evaluations':
       queryClient.invalidateQueries({ queryKey: ['evaluations'] })
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      applications.push({ jobPostingId, applicationId })
       refreshStaffBell()
       break
 
     case 'interview_codes':
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-      queryClient.invalidateQueries({ queryKey: ['application', applicationId] })
+      applications.push({ jobPostingId, applicationId })
       refreshCandidateData()
       break
 
@@ -159,7 +160,7 @@ const handleDbChange = (queryClient: QueryClient, payload: DbChangePayload) => {
     case 'offers':
       queryClient.invalidateQueries({ queryKey: ['offers'] })
       queryClient.invalidateQueries({ queryKey: ['candidate-offer'] })
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      applications.push({ jobPostingId, applicationId })
       refreshCandidateData()
       refreshStaffBell()
       break
@@ -207,6 +208,9 @@ export const useAppNotifications = () => {
 
     connectionRef.current = connection
 
+    // Gom sự kiện hồ sơ theo từng kết nối: chấm lại cả tin sinh ra một loạt sự kiện liền nhau.
+    const applications = createApplicationChangeBatcher(queryClient)
+
     // Start connection
     connection
       .start()
@@ -236,39 +240,23 @@ export const useAppNotifications = () => {
       switch (eventType) {
         case 'ReceiveDbChange':
           // ADR-057: sự kiện phát ra từ chính database, không phụ thuộc command có nhớ push hay không.
-          handleDbChange(queryClient, payload as DbChangePayload)
+          handleDbChange(queryClient, applications, payload as DbChangePayload)
           break
 
         case 'ReceiveNewApplication':
-          // Refresh applications list
-          queryClient.invalidateQueries({ queryKey: ['applications'] })
-          queryClient.invalidateQueries({
-            queryKey: ['job', payload?.jobPostingId, 'applications'],
-          })
-          queryClient.invalidateQueries({ queryKey: ['my-jobs'] }) // Update applicant count on dashboards
-          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          applications.push({ jobPostingId: payload?.jobPostingId, applicationId: payload?.id })
           refreshStaffBell() // Chuông nhân sự: ứng viên mới ứng tuyển
           break
 
         case 'ReceiveScheduleResponse':
           // Ứng viên xác nhận/báo bận lịch phỏng vấn → cập nhật hồ sơ + chuông nhân sự.
-          queryClient.invalidateQueries({ queryKey: ['applications'] })
-          queryClient.invalidateQueries({ queryKey: ['application', payload?.applicationId] })
-          queryClient.invalidateQueries({
-            queryKey: ['job', payload?.jobPostingId, 'applications'],
-          })
-          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          applications.push({ jobPostingId: payload?.jobPostingId, applicationId: payload?.applicationId })
           refreshStaffBell() // Chuông nhân sự: ứng viên phản hồi lịch phỏng vấn
           break
 
         case 'ReceiveOnlineTestSubmitted':
           // Ứng viên hoàn thành bài thi trắc nghiệm → cập nhật bảng điểm + danh sách + chuông nhân sự.
-          queryClient.invalidateQueries({ queryKey: ['applications'] })
-          queryClient.invalidateQueries({
-            queryKey: ['job', payload?.jobPostingId, 'applications'],
-          })
-          queryClient.invalidateQueries({ queryKey: ['my-jobs'] })
-          queryClient.invalidateQueries({ queryKey: ['hr-dashboard'] })
+          applications.push({ jobPostingId: payload?.jobPostingId, applicationId: payload?.applicationId })
           refreshOnlineTestResults() // Bảng điểm trắc nghiệm tải lại tức thời
           refreshStaffBell() // Chuông nhân sự: ứng viên nộp bài thi trắc nghiệm
           break
@@ -290,9 +278,7 @@ export const useAppNotifications = () => {
           break
 
         case 'ReceiveApplicationStatusUpdate':
-          // Refresh candidate's application details
-          queryClient.invalidateQueries({ queryKey: ['applications'] })
-          queryClient.invalidateQueries({ queryKey: ['application', payload?.id] })
+          applications.push({ jobPostingId: payload?.jobPostingId, applicationId: payload?.id })
           break
 
         case 'JobReassigned':
@@ -351,6 +337,7 @@ export const useAppNotifications = () => {
     })
 
     return () => {
+      applications.dispose()
       if (connectionRef.current) {
         connectionRef.current.stop().then(() => {
           console.log('[SignalR] Disconnected from AppNotifications hub')

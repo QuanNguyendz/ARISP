@@ -17,6 +17,7 @@ import { applicationService } from '@ari/shared/fservices/application'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { formatScore } from '@ari/shared/utils/format'
+import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 
 import { statusMeta, type Group } from '../_candidateStatus'
@@ -494,7 +495,7 @@ export default function RecruiterCandidatesPage() {
                                                         Điểm CV: {formatScore(app.matchScore)}
                                                       </span>
                                                     ) : (
-                                                      <span className="text-ink-400 text-xs">—</span>
+                                                      <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />
                                                     )}
                                                   </td>
                                                   <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>

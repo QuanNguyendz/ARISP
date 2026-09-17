@@ -21,11 +21,14 @@ public class OnlineTestBankGateTests
 {
     private static Task<Result<JobPostingResponse>> Run(
         InMemoryUnitOfWork uow, Guid jobId, string status, Guid userId, string? role)
-        => new UpdateJobStatusCommandHandler(
+    {
+        ARI.Application.UnitTests.CvScoring.CvScoringKit.EnsureRubricsForAllJobs(uow);
+        return new UpdateJobStatusCommandHandler(
                 uow, new RecordingFileStorage(), new RecordingJdStampService(), new StubDocumentParser(),
                 new RecordingNotificationService(), new RecordingEmailService(),
                 NullLogger<UpdateJobStatusCommandHandler>.Instance)
             .Handle(new UpdateJobStatusCommand(jobId, JobPostingData.StatusRequest(status), userId, role), CancellationToken.None);
+    }
 
     private static OnlineTestQuestion Question(Guid jobId) => new()
     {

@@ -45,14 +45,18 @@ public class GetApplicationByIdTests
     public async Task Detail_loads_linked_analysis_for_match_score()
     {
         var job = ScreeningData.Job();
+        var rubric = ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id);
         var analysis = ScreeningData.Analysis(job.Id, score: 91, summary: "Ứng viên mạnh");
+        analysis.RubricDocumentId = rubric.Id;
         var app = ScreeningData.App(job.Id, analysisId: analysis.Id);
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(analysis).Seed(app);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(rubric).Seed(analysis).Seed(app);
 
         var res = await Svc(uow).GetApplicationByIdAsync(app.Id, CancellationToken.None);
 
         Assert.Equal(91, res.Value!.MatchScore); // CvJdAnalysis null → được nạp thêm
         Assert.Equal("Ứng viên mạnh", res.Value.CvJdSummary);
+        Assert.Equal("scored", res.Value.CvScoreStatus);
+        Assert.NotNull(res.Value.CvScore);
     }
 
     [Fact]

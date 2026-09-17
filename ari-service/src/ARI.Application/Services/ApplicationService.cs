@@ -27,6 +27,8 @@ namespace ARI.Application.Services
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly IMemoryCache _cache;
         private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+        private readonly ICvScoringQueue _cvScoringQueue;
+        private readonly ARI.Application.CvScoring.CvScoringInFlight _cvScoringInFlight;
 
         // Cache key cho danh sách toàn bộ ứng tuyển (HR view).
         private const string AllApplicationsCacheKey = "applications:all";
@@ -74,7 +76,9 @@ namespace ARI.Application.Services
             INotificationService notificationService,
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             IMemoryCache cache,
-            Microsoft.Extensions.Configuration.IConfiguration configuration)
+            Microsoft.Extensions.Configuration.IConfiguration configuration,
+            ICvScoringQueue cvScoringQueue,
+            ARI.Application.CvScoring.CvScoringInFlight cvScoringInFlight)
         {
             _unitOfWork = unitOfWork;
             _ragIngestion = ragIngestion;
@@ -83,6 +87,8 @@ namespace ARI.Application.Services
             _scopeFactory = scopeFactory;
             _cache = cache;
             _configuration = configuration;
+            _cvScoringQueue = cvScoringQueue;
+            _cvScoringInFlight = cvScoringInFlight;
         }
 
         /// <summary>Gốc Candidate Portal cho link trong email — không hardcode localhost vào thư gửi đi.</summary>
@@ -116,27 +122,16 @@ namespace ARI.Application.Services
                 NoticePeriod = application.NoticePeriod,
                 InterviewScore = interviewScore,
                 InterviewDate = interviewDate,
-                MatchScore = application.CvJdAnalysis?.MatchScore,
-                CvJdSummary = application.CvJdAnalysis?.Summary,
-                CvCriterionScores = MapCvCriterionScores(application.CvJdAnalysis?.CriterionScores)
+                // Chỉ hiện điểm chấm theo bộ tiêu chí (ADR-070) — điểm AI tự cho trước đây và "0" của file
+                // không phải CV đều không được lọt ra.
+                MatchScore = application.CvJdAnalysis is { } a && CvScoring.CvScoreState.IsDisplayable(a.Status, a.RubricDocumentId)
+                    ? a.MatchScore
+                    : null,
+                CvJdSummary = application.CvJdAnalysis is { } s && CvScoring.CvScoreState.IsDisplayable(s.Status, s.RubricDocumentId)
+                    ? s.Summary
+                    : null,
             };
         }
-
-
-        /// <summary>
-        /// Đọc điểm tiêu chí chấm CV để hiển thị (ADR-060). Đọc được CẢ dạng phẳng cũ lẫn dạng có ảnh
-        /// chụp, nên hồ sơ chấm trước khi khai rubric vẫn hiện đúng.
-        /// </summary>
-        private static List<CvCriterionScoreDto> MapCvCriterionScores(string? json)
-            => ARI.Application.Playbooks.ScoringRubricSupport.ParseForDisplay(json)
-                .Select(c => new CvCriterionScoreDto
-                {
-                    Key = c.Key,
-                    Score = c.Score,
-                    Label = c.Label,
-                    Weight = c.Weight,
-                })
-                .ToList();
 
         public async Task<Result<ApplicationResponse>> SubmitApplicationAsync(SubmitApplicationRequest request, string source = "invited", CancellationToken ct = default)
         {
@@ -165,87 +160,15 @@ namespace ARI.Application.Services
                 Status = "cv_submitted"
             };
 
-            // Auto-link CvJdAnalysis if it exists
-            if (!string.IsNullOrEmpty(request.CvFileHash))
-            {
-                var analyses = await _unitOfWork.Repository<CvJdAnalysis>()
-                    .FindAsync(x => x.JobPostingId == request.JobPostingId && x.CvHash == request.CvFileHash, ct);
-                var analysis = System.Linq.Enumerable.FirstOrDefault(analyses);
-                if (analysis != null)
-                {
-                    application.CvJdAnalysisId = analysis.Id;
-                }
-            }
-
             await _unitOfWork.Repository<ARI.Domain.Entities.Application>().AddAsync(application, ct);
             await _unitOfWork.SaveChangesAsync(ct);
             _cache.Remove(AllApplicationsCacheKey); // xóa cache để lần load tiếp theo lấy dữ liệu mới nhất
 
-            // Auto-trigger background CV-JD analysis if it does not already exist
-            if (application.CvJdAnalysisId == null && !string.IsNullOrEmpty(application.CvFileUrl))
-            {
-                var fileUrl = application.CvFileUrl;
-                var extension = System.IO.Path.GetExtension(fileUrl).ToLower();
-                var isTestOrDummy = fileUrl.Contains("test", StringComparison.OrdinalIgnoreCase) || 
-                                    fileUrl.Contains("dummy", StringComparison.OrdinalIgnoreCase) || 
-                                    fileUrl.Contains("mock", StringComparison.OrdinalIgnoreCase) || 
-                                    fileUrl.Contains("example", StringComparison.OrdinalIgnoreCase);
-                var isValidExtension = extension == ".pdf" || extension == ".docx" || extension == ".doc";
-
-                if (!isTestOrDummy && isValidExtension)
-                {
-                    var appId = application.Id;
-                    var jobId = application.JobPostingId;
-                    var hash = request.CvFileHash;
-                    
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                        using var scope = _scopeFactory.CreateScope();
-                        var storage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
-                        var cvJdSvc = scope.ServiceProvider.GetRequiredService<CvJdAnalysisService>();
-                        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                        
-                        var bytes = await storage.ReadAllBytesAsync(fileUrl);
-                        if (bytes != null && bytes.Length > 0)
-                        {
-                            using var ms = new System.IO.MemoryStream(bytes);
-                            var fileName = System.IO.Path.GetFileName(fileUrl);
-                            var analysisResult = await cvJdSvc.AnalyzeAndCacheAsync(jobId, ms, fileName, CancellationToken.None);
-                            if (!analysisResult.IsFailure)
-                            {
-                                var appRepo = uow.Repository<ARI.Domain.Entities.Application>();
-                                var app = await appRepo.GetByIdAsync(appId);
-                                if (app != null)
-                                {
-                                    app.CvJdAnalysisId = analysisResult.Value.Id;
-                                    await uow.SaveChangesAsync();
-                                    
-                                    // Notify candidate and recruiters that background analysis completed
-                                    var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
-                                    if (app.CandidateAccountId.HasValue)
-                                    {
-                                        await notifSvc.PublishUserEventAsync(app.CandidateAccountId.Value, "ReceiveUserNotification", new { Type = "AiAnalysisComplete" }, CancellationToken.None);
-                                    }
-                                    
-                                    if (jobPosting != null)
-                                    {
-                                        var responseDto = MapToResponse(app, jobPosting);
-                                        await notifSvc.PublishUserEventAsync(jobPosting.CreatedByUserId, "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
-                                        await notifSvc.PublishGroupEventAsync("hr_admin", "ReceiveApplicationStatusUpdate", responseDto, CancellationToken.None);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // Background task must not crash
-                    }
-                });
-            }
-        }
+            // Chấm CV ở nền theo bộ tiêu chí của tin (ADR-070). Cùng file đã được chấm lúc ứng viên xem độ
+            // phù hợp thì bộ chấm trả lại ngay bản đó, không gọi AI. Tin chưa có bộ tiêu chí thì hồ sơ nằm
+            // chờ — lượt quét nền nhắc HM và tự chấm khi bộ tiêu chí có mặt.
+            if (!string.IsNullOrEmpty(application.CvFileUrl))
+                _cvScoringQueue.EnqueueApplication(application.Id);
 
             // Chunk + embed + lưu pgvector CV — do RAG service (Python) sở hữu (ADR-039).
             if (!string.IsNullOrEmpty(request.CvText))
@@ -498,18 +421,32 @@ namespace ARI.Application.Services
 
             var analysisTask = Task.Run(async () =>
             {
-                var dict = new Dictionary<Guid, (int MatchScore, string Summary)>();
+                var dict = new Dictionary<Guid, (int MatchScore, string Summary, string Status, Guid? RubricId)>();
                 try
                 {
                     if (analysisIds.Count == 0) return dict;
                     using var scope = _scopeFactory.CreateScope();
                     var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                     var list = await uow.Repository<CvJdAnalysis>()
-                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id)).Select(c => new { c.Id, c.MatchScore, c.Summary }), ct);
-                    foreach (var a in list) dict[a.Id] = (a.MatchScore, a.Summary);
+                        .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id))
+                            .Select(c => new { c.Id, c.MatchScore, c.Summary, c.Status, c.RubricDocumentId }), ct);
+                    foreach (var a in list) dict[a.Id] = (a.MatchScore, a.Summary, a.Status, a.RubricDocumentId);
                 }
                 catch { }
                 return dict;
+            });
+
+            // Bộ tiêu chí đang sống của từng tin — để biết điểm nào còn hiện hành, hồ sơ nào đang chờ (ADR-070).
+            var rubricTask = Task.Run(async () =>
+            {
+                try
+                {
+                    if (jobIds.Count == 0) return new Dictionary<Guid, Guid>();
+                    using var scope = _scopeFactory.CreateScope();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    return await ARI.Application.CvScoring.CvRubricStore.LiveIdsByJobAsync(uow, jobIds, ct);
+                }
+                catch { return new Dictionary<Guid, Guid>(); }
             });
 
             var bookingsTask = Task.Run(async () =>
@@ -613,10 +550,11 @@ namespace ARI.Application.Services
                 return dict;
             });
 
-            await Task.WhenAll(jobTask, analysisTask, bookingsTask, invitesTask, sessionsTask, evalsTask, testsTask, candidatesTask);
+            await Task.WhenAll(jobTask, analysisTask, rubricTask, bookingsTask, invitesTask, sessionsTask, evalsTask, testsTask, candidatesTask);
 
             var jobDict = await jobTask;
             var analysisDataById = await analysisTask;
+            var liveRubrics = await rubricTask;
             var scheduledBookings = await bookingsTask;
             var highestRoundInvites = await invitesTask;
             var highestRoundSessions = await sessionsTask;
@@ -665,6 +603,18 @@ namespace ARI.Application.Services
                     }
                 }
 
+                ARI.Application.CvScoring.CvScoreState.AnalysisInfo? analysisInfo = null;
+                string? analysisSummary = null;
+                if (app.CvJdAnalysisId is { } analysisId && analysisDataById.TryGetValue(analysisId, out var an))
+                {
+                    analysisInfo = new ARI.Application.CvScoring.CvScoreState.AnalysisInfo(an.Status, an.RubricId, an.MatchScore);
+                    analysisSummary = an.Summary;
+                }
+                Guid? appLiveRubric = liveRubrics.TryGetValue(app.JobPostingId, out var liveRubricId) ? liveRubricId : null;
+                var cvFailure = ARI.Application.CvScoring.CvScoreState.FailureOf(_cvScoringInFlight, app.Id, appLiveRubric);
+                var (cvState, cvScore) = ARI.Application.CvScoring.CvScoreState.Resolve(
+                    !string.IsNullOrWhiteSpace(app.CvFileUrl), analysisInfo, appLiveRubric, cvFailure);
+
                 var resp = new ApplicationResponse
                 {
                     Id = app.Id,
@@ -680,12 +630,10 @@ namespace ARI.Application.Services
                     PracticeSessionUsed = app.PracticeSessionUsed,
                     CreatedAt = app.CreatedAt,
                     CvJdAnalysisId = app.CvJdAnalysisId,
-                    MatchScore = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val)
-                        ? val.MatchScore
-                        : (int?)null,
-                    CvJdSummary = app.CvJdAnalysisId.HasValue && analysisDataById.TryGetValue(app.CvJdAnalysisId.Value, out var val2)
-                        ? val2.Summary
-                        : null,
+                    MatchScore = cvScore,
+                    CvScoreStatus = cvState,
+                    CvScoreRetryAt = cvState == ARI.Domain.Constants.CvScoreStates.ScoringFailed ? cvFailure?.RetryAfter : null,
+                    CvJdSummary = cvScore.HasValue ? analysisSummary : null,
                     HasScheduledInterview = bookedAppIds.Contains(app.Id),
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
@@ -936,6 +884,16 @@ namespace ARI.Application.Services
             }
 
             var response = MapToResponse(application, jobPosting, currentRound, score, interviewDate);
+
+            // Cách ra điểm CV (ADR-070): trạng thái + từng tiêu chí + phép tính. Màn chi tiết là nơi
+            // HM / Recruiter kiểm lại con số trước khi duyệt hồ sơ.
+            response.CvScore = await ARI.Application.CvScoring.CvScoreBreakdownBuilder.BuildAsync(
+                _unitOfWork, application, application.CvJdAnalysis, ct, _cvScoringInFlight);
+            response.CvScoreStatus = response.CvScore.State;
+            response.CvScoreRetryAt = response.CvScore.RetryAt;
+            response.MatchScore = response.CvScore.Total;
+            if (response.MatchScore == null) response.CvJdSummary = null;
+
             // Cờ đủ điều kiện cấp Interview Code: đã đặt lịch phỏng vấn thật (booking "scheduled").
             var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(
                 b => b.ApplicationId == id && b.Status == "scheduled", ct);

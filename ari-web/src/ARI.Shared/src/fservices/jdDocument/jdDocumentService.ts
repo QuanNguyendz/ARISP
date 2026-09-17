@@ -44,6 +44,16 @@ export type JdDocumentInput = Omit<
   | 'generatedAt'
 >
 
+/** Những ô màn tạo tin cần AI suy ra từ văn xuôi của bản JD. Mọi trường đều có thể trống — không phải lỗi. */
+export interface JdFieldSuggestion {
+  skills: string[]
+  jobCategory?: string | null
+  /** Yêu cầu ngoại ngữ nếu JD có nêu, vd "English (TOEIC > 700)". */
+  languageRequirement?: string | null
+  /** Ngôn ngữ nên dùng cho các vòng phỏng vấn AI. */
+  interviewLanguage?: 'vi' | 'en' | null
+}
+
 export interface JdGeneratedFile {
   /** storageKey — gửi NGUYÊN TRẠNG trong payload tạo tin, không dùng để hiển thị. */
   storageKey: string
@@ -69,10 +79,8 @@ export const jdDocumentService = {
    * `POST` vì mỗi lượt là một lượt Gemini có tính phí. Danh sách rỗng KHÔNG phải lỗi — bản JD có thể
    * không nêu công nghệ nào cụ thể, và màn tạo tin chỉ việc để người dùng tự gõ như trước.
    */
-  async suggestSkills(requestId: string): Promise<{ skills: string[]; jobCategory?: string | null }> {
-    const { data } = await apiClient.post<{ skills: string[]; jobCategory?: string | null }>(
-      `/recruitment-requests/${requestId}/jd/skills`
-    )
+  async suggestSkills(requestId: string): Promise<JdFieldSuggestion> {
+    const { data } = await apiClient.post<JdFieldSuggestion>(`/recruitment-requests/${requestId}/jd/skills`)
     return data
   },
 

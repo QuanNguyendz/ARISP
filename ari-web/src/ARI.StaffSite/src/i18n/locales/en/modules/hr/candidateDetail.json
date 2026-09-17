@@ -41,7 +41,6 @@
   "pass": "Pass",
   "notPass": "Not Pass",
   "viewReport": "View report",
-  "cvCriteriaTitle": "CV score by company criteria",
   "roundTypes": {
     "screening": "Screening",
     "technical": "Technical",

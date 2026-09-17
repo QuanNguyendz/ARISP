@@ -59,7 +59,7 @@
     "salaryNegotiable": "Thoả thuận",
     "salaryNegotiableHint": "Phiếu ghi \"thoả thuận\" — HR Leader sẽ chốt con số ở bước duyệt thư mời.",
     "rounds": "Vòng phỏng vấn cho vị trí này",
-    "roundsHint": "Thứ tự chính là số vòng. Recruiter sẽ dựng tin theo đúng danh sách này.",
+    "roundsHint": "Thứ tự chính là số vòng; mỗi loại vòng chọn một lần. Recruiter sẽ dựng tin theo đúng danh sách này.",
     "roundsMoveUp": "Đưa lên trước",
     "roundsMoveDown": "Đưa xuống sau",
     "roundsRemove": "Bỏ vòng này"

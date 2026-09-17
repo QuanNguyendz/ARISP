@@ -153,6 +153,17 @@ class DetectLanguageResponse(CamelModel):
     language: str  # "en" | "ja" | "vi" | ...
 
 
+class AiAttachment(CamelModel):
+    """File gốc gửi kèm lời gọi model (ADR-070) — hiện chỉ PDF."""
+
+    file_name: str
+    mime_type: str
+    data: str  # base64
+
+
 class CompleteJsonRequest(CamelModel):
     system_instruction: str
     user_content: str
+    # ADR-070: đường dự phòng của .NET gửi kèm file PDF gốc (CV, JD) — trước đây chỉ có text trích ra,
+    # nên CV dạng ảnh scan tới tay model gần như rỗng.
+    attachments: list[AiAttachment] = []

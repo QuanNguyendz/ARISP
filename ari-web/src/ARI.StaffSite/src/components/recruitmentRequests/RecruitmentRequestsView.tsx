@@ -28,9 +28,14 @@ import {
   EMPLOYMENT_TYPES,
   WORK_MODES,
   EXPERIENCE_LEVELS,
+  SALARY_CURRENCIES,
+  DEFAULT_SALARY_CURRENCY,
+  normalizeSalaryCurrency,
   jobOptionLabel,
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { cvRubricProblems } from '@ari/shared/fservices/cvRubric'
+import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import { profileService, type RecruiterOverview } from '@/fservices/profile/profileService'
 
 /**
@@ -117,7 +122,9 @@ const emptyInput = (): RecruitmentRequestInput => ({
   experienceLevel: 'middle',
   salaryMin: undefined,
   salaryMax: undefined,
-  salaryCurrency: 'VND',
+  salaryCurrency: DEFAULT_SALARY_CURRENCY,
+  // ADR-070: bắt buộc — bắt đầu trống để HM chọn cách điền (AI gợi ý, mẫu công ty, Excel, gõ tay).
+  cvRubric: [],
 })
 
 /** Định dạng dải lương cho danh sách. Thoả thuận = chưa điền con số nào. */
@@ -387,6 +394,8 @@ function RequestFormModal({
   const [form, setForm] = useState<RecruitmentRequestInput>(initial ?? emptyInput())
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
+  const [triedSubmit, setTriedSubmit] = useState(false)
+  const { t: tRubric } = useTranslation(CV_SCORING_NS)
 
   // Đội của chính người đang lập phiếu, lấy từ HỒ SƠ chứ không từ form: đây là ô chỉ đọc, giá trị
   // hiện ra phải đúng bằng thứ server sẽ ghi vào phiếu.
@@ -414,6 +423,12 @@ function RequestFormModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
+    setTriedSubmit(true)
+    // Bộ tiêu chí sai thì server cũng chặn — chặn ở đây để lỗi hiện ngay cạnh trình soạn.
+    if (cvRubricProblems(form.cvRubric ?? []).length > 0) {
+      setErr(tRubric('editor.warnings'))
+      return
+    }
     setSubmitting(true)
     try {
       const payload: RecruitmentRequestInput = {
@@ -610,11 +625,14 @@ function RequestFormModal({
             </div>
             <div>
               <label className={labelCls}>{t('form.currency')}</label>
-              <input
+              <Select
                 disabled={negotiable}
-                value={form.salaryCurrency ?? 'VND'}
-                onChange={(e) => setForm({ ...form, salaryCurrency: e.target.value })}
-                className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-50`}
+                value={normalizeSalaryCurrency(form.salaryCurrency)}
+                onChange={(v) => setForm({ ...form, salaryCurrency: v })}
+                ariaLabel={t('form.currency')}
+                className="w-full"
+                buttonClassName="px-3 py-2.5 text-sm"
+                options={SALARY_CURRENCIES}
               />
             </div>
           </div>
@@ -675,6 +693,27 @@ function RequestFormModal({
           <p className="mt-1 text-xs text-ink-400">{t('form.roundsHint')}</p>
         </div>
 
+        {/* ADR-070: "ứng viên thế nào là phù hợp" là quyết định của người có nhu cầu tuyển, và tin không có
+            bộ tiêu chí thì không chấm được CV nào — nên bộ tiêu chí nằm ngay trên phiếu, bắt buộc. */}
+        <div className="rounded-2xl border border-ai-200 bg-ai-50/40 p-4 dark:border-ai-500/20 dark:bg-ai-500/5">
+          <label className={labelCls}>{tRubric('editor.title')} *</label>
+          <CvRubricEditor
+            value={form.cvRubric ?? []}
+            onChange={(next) => setForm((f) => ({ ...f, cvRubric: next }))}
+            showProblems={triedSubmit}
+            suggestSource={() =>
+              form.title.trim() && (form.description?.trim() || form.requirements?.trim())
+                ? {
+                    title: form.title.trim(),
+                    description: form.description ?? null,
+                    requirements: form.requirements ?? null,
+                    experienceLevel: form.experienceLevel ?? null,
+                  }
+                : null
+            }
+          />
+        </div>
+
         <div className="flex gap-3 pt-2">
           <button
             type="button"
@@ -719,6 +758,7 @@ function RequestDetailPanel({
   canComposeJd: boolean
 }) {
   const { t } = useTranslation('modules/staff/recruitmentRequests')
+  const { t: tRubric } = useTranslation(CV_SCORING_NS)
   const [detail, setDetail] = useState<RecruitmentRequestDetail | null>(null)
   const [recruiters, setRecruiters] = useState<RecruiterOverview[]>([])
   const [chosenRecruiter, setChosenRecruiter] = useState('')
@@ -806,7 +846,10 @@ function RequestDetailPanel({
           reason: detail.reason ?? '',
           description: detail.description ?? '',
           requirements: detail.requirements ?? '',
-          requestedRounds: detail.requestedRounds ?? [],
+          // Phiếu cũ có thể khai trùng loại vòng (trước khi có luật mỗi loại một lần) — gộp lại ngay khi mở sửa
+          // để HM thấy đúng danh sách sẽ được lưu, thay vì bấm lưu rồi mới bị server trả lỗi.
+          requestedRounds: [...new Set(detail.requestedRounds ?? [])],
+          cvRubric: detail.cvRubric ?? [],
           employmentType: detail.employmentType ?? 'full_time',
           workMode: detail.workMode ?? 'onsite',
           location: detail.location ?? '',
@@ -815,7 +858,7 @@ function RequestDetailPanel({
           salaryNegotiable: detail.salaryMin == null && detail.salaryMax == null,
           salaryMin: detail.salaryMin ?? undefined,
           salaryMax: detail.salaryMax ?? undefined,
-          salaryCurrency: detail.salaryCurrency ?? 'VND',
+          salaryCurrency: normalizeSalaryCurrency(detail.salaryCurrency),
         }}
         onClose={() => setMode('view')}
         onSaved={() => {
@@ -893,6 +936,18 @@ function RequestDetailPanel({
               .join('  ·  ')}
           />
         )}
+
+        {/* Bộ tiêu chí chấm CV (ADR-070) — HR Leader xem khi duyệt; phiếu lập trước đó thì báo thiếu. */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-ink-500 dark:text-ink-400">{tRubric('editor.title')}</p>
+          {(detail.cvRubric ?? []).length > 0 ? (
+            <ReadOnlyRubric criteria={detail.cvRubric ?? []} />
+          ) : (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              {tRubric('requestMissing')}
+            </p>
+          )}
+        </div>
 
         {/* Lý do thu hồi (ADR-066): Recruiter vừa mất việc và HR Leader vừa bị huỷ chữ ký đều phải
             đọc được dòng này ngay trên phiếu, không phải đi tìm trong chuông. */}
@@ -1134,6 +1189,8 @@ function RoundPicker({
   t: (key: string, opts?: Record<string, unknown>) => string
 }) {
   const label = (r: string) => t(`roundTypes.${roundTypeKey(r)}`)
+  // Mỗi loại vòng chỉ một lần (server chặn trùng): loại đã có thì ẩn nút thêm, bỏ vòng đó đi thì nút hiện lại.
+  const addable = ROUND_TYPES.filter((r) => !value.includes(r))
   const move = (i: number, delta: number) => {
     const j = i + delta
     if (j < 0 || j >= value.length) return
@@ -1148,7 +1205,7 @@ function RoundPicker({
         <ul className="space-y-1.5">
           {value.map((r, i) => (
             <li
-              key={`${r}-${i}`}
+              key={r}
               className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2 dark:border-white/10"
             >
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
@@ -1188,18 +1245,20 @@ function RoundPicker({
         </ul>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
-        {ROUND_TYPES.map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => onChange([...value, r])}
-            className="inline-flex items-center gap-1 rounded-xl border border-dashed border-ink-300 px-2.5 py-1.5 text-xs text-ink-600 hover:bg-ink-50 dark:border-white/20 dark:text-ink-300 dark:hover:bg-white/5"
-          >
-            + {label(r)}
-          </button>
-        ))}
-      </div>
+      {addable.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {addable.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => onChange([...value, r])}
+              className="inline-flex items-center gap-1 rounded-xl border border-dashed border-ink-300 px-2.5 py-1.5 text-xs text-ink-600 hover:bg-ink-50 dark:border-white/20 dark:text-ink-300 dark:hover:bg-white/5"
+            >
+              + {label(r)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1217,7 +1276,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-ink-900">
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-ink-900">
         <div className="mb-5 flex items-start justify-between gap-3">
           <h3 className="text-lg font-semibold text-ink-900 dark:text-white">{title}</h3>
           <button

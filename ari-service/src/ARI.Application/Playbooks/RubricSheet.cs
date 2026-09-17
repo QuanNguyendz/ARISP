@@ -13,8 +13,10 @@ namespace ARI.Application.Playbooks
     /// Đọc/ghi file Excel bộ tiêu chí chấm điểm (ADR-060). Cùng khuôn với import ngân hàng đề trắc
     /// nghiệm (ADR-049) để HR chỉ phải học một cách làm: tải mẫu → điền → upload → báo lỗi theo dòng.
     ///
-    /// Layout: A = Mã tiêu chí, B = Tên hiển thị, C = Trọng số (%), D = Chuẩn chấm (tuỳ chọn).
-    /// Dòng 1 là tiêu đề, luôn bỏ qua.
+    /// Layout: A = Mã tiêu chí (để trống thì hệ thống tự sinh từ tên), B = Tên hiển thị, C = Trọng số (%),
+    /// D = Chuẩn chấm, E–H = mức neo 90–100 / 70–89 / 40–69 / 0–39 (ADR-070, tuỳ chọn),
+    /// I = ý kiểm — mỗi dòng trong ô là một ý (Alt+Enter), tuỳ chọn.
+    /// Dòng 1 là tiêu đề, luôn bỏ qua. File cũ chỉ có A–D vẫn đọc được.
     /// </summary>
     public static class RubricSheet
     {
@@ -63,16 +65,58 @@ namespace ARI.Application.Playbooks
                     continue;
                 }
 
+                var levels = new RubricLevels
+                {
+                    Excellent = NullIfEmpty(Cell(4)),
+                    Good = NullIfEmpty(Cell(5)),
+                    Fair = NullIfEmpty(Cell(6)),
+                    Poor = NullIfEmpty(Cell(7)),
+                };
+
+                var checks = CvRubricEditing.NormalizeChecks(
+                    Cell(8).Split('\n', '\r').Select(t => new RubricCheck { Text = t }));
+
                 criteria.Add(new RubricCriterion
                 {
-                    Key = key.ToLowerInvariant().Replace(' ', '_'),
+                    // Mã để trống → sinh từ tên. Người khai không phải tự nghĩ ra "hard_skills".
+                    Key = key.Length == 0 && name.Length > 0
+                        ? CvRubricEditing.Slugify(name)
+                        : key.ToLowerInvariant().Replace(' ', '_'),
                     Name = name,
                     Weight = weight,
                     Description = string.IsNullOrWhiteSpace(description) ? null : description,
+                    Levels = levels.IsEmpty ? null : levels,
+                    Checks = checks,
                 });
             }
 
             return new ParseResult(criteria, errors);
+        }
+
+        private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+        private static readonly string[] HeaderRow =
+        {
+            "Mã tiêu chí (để trống để hệ thống tự sinh)", "Tên tiêu chí",
+            "Trọng số (%) — tổng phải = 100", "Chuẩn chấm",
+            "Mức 90–100 (xuất sắc)", "Mức 70–89 (tốt)", "Mức 40–69 (đạt một phần)", "Mức 0–39 (chưa đạt)",
+            "Ý kiểm — mỗi dòng một ý (Alt+Enter); quyết định điểm trong dải",
+        };
+
+        /// <summary>
+        /// Xuất một bộ tiêu chí ra file Excel đúng bố cục đọc vào (ADR-070). Dùng cho nút "Xuất Excel" của
+        /// trình soạn và làm file lưu kèm mỗi phiên bản bộ tiêu chí của tin — tải về là mở lại được.
+        /// </summary>
+        public static byte[] Build(IReadOnlyList<RubricCriterion> criteria)
+        {
+            var rows = new List<string?[]> { HeaderRow };
+            rows.AddRange(criteria.Select(c => new[]
+            {
+                c.Key, c.Name, c.Weight.ToString("0.##", CultureInfo.InvariantCulture), c.Description,
+                c.Levels?.Excellent, c.Levels?.Good, c.Levels?.Fair, c.Levels?.Poor,
+                c.Checks is { Count: > 0 } checks ? string.Join("\n", checks.Select(x => x.Text)) : null,
+            }));
+            return Write(rows);
         }
 
         /// <summary>Chấp nhận "40", "40%", "40,5" (dấu phẩy thập phân kiểu VN) và "40.5".</summary>
@@ -87,6 +131,46 @@ namespace ARI.Application.Playbooks
         /// <summary>File mẫu kèm ví dụ có tổng đúng 100 — người dùng sửa đè lên là dùng được ngay.</summary>
         public static byte[] BuildTemplate(bool forCv)
         {
+            var rows = new List<string?[]> { HeaderRow };
+
+            if (forCv)
+            {
+                rows.Add(new[] { "", "Kinh nghiệm liên quan", "40",
+                    "Số năm và độ liên quan của kinh nghiệm so với JD; dự án tương đương tính điểm cao.",
+                    "Từ 4 năm làm sản phẩm thật cùng lĩnh vực, có vai trò dẫn dắt.",
+                    "2–4 năm, đúng lĩnh vực.",
+                    "Dưới 2 năm hoặc lĩnh vực gần.",
+                    "Chỉ có dự án học tập / thực tập ngắn.",
+                    "Có ≥ 4 năm làm sản phẩm thật đúng lĩnh vực\nTừng giữ vai trò dẫn dắt kỹ thuật hoặc trưởng nhóm\nCó dự án quy mô lớn (nhiều người dùng / dữ liệu lớn)\nCó kết quả đo được (%, thời gian, số người dùng)" });
+                rows.Add(new[] { "", "Kỹ năng chuyên môn", "35",
+                    "Khớp với danh sách kỹ năng bắt buộc trong JD; có bằng chứng sử dụng thực tế.",
+                    "Đủ mọi kỹ năng bắt buộc, có kết quả đo được.",
+                    "Đủ phần lớn kỹ năng bắt buộc.",
+                    "Thiếu vài kỹ năng bắt buộc.",
+                    "Thiếu phần lớn kỹ năng bắt buộc.",
+                    "Dùng đủ mọi kỹ năng bắt buộc trong dự án thật\nCó chứng chỉ hoặc đóng góp mã nguồn mở liên quan\nMô tả được chiều sâu (tối ưu, thiết kế) chứ không chỉ liệt kê" });
+                rows.Add(new[] { "", "Học vấn & chứng chỉ", "15",
+                    "Ngành học phù hợp, chứng chỉ liên quan.", "", "", "", "" });
+                rows.Add(new[] { "", "Chất lượng trình bày CV", "10",
+                    "Rõ ràng, có số liệu kết quả, không lỗi trình bày.", "", "", "", "" });
+            }
+            else
+            {
+                rows.Add(new[] { "technical", "Chuyên môn", "40",
+                    "Trả lời đúng và sâu về kỹ thuật cốt lõi của vị trí; nêu được đánh đổi." });
+                rows.Add(new[] { "problem_solving", "Giải quyết vấn đề", "25",
+                    "Phân tích có cấu trúc, đặt câu hỏi làm rõ trước khi trả lời." });
+                rows.Add(new[] { "communication", "Giao tiếp", "20",
+                    "Diễn đạt mạch lạc, đúng trọng tâm, không lan man." });
+                rows.Add(new[] { "culture_fit", "Phù hợp văn hoá", "15",
+                    "Thái độ hợp tác, tinh thần học hỏi, khớp giá trị công ty." });
+            }
+
+            return Write(rows);
+        }
+
+        private static byte[] Write(IReadOnlyList<string?[]> rows)
+        {
             using var mem = new MemoryStream();
             using (var doc = SpreadsheetDocument.Create(mem, SpreadsheetDocumentType.Workbook))
             {
@@ -98,35 +182,6 @@ namespace ARI.Application.Playbooks
 
                 var sheets = wbPart.Workbook.AppendChild(new Sheets());
                 sheets.Append(new Sheet { Id = wbPart.GetIdOfPart(wsPart), SheetId = 1U, Name = "Tieu chi" });
-
-                var rows = new List<string?[]>
-                {
-                    new[] { "Mã tiêu chí (a-z, _)", "Tên hiển thị",
-                            "Trọng số (%) — tổng phải = 100", "Chuẩn chấm (tuỳ chọn)" },
-                };
-
-                if (forCv)
-                {
-                    rows.Add(new[] { "experience", "Kinh nghiệm liên quan", "40",
-                        "Số năm và độ liên quan của kinh nghiệm so với JD; dự án tương đương tính điểm cao." });
-                    rows.Add(new[] { "hard_skills", "Kỹ năng chuyên môn", "35",
-                        "Khớp với danh sách kỹ năng bắt buộc trong JD; có bằng chứng sử dụng thực tế." });
-                    rows.Add(new[] { "education", "Học vấn & chứng chỉ", "15",
-                        "Ngành học phù hợp, chứng chỉ liên quan." });
-                    rows.Add(new[] { "cv_quality", "Chất lượng trình bày CV", "10",
-                        "Rõ ràng, có số liệu kết quả, không lỗi trình bày." });
-                }
-                else
-                {
-                    rows.Add(new[] { "technical", "Chuyên môn", "40",
-                        "Trả lời đúng và sâu về kỹ thuật cốt lõi của vị trí; nêu được đánh đổi." });
-                    rows.Add(new[] { "problem_solving", "Giải quyết vấn đề", "25",
-                        "Phân tích có cấu trúc, đặt câu hỏi làm rõ trước khi trả lời." });
-                    rows.Add(new[] { "communication", "Giao tiếp", "20",
-                        "Diễn đạt mạch lạc, đúng trọng tâm, không lan man." });
-                    rows.Add(new[] { "culture_fit", "Phù hợp văn hoá", "15",
-                        "Thái độ hợp tác, tinh thần học hỏi, khớp giá trị công ty." });
-                }
 
                 for (int i = 0; i < rows.Count; i++)
                     sheetData.Append(RowOf((uint)(i + 1), rows[i]));

@@ -1,8 +1,17 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ARI.Application.DTOs
 {
+    /// <summary>
+    /// Kết quả AI chấm một CV theo bộ tiêu chí của tin (ADR-070).
+    ///
+    /// CỐ Ý không có điểm tổng: AI chỉ chấm TỪNG tiêu chí kèm bằng chứng, điểm tổng do backend cộng có
+    /// trọng số. Trước đây schema có <c>match_score</c> và khi tin chưa khai bộ tiêu chí thì con số đó
+    /// thành điểm của ứng viên — một phán đoán không giải thích được từ tiêu chí nào.
+    /// </summary>
     public class CvJdAnalysisResultDto
     {
         [JsonPropertyName("is_valid_cv")]
@@ -17,15 +26,9 @@ namespace ARI.Application.DTOs
         [JsonPropertyName("tech_depth_analysis")]
         public string TechDepthAnalysis { get; set; } = string.Empty;
 
-        [JsonPropertyName("match_score")]
-        public int MatchScore { get; set; }
-
-        /// <summary>
-        /// Điểm từng tiêu chí do AI chấm khi doanh nghiệp có khai bộ tiêu chí (ADR-060).
-        /// Điểm tổng KHÔNG lấy từ <see cref="MatchScore"/> nữa mà do backend cộng có trọng số.
-        /// </summary>
-        [JsonPropertyName("criterion_scores")]
-        public Dictionary<string, decimal>? CriterionScores { get; set; }
+        /// <summary>Điểm từng tiêu chí, đúng và đủ các mã trong bộ tiêu chí.</summary>
+        [JsonPropertyName("criteria")]
+        public List<CvCriterionAiResult> Criteria { get; set; } = new();
 
         [JsonPropertyName("summary")]
         public string Summary { get; set; } = string.Empty;
@@ -61,5 +64,120 @@ namespace ARI.Application.DTOs
         /// <summary>Nhà cung cấp AI thực sự tạo phân tích: "Gemini" | "GPT-4o-mini" (fallback). Đặt nội bộ, không từ JSON của AI.</summary>
         [JsonIgnore]
         public string Provider { get; set; } = "Gemini";
+    }
+
+    /// <summary>AI chấm một tiêu chí: điểm + trích dẫn từ CV + lý do theo chuẩn chấm.</summary>
+    public class CvCriterionAiResult
+    {
+        [JsonPropertyName("key")]
+        public string Key { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Dải điểm AI chọn: excellent | good | fair | poor. Với tiêu chí có ý kiểm, điểm trong dải do backend tính
+        /// từ <see cref="Checks"/>; không có ý kiểm thì dùng <see cref="Score"/> (kẹp vào dải).
+        /// </summary>
+        [JsonPropertyName("band")]
+        public string? Band { get; set; }
+
+        /// <summary><c>null</c> khi model không chấm được — tiêu chí bị loại khỏi phép tính, không tính 0.</summary>
+        [JsonPropertyName("score")]
+        public decimal? Score { get; set; }
+
+        /// <summary>Câu trả lời có/không cho từng ý kiểm của tiêu chí.</summary>
+        [JsonPropertyName("checks")]
+        public List<CvCheckAiResult>? Checks { get; set; }
+
+        /// <summary>Trích nguyên văn từ CV làm căn cứ. Rỗng = CV không có bằng chứng.</summary>
+        [JsonPropertyName("evidence")]
+        public string Evidence { get; set; } = string.Empty;
+
+        /// <summary>Vì sao điểm rơi vào dải này, đối chiếu chuẩn chấm/mức neo.</summary>
+        [JsonPropertyName("reasoning")]
+        public string Reasoning { get; set; } = string.Empty;
+    }
+
+    /// <summary>AI trả lời một ý kiểm. Đạt mà không trích được bằng chứng thì backend KHÔNG tính.</summary>
+    public class CvCheckAiResult
+    {
+        [JsonPropertyName("key")]
+        public string Key { get; set; } = string.Empty;
+
+        [JsonPropertyName("met")]
+        [JsonConverter(typeof(LenientNullableBoolConverter))]
+        public bool? Met { get; set; }
+
+        [JsonPropertyName("evidence")]
+        public string? Evidence { get; set; }
+    }
+
+    /// <summary>
+    /// Model đôi khi trả <c>"true"</c>, <c>"yes"</c>, <c>"có"</c> hay <c>1</c> thay cho boolean — một ý kiểm viết lệch
+    /// kiểu không được làm hỏng cả lượt chấm. Không nhận ra thì coi như chưa trả lời (null).
+    /// </summary>
+    public sealed class LenientNullableBoolConverter : JsonConverter<bool?>
+    {
+        public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.True: return true;
+                case JsonTokenType.False: return false;
+                case JsonTokenType.Null: return null;
+                case JsonTokenType.Number: return reader.TryGetDecimal(out var d) ? d != 0 : null;
+                case JsonTokenType.String:
+                    return (reader.GetString() ?? string.Empty).Trim().ToLowerInvariant() switch
+                    {
+                        "true" or "yes" or "y" or "1" or "có" or "co" or "đạt" or "dat" => true,
+                        "false" or "no" or "n" or "0" or "không" or "khong" or "chưa" or "chua" => false,
+                        _ => null,
+                    };
+                default:
+                    reader.Skip();
+                    return null;
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options)
+        {
+            if (value is { } v) writer.WriteBooleanValue(v);
+            else writer.WriteNullValue();
+        }
+    }
+
+    /// <summary>Đầu vào để AI gợi ý bộ tiêu chí chấm CV từ phiếu / JD (ADR-070).</summary>
+    public record CvRubricSuggestionInput(
+        string Title,
+        string? Description,
+        string? Requirements,
+        string? ExperienceLevel,
+        IReadOnlyList<string>? Skills);
+
+    /// <summary>Một tiêu chí AI gợi ý — bản nháp, người dùng sửa trước khi lưu.</summary>
+    public class CvRubricSuggestionItem
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("weight")]
+        public decimal Weight { get; set; }
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = string.Empty;
+
+        [JsonPropertyName("excellent")]
+        public string? Excellent { get; set; }
+
+        [JsonPropertyName("good")]
+        public string? Good { get; set; }
+
+        [JsonPropertyName("fair")]
+        public string? Fair { get; set; }
+
+        [JsonPropertyName("poor")]
+        public string? Poor { get; set; }
+
+        /// <summary>3–5 ý kiểm có/không, kiểm được từ CV.</summary>
+        [JsonPropertyName("checks")]
+        public List<string>? Checks { get; set; }
     }
 }

@@ -68,13 +68,15 @@ public class JobSignOffTests
     }
 
     private (InMemoryUnitOfWork uow, JobPosting job) Seed(
-        string status = "pending", string? signOff = HmSignOffStatus.Pending, DateTimeOffset? deadline = null)
+        string status = "pending", string? signOff = HmSignOffStatus.Pending, DateTimeOffset? deadline = null,
+        bool withRubric = true)
     {
         var job = JobPostingData.Job(_ownerId, status: status, deadline: deadline);
         job.HmSignOffStatus = signOff;
         var uow = new InMemoryUnitOfWork().Seed(job)
             .Seed(new User { Id = _ownerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, FullName = "Recruiter A", IsActive = true });
         HiringManagerSeed.Primary(uow, job.Id, _hmId, _ownerId);
+        if (withRubric) uow.Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id));
         return (uow, job);
     }
 

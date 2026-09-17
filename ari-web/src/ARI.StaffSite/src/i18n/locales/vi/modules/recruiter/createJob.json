@@ -48,6 +48,7 @@
     "salaryNegotiable": "Thỏa thuận",
     "salaryMin": "Tối thiểu",
     "salaryMax": "Tối đa",
+    "currency": "Đơn vị tiền",
     "aiInterviewRounds": "Vòng phỏng vấn AI",
     "addRound": "Thêm vòng",
     "round": "Vòng {{number}}",

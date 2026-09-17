@@ -6,6 +6,7 @@ using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Jobs.Commands.CreateJob;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -41,7 +42,9 @@ public class CreateJobCommandHandlerTests
     private static Task<Result<JobPostingResponse>> Run(
         InMemoryUnitOfWork uow, RecordingRagIngestionService rag, RecordingNotificationService notif,
         CreateJobPostingRequest req, Guid userId)
-        => new CreateJobCommandHandler(uow, rag, notif, NullLogger<CreateJobCommandHandler>.Instance)
+        => new CreateJobCommandHandler(uow, rag, notif,
+                ARI.Application.UnitTests.CvScoring.CvScoringKit.RubricService(uow),
+                NullLogger<CreateJobCommandHandler>.Instance)
             .Handle(new CreateJobCommand(req, userId), CancellationToken.None);
 
     private static CreateJobPostingRequest Req() => JobPostingData.Request();
@@ -191,6 +194,38 @@ public class CreateJobCommandHandlerTests
         Assert.Equal("Tiếng Việt", job.LanguageRequirement);   // detectedLang=vi
         Assert.Equal("VND", job.SalaryCurrency);
         Assert.Null(job.Vacancies);
+    }
+
+    // UTCID13 — đơn vị tiền ngoài VND/USD → chặn, không tạo tin
+    [Fact]
+    public async Task UTCID13_Salary_currency_outside_vnd_usd_rejected()
+    {
+        var userId = Guid.NewGuid();
+        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
+        var req = Req();
+        req.SalaryCurrency = "EUR";
+        WithApprovedRequest(uow, req, userId);
+
+        var res = await Run(uow, req, userId);
+
+        Assert.Equal(SalaryCurrencies.InvalidMessage, res.Error);
+        Assert.Empty(uow.Repo<JobPosting>().Items);
+    }
+
+    // UTCID14 — "usd" viết thường → lưu "USD" (bộ lọc lương Job Board so khớp đúng chuỗi "USD")
+    [Fact]
+    public async Task UTCID14_Salary_currency_is_stored_upper_case()
+    {
+        var userId = Guid.NewGuid();
+        var uow = new InMemoryUnitOfWork().Seed(JobPostingData.Staff(userId));
+        var req = Req();
+        req.SalaryCurrency = " usd ";
+        WithApprovedRequest(uow, req, userId);
+
+        var res = await Run(uow, req, userId);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("USD", Assert.Single(uow.Repo<JobPosting>().Items).SalaryCurrency);
     }
 
     // ---------- Tác dụng phụ ----------

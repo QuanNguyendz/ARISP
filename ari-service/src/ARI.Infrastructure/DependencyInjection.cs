@@ -172,6 +172,10 @@ namespace ARI.Infrastructure
             services.AddSingleton<IEmailQueue, EmailBackgroundQueue>();
             services.AddHostedService<EmailQueueHostedService>();
 
+            // Chấm CV nền theo bộ tiêu chí (ADR-070): hàng đợi + lượt quét tự lành 10'/lần.
+            services.AddSingleton<ICvScoringQueue, CvScoringBackgroundQueue>();
+            services.AddHostedService<CvScoringHostedService>();
+
             // Dọn video phỏng vấn thật quá hạn lưu (ADR-052) — quét 12h/lần.
             services.AddHostedService<RecordingRetentionHostedService>();
 

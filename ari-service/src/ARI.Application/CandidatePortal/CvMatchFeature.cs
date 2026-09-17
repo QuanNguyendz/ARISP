@@ -1,44 +1,48 @@
 using System;
-using System.Collections.Concurrent;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.CvScoring;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ARI.Application.CandidatePortal
 {
     /// <summary>
-    /// GET /api/portal/jobs/{jobPostingId}/cv-match — phân tích độ phù hợp CV–JD dùng CHÍNH CV
-    /// trong hồ sơ của ứng viên hiện tại. Kết quả cache theo (job + CV hash); phân tích chạy nền,
-    /// FE poll trạng thái (processing/completed/failed).
+    /// GET /api/portal/jobs/{jobPostingId}/cv-match — độ phù hợp của CHÍNH CV trong hồ sơ ứng viên với
+    /// tin này, chấm theo bộ tiêu chí của tin (ADR-070). Kết quả dùng lại theo (tin, file CV, bộ tiêu
+    /// chí); chấm chạy nền, FE poll trạng thái (processing/completed/failed/rubric_pending).
+    ///
+    /// Trạng thái "đang chấm" và "vừa hỏng" đọc từ <see cref="CvScoringInFlight"/> — chung với hàng đợi
+    /// chấm hồ sơ, nên xem độ phù hợp rồi nộp ngay không gọi AI hai lần.
     /// </summary>
     public record GetCvMatchQuery(Guid JobPostingId, Guid CandidateId) : IRequest<Result<CvMatchResponse>>;
 
     public class GetCvMatchQueryHandler : IRequestHandler<GetCvMatchQuery, Result<CvMatchResponse>>
     {
-        // Trạng thái phân tích CV-JD đang chạy nền (key = "{jobId}:{cvHash}"). Dùng cho lỗi AI
-        // (không ghi row vào DB) để poll biết được kết quả thất bại. Kết quả thành công nằm ở DB cache.
-        private sealed class MatchJobState
-        {
-            public string Status = "processing";
-            public string? Message;
-        }
-        private static readonly ConcurrentDictionary<string, MatchJobState> _matchJobs = new();
-
         private readonly IUnitOfWork _unitOfWork;
         private readonly IFileStorageService _fileStorage;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ICvScoringService _scoring;
+        private readonly CvScoringInFlight _inFlight;
 
-        public GetCvMatchQueryHandler(IUnitOfWork unitOfWork, IFileStorageService fileStorage, IServiceScopeFactory scopeFactory)
+        public GetCvMatchQueryHandler(
+            IUnitOfWork unitOfWork,
+            IFileStorageService fileStorage,
+            IServiceScopeFactory scopeFactory,
+            ICvScoringService scoring,
+            CvScoringInFlight inFlight)
         {
             _unitOfWork = unitOfWork;
             _fileStorage = fileStorage;
             _scopeFactory = scopeFactory;
+            _scoring = scoring;
+            _inFlight = inFlight;
         }
 
         public async Task<Result<CvMatchResponse>> Handle(GetCvMatchQuery request, CancellationToken ct)
@@ -74,15 +78,28 @@ namespace ARI.Application.CandidatePortal
                 return Result.Success(resp);
             }
 
-            var cvHash = PortalSupport.ComputeHash(bytes);
-            var key = $"{jobPostingId}:{cvHash}";
+            var lookup = await _scoring.LookupAsync(jobPostingId, bytes, ct);
 
-            // 1. Đã có kết quả cache trong DB (không chạy lại Gemini).
-            var cached = (await _unitOfWork.Repository<CvJdAnalysis>()
-                .FindAsync(x => x.JobPostingId == jobPostingId && x.CvHash == cvHash, ct)).FirstOrDefault();
-            if (cached != null && cached.Status == "completed")
+            // Tin chưa có bộ tiêu chí → KHÔNG chấm (ADR-070).
+            if (lookup.Rubric == null || lookup.Key == null)
             {
-                _matchJobs.TryRemove(key, out _);
+                resp.AiAvailable = false;
+                resp.Status = "rubric_pending";
+                resp.Message = "Tin này chưa sẵn sàng chấm độ phù hợp CV. Bạn vẫn có thể ứng tuyển bình thường.";
+                return Result.Success(resp);
+            }
+
+            // 1. Đã có kết quả cho đúng (tin, file, bộ tiêu chí).
+            if (lookup.Existing is { } cached)
+            {
+                if (string.Equals(cached.Status, CvAnalysisStatuses.InvalidCv, StringComparison.OrdinalIgnoreCase))
+                {
+                    resp.AiAvailable = false;
+                    resp.Status = "failed";
+                    resp.Message = cached.ErrorMessage ?? "File CV không hợp lệ.";
+                    return Result.Success(resp);
+                }
+
                 resp.AiAvailable = true;
                 resp.Status = "completed";
                 resp.Analysis = new CvMatchAnalysisDto
@@ -97,91 +114,73 @@ namespace ARI.Application.CandidatePortal
                 };
                 return Result.Success(resp);
             }
-            if (cached != null && cached.Status == "failed")
-            {
-                _matchJobs.TryRemove(key, out _);
-                resp.AiAvailable = false;
-                resp.Status = "failed";
-                resp.Message = cached.ErrorMessage ?? "CV không hợp lệ.";
-                return Result.Success(resp);
-            }
 
-            // 2. Có job nền đang/đã chạy. Lỗi AI (không ghi DB) được giữ ở bộ nhớ để poll đọc.
-            if (_matchJobs.TryGetValue(key, out var state))
+            var key = lookup.Key;
+
+            // 2. Đang chấm (từ lượt poll trước hoặc từ hàng đợi hồ sơ).
+            if (_inFlight.IsRunning(key))
             {
-                if (state.Status == "failed")
-                {
-                    _matchJobs.TryRemove(key, out _);
-                    resp.AiAvailable = false;
-                    resp.Status = "failed";
-                    resp.Message = state.Message ?? "Phân tích CV thất bại.";
-                    return Result.Success(resp);
-                }
                 resp.Status = "processing";
                 return Result.Success(resp);
             }
 
-            // 3. Chưa có gì → khởi chạy phân tích ở nền và trả "processing" để FE poll.
-            if (_matchJobs.TryAdd(key, new MatchJobState { Status = "processing" }))
+            // 3. Vừa hỏng và chưa tới giờ thử lại → báo lỗi, không gọi AI liên tục mỗi lượt poll.
+            if (_inFlight.ShouldBackOff(key) && _inFlight.LastFailure(key) is { } failure)
             {
-                var bytesCopy = bytes;
-                var fileNameCopy = fileName;
-                _ = Task.Run(async () =>
+                resp.AiAvailable = false;
+                resp.Status = "failed";
+                resp.Message = failure.Message;
+                return Result.Success(resp);
+            }
+
+            // 4. Chưa có gì → chấm ở nền và trả "processing" để FE poll. Khoá được giữ ngay trong lượt
+            //    chấm, nên poll kế tiếp thấy IsRunning; hai request đồng thời thì người sau chờ rồi dùng
+            //    lại kết quả người trước.
+            var bytesCopy = bytes;
+            var fileNameCopy = fileName;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var svc = scope.ServiceProvider.GetRequiredService<ICvScoringService>();
+                    var r = await svc.ScoreAsync(jobPostingId, bytesCopy, fileNameCopy, CancellationToken.None);
+                    if (r.IsFailure) return;
+
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                    var dedupKey = $"ai_analysis:{jobPostingId}";
+                    var exists = await uow.Repository<Notification>().CountAsync(
+                        n => n.CandidateAccountId == candidateId && n.DedupKey == dedupKey, CancellationToken.None) > 0;
+                    if (!exists)
+                    {
+                        await uow.Repository<Notification>().AddAsync(new Notification
+                        {
+                            CandidateAccountId = candidateId,
+                            DedupKey = dedupKey,
+                            Type = "system",
+                            Title = "Phân tích CV hoàn tất",
+                            Body = "AI đã hoàn tất phân tích CV của bạn. Vui lòng bấm vào để xem kết quả.",
+                            Link = $"/jobs/{jobPostingId}",
+                            IsRead = false
+                        }, CancellationToken.None);
+                        await uow.SaveChangesAsync(CancellationToken.None);
+                    }
+
+                    await notifSvc.PublishUserEventAsync(candidateId, "ReceiveUserNotification",
+                        new { Type = "AiAnalysisComplete", JobPostingId = jobPostingId }, CancellationToken.None);
+                }
+                catch (Exception ex)
                 {
                     try
                     {
                         using var scope = _scopeFactory.CreateScope();
-                        var svc = scope.ServiceProvider.GetRequiredService<ICvJdAnalysisService>();
-                        var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
-                        using var bgStream = new System.IO.MemoryStream(bytesCopy);
-                        var r = await svc.AnalyzeAndCacheAsync(jobPostingId, bgStream, fileNameCopy, CancellationToken.None);
-                        if (!r.IsFailure)
-                        {
-                            // Thành công → đã nằm trong DB cache, bỏ trạng thái nền.
-                            _matchJobs.TryRemove(key, out _);
-
-                            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                            var notifRepo = uow.Repository<Notification>();
-                            var dedupKey = $"ai_analysis:{jobPostingId}";
-
-                            var existingNotifs = await notifRepo.FindAsync(n => n.CandidateAccountId == candidateId && n.DedupKey == dedupKey, CancellationToken.None);
-                            var existingNotif = existingNotifs.FirstOrDefault();
-                            if (existingNotif == null)
-                            {
-                                var newNotif = new Notification
-                                {
-                                    CandidateAccountId = candidateId,
-                                    DedupKey = dedupKey,
-                                    Type = "system",
-                                    Title = "Phân tích CV hoàn tất",
-                                    Body = $"AI đã hoàn tất phân tích CV của bạn. Vui lòng bấm vào để xem kết quả.",
-                                    Link = $"/jobs/{jobPostingId}",
-                                    IsRead = false
-                                };
-                                await notifRepo.AddAsync(newNotif, CancellationToken.None);
-                                await uow.SaveChangesAsync(CancellationToken.None);
-                            }
-
-                            // Notify candidate
-                            await notifSvc.PublishUserEventAsync(candidateId, "ReceiveUserNotification", new { Type = "AiAnalysisComplete" }, CancellationToken.None);
-                        }
-                        else if (_matchJobs.TryGetValue(key, out var s))
-                        {
-                            // Lỗi AI không ghi DB → giữ trạng thái failed cho poll kế tiếp.
-                            s.Status = "failed";
-                            s.Message = r.Error;
-                        }
+                        scope.ServiceProvider.GetService<ILogger<GetCvMatchQueryHandler>>()
+                            ?.LogError(ex, "Chấm độ phù hợp CV nền thất bại cho tin {JobId}", jobPostingId);
                     }
-                    catch (Exception)
-                    {
-                        if (_matchJobs.TryGetValue(key, out var s))
-                        {
-                            s.Status = "failed";
-                            s.Message = "Lỗi hệ thống khi phân tích CV.";
-                        }
-                    }
-                });
-            }
+                    catch { /* không để tác vụ nền làm sập tiến trình */ }
+                }
+            });
 
             resp.Status = "processing";
             return Result.Success(resp);

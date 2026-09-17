@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -27,6 +28,10 @@ namespace ARI.Infrastructure.AI
         private const string GeminiEndpoint =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+        private const string PdfMime = "application/pdf";
+
+        private static readonly JsonSerializerOptions ReadOpts = new() { PropertyNameCaseInsensitive = true };
+
         public GeminiProvider(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiProvider> logger, IAIProvider aiProvider)
         {
             _httpClient = httpClient;
@@ -37,22 +42,24 @@ namespace ARI.Infrastructure.AI
 
         /// <summary>
         /// Lấy JSON kết quả: thử Gemini trước; nếu lỗi (vd 503 quá tải, hết retry) thì fallback sang
-        /// OpenAI GPT-4o-mini với cùng system instruction + nội dung, rồi bọc lại theo envelope giống
-        /// Gemini (candidates[0].content.parts[0].text) để khối parse phía dưới dùng chung không cần sửa.
+        /// OpenAI GPT-4o-mini với cùng system instruction + nội dung + CHÍNH CÁC FILE gốc (ADR-070 —
+        /// trước đây fallback chỉ nhận text trích ra, CV scan tới tay model gần như rỗng), rồi bọc lại
+        /// theo envelope giống Gemini (candidates[0].content.parts[0].text) để khối parse dùng chung.
         /// Nếu cả hai cùng lỗi → ném exception cho caller trả Result.Failure.
         /// </summary>
         private async Task<(string Json, string Provider)> GetAnalysisJsonAsync(
-            object geminiRequestBody, string systemInstruction, string userContent, CancellationToken ct)
+            object geminiRequestBody, string systemInstruction, string userContent,
+            IReadOnlyList<AiAttachment>? attachments, CancellationToken ct)
         {
             try
             {
                 var json = await PostToGeminiAsync(geminiRequestBody, ct);
                 return (json, "Gemini");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "Gemini lỗi — chuyển fallback OpenAI GPT-4o-mini.");
-                var innerJson = await _aiProvider.CompleteJsonAsync(systemInstruction, userContent, ct);
+                var innerJson = await _aiProvider.CompleteJsonAsync(systemInstruction, userContent, attachments, ct);
                 var envelope = new
                 {
                     candidates = new[]
@@ -71,6 +78,9 @@ namespace ARI.Infrastructure.AI
         /// </summary>
         private async Task<string> PostToGeminiAsync(object requestBody, CancellationToken ct)
         {
+            if (string.IsNullOrEmpty(_apiKey))
+                throw new InvalidOperationException("GEMINI_API_KEY is not configured.");
+
             const int maxAttempts = 3;
             for (int attempt = 1; ; attempt++)
             {
@@ -114,184 +124,243 @@ namespace ARI.Infrastructure.AI
             }
         }
 
-        public async Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(
-            string jdText, 
-            byte[]? cvFileBytes, 
-            string? cvMimeType, 
-            string? fallbackCvText,
-            string? rubricInstruction = null,
-            CancellationToken ct = default)
+        /// <summary>
+        /// Bóc JSON do model sinh ra khỏi envelope <c>candidates[0].content.parts[0].text</c>, gỡ rào
+        /// markdown nếu model lờ <c>responseMimeType</c>, kèm số token. Trả null nếu rỗng.
+        /// </summary>
+        private static (string? Json, int PromptTokens, int CompletionTokens) Unwrap(string envelopeJson)
         {
-            if (string.IsNullOrEmpty(_apiKey))
+            using var document = JsonDocument.Parse(envelopeJson);
+            var root = document.RootElement;
+            var raw = root.GetProperty("candidates")[0]
+                .GetProperty("content").GetProperty("parts")[0]
+                .GetProperty("text").GetString();
+
+            int promptTokens = 0, completionTokens = 0;
+            if (root.TryGetProperty("usageMetadata", out var usage))
             {
-                return Result<CvJdAnalysisResultDto>.Failure("GEMINI_API_KEY is not configured.");
+                if (usage.TryGetProperty("promptTokenCount", out var p)) promptTokens = p.GetInt32();
+                if (usage.TryGetProperty("candidatesTokenCount", out var c)) completionTokens = c.GetInt32();
             }
 
+            if (string.IsNullOrEmpty(raw)) return (null, promptTokens, completionTokens);
 
-            var systemInstruction = @"You are an expert Headhunter and Tech Lead.
-Your task is to analyze a candidate's CV against a Job Description (JD).
-CRITICAL INSTRUCTION: You must STRICTLY verify if the document is actually a Resume/CV. If irrelevant, you MUST set 'is_valid_cv' to false, 'match_score' to 0.
+            raw = raw.Trim();
+            if (raw.StartsWith("```"))
+            {
+                var firstNewLine = raw.IndexOf('\n');
+                raw = firstNewLine >= 0 ? raw[(firstNewLine + 1)..] : raw.TrimStart('`');
+                if (raw.EndsWith("```")) raw = raw[..^3];
+            }
+            return (raw.Trim(), promptTokens, completionTokens);
+        }
 
-If it IS a valid CV, employ Chain-of-Thought reasoning:
-1. Identify Seniority Required in JD (Fresher, Junior, Mid, Senior).
-2. Calculate candidate's Professional Experience. CRITICAL RULE: Academic projects and short internships DO NOT count towards professional experience for Senior roles.
-3. PENALTY RULE: If JD requires Senior (e.g., 4+ years) and CV is Fresher/Intern (< 1 year), 'match_score' MUST NOT exceed 30%, regardless of keyword matches.
-4. Depth Check: Evaluate if they have hands-on production depth (e.g. building RAG, Vector DBs, System Optimization) or just surface-level API usage.
+        /// <summary>Phần <c>parts</c> của một file gốc: PDF gửi nguyên file, loại khác không gửi được.</summary>
+        private static object InlinePdf(AiAttachment file) => new
+        {
+            inline_data = new { mime_type = PdfMime, data = Convert.ToBase64String(file.Bytes) },
+        };
 
-CRITICAL LANGUAGE RULE: EVERY text value in the JSON (summary, skills_matched, skills_gaps, red_flags, experience_relevance, analysis_reasoning, seniority_alignment, tech_depth_analysis) MUST be written in VIETNAMESE (tiếng Việt) — regardless of the language of the CV or JD. Only keep proper nouns / technical terms as-is (e.g. C#, .NET, PostgreSQL, React, RAG, Vector DB). Do NOT write these fields in English.
+        private static bool IsPdf(AiAttachment? file)
+            => file is { Bytes.Length: > 0 } && string.Equals(file.MimeType, PdfMime, StringComparison.OrdinalIgnoreCase);
 
-You MUST return ONLY a valid JSON object matching this schema, without markdown formatting.
+        // ================================================================
+        // Chấm CV theo bộ tiêu chí (ADR-060 / ADR-070)
+        // ================================================================
+
+        private const string CvScoringInstruction = @"You are an expert technical recruiter scoring a candidate's CV against a Job Description using the company's SCORING RUBRIC.
+CRITICAL: First verify the document is actually a CV/Resume. If it is not, set ""is_valid_cv"" to false, return an empty ""criteria"" array, and leave the other fields empty.
+
+If it IS a CV:
+1. Identify the seniority the JD requires (Fresher, Junior, Mid, Senior).
+2. Work out the candidate's PROFESSIONAL experience. Academic projects and short internships DO NOT count as professional experience for Senior roles.
+3. Evaluate EVERY criterion of the rubric exactly once. Base everything ONLY on evidence written in the CV — no evidence means a low band; never assume.
+   a. ""band"": choose ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69) or ""poor"" (0-39). When the criterion lists band descriptions, pick the band whose description the evidence matches; otherwise judge against the criterion's scoring guide.
+      - For criteria about experience or seniority: if the JD requires Senior (e.g. 4+ years) and the candidate has under 1 year of professional experience, the band MUST be ""poor"" and the score MUST NOT exceed 30.
+      - Check depth: hands-on production work (building systems, optimisation, ownership) ranks higher than surface-level API usage or keyword lists.
+   b. If the criterion has a checklist (""ý kiểm"", items written as [key] text), answer EVERY item in ""checks"" as { ""key"", ""met"", ""evidence"" }:
+      - ""met"": true ONLY when the CV explicitly proves the item, and then quote that proof verbatim in ""evidence"" (at most 200 characters). Otherwise ""met"": false and ""evidence"" is an empty string.
+      - Judge each item on its own; do not change the band because of the checklist. The system computes the exact score inside the band from your answers, so set ""score"" to null for these criteria.
+   c. If the criterion has NO checklist, give ""score"" as an integer inside the chosen band: the bottom of the band when the evidence barely meets the band description, the middle when it clearly meets it with several pieces of evidence, the top when it is close to the next band's description (100 only when it clearly exceeds every aspect). Use ""checks"": [].
+   - ""evidence"": quote the CV verbatim for the criterion as a whole (short, at most 300 characters; join several quotes with "" … ""). Use an empty string when the CV has nothing relevant.
+   - ""reasoning"": 1-2 sentences explaining why the evidence falls in that band, referring to the band descriptions / scoring guide.
+4. Do NOT produce an overall score. The system computes it from your criterion scores and the rubric weights.
+5. Anything listed under ""KHÔNG ĐƯỢC DÙNG ĐỂ CHẤM ĐIỂM"" must never influence any score.
+
+LANGUAGE RULE: every text value (analysis_reasoning, seniority_alignment, tech_depth_analysis, reasoning, summary, skills_matched, skills_gaps, red_flags, experience_relevance) MUST be written in VIETNAMESE. Keep proper nouns / technical terms as-is (C#, .NET, PostgreSQL, React...). The ""evidence"" quotes stay in the CV's original language.
+
+Return ONLY a valid JSON object, without markdown formatting:
 {
   ""is_valid_cv"": boolean,
-  ""analysis_reasoning"": string (Tiếng Việt — lập luận từng bước),
-  ""seniority_alignment"": string (Tiếng Việt — phân tích khoảng cách cấp bậc giữa JD và CV),
-  ""tech_depth_analysis"": string (Tiếng Việt — đánh giá chiều sâu thực chiến vs kiến thức bề mặt),
-  ""match_score"": int (0-100),
-  ""summary"": string (Tiếng Việt. Định dạng ĐÚNG 2 đoạn, mỗi đoạn nằm trên một dòng riêng, ngăn cách bằng ký tự xuống dòng '\n'. Đoạn 1 bắt đầu bằng '🌟 Điểm sáng: ' nêu ưu điểm. Đoạn 2 bắt đầu bằng '⚠️ Điểm cần lưu ý: ' nêu vì sao chưa đạt yêu cầu của JD. Mỗi đoạn 2-4 câu, súc tích.),
-  ""skills_matched"": string[] (Tiếng Việt — mỗi phần tử là MỘT kỹ năng khớp, kèm mức độ ngắn gọn trong ngoặc, ví dụ ""C# (cơ bản, qua thực tập)"". Giữ tên công nghệ nguyên gốc.),
-  ""skills_gaps"": string[] (Tiếng Việt — mỗi phần tử là MỘT kỹ năng/kinh nghiệm còn thiếu, ngắn gọn. Giữ tên công nghệ nguyên gốc.),
-  ""red_flags"": string[] (Tiếng Việt — khoảng trống sự nghiệp hoặc điểm đáng ngờ. Để mảng rỗng nếu không có.),
-  ""experience_relevance"": string (Tiếng Việt — mức độ phù hợp lĩnh vực với JD),
-  ""overall_recommendation"": string (CHỈ chọn đúng một trong các giá trị tiếng Anh sau: 'Strong Hire', 'Hire', 'Proceed with caution', 'Reject')
+  ""analysis_reasoning"": string (lập luận từng bước),
+  ""seniority_alignment"": string (khoảng cách cấp bậc giữa JD và CV),
+  ""tech_depth_analysis"": string (chiều sâu thực chiến so với kiến thức bề mặt),
+  ""criteria"": [ { ""key"": string (exactly one of the rubric keys), ""band"": ""excellent"" | ""good"" | ""fair"" | ""poor"", ""score"": integer 0-100 or null (null for criteria with a checklist), ""checks"": [ { ""key"": string (exactly one of this criterion's checklist keys), ""met"": boolean, ""evidence"": string } ], ""evidence"": string, ""reasoning"": string } ],
+  ""summary"": string (ĐÚNG 2 đoạn, ngăn cách bằng '\n'. Đoạn 1 bắt đầu bằng '🌟 Điểm sáng: '. Đoạn 2 bắt đầu bằng '⚠️ Điểm cần lưu ý: '. Mỗi đoạn 2-4 câu.),
+  ""skills_matched"": string[] (mỗi phần tử một kỹ năng khớp, kèm mức độ ngắn trong ngoặc),
+  ""skills_gaps"": string[] (mỗi phần tử một kỹ năng/kinh nghiệm còn thiếu),
+  ""red_flags"": string[] (khoảng trống sự nghiệp hoặc điểm đáng ngờ; mảng rỗng nếu không có),
+  ""experience_relevance"": string (mức độ phù hợp lĩnh vực với JD)
 }";
 
-            // Doanh nghiệp có khai bộ tiêu chí → AI chấm TỪNG tiêu chí, backend cộng có trọng số.
-            // Không khai thì giữ nguyên hành vi cũ (AI tự cho match_score) để tin cũ không vỡ.
-            if (!string.IsNullOrWhiteSpace(rubricInstruction))
-            {
-                systemInstruction += "\n\n--- SCORING RUBRIC (bắt buộc tuân thủ) ---\n" + rubricInstruction
-                    + "\n\nNgoài các trường trên, BẮT BUỘC thêm khoá \"criterion_scores\": {\"<mã tiêu chí>\": <0-100>} chấm ĐÚNG và ĐỦ các mã tiêu chí liệt kê ở trên, không thêm mã nào khác. Mỗi điểm phải dựa trên bằng chứng có trong CV; thiếu bằng chứng thì cho điểm thấp, không suy diễn. Hệ thống sẽ TỰ TÍNH điểm tổng từ các tiêu chí này theo trọng số — match_score bạn đưa ra chỉ là ước lượng tham khảo.";
-            }
+        public async Task<Result<CvJdAnalysisResultDto>> AnalyzeCvJdMatchAsync(CvScoringAiRequest request, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(request.RubricInstruction) || request.CriterionKeys.Count == 0)
+                return Result<CvJdAnalysisResultDto>.Failure("Không có bộ tiêu chí — không chấm CV.");
 
-            var parts = new List<object>
-            {
-                new { text = $"--- JOB DESCRIPTION ---\n{jdText}\n\n--- CANDIDATE CV ---" }
-            };
+            var hasCvPdf = IsPdf(request.CvPdf);
+            if (!hasCvPdf && string.IsNullOrWhiteSpace(request.CvText))
+                return Result<CvJdAnalysisResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
 
-            // Use Multimodal (PDF) if available, otherwise use fallback text
-            if (cvFileBytes != null && cvFileBytes.Length > 0 && cvMimeType == "application/pdf")
+            var systemInstruction = CvScoringInstruction
+                + "\n\n--- SCORING RUBRIC (mã | tên | trọng số | chuẩn chấm) ---\n" + request.RubricInstruction
+                + "\n\nREQUIRED criterion keys (score each exactly once, no other keys): "
+                + string.Join(", ", request.CriterionKeys);
+
+            var hasJdPdf = IsPdf(request.JdPdf);
+            var jdHeader = $"--- JOB DESCRIPTION ---\n{request.JdText}"
+                           + (hasJdPdf ? "\n(File JD gốc đính kèm ngay sau đây — ưu tiên nội dung trong file.)" : string.Empty);
+
+            var parts = new List<object> { new { text = jdHeader } };
+            if (hasJdPdf) parts.Add(InlinePdf(request.JdPdf!));
+            parts.Add(new { text = "\n--- CANDIDATE CV ---" });
+            if (hasCvPdf)
             {
-                parts.Add(new
-                {
-                    inline_data = new
-                    {
-                        mime_type = "application/pdf",
-                        data = Convert.ToBase64String(cvFileBytes)
-                    }
-                });
-                
-                if (!string.IsNullOrEmpty(fallbackCvText))
-                {
-                    parts.Add(new { text = "\n(Fallback Extracted Text in case PDF parsing fails):\n" + fallbackCvText });
-                }
-            }
-            else if (!string.IsNullOrEmpty(fallbackCvText))
-            {
-                parts.Add(new { text = fallbackCvText });
+                parts.Add(InlinePdf(request.CvPdf!));
+                if (!string.IsNullOrWhiteSpace(request.CvText))
+                    parts.Add(new { text = "\n(Fallback Extracted Text in case PDF parsing fails):\n" + request.CvText });
             }
             else
             {
-                return Result<CvJdAnalysisResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
+                parts.Add(new { text = request.CvText! });
             }
 
             var requestBody = new
             {
-                system_instruction = new
-                {
-                    parts = new[] { new { text = systemInstruction } }
-                },
-                contents = new[]
-                {
-                    new { parts = parts }
-                },
-                generationConfig = new
-                {
-                    responseMimeType = "application/json",
-                    temperature = 0.0
-                }
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
+                contents = new[] { new { parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.0 },
             };
 
+            var attachments = new List<AiAttachment>();
+            if (hasJdPdf) attachments.Add(request.JdPdf!);
+            if (hasCvPdf) attachments.Add(request.CvPdf!);
+
+            var fallbackUser = $"{jdHeader}\n\n--- CANDIDATE CV ---\n"
+                               + (hasCvPdf ? "(CV gốc đính kèm dạng PDF.)\n" : string.Empty)
+                               + request.CvText;
+
             var sw = Stopwatch.StartNew();
-            
-            string responseJson = string.Empty;
-            string analysisProvider = "Gemini";
+            string responseJson;
+            string provider;
             try
             {
-                (responseJson, analysisProvider) = await GetAnalysisJsonAsync(
-                    requestBody, systemInstruction,
-                    $"--- JOB DESCRIPTION ---\n{jdText}\n\n--- CANDIDATE CV ---\n{fallbackCvText}", ct);
+                (responseJson, provider) = await GetAnalysisJsonAsync(requestBody, systemInstruction, fallbackUser, attachments, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV-JD analysis).");
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (chấm CV).");
                 return Result<CvJdAnalysisResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
             }
             sw.Stop();
-            
-            _logger.LogInformation($"Gemini API call completed in {sw.ElapsedMilliseconds}ms");
+            _logger.LogInformation("Chấm CV bằng {Provider} xong trong {Ms}ms", provider, sw.ElapsedMilliseconds);
 
             try
             {
-                // Parse the Gemini Response structure
-                using var document = JsonDocument.Parse(responseJson);
-                var root = document.RootElement;
-                
-                var candidates = root.GetProperty("candidates");
-                var firstCandidate = candidates[0];
-                var content = firstCandidate.GetProperty("content");
-                var responseParts = content.GetProperty("parts");
-                var firstPart = responseParts[0];
-                var rawJsonString = firstPart.GetProperty("text").GetString();
+                var (json, promptTokens, completionTokens) = Unwrap(responseJson);
+                if (string.IsNullOrEmpty(json))
+                    return Result<CvJdAnalysisResultDto>.Failure("AI trả về nội dung rỗng.");
 
-                if (string.IsNullOrEmpty(rawJsonString))
-                {
-                    return Result<CvJdAnalysisResultDto>.Failure("Gemini returned empty text.");
-                }
-
-                // Extract Usage Metadata
-                int promptTokens = 0, completionTokens = 0;
-                if (root.TryGetProperty("usageMetadata", out var usageProp))
-                {
-                    if (usageProp.TryGetProperty("promptTokenCount", out var pCount)) promptTokens = pCount.GetInt32();
-                    if (usageProp.TryGetProperty("candidatesTokenCount", out var cCount)) completionTokens = cCount.GetInt32();
-                }
-
-                // Remove markdown code blocks if Gemini ignores responseMimeType
-                if (rawJsonString.StartsWith("```json"))
-                {
-                    rawJsonString = rawJsonString.Substring(7);
-                    if (rawJsonString.EndsWith("```"))
-                    {
-                        rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
-                    }
-                }
-                rawJsonString = rawJsonString.Trim();
-
-                var result = JsonSerializer.Deserialize<CvJdAnalysisResultDto>(rawJsonString, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
+                var result = JsonSerializer.Deserialize<CvJdAnalysisResultDto>(json, ReadOpts);
                 if (result == null)
-                {
-                    return Result<CvJdAnalysisResultDto>.Failure("Failed to deserialize Gemini JSON output.");
-                }
+                    return Result<CvJdAnalysisResultDto>.Failure("Không đọc được kết quả chấm CV của AI.");
 
-                // Gắn Telemetry vào DTO để trả về cho ApplicationService
+                result.Criteria ??= new List<CvCriterionAiResult>();
                 result.RawResponse = responseJson;
                 result.ProcessingTimeMs = (int)sw.ElapsedMilliseconds;
                 result.PromptTokens = promptTokens;
                 result.CompletionTokens = completionTokens;
-                result.Provider = analysisProvider;
-
+                result.Provider = provider;
                 return Result<CvJdAnalysisResultDto>.Success(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to parse Gemini response. Raw Response: {RawResponse}", responseJson);
-                return Result<CvJdAnalysisResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
+                _logger.LogError(ex, "Không parse được kết quả chấm CV. Raw: {RawResponse}", responseJson);
+                return Result<CvJdAnalysisResultDto>.Failure($"Không đọc được kết quả chấm CV của AI: {ex.Message}");
             }
         }
+
+        // ================================================================
+        // Gợi ý bộ tiêu chí chấm CV (ADR-070)
+        // ================================================================
+
+        private const string RubricSuggestionInstruction = @"You help a Hiring Manager draft a CV SCORING RUBRIC for one job opening.
+Rules:
+- Return 4 to 6 criteria that can be judged FROM A CV ALONE: professional experience, required technical skills, domain knowledge, education / certificates, measurable achievements, CV clarity. Do NOT include criteria that need an interview (communication, attitude, culture fit).
+- NEVER use protected or discriminatory attributes (age, gender, marital status, religion, ethnicity, hometown, appearance, health) as criteria.
+- Weights are integers that sum to exactly 100 and reflect importance for THIS role.
+- Every text value is Vietnamese; keep technology names as-is.
+- ""name"": short criterion name. ""description"": what a strong candidate shows in the CV (1-2 sentences).
+- ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69), ""poor"" (0-39): concrete, observable descriptions (years, named technologies, measurable results) so two reviewers would pick the same band.
+- ""checks"": 3 to 5 short yes/no items, each verifiable from the CV text alone and each a DISTINCT sign of strength for this criterion (e.g. ""Có ≥ 3 năm làm C#/.NET production"", ""Có số liệu kết quả đo được (%, số người dùng)""). They decide the exact score inside a band, so do not just restate the band descriptions, and never use protected attributes.
+Return ONLY a valid JSON object, without markdown:
+{ ""criteria"": [ { ""name"": string, ""weight"": integer, ""description"": string, ""excellent"": string, ""good"": string, ""fair"": string, ""poor"": string, ""checks"": string[] } ] }";
+
+        private sealed class RubricSuggestionEnvelope
+        {
+            public List<CvRubricSuggestionItem>? Criteria { get; set; }
+        }
+
+        public async Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(input.Title))
+                return Result<List<CvRubricSuggestionItem>>.Failure("Cần tên vị trí để gợi ý bộ tiêu chí.");
+
+            var skills = input.Skills is { Count: > 0 } ? string.Join(", ", input.Skills) : "(không nêu)";
+            var userContent =
+                $"Vị trí: {input.Title}\n"
+                + $"Cấp bậc: {input.ExperienceLevel ?? "(không nêu)"}\n"
+                + $"Kỹ năng nêu trong tin: {skills}\n\n"
+                + $"--- MÔ TẢ CÔNG VIỆC ---\n{input.Description ?? "(không có)"}\n\n"
+                + $"--- YÊU CẦU ỨNG VIÊN ---\n{input.Requirements ?? "(không có)"}";
+
+            var requestBody = new
+            {
+                system_instruction = new { parts = new[] { new { text = RubricSuggestionInstruction } } },
+                contents = new[] { new { parts = new[] { new { text = userContent } } } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.3 },
+            };
+
+            string responseJson;
+            try
+            {
+                (responseJson, _) = await GetAnalysisJsonAsync(requestBody, RubricSuggestionInstruction, userContent, null, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (gợi ý bộ tiêu chí).");
+                return Result<List<CvRubricSuggestionItem>>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
+            }
+
+            try
+            {
+                var (json, _, _) = Unwrap(responseJson);
+                var parsed = string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<RubricSuggestionEnvelope>(json, ReadOpts);
+                var items = parsed?.Criteria?.Where(c => !string.IsNullOrWhiteSpace(c.Name)).ToList() ?? new();
+                return items.Count == 0
+                    ? Result<List<CvRubricSuggestionItem>>.Failure("AI chưa gợi ý được tiêu chí nào — hãy thử lại hoặc tự nhập.")
+                    : Result<List<CvRubricSuggestionItem>>.Success(items);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Không parse được gợi ý bộ tiêu chí. Raw: {RawResponse}", responseJson);
+                return Result<List<CvRubricSuggestionItem>>.Failure("Không đọc được gợi ý của AI — hãy thử lại.");
+            }
+        }
+
+        // ================================================================
+        // Các tác vụ khác (không chấm điểm)
+        // ================================================================
 
         public async Task<Result<CvReviewResultDto>> ReviewCvAsync(
             byte[]? cvFileBytes,
@@ -299,10 +368,6 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             string? fallbackCvText,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
-                return Result<CvReviewResultDto>.Failure("GEMINI_API_KEY is not configured.");
-
-
             var systemInstruction = @"You are an expert technical recruiter reviewing a candidate's CV/Resume (no specific job description).
 CRITICAL: First verify the document is actually a CV/Resume. If it is not, set 'is_valid_cv' to false.
 
@@ -318,42 +383,25 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
   ""missing_sections"": string[] (các mục quan trọng còn thiếu trong CV như 'GitHub link', 'Mô tả dự án'. Để rỗng nếu đầy đủ)
 }";
 
-            var parts = new List<object>
-            {
-                new { text = "--- CANDIDATE CV ---" }
-            };
-
-            if (cvFileBytes != null && cvFileBytes.Length > 0 && cvMimeType == "application/pdf")
-            {
-                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(cvFileBytes) } });
-                if (!string.IsNullOrEmpty(fallbackCvText))
-                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackCvText });
-            }
-            else if (!string.IsNullOrEmpty(fallbackCvText))
-            {
-                parts.Add(new { text = fallbackCvText });
-            }
-            else
-            {
+            var built = BuildDocumentParts("--- CANDIDATE CV ---", cvFileBytes, cvMimeType, fallbackCvText, "cv.pdf");
+            if (built == null)
                 return Result<CvReviewResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
-            }
 
             var requestBody = new
             {
                 system_instruction = new { parts = new[] { new { text = systemInstruction } } },
-                contents = new[] { new { parts = parts } },
-                generationConfig = new { responseMimeType = "application/json", temperature = 0.2 }
+                contents = new[] { new { parts = built.Value.Parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.2 },
             };
 
-            string responseJson = string.Empty;
-            string reviewProvider = "Gemini";
+            string responseJson;
+            string reviewProvider;
             try
             {
                 (responseJson, reviewProvider) = await GetAnalysisJsonAsync(
-                    requestBody, systemInstruction,
-                    $"--- CANDIDATE CV ---\n{fallbackCvText}", ct);
+                    requestBody, systemInstruction, $"--- CANDIDATE CV ---\n{fallbackCvText}", built.Value.Attachments, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV review).");
                 return Result<CvReviewResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
@@ -361,30 +409,11 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
 
             try
             {
-                using var document = JsonDocument.Parse(responseJson);
-                var root = document.RootElement;
-                var rawJsonString = root.GetProperty("candidates")[0]
-                    .GetProperty("content").GetProperty("parts")[0]
-                    .GetProperty("text").GetString();
-
-                if (string.IsNullOrEmpty(rawJsonString))
+                var (json, promptTokens, completionTokens) = Unwrap(responseJson);
+                if (string.IsNullOrEmpty(json))
                     return Result<CvReviewResultDto>.Failure("Gemini returned empty text.");
 
-                int promptTokens = 0, completionTokens = 0;
-                if (root.TryGetProperty("usageMetadata", out var usageProp))
-                {
-                    if (usageProp.TryGetProperty("promptTokenCount", out var pCount)) promptTokens = pCount.GetInt32();
-                    if (usageProp.TryGetProperty("candidatesTokenCount", out var cCount)) completionTokens = cCount.GetInt32();
-                }
-
-                if (rawJsonString.StartsWith("```json"))
-                {
-                    rawJsonString = rawJsonString.Substring(7);
-                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
-                }
-                rawJsonString = rawJsonString.Trim();
-
-                var result = JsonSerializer.Deserialize<CvReviewResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var result = JsonSerializer.Deserialize<CvReviewResultDto>(json, ReadOpts);
                 if (result == null)
                     return Result<CvReviewResultDto>.Failure("Failed to deserialize Gemini CV review output.");
 
@@ -406,10 +435,6 @@ You MUST return ONLY a valid JSON object matching this schema, in Vietnamese, wi
             string? fallbackJdText,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
-                return Result<JdExtractionResultDto>.Failure("GEMINI_API_KEY is not configured.");
-
-
             var systemInstruction = @"You are an expert IT recruiter assistant. You read a Job Description (JD) document and extract structured fields to pre-fill a job posting form.
 CRITICAL: First verify the document is actually a Job Description. If it is not, set 'is_valid_jd' to false and leave the other fields empty/null.
 
@@ -425,7 +450,8 @@ Rules:
   CRITICAL CONTACT RULE: You MUST EXCLUDE any company contact information (such as candidate application submission emails, HR contact names, phone numbers, mail subject formats, or call-to-actions like ""Liên hệ nộp hồ sơ qua email...""). If this contact section is at the end of the JD, stop extracting before it.
 - 'skills' is an array of concrete technical skills/tools mentioned (keep proper names: C#, .NET, React, PostgreSQL...). Max 15.
 - 'language_requirement' ONLY if the JD explicitly requires a foreign language proficiency (e.g. ""English (TOEIC > 700)""). If the JD is Vietnamese with no foreign-language requirement, set null.
-- 'salary_min'/'salary_max': Extract the salary range. 
+- 'interview_language' is the language the AI interview rounds should be held in: ""en"" if the JD is written in English OR explicitly requires working/communicating in English, otherwise ""vi"". Only ""vi"" or ""en"".
+- 'salary_min'/'salary_max': Extract the salary range.
   CRITICAL SALARY RULE: If the JD mentions an active starting/training salary/allowance (e.g. ""Trợ cấp đào tạo 6,000,000 – 8,000,000 VNĐ/tháng"") AND a prospective/potential future salary after contract/training (e.g. ""cơ hội ký hợp đồng chính thức với mức thu nhập trung bình từ 12.000.000 VNĐ - 15.000.000 VNĐ/tháng""), you MUST extract the active starting/training salary (e.g., min: 6000000, max: 8000000). Do NOT extract the potential/future contract salary.
   If the original JD states the salary in USD or other currencies, you MUST automatically convert it to VND (Vietnamese Dong) using the current approximate rate (e.g. 1 USD = 25,000 VND). Round the final converted value to the nearest million VND (e.g. 37,500,000 VND should be rounded to 38,000,000 VND, 15,300,000 VND should be rounded to 15,000,000 VND) and output it as a plain number (e.g. 38000000). If the original JD is in VND, keep it in VND but still round it to the nearest million VND. If no salary is explicitly stated, set them to null. Do not invent.
 - Only fill a field if you are confident it is in the JD; otherwise use null (or empty array for skills).
@@ -443,45 +469,29 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
   ""location"": string|null,
   ""skills"": string[],
   ""language_requirement"": string|null,
+  ""interview_language"": ""vi""|""en"",
   ""salary_min"": number|null,
   ""salary_max"": number|null
 }";
 
-            var parts = new List<object>
-            {
-                new { text = "--- JOB DESCRIPTION DOCUMENT ---" }
-            };
-
-            if (jdFileBytes != null && jdFileBytes.Length > 0 && jdMimeType == "application/pdf")
-            {
-                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(jdFileBytes) } });
-                if (!string.IsNullOrEmpty(fallbackJdText))
-                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackJdText });
-            }
-            else if (!string.IsNullOrEmpty(fallbackJdText))
-            {
-                parts.Add(new { text = fallbackJdText });
-            }
-            else
-            {
+            var built = BuildDocumentParts("--- JOB DESCRIPTION DOCUMENT ---", jdFileBytes, jdMimeType, fallbackJdText, "jd.pdf");
+            if (built == null)
                 return Result<JdExtractionResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
-            }
 
             var requestBody = new
             {
                 system_instruction = new { parts = new[] { new { text = systemInstruction } } },
-                contents = new[] { new { parts = parts } },
-                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 }
+                contents = new[] { new { parts = built.Value.Parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 },
             };
 
-            string responseJson = string.Empty;
+            string responseJson;
             try
             {
                 (responseJson, _) = await GetAnalysisJsonAsync(
-                    requestBody, systemInstruction,
-                    $"--- JOB DESCRIPTION ---\n{fallbackJdText}", ct);
+                    requestBody, systemInstruction, $"--- JOB DESCRIPTION ---\n{fallbackJdText}", built.Value.Attachments, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (JD extraction).");
                 return Result<JdExtractionResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
@@ -489,30 +499,11 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
 
             try
             {
-                using var document = JsonDocument.Parse(responseJson);
-                var root = document.RootElement;
-                var rawJsonString = root.GetProperty("candidates")[0]
-                    .GetProperty("content").GetProperty("parts")[0]
-                    .GetProperty("text").GetString();
-
-                if (string.IsNullOrEmpty(rawJsonString))
+                var (json, promptTokens, completionTokens) = Unwrap(responseJson);
+                if (string.IsNullOrEmpty(json))
                     return Result<JdExtractionResultDto>.Failure("Gemini returned empty text.");
 
-                int promptTokens = 0, completionTokens = 0;
-                if (root.TryGetProperty("usageMetadata", out var usageProp))
-                {
-                    if (usageProp.TryGetProperty("promptTokenCount", out var pCount)) promptTokens = pCount.GetInt32();
-                    if (usageProp.TryGetProperty("candidatesTokenCount", out var cCount)) completionTokens = cCount.GetInt32();
-                }
-
-                if (rawJsonString.StartsWith("```json"))
-                {
-                    rawJsonString = rawJsonString.Substring(7);
-                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
-                }
-                rawJsonString = rawJsonString.Trim();
-
-                var result = JsonSerializer.Deserialize<JdExtractionResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var result = JsonSerializer.Deserialize<JdExtractionResultDto>(json, ReadOpts);
                 if (result == null)
                     return Result<JdExtractionResultDto>.Failure("Failed to deserialize Gemini JD extraction output.");
 
@@ -536,9 +527,6 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
             string formEmail,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(_apiKey))
-                return Result<CvContactVerificationResultDto>.Failure("GEMINI_API_KEY is not configured.");
-
             var systemInstruction = $@"You are an AI assistant verifying CV contact details against a job application form.
 You are given a candidate's CV and the contact details they entered in the form:
 - Full Name: {formName}
@@ -564,41 +552,24 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
   ""mismatch_details"": string|null
 }}";
 
-            var parts = new List<object>
-            {
-                new { text = "--- CANDIDATE CV ---" }
-            };
-
-            if (cvFileBytes != null && cvFileBytes.Length > 0 && cvMimeType == "application/pdf")
-            {
-                parts.Add(new { inline_data = new { mime_type = "application/pdf", data = Convert.ToBase64String(cvFileBytes) } });
-                if (!string.IsNullOrEmpty(fallbackCvText))
-                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackCvText });
-            }
-            else if (!string.IsNullOrEmpty(fallbackCvText))
-            {
-                parts.Add(new { text = fallbackCvText });
-            }
-            else
-            {
+            var built = BuildDocumentParts("--- CANDIDATE CV ---", cvFileBytes, cvMimeType, fallbackCvText, "cv.pdf");
+            if (built == null)
                 return Result<CvContactVerificationResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
-            }
 
             var requestBody = new
             {
                 system_instruction = new { parts = new[] { new { text = systemInstruction } } },
-                contents = new[] { new { parts = parts } },
-                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 }
+                contents = new[] { new { parts = built.Value.Parts } },
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.1 },
             };
 
-            string responseJson = string.Empty;
+            string responseJson;
             try
             {
                 (responseJson, _) = await GetAnalysisJsonAsync(
-                    requestBody, systemInstruction,
-                    $"--- CANDIDATE CV ---\n{fallbackCvText}", ct);
+                    requestBody, systemInstruction, $"--- CANDIDATE CV ---\n{fallbackCvText}", built.Value.Attachments, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Gemini + fallback OpenAI đều lỗi (CV contact verification).");
                 return Result<CvContactVerificationResultDto>.Failure($"Dịch vụ AI tạm thời không khả dụng: {ex.Message}");
@@ -606,23 +577,11 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
 
             try
             {
-                using var document = JsonDocument.Parse(responseJson);
-                var root = document.RootElement;
-                var rawJsonString = root.GetProperty("candidates")[0]
-                    .GetProperty("content").GetProperty("parts")[0]
-                    .GetProperty("text").GetString();
-
-                if (string.IsNullOrEmpty(rawJsonString))
+                var (json, _, _) = Unwrap(responseJson);
+                if (string.IsNullOrEmpty(json))
                     return Result<CvContactVerificationResultDto>.Failure("Gemini returned empty text.");
 
-                if (rawJsonString.StartsWith("```json"))
-                {
-                    rawJsonString = rawJsonString.Substring(7);
-                    if (rawJsonString.EndsWith("```")) rawJsonString = rawJsonString.Substring(0, rawJsonString.Length - 3);
-                }
-                rawJsonString = rawJsonString.Trim();
-
-                var result = JsonSerializer.Deserialize<CvContactVerificationResultDto>(rawJsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var result = JsonSerializer.Deserialize<CvContactVerificationResultDto>(json, ReadOpts);
                 if (result == null)
                     return Result<CvContactVerificationResultDto>.Failure("Failed to deserialize Gemini CV contact verification output.");
 
@@ -633,6 +592,37 @@ You MUST return ONLY a valid JSON object matching this schema, without markdown 
                 _logger.LogError(ex, "Failed to parse Gemini CV contact verification. Raw: {RawResponse}", responseJson);
                 return Result<CvContactVerificationResultDto>.Failure($"Failed to parse Gemini response: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Phần nội dung cho một tài liệu đơn (CV hoặc JD): PDF gửi nguyên file (kèm text dự phòng),
+        /// loại khác gửi text. Trả kèm danh sách file để đường dự phòng cũng đọc được file gốc.
+        /// Null khi không có gì để gửi.
+        /// </summary>
+        private static (List<object> Parts, List<AiAttachment> Attachments)? BuildDocumentParts(
+            string header, byte[]? fileBytes, string? mimeType, string? fallbackText, string fileName)
+        {
+            var parts = new List<object> { new { text = header } };
+            var attachments = new List<AiAttachment>();
+
+            if (fileBytes is { Length: > 0 } && mimeType == PdfMime)
+            {
+                var file = new AiAttachment(fileName, PdfMime, fileBytes);
+                parts.Add(InlinePdf(file));
+                attachments.Add(file);
+                if (!string.IsNullOrEmpty(fallbackText))
+                    parts.Add(new { text = "\n(Fallback Extracted Text):\n" + fallbackText });
+            }
+            else if (!string.IsNullOrEmpty(fallbackText))
+            {
+                parts.Add(new { text = fallbackText });
+            }
+            else
+            {
+                return null;
+            }
+
+            return (parts, attachments);
         }
     }
 }

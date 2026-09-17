@@ -136,6 +136,7 @@ public class GetEvaluationDetailQueryHandlerTests
         var analysis = new CvJdAnalysis
         {
             JobPostingId = job.Id,
+            RubricDocumentId = Guid.NewGuid(), // chấm theo bộ tiêu chí (ADR-070)
             MatchScore = 73,
             Summary = "Khớp phần lớn kỹ năng backend, thiếu kinh nghiệm Kubernetes.",
         };

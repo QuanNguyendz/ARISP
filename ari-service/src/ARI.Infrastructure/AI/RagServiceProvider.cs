@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -150,10 +151,19 @@ namespace ARI.Infrastructure.AI
                    ?? new LanguageAssessment();
         }
 
-        public async Task<string> CompleteJsonAsync(string systemInstruction, string userContent, CancellationToken ct = default)
+        public async Task<string> CompleteJsonAsync(
+            string systemInstruction,
+            string userContent,
+            IReadOnlyList<AiAttachment>? attachments = null,
+            CancellationToken ct = default)
         {
+            var files = (attachments ?? Array.Empty<AiAttachment>())
+                .Where(a => a.Bytes is { Length: > 0 })
+                .Select(a => new { fileName = a.FileName, mimeType = a.MimeType, data = Convert.ToBase64String(a.Bytes) })
+                .ToList();
+
             using var resp = await _http.PostAsJsonAsync("/complete-json",
-                new { systemInstruction, userContent }, JsonOpts, ct);
+                new { systemInstruction, userContent, attachments = files }, JsonOpts, ct);
             resp.EnsureSuccessStatusCode();
             // Service trả về JSON object thô — trả nguyên chuỗi cho người gọi tự parse.
             return await resp.Content.ReadAsStringAsync(ct);

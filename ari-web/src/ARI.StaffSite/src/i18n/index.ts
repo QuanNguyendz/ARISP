@@ -56,6 +56,8 @@ import staffInterviewResultsVi from './locales/vi/modules/staff/interviewResults
 import staffInterviewResultsEn from './locales/en/modules/staff/interviewResults.json'
 import staffJobPlaybooksVi from './locales/vi/modules/staff/jobPlaybooks.json'
 import staffJobPlaybooksEn from './locales/en/modules/staff/jobPlaybooks.json'
+import staffCvScoringVi from './locales/vi/modules/staff/cvScoring.json'
+import staffCvScoringEn from './locales/en/modules/staff/cvScoring.json'
 import hrJobPostingDetailVi from './locales/vi/modules/hr/jobPostingDetail.json'
 import hrJobPostingDetailEn from './locales/en/modules/hr/jobPostingDetail.json'
 
@@ -120,6 +122,7 @@ export const resources = {
     'modules/staff/offers': staffOffersVi,
     'modules/staff/interviewResults': staffInterviewResultsVi,
     'modules/staff/jobPlaybooks': staffJobPlaybooksVi,
+    'modules/staff/cvScoring': staffCvScoringVi,
     'modules/hr/jobPostingDetail': hrJobPostingDetailVi,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardVi,
@@ -166,6 +169,7 @@ export const resources = {
     'modules/staff/offers': staffOffersEn,
     'modules/staff/interviewResults': staffInterviewResultsEn,
     'modules/staff/jobPlaybooks': staffJobPlaybooksEn,
+    'modules/staff/cvScoring': staffCvScoringEn,
     'modules/hr/jobPostingDetail': hrJobPostingDetailEn,
     // Recruiter module
     'modules/recruiter/dashboard': recruiterDashboardEn,
@@ -211,6 +215,7 @@ const siteNamespaces = [
   'modules/staff/offers',
   'modules/staff/interviewResults',
   'modules/staff/jobPlaybooks',
+  'modules/staff/cvScoring',
   'modules/hr/jobPostingDetail',
   'modules/recruiter/dashboard',
   'modules/recruiter/jobs',

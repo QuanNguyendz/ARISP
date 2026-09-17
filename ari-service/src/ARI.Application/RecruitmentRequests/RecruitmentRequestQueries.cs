@@ -240,7 +240,10 @@ namespace ARI.Application.RecruitmentRequests
                 // vừa suy ra ở trên — không truy vấn lại, không có cột thứ hai để trôi lệch.
                 CanRevoke: RecruitmentRequestStatus.IsRevocable(req.Status)
                            && jobPostingId == Guid.Empty
-                           && (isOwner || isAdmin)));
+                           && (isOwner || isAdmin),
+
+                CvRubric: ARI.Application.Playbooks.CvRubricEditing.ToInput(
+                    ARI.Application.Playbooks.ScoringRubric.Deserialize(req.CvRubricJson))));
         }
     }
 }

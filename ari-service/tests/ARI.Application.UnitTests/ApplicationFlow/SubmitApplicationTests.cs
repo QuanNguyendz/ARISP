@@ -13,7 +13,7 @@ namespace ARI.Application.UnitTests.ApplicationFlow;
 
 /// <summary>
 /// Nộp hồ sơ ứng tuyển (<see cref="ApplicationService.SubmitApplicationAsync"/>, Phase 2): chặn tin
-/// đóng/hết hạn, tạo Application ở trạng thái cv_submitted, auto-link CV-JD Analysis theo hash, đẩy CV vào
+/// đóng/hết hạn, tạo Application ở trạng thái cv_submitted, đưa CV vào hàng chấm (ADR-070), đẩy CV vào
 /// RAG, và bắn thông báo cho nhân sự + ứng viên tự ứng tuyển.
 /// </summary>
 public class SubmitApplicationTests
@@ -22,12 +22,14 @@ public class SubmitApplicationTests
     private readonly Guid _accountId = Guid.NewGuid();
 
     private sealed record Ctx(
-        InMemoryUnitOfWork Uow, RecordingNotificationService Notif, RecordingEmailService Email, RecordingRagIngestionService Rag);
+        InMemoryUnitOfWork Uow, RecordingNotificationService Notif, RecordingEmailService Email, RecordingRagIngestionService Rag,
+        ARI.Application.UnitTests.CvScoring.RecordingCvScoringQueue Queue);
 
-    private Ctx NewCtx() => new(new InMemoryUnitOfWork(), new RecordingNotificationService(), new RecordingEmailService(), new RecordingRagIngestionService());
+    private Ctx NewCtx() => new(new InMemoryUnitOfWork(), new RecordingNotificationService(), new RecordingEmailService(),
+        new RecordingRagIngestionService(), new ARI.Application.UnitTests.CvScoring.RecordingCvScoringQueue());
 
     private static Task<Result<ApplicationResponse>> Run(Ctx c, SubmitApplicationRequest req, string source = "invited")
-        => ApplicationServiceFactory.Create(c.Uow, c.Notif, c.Email, c.Rag).SubmitApplicationAsync(req, source, CancellationToken.None);
+        => ApplicationServiceFactory.Create(c.Uow, c.Notif, c.Email, c.Rag, c.Queue).SubmitApplicationAsync(req, source, CancellationToken.None);
 
     // ---------- Chặn ----------
 
@@ -132,30 +134,33 @@ public class SubmitApplicationTests
         Assert.Empty(c.Rag.Ingested);
     }
 
+    /// <summary>
+    /// ADR-070: nộp hồ sơ không tự gắn bản chấm nào (trước đây gắn cả bản <c>failed</c>) — hồ sơ vào hàng chấm
+    /// nền, bộ chấm dùng lại kết quả sẵn có theo (tin, file, bộ tiêu chí) nếu có.
+    /// </summary>
     [Fact]
-    public async Task Auto_links_matching_analysis_by_hash()
-    {
-        var c = NewCtx();
-        var job = ApplicationData.Job();
-        var analysis = ApplicationData.Analysis(job.Id, cvHash: "HASH-1");
-        c.Uow.Seed(job).Seed(analysis);
-
-        var res = await Run(c, ApplicationData.SubmitRequest(job.Id, cvHash: "HASH-1"));
-
-        Assert.Equal(analysis.Id, res.Value.CvJdAnalysisId);
-        Assert.Equal(analysis.Id, Assert.Single(c.Uow.Repo<Domain.Entities.Application>().Items).CvJdAnalysisId);
-    }
-
-    [Fact]
-    public async Task Non_matching_hash_leaves_analysis_unlinked()
+    public async Task Cv_file_is_queued_for_scoring_and_nothing_is_linked_inline()
     {
         var c = NewCtx();
         var job = ApplicationData.Job();
         c.Uow.Seed(job).Seed(ApplicationData.Analysis(job.Id, cvHash: "HASH-1"));
 
-        var res = await Run(c, ApplicationData.SubmitRequest(job.Id, cvHash: "OTHER-HASH"));
+        var res = await Run(c, ApplicationData.SubmitRequest(job.Id, cvFileUrl: "cv/cv.pdf"));
 
         Assert.Null(res.Value.CvJdAnalysisId);
+        Assert.Equal(new[] { res.Value.Id }, c.Queue.Applications);
+    }
+
+    [Fact]
+    public async Task Without_a_cv_file_nothing_is_queued()
+    {
+        var c = NewCtx();
+        var job = ApplicationData.Job();
+        c.Uow.Seed(job);
+
+        await Run(c, ApplicationData.SubmitRequest(job.Id));
+
+        Assert.Empty(c.Queue.Applications);
     }
 
     // ---------- Thông báo ----------

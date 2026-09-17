@@ -57,15 +57,18 @@ namespace ARI.Application.Dev.SeedInterviewJob
         private readonly IUnitOfWork _unitOfWork;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IInterviewCodeService _interviewCodeService;
+        private readonly CvScoring.CvRubricService _cvRubrics;
 
         public SeedInterviewJobCommandHandler(
             IUnitOfWork unitOfWork,
             IPasswordHasher passwordHasher,
-            IInterviewCodeService interviewCodeService)
+            IInterviewCodeService interviewCodeService,
+            CvScoring.CvRubricService cvRubrics)
         {
             _unitOfWork = unitOfWork;
             _passwordHasher = passwordHasher;
             _interviewCodeService = interviewCodeService;
+            _cvRubrics = cvRubrics;
         }
 
         public async Task<Result<SeedInterviewJobResult>> Handle(SeedInterviewJobCommand request, CancellationToken ct)
@@ -140,6 +143,9 @@ namespace ARI.Application.Dev.SeedInterviewJob
 
             // 3b) Hiring Manager chính (ADR-068) — mọi tin đều có; buổi thật chờ HM cho vào phòng.
             await DevHiringManagerSeed.EnsureAsync(_unitOfWork, _passwordHasher, job, ct);
+
+            // 3c) Bộ tiêu chí chấm CV (ADR-070) — bắt buộc với mọi tin.
+            await DevCvRubricSeed.EnsureAsync(_unitOfWork, _cvRubrics, job, staff.Id, ct);
 
             // 4) Cấu hình 3 vòng — mốc để backend biết đâu là vòng CUỐI (chỉ khi đó mới "Đạt").
             var existingRounds = (await _unitOfWork.Repository<InterviewRoundConfig>()

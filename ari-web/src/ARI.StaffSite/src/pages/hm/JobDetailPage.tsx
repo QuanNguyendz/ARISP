@@ -26,6 +26,7 @@ import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import HmAvailabilityPanel, { HM_AVAILABILITY_ANCHOR } from '@/components/hiring/HmAvailabilityPanel'
 import HmApproveScheduleNotice from '@/components/hiring/HmApproveScheduleNotice'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
+import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
 import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
@@ -68,8 +69,10 @@ export default function HmJobDetailPage() {
     enabled: !!id,
   })
 
+  // Cùng khoá với màn tin của Recruiter để mọi nhánh realtime (invalidateApplicationQueries) phủ tới —
+  // khoá riêng trước đây khiến điểm CV chấm nền xong không bao giờ tự hiện ở màn này.
   const { data: applications = [] } = useQuery({
-    queryKey: ['job-applications', id],
+    queryKey: ['job', id, 'applications'],
     queryFn: () => jobService.getJobApplications(id),
     enabled: !!id,
   })
@@ -108,7 +111,7 @@ export default function HmJobDetailPage() {
       setDecision(null)
       setActionError(null)
       setReason('')
-      queryClient.invalidateQueries({ queryKey: ['job-applications', id] })
+      queryClient.invalidateQueries({ queryKey: ['job', id, 'applications'] })
       queryClient.invalidateQueries({ queryKey: ['applications'] })
     },
     onError: (e: unknown) => {
@@ -245,6 +248,9 @@ export default function HmJobDetailPage() {
             {/* Playbook của tin (ADR-069) — cùng lý do với ngân hàng đề: hỏi gì, câu nào bắt buộc, đáp án
                 tốt trông ra sao là quyết định CHUYÊN MÔN của Hiring Manager, nên HM thêm/xoá ngay tại tin
                 thay vì phải nhờ HR vào màn Playbook chung. */}
+            {/* Bộ tiêu chí chấm CV (ADR-070) — HM chính soạn và sửa; lưu bộ mới là chấm lại mọi hồ sơ. */}
+            <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+
             <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
 
             {/* File JD — ADR-064. Chữ ký của Hiring Manager LÀ cổng đăng tin (ADR-063), nên họ phải

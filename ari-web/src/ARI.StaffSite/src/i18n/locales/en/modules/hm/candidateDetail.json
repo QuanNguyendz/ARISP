@@ -3,7 +3,6 @@
   "loadError": "Could not load this candidate. They may not belong to a job you are on.",
   "back": "Back to the job",
   "contact": "Contact details",
-  "matchScore": "CV–JD match: {{score}}/100",
   "viewCv": "View CV",
   "evaluations": {
     "title": "Interview results",

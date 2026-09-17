@@ -59,7 +59,7 @@
     "salaryNegotiable": "Negotiable",
     "salaryNegotiableHint": "Filed as negotiable — the HR Leader settles the figure when approving the offer.",
     "rounds": "Interview rounds for this role",
-    "roundsHint": "The order is the round number. The recruiter builds the posting from this list.",
+    "roundsHint": "The order is the round number; each round type can be picked once. The recruiter builds the posting from this list.",
     "roundsMoveUp": "Move earlier",
     "roundsMoveDown": "Move later",
     "roundsRemove": "Remove this round"
