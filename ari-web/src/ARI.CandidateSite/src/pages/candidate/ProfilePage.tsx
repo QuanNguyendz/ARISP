@@ -51,6 +51,7 @@ import type {
 } from '@ari/shared/fservices/profile/profileService'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useRefreshCandidateAvatar } from '@/fservices/profile/avatarQuery'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 // Kỹ năng & công nghệ phổ biến hiện nay (gợi ý nhanh để ứng viên thêm bằng 1 cú nhấp)
 const SUGGESTED_SKILLS = [
@@ -388,7 +389,7 @@ export default function ProfilePage() {
       setDirty(false)
       setSavedAt(Date.now())
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || t('profile.saveFailed'))
+      setError(resolveApiError(e, t, 'profile.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -431,7 +432,7 @@ export default function ProfilePage() {
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } }; message?: string }
       // Giữ modal mở kèm lỗi để ứng viên thử lại ngay, không mất khung đã căn.
-      setAvatarError(err?.response?.data?.message || err?.message || t('profile.avatarUploadFailed'))
+      setAvatarError(resolveApiError(err, t, 'profile.avatarUploadFailed'))
     } finally {
       setAvatarUploading(false)
     }
@@ -469,7 +470,7 @@ export default function ProfilePage() {
         setCvNotice(t('profile.cvUploadedAndAnalyzed'))
       }
     } catch (e: any) {
-      setCvError(e?.response?.data?.message || e?.message || t('profile.cvUploadFailed'))
+      setCvError(resolveApiError(e, t, 'profile.cvUploadFailed'))
     } finally {
       setCvUploading(false)
     }

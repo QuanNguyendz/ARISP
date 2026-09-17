@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 
 function Logo() {
   return (
@@ -69,21 +68,14 @@ export default function LegalPageShell({
     <div className="min-h-screen bg-ink-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-ink-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+        {/* Chỉ còn logo — logo đã là đường về trang chủ. Nút "Quay lại" dựa vào `history.back()`,
+            mà trang điều khoản thường được mở ở tab mới từ form đăng ký: lúc đó lịch sử trống và nút
+            dẫn đi một nơi người dùng chưa từng ở. */}
+        <div className="mx-auto flex max-w-3xl items-center px-6 py-4">
           <Link to="/" className="flex items-center gap-2.5">
             <Logo />
             <span className="font-display text-xl font-extrabold text-ink-900">ARISP</span>
           </Link>
-          <button
-            type="button"
-            onClick={() =>
-              window.history.length > 1 ? window.history.back() : (window.location.href = '/')
-            }
-            className="flex items-center gap-1.5 text-sm font-medium text-ink-500 transition hover:text-brand-600"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại
-          </button>
         </div>
       </header>
 

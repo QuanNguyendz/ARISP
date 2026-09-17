@@ -187,6 +187,53 @@ namespace ARI.Application.OnlineTest
         public static string SerializeOptions(IEnumerable<string> options)
             => JsonSerializer.Serialize(options.Select(o => o.Trim()).ToList(), JsonOpts);
 
+        /// <summary>
+        /// Khoá nhận diện "cùng một câu hỏi" trong ngân hàng đề của MỘT tin.
+        ///
+        /// <b>Vì sao cần.</b> Nhập lại đúng file Excel vừa nhập sẽ nhân đôi cả ngân hàng: không cửa
+        /// ghi nào từng đối chiếu với câu đã có. Ngân hàng lẫn bản sao thì bốc đề (<see cref="DrawQuestions"/>)
+        /// có thể rút ra hai lần cùng một câu trong một bài, và người ra đề phải dọn tay từng dòng.
+        ///
+        /// <b>Chuẩn hoá tới đâu.</b> So theo NỘI DUNG câu hỏi, bỏ qua khác biệt không mang nghĩa:
+        /// khoảng trắng thừa/xuống dòng (dán từ Word hay sinh ra) và hoa–thường. CỐ Ý <b>không</b>
+        /// bỏ dấu tiếng Việt — "hộp" và "hop" là hai từ khác nhau, gộp lại là chặn nhầm câu hợp lệ.
+        /// Phương án trả lời cũng không tính vào khoá: sửa một phương án rồi nhập lại vẫn là **cùng
+        /// một câu hỏi** đang nằm trong ngân hàng, và đó đúng là thứ người ra đề muốn được cảnh báo.
+        /// </summary>
+        public static string DuplicateKey(string? questionText)
+        {
+            var text = (questionText ?? string.Empty).Trim();
+            if (text.Length == 0) return string.Empty;
+
+            var sb = new System.Text.StringBuilder(text.Length);
+            var pendingSpace = false;
+            foreach (var ch in text)
+            {
+                if (char.IsWhiteSpace(ch)) { pendingSpace = sb.Length > 0; continue; }
+                if (pendingSpace) { sb.Append(' '); pendingSpace = false; }
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Khoá của mọi câu đang có trong ngân hàng của tin — dùng để đối chiếu trước khi ghi.
+        ///
+        /// <paramref name="excludeId"/> dành cho lệnh SỬA: câu đang sửa luôn trùng với chính nó.
+        /// </summary>
+        public static async Task<HashSet<string>> ExistingQuestionKeysAsync(
+            IUnitOfWork uow, Guid jobPostingId, CancellationToken ct, Guid? excludeId = null)
+        {
+            var texts = await uow.Repository<OnlineTestQuestion>().QueryAsync(
+                q => q.Where(x => x.JobPostingId == jobPostingId && (excludeId == null || x.Id != excludeId))
+                      .Select(x => x.QuestionText),
+                ct);
+
+            return texts.Select(DuplicateKey).Where(k => k.Length > 0).ToHashSet(StringComparer.Ordinal);
+        }
+
+        public const string DuplicateMessage = "Câu hỏi này đã có trong ngân hàng đề của tin.";
+
         public static string SerializeInts(IEnumerable<int> values)
             => JsonSerializer.Serialize(values.Distinct().OrderBy(v => v).ToList(), JsonOpts);
 

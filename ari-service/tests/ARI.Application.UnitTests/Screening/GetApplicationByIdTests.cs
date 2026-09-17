@@ -24,7 +24,7 @@ public class GetApplicationByIdTests
         var res = await Svc(new InMemoryUnitOfWork()).GetApplicationByIdAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Application not found", res.Error);
+        Assert.Contains("Không tìm thấy hồ sơ ứng tuyển", res.Error);
     }
 
     [Fact]

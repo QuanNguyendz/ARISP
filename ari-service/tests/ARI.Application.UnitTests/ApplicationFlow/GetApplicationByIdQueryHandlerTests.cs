@@ -78,12 +78,12 @@ public class GetApplicationByIdQueryHandlerTests
     [Fact]
     public async Task UTCID04_Not_found()
     {
-        var svc = new StubApplicationService { GetByIdResult = Result.Failure<ApplicationResponse>("Application not found.") };
+        var svc = new StubApplicationService { GetByIdResult = Result.Failure<ApplicationResponse>("Không tìm thấy hồ sơ ứng tuyển.") };
 
         var res = await Handler(svc, new RecordingFileStorage()).Handle(Query(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Application not found.", res.Error);
+        Assert.Equal("Không tìm thấy hồ sơ ứng tuyển.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
     }
 

@@ -129,7 +129,7 @@ public class JdDocumentFlowTests
         var res = await Get(uow, req.Id, _recruiterId, RoleNames.Recruiter);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("chưa được HR Leader duyệt", res.Error);
+        Assert.Contains("chưa được HR Admin duyệt", res.Error);
     }
 
     // ---------- Lưu ----------

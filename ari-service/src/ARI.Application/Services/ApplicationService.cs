@@ -137,7 +137,7 @@ namespace ARI.Application.Services
         {
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(request.JobPostingId, ct);
             if (jobPosting == null)
-                return Result.Failure<ApplicationResponse>("Job posting not found.");
+                return Result.Failure<ApplicationResponse>("Không tìm thấy tin tuyển dụng.");
 
             if (jobPosting.Status != "active")
                 return Result.Failure<ApplicationResponse>("Tin tuyển dụng này hiện không hoạt động hoặc đã bị đóng.");
@@ -733,7 +733,7 @@ namespace ARI.Application.Services
         {
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(jobPostingId, ct);
             if (jobPosting == null)
-                return Result.Failure<List<ApplicationResponse>>("Job posting not found.");
+                return Result.Failure<List<ApplicationResponse>>("Không tìm thấy tin tuyển dụng.");
 
             var applications = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .QueryAsync(q => q
@@ -823,7 +823,7 @@ namespace ARI.Application.Services
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(id, ct);
             if (application == null)
-                return Result.Failure<ApplicationResponse>("Application not found.");
+                return Result.Failure<ApplicationResponse>("Không tìm thấy hồ sơ ứng tuyển.");
 
             if (application.CvJdAnalysisId.HasValue && application.CvJdAnalysis == null)
             {
@@ -918,12 +918,12 @@ namespace ARI.Application.Services
         public async Task<Result<ApplicationResponse>> UpdateApplicationStatusAsync(Guid id, string newStatus, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(newStatus))
-                return Result.Failure<ApplicationResponse>("Target status cannot be empty.");
+                return Result.Failure<ApplicationResponse>("Vui lòng chọn trạng thái muốn chuyển sang.");
 
             var repository = _unitOfWork.Repository<ARI.Domain.Entities.Application>();
             var application = await repository.GetByIdAsync(id, ct);
             if (application == null)
-                return Result.Failure<ApplicationResponse>("Application not found.");
+                return Result.Failure<ApplicationResponse>("Không tìm thấy hồ sơ ứng tuyển.");
 
             string currentStatus = application.Status?.Trim() ?? string.Empty;
             newStatus = newStatus.Trim().ToLowerInvariant();
@@ -1201,7 +1201,7 @@ namespace ARI.Application.Services
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(applicationId, ct);
             if (application == null)
-                return Result.Failure<bool>("Application not found.");
+                return Result.Failure<bool>("Không tìm thấy hồ sơ ứng tuyển.");
 
             // Vòng trắc nghiệm không hỗ trợ phỏng vấn thử (buổi thử là hội thoại với AI).
             var roundConfig = (await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(

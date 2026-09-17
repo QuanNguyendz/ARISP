@@ -49,7 +49,7 @@
   "rubricHint": "A scoring rubric is an Excel sheet following the template: criterion key, display name, weight (%) and scoring standard. Weights must sum to exactly 100 — otherwise the file is rejected.",
   "downloadTemplate": "Download template",
   "templateDownloadError": "Could not download the template.",
-  "jobScopedHint": "Job and round playbooks are added by the primary Hiring Manager right on the job page (the HR Leader can add/delete them there too). This page shows them for an overview only.",
+  "jobScopedHint": "Job and round playbooks are added by the primary Hiring Manager right on the job page (the HR Admin can add/delete them there too). This page shows them for an overview only.",
   "openJob": "Open job",
   "unknownJob": "Job no longer listed"
 }

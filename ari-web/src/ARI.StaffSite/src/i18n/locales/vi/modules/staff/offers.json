@@ -4,7 +4,7 @@
     "loading": "Đang tải..."
   },
   "title": "Thư mời nhận việc",
-  "description": "Đoạn kết của phễu tuyển dụng: Hiring Manager hoặc Recruiter soạn thư và gửi duyệt, HR Leader chốt, rồi gửi ứng viên.",
+  "description": "Đoạn kết của phễu tuyển dụng: Hiring Manager hoặc Recruiter soạn thư và gửi duyệt, HR Admin chốt, rồi gửi ứng viên.",
   "loadError": "Không tải được danh sách thư mời.",
   "searchPlaceholder": "Tìm theo ứng viên hoặc vị trí...",
   "emptyTitle": "Chưa có thư mời nào",
@@ -45,8 +45,8 @@
   "editor": {
     "title": "Thư mời nhận việc",
     "createTitle": "Soạn thư mời nhận việc",
-    "createHint": "Điền mức lương, ngày bắt đầu và hạn trả lời rồi gửi HR Leader duyệt.",
-    "returnedReason": "HR Leader trả về bản nháp: {{reason}}",
+    "createHint": "Điền mức lương, ngày bắt đầu và hạn trả lời rồi gửi HR Admin duyệt.",
+    "returnedReason": "HR Admin trả về bản nháp: {{reason}}",
     "candidateNote": "Ứng viên phản hồi: {{note}}"
   },
   "fields": {

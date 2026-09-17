@@ -39,7 +39,7 @@ public class DepartmentScopeTests
             },
             new User
             {
-                Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Leader",
+                Id = _hrLeaderId, Email = "hr@x.io", Role = RoleNames.HrAdmin, FullName = "HR Admin",
                 IsActive = true,
             });
         return uow;

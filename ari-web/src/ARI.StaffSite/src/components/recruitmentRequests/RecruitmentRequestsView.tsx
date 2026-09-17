@@ -37,6 +37,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { cvRubricProblems } from '@ari/shared/fservices/cvRubric'
 import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import { profileService, type RecruiterOverview } from '@/fservices/profile/profileService'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Màn phiếu yêu cầu tuyển dụng (ADR-063) — MỘT view dùng chung cho cả ba vai trò.
@@ -103,6 +104,19 @@ const ROUND_TYPES = ['online_test', 'screening', 'technical'] as const
 const toInstant = (day?: string | null) => {
   const picked = (day ?? '').slice(0, 10)
   return picked ? new Date(`${picked}T00:00:00`).toISOString() : undefined
+}
+
+/**
+ * Hôm nay theo múi giờ **trình duyệt**, dạng `YYYY-MM-DD` — đúng khuôn `<input type="date">` nhận.
+ *
+ * Không dùng `toISOString().slice(0,10)`: chuỗi đó là ngày UTC, nên từ 07:00 sáng giờ Việt Nam trở
+ * đi nó vẫn còn là hôm qua ở UTC — chặn "quá khứ" bằng mốc đó thì lại cấm chọn đúng hôm nay. Ghép
+ * từ các thành phần giờ local mới ra đúng ngày người dùng đang nhìn thấy trên lịch.
+ */
+const todayInput = () => {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
 const emptyInput = (): RecruitmentRequestInput => ({
@@ -172,7 +186,7 @@ export default function RecruitmentRequestsView() {
         ...(priorityFilter === 'all' ? {} : { priority: priorityFilter }),
       }))
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -410,6 +424,13 @@ function RequestFormModal({
   /** O tich SUY RA tu du lieu: thoa thuan = chua dien con so nao. */
   const negotiable = form.salaryNegotiable ?? false
 
+  // Ngày dự kiến bắt đầu không được nằm trong quá khứ. Phiếu nằm chờ vài tuần rồi mở ra sửa thì ngày
+  // cũ TỰ trôi vào quá khứ mà không ai gõ gì — nên phải kiểm cả giá trị tải từ máy chủ, không chỉ
+  // chặn ô chọn. So sánh chuỗi `YYYY-MM-DD` là so sánh đúng thứ tự ngày, không cần dựng `Date`.
+  const today = todayInput()
+  const startDate = (form.expectedStartDate ?? '').slice(0, 10)
+  const startDateInPast = startDate !== '' && startDate < today
+
   const setNegotiable = (on: boolean) =>
     setForm({
       ...form,
@@ -429,6 +450,12 @@ function RequestFormModal({
       setErr(tRubric('editor.warnings'))
       return
     }
+    // Máy chủ cũng chặn — chặn lại ở đây để lỗi hiện bằng tiếng của giao diện, thay vì bong bóng
+    // mặc định của trình duyệt (theo ngôn ngữ hệ điều hành) khi giá trị cũ rơi dưới `min`.
+    if (startDateInPast) {
+      setErr(t('errors.startDateInPast'))
+      return
+    }
     setSubmitting(true)
     try {
       const payload: RecruitmentRequestInput = {
@@ -441,7 +468,7 @@ function RequestFormModal({
       else await recruitmentRequestService.create(payload)
       onSaved()
     } catch (e: any) {
-      setErr(e?.response?.data?.message || t('errors.saveFailed'))
+      setErr(resolveApiError(e, t, 'errors.saveFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -521,10 +548,18 @@ function RequestFormModal({
             <input
               required
               type="date"
-              value={(form.expectedStartDate ?? '').slice(0, 10)}
+              // `min` làm lịch xổ xuống mờ hẳn những ngày đã qua — cản ngay lúc chọn, trước khi
+              // người dùng phải bấm lưu mới biết sai.
+              min={today}
+              value={startDate}
               onChange={(e) => setForm({ ...form, expectedStartDate: e.target.value })}
               className={inputCls}
             />
+            {startDateInPast && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {t('errors.startDateInPast')}
+              </p>
+            )}
           </div>
         </div>
 
@@ -787,7 +822,7 @@ function RequestDetailPanel({
         setChosenRecruiter(sameDept?.id ?? usable[0]?.id ?? '')
       }
     } catch (e: any) {
-      setErr(e?.response?.data?.message || t('errors.loadFailed'))
+      setErr(resolveApiError(e, t, 'errors.loadFailed'))
     }
   }, [id, t])
 
@@ -812,7 +847,7 @@ function RequestDetailPanel({
       setRevokeReason('')
       setMode('view')
     } catch (e: any) {
-      setErr(e?.response?.data?.message || t('errors.actionFailed'))
+      setErr(resolveApiError(e, t, 'errors.actionFailed'))
     } finally {
       setBusy(false)
     }

@@ -883,11 +883,11 @@ namespace ARI.Application.Services
         {
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(request.ApplicationId, ct);
             if (application == null)
-                return Result.Failure<StartSessionResponse>("Application not found.");
+                return Result.Failure<StartSessionResponse>("Không tìm thấy hồ sơ ứng tuyển.");
 
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
             if (jobPosting == null)
-                return Result.Failure<StartSessionResponse>("Job posting not found.");
+                return Result.Failure<StartSessionResponse>("Không tìm thấy tin tuyển dụng.");
 
             var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
                 .FindAsync(r => r.JobPostingId == jobPosting.Id && r.RoundNumber == request.RoundNumber, ct);
@@ -1005,9 +1005,9 @@ namespace ARI.Application.Services
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
-                return Result.Failure<string>("Session not found.");
+                return Result.Failure<string>("Không tìm thấy phiên phỏng vấn.");
             if (session.Status != "active")
-                return Result.Failure<string>("Session is not active.");
+                return Result.Failure<string>("Phiên phỏng vấn không còn hoạt động.");
 
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session.ApplicationId, ct);
             var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application!.JobPostingId, ct);
@@ -1185,9 +1185,9 @@ namespace ARI.Application.Services
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
-                return Result.Failure<Answer>("Session not found.");
+                return Result.Failure<Answer>("Không tìm thấy phiên phỏng vấn.");
             if (session.Status != "active")
-                return Result.Failure<Answer>("Session is not active.");
+                return Result.Failure<Answer>("Phiên phỏng vấn không còn hoạt động.");
 
             var answer = new Answer
             {
@@ -1239,7 +1239,7 @@ namespace ARI.Application.Services
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
-                return Result.Failure<bool>("Session not found.");
+                return Result.Failure<bool>("Không tìm thấy phiên phỏng vấn.");
 
             // Idempotent: phiên đã "completed" là trạng thái cuối — không đóng/sinh evaluation lần hai
             // (chống race khi enforce server + NotifyTimeout FE cùng bắn — ADR-050).
@@ -1322,7 +1322,7 @@ namespace ARI.Application.Services
         {
             var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
             if (session == null)
-                return Result.Failure<bool>("Session not found.");
+                return Result.Failure<bool>("Không tìm thấy phiên phỏng vấn.");
             if (session.Status == "completed")
                 return Result.Success(true); // đã đóng — idempotent
 
@@ -1676,11 +1676,11 @@ namespace ARI.Application.Services
         {
             var evaluation = await _unitOfWork.Repository<Evaluation>().GetByIdAsync(request.EvaluationId, ct);
             if (evaluation == null)
-                return Result.Failure<bool>("Evaluation report not found.");
+                return Result.Failure<bool>("Không tìm thấy báo cáo đánh giá.");
 
             var hrUser = await _unitOfWork.Repository<User>().GetByIdAsync(hrUserId, ct);
             if (hrUser == null)
-                return Result.Failure<bool>("HR User not found.");
+                return Result.Failure<bool>("Không tìm thấy tài khoản nhân sự.");
 
             // ===== AI ĐÃ PHỎNG VẤN — NGƯỜI CHỐT LÀ HIRING MANAGER (ADR-061) =====
             //
@@ -1695,7 +1695,7 @@ namespace ARI.Application.Services
             var applicationForGate = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
                 .GetByIdAsync(evaluation.ApplicationId, ct);
             if (applicationForGate == null)
-                return Result.Failure<bool>("Application associated with this evaluation was not found.");
+                return Result.Failure<bool>("Không tìm thấy hồ sơ ứng tuyển của bản đánh giá này.");
 
             var primaryHm = await JobAccess.PrimaryHiringManagerAsync(
                 _unitOfWork, applicationForGate.JobPostingId, ct);
@@ -1728,10 +1728,10 @@ namespace ARI.Application.Services
                 // họ. Trước ADR-061 chỉ quản trị viên được ghi đè, nên người hiểu công việc nhất
                 // lại không sửa được kết luận sai của mô hình.
                 if (!isAdminActor && !isTheHiringManager)
-                    return Result.Failure<bool>("Only the Hiring Manager, HR Admin or Super Admin can override AI verdict.");
+                    return Result.Failure<bool>("Chỉ Hiring Manager, HR Admin hoặc Super Admin mới đổi được kết quả AI.");
 
                 if (string.IsNullOrEmpty(request.OverrideReason))
-                    return Result.Failure<bool>("Override reason is mandatory when changing the AI verdict.");
+                    return Result.Failure<bool>("Đổi kết quả AI thì bắt buộc nhập lý do.");
             }
 
             if (!SalaryCurrencies.IsAllowed(request.SuggestedSalaryCurrency))
@@ -1803,7 +1803,7 @@ namespace ARI.Application.Services
                     {
                         await OfferSupport.NotifyStaffAsync(_unitOfWork, recipient, "pending",
                             "Ứng viên đã qua vòng cuối — soạn thư mời",
-                            $"{application.CandidateName} — vị trí \"{jobTitle}\". Soạn thư mời nhận việc rồi gửi HR Leader chốt.",
+                            $"{application.CandidateName} — vị trí \"{jobTitle}\". Soạn thư mời nhận việc rồi gửi HR Admin chốt.",
                             await StaffLinks.CandidateAsync(_unitOfWork, recipient, application.Id, ct),
                             $"offer_needed:{application.Id}:{recipient}", ct);
                         offerTaskRecipients.Add(recipient);

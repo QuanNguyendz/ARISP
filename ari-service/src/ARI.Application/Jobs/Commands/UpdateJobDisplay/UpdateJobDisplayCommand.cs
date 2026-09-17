@@ -34,7 +34,7 @@ namespace ARI.Application.Jobs.Commands.UpdateJobDisplay
         {
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(command.Id, ct);
             if (job == null)
-                return Result.Failure<JobPostingResponse>("Job posting not found.", CommonErrorCodes.NotFound);
+                return Result.Failure<JobPostingResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
             var isSuperOrHrAdmin = RoleNames.IsAdmin(command.Role);
             var isOwner = job.CreatedByUserId == command.UserId;

@@ -54,8 +54,8 @@ namespace ARI.API.Controllers
             if (result.IsFailure)
             {
                 return result.ErrorCode == CommonErrorCodes.Conflict
-                    ? Conflict(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? Conflict(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
             }
 
             var value = result.Value;

@@ -75,7 +75,7 @@
     "interviewPassScore": "Interview pass score",
     "interviewPassScoreHint": "At or above this score the AI concludes \"pass\" (0–100). Applies only when an interview scoring rubric is configured in the Playbook.",
     "hiringManager": "Hiring Manager",
-    "hiringManagerHint": "The author of the recruitment request — assigned automatically as the job's primary Hiring Manager (approves candidates, signs off the job description, confirms results). To change it, ask an HR Leader to transfer the Hiring Manager on the job page.",
+    "hiringManagerHint": "The author of the recruitment request — assigned automatically as the job's primary Hiring Manager (approves candidates, signs off the job description, confirms results). To change it, ask an HR Admin to transfer the Hiring Manager on the job page.",
     "jdDraft": {
       "description": "Job description",
       "requirements": "Candidate requirements"
@@ -101,7 +101,7 @@
   },
   "recruitmentRequest": {
     "title": "Recruitment request",
-    "description": "Every job posting must be built from a request raised by a Hiring Manager and approved by the HR Leader. Pick the request first — the fields below are pre-filled from it.",
+    "description": "Every job posting must be built from a request raised by a Hiring Manager and approved by the HR Admin. Pick the request first — the fields below are pre-filled from it.",
     "placeholder": "— Select a recruitment request —",
     "loading": "Loading requests...",
     "headcount": "{{count}} position(s)",

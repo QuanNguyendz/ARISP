@@ -36,7 +36,7 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> GetAll([FromQuery] bool activeOnly = false, CancellationToken ct = default)
         {
             var result = await _sender.Send(new GetDepartmentsQuery(activeOnly), ct);
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
         [HttpPost]
@@ -47,8 +47,8 @@ namespace ARI.API.Controllers
 
             if (result.IsFailure)
                 return result.ErrorCode == CommonErrorCodes.Conflict
-                    ? Conflict(new { message = result.Error })
-                    : BadRequest(new { message = result.Error });
+                    ? Conflict(new { message = result.Error, code = result.ErrorCode })
+                    : BadRequest(new { message = result.Error, code = result.ErrorCode });
 
             return Ok(new { id = result.Value });
         }
@@ -63,9 +63,9 @@ namespace ARI.API.Controllers
 
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
     }

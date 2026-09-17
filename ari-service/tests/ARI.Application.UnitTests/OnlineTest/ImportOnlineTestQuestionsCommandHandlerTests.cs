@@ -126,4 +126,76 @@ public class ImportOnlineTestQuestionsCommandHandlerTests
         Assert.Single(uow.Repo<OnlineTestQuestion>().Items);   // chỉ dòng hợp lệ được lưu
         Assert.Equal(1, uow.SaveChangesCount);
     }
+
+    // ---------- Chống trùng: nhập lại file cũ không được nhân đôi ngân hàng ----------
+
+    [Fact]
+    public async Task Nhap_lai_cung_mot_file_thi_khong_them_cau_nao_nua()
+    {
+        var owner = Guid.NewGuid();
+        var job = OnlineTestData.Job(owner: owner);
+        var uow = new InMemoryUnitOfWork().Seed(job);
+        var file = OnlineTestData.BuildXlsx(
+            Header,
+            new[] { "HTTP 404?", "single", "Thành công", "Không tìm thấy", "", "", "", "", "B" },
+            new[] { "Ngôn ngữ backend?", "multiple", "C#", "HTML", "Python", "", "", "", "A,C" });
+
+        var first = await Run(uow, new ImportOnlineTestQuestionsCommand(job.Id, file, "q.xlsx", owner, AppRoles.Recruiter));
+        var second = await Run(uow, new ImportOnlineTestQuestionsCommand(job.Id, file, "q.xlsx", owner, AppRoles.Recruiter));
+
+        Assert.Equal(2, first.Value.Imported);
+        Assert.Empty(first.Value.Duplicates);
+
+        // Lần hai: không câu nào vào, và mỗi dòng trùng được chỉ đích danh để người ra đề biết vì sao.
+        Assert.Equal(0, second.Value.Imported);
+        Assert.Equal(0, second.Value.Failed);                               // trùng KHÔNG phải lỗi file
+        Assert.Equal(new[] { 2, 3 }, second.Value.Duplicates.Select(d => d.Row).ToArray());
+        Assert.Equal(2, uow.Repo<OnlineTestQuestion>().Items.Count);        // ngân hàng giữ nguyên
+    }
+
+    [Fact]
+    public async Task Trung_trong_noi_bo_file_cung_bi_bo_qua()
+    {
+        var owner = Guid.NewGuid();
+        var job = OnlineTestData.Job(owner: owner);
+        var uow = new InMemoryUnitOfWork().Seed(job);
+
+        // Dòng 3 lặp lại dòng 2 nhưng khác hoa-thường + khoảng trắng thừa: dán từ Word ra đúng kiểu này.
+        var file = OnlineTestData.BuildXlsx(
+            Header,
+            new[] { "HTTP 404?", "single", "Thành công", "Không tìm thấy", "", "", "", "", "B" },
+            new[] { "  http 404?  ", "single", "Thành công", "Không tìm thấy", "", "", "", "", "B" },
+            new[] { "HTTP 500?", "single", "Thành công", "Lỗi máy chủ", "", "", "", "", "B" });
+
+        var res = await Run(uow, new ImportOnlineTestQuestionsCommand(job.Id, file, "q.xlsx", owner, AppRoles.Recruiter));
+
+        Assert.Equal(2, res.Value.Imported);
+        Assert.Equal(new[] { 3 }, res.Value.Duplicates.Select(d => d.Row).ToArray());
+        Assert.Equal(2, uow.Repo<OnlineTestQuestion>().Items.Count);
+    }
+
+    [Fact]
+    public async Task Cau_moi_trong_file_co_dong_trung_van_duoc_them()
+    {
+        // Trùng chỉ bỏ qua ĐÚNG dòng đó — nhập bổ sung vài câu vào file cũ là thao tác thường gặp
+        // nhất, và nó phải chạy được mà không cần xoá tay các dòng đã nhập.
+        var owner = Guid.NewGuid();
+        var job = OnlineTestData.Job(owner: owner);
+        var uow = new InMemoryUnitOfWork().Seed(job);
+
+        await Run(uow, new ImportOnlineTestQuestionsCommand(job.Id, OnlineTestData.BuildXlsx(
+            Header,
+            new[] { "HTTP 404?", "single", "Thành công", "Không tìm thấy", "", "", "", "", "B" }),
+            "q.xlsx", owner, AppRoles.Recruiter));
+
+        var res = await Run(uow, new ImportOnlineTestQuestionsCommand(job.Id, OnlineTestData.BuildXlsx(
+            Header,
+            new[] { "HTTP 404?", "single", "Thành công", "Không tìm thấy", "", "", "", "", "B" },
+            new[] { "HTTP 500?", "single", "Thành công", "Lỗi máy chủ", "", "", "", "", "B" }),
+            "q.xlsx", owner, AppRoles.Recruiter));
+
+        Assert.Equal(1, res.Value.Imported);
+        Assert.Single(res.Value.Duplicates);
+        Assert.Equal(2, uow.Repo<OnlineTestQuestion>().Items.Count);
+    }
 }

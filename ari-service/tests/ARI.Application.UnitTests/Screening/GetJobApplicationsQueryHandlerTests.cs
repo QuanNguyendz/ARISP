@@ -85,7 +85,7 @@ public class GetJobApplicationsQueryHandlerTests
         var res = await Run(uow, new RecordingFileStorage(), job.Id, owner, AppRoles.Recruiter, svcUow: new InMemoryUnitOfWork());
 
         Assert.True(res.IsFailure);
-        Assert.Equal("Job posting not found.", res.Error);   // đúng lỗi service trả về
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);   // đúng lỗi service trả về
     }
 
     // UTCID06 — list ứng viên rỗng → Success([])

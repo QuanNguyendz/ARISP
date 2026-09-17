@@ -56,6 +56,13 @@
     "cancel": "Cancel",
     "confirm": "Lock Account"
   },
+  "roleModal": {
+    "title": "Change role",
+    "description": "Confirm the role change for \"{{name}}\". The action is written to the audit log.",
+    "hiringManagerWarning": "This person is a Hiring Manager. Removing that role CLOSES every approval gate on the jobs they own until an HR Admin transfers the Hiring Manager to someone else.",
+    "cancel": "Cancel",
+    "confirm": "Change role"
+  },
   "createModal": {
     "title": "Create Staff Account",
     "description": "A temporary password will be emailed to the staff member.",

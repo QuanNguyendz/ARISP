@@ -31,7 +31,7 @@ public class CreateJobSlotsCommandHandlerTests
         var uow = new InMemoryUnitOfWork();
         var res = await Run(uow, Guid.NewGuid(), One());
         Assert.True(res.IsFailure);
-        Assert.Equal("Job posting not found.", res.Error);
+        Assert.Equal("Không tìm thấy tin tuyển dụng.", res.Error);
         Assert.Equal(CommonErrorCodes.NotFound, res.ErrorCode);
         Assert.Empty(uow.Repo<AvailabilitySlot>().Items);
     }

@@ -55,7 +55,7 @@ namespace ARI.Application.Auth.Commands.CompleteExternalCandidateSignIn
             else
             {
                 if (!candidate.IsActive)
-                    return Result.Failure<ExternalSignInTokens>("Account disabled.", AuthErrorCodes.AccountDisabled);
+                    return Result.Failure<ExternalSignInTokens>("Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.", AuthErrorCodes.AccountDisabled);
 
                 candidate.LastLoginAt = DateTimeOffset.UtcNow;
 

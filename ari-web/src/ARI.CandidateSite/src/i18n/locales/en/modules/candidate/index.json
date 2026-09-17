@@ -198,7 +198,7 @@
     "viewJobPosting": "View Job Posting",
     "copyCode": "Copy Code",
     "copied": "Copied",
-    "hrConfirming": "Results pending HR Leader confirmation",
+    "hrConfirming": "Results pending HR Admin confirmation",
     "hrConfirmingHint": "You'll receive a notification as soon as the results for this interview round are available.",
     "missedInterview": "You missed the round {{round}} interview",
     "missedInterviewHint": "The {{time}} appointment passed with no interview recorded, so your application stops at this round. Next time, if you are busy, contact HR beforehand to agree on another time.",

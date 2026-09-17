@@ -1,6 +1,6 @@
 {
   "title": "Recruitment Requests",
-  "description": "Hiring needs per team — HR Leader approves and assigns a recruiter to build the posting",
+  "description": "Hiring needs per team — HR Admin approves and assigns a recruiter to build the posting",
   "create": "New request",
   "loading": "Loading...",
   "negotiable": "Negotiable",
@@ -36,7 +36,7 @@
     "salaryMin": "Minimum",
     "salaryMax": "Maximum",
     "currency": "Currency",
-    "salaryHint": "Leave both empty if negotiable. HR Leader may send the request back to adjust this range.",
+    "salaryHint": "Leave both empty if negotiable. HR Admin may send the request back to adjust this range.",
     "reason": "Reason",
     "reasonPlaceholder": "e.g. Backfill, team growth, new project...",
     "description": "Role summary",
@@ -57,7 +57,7 @@
     "priority": "Priority",
     "expectedStartDate": "Expected start date",
     "salaryNegotiable": "Negotiable",
-    "salaryNegotiableHint": "Filed as negotiable — the HR Leader settles the figure when approving the offer.",
+    "salaryNegotiableHint": "Filed as negotiable — the HR Admin settles the figure when approving the offer.",
     "rounds": "Interview rounds for this role",
     "roundsHint": "The order is the round number; each round type can be picked once. The recruiter builds the posting from this list.",
     "roundsMoveUp": "Move earlier",
@@ -78,7 +78,7 @@
     "rejectReasonPlaceholder": "e.g. Salary range exceeds the band for this level, please lower it...",
     "rejectReasonHint": "At least 10 characters. The requester needs to know what to change.",
     "confirmReject": "Confirm send back",
-    "reviewNote": "HR Leader note: {{reason}}",
+    "reviewNote": "HR Admin note: {{reason}}",
     "edit": "Edit",
     "resubmit": "Resubmit",
     "cancel": "Withdraw",
@@ -92,7 +92,7 @@
     "reopenReason": "Reason for reopening",
     "closeReason": "Reason for closing",
     "revokeReasonPlaceholder": "e.g. the team changed direction and needs a different role…",
-    "reopenHint": "The request goes back to pending so you can edit it, and the HR Leader must approve it again together with a recruiter assignment.",
+    "reopenHint": "The request goes back to pending so you can edit it, and the HR Admin must approve it again together with a recruiter assignment.",
     "closeHint": "The request is closed for good and cannot become a job posting. File a new request if the need returns.",
     "confirmReopen": "Reopen request",
     "confirmClose": "Close request",
@@ -103,7 +103,8 @@
   "errors": {
     "loadFailed": "Could not load recruitment requests.",
     "saveFailed": "Could not save the request.",
-    "actionFailed": "Action failed."
+    "actionFailed": "Action failed.",
+    "startDateInPast": "The expected start date cannot be in the past — pick today or later."
   },
   "priority": {
     "high": "High",

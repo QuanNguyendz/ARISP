@@ -428,6 +428,7 @@ export default function JobOnlineTestPage() {
                     {t('bank.import.resultSummary', {
                       imported: importResult.imported,
                       failed: importResult.failed,
+                      duplicates: importResult.duplicates?.length ?? 0,
                     })}
                   </p>
                   {importResult.errors.length > 0 && (
@@ -436,6 +437,20 @@ export default function JobOnlineTestPage() {
                         <li key={i}>{t('bank.import.rowError', { row: err.row, message: err.message })}</li>
                       ))}
                     </ul>
+                  )}
+                  {/* Trùng hiện màu hổ phách, tách hẳn khỏi danh sách lỗi đỏ: file không sai, chỉ là
+                      những câu đó đã có sẵn nên không được thêm lại. */}
+                  {(importResult.duplicates?.length ?? 0) > 0 && (
+                    <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      <p className="font-medium">{t('bank.import.duplicatesTitle')}</p>
+                      <ul className="mt-1 max-h-40 space-y-1 overflow-auto">
+                        {importResult.duplicates.map((dup, i) => (
+                          <li key={i}>
+                            {t('bank.import.rowError', { row: dup.row, message: dup.message })}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

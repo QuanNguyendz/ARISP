@@ -81,7 +81,7 @@
       "super_admin": "Super Admin (chốt thay)"
     },
     "awaitingDecision": "Đang chờ {{name}} chốt kết quả. Bạn xem được báo cáo nhưng không phải người quyết định.",
-    "awaitingAdminDecision": "Tin này chưa có Hiring Manager đang hoạt động — HR Leader cần gán / chuyển Hiring Manager, hoặc chốt thay kèm lý do. Bạn xem được báo cáo nhưng không phải người quyết định.",
+    "awaitingAdminDecision": "Tin này chưa có Hiring Manager đang hoạt động — HR Admin cần gán / chuyển Hiring Manager, hoặc chốt thay kèm lý do. Bạn xem được báo cáo nhưng không phải người quyết định.",
     "unavailableHint": "Tin này chưa có Hiring Manager đang hoạt động (chưa gán, hoặc tài khoản đã bị khoá). Bạn chốt thay được nhưng phải ghi lý do — hoặc gán / chuyển Hiring Manager cho tin trước."
   },
   "session": {

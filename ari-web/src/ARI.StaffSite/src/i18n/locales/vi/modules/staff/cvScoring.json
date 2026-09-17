@@ -9,7 +9,7 @@
     "replace": "Thay",
     "templates": "Mẫu công ty",
     "templatesLoading": "Đang tải mẫu…",
-    "noTemplates": "Chưa có mẫu nào — HR Leader thêm mẫu ở màn Playbook.",
+    "noTemplates": "Chưa có mẫu nào — HR Admin thêm mẫu ở màn Playbook.",
     "templateItem": "{{name}} · {{count}} tiêu chí",
     "importExcel": "Nhập Excel",
     "exportExcel": "Xuất Excel",

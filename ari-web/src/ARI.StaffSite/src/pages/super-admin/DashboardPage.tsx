@@ -21,6 +21,7 @@ import {
 } from '@/fservices/admin'
 import { auditActionLabel, roleLabel, roleBadgeClass, timeAgo } from '@/utils/adminLabels'
 import { DashboardSkeleton } from './_skeletons'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 const initials = (name?: string | null) =>
   (name || 'U')
@@ -54,7 +55,7 @@ export default function SuperAdminDashboardPage() {
       setRequests(p)
       setLogs(l.items)
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || t('errors.loadFailed'))
+      setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -70,7 +71,7 @@ export default function SuperAdminDashboardPage() {
       await adminService.approveAccountRequest(id)
       await load()
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('errors.approveFailed'))
+      setError(resolveApiError(e, t, 'errors.approveFailed'))
     } finally {
       setApprovingId(null)
     }

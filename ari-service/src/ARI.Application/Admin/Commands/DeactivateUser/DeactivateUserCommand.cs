@@ -31,7 +31,7 @@ namespace ARI.Application.Admin.Commands.DeactivateUser
 
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             if (!user.IsActive)
                 return Result.Failure("Tài khoản đã bị khóa.");

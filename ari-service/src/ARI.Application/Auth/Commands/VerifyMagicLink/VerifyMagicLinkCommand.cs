@@ -43,7 +43,7 @@ namespace ARI.Application.Auth.Commands.VerifyMagicLink
             var candidate = candidates.FirstOrDefault();
 
             if (candidate == null)
-                return Result.Failure<string>("Candidate account not found.", AuthErrorCodes.NotFound);
+                return Result.Failure<string>("Không tìm thấy tài khoản ứng viên.", AuthErrorCodes.NotFound);
 
             return Result.Success(_tokenService.CreateCandidateToken(candidate));
         }

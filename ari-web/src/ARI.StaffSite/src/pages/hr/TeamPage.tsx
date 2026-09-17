@@ -22,6 +22,7 @@ import {
   accountRequestService,
   type NewAccountRequestItem,
 } from '@/fservices/accountRequest/accountRequestService'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 /**
  * Vai trò nhân sự mà HR xin cấp tài khoản — khớp `RoleNames.AssignableStaff` phía backend.
@@ -328,7 +329,7 @@ function RequestModal({
       const res = await accountRequestService.create(cleaned)
       onDone(res.count)
     } catch (e: any) {
-      setError(e?.response?.data?.message || t('submitError'))
+      setError(resolveApiError(e, t, 'submitError'))
     } finally {
       setSubmitting(false)
     }

@@ -41,7 +41,7 @@ namespace ARI.Application.Auth.Commands.StaffResetPassword
             var user = users.FirstOrDefault();
 
             if (user == null || !user.IsActive)
-                return Result.Failure("Invalid email or recovery token.");
+                return Result.Failure("Email hoặc mã khôi phục không đúng.");
 
             // Tìm token hợp lệ trong bảng MagicLinks (chỉ token thuộc cổng Staff)
             var magicLinks = await _unitOfWork.Repository<MagicLink>().FindAsync(m =>
@@ -53,7 +53,7 @@ namespace ARI.Application.Auth.Commands.StaffResetPassword
             var magicLink = magicLinks.FirstOrDefault();
 
             if (magicLink == null)
-                return Result.Failure("Invalid, expired, or already used recovery token.");
+                return Result.Failure("Mã khôi phục không đúng, đã hết hạn hoặc đã được dùng.");
 
             if (!AuthSupport.IsStrongPassword(request.NewPassword, out var validationError))
                 return Result.Failure(validationError);

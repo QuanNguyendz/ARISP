@@ -93,10 +93,10 @@
   },
   "hrFeedback": {
     "title": "Nhận xét từ HR",
-    "hrLeader": "HR Leader"
+    "hrLeader": "HR Admin"
   },
   "pendingHrReview": {
-    "title": "Kết quả đang chờ HR Leader xác nhận",
+    "title": "Kết quả đang chờ HR Admin xác nhận",
     "description": "AI đã hoàn tất chấm điểm vòng {round}. Bạn sẽ nhận thông báo ngay khi HR xác nhận và chia sẻ kết quả."
   },
   "noReport": {

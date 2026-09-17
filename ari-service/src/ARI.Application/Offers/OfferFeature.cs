@@ -377,7 +377,7 @@ namespace ARI.Application.Offers
             var fyi = await OfferSupport.NotifyStaffAboutOffersAsync(_unitOfWork,
                 new Guid?[] { job.CreatedByUserId, hm?.UserId }
                     .Where(id => id != request.UserId && !approverIds.Contains(id)),
-                "system", "Thư mời đã được gửi HR Leader chốt",
+                "system", "Thư mời đã được gửi HR Admin chốt",
                 $"Ứng viên {app.CandidateName} — vị trí \"{job.Title}\".",
                 $"offer_submitted_fyi:{offer.Id}:{stamp}", ct);
 
@@ -444,8 +444,8 @@ namespace ARI.Application.Offers
 
                 return Result<bool>.Failure(
                     isTheHm
-                        ? "Hiring Manager đề xuất mức lương nhưng không tự chốt được thư mời — HR Leader là người quyết định cuối cùng."
-                        : "Chỉ HR Leader hoặc quản trị viên mới chốt được thư mời.",
+                        ? "Hiring Manager đề xuất mức lương nhưng không tự chốt được thư mời — HR Admin là người quyết định cuối cùng."
+                        : "Chỉ HR Admin hoặc quản trị viên mới chốt được thư mời.",
                     CommonErrorCodes.Forbidden);
             }
 
@@ -478,7 +478,7 @@ namespace ARI.Application.Offers
                 new Guid?[] { offer.CreatedByUserId, job.CreatedByUserId, hmForDecision?.UserId }
                     .Where(id => id != request.UserId),
                 decision == "approved" ? "approved" : "rejected",
-                decision == "approved" ? "Thư mời đã được HR Leader chốt" : "Thư mời cần chỉnh sửa",
+                decision == "approved" ? "Thư mời đã được HR Admin chốt" : "Thư mời cần chỉnh sửa",
                 $"{app.CandidateName} — vị trí \"{job.Title}\"."
                     + (decision == "approved" ? " Chủ tin gửi thư cho ứng viên qua trình soạn thư." : string.Empty)
                     + (note != null ? $" {note}" : string.Empty),

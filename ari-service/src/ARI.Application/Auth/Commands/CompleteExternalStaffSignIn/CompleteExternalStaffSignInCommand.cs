@@ -38,12 +38,22 @@ namespace ARI.Application.Auth.Commands.CompleteExternalStaffSignIn
         {
             var email = request.Email;
 
-            // Ưu tiên danh sách miền do Super Admin cấu hình qua UI (bảng system_settings),
-            // fallback sang appsettings/env nếu DB chưa được set.
+            // Danh sách miền do Super Admin cấu hình qua UI (bảng system_settings).
+            //
+            // ĐỌC THEO SỰ TỒN TẠI CỦA HÀNG, không theo việc hàng đó có rỗng hay không. Màn Cài đặt hệ
+            // thống ghi rõ "để trống = cho phép mọi miền", nhưng trước đây ô trống lại bị coi là "chưa
+            // cấu hình" và rơi về `appsettings.json` — nơi có sẵn `"fpt.edu.vn, arisp.com"`. Hệ quả:
+            // Super Admin xoá trắng ô rồi lưu, giao diện báo đã mở cho mọi miền, mà tài khoản gmail
+            // vẫn bị chặn ở cửa Google; cùng tài khoản đó đăng nhập bằng mật khẩu thì lại vào được,
+            // nên triệu chứng trông như lỗi của Google Sign-In chứ không phải của cấu hình.
+            //
+            // Hàng có mặt = Super Admin ĐÃ quyết định (màn Cài đặt luôn ghi khoá này khi bấm Lưu), kể
+            // cả khi họ cố ý xoá trắng. Chỉ hệ thống CHƯA TỪNG cấu hình mới dùng giá trị mồi ở
+            // appsettings — thứ để dựng máy lần đầu, không phải thứ ghi đè lựa chọn của người dùng.
             var dbDomainSetting = (await _unitOfWork.Repository<SystemSetting>()
                 .FindAsync(s => s.Key == "allowed_email_domains", ct)).FirstOrDefault();
-            var allowed = !string.IsNullOrWhiteSpace(dbDomainSetting?.Value)
-                ? dbDomainSetting!.Value
+            var allowed = dbDomainSetting != null
+                ? dbDomainSetting.Value ?? string.Empty
                 : (_configuration["Authentication:AllowedDomains"] ?? _configuration["Auth:AllowedDomains"] ?? string.Empty);
             var allowedDomains = allowed
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
@@ -54,7 +64,7 @@ namespace ARI.Application.Auth.Commands.CompleteExternalStaffSignIn
 
             var isDomainAllowed = !allowedDomains.Any() || allowedDomains.Contains(emailDomain);
             if (!isDomainAllowed)
-                return Result.Failure<ExternalSignInTokens>("Email domain is not allowed.", AuthErrorCodes.DomainNotAllowed);
+                return Result.Failure<ExternalSignInTokens>("Email không thuộc tên miền được phép đăng nhập nội bộ.", AuthErrorCodes.DomainNotAllowed);
 
             var users = await _unitOfWork.Repository<User>().FindAsync(u => u.Email == email, ct);
             var user = users.FirstOrDefault();
@@ -62,11 +72,11 @@ namespace ARI.Application.Auth.Commands.CompleteExternalStaffSignIn
             if (user == null)
             {
                 // Tài khoản chưa được Super Admin cấp phát → CHẶN đăng nhập, KHÔNG tự động tạo tài khoản
-                return Result.Failure<ExternalSignInTokens>("Account not provisioned.", AuthErrorCodes.NotProvisioned);
+                return Result.Failure<ExternalSignInTokens>("Tài khoản này chưa được cấp quyền vào hệ thống nội bộ. Hãy liên hệ quản trị viên.", AuthErrorCodes.NotProvisioned);
             }
 
             if (!user.IsActive || user.Role == "Pending")
-                return Result.Failure<ExternalSignInTokens>("Account pending approval.", AuthErrorCodes.PendingApproval);
+                return Result.Failure<ExternalSignInTokens>("Tài khoản đang chờ quản trị viên duyệt.", AuthErrorCodes.PendingApproval);
 
             user.LastLoginAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<User>().Update(user);

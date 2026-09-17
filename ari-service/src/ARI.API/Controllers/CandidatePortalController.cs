@@ -69,7 +69,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new GetCvMatchQuery(jobPostingId, candidateId), ct);
             if (result.IsFailure)
-                return Unauthorized(new { message = result.Error });
+                return Unauthorized(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -105,7 +105,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new SaveJobCommand(candidateId, jobPostingId), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { saved = true });
         }
 
@@ -157,9 +157,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error }),
+                    CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error, code = result.ErrorCode }),
                     "no_cv" or "cv_unreadable" => BadRequest(new { message = result.Error, code = result.ErrorCode }),
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -209,11 +209,11 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error }),
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    CommonErrorCodes.ServerError => StatusCode(500, new { message = result.Error }),
+                    CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error, code = result.ErrorCode }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    CommonErrorCodes.ServerError => StatusCode(500, new { message = result.Error, code = result.ErrorCode }),
                     "no_cv" or "cv_unreadable" => BadRequest(new { message = result.Error, code = result.ErrorCode }),
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -256,7 +256,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new MarkPortalNotificationReadCommand(candidateId, id), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { read = true });
         }
 
@@ -268,7 +268,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new DeletePortalNotificationCommand(candidateId, id), ct);
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(new { deleted = true });
         }
 
@@ -292,7 +292,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new GetPortalSettingsQuery(candidateId), ct);
             if (result.IsFailure)
-                return Unauthorized(new { message = result.Error });
+                return Unauthorized(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -304,7 +304,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new UpdatePortalSettingsCommand(candidateId, settings), ct);
             if (result.IsFailure)
-                return Unauthorized(new { message = result.Error });
+                return Unauthorized(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -316,7 +316,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new ExportMyDataQuery(candidateId), ct);
             if (result.IsFailure)
-                return Unauthorized(new { message = result.Error });
+                return Unauthorized(new { message = result.Error, code = result.ErrorCode });
 
             var file = result.Value;
             return File(file.Bytes, file.ContentType, file.FileName);
@@ -357,7 +357,7 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode == CommonErrorCodes.Forbidden
                     ? Forbid()
-                    : NotFound(new { message = result.Error });
+                    : NotFound(new { message = result.Error, code = result.ErrorCode });
             }
             return Ok(result.Value);
         }
@@ -374,8 +374,8 @@ namespace ARI.API.Controllers
                 return result.ErrorCode switch
                 {
                     CommonErrorCodes.Forbidden => Forbid(),
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
             return Ok(result.Value);
@@ -409,8 +409,8 @@ namespace ARI.API.Controllers
                 return result.ErrorCode switch
                 {
                     CommonErrorCodes.Forbidden => Forbid(),
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
             return Ok(result.Value);
@@ -428,7 +428,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new GetMyProfileQuery(candidateId));
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -440,7 +440,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new UpdateMyProfileCommand(candidateId, req));
             if (result.IsFailure)
-                return NotFound(new { message = result.Error });
+                return NotFound(new { message = result.Error, code = result.ErrorCode });
             return Ok(result.Value);
         }
 
@@ -474,9 +474,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
                     "invalid_cv" => BadRequest(new { message = result.Error, code = "invalid_cv" }),
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -520,8 +520,8 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -540,9 +540,9 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
                     "wrong_current_password" => BadRequest(new { message = result.Error, code = "wrong_current_password" }),
-                    _ => BadRequest(new { message = result.Error }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 
@@ -571,7 +571,7 @@ namespace ARI.API.Controllers
                 new GetCandidateOfferQuery(applicationId, candidateId, GetEmailClaim()), ct);
 
             return result.IsFailure
-                ? NotFound(new { message = result.Error })
+                ? NotFound(new { message = result.Error, code = result.ErrorCode })
                 : Ok(result.Value);
         }
 
@@ -590,10 +590,10 @@ namespace ARI.API.Controllers
             {
                 return result.ErrorCode switch
                 {
-                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                    CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                    CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                    _ => BadRequest(new { message = result.Error }),
+                    CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                    CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error, code = result.ErrorCode }),
+                    CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                    _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
                 };
             }
 

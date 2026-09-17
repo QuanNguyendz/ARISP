@@ -36,7 +36,7 @@ namespace ARI.Application.Auth.Commands.RefreshCandidateToken
             var storedToken = storedTokens.FirstOrDefault();
 
             if (storedToken == null)
-                return Result.Failure<AuthResponse>("Invalid or expired refresh token.", AuthErrorCodes.InvalidCredentials);
+                return Result.Failure<AuthResponse>("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", AuthErrorCodes.InvalidCredentials);
 
             // Revoke token cũ
             storedToken.RevokedAt = DateTimeOffset.UtcNow;
@@ -46,7 +46,7 @@ namespace ARI.Application.Auth.Commands.RefreshCandidateToken
             // Tìm candidate để sinh JWT mới
             var candidate = await _unitOfWork.Repository<CandidateAccount>().GetByIdAsync(storedToken.CandidateAccountId, ct);
             if (candidate == null)
-                return Result.Failure<AuthResponse>("Candidate not found.", AuthErrorCodes.InvalidCredentials);
+                return Result.Failure<AuthResponse>("Không tìm thấy ứng viên.", AuthErrorCodes.InvalidCredentials);
 
             var newAccessToken = _tokenService.CreateCandidateToken(candidate);
             var newRefreshToken = await AuthSupport.IssueRefreshTokenForCandidateAsync(_unitOfWork, candidate.Id, ct);

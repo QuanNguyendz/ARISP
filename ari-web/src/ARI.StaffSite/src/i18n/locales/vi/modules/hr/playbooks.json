@@ -49,7 +49,7 @@
   "rubricHint": "Bộ tiêu chí là bảng Excel theo mẫu: mã tiêu chí, tên hiển thị, trọng số (%) và chuẩn chấm. Tổng trọng số phải đúng 100 — nếu không, hệ thống sẽ từ chối file.",
   "downloadTemplate": "Tải file mẫu",
   "templateDownloadError": "Không tải được file mẫu.",
-  "jobScopedHint": "Playbook theo tin và theo vòng do Hiring Manager chính thêm ngay trong màn tin (HR Leader cũng thêm/xoá được ở đó). Ở đây chỉ để xem toàn cảnh.",
+  "jobScopedHint": "Playbook theo tin và theo vòng do Hiring Manager chính thêm ngay trong màn tin (HR Admin cũng thêm/xoá được ở đó). Ở đây chỉ để xem toàn cảnh.",
   "openJob": "Mở tin",
   "unknownJob": "Tin không còn trong danh sách"
 }

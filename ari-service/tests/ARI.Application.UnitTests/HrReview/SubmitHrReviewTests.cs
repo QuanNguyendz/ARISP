@@ -154,7 +154,7 @@ public class SubmitHrReviewTests
         var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass", overrideReason: null));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Override reason", res.Error);
+        Assert.Contains("bắt buộc nhập lý do", res.Error);
         Assert.Empty(uow.Repo<Domain.Entities.HrReview>().Items);
         Assert.Empty(uow.Repo<AuditLog>().Items);
     }
@@ -201,7 +201,7 @@ public class SubmitHrReviewTests
         var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(Guid.NewGuid(), "pass"));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Evaluation report not found", res.Error);
+        Assert.Contains("Không tìm thấy báo cáo đánh giá", res.Error);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class SubmitHrReviewTests
         var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "pass"));
 
         Assert.True(res.IsFailure);
-        Assert.Contains("HR User not found", res.Error);
+        Assert.Contains("Không tìm thấy tài khoản nhân sự", res.Error);
     }
 
     // ---------- Auto-progression sang vòng kế (ADR-017) ----------

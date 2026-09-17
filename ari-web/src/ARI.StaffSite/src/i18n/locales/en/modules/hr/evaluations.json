@@ -81,7 +81,7 @@
       "super_admin": "Super Admin (on their behalf)"
     },
     "awaitingDecision": "Waiting for {{name}} to make the call. You can read the report but you are not the decision maker.",
-    "awaitingAdminDecision": "This job has no active Hiring Manager — an HR Leader needs to assign / transfer one, or decide on their behalf with a reason. You can read the report but you are not the decision maker.",
+    "awaitingAdminDecision": "This job has no active Hiring Manager — an HR Admin needs to assign / transfer one, or decide on their behalf with a reason. You can read the report but you are not the decision maker.",
     "unavailableHint": "This job has no active Hiring Manager (never assigned, or the account was locked). You can decide on their behalf with a reason — or assign / transfer a Hiring Manager first."
   },
   "session": {

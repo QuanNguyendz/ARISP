@@ -25,7 +25,7 @@ public class PracticeEligibilityTests
         var res = await Run(new InMemoryUnitOfWork(), Guid.NewGuid(), 1);
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Application not found", res.Error);
+        Assert.Contains("Không tìm thấy hồ sơ ứng tuyển", res.Error);
     }
 
     [Fact]

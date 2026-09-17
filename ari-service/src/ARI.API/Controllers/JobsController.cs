@@ -77,11 +77,11 @@ namespace ARI.API.Controllers
         {
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error }),
-                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error }),
-                CommonErrorCodes.ServerError => StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Unauthorized => Unauthorized(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.ServerError => StatusCode(StatusCodes.Status500InternalServerError, new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
 

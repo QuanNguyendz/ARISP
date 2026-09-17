@@ -109,7 +109,7 @@ public class UpdateApplicationStatusTests
         var res = await Run(uow, notif, app.Id, "   ");
 
         Assert.True(res.IsFailure);
-        Assert.Contains("cannot be empty", res.Error);
+        Assert.Contains("trạng thái muốn chuyển sang", res.Error);
     }
 
     [Fact]
@@ -226,6 +226,6 @@ public class UpdateApplicationStatusTests
         var res = await Run(new InMemoryUnitOfWork(), new RecordingNotificationService(), Guid.NewGuid(), "screening");
 
         Assert.True(res.IsFailure);
-        Assert.Contains("Application not found", res.Error);
+        Assert.Contains("Không tìm thấy hồ sơ ứng tuyển", res.Error);
     }
 }

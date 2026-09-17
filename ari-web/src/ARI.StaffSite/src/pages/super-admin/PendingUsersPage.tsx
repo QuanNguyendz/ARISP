@@ -7,6 +7,7 @@ import { PageHeader, EmptyState, ErrorAlert } from '@ari/shared/ui'
 import { adminService, type AccountRequest } from '@/fservices/admin'
 import { roleLabel, roleBadgeClass } from '@/utils/adminLabels'
 import { CardListSkeleton } from './_skeletons'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 
 const initials = (name?: string | null) =>
   (name || 'U')
@@ -47,7 +48,7 @@ export default function PendingUsersPage() {
       await adminService.approveAccountRequest(r.id)
       refetch()
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('errors.approveFailed'))
+      setMutationError(resolveApiError(e, t, 'errors.approveFailed'))
     } finally {
       setBusyId(null)
     }
@@ -63,7 +64,7 @@ export default function PendingUsersPage() {
       refetch()
       setRejectTarget(null)
     } catch (e: any) {
-      setMutationError(e?.response?.data?.message || t('errors.rejectFailed'))
+      setMutationError(resolveApiError(e, t, 'errors.rejectFailed'))
     } finally {
       setBusyId(null)
     }

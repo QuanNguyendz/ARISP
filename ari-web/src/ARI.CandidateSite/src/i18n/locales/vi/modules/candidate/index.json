@@ -198,7 +198,7 @@
     "viewJobPosting": "Xem tin tuyển dụng",
     "copyCode": "Sao chép mã",
     "copied": "Đã sao chép",
-    "hrConfirming": "Kết quả đang chờ HR Leader xác nhận",
+    "hrConfirming": "Kết quả đang chờ HR Admin xác nhận",
     "hrConfirmingHint": "Bạn sẽ nhận thông báo ngay khi có kết quả vòng phỏng vấn này.",
     "missedInterview": "Bạn đã lỡ buổi phỏng vấn vòng {{round}}",
     "missedInterviewHint": "Lịch hẹn {{time}} đã qua mà không ghi nhận buổi phỏng vấn nào, nên hồ sơ dừng lại ở vòng này. Lần sau, nếu bận hãy liên hệ trước với bộ phận nhân sự để thống nhất một khung giờ khác.",

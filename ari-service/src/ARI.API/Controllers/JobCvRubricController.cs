@@ -55,7 +55,7 @@ namespace ARI.API.Controllers
 
             var file = await _sender.Send(new ExportCvRubricSheetQuery(current.Value!.Criteria), ct);
             return file.IsFailure
-                ? BadRequest(new { message = file.Error })
+                ? BadRequest(new { message = file.Error, code = file.ErrorCode })
                 : File(file.Value!, RubricSheet.XlsxContentType, "bo-tieu-chi-cham-cv.xlsx");
         }
     }

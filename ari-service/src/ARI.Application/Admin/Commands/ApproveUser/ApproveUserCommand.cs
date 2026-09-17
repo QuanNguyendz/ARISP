@@ -23,10 +23,10 @@ namespace ARI.Application.Admin.Commands.ApproveUser
         {
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(request.Id, ct);
             if (user == null)
-                return Result.Failure("User not found.", CommonErrorCodes.NotFound);
+                return Result.Failure("Không tìm thấy người dùng.", CommonErrorCodes.NotFound);
 
             if (user.IsActive)
-                return Result.Failure("User already active.");
+                return Result.Failure("Tài khoản đang hoạt động.");
 
             user.IsActive = true;
             _unitOfWork.Repository<User>().Update(user);

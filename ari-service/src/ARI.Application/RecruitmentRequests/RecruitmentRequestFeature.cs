@@ -154,6 +154,19 @@ namespace ARI.Application.RecruitmentRequests
             if (input.ExpectedStartDate is null)
                 return Result.Failure("Ngày dự kiến bắt đầu là bắt buộc.");
 
+            // Ngày đã trôi qua thì phiếu tự mâu thuẫn: cả hàng chờ theo mức độ ưu tiên (ADR-065) lẫn
+            // kế hoạch dựng tin của Recruiter đều đọc đúng ô này để biết "bao giờ cần người".
+            //
+            // Chặn ở đây chứ không chỉ đặt `min` cho ô nhập: `min` chỉ cản con trỏ chuột, còn phiếu
+            // nằm chờ vài tuần rồi mở ra sửa thì ngày cũ **tự** trôi vào quá khứ mà không ai gõ gì.
+            //
+            // Nới đúng một ngày là CỐ Ý. Ô `<input type="date">` gửi lên nửa đêm theo múi giờ TRÌNH
+            // DUYỆT, nên "hôm nay" của người ở UTC+7 tới server thành 17:00 hôm trước; so thẳng với
+            // ngày UTC sẽ đánh trượt đúng lựa chọn hợp lệ nhất. Một ngày phủ hết dải múi giờ thật
+            // (UTC-12..+14) mà vẫn chặn được ca người dùng báo: chọn ngày của tháng trước.
+            if (input.ExpectedStartDate.Value.UtcDateTime.Date < DateTime.UtcNow.Date.AddDays(-1))
+                return Result.Failure("Ngày dự kiến bắt đầu không được nằm trong quá khứ.");
+
             if (string.IsNullOrWhiteSpace(input.Reason))
                 return Result.Failure("Lý do tuyển là bắt buộc.");
 
@@ -561,7 +574,7 @@ namespace ARI.Application.RecruitmentRequests
             // phiếu cho đội mình cũng không lách được, dù policy cho phép vai trò đó duyệt.
             if (req.RequestedByUserId == request.ActorId)
                 return Result.Failure(
-                    "Không thể tự duyệt phiếu do chính mình lập. Nhờ một HR Leader khác duyệt.",
+                    "Không thể tự duyệt phiếu do chính mình lập. Nhờ một HR Admin khác duyệt.",
                     CommonErrorCodes.Forbidden);
 
             if (!RecruitmentRequestStatus.Is(req.Status, RecruitmentRequestStatus.Pending))

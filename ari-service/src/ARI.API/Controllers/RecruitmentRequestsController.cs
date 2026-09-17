@@ -45,7 +45,7 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(
                 new GetRecruitmentRequestsQuery(status, search, priority, _currentUser.UserId, _currentUser.Role), ct);
 
-            return result.IsFailure ? BadRequest(new { message = result.Error }) : Ok(result.Value);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
         [HttpGet("{id:guid}")]
@@ -65,7 +65,7 @@ namespace ARI.API.Controllers
             var result = await _sender.Send(new CreateRecruitmentRequestCommand(input, _currentUser.UserId, _currentUser.Role), ct);
 
             return result.IsFailure
-                ? BadRequest(new { message = result.Error })
+                ? BadRequest(new { message = result.Error, code = result.ErrorCode })
                 : CreatedAtAction(nameof(GetById), new { id = result.Value }, new { id = result.Value });
         }
 
@@ -157,10 +157,10 @@ namespace ARI.API.Controllers
 
             return result.ErrorCode switch
             {
-                CommonErrorCodes.NotFound => NotFound(new { message = result.Error }),
-                CommonErrorCodes.Forbidden => StatusCode(403, new { message = result.Error }),
-                CommonErrorCodes.Conflict => Conflict(new { message = result.Error }),
-                _ => BadRequest(new { message = result.Error }),
+                CommonErrorCodes.NotFound => NotFound(new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Forbidden => StatusCode(403, new { message = result.Error, code = result.ErrorCode }),
+                CommonErrorCodes.Conflict => Conflict(new { message = result.Error, code = result.ErrorCode }),
+                _ => BadRequest(new { message = result.Error, code = result.ErrorCode }),
             };
         }
     }

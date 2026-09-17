@@ -27,8 +27,15 @@ namespace ARI.Application.OnlineTest
     /// <summary>Một dòng lỗi khi import (số dòng trong file + lý do).</summary>
     public record OnlineTestImportRowError(int Row, string Message);
 
-    /// <summary>Kết quả import: số câu thêm được, số dòng lỗi, chi tiết lỗi.</summary>
-    public record OnlineTestImportResultDto(int Imported, int Failed, List<OnlineTestImportRowError> Errors);
+    /// <summary>
+    /// Kết quả import: số câu thêm được, số dòng lỗi, chi tiết lỗi, và các dòng bị BỎ QUA vì trùng.
+    ///
+    /// Trùng tách hẳn khỏi lỗi: dòng lỗi là file điền sai và người ra đề phải sửa file; dòng trùng là
+    /// file đúng nhưng câu đó đã có sẵn — không phải việc phải sửa, chỉ là việc phải biết.
+    /// </summary>
+    public record OnlineTestImportResultDto(
+        int Imported, int Failed, List<OnlineTestImportRowError> Errors,
+        List<OnlineTestImportRowError> Duplicates);
 
     public record ImportOnlineTestQuestionsCommand(
         Guid JobPostingId, byte[] FileBytes, string FileName, Guid? UserId, string? Role)
@@ -69,8 +76,15 @@ namespace ARI.Application.OnlineTest
             var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, command.JobPostingId, ct);
 
             var errors = new List<OnlineTestImportRowError>();
+            var duplicates = new List<OnlineTestImportRowError>();
             var toAdd = new List<OnlineTestQuestion>();
             var acceptedTexts = new List<string>();
+
+            // Khoá của các câu ĐÃ CÓ trong ngân hàng. Các dòng nhận được trong chính file này cũng được
+            // nhét vào đây khi đi qua, nên một lần quét chặn luôn cả hai kiểu trùng: trùng với ngân hàng
+            // (nhập lại file cũ) và trùng trong nội bộ file (dán lặp một câu).
+            var seenKeys = await OnlineTestSupport.ExistingQuestionKeysAsync(_unitOfWork, command.JobPostingId, ct);
+
             int rowNumber = 0; // khớp số dòng Excel: dòng 1 là tiêu đề
 
             foreach (var cells in rows)
@@ -103,6 +117,15 @@ namespace ARI.Application.OnlineTest
                     continue;
                 }
 
+                // Trùng thì BỎ QUA dòng đó, không đánh hỏng cả file: phần còn lại vẫn là câu mới hợp lệ,
+                // và bắt người ra đề tự dò xem câu nào đã có rồi mới được nhập là đúng việc máy nên làm.
+                var key = OnlineTestSupport.DuplicateKey(parsed!.QuestionText);
+                if (!seenKeys.Add(key))
+                {
+                    duplicates.Add(new OnlineTestImportRowError(rowNumber, OnlineTestSupport.DuplicateMessage));
+                    continue;
+                }
+
                 acceptedTexts.Add(parsed.QuestionText);
 
                 var correct = CreateOnlineTestQuestionCommandHandler.NormalizeCorrect(parsed!);
@@ -131,7 +154,7 @@ namespace ARI.Application.OnlineTest
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
-            return Result.Success(new OnlineTestImportResultDto(toAdd.Count, errors.Count, errors));
+            return Result.Success(new OnlineTestImportResultDto(toAdd.Count, errors.Count, errors, duplicates));
         }
 
         /// <summary>Dựng request từ 1 dòng file. Trả về null + lý do nếu dòng không dùng được.</summary>

@@ -75,7 +75,7 @@
     "interviewPassScore": "Điểm sàn phỏng vấn",
     "interviewPassScoreHint": "Từ điểm này trở lên AI kết luận \"đạt\" (0–100). Chỉ áp dụng khi đã khai bộ tiêu chí chấm phỏng vấn trong Playbook.",
     "hiringManager": "Hiring Manager phụ trách",
-    "hiringManagerHint": "Người lập phiếu yêu cầu tuyển dụng — hệ thống tự gán làm Hiring Manager chính của tin (duyệt hồ sơ, ký duyệt mô tả công việc, chốt kết quả). Muốn đổi người thì nhờ HR Leader chuyển Hiring Manager ở trang tin.",
+    "hiringManagerHint": "Người lập phiếu yêu cầu tuyển dụng — hệ thống tự gán làm Hiring Manager chính của tin (duyệt hồ sơ, ký duyệt mô tả công việc, chốt kết quả). Muốn đổi người thì nhờ HR Admin chuyển Hiring Manager ở trang tin.",
     "jdDraft": {
       "description": "Mô tả công việc",
       "requirements": "Yêu cầu ứng viên"
@@ -101,7 +101,7 @@
   },
   "recruitmentRequest": {
     "title": "Phiếu yêu cầu tuyển dụng",
-    "description": "Mọi tin tuyển dụng đều phải dựng từ một phiếu do Hiring Manager lập và HR Leader đã duyệt. Chọn phiếu trước — các trường bên dưới sẽ được điền sẵn theo phiếu.",
+    "description": "Mọi tin tuyển dụng đều phải dựng từ một phiếu do Hiring Manager lập và HR Admin đã duyệt. Chọn phiếu trước — các trường bên dưới sẽ được điền sẵn theo phiếu.",
     "placeholder": "— Chọn phiếu yêu cầu tuyển dụng —",
     "loading": "Đang tải danh sách phiếu...",
     "headcount": "{{count}} người",

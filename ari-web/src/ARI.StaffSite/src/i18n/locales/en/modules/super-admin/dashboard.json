@@ -11,7 +11,7 @@
   },
   "pendingUsers": {
     "title": "Account Creation Requests",
-    "subtitle": "Submitted by HR Leader · awaiting your approval",
+    "subtitle": "Submitted by HR Admin · awaiting your approval",
     "viewAll": "View all",
     "empty": "No pending requests",
     "by": "by {{name}}",

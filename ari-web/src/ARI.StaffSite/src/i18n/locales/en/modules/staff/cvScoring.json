@@ -9,7 +9,7 @@
     "replace": "Replace",
     "templates": "Company templates",
     "templatesLoading": "Loading templates…",
-    "noTemplates": "No templates yet — HR Leaders add them on the Playbook screen.",
+    "noTemplates": "No templates yet — HR Admins add them on the Playbook screen.",
     "templateItem": "{{name}} · {{count}} criteria",
     "importExcel": "Import Excel",
     "exportExcel": "Export Excel",
