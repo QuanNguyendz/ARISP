@@ -63,6 +63,7 @@
     "onlineTestLanguageNotice": "Questions must be written in {{language}}. After creating the job, open \"Question bank\" and update the questions to match — uploaded Excel files are checked and rejected if the language does not match.",
     "minutes": "Minutes",
     "minutesMax": "Max 20 minutes",
+    "testMinutesHint": "Test duration: the test closes exactly this many minutes after the scheduled time (joining late means less time). Same value as Duration in the question bank.",
     "visibility": "Visibility",
     "languageRequirement": "Language Requirement",
     "languageRequirementPlaceholder": "e.g. English (IELTS 6.5)",

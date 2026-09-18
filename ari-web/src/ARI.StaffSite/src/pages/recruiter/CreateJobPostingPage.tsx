@@ -35,6 +35,8 @@ interface CreateJobPostingPageProps {
 
 // Trần thời lượng mỗi vòng phỏng vấn (sơ loại / chuyên môn) — tối đa 20 phút.
 const MAX_ROUND_MINUTES = 20
+/** Trần thời lượng bài thi trắc nghiệm — cùng khoảng 1–300 với server (`OnlineTestWindow`). */
+const MAX_TEST_MINUTES = 300
 
 const input =
   'w-full px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-ink-200 dark:border-white/10 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:border-brand-400 dark:focus:border-brand-500/50 text-sm'
@@ -558,7 +560,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         interviewPassScore,
         roundConfigs: rounds.map((r) =>
           r.roundType === 'online_test'
-            ? { ...r, maxDurationMinutes: Math.max(r.maxDurationMinutes || 30, 1) }
+            ? { ...r, maxDurationMinutes: Math.min(Math.max(r.maxDurationMinutes || 30, 1), MAX_TEST_MINUTES) }
             : { ...r, maxDurationMinutes: Math.min(Math.max(r.maxDurationMinutes || MAX_ROUND_MINUTES, 1), MAX_ROUND_MINUTES) },
         ),
         languageRequirement: languageRequirement.trim() || undefined,
@@ -1062,7 +1064,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                         <input
                           type="number"
                           min={1}
-                          max={capped ? MAX_ROUND_MINUTES : undefined}
+                          max={capped ? MAX_ROUND_MINUTES : MAX_TEST_MINUTES}
                           inputMode="numeric"
                           value={round.maxDurationMinutes === 0 ? '' : round.maxDurationMinutes}
                           onChange={(e) =>
@@ -1071,19 +1073,21 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                               'maxDurationMinutes',
                               e.target.value === ''
                                 ? 0
-                                : capped
-                                  ? Math.min(Number(e.target.value), MAX_ROUND_MINUTES)
-                                  : Number(e.target.value),
+                                : Math.min(Number(e.target.value), capped ? MAX_ROUND_MINUTES : MAX_TEST_MINUTES),
                             )
                           }
                           onBlur={(e) => {
                             const v = Number(e.target.value)
+                            const cap = capped ? MAX_ROUND_MINUTES : MAX_TEST_MINUTES
                             if (e.target.value === '' || v < 1) changeRound(idx, 'maxDurationMinutes', capped ? MAX_ROUND_MINUTES : 30)
-                            else if (capped && v > MAX_ROUND_MINUTES) changeRound(idx, 'maxDurationMinutes', MAX_ROUND_MINUTES)
+                            else if (v > cap) changeRound(idx, 'maxDurationMinutes', cap)
                           }}
                           className={`${input} py-2`}
                         />
                         {capped && <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">{t('form.minutesMax')}</p>}
+                        {/* Vòng trắc nghiệm: số phút này LÀ thời lượng bài thi (ADR-072) — cùng một giá trị với
+                            ô "Thời lượng" ở màn ngân hàng đề, và quyết định giờ đóng bài của mọi ca thi. */}
+                        {!capped && <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">{t('form.testMinutesHint')}</p>}
                       </div>
                     </div>
                     {/* Ngôn ngữ vòng trắc nghiệm quyết định ngôn ngữ của ĐỀ THI, mà đề nằm ở ngân hàng

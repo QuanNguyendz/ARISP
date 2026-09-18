@@ -133,6 +133,16 @@ export interface JobPosting {
   recruitmentRequestId?: string | null
   /** Tin đã có bộ tiêu chí chấm CV chưa (ADR-070) — thiếu thì không gửi duyệt / đăng được. Chỉ nhân sự nhận được. */
   hasCvRubric?: boolean | null
+  /**
+   * Ngân hàng đề trắc nghiệm so với số câu mỗi bài — `questionCount < questionsPerTest` thì không gửi duyệt /
+   * đăng được. Null khi tin không có vòng trắc nghiệm. Chỉ nhân sự nhận được.
+   */
+  onlineTestBank?: OnlineTestBankStatus | null
+}
+
+export interface OnlineTestBankStatus {
+  questionCount: number
+  questionsPerTest: number
 }
 
 export type HmSignOffStatus = 'pending' | 'approved' | 'rejected' | 'bypassed'

@@ -11,6 +11,7 @@
     "noTest": "Vị trí này chưa có bài thi trắc nghiệm. Bạn không cần làm bài.",
     "progress": "Đã trả lời {{answered}}/{{total}} câu · Điểm đạt: {{pass}}/100",
     "timeLeft": "Thời gian còn lại: {{time}}",
+    "closesAt": "Bài thi đóng lúc {{closes}}",
     "multiHint": "Chọn nhiều đáp án",
     "question": "Câu {{n}}.",
     "submit": "Nộp bài",
@@ -27,21 +28,23 @@
     "submittedCount": "Đã nộp {{total}} câu.",
     "gate": {
       "title": "Trước khi bắt đầu",
-      "summary": "{{count}} câu · {{minutes}} phút.",
+      "summary": "{{count}} câu · bài thi {{minutes}} phút, đóng lúc {{closes}}.",
+      "remaining": "Còn lại {{time}}",
+      "lateNotice": "Bài thi {{minutes}} phút này đã mở từ trước và vẫn đóng đúng {{closes}} — bạn vào muộn nên thời gian làm bài ngắn hơn. Hãy bắt đầu ngay.",
       "leaveRuleTitle": "Rời khỏi bài thi là TỰ NỘP.",
       "leaveRule": "Chuyển tab, thu nhỏ cửa sổ hay đóng trang đều khiến bài của bạn được nộp ngay với những câu đã làm. Hãy đóng các ứng dụng khác trước khi bắt đầu.",
-      "timerRule": "Đồng hồ {{minutes}} phút chạy từ lúc bạn bấm Bắt đầu. Hết giờ, bài tự nộp.",
+      "timerRule": "Đồng hồ đếm tới giờ đóng bài ({{closes}}) — không tính lại từ lúc bạn bấm Bắt đầu. Tới giờ đóng, bài tự nộp.",
       "oneAttemptRule": "Bạn chỉ có MỘT lượt làm bài — không làm lại được.",
       "startButton": "Tôi đã hiểu — Bắt đầu làm bài",
-      "startHint": "Đồng hồ bắt đầu chạy ngay khi bạn bấm nút trên."
+      "startHint": "Đồng hồ vẫn chạy trong lúc bạn đọc trang này."
     },
     "window": {
       "notYetTitle": "Chưa tới giờ làm bài",
-      "notYetDetail": "Bài thi mở lúc {{time}}. Hãy quay lại đúng giờ — bạn có 1 tiếng kể từ lúc đó để vào làm bài.",
-      "closedTitle": "Đã quá giờ vào làm bài",
-      "closedDetail": "Bài thi mở lúc {{time}} và chỉ nhận người vào trong 1 tiếng kể từ đó. Hãy liên hệ bộ phận nhân sự nếu bạn gặp sự cố.",
+      "notYetDetail": "Bài thi mở lúc {{time}} và đóng lúc {{closes}} ({{minutes}} phút). Vào lúc nào trong khoảng đó cũng được, nhưng đồng hồ luôn đếm tới giờ đóng — vào muộn thì còn ít thời gian hơn. Cứ để trang này mở, tới giờ bài sẽ tự hiện.",
+      "closedTitle": "Bài thi đã đóng",
+      "closedDetail": "Bài thi diễn ra từ {{time}} đến {{closes}} và đã đóng. Hãy liên hệ bộ phận nhân sự nếu bạn gặp sự cố.",
       "expiredTitle": "Bài thi trắc nghiệm đã hết hạn",
-      "expiredDetail": "Bài thi mở lúc {{time}} và chỉ nhận người vào làm trong 1 tiếng kể từ đó. Bạn không vào làm bài trong khoảng thời gian này nên bài thi đã hết hạn và được hệ thống tự động nộp.",
+      "expiredDetail": "Bài thi diễn ra từ {{time}} đến {{closes}}. Bạn không vào làm bài trong khoảng thời gian này nên bài thi đã hết hạn và được hệ thống tự động nộp.",
       "expiredDetailNoTime": "Bạn không vào làm bài trong khung giờ đã hẹn nên bài thi đã hết hạn và được hệ thống tự động nộp.",
       "expiredContact": "Nếu bạn gặp sự cố khiến không vào được đúng giờ, hãy liên hệ trực tiếp bộ phận nhân sự — hệ thống không tự mở lại bài thi."
     }

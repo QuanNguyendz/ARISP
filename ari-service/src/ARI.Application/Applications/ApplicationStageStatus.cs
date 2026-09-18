@@ -155,8 +155,8 @@ namespace ARI.Application.Applications
                 if (submission != null)
                     return OnlineTestSubmittedBy.IsSystem(submission.SubmittedBy) ? TestExpired : TestSubmitted;
 
-                // Chưa có bài mà cửa vào đã đóng: ứng viên không còn vào được nữa, dù hệ thống chỉ nộp
-                // thay sau hạn chót (xem OnlineTestExpiry). Bảng phải nói ngay, không đợi tác vụ nền.
+                // Chưa có bài mà bài đã đóng: ứng viên không còn vào được nữa, dù hệ thống chỉ nộp thay
+                // sau hạn chót (xem OnlineTestExpiry). Bảng phải nói ngay, không đợi tác vụ nền.
                 var testBooking = bookings
                     .Where(b => b.ApplicationId == app.Id && b.RoundNumber == round
                                 && string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase))
@@ -165,7 +165,9 @@ namespace ARI.Application.Applications
                 var testSlot = testBooking == null
                     ? null
                     : slots.FirstOrDefault(s => s.Id == testBooking.AvailabilitySlotId);
-                if (testSlot != null && now > testSlot.StartTime + OnlineTestSupport.EntryWindow)
+                if (testSlot != null
+                    && now >= OnlineTestWindow.ClosesAt(
+                        testSlot.StartTime, OnlineTestWindow.DurationOf(roundConfigs, app.JobPostingId, round)))
                     return TestExpired;
 
                 // Chưa nộp: mở rồi hay chưa tới giờ — cả hai đều là "chờ ứng viên làm bài", nhưng

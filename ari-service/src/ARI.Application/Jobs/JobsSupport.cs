@@ -70,6 +70,11 @@ namespace ARI.Application.Jobs
             {
                 if (round.RoundNumber <= 0) return "RoundNumber must be > 0.";
                 if (round.MaxDurationMinutes <= 0) return "MaxDurationMinutes must be > 0.";
+                // Số phút của vòng trắc nghiệm LÀ thời lượng bài thi (ADR-072) — cùng khoảng hợp lệ với màn
+                // ngân hàng đề, hai cửa ghi cùng một cột thì không được nhận hai luật khác nhau.
+                if (ARI.Application.Scheduling.InterviewInviteEmail.IsOnlineTest(round.RoundType)
+                    && !ARI.Application.OnlineTest.OnlineTestWindow.IsValidDuration(round.MaxDurationMinutes))
+                    return ARI.Application.OnlineTest.OnlineTestWindow.InvalidDurationMessage;
                 if (round.InterviewCodeTtlHours <= 0) return "InterviewCodeTtlHours must be > 0.";
             }
 

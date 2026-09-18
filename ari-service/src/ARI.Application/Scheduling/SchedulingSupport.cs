@@ -105,9 +105,28 @@ namespace ARI.Application.Scheduling
         /// </summary>
         public static async Task<string?> RoundTypeAsync(
             IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, CancellationToken ct)
+            => (await RoundConfigAsync(unitOfWork, jobPostingId, roundNumber, ct))?.RoundType;
+
+        /// <summary>Cấu hình của một vòng trong tin, <c>null</c> nếu tin chưa khai vòng đó.</summary>
+        public static async Task<InterviewRoundConfig?> RoundConfigAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, CancellationToken ct)
             => (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
                     r => r.JobPostingId == jobPostingId && r.RoundNumber == roundNumber, ct))
-                .FirstOrDefault()?.RoundType;
+                .FirstOrDefault();
+
+        /// <summary>
+        /// Giờ kết thúc THỰC của một ca sắp tạo/sửa.
+        ///
+        /// Ca THI không có giờ kết thúc riêng: bài đóng lúc giờ mở + thời lượng bài (ADR-072), nên
+        /// server tự tính và bỏ qua giờ kết thúc client gửi lên. Để người tạo ca gõ giờ kết thúc thì ca
+        /// 09:00–10:00 với bài 30 phút sẽ in "09:00–10:00" lên thư mời trong khi bài đóng lúc 09:30.
+        /// Ca phỏng vấn giữ nguyên giờ người dùng chọn.
+        /// </summary>
+        public static DateTimeOffset EffectiveEndTime(
+            InterviewRoundConfig? round, DateTimeOffset startTime, DateTimeOffset requestedEndTime)
+            => OnlineTestWindow.IsTestRound(round)
+                ? OnlineTestWindow.EndTimeFor(startTime, OnlineTestWindow.DurationOf(round))
+                : requestedEndTime;
 
         /// <summary>
         /// Số thứ tự các vòng TRẮC NGHIỆM của tin — những vòng mà Hiring Manager không phải có mặt.
@@ -153,14 +172,13 @@ namespace ARI.Application.Scheduling
         ///
         /// <b>Vòng hội thoại:</b> đúng bằng ca. Ứng viên ngồi trong phòng từ đầu tới cuối.
         ///
-        /// <b>Vòng trắc nghiệm:</b> dài hơn ca, và đây chính là chỗ luật 2 từng thủng. Giờ hẹn thi chỉ
-        /// là lúc <i>mở cửa</i>: ứng viên còn vào được trong suốt <see cref="OnlineTestSupport.EntryWindow"/>
-        /// (1 tiếng), và người vào ở phút cuối vẫn còn nguyên đồng hồ làm bài của mình. Một ca thi khai
-        /// 09:00–10:00 với bài 30 phút nghĩa là ứng viên có thể đang làm bài tới tận 10:35 — nên xếp
-        /// buổi phỏng vấn 10:00 vẫn lọt qua phép so theo khung ca, dù trên thực tế trùng nhau.
+        /// <b>Vòng trắc nghiệm:</b> từ giờ mở tới <see cref="OnlineTestWindow.ClosesAt"/> — giờ hẹn +
+        /// thời lượng bài (ADR-072). Ca thi tạo mới lưu giờ kết thúc đúng bằng mốc đó, nhưng ca tạo từ
+        /// trước ADR-072 có thể mang giờ kết thúc gõ tay; đọc theo thời lượng thì luật 2 không phụ thuộc
+        /// vào chuyện dữ liệu cũ đã được đồng bộ hay chưa.
         ///
-        /// So với <see cref="OnlineTestSupport.SubmissionDeadline"/> chứ không tự cộng tay: đó là cùng
-        /// một mốc mà hosted service dùng để nộp bài thay, hai công thức thì sẽ có ngày lệch nhau.
+        /// Tính bằng <see cref="OnlineTestWindow"/> chứ không tự cộng tay: đó là cùng một mốc mà màn
+        /// làm bài dùng để đóng bài, hai công thức thì sẽ có ngày lệch nhau.
         /// </summary>
         public static async Task<Func<AvailabilitySlot, (DateTimeOffset Start, DateTimeOffset End)>>
             BusyWindowResolverAsync(IUnitOfWork unitOfWork, IEnumerable<AvailabilitySlot> slots, CancellationToken ct)
@@ -169,24 +187,16 @@ namespace ARI.Application.Scheduling
 
             var testRounds = (await unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
                     r => jobIds.Contains(r.JobPostingId), ct))
-                .Where(r => InterviewInviteEmail.IsOnlineTest(r.RoundType))
-                .Select(r => (r.JobPostingId, r.RoundNumber))
-                .ToHashSet();
-
-            var durations = (await unitOfWork.Repository<JobPosting>().FindAsync(j => jobIds.Contains(j.Id), ct))
-                .ToDictionary(j => j.Id, j => j.OnlineTestDurationMinutes);
+                .Where(OnlineTestWindow.IsTestRound)
+                .GroupBy(r => (r.JobPostingId, r.RoundNumber))
+                .ToDictionary(g => g.Key, g => OnlineTestWindow.DurationOf(g.First()));
 
             return slot =>
             {
-                if (!testRounds.Contains((slot.JobPostingId, slot.RoundNumber)))
+                if (!testRounds.TryGetValue((slot.JobPostingId, slot.RoundNumber), out var minutes))
                     return (slot.StartTime, slot.EndTime);
 
-                durations.TryGetValue(slot.JobPostingId, out var minutes);
-                var deadline = OnlineTestSupport.SubmissionDeadline(slot.StartTime, minutes);
-
-                // Không bao giờ NGẮN hơn chính khung ca: Recruiter khai ca thi dài hơn cửa vào + thời
-                // lượng thì con số họ khai mới là ý định, và rút ngắn nó đi là tự tạo lỗ thứ hai.
-                return (slot.StartTime, deadline > slot.EndTime ? deadline : slot.EndTime);
+                return (slot.StartTime, OnlineTestWindow.ClosesAt(slot.StartTime, minutes));
             };
         }
 
@@ -245,9 +255,8 @@ namespace ARI.Application.Scheduling
                     var otherSlots = (await unitOfWork.Repository<AvailabilitySlot>()
                         .FindAsync(s => otherSlotIds.Contains(s.Id), ct)).ToList();
 
-                    // So theo khoảng BẬN chứ không theo khung ca: ca thi còn kéo dài quá giờ đóng ca
-                    // (cửa vào 1 tiếng + thời lượng bài), nên hai khung ca kề nhau vẫn có thể là cùng
-                    // một lúc đối với con người đang ngồi làm bài.
+                    // So theo khoảng BẬN chứ không theo khung ca: ca thi kéo dài đúng tới giờ đóng bài
+                    // (giờ hẹn + thời lượng bài), còn giờ kết thúc lưu trên ca cũ có thể gõ tay khác đi.
                     var busyWindow = await BusyWindowResolverAsync(
                         unitOfWork, otherSlots.Append(slot), ct);
                     var (myStart, myEnd) = busyWindow(slot);

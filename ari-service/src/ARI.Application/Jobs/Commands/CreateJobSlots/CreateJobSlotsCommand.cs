@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using MediatR;
 
@@ -28,6 +30,9 @@ namespace ARI.Application.Jobs.Commands.CreateJobSlots
             if (job == null)
                 return Result.Failure("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
+            var rounds = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == job.Id, ct)).ToList();
+
             foreach (var slotDto in command.Slots)
             {
                 var slot = new AvailabilitySlot
@@ -35,7 +40,11 @@ namespace ARI.Application.Jobs.Commands.CreateJobSlots
                     JobPostingId = job.Id,
                     RoundNumber = slotDto.RoundNumber,
                     StartTime = slotDto.StartTime,
-                    EndTime = slotDto.EndTime,
+                    // Ca thi: giờ kết thúc = giờ mở + thời lượng bài (ADR-072).
+                    EndTime = SchedulingSupport.EffectiveEndTime(
+                        rounds.FirstOrDefault(r => r.RoundNumber == slotDto.RoundNumber),
+                        slotDto.StartTime,
+                        slotDto.EndTime),
                     Timezone = slotDto.Timezone,
                     Capacity = slotDto.Capacity,
                     BookedCount = 0

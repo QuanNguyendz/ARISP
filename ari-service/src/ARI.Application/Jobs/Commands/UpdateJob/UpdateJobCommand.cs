@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
+using ARI.Application.Scheduling;
 using ARI.Application.Services;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
@@ -69,6 +71,29 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
                 return Result.Failure<JobPostingResponse>(validationError);
 
             var detectedLang = JobDescriptionLanguageDetector.Detect(request.JobDescription);
+
+            // 3b. Số phút của vòng trắc nghiệm LÀ thời lượng bài thi (ADR-072) — đổi nó là đổi giờ đóng bài
+            //     của mọi ca thi trong vòng. Kiểm TRƯỚC khi ghi bất cứ trường nào: bị chặn thì cả lệnh
+            //     không đổi gì, thay vì lưu nửa tin rồi mới báo lỗi.
+            var now = DateTimeOffset.UtcNow;
+            var currentRounds = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                .FindAsync(r => r.JobPostingId == command.Id, ct)).ToList();
+            var durationChanges = new List<(int Round, int Old, int New)>();
+            foreach (var wanted in request.RoundConfigs.Where(r => InterviewInviteEmail.IsOnlineTest(r.RoundType)))
+            {
+                var current = currentRounds.FirstOrDefault(r => r.RoundNumber == wanted.RoundNumber && OnlineTestWindow.IsTestRound(r));
+                if (current == null) continue;
+
+                var oldDuration = OnlineTestWindow.DurationOf(current);
+                if (oldDuration == wanted.MaxDurationMinutes) continue;
+
+                var blocker = await OnlineTestWindow.DurationChangeBlockerAsync(
+                    _unitOfWork, job.Id, wanted.RoundNumber, oldDuration, now, ct);
+                if (blocker != null)
+                    return Result.Failure<JobPostingResponse>(blocker, OnlineTestWindow.DurationLockedCode);
+
+                durationChanges.Add((wanted.RoundNumber, oldDuration, wanted.MaxDurationMinutes));
+            }
 
             // 4. Update fields
             job.Title = request.Title!.Trim();
@@ -180,6 +205,15 @@ namespace ARI.Application.Jobs.Commands.UpdateJob
             else
             {
                 finalRoundDtos = existingList.Select(RoundConfigDto.FromEntity).ToList();
+            }
+
+            // Ca thi lưu giờ kết thúc = giờ đóng bài — kéo theo thời lượng mới để màn xếp lịch, Portal và
+            // thư mời không in khung giờ cũ.
+            if (durationChanges.Count > 0)
+            {
+                foreach (var (round, oldDuration, newDuration) in durationChanges)
+                    await OnlineTestWindow.SyncSlotEndsAsync(_unitOfWork, job.Id, round, oldDuration, newDuration, now, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
             }
 
             // Gửi thông báo SignalR cho Recruiter vừa update job (nếu có)

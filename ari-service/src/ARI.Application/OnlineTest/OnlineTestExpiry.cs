@@ -27,12 +27,12 @@ namespace ARI.Application.OnlineTest
     /// như mọi bài khác, đánh dấu <see cref="OnlineTestSubmittedBy.System"/> để mọi màn nói đúng
     /// "hết hạn" thay vì "đã nộp bài".
     ///
-    /// <b>Vì sao chờ tới hạn chót chứ không nộp ngay lúc đóng cửa.</b> Server không biết ứng viên
-    /// đã bấm "Bắt đầu" hay chưa — người vào ở phút thứ 59 vẫn đang làm bài sau giờ đóng cửa. Chỉ
-    /// sau <see cref="OnlineTestSupport.SubmissionDeadline"/> (đóng cửa + thời lượng bài), "chưa có
-    /// bài" mới chắc chắn là "không vào làm". Trong khoảng giữa, Portal đã hiện "Đã hết hạn" nhờ
-    /// cờ <c>Expired</c> của <see cref="GetCandidateOnlineTestQuery"/>, nên ứng viên không phải chờ
-    /// tác vụ nền mới biết.
+    /// <b>Vì sao chờ tới hạn chót chứ không nộp ngay lúc bài đóng.</b> Người đang làm bài tự nộp
+    /// đúng giờ đóng, và bài đó còn phải đi hết đường truyền. Chỉ sau
+    /// <see cref="OnlineTestWindow.SubmissionDeadline"/> (giờ đóng + độ trễ mạng), "chưa có bài" mới
+    /// chắc chắn là "không vào làm". Trong khoảng giữa, Portal đã hiện "Đã hết hạn" nhờ cờ
+    /// <c>Expired</c> của <see cref="GetCandidateOnlineTestQuery"/>, nên ứng viên không phải chờ tác
+    /// vụ nền mới biết.
     /// </summary>
     public static class OnlineTestExpiry
     {
@@ -65,9 +65,9 @@ namespace ARI.Application.OnlineTest
             var slotById = (await uow.Repository<AvailabilitySlot>().FindAsync(s => slotIds.Contains(s.Id), ct))
                 .GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First());
 
-            // Lọc thô bằng cận dưới không phụ thuộc thời lượng bài (đóng cửa + độ trễ mạng) để khỏi
-            // tải cấu hình của mọi tin; hạn chót chính xác được tính lại theo từng tin bên dưới.
-            var minimumDeadline = OnlineTestSupport.EntryWindow + OnlineTestSupport.SubmitGrace;
+            // Lọc thô bằng cận dưới không phụ thuộc thời lượng bài (thời lượng tối thiểu + độ trễ mạng)
+            // để khỏi tải cấu hình của mọi tin; hạn chót chính xác được tính lại theo từng vòng bên dưới.
+            var minimumDeadline = TimeSpan.FromMinutes(OnlineTestWindow.MinDurationMinutes) + OnlineTestWindow.SubmitGrace;
             var candidates = live
                 .Where(b => slotById.TryGetValue(b.AvailabilitySlotId, out var s) && s.StartTime + minimumDeadline <= now)
                 // Mỗi hồ sơ + vòng chỉ tính lịch MỚI NHẤT — cùng cách ScheduledStartAsync chọn giờ hẹn.
@@ -118,7 +118,8 @@ namespace ARI.Application.OnlineTest
                 // Hồ sơ đã đóng (rút, bị loại, đã tuyển…) thì không còn vòng nào để ghi kết quả.
                 if (ApplicationStatuses.IsTerminal(app.Status)) continue;
 
-                if (now <= OnlineTestSupport.SubmissionDeadline(slot.StartTime, job.OnlineTestDurationMinutes))
+                var duration = OnlineTestWindow.DurationOf(roundConfigs, job.Id, booking.RoundNumber);
+                if (now <= OnlineTestWindow.SubmissionDeadline(slot.StartTime, duration))
                     continue;
 
                 // Chấm đúng như một bài ứng viên nộp trống — cùng bộ đề (deterministic), cùng hàm chấm.

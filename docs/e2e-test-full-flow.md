@@ -574,7 +574,7 @@ Hồ sơ mới: tạo thêm một tài khoản ứng viên, hoặc gọi lại `
 | Điểm CV hiện *Chờ tiêu chí* | Tin chưa có bộ tiêu chí chấm CV (H17) |
 | Không chọn được ca khi xếp lịch vòng 2/3 | Ca nằm ngoài **Lịch tôi có mặt được** của HM, hoặc trùng giờ với buổi khác của ứng viên |
 | Không tạo được ca | Giờ bắt đầu đã ở quá khứ, vì ca phải nằm trong tương lai |
-| Bài thi báo chưa mở | Chưa tới giờ bắt đầu ca. Bài chỉ mở trong 1 giờ kể từ giờ bắt đầu |
+| Bài thi báo chưa mở | Chưa tới giờ bắt đầu ca. Bài mở lúc giờ bắt đầu ca và đóng sau đúng thời lượng bài (số phút của vòng trắc nghiệm); vào muộn thì còn ít thời gian hơn (ADR-072) |
 | **Cho ứng viên vào** bị mờ | HM chưa bấm **Vào phòng** |
 | Tài khoản tạo từ giao diện không đăng nhập được | Không có SMTP nên mật khẩu tạm không gửi đi. Dùng SQL ở bước 1.2 |
 | Thư ghi **Gửi lỗi** trong *Lịch sử email* | Chưa cấu hình `EmailSettings`. Không ảnh hưởng luồng, vì nội dung thư vẫn được lưu |

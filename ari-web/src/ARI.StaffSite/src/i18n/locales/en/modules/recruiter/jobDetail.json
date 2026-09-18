@@ -28,6 +28,7 @@
   "onlineTestBank": "Question Bank",
   "editJob": "Edit Job",
   "submitForApproval": "Send to HM for sign-off",
+  "onlineTestBankShort": "The question bank has only {{count}}/{{required}} questions — each test draws {{required}}, so the job cannot be sent for sign-off yet. Add questions or lower the questions per test.",
   "closeJob": "Close Job",
   "statusUpdated": "Status updated.",
   "jobSubmittedForApproval": "Sent to the Hiring Manager to sign off the job description. It goes live once signed.",

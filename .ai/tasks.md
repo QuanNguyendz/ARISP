@@ -48,7 +48,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ## Backlog (Chưa bắt đầu)
 
 ### Nợ kỹ thuật đã biết
-- [ ] **Gán mã lỗi cho phần còn lại của 537 `Result.Failure`** để câu báo lỗi đổi theo ngôn ngữ giao diện. Hạ tầng đã xong ngày 2026-09-18 (`code` đi kèm mọi thân lỗi controller; `resolveApiError` ở `@ari/shared/utils/apiError` dịch theo mã rồi mới rơi về câu server). Việc còn lại là **đặt tên mã** cho từng nhóm nghiệp vụ (lịch, offer, playbook, online test…), thêm câu vi/en vào `locales/*/errors.json` và khai vào bảng `CODE_KEYS`. Làm dần theo module được — mã chưa khai thì rơi về câu tiếng Việt của server chứ không vỡ.
+- [ ] **Gán mã lỗi cho phần còn lại của 537 `Result.Failure`** để câu báo lỗi đổi theo ngôn ngữ giao diện. Hạ tầng đã xong ngày 2026-09-18 (`code` đi kèm mọi thân lỗi controller; `resolveApiError` ở `@ari/shared/utils/apiError` dịch theo mã rồi mới rơi về câu server). Việc còn lại là **đặt tên mã** cho từng nhóm nghiệp vụ (lịch, offer, playbook, online test…), thêm câu vi/en vào `locales/*/errors.json` và khai vào bảng `CODE_KEYS`. Làm dần theo module được — mã chưa khai thì giao diện tiếng Việt hiện câu tiếng Việt của server, giao diện tiếng Anh hiện câu viết sẵn của màn (thứ tự sửa ngày 2026-09-18). Đã có mã: `online_test_bank_insufficient`, `cv_rubric_required`.
 - [ ] **Rà nốt lớp CỘT giữa model EF và migration** (phần ADR-056 tự loại khỏi phạm vi: "0 thao tác chạm cột/dữ liệu"). Vụ `reminder_1h_sent` (đã sửa 2026-08-14) cho thấy `HasColumnName`/kiểu dữ liệu khai trong `OnModelCreating` có thể **không có migration tương ứng** — Supabase trước đây được sửa tay nên trùng khớp che mất lỗi, DB dựng từ số 0 thì lộ. Cách rà: dựng container `pgvector:pg17` trắng → `dotnet ef database update` → so `information_schema.columns` với model (`dotnet ef dbcontext script` hoặc so snapshot), tìm cột lệch tên/kiểu/nullable còn lại.
 
 ### FE UI Redesign (mới) – từ mockup `design/mockups/`
@@ -190,6 +190,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Unit test luồng Online Test — chấm điểm (khớp hoàn toàn, làm tròn 2 số, điểm sàn inclusive, chỉ chấm bộ đề đã bốc), gating (1 lượt/vòng, CV chưa duyệt, đã rút, ngân hàng rỗng, phân quyền), ẩn đáp án + bốc đề deterministic, validate câu hỏi — **33 test mới, 44/44 pass** ✅ 2026-08-05
 - [x] Chống gian lận (mức đủ) bài trắc nghiệm: FE bắt `visibilitychange`/`blur` khi làm bài (khử trùng 500ms) → đếm số lần rời tab, banner nhắc + cảnh báo leo thang, gửi kèm khi nộp; BE lưu `OnlineTestSubmission.TabSwitchCount` (migration `AddOnlineTestTabSwitchCount`); HR thấy cột "Rời màn hình" (badge nghi vấn) ở bảng điểm + export `.xlsx` ✅ 2026-08-06
 - [x] Loại vòng `online_test` trong form tạo tin: thêm option "Online Test / Trắc nghiệm" vào dropdown Loại vòng (`CreateJobPostingPage`) + hint; sửa nhãn hiển thị 3 nhánh ở `JobDetailPage`/`JobPostingDetailPage` (trước hiện nhầm "Screening") — hoàn tất phần UI còn thiếu của ADR-049 ✅ 2026-08-06
+- [x] Khung giờ thi cố định (đóng lúc giờ hẹn + thời lượng, vào muộn còn ít giờ) + thời lượng một nguồn trên vòng `online_test` + đồng hồ theo giờ server (ADR-072) ✅ 2026-09-18
 
 ### Phase 3 – Scheduling (Practice) & Interview Code
 - [x] Kiosk mode frontend: nhập Interview Code → phiên phỏng vấn thật (token phạm vi phiên), device check, phòng phỏng vấn có avatar, màn kết thúc tự reset (ADR-052) ✅ 2026-08-05
@@ -364,6 +365,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Sơ đồ swimlane **Use-case Overview** toàn hệ thống vẽ đúng theo code (`docs/diagrams/arisp-usecase-overview.drawio`) — 2026-09-15
 - [x] Vẽ lại sơ đồ Use-case Overview sau ADR-068 (bỏ nhánh "Job has a Hiring Manager?", JD "No" → `rejected` → sửa/gửi lại, thao tác chuyển HM, HM soạn thư mời) — 2026-09-15
 - [x] Sơ đồ swimlane **luồng tính Match Score CV–JD** vẽ theo code (`docs/diagrams/arisp-cv-jd-match-score.drawio`) — 2026-09-17
+- [x] Chuyển sơ đồ **tổng quan chấm CV–JD** sang tiếng Anh, bỏ ví dụ, thêm khung chú giải (`docs/diagrams/arisp-cv-scoring-overview.drawio`) — 2026-09-19
 
 ### Phase 13 – Polish & Scale
 - [ ] Redis caching (session data, slot availability, frequently accessed evaluations)
@@ -384,6 +386,39 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-18: **Bài trắc nghiệm là một đợt thi có giờ cố định; thời lượng có một nguồn (ADR-072).** Người dùng hỏi thời lượng bài do người cấu hình hay mặc định. Câu trả lời: có hai ô "thời lượng", ô "Số phút" của vòng trắc nghiệm ở màn tạo tin không có tác dụng gì. Người dùng muốn gộp lại, và muốn khung giờ thi thành *"bài 30 phút bắt đầu 9h thì 9h–9h30 vào lúc nào cũng được, 9h30 đóng — vào 9h15 còn 15 phút"* thay cho cửa vào 1 tiếng + đồng hồ riêng mỗi người.
+  - **BE:** luật duy nhất `OnlineTestWindow` (`ClosesAt = giờ hẹn + thời lượng`, hạn nộp `+1 phút`); bỏ `EntryWindow` ở cả 7 chỗ đọc (lấy đề/nộp bài, tự nộp khi hết hạn, lịch ứng viên, Portal, bảng ứng viên, khoảng bận khi xếp lịch, thư mời/nhắc). Thời lượng = `MaxDurationMinutes` của vòng `online_test`; màn ngân hàng đề ghi vào vòng (`DurationMinutes` nullable: tin chưa có vòng thì không lưu được). Giờ kết thúc ca thi server tự tính = giờ đóng (`SchedulingSupport.EffectiveEndTime`). Chặn đổi thời lượng khi còn ứng viên giữ chỗ ở ca thi chưa đóng (mã `online_test_duration_locked`, cả màn ngân hàng đề lẫn lệnh sửa tin); đổi được thì kéo giờ kết thúc các ca chưa đóng. `CandidateOnlineTestDto.ServerNow`. Migration `MergeOnlineTestDurationIntoRoundConfig`: chép giá trị đang có hiệu lực sang vòng, đồng bộ giờ kết thúc ca thi cũ, bỏ cột `job_postings.online_test_duration_minutes`.
+  - **FE:** màn làm bài đếm ngược tới giờ đóng theo giờ server (sửa luôn lỗi trong ảnh chụp: "Đã quá giờ vào làm bài" cho bài server chưa mở, do so theo giờ máy), tự tải lại khi tới giờ mở, cửa trước khi bắt đầu hiện giờ đóng + số phút còn lại + cảnh báo vào muộn. Màn cấu hình lịch thay ô "Kết thúc" của ca thi bằng "Đóng bài lúc HH:mm". Màn ngân hàng đề khoá ô thời lượng khi chưa có vòng, kèm giải thích dùng chung với màn tạo tin; màn tạo tin trần 300 phút + gợi ý. Câu chữ vi/en ở Portal, lịch, thư mời.
+  - **Kiểm chứng:** Application 2056/2056 (viết lại các test dựa trên cửa 1 tiếng + test mới), Infrastructure 7/7, Domain 63/63. Migration chạy thật lên/xuống trên DB Postgres tạm (dữ liệu mẫu: chép 45′, giá trị hỏng → 30, ca 09:00–17:00 → 09:00–09:45, ca phỏng vấn không đổi). `tsc` CandidateSite + StaffSite sạch, vitest StaffSite 90/90, `check:i18n` đạt, eslint không lỗi mới.
+
+- [x] 2026-09-19: **Sơ đồ tổng quan chấm CV–JD bản tiếng Anh — `docs/diagrams/arisp-cv-scoring-overview.drawio` (+ `.png` 3475×1803).** Người dùng yêu cầu chuyển sơ đồ ngày 2026-09-17 sang tiếng Anh, bỏ phần ví dụ và ghi rõ các chú thích cần thiết.
+  - **Bỏ ví dụ:** gỡ bốn hộp C₁…C₄ (số liệu lần chạy thật) và dòng "vd: 9.010 ÷ 100…" ở hộp kết quả. Giai đoạn 3 còn chuỗi *kiểm CV hợp lệ → điểm trong dải → trung bình có trọng số → khuyến nghị*.
+  - **Chú thích mới**, đọc từ code chứ không chép từ sơ đồ cũ:
+    - bảng dải neo Excellent 90–100 · Good 70–89 · Fair 40–69 · Poor 0–39 (`ScoringRubric.BandRange`);
+    - bảng khuyến nghị Strong Hire ≥ 80 · Hire 65–79 · Proceed with caution 50–64 · Reject < 50 (`CvScoreSnapshot.Recommendation`);
+    - luật tính trong dải (`CvCriterionScoring`: "đạt" không trích dẫn tính là không đạt; ý bỏ sót loại khỏi cả hai vế; không có ý kiểm thì kẹp vào dải; làm tròn half-away-from-zero);
+    - luật bộ tiêu chí (`ScoringRubric.Validate`: 1–20 tiêu chí, trọng số > 0 và tổng = 100, ≤ 8 ý kiểm);
+    - thuật ngữ và kiểu mũi tên.
+  - **Sửa một chỗ sai của bản cũ:** "thử lại 3 lần" thành "up to 3 attempts" (`maxAttempts = 3` gồm cả lần đầu).
+
+  **Kiểm chứng:** XML hợp lệ. Render bằng draw.io desktop CLI và soát không có nhãn đè hộp hay mũi tên cắt nhãn. Không sửa code.
+
+- [x] 2026-09-18: **Ngân hàng đề ít hơn số câu mỗi bài: bấm "Gửi HM ký duyệt" chỉ thấy lỗi 400 chung chung** (ngân hàng 10 câu, cấu hình 20 câu/bài → "Không thể cập nhật trạng thái tin."). Server vốn có câu báo rõ nhưng không kèm mã, nên `resolveApiError` rơi về câu dự phòng của màn. Xem ADR-049 "Cập nhật 2026-09-18".
+  - BE: gom luật về `OnlineTestBankGate` (dùng ở `UpdateJobStatusCommand`, trả mã `online_test_bank_insufficient`). **Lấp lỗ tin đã rời bản nháp:** `UpdateOnlineTestSettingsCommand` chặn tăng số câu mỗi bài vượt ngân hàng, `DeleteOnlineTestQuestionCommand` chặn xoá xuống dưới ngưỡng (chỉ với `pending`/`active`/`closed`; bản nháp chỉ cảnh báo). `JobPostingResponse.OnlineTestBank` cho nhân sự.
+  - FE: băng cảnh báo trên màn tin Recruiter (dẫn sang ngân hàng đề) + cảnh báo theo giá trị đang gõ ở `JobOnlineTestPage`; `CODE_KEYS` thêm `online_test_bank_insufficient` và `cv_rubric_required` (cùng nút, cùng bệnh), câu vi/en ở `errors.json`.
+  - **Kiểm chứng:** 11 test mới / 14 ca (`OnlineTestBankGateTests` + `GetJobByIdQueryHandlerTests`); toàn bộ backend 2 110 test pass; `tsc --noEmit` StaffSite sạch.
+
+- [x] 2026-09-18: **`resolveApiError` — câu server tiếng Việt thắng câu viết sẵn của màn khi giao diện tiếng Việt.** Gốc chung của lỗi trên: thứ tự cũ (mã → câu viết sẵn của màn → câu server) khiến câu server gần như không bao giờ tới màn hình, vì hầu hết ~58 chỗ gọi đều truyền `fallbackKey`. Mọi lỗi nghiệp vụ chưa gắn mã ("hạn nộp đã qua", "tin chưa có Hiring Manager"…) đều bị nuốt thành "Không thể cập nhật trạng thái tin." / "Xung đột dữ liệu".
+  - Thứ tự mới: **mã nghiệp vụ** (`CODE_KEYS`) → **câu server khi cùng ngôn ngữ giao diện** (giao diện `vi` + câu có chữ tiếng Việt; bỏ qua 401 vì câu server ở đó viết cho lập trình viên) → **mã nhóm** (`GENERIC_CODE_KEYS`: `not_found`/`forbidden`/`conflict`/…, tách khỏi `CODE_KEYS`) → câu viết sẵn của màn → câu server khác ngôn ngữ → câu theo mã HTTP. **Giao diện tiếng Anh giữ nguyên thứ tự cũ.**
+  - Sửa kèm hai lỗi có sẵn ở bước cuối (lộ ra khi viết test): chữ tiếng Anh của tầng axios ("Network Error") và câu phiên 401 ("…gửi Bearer token") từng lọt ra màn hình khi màn không truyền `fallbackKey`.
+  - **Kiểm chứng:** `ARI.StaffSite/src/__tests__/apiError.test.ts` (9 ca); toàn bộ 90 test StaffSite pass; `tsc --noEmit` StaffSite + CandidateSite sạch; eslint sạch.
+
+- [x] 2026-09-18: **Sơ đồ kiến trúc RAG + kiến trúc hệ thống (draw.io).** Sinh bằng `docs/diagrams/gen_rag_and_architecture.py` — mọi con số đọc từ code thật, đổi code thì sửa hằng số rồi chạy lại.
+  - `docs/diagrams/arisp-rag-architecture.drawio` — **3 trang**: ① kiến trúc RAG tổng quan (nguồn → .NET → rag-service → pgvector → OpenAI), ② luồng NẠP (cắt đoạn 1000/500 ký tự · embed 1536 chiều · DELETE+INSERT idempotent · index HNSW + GIN · ví dụ cắt một playbook 1 600 ký tự), ③ luồng TRUY VẤN (dựng câu truy hồi → lọc phạm vi → dense `<=>` + sparse `ts_rank` OR-semantics → RRF k=60 × trọng số scope → tách theo `document_type` → prompt → gpt-4o streaming → SSE → SignalR → ElevenLabs).
+  - `docs/diagrams/arisp-system-architecture.drawio` — 1 trang ở mức **THÀNH PHẦN**, kiểu sơ đồ kiến trúc quen thuộc (hộp `<<Service>>` + icon, ranh giới `ARISP SYSTEM`, tác nhân hình người). Qua 3 vòng chỉnh theo góp ý người dùng: (1) bỏ mô tả nội bộ từng stack; (2) thêm icon React + TypeScript; (3) **gỡ rối mũi tên** — mỗi liên kết MỘT mũi tên hai đầu (28 → 14 đường), xếp tầng trên→dưới, dịch vụ ngoài áp sát tầng gọi nó, 4 dịch vụ cột phải dùng bảng `LANES` chọn làn theo thứ tự để không có điểm cắt; nhãn ghim trên đoạn dài nhất, xoay dọc khi đoạn đó thẳng đứng; thu khổ trang 1580×1010 → 1250×850 cho bản PNG đọc rõ chữ. Kiểm bằng preview tự dựng (vẽ đúng đường gấp + nhãn): **0 điểm cắt** (bản đầu 23), **0 nhãn chồng nhãn**, **0 nhãn đè lên hộp**.
+  - Nhúng **11 icon SVG** (base64) người dùng cung cấp; thiếu file thì ô vẫn vẽ bằng màu nền để script chạy được trên máy khác.
+  - **Kiểm chứng:** XML well-formed (ElementTree); không ô nào chồng nhau hay tràn trang; ước lượng chiều cao chữ sau khi tự xuống dòng — không ô nội dung nào tràn; dựng ảnh xem thử bằng Pillow để soát bố cục bằng mắt. Nhãn escape **hai tầng** (XML rồi HTML) nên `<=>` của pgvector và `a & b` của tsquery hiện đúng.
 
 - [x] 2026-09-18: **Một lượt sửa 10 lỗi / yêu cầu người dùng báo từ bản chạy thử** (nhánh `feature/be/cv-rubric-mandatory`).
   1. **Ngày dự kiến bắt đầu trên phiếu chọn được ngày quá khứ.** Chặn ở cả hai tầng: `RecruitmentRequestSupport.ValidateInput` (nới đúng 1 ngày vì ô `<input type="date">` gửi nửa đêm theo múi giờ trình duyệt) + `min` và cảnh báo inline ở `RecruitmentRequestsView`. 3 test mới.

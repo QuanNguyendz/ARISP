@@ -76,7 +76,7 @@ export default function JobOnlineTestPage() {
       setBank(data)
       setPassScore(data.passScore)
       setQuestionsPerTest(data.questionsPerTest)
-      setDurationMinutes(data.durationMinutes)
+      setDurationMinutes(data.durationMinutes ?? 30)
     } catch (e) {
       setError(errMsg(e, t('bank.errors.loadBank')))
     } finally {
@@ -138,6 +138,12 @@ export default function JobOnlineTestPage() {
     }
   }
 
+  /**
+   * Tin có vòng trắc nghiệm chưa — thời lượng bài SỐNG TRÊN VÒNG đó (ADR-072), nên chưa có vòng thì
+   * không có chỗ lưu thời lượng và ô nhập bị khoá.
+   */
+  const hasTestRound = bank?.durationMinutes != null
+
   const saveSettings = async () => {
     if (!jobId) return
     if (
@@ -145,8 +151,7 @@ export default function JobOnlineTestPage() {
       passScore > 100 ||
       questionsPerTest < 1 ||
       questionsPerTest > 200 ||
-      durationMinutes < 1 ||
-      durationMinutes > 300
+      (hasTestRound && (durationMinutes < 1 || durationMinutes > 300))
     ) {
       setError(t('bank.errors.settingsRange'))
       return
@@ -157,9 +162,10 @@ export default function JobOnlineTestPage() {
       const updated = await onlineTestService.updateSettings(jobId, {
         passScore,
         questionsPerTest,
-        durationMinutes,
+        durationMinutes: hasTestRound ? durationMinutes : null,
       })
       setBank(updated)
+      setDurationMinutes(updated.durationMinutes ?? 30)
     } catch (e) {
       setError(errMsg(e, t('bank.errors.saveSettings')))
     } finally {
@@ -336,13 +342,30 @@ export default function JobOnlineTestPage() {
                     min={1}
                     max={300}
                     value={durationMinutes}
+                    disabled={!hasTestRound}
                     onChange={(e) =>
                       setDurationMinutes(Math.min(300, Math.max(1, Number(e.target.value) || 1)))
                     }
-                    className={numInput}
+                    className={`${numInput} disabled:cursor-not-allowed disabled:opacity-50`}
                   />
                 </div>
               </div>
+              {/* Một ô, một nguồn (ADR-072): đây cũng chính là "Số phút" của vòng trắc nghiệm ở màn tạo tin,
+                  và là thứ quyết định giờ ĐÓNG bài của mọi ca thi. */}
+              <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
+                {hasTestRound ? t('bank.settings.durationHint') : t('bank.settings.durationNoRound')}
+              </p>
+              {/* Theo giá trị ĐANG GÕ, không đợi lưu: người dùng thấy ngay ô số câu vượt ngân hàng. Chỉ cảnh
+                  báo — tin còn nháp được khai số câu trước rồi nhập câu hỏi sau; cổng gửi duyệt mới chặn, và
+                  tin đã gửi duyệt / đang tuyển thì server từ chối lưu. */}
+              {bank && questionsPerTest > questions.length && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                    {t('bank.settings.bankShort', { count: questions.length, required: questionsPerTest })}
+                  </p>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={saveSettings}
@@ -350,7 +373,7 @@ export default function JobOnlineTestPage() {
                   savingSettings ||
                   (passScore === bank?.passScore &&
                     questionsPerTest === bank?.questionsPerTest &&
-                    durationMinutes === bank?.durationMinutes)
+                    (!hasTestRound || durationMinutes === bank?.durationMinutes))
                 }
                 className="mt-3 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >

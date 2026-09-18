@@ -21,8 +21,8 @@ namespace ARI.Application.UnitTests.OnlineTest;
 /// </summary>
 public class OnlineTestExpiryTests
 {
-    // Thời lượng bài 30' (OnlineTestData.Job) → hạn chót = giờ hẹn + 1h cửa vào + 30' + 5' trễ mạng = 95'.
-    private static readonly TimeSpan PastDeadline = TimeSpan.FromMinutes(100);
+    // Thời lượng bài 30' → bài đóng lúc giờ hẹn + 30', hạn chót = + 1' trễ mạng = 31' (ADR-072).
+    private static readonly TimeSpan PastDeadline = TimeSpan.FromMinutes(40);
 
     private sealed record Seeded(
         InMemoryUnitOfWork Uow, JobPosting Job, ARI.Domain.Entities.Application App,
@@ -36,7 +36,6 @@ public class OnlineTestExpiryTests
         int durationMinutes = 30)
     {
         var job = OnlineTestData.Job(passScore: 70, perTest: 3);
-        job.OnlineTestDurationMinutes = durationMinutes;
         var app = OnlineTestData.Application(job.Id, Guid.NewGuid(), status: appStatus);
         var now = DateTimeOffset.UtcNow;
         var slot = new AvailabilitySlot
@@ -53,7 +52,10 @@ public class OnlineTestExpiryTests
 
         var uow = new InMemoryUnitOfWork()
             .Seed(job).Seed(app).Seed(slot).Seed(booking)
-            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = roundType })
+            .Seed(new InterviewRoundConfig
+            {
+                JobPostingId = job.Id, RoundNumber = 1, RoundType = roundType, MaxDurationMinutes = durationMinutes,
+            })
             .Seed(OnlineTestData.Single(job.Id, 0), OnlineTestData.Single(job.Id, 1), OnlineTestData.Single(job.Id, 2));
 
         return new Seeded(uow, job, app, slot, booking);
@@ -105,11 +107,11 @@ public class OnlineTestExpiryTests
     // ---------- Chưa tới hạn chót ----------
 
     [Fact]
-    public async Task Cua_vao_da_dong_nhung_chua_toi_han_chot_thi_chua_nop_thay()
+    public async Task Bai_vua_dong_nhung_chua_het_do_tre_mang_thi_chua_nop_thay()
     {
-        // Người vào ở phút thứ 59 vẫn đang làm bài sau giờ đóng cửa — server không biết ai đã bấm
-        // "Bắt đầu", nên chưa được nộp thay trước khi đồng hồ của người vào muộn nhất hết.
-        var s = Setup(TimeSpan.FromMinutes(70));
+        // Người đang làm tự nộp ĐÚNG giờ đóng, và bài đó còn đang trên đường truyền — nộp thay lúc này
+        // là giành mất bài thật của họ.
+        var s = Setup(TimeSpan.FromMinutes(30) + TimeSpan.FromSeconds(20));
 
         var created = await Run(s.Uow);
 
@@ -118,9 +120,9 @@ public class OnlineTestExpiryTests
     }
 
     [Theory]
-    [InlineData(120, false)] // 60' cửa + 60' bài + 5' = 125' → chưa tới
-    [InlineData(130, true)]
-    public async Task Han_chot_tinh_theo_thoi_luong_bai_cua_tin(int minutesAgo, bool expected)
+    [InlineData(60, false)] // bài 60' vừa đóng, còn 1' trễ mạng → chưa tới hạn chót
+    [InlineData(62, true)]
+    public async Task Han_chot_tinh_theo_thoi_luong_cua_vong_thi(int minutesAgo, bool expected)
     {
         var s = Setup(TimeSpan.FromMinutes(minutesAgo), durationMinutes: 60);
 

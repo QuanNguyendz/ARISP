@@ -188,6 +188,12 @@ namespace ARI.Application.DTOs
         /// </summary>
         public bool? HasCvRubric { get; set; }
 
+        /// <summary>
+        /// Ngân hàng đề trắc nghiệm so với số câu mỗi bài (<c>OnlineTestBankGate</c>) — để màn tin nói trước vì
+        /// sao "Gửi duyệt" sẽ bị chặn. Null khi tin không có vòng trắc nghiệm, và ở Job Board công khai.
+        /// </summary>
+        public OnlineTestBankStatusDto? OnlineTestBank { get; set; }
+
         public static JobPostingResponse FromEntity(JobPosting job, List<RoundConfigDto> roundConfigs) =>
             new()
             {
@@ -229,6 +235,9 @@ namespace ARI.Application.DTOs
                 SignedJdFileUrl = job.SignedJdFileUrl
             };
     }
+
+    /// <summary>Số câu đang có trong ngân hàng đề và số câu mỗi lượt thi cần bốc.</summary>
+    public record OnlineTestBankStatusDto(int QuestionCount, int QuestionsPerTest);
 
     /// <summary>
     /// DTO thông tin rút gọn của Job Posting để hiển thị danh sách trên Job Board công khai.

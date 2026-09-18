@@ -337,6 +337,10 @@ export default function RecruiterJobDetailPage() {
   }
 
   const canSubmit = job.status === 'draft' || job.status === 'rejected'
+  const bankShort =
+    job.onlineTestBank && job.onlineTestBank.questionCount < job.onlineTestBank.questionsPerTest
+      ? job.onlineTestBank
+      : null
   const canClose = job.status === 'active'
   // Chỉ cho Recruiter sửa tin khi còn nháp hoặc bị HR từ chối — đã gửi duyệt (pending) / đã duyệt (active...) thì khoá.
   const canEdit = job.status === 'draft' || job.status === 'rejected'
@@ -503,6 +507,20 @@ export default function RecruiterJobDetailPage() {
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             {tRubric('jobChip.missing')}
           </a>
+        )}
+
+        {/* Cùng lý do: ngân hàng đề ít hơn số câu mỗi bài thì server chặn gửi duyệt (OnlineTestBankGate). */}
+        {canSubmit && bankShort && (
+          <Link
+            to={`/recruiter/my-jobs/${job.id}/online-test`}
+            className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {t('onlineTestBankShort', {
+              count: bankShort.questionCount,
+              required: bankShort.questionsPerTest,
+            })}
+          </Link>
         )}
 
         {job.status === 'rejected' && job.rejectionReason && (

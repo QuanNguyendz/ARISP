@@ -11,6 +11,7 @@
     "noTest": "This position has no online test. You don't need to take one.",
     "progress": "Answered {{answered}}/{{total}} questions · Pass score: {{pass}}/100",
     "timeLeft": "Time left: {{time}}",
+    "closesAt": "The test closes at {{closes}}",
     "multiHint": "Select multiple",
     "question": "Q{{n}}.",
     "submit": "Submit",
@@ -27,21 +28,23 @@
     "submittedCount": "{{total}} questions submitted.",
     "gate": {
       "title": "Before you begin",
-      "summary": "{{count}} questions · {{minutes}} minutes.",
+      "summary": "{{count}} questions · {{minutes}}-minute test, closes at {{closes}}.",
+      "remaining": "{{time}} left",
+      "lateNotice": "This {{minutes}}-minute test opened earlier and still closes at {{closes}} — you joined late, so you have less time. Start right away.",
       "leaveRuleTitle": "Leaving the test SUBMITS it.",
       "leaveRule": "Switching tabs, minimising the window or closing the page submits your answers as they are. Close other apps before you start.",
-      "timerRule": "The {{minutes}}-minute timer starts when you press Begin. When it runs out, the test submits itself.",
+      "timerRule": "The timer counts down to the closing time ({{closes}}) — it does not restart when you press Begin. At closing time the test submits itself.",
       "oneAttemptRule": "You get ONE attempt — there is no retake.",
       "startButton": "I understand — Begin the test",
-      "startHint": "The timer starts the moment you press the button above."
+      "startHint": "The clock keeps running while you read this page."
     },
     "window": {
       "notYetTitle": "The test has not opened yet",
-      "notYetDetail": "It opens at {{time}}. Come back then — you have 1 hour from that moment to enter.",
-      "closedTitle": "The entry window has closed",
-      "closedDetail": "The test opened at {{time}} and only accepted entries for 1 hour. Contact HR if something went wrong.",
+      "notYetDetail": "It opens at {{time}} and closes at {{closes}} ({{minutes}} minutes). You can join any time in between, but the timer always runs to the closing time — join late and you get less time. Keep this page open; the test appears on its own when it opens.",
+      "closedTitle": "The test has closed",
+      "closedDetail": "The test ran from {{time}} to {{closes}} and has closed. Contact HR if something went wrong.",
       "expiredTitle": "The online test has expired",
-      "expiredDetail": "The test opened at {{time}} and accepted entries for 1 hour. You did not start it in that window, so it has expired and was submitted automatically.",
+      "expiredDetail": "The test ran from {{time}} to {{closes}}. You did not start it in that window, so it has expired and was submitted automatically.",
       "expiredDetailNoTime": "You did not start the test in the scheduled window, so it has expired and was submitted automatically.",
       "expiredContact": "If something prevented you from joining on time, contact HR directly — the system does not reopen the test."
     }

@@ -438,15 +438,11 @@ public class SlotConflictRulesTests
         Assert.Contains("trùng khung giờ", res.Error);
     }
 
-    [Fact]
-    public async Task Ca_thi_chan_buoi_phong_van_ngay_SAU_khi_ca_thi_ket_thuc()
+    /// <summary>Ca thi lúc <paramref name="start"/> (giờ kết thúc lưu trên ca = +1h) + buổi phỏng vấn ngay sau đó.</summary>
+    private (InMemoryUnitOfWork Uow, ARI.Domain.Entities.Application App, AvailabilitySlot Test, AvailabilitySlot Interview)
+        TestThenInterview(DateTimeOffset start, int testMinutes)
     {
-        // Giờ hẹn thi chỉ là lúc MỞ CỬA: ứng viên còn vào được suốt 1 tiếng sau đó, và người vào ở
-        // phút cuối vẫn còn nguyên đồng hồ làm bài. Ca thi 09:00–10:00 với bài 30 phút nghĩa là có
-        // thể đang làm bài tới ~10:35 — nên buổi phỏng vấn 10:00 KHÔNG xếp được, dù hai khung ca chỉ
-        // chạm nhau chứ không chồng lấn. So theo khung ca là đúng chỗ luật 2 từng thủng.
         var uow = new InMemoryUnitOfWork();
-        var start = DateTimeOffset.UtcNow.AddDays(4);
         var job = SchedulingData.Job(owner: _staffId);
         var app = SchedulingData.Application(job.Id, Guid.NewGuid());
 
@@ -455,17 +451,44 @@ public class SlotConflictRulesTests
 
         uow.Seed(job).Seed(app).Seed(testSlot).Seed(interviewSlot);
         uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening" });
-        uow.Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 3, RoundType = "online_test" });
+        uow.Seed(new InterviewRoundConfig
+        {
+            JobPostingId = job.Id, RoundNumber = 3, RoundType = "online_test", MaxDurationMinutes = testMinutes,
+        });
         WithHiringManager(uow, job.Id, start, start.AddHours(6));
         _ = new SlotSqlEmulator(uow);
+        return (uow, app, testSlot, interviewSlot);
+    }
 
-        Assert.True((await Assign(uow, app.Id, testSlot.Id, round: 3)).IsSuccess);
+    [Fact]
+    public async Task Ca_thi_ban_toi_gio_dong_bai_du_gio_ket_thuc_luu_tren_ca_som_hon()
+    {
+        // Bài thi đóng lúc giờ hẹn + thời lượng (ADR-072). Ca tạo trước ADR-072 có thể mang giờ kết thúc
+        // gõ tay NGẮN hơn bài: ca 09:00–10:00, bài 90 phút → ứng viên làm bài tới 10:30, nên buổi phỏng
+        // vấn 10:00 không xếp được dù hai khung ca chỉ chạm nhau.
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var s = TestThenInterview(start, testMinutes: 90);
 
-        var res = await Assign(uow, app.Id, interviewSlot.Id, round: 1);
+        Assert.True((await Assign(s.Uow, s.App.Id, s.Test.Id, round: 3)).IsSuccess);
+
+        var res = await Assign(s.Uow, s.App.Id, s.Interview.Id, round: 1);
 
         Assert.True(res.IsFailure);
         Assert.Contains("trùng khung giờ", res.Error);
         Assert.Contains("bài thi còn mở tới", res.Error); // nói rõ vì sao hai ca không chồng nhau lại xung đột
+    }
+
+    [Fact]
+    public async Task Bai_thi_da_dong_thi_xep_duoc_buoi_phong_van_sau_do()
+    {
+        // Trước ADR-072 cửa vào mở một tiếng rồi mỗi người còn nguyên đồng hồ, nên ca thi 09:00 với bài
+        // 30' chặn mọi buổi phỏng vấn tới ~10:35. Nay bài đóng đúng 09:30 — 10:00 là rảnh.
+        var start = DateTimeOffset.UtcNow.AddDays(4);
+        var s = TestThenInterview(start, testMinutes: 30);
+
+        Assert.True((await Assign(s.Uow, s.App.Id, s.Test.Id, round: 3)).IsSuccess);
+
+        Assert.True((await Assign(s.Uow, s.App.Id, s.Interview.Id, round: 1)).IsSuccess);
     }
 
     [Fact]

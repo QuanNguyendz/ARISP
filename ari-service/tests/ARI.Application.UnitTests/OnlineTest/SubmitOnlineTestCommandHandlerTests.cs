@@ -302,22 +302,24 @@ public class SubmitOnlineTestCommandHandlerTests
         Assert.Single(uow.Repo<OnlineTestSubmission>().Items);
     }
 
-    // ---------- Hạn chót (đóng cửa + thời lượng bài) ----------
+    // ---------- Hạn chót (giờ đóng bài + độ trễ mạng — ADR-072) ----------
 
     /// <summary>Tin (bài 30') + hồ sơ + 1 câu, kèm lịch thi bắt đầu <paramref name="minutesAgo"/> phút trước.</summary>
-    private (InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app, OnlineTestQuestion q) ScheduledAgo(int minutesAgo)
+    private (InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app, OnlineTestQuestion q) ScheduledAgo(double minutesAgo)
     {
         var job = OnlineTestData.Job(passScore: 70);
         var app = OnlineTestData.Application(job.Id, _accountId, email: Email);
         var q = OnlineTestData.Single(job.Id, 0);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo);
         var slot = new AvailabilitySlot
         {
             JobPostingId = job.Id, RoundNumber = 1,
-            StartTime = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
-            EndTime = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo + 60),
+            StartTime = start,
+            EndTime = start.AddMinutes(30),
             Capacity = null,
         };
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(q).Seed(slot)
+            .Seed(OnlineTestData.TestRound(job.Id, durationMinutes: 30))
             .Seed(new InterviewBooking
             {
                 ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 1,
@@ -326,11 +328,12 @@ public class SubmitOnlineTestCommandHandlerTests
         return (uow, app, q);
     }
 
-    [Fact]
-    public async Task Nop_sau_gio_dong_cua_nhung_truoc_han_chot_van_duoc_nhan()
+    [Theory]
+    [InlineData(29)]    // vào muộn, nộp trước giờ đóng
+    [InlineData(30.3)]  // bài tự nộp đúng giờ đóng, tới server chậm vài giây
+    public async Task Nop_truoc_han_chot_thi_duoc_nhan(double minutesAgo)
     {
-        // Cửa 1 tiếng là cửa VÀO: người vào ở phút 59 còn nguyên đồng hồ làm bài của mình.
-        var (uow, app, q) = ScheduledAgo(80);
+        var (uow, app, q) = ScheduledAgo(minutesAgo);
 
         var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, new() { [q.Id] = new() { 0 } }));
 
@@ -338,12 +341,14 @@ public class SubmitOnlineTestCommandHandlerTests
         Assert.Equal(ARI.Domain.Constants.OnlineTestSubmittedBy.Candidate, Graded(uow).SubmittedBy);
     }
 
-    [Fact]
-    public async Task Qua_han_chot_thi_khong_nhan_bai()
+    [Theory]
+    [InlineData(32)]   // bài 30' + 1' trễ mạng đã qua — trước ADR-072 vẫn được nhận tới phút 95
+    [InlineData(180)]
+    public async Task Qua_han_chot_thi_khong_nhan_bai(double minutesAgo)
     {
         // Quá hạn chót thì bài đã thuộc về hệ thống nộp thay; bài tới muộn hơn chỉ có thể là đồng hồ
         // phía trình duyệt đã bị vượt qua.
-        var (uow, app, q) = ScheduledAgo(180);
+        var (uow, app, q) = ScheduledAgo(minutesAgo);
 
         var res = await Run(uow, new RecordingNotificationService(), Cmd(app.Id, new() { [q.Id] = new() { 0 } }));
 

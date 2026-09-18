@@ -11,7 +11,10 @@
       "passScore": "Pass score (%)",
       "questionsPerTest": "Questions per test",
       "duration": "Duration (min)",
-      "save": "Save settings"
+      "durationHint": "This is the same value as the online test round's \"Minutes\" on the job edit screen — editing either changes both. The test opens at the scheduled time and closes exactly this many minutes later; candidates who join late get less time. It cannot be changed while candidates are booked into a test slot that has not ended yet.",
+      "durationNoRound": "This job has no online test round yet, so there is no test duration. Add an \"Online test\" round on the job edit screen, then set the duration.",
+      "save": "Save settings",
+      "bankShort": "The bank has only {{count}} questions, fewer than {{required}} per test. The job can only be submitted once the bank has at least {{required}} questions — add questions or lower the questions per test."
     },
     "import": {
       "title": "Import from Excel",

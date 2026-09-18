@@ -63,6 +63,7 @@
     "onlineTestLanguageNotice": "Đề thi phải viết bằng {{language}}. Sau khi tạo tin, vào \"Ngân hàng câu hỏi\" cập nhật đề đúng ngôn ngữ này — file Excel nhập lên sẽ bị kiểm tra và từ chối nếu sai ngôn ngữ.",
     "minutes": "Phút",
     "minutesMax": "Tối đa 20 phút",
+    "testMinutesHint": "Thời lượng bài thi: bài đóng đúng số phút này sau giờ hẹn (vào muộn thì còn ít thời gian hơn). Cùng giá trị với ô Thời lượng ở ngân hàng đề.",
     "visibility": "Hiển thị",
     "languageRequirement": "Yêu cầu ngôn ngữ",
     "languageRequirementPlaceholder": "VD: Tiếng Anh (IELTS 6.5)",

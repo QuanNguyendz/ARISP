@@ -26,19 +26,20 @@ public class GetCandidateOnlineTestQueryHandlerTests
         => new GetCandidateOnlineTestQueryHandler(uow).Handle(q, CancellationToken.None);
 
     /// <summary>
-    /// Dựng tin + hồ sơ + ngân hàng đề, kèm một ca đang MỞ (giờ hẹn vừa qua).
+    /// Dựng tin + hồ sơ + ngân hàng đề + vòng trắc nghiệm 30', kèm một ca đang MỞ (giờ hẹn vừa qua).
     ///
-    /// Cửa vào phòng thi mở từ giờ hẹn và đóng sau 1 tiếng, nên không gieo lịch thì MỌI ca test
-    /// đều không nhận được đề — và test sẽ đo nhầm: nó tưởng đang kiểm luật duyệt CV trong khi
-    /// thực tế bị chặn ở luật giờ.
+    /// Bài mở từ giờ hẹn và đóng sau đúng thời lượng bài, nên không gieo lịch thì MỌI ca test đều
+    /// không nhận được đề — và test sẽ đo nhầm: nó tưởng đang kiểm luật duyệt CV trong khi thực tế
+    /// bị chặn ở luật giờ.
     /// </summary>
     private (InMemoryUnitOfWork uow, JobPosting job, ARI.Domain.Entities.Application app) Setup(
-        string status = "screening", int perTest = 50, int bank = 3, bool scheduled = true)
+        string status = "screening", int perTest = 50, int bank = 3, bool scheduled = true, int durationMinutes = 30)
     {
         var job = OnlineTestData.Job(perTest: perTest);
         var app = OnlineTestData.Application(job.Id, _accountId, status: status, email: Email);
         var questions = Enumerable.Range(0, bank).Select(_ => OnlineTestData.Single(job.Id, 0)).ToArray();
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(questions);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(questions)
+            .Seed(OnlineTestData.TestRound(job.Id, durationMinutes));
 
         if (scheduled)
         {
@@ -46,7 +47,7 @@ public class GetCandidateOnlineTestQueryHandlerTests
             {
                 JobPostingId = job.Id, RoundNumber = 1,
                 StartTime = DateTimeOffset.UtcNow.AddMinutes(-5),
-                EndTime = DateTimeOffset.UtcNow.AddMinutes(55),
+                EndTime = DateTimeOffset.UtcNow.AddMinutes(25),
                 Capacity = null,
             };
             uow.Seed(slot).Seed(new InterviewBooking
@@ -59,7 +60,7 @@ public class GetCandidateOnlineTestQueryHandlerTests
         return (uow, job, app);
     }
 
-    // ---------- Cửa vào phòng thi (giờ hẹn + 1 tiếng) ----------
+    // ---------- Khung giờ thi: [giờ hẹn, giờ hẹn + thời lượng) — ADR-072 ----------
 
     [Fact]
     public async Task Chua_xep_lich_thi_khong_co_de()
@@ -101,16 +102,15 @@ public class GetCandidateOnlineTestQueryHandlerTests
     }
 
     [Fact]
-    public async Task Qua_mot_tieng_ke_tu_gio_hen_thi_dong_cua()
+    public async Task Het_thoi_luong_bai_thi_dong_bai_du_con_trong_mot_tieng()
     {
-        // Không đóng cửa thì "giờ hẹn" chỉ là trang trí: người thi tuần sau vẫn vào được cùng đề.
+        // Trước ADR-072 cửa vào mở một tiếng bất kể bài dài bao nhiêu: ca 09:00, bài 30' vẫn nhận người
+        // vào lúc 09:45 rồi cho họ nguyên 30 phút. Nay bài đóng đúng lúc giờ hẹn + thời lượng.
         var (uow, job, app) = Setup(scheduled: false);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-45);
         var slot = new AvailabilitySlot
         {
-            JobPostingId = job.Id, RoundNumber = 1,
-            StartTime = DateTimeOffset.UtcNow.AddHours(-3),
-            EndTime = DateTimeOffset.UtcNow.AddHours(-2),
-            Capacity = null,
+            JobPostingId = job.Id, RoundNumber = 1, StartTime = start, EndTime = start.AddMinutes(30), Capacity = null,
         };
         uow.Seed(slot).Seed(new InterviewBooking
         {
@@ -122,10 +122,11 @@ public class GetCandidateOnlineTestQueryHandlerTests
 
         Assert.False(res.Value.CanStart);
         Assert.Empty(res.Value.Questions);
+        Assert.True(res.Value.Expired);
     }
 
     [Fact]
-    public async Task Dung_gio_thi_mo_cua_va_tra_de()
+    public async Task Dung_gio_thi_mo_bai_va_gio_dong_la_gio_hen_cong_thoi_luong()
     {
         var (uow, _, app) = Setup();
 
@@ -133,8 +134,48 @@ public class GetCandidateOnlineTestQueryHandlerTests
 
         Assert.True(res.Value.CanStart);
         Assert.NotEmpty(res.Value.Questions);
-        Assert.Equal(res.Value.OpensAt!.Value.AddHours(1), res.Value.ClosesAt);
+        Assert.Equal(res.Value.OpensAt!.Value.AddMinutes(30), res.Value.ClosesAt);
+        Assert.Equal(30, res.Value.DurationMinutes);
         Assert.False(res.Value.Expired);
+    }
+
+    [Fact]
+    public async Task Vao_muon_van_vao_duoc_nhung_gio_dong_khong_doi()
+    {
+        // Ca 09:00, bài 30', vào lúc 09:15 → vẫn làm được, nhưng đồng hồ đếm tới 09:30 (còn 15'),
+        // không phải 09:45. Giờ đóng là của cả ca, không phải của từng người.
+        var (uow, job, app) = Setup(scheduled: false);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-15);
+        var slot = new AvailabilitySlot
+        {
+            JobPostingId = job.Id, RoundNumber = 1, StartTime = start, EndTime = start.AddMinutes(30), Capacity = null,
+        };
+        uow.Seed(slot).Seed(new InterviewBooking
+        {
+            ApplicationId = app.Id, AvailabilitySlotId = slot.Id, RoundNumber = 1,
+            Status = BookingStatus.Scheduled,
+        });
+
+        var res = await Run(uow, new GetCandidateOnlineTestQuery(app.Id, _accountId, Email));
+
+        Assert.True(res.Value.CanStart);
+        Assert.Equal(start.AddMinutes(30), res.Value.ClosesAt);
+        // Giờ server đi kèm để đồng hồ phía trình duyệt đếm theo server, không theo giờ máy ứng viên.
+        Assert.NotNull(res.Value.ServerNow);
+        var remaining = res.Value.ClosesAt!.Value - res.Value.ServerNow!.Value;
+        Assert.InRange(remaining.TotalMinutes, 14.9, 15.1);
+    }
+
+    [Fact]
+    public async Task Thoi_luong_doc_tu_vong_trac_nghiem()
+    {
+        // Một nguồn duy nhất (ADR-072): đổi số phút của vòng là đổi giờ đóng bài.
+        var (uow, _, app) = Setup(durationMinutes: 45);
+
+        var res = await Run(uow, new GetCandidateOnlineTestQuery(app.Id, _accountId, Email));
+
+        Assert.Equal(45, res.Value.DurationMinutes);
+        Assert.Equal(res.Value.OpensAt!.Value.AddMinutes(45), res.Value.ClosesAt);
     }
 
     // ---------- Hết hạn ----------
@@ -192,7 +233,7 @@ public class GetCandidateOnlineTestQueryHandlerTests
     [Fact]
     public async Task Bai_ung_vien_tu_nop_thi_khong_phai_het_han()
     {
-        // Người vào ở phút 59 rồi nộp sau giờ đóng cửa vẫn là người ĐÃ LÀM BÀI.
+        // Người tự nộp (kể cả bài tự nộp lúc hết giờ) vẫn là người ĐÃ LÀM BÀI.
         var (uow, app) = ScheduledAgo(3);
         uow.Seed(OnlineTestData.Submission(app.Id, 40, passed: false));
 

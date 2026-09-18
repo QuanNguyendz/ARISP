@@ -107,6 +107,25 @@ export default function JobScheduleConfigPage() {
   )
 
   /**
+   * Thời lượng bài thi (phút) của vòng đang chọn — chỉ có nghĩa ở vòng trắc nghiệm.
+   *
+   * Ca THI không có giờ kết thúc riêng (ADR-072): bài đóng lúc giờ mở + thời lượng, server tự tính và bỏ
+   * qua giờ kết thúc gửi lên. Màn này tính cùng một phép để người tạo ca thấy trước giờ đóng, thay cho
+   * một ô "Kết thúc" gõ tay không có tác dụng gì.
+   */
+  const testMinutes = useMemo(() => {
+    const minutes = rounds.find((r) => r.roundNumber === round)?.maxDurationMinutes ?? 0
+    return minutes > 0 ? minutes : 30
+  }, [rounds, round])
+
+  /** Giờ đóng bài của một ca thi mở lúc `d`+`s`, hoặc `null` khi chưa đủ ngày/giờ. */
+  const testEndOf = (d: string, s: string): Date | null => {
+    if (!d || !s) return null
+    const from = new Date(`${d}T${s}`)
+    return Number.isNaN(from.getTime()) ? null : new Date(from.getTime() + testMinutes * 60_000)
+  }
+
+  /**
    * Ca THI trắc nghiệm đứng ngoài luật chồng giờ — cùng vị từ với server
    * (`SchedulingSupport.ValidateSlotTimeAsync`). Luật đó sinh ra vì Hiring Manager ngồi cùng mọi buổi
    * phỏng vấn; bài thi trực tuyến không ai ngồi cùng, nên một đợt thi cả ngày không được phép chặn ca
@@ -247,12 +266,17 @@ export default function JobScheduleConfigPage() {
 
   const saveEdit = async () => {
     if (!editing) return
-    if (!editing.date || !editing.start || !editing.end) {
-      setError(t('validation.fillAllFields'))
+    const editEnd = isTestRound
+      ? testEndOf(editing.date, editing.start)
+      : editing.end
+        ? new Date(`${editing.date}T${editing.end}`)
+        : null
+    if (!editing.date || !editing.start || !editEnd) {
+      setError(t(isTestRound ? 'validation.fillTestFields' : 'validation.fillAllFields'))
       return
     }
     const startIso = new Date(`${editing.date}T${editing.start}`).toISOString()
-    const endIso = new Date(`${editing.date}T${editing.end}`).toISOString()
+    const endIso = editEnd.toISOString()
     if (new Date(endIso) <= new Date(startIso)) {
       setError(t('validation.endAfterStart'))
       return
@@ -285,12 +309,13 @@ export default function JobScheduleConfigPage() {
 
   const addSlot = async () => {
     if (!jobId) return
-    if (!date || !start || !end) {
-      setError(t('validation.fillAllFields'))
+    const draftEnd = isTestRound ? testEndOf(date, start) : end ? new Date(`${date}T${end}`) : null
+    if (!date || !start || !draftEnd) {
+      setError(t(isTestRound ? 'validation.fillTestFields' : 'validation.fillAllFields'))
       return
     }
     const startIso = new Date(`${date}T${start}`).toISOString()
-    const endIso = new Date(`${date}T${end}`).toISOString()
+    const endIso = draftEnd.toISOString()
     if (new Date(endIso) <= new Date(startIso)) {
       setError(t('validation.endAfterStart'))
       return
@@ -426,13 +451,29 @@ export default function JobScheduleConfigPage() {
                   </label>
                   <TimeInput value={start} onChange={setStart} ariaLabel={t('slotForm.startTime')} />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">
-                    {t('slotForm.endTime')}
-                  </label>
-                  <TimeInput value={end} onChange={setEnd} ariaLabel={t('slotForm.endTime')} />
-                </div>
+                {isTestRound ? (
+                  <div>
+                    <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">
+                      {t('slotForm.testEndTime')}
+                    </label>
+                    <div className="flex h-[38px] items-center rounded-xl border border-ink-100 bg-ink-50 px-3 text-sm font-medium text-ink-700 dark:border-white/5 dark:bg-white/5 dark:text-ink-200">
+                      {formatTime24(testEndOf(date, start)) || '—'}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">
+                      {t('slotForm.endTime')}
+                    </label>
+                    <TimeInput value={end} onChange={setEnd} ariaLabel={t('slotForm.endTime')} />
+                  </div>
+                )}
               </div>
+              {isTestRound && (
+                <p className="text-xs text-ink-500 dark:text-ink-400">
+                  {t('slotForm.testEndHint', { minutes: testMinutes })}
+                </p>
+              )}
               {/* Sức chứa TUỲ LOẠI VÒNG. Vòng hội thoại: luôn 1 vì Hiring Manager ngồi cùng AI
                 suốt buổi (ADR-067) — không phải lựa chọn, nên chỉ nói một câu chứ không dựng ô nhập
                 rồi để server từ chối. Vòng trắc nghiệm: bài thi trực tuyến, mặc định không giới hạn
@@ -754,13 +795,23 @@ export default function JobScheduleConfigPage() {
                           inputClassName="rounded-lg py-1.5 pl-2.5 text-sm"
                         />
                         <span className="text-sm text-ink-400">–</span>
-                        <TimeInput
-                          value={editing.end}
-                          onChange={(v) => setEditing((cur) => (cur ? { ...cur, end: v } : cur))}
-                          ariaLabel={t('slotForm.endTime')}
-                          className="w-[6.25rem]"
-                          inputClassName="rounded-lg py-1.5 pl-2.5 text-sm"
-                        />
+                        {isTestRound ? (
+                          // Ca thi: giờ đóng suy từ giờ mở + thời lượng bài (ADR-072), không sửa tay.
+                          <span
+                            className="text-sm font-medium text-ink-700 dark:text-ink-200"
+                            title={t('slotForm.testEndHint', { minutes: testMinutes })}
+                          >
+                            {formatTime24(testEndOf(editing.date, editing.start)) || '—'}
+                          </span>
+                        ) : (
+                          <TimeInput
+                            value={editing.end}
+                            onChange={(v) => setEditing((cur) => (cur ? { ...cur, end: v } : cur))}
+                            ariaLabel={t('slotForm.endTime')}
+                            className="w-[6.25rem]"
+                            inputClassName="rounded-lg py-1.5 pl-2.5 text-sm"
+                          />
+                        )}
                         <button
                           type="button"
                           onClick={saveEdit}

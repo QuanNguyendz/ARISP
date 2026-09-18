@@ -20,6 +20,24 @@ namespace ARI.Application.OnlineTest
             OnlineTestSupport.ParseOptions(q.Options),
             string.IsNullOrWhiteSpace(q.QuestionType) ? "single" : q.QuestionType,
             OnlineTestSupport.ParseInts(q.CorrectOptions));
+
+        /// <summary>
+        /// Ngân hàng đề + cấu hình bài thi. Thời lượng và ngôn ngữ đọc từ VÒNG trắc nghiệm — nguồn duy
+        /// nhất của hai giá trị đó (ADR-072); tin chưa có vòng thì cả hai là null.
+        /// </summary>
+        public static async Task<OnlineTestBankDto> BankAsync(
+            IUnitOfWork uow, JobPosting job, List<OnlineTestQuestionDto> questions, CancellationToken ct)
+        {
+            var round = await OnlineTestWindow.TestRoundAsync(uow, job.Id, ct);
+            return new OnlineTestBankDto(
+                job.Id,
+                job.Title,
+                job.OnlineTestPassScore,
+                job.OnlineTestQuestionsPerTest,
+                round == null ? null : OnlineTestWindow.DurationOf(round),
+                questions,
+                OnlineTestLanguageGuard.Normalize(round?.InterviewLanguage));
+        }
     }
 
     // ============================================================
@@ -47,10 +65,7 @@ namespace ARI.Application.OnlineTest
                 .Select(OnlineTestMapping.ToDto)
                 .ToList();
 
-            var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, job.Id, ct);
-
-            return Result.Success(new OnlineTestBankDto(
-                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions, language));
+            return Result.Success(await OnlineTestMapping.BankAsync(_unitOfWork, job, questions, ct));
         }
     }
 
@@ -191,8 +206,20 @@ namespace ARI.Application.OnlineTest
             var entity = await _unitOfWork.Repository<OnlineTestQuestion>().GetByIdAsync(command.Id, ct);
             if (entity == null) return Result.Failure("Không tìm thấy câu hỏi.", CommonErrorCodes.NotFound);
 
-            var (ok, _) = await OnlineTestSupport.CanManageAsync(_unitOfWork, entity.JobPostingId, command.UserId, command.Role, ct);
+            var (ok, job) = await OnlineTestSupport.CanManageAsync(_unitOfWork, entity.JobPostingId, command.UserId, command.Role, ct);
             if (!ok) return Result.Failure("Bạn không có quyền xoá câu hỏi này.", CommonErrorCodes.Forbidden);
+
+            // Tin đã rời bản nháp: xoá câu không được kéo ngân hàng xuống dưới số câu mỗi bài (OnlineTestBankGate).
+            if (job != null && OnlineTestBankGate.IsEnforcedFor(job.Status))
+            {
+                var bank = await OnlineTestBankGate.EvaluateAsync(_unitOfWork, job, ct);
+                if (bank != null && bank.QuestionCount - 1 < bank.Required)
+                    return Result.Failure(
+                        $"Không xoá được: mỗi bài thi bốc {bank.Required} câu và ngân hàng đang có {bank.QuestionCount} câu. "
+                        + "Tin đã gửi duyệt hoặc đang tuyển nên ngân hàng không được ít hơn số câu mỗi bài — "
+                        + "hãy thêm câu thay thế trước, hoặc giảm số câu mỗi bài.",
+                        OnlineTestBankGate.InsufficientCode);
+            }
 
             _unitOfWork.Repository<OnlineTestQuestion>().Delete(entity);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -204,8 +231,12 @@ namespace ARI.Application.OnlineTest
     // PUT /api/online-test/jobs/{jobId}/settings — điểm sàn + số câu/bài + thời lượng
     // ============================================================
 
+    /// <summary>
+    /// Lưu cấu hình bài thi. <paramref name="DurationMinutes"/> là số phút của VÒNG trắc nghiệm — cùng
+    /// cột với ô "Số phút" ở màn tạo tin (ADR-072); <c>null</c> = giữ nguyên.
+    /// </summary>
     public record UpdateOnlineTestSettingsCommand(
-        Guid JobPostingId, int PassScore, int QuestionsPerTest, int DurationMinutes, Guid? UserId, string? Role)
+        Guid JobPostingId, int PassScore, int QuestionsPerTest, int? DurationMinutes, Guid? UserId, string? Role)
         : IRequest<Result<OnlineTestBankDto>>;
 
     public class UpdateOnlineTestSettingsCommandHandler : IRequestHandler<UpdateOnlineTestSettingsCommand, Result<OnlineTestBankDto>>
@@ -220,18 +251,67 @@ namespace ARI.Application.OnlineTest
                 return Result.Failure<OnlineTestBankDto>("Điểm sàn phải nằm trong khoảng 0–100.");
             if (command.QuestionsPerTest < 1 || command.QuestionsPerTest > 200)
                 return Result.Failure<OnlineTestBankDto>("Số câu mỗi bài phải từ 1 đến 200.");
-            if (command.DurationMinutes < 1 || command.DurationMinutes > 300)
-                return Result.Failure<OnlineTestBankDto>("Thời lượng phải từ 1 đến 300 phút.");
+            if (command.DurationMinutes is { } minutes && !OnlineTestWindow.IsValidDuration(minutes))
+                return Result.Failure<OnlineTestBankDto>(OnlineTestWindow.InvalidDurationMessage);
 
             var (ok, job) = await OnlineTestSupport.CanManageAsync(_unitOfWork, command.JobPostingId, command.UserId, command.Role, ct);
             if (job == null) return Result.Failure<OnlineTestBankDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
             if (!ok) return Result.Failure<OnlineTestBankDto>("Bạn không có quyền cấu hình bài thi của tin này.", CommonErrorCodes.Forbidden);
 
+            // Thời lượng sống trên VÒNG trắc nghiệm. Một ngân hàng đề là một bài thi, nên tin (hiếm khi)
+            // có hơn một vòng trắc nghiệm thì mọi vòng đó cùng thời lượng — màn này chỉ có một ô.
+            var testRounds = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => r.JobPostingId == job.Id, ct))
+                .Where(OnlineTestWindow.IsTestRound)
+                .ToList();
+
+            if (command.DurationMinutes.HasValue && testRounds.Count == 0)
+                return Result.Failure<OnlineTestBankDto>(
+                    "Tin này chưa có vòng trắc nghiệm nên chưa có thời lượng bài để lưu. "
+                    + "Thêm vòng \"Trắc nghiệm\" ở màn sửa tin rồi đặt thời lượng.");
+
+            var now = DateTimeOffset.UtcNow;
+            var changedRounds = command.DurationMinutes is { } wanted
+                ? testRounds.Where(r => OnlineTestWindow.DurationOf(r) != wanted).ToList()
+                : new List<InterviewRoundConfig>();
+
+            foreach (var round in changedRounds)
+            {
+                var blocker = await OnlineTestWindow.DurationChangeBlockerAsync(
+                    _unitOfWork, job.Id, round.RoundNumber, OnlineTestWindow.DurationOf(round), now, ct);
+                if (blocker != null)
+                    return Result.Failure<OnlineTestBankDto>(blocker, OnlineTestWindow.DurationLockedCode);
+            }
+
+            // Tin đã rời bản nháp: không được TĂNG số câu mỗi bài vượt quá ngân hàng (OnlineTestBankGate).
+            // Chỉ chặn khi tăng — tin cũ đang lệch sẵn vẫn sửa được điểm sàn / thời lượng, hay giảm dần về
+            // mức hợp lệ, thay vì bị khoá cứng mọi thay đổi. Ở bản nháp chỉ cảnh báo trên màn hình; cổng
+            // gửi duyệt mới chặn.
+            if (OnlineTestBankGate.IsEnforcedFor(job.Status) && command.QuestionsPerTest > job.OnlineTestQuestionsPerTest)
+            {
+                var bank = await OnlineTestBankGate.EvaluateAsync(_unitOfWork, job, ct);
+                if (bank != null && command.QuestionsPerTest > bank.QuestionCount)
+                    return Result.Failure<OnlineTestBankDto>(
+                        $"Ngân hàng đề mới có {bank.QuestionCount} câu, không đủ cho {command.QuestionsPerTest} câu mỗi bài thi. "
+                        + "Tin đã gửi duyệt hoặc đang tuyển nên số câu mỗi bài không được vượt quá ngân hàng — "
+                        + "hãy thêm câu hỏi trước rồi mới tăng số câu mỗi bài.",
+                        OnlineTestBankGate.InsufficientCode);
+            }
+
             job.OnlineTestPassScore = command.PassScore;
             job.OnlineTestQuestionsPerTest = command.QuestionsPerTest;
-            job.OnlineTestDurationMinutes = command.DurationMinutes;
-            job.UpdatedAt = DateTimeOffset.UtcNow;
+            job.UpdatedAt = now;
             _unitOfWork.Repository<JobPosting>().Update(job);
+
+            foreach (var round in changedRounds)
+            {
+                var newDuration = command.DurationMinutes!.Value;
+                await OnlineTestWindow.SyncSlotEndsAsync(
+                    _unitOfWork, job.Id, round.RoundNumber, OnlineTestWindow.DurationOf(round), newDuration, now, ct);
+                round.MaxDurationMinutes = newDuration;
+                _unitOfWork.Repository<InterviewRoundConfig>().Update(round);
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
 
             var questions = (await _unitOfWork.Repository<OnlineTestQuestion>()
@@ -240,10 +320,7 @@ namespace ARI.Application.OnlineTest
                 .Select(OnlineTestMapping.ToDto)
                 .ToList();
 
-            var language = await OnlineTestSupport.GetOnlineTestLanguageAsync(_unitOfWork, job.Id, ct);
-
-            return Result.Success(new OnlineTestBankDto(
-                job.Id, job.Title, job.OnlineTestPassScore, job.OnlineTestQuestionsPerTest, job.OnlineTestDurationMinutes, questions, language));
+            return Result.Success(await OnlineTestMapping.BankAsync(_unitOfWork, job, questions, ct));
         }
     }
 
