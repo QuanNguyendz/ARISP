@@ -11,7 +11,10 @@
       "passScore": "Điểm đạt (%)",
       "questionsPerTest": "Số câu mỗi bài",
       "duration": "Thời lượng (phút)",
-      "save": "Lưu cấu hình"
+      "durationHint": "Thời lượng cũng chính là \"Số phút\" của vòng trắc nghiệm ở màn sửa tin — sửa ở đâu cũng là một giá trị. Bài thi mở lúc giờ hẹn và đóng sau đúng số phút này; ứng viên vào muộn thì còn ít thời gian hơn. Không đổi được khi đang có ứng viên được hẹn thi mà ca chưa kết thúc.",
+      "durationNoRound": "Tin chưa có vòng trắc nghiệm nên chưa có thời lượng bài. Thêm vòng \"Trắc nghiệm\" ở màn sửa tin rồi đặt thời lượng.",
+      "save": "Lưu cấu hình",
+      "bankShort": "Ngân hàng mới có {{count}} câu, ít hơn {{required}} câu mỗi bài. Tin chỉ gửi duyệt được khi ngân hàng có ít nhất {{required}} câu — thêm câu hỏi hoặc giảm số câu mỗi bài."
     },
     "import": {
       "title": "Nhập từ file Excel",

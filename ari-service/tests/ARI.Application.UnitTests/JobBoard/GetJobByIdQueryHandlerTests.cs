@@ -118,4 +118,46 @@ public class GetJobByIdQueryHandlerTests
         Assert.Equal(2, res.Value.RoundConfigs.Count);
         Assert.Equal(1, res.Value.RoundConfigs[0].RoundNumber); // sắp theo RoundNumber
     }
+
+    /// <summary>Màn tin cần số câu ngân hàng / số câu mỗi bài để cảnh báo TRƯỚC khi người dùng bấm gửi duyệt.</summary>
+    [Fact]
+    public async Task Staff_gets_online_test_bank_status_for_online_test_job()
+    {
+        var job = JobBoardData.PublicJob(status: "draft", isPublic: false);
+        job.OnlineTestQuestionsPerTest = 20;
+        var uow = new InMemoryUnitOfWork().Seed(job)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" });
+        for (var i = 0; i < 10; i++)
+            uow.Seed(new OnlineTestQuestion { JobPostingId = job.Id, QuestionText = $"Q{i}", Options = "[\"a\",\"b\"]" });
+
+        var res = await Run(uow, new RecordingFileStorage(), job.Id, isStaff: true, userId: Guid.NewGuid(), role: "hr_admin");
+
+        Assert.NotNull(res.Value.OnlineTestBank);
+        Assert.Equal(10, res.Value.OnlineTestBank!.QuestionCount);
+        Assert.Equal(20, res.Value.OnlineTestBank.QuestionsPerTest);
+    }
+
+    [Fact]
+    public async Task Online_test_bank_status_is_absent_without_online_test_round()
+    {
+        var job = JobBoardData.PublicJob();
+        var uow = new InMemoryUnitOfWork().Seed(job)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "technical" });
+
+        var res = await Run(uow, new RecordingFileStorage(), job.Id, isStaff: true, userId: Guid.NewGuid(), role: "hr_admin");
+
+        Assert.Null(res.Value.OnlineTestBank);
+    }
+
+    [Fact]
+    public async Task Online_test_bank_status_is_staff_only()
+    {
+        var job = JobBoardData.PublicJob();
+        var uow = new InMemoryUnitOfWork().Seed(job)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" });
+
+        var res = await Run(uow, new RecordingFileStorage(), job.Id, isStaff: false);
+
+        Assert.Null(res.Value.OnlineTestBank);
+    }
 }

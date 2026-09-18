@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
@@ -75,12 +76,13 @@ namespace ARI.Application.Scheduling
                     .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id)).Select(j => new { j.Id, j.Title }), ct))
                 .ToDictionary(j => j.Id, j => j.Title);
 
-            // Loại vòng theo (tin, vòng) — để gọi đúng tên và tính đúng lúc một buổi "đã qua".
-            var roundTypes = (await _unitOfWork.Repository<InterviewRoundConfig>()
-                    .QueryAsync(q => q.Where(r => jobIds.Contains(r.JobPostingId))
-                        .Select(r => new { r.JobPostingId, r.RoundNumber, r.RoundType }), ct))
+            // Cấu hình vòng theo (tin, vòng) — để gọi đúng tên và tính đúng lúc một buổi "đã qua" (vòng
+            // thi: theo thời lượng bài).
+            var roundConfigs = (await _unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => jobIds.Contains(r.JobPostingId), ct))
                 .GroupBy(r => (r.JobPostingId, r.RoundNumber))
-                .ToDictionary(g => g.Key, g => g.First().RoundType);
+                .ToDictionary(g => g.Key, g => g.First());
+            var roundTypes = roundConfigs.ToDictionary(kv => kv.Key, kv => kv.Value.RoundType);
 
             // Vòng trắc nghiệm đã có bài thì xong việc của ứng viên — dù cửa vào còn mở.
             var submitted = (await _unitOfWork.Repository<OnlineTestSubmission>()
@@ -115,6 +117,13 @@ namespace ARI.Application.Scheduling
                 };
             }
 
+            int TestDurationOf(InterviewBooking b) =>
+                OnlineTestWindow.DurationOf(
+                    appById.TryGetValue(b.ApplicationId, out var a)
+                    && roundConfigs.TryGetValue((a.JobPostingId, b.RoundNumber), out var rc)
+                        ? rc
+                        : null);
+
             foreach (var b in bookings.OrderBy(b => slotById.TryGetValue(b.AvailabilitySlotId, out var s) ? s.StartTime : DateTimeOffset.MaxValue))
             {
                 var item = ToItem(b);
@@ -125,11 +134,11 @@ namespace ARI.Application.Scheduling
                     // Còn ở nhóm "sắp tới" tới khi buổi THỰC SỰ kết thúc, không phải tới giờ bắt đầu.
                     // Chia theo giờ bắt đầu thì ca vừa bắt đầu 5 phút đã rơi sang "Đã diễn ra", và nút
                     // xác nhận trong thư mời báo nhầm "lịch này đã được phản hồi trước đó".
-                    // Vòng trắc nghiệm: tới khi cửa vào đóng (giờ hẹn + 1 tiếng), hoặc khi đã có bài.
+                    // Vòng trắc nghiệm: tới khi bài đóng (giờ hẹn + thời lượng — ADR-072), hoặc khi đã có bài.
                     var isTest = InterviewInviteEmail.IsOnlineTest(item.RoundType);
                     var open = isTest
                         ? !submitted.Contains((b.ApplicationId, b.RoundNumber))
-                          && now <= item.StartTime + ARI.Application.OnlineTest.OnlineTestSupport.EntryWindow
+                          && now < OnlineTestWindow.ClosesAt(item.StartTime, TestDurationOf(b))
                         : now < item.EndTime;
                     (open ? upcoming : past).Add(item);
                 }

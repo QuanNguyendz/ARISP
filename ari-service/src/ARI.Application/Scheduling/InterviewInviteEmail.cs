@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using ARI.Application.Common;
@@ -63,8 +64,26 @@ namespace ARI.Application.Scheduling
         /// hồ sơ vẫn ở vòng đó, Recruiter quyết định (xem OnlineTestExpiry).
         /// </summary>
         public static string NoShowConsequenceHtml(string? roundType) => IsOnlineTest(roundType)
-            ? "Nếu bạn <strong>không vào làm bài</strong> trong khung giờ trên (từ giờ hẹn tới 1 tiếng sau), bài thi sẽ <strong>hết hạn và được hệ thống tự động nộp</strong>."
+            ? "Bài thi <strong>đóng đúng giờ kết thúc</strong> ở trên — vào muộn thì thời gian làm bài ngắn lại tương ứng. "
+              + "Nếu bạn <strong>không vào làm bài</strong> trước giờ đóng, bài thi sẽ <strong>hết hạn và được hệ thống tự động nộp</strong>."
             : "Nếu bạn <strong>không phản hồi và không tham dự</strong> buổi phỏng vấn trên, hồ sơ của bạn sẽ <strong>dừng lại ở vòng này</strong>.";
+
+        /// <summary>
+        /// Dòng "Thời gian" của thư. Vòng trắc nghiệm in CẢ khung giờ (mở – đóng, ADR-072): bài thi đóng
+        /// cứng lúc giờ hẹn + thời lượng, nên chỉ in giờ mở là giấu mất mốc quan trọng nhất với người
+        /// định vào muộn. Vòng phỏng vấn chỉ cần giờ hẹn.
+        /// </summary>
+        public static string WhenText(DateTimeOffset startTimeUtc, InterviewRoundConfig? round)
+        {
+            // Giờ hẹn hiển thị theo múi giờ VN (+7) — ứng viên và nhân sự đều ở VN.
+            var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
+            var day = $"{VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
+            if (!OnlineTestWindow.IsTestRound(round)) return $"{local:HH:mm} - {day}";
+
+            var closes = OnlineTestWindow.ClosesAt(startTimeUtc, OnlineTestWindow.DurationOf(round))
+                .ToOffset(TimeSpan.FromHours(7));
+            return $"{local:HH:mm} – {closes:HH:mm} - {day}";
+        }
 
         public static string RoundLabel(string? roundType) => (roundType ?? string.Empty).ToLowerInvariant() switch
         {
@@ -96,14 +115,13 @@ namespace ARI.Application.Scheduling
                 .OrderBy(r => r.RoundNumber)
                 .ToList();
 
-            var currentType = roundConfigs.FirstOrDefault(r => r.RoundNumber == round)?.RoundType;
+            var currentRound = roundConfigs.FirstOrDefault(r => r.RoundNumber == round);
+            var currentType = currentRound?.RoundType;
             var previousType = roundConfigs.FirstOrDefault(r => r.RoundNumber == round - 1)?.RoundType;
             var onlineTest = IsOnlineTest(currentType);
             var remote = IsRemoteRound(currentType);
 
-            // Giờ hẹn hiển thị theo múi giờ VN (+7) — ứng viên và nhân sự đều ở VN.
-            var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
-            var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
+            var whenText = WhenText(startTimeUtc, currentRound);
 
             var baseUrl = FrontendUrls.Candidate(configuration);
             var confirmLink = $"{baseUrl}/portal/schedule/{app.Id}?booking={bookingId}&action=confirm";
@@ -124,7 +142,10 @@ namespace ARI.Application.Scheduling
                 : $"Buổi phỏng vấn vòng {round}";
 
             var locationHtml = onlineTest
-                ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
+                ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Thời lượng</td>"
+                  + $"<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>{OnlineTestWindow.DurationOf(currentRound)} phút</strong> — "
+                  + "vào lúc nào trong khung giờ cũng được, nhưng đồng hồ đếm tới giờ đóng bài: vào muộn thì còn ít thời gian hơn.</td></tr>"
+                  + "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
                   + "<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>Làm bài trực tuyến</strong> trên Candidate Portal — không cần tới văn phòng.</td></tr>"
                 : remote
                     ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
@@ -224,12 +245,12 @@ namespace ARI.Application.Scheduling
             CancellationToken ct = default)
         {
             var invite = await BuildAsync(unitOfWork, configuration, app, job, round, bookingId, startTimeUtc, ct);
-            var roundType = (await unitOfWork.Repository<InterviewRoundConfig>()
+            var roundConfig = (await unitOfWork.Repository<InterviewRoundConfig>()
                     .FindAsync(r => r.JobPostingId == app.JobPostingId && r.RoundNumber == round, ct))
-                .FirstOrDefault()?.RoundType;
+                .FirstOrDefault();
+            var roundType = roundConfig?.RoundType;
 
-            var local = startTimeUtc.ToOffset(TimeSpan.FromHours(7));
-            var whenText = $"{local:HH:mm} - {VietnameseWeekday(local)}, ngày {local:dd/MM/yyyy} (giờ VN)";
+            var whenText = WhenText(startTimeUtc, roundConfig);
             var hoursLeft = Math.Max(1, (int)Math.Round((startTimeUtc - DateTimeOffset.UtcNow).TotalHours));
 
             var baseUrl = FrontendUrls.Candidate(configuration);

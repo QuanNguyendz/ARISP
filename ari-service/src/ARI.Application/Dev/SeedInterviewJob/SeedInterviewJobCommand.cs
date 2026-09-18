@@ -134,8 +134,7 @@ namespace ARI.Application.Dev.SeedInterviewJob
                     Location = "Hà Nội",
                     SalaryCurrency = "VND",
                     OnlineTestPassScore = 70,
-                    OnlineTestQuestionsPerTest = 10,
-                    OnlineTestDurationMinutes = 15
+                    OnlineTestQuestionsPerTest = 10
                 };
                 await _unitOfWork.Repository<JobPosting>().AddAsync(job, ct);
                 await _unitOfWork.SaveChangesAsync(ct);
@@ -166,7 +165,8 @@ namespace ARI.Application.Dev.SeedInterviewJob
                     RoundType = type,
                     InterviewLanguage = "vi",
                     InterviewCodeTtlHours = 2,
-                    MaxDurationMinutes = 45
+                    // Vòng trắc nghiệm: số phút này LÀ thời lượng bài thi (ADR-072).
+                    MaxDurationMinutes = type == "online_test" ? 15 : 45
                 }, ct);
             }
             await _unitOfWork.SaveChangesAsync(ct);

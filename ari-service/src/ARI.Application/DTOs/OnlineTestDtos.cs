@@ -17,7 +17,11 @@ namespace ARI.Application.DTOs
         string JobTitle,
         int PassScore,
         int QuestionsPerTest,
-        int DurationMinutes,
+        /// <summary>
+        /// Thời lượng bài = số phút của vòng trắc nghiệm (ADR-072). <c>null</c> khi tin chưa có vòng
+        /// trắc nghiệm — không có vòng thì không có chỗ nào để lưu thời lượng.
+        /// </summary>
+        int? DurationMinutes,
         List<OnlineTestQuestionDto> Questions,
         /// <summary>
         /// Ngôn ngữ đề thi lấy từ cấu hình vòng trắc nghiệm ("vi"/"en"); null nếu tin chưa có vòng
@@ -57,7 +61,10 @@ namespace ARI.Application.DTOs
         /// </summary>
         DateTimeOffset? OpensAt = null,
 
-        /// <summary>Hết giờ được phép VÀO thi (= <see cref="OpensAt"/> + 1 tiếng).</summary>
+        /// <summary>
+        /// Giờ bài thi ĐÓNG (= <see cref="OpensAt"/> + thời lượng bài — ADR-072). Vừa là hạn cuối được
+        /// vào, vừa là mốc đồng hồ đếm ngược chạm 0: vào muộn thì còn ít thời gian hơn.
+        /// </summary>
         DateTimeOffset? ClosesAt = null,
 
         /// <summary>
@@ -74,7 +81,14 @@ namespace ARI.Application.DTOs
         /// Cố ý không kèm điểm: bài hệ thống nộp cũng là một kết quả, và kết quả chỉ công bố khi
         /// cả vòng đã chốt.
         /// </summary>
-        bool Expired = false);
+        bool Expired = false,
+
+        /// <summary>
+        /// Giờ của SERVER lúc trả phản hồi. Đồng hồ đếm ngược tính theo độ lệch giữa giờ này và giờ
+        /// máy ứng viên: máy lệch vài phút thì đếm theo giờ máy sẽ tự nộp bài sớm (hoặc muộn) đúng
+        /// chừng ấy, và báo "đã quá giờ" trong khi server còn chưa mở bài.
+        /// </summary>
+        DateTimeOffset? ServerNow = null);
 
     /// <summary>
     /// Biên nhận nộp bài — thứ DUY NHẤT ứng viên nhận lại sau khi bấm nộp.
@@ -180,7 +194,12 @@ namespace ARI.Application.DTOs
     {
         public int PassScore { get; set; }
         public int QuestionsPerTest { get; set; }
-        public int DurationMinutes { get; set; }
+
+        /// <summary>
+        /// Số phút của vòng trắc nghiệm. Bỏ trống = giữ nguyên; tin chưa có vòng trắc nghiệm thì
+        /// không được gửi (không có chỗ lưu).
+        /// </summary>
+        public int? DurationMinutes { get; set; }
     }
 
     public class SubmitOnlineTestRequest

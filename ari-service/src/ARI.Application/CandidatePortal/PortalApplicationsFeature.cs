@@ -513,10 +513,12 @@ namespace ARI.Application.CandidatePortal
                 {
                     // Hết giờ hẹn mà không có phiên phỏng vấn thật nào của vòng → quá hạn, không
                     // để hiển thị mãi "đã xếp lịch" (ứng viên cần liên hệ nhân sự xếp lại).
-                    // Vòng trắc nghiệm thì không "quá hạn" mà HẾT HẠN — khi cửa vào đóng (giờ hẹn +
-                    // 1 tiếng), không phải khi ca kết thúc.
+                    // Vòng trắc nghiệm thì không "quá hạn" mà HẾT HẠN — khi bài đóng (giờ hẹn + thời
+                    // lượng bài, ADR-072).
                     status = isTestRound
-                        ? (nowUtc > slot.StartTime + ARI.Application.OnlineTest.OnlineTestSupport.EntryWindow ? "expired" : "scheduled")
+                        ? (nowUtc >= ARI.Application.OnlineTest.OnlineTestWindow.ClosesAt(
+                                slot.StartTime, ARI.Application.OnlineTest.OnlineTestWindow.DurationOf(rc))
+                            ? "expired" : "scheduled")
                         : (slot.EndTime <= nowUtc ? "missed" : "scheduled");
                 }
                 else if (inv != null)

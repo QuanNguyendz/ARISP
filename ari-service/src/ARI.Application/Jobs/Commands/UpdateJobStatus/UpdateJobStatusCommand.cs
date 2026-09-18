@@ -8,6 +8,7 @@ using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.OnlineTest;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
@@ -111,11 +112,15 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             // Tin có vòng trắc nghiệm mà ngân hàng đề chưa đủ câu thì ứng viên sẽ bấm vào một bài thi
             // rỗng (hoặc bốc không đủ số câu đã cấu hình). Chặn ở CẢ hai cổng ra khỏi bản nháp —
             // gửi duyệt và đăng thẳng — vì HR Leader publish từ draft sẽ đi vòng qua cổng gửi duyệt.
+            // Sau cổng này, luật được giữ ở chính các lệnh sửa ngân hàng/cấu hình (OnlineTestBankGate).
             if (targetStatus == "pending" || targetStatus == "active")
             {
-                var bankError = await ValidateOnlineTestBankAsync(job, ct);
-                if (bankError != null)
-                    return Result.Failure<JobPostingResponse>(bankError);
+                // Có mã lỗi riêng: không có mã thì giao diện rơi về câu chung "Không thể cập nhật trạng
+                // thái tin" và người dùng chỉ thấy một lỗi 400 không nói gì.
+                var bank = await OnlineTestBankGate.EvaluateAsync(_unitOfWork, job, ct);
+                if (bank is { IsSufficient: false })
+                    return Result.Failure<JobPostingResponse>(
+                        OnlineTestBankGate.LeaveDraftMessage(bank), OnlineTestBankGate.InsufficientCode);
 
                 // ADR-070: tin không có bộ tiêu chí chấm CV thì không chấm được hồ sơ nào — chặn ở mọi lối ra
                 // job board, kể cả khi quản trị viên vượt chữ ký HM (vượt chữ ký không làm ra bộ tiêu chí).
@@ -410,37 +415,6 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
             }
 
             return Result.Success(statusResponse);
-        }
-
-        /// <summary>
-        /// Tin có vòng <c>online_test</c> phải có sẵn ngân hàng đề trước khi rời bản nháp.
-        /// Trả về thông báo lỗi, hoặc <c>null</c> khi hợp lệ (tin không có vòng trắc nghiệm cũng hợp lệ).
-        /// Ngưỡng là <c>OnlineTestQuestionsPerTest</c> chứ không phải "có ít nhất 1 câu": mỗi lượt thi
-        /// bốc N câu ngẫu nhiên, ngân hàng ít hơn N thì đề thi không thể dựng đúng cấu hình.
-        /// </summary>
-        private async Task<string?> ValidateOnlineTestBankAsync(JobPosting job, CancellationToken ct)
-        {
-            var rounds = (await _unitOfWork.Repository<InterviewRoundConfig>()
-                .FindAsync(r => r.JobPostingId == job.Id, ct)).ToList();
-
-            var onlineTestRounds = rounds
-                .Where(r => string.Equals((r.RoundType ?? string.Empty).Trim(), "online_test", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(r => r.RoundNumber)
-                .ToList();
-            if (onlineTestRounds.Count == 0) return null;
-
-            var questionCount = (await _unitOfWork.Repository<OnlineTestQuestion>()
-                .FindAsync(q => q.JobPostingId == job.Id, ct)).Count();
-
-            var required = job.OnlineTestQuestionsPerTest > 0 ? job.OnlineTestQuestionsPerTest : 1;
-            if (questionCount >= required) return null;
-
-            var roundLabel = string.Join(", ", onlineTestRounds.Select(r => $"vòng {r.RoundNumber}"));
-            return questionCount == 0
-                ? $"Tin này có vòng trắc nghiệm ({roundLabel}) nhưng ngân hàng đề đang trống. "
-                  + $"Hãy thêm ít nhất {required} câu hỏi (mỗi lượt thi bốc {required} câu) trong mục Trắc nghiệm của tin rồi gửi duyệt lại."
-                : $"Ngân hàng đề của tin mới có {questionCount} câu, chưa đủ {required} câu cho mỗi lượt thi của vòng trắc nghiệm ({roundLabel}). "
-                  + $"Hãy thêm câu hỏi hoặc giảm số câu mỗi bài trong mục Trắc nghiệm rồi gửi duyệt lại.";
         }
 
         /// <summary>

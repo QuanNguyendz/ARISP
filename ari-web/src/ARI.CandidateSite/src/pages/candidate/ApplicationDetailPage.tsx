@@ -321,9 +321,9 @@ function RoundPlaceholder({
       )
     }
 
-    // ---- Cửa vào phòng thi (giờ hẹn → +1 tiếng) -------------------------------------------
-    // Server chỉ trả đề trong cửa sổ đó, nên thẻ này phải nói đúng với server: hiện nút "Bắt đầu"
-    // ngoài cửa sổ là mời ứng viên bấm vào một trang trống, đúng lúc họ đang sốt ruột nhất.
+    // ---- Khung giờ thi (giờ hẹn → giờ hẹn + thời lượng, ADR-072) --------------------------
+    // Server chỉ trả đề trong khung đó, nên thẻ này phải nói đúng với server: hiện nút "Bắt đầu"
+    // ngoài khung là mời ứng viên bấm vào một trang trống, đúng lúc họ đang sốt ruột nhất.
     const opensAt = onlineTest.opensAt ? new Date(onlineTest.opensAt) : null
     const closesAt = onlineTest.closesAt ? new Date(onlineTest.closesAt) : null
     const fmt = (d: Date) =>
@@ -383,7 +383,10 @@ function RoundPlaceholder({
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
             {opensAt
-              ? t('onlineTest.notOpenDetail', { opens: fmt(opensAt) })
+              ? t('onlineTest.notOpenDetail', {
+                  opens: fmt(opensAt),
+                  closes: closesAt ? formatTime24(closesAt) : '',
+                })
               : t('onlineTest.notScheduledDetail')}
           </p>
           <p className="mt-1 text-xs text-ink-400">
@@ -408,6 +411,13 @@ function RoundPlaceholder({
             minutes: onlineTest.durationMinutes,
           })}
         </p>
+        {/* Bài đang mở và đóng cứng lúc giờ hẹn + thời lượng: nói giờ đóng để ai vào muộn biết mình
+            không còn đủ thời lượng (ADR-072). */}
+        {closesAt && (
+          <p className="mt-1 text-sm font-medium text-amber-700">
+            {t('onlineTest.closesAt', { closes: formatTime24(closesAt) })}
+          </p>
+        )}
         {/* Làm tại nhà — nói rõ để ứng viên không chờ một buổi hẹn không tồn tại. */}
         <p className="mt-1 text-xs text-ink-400">{t('onlineTest.remoteHint')}</p>
         <Link

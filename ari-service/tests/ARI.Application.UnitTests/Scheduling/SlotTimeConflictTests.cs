@@ -34,6 +34,58 @@ public class SlotTimeConflictTests
             .Handle(new UpdateSlotTimeCommand(slotId, start, end, _ownerId, AppRoles.Recruiter),
                 CancellationToken.None);
 
+    // ---------- Ca THI: giờ kết thúc = giờ mở + thời lượng bài (ADR-072) ----------
+
+    private InMemoryUnitOfWork JobWithTestRound(JobPosting job, int minutes) =>
+        new InMemoryUnitOfWork().Seed(job).Seed(new InterviewRoundConfig
+        {
+            JobPostingId = job.Id, RoundNumber = 2, RoundType = "online_test", MaxDurationMinutes = minutes,
+        });
+
+    [Fact]
+    public async Task Tao_ca_thi_thi_server_tu_tinh_gio_ket_thuc_theo_thoi_luong_bai()
+    {
+        // Người tạo ca gõ 09:00–10:00 cho bài 30 phút: thư mời mà in "09:00–10:00" là nói sai giờ đóng bài.
+        var job = SchedulingData.Job(owner: _ownerId);
+        var uow = JobWithTestRound(job, minutes: 30);
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+
+        var res = await Create(uow, SchedulingData.SlotRequest(job.Id, round: 2, capacity: 5, start: start, end: start.AddHours(1)));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(start.AddMinutes(30), res.Value.EndTime);
+        Assert.Equal(start.AddMinutes(30), Assert.Single(uow.Repo<AvailabilitySlot>().Items).EndTime);
+    }
+
+    [Fact]
+    public async Task Sua_gio_ca_thi_cung_tinh_lai_gio_ket_thuc()
+    {
+        var job = SchedulingData.Job(owner: _ownerId);
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+        var slot = SchedulingData.Slot(job.Id, round: 2, capacity: 5, start: start);
+        var uow = JobWithTestRound(job, minutes: 45).Seed(slot);
+
+        var newStart = start.AddHours(3);
+        var res = await UpdateTime(uow, slot.Id, newStart, newStart.AddHours(2));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(newStart.AddMinutes(45), slot.EndTime);
+    }
+
+    [Fact]
+    public async Task Ca_phong_van_giu_nguyen_gio_ket_thuc_nguoi_dung_chon()
+    {
+        var job = SchedulingData.Job(owner: _ownerId);
+        var uow = new InMemoryUnitOfWork().Seed(job)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "screening", MaxDurationMinutes = 20 });
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+
+        var res = await Create(uow, SchedulingData.SlotRequest(job.Id, round: 1, start: start, end: start.AddMinutes(50)));
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal(start.AddMinutes(50), res.Value.EndTime);
+    }
+
     // ---------- Tạo ca ----------
 
     [Fact]

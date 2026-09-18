@@ -722,7 +722,7 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 - **Cập nhật 2026-07-24 — Screening Test (bốc đề ngẫu nhiên + multi-choice + hẹn giờ + export Excel):** migration `AddOnlineTestScreening`.
   1. **Bốc N câu ngẫu nhiên/lượt (mặc định 20):** `JobPosting.OnlineTestQuestionsPerTest`. Bốc **deterministic** theo (questionId, applicationId, round) bằng FNV-1a (`OnlineTestSupport.DrawQuestions`) → cùng ứng viên/vòng luôn nhận cùng bộ đề (không đổi khi refresh) và **chấm lại đúng bộ đó lúc nộp**, không cần bảng "attempt".
   2. **Single & multiple choice:** `OnlineTestQuestion.QuestionType` (`single|multiple`) + `CorrectOptions` (jsonb mảng index; `CorrectOption` legacy giữ đồng bộ = phần tử đầu). Chấm **all-or-nothing**: đúng khi tập chọn KHỚP HOÀN TOÀN tập đáp án đúng (áp cả single lẫn multiple). `SelectedAnswers` đổi ngữ nghĩa sang `{questionId:[indices]}`.
-  3. **Hẹn giờ ~30 phút:** `JobPosting.OnlineTestDurationMinutes`. FE đếm ngược + **tự nộp khi hết giờ** (kể cả chưa trả lời hết). Enforcement server-side (startedAt) là follow-up.
+  3. **Hẹn giờ ~30 phút:** `JobPosting.OnlineTestDurationMinutes`. FE đếm ngược + **tự nộp khi hết giờ** (kể cả chưa trả lời hết). Enforcement server-side (startedAt) là follow-up. *(Đã thay bởi ADR-072: thời lượng nằm trên vòng `online_test`, bài đóng lúc giờ hẹn + thời lượng, server chặn theo hạn chót.)*
   4. **Chấm chính xác theo lượt:** thêm `OnlineTestSubmission.CorrectCount` + `TotalQuestions` (số câu đã bốc) → results/export đọc trực tiếp, không suy từ score×bankSize.
   5. **Export Excel (.xlsx):** `GET /online-test/jobs/{id}/results/export` dựng bằng OpenXML SDK (`DocumentFormat.OpenXml` đã có sẵn), FE tải blob. Endpoint pass-score cũ thay bằng `PUT .../settings` (passScore + questionsPerTest + durationMinutes).
 - **Cập nhật 2026-07-24 — Import ngân hàng câu hỏi từ Excel (giảm nhập tay):** `OnlineTestImportFeature.cs`.
@@ -736,6 +736,11 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   - **`GetCandidateOnlineTestQuery`:** KHÔNG fail; thêm cờ `CvPassed` vào `CandidateOnlineTestDto`, khi chưa pass vẫn trả metadata (số câu, điểm sàn, thời lượng) nhưng `Questions` **rỗng** (không lộ đề/đáp án). FE `OnlineTestEntry` hiện **ô mờ khoá "Chờ duyệt CV"** (không ẩn) khi `!cvPassed`; trang `OnlineTestPage` hiện khối khoá "Chờ duyệt CV" nếu vào URL trực tiếp. i18n `page.lockedTitle/lockedDetail` + `entry.locked` VI/EN.
 - **Cập nhật 2026-07-24 — Realtime cho STAFF khi ứng viên nộp bài:** trước đó chỉ ứng viên có realtime (`OnlineTestGraded` → chuông + refetch hồ sơ); staff không nhận gì. Bổ sung theo pattern "ứng viên mới ứng tuyển": `SubmitOnlineTestCommand` bắn `ReceiveOnlineTestSubmitted` (payload `applicationId/jobPostingId/candidateName/roundNumber/score/isPassed`) tới **recruiter chủ tin** (`PublishUserEventAsync(job.CreatedByUserId)`) + **nhóm `hr_admin`** (`PublishGroupEventAsync`). Chuông staff sinh trong `GetStaffNotificationsQuery.SyncNotificationsAsync` (section 4, idempotent dedup `onlinetest:{submissionId}`, link tới bảng điểm theo route recruiter/hr). FE `useAppNotifications` xử lý `ReceiveOnlineTestSubmitted` → `refreshStaffBell()` + invalidate `applications`/`my-jobs`/`hr-dashboard` + phát window event `STAFF_ONLINE_TEST_REFRESH_EVENT`; `JobOnlineTestResultsPage` nghe event → refetch nền (không nháy spinner) → **bảng điểm tự cập nhật realtime** khi đang mở.
 - **Không làm (follow-up):** chưa gắn FK cứng `online_test_submissions.application_id → applications`; chưa thêm `online_test` vào enum `RoundType` (comment); hẹn giờ chưa enforce phía server (client tự nộp); bốc đề có thể đổi nếu ngân hàng bị sửa giữa lúc đang thi.
+- **Cập nhật 2026-09-18 — Luật "ngân hàng ≥ số câu mỗi bài" gom về MỘT chỗ và giữ cả sau khi rời bản nháp** (`OnlineTestBankGate`). Bối cảnh: ngân hàng 10 câu, cấu hình 20 câu/bài → bấm "Gửi HM ký duyệt" chỉ thấy lỗi 400 "Không thể cập nhật trạng thái tin" (server có câu báo rõ nhưng **không kèm mã**, nên `resolveApiError` rơi về câu dự phòng của màn).
+  1. **Một luật, một chỗ:** `OnlineTestBankGate.EvaluateAsync` (null khi tin không có vòng `online_test`) + `RequiredFor` + `LeaveDraftMessage`. `UpdateJobStatusCommand` bỏ hàm riêng, dùng gate và trả **mã `online_test_bank_insufficient`**.
+  2. **Sau khi rời bản nháp (`pending`/`active`/`closed`) luật được giữ ở chính lệnh sửa:** `UpdateOnlineTestSettingsCommand` chặn **TĂNG** số câu mỗi bài vượt ngân hàng; `DeleteOnlineTestQuestionCommand` chặn xoá làm ngân hàng thấp hơn số câu mỗi bài. Trước đây cổng chỉ đứng ở lối ra bản nháp, nên tin đang tuyển hạ được ngân hàng xuống dưới N và ứng viên kế tiếp nhận đề thiếu câu. **Chỉ chặn khi tăng** — tin cũ đang lệch sẵn vẫn sửa được điểm sàn/thời lượng hay giảm dần số câu, không bị khoá cứng.
+  3. **Ở bản nháp chỉ CẢNH BÁO**, không chặn: khai số câu mỗi bài trước rồi mới nhập câu hỏi là thứ tự làm việc hợp lệ. `JobPostingResponse.OnlineTestBank` (`questionCount`, `questionsPerTest` — chỉ nhân sự) → màn tin Recruiter hiện băng cảnh báo hổ phách dẫn sang ngân hàng đề (cùng khuôn cảnh báo thiếu bộ tiêu chí CV); `JobOnlineTestPage` cảnh báo theo giá trị đang gõ ở ô số câu mỗi bài.
+  4. **Mã lỗi vào `CODE_KEYS`** (`online_test_bank_insufficient`, kèm `cv_rubric_required` cũng đang rơi về câu chung trên cùng nút) + câu vi/en ở `errors.json` → `job.*`.
 
 ### ADR-051: Buổi phỏng vấn thử — transcript + nhận xét AI riêng tư cho ứng viên, lưu vĩnh viễn
 - **Ngày:** 2026-08-05. **Branch:** `feature/be/practice-transcript-review`.
@@ -1994,3 +1999,70 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   - **Ý kiểm tốt phụ thuộc HM viết tốt:** ý mơ hồ ("kinh nghiệm tốt") thì trả lời có/không cũng mơ hồ. AI gợi ý và
     placeholder hướng về dấu hiệu đo được.
   - Mỗi ý nặng bằng nhau trong dải (không có trọng số con) — giữ đơn giản để HM đọc lại được phép tính.
+
+### ADR-072: Bài trắc nghiệm là một đợt thi có giờ cố định — đóng lúc giờ hẹn + thời lượng; thời lượng có một nguồn
+
+- **Ngày:** 2026-09-18
+- **Trạng thái:** Đã triển khai. **Thay** phần "cửa vào 1 tiếng" (cập nhật 2026-09-13 của ADR-049) và phần
+  "hẹn giờ `JobPosting.OnlineTestDurationMinutes`" (cập nhật 2026-07-24 của ADR-049).
+
+- **Bối cảnh.** Hai vấn đề người dùng hỏi cùng lúc:
+  1. **Hai ô "thời lượng", chỉ một ô có tác dụng.** Màn tạo tin có "Số phút" cho mọi vòng, kể cả vòng trắc nghiệm
+     (`InterviewRoundConfig.MaxDurationMinutes`); màn ngân hàng đề có "Thời lượng" (`JobPosting.OnlineTestDurationMinutes`).
+     Bài thi chỉ đọc ô thứ hai. Khai 45 phút lúc tạo tin thì ứng viên vẫn làm 30 phút, trong khi màn tin lại hiện 45′.
+  2. **Khung giờ thi không có giờ đóng chung.** Cửa vào mở một tiếng kể từ giờ hẹn, người vào lúc nào cũng có nguyên
+     đồng hồ của mình. Ca 09:00, bài 30 phút thì người vào lúc 09:59 làm tới 10:29, và server nhận bài tới 10:35.
+     Không ai nói được bài thi kết thúc lúc nào. Người dùng muốn: *"bài 30 phút, bắt đầu 9h thì 9h–9h30 vào lúc nào
+     cũng được, đồng hồ chạm 9h30 là đóng — vào lúc 9h15 thì còn 15 phút"*.
+  3. Kèm theo: ảnh chụp của người dùng báo "Đã quá giờ vào làm bài" cho một bài server còn chưa mở. Màn làm bài so
+     giờ mở với **giờ máy ứng viên**, nên máy chạy nhanh vài phút là hiện sai trạng thái. Đồng hồ đếm ngược cũng
+     chạy theo giờ máy.
+
+- **Quyết định.**
+  1. **Một luật, một chỗ: `OnlineTestWindow`.** `ClosesAt = giờ hẹn + thời lượng`. Bài mở trong `[giờ hẹn, ClosesAt)`,
+     server nhận bài tới `SubmissionDeadline = ClosesAt + 1 phút` (độ trễ mạng, trước là 5 phút cộng thêm cửa 1 tiếng).
+     Mọi chỗ trước đây tự cộng `EntryWindow` đều đi qua đây: lấy đề/nộp bài
+     (`CandidateOnlineTestFeature`), tự nộp khi hết hạn (`OnlineTestExpiry`), lịch ứng viên (`CandidateScheduling`),
+     trạng thái vòng trên Portal (`PortalApplicationsFeature`), trạng thái bảng ứng viên (`ApplicationStageStatus`),
+     khoảng bận khi xếp lịch (`SchedulingSupport.BusyWindowResolverAsync`), thư mời/nhắc lịch (`InterviewInviteEmail`).
+     `EntryWindow` bị xoá.
+  2. **Thời lượng có đúng một nguồn:** `MaxDurationMinutes` của vòng `online_test`. Ô ở màn tạo tin và ô ở màn ngân hàng
+     đề cùng ghi cột đó (`UpdateOnlineTestSettingsCommand` ghi vào vòng; `DurationMinutes` trong request và DTO thành
+     nullable: `null` = tin chưa có vòng trắc nghiệm, không có chỗ lưu, ô bị khoá). Cả hai cửa cùng khoảng 1–300 phút.
+     Migration `MergeOnlineTestDurationIntoRoundConfig` chép giá trị đang có hiệu lực (cột trên `job_postings`) sang vòng
+     rồi **bỏ cột**. Hai nguồn cho một sự thật là trôi lệch (bài học ADR-058/065).
+  3. **Ca thi không có giờ kết thúc riêng.** Giờ kết thúc của ca = giờ đóng bài; server tự tính ở `CreateSlot`,
+     `UpdateSlotTime` và `CreateJobSlots` (`SchedulingSupport.EffectiveEndTime`), bỏ qua giờ kết thúc client gửi lên. Màn
+     cấu hình lịch thay ô "Kết thúc" bằng dòng "Đóng bài lúc HH:mm". Migration đồng bộ giờ kết thúc của mọi ca thi cũ
+     (ca 09:00–17:00 gõ tay trước đây chưa từng có tác dụng gì). Logic vẫn tính theo thời lượng chứ không đọc `EndTime`,
+     nên dữ liệu cũ chưa đồng bộ cũng không làm sai giờ đóng.
+  4. **Không đổi thời lượng khi còn ca thi chưa đóng.** Có ứng viên đang giữ chỗ, ca chưa đóng, chưa nộp bài →
+     `OnlineTestWindow.DurationChangeBlockerAsync` chặn, mã `online_test_duration_locked`. Áp ở cả màn ngân hàng đề
+     lẫn lệnh sửa tin (kiểm TRƯỚC khi ghi trường nào). Người đó đã nhận thư ghi giờ đóng, người đang làm thì đồng hồ trên
+     máy đang đếm về giờ đóng cũ. Cùng lý do màn xếp lịch không cho sửa giờ ca đã có người giữ chỗ. Đổi được thì
+     `SyncSlotEndsAsync` kéo giờ kết thúc của các ca chưa đóng theo; ca đã đóng giữ nguyên làm lịch sử.
+  5. **Đồng hồ ứng viên theo giờ server.** `CandidateOnlineTestDto.ServerNow`; FE đo độ lệch lúc nhận phản hồi, đếm
+     ngược tới `ClosesAt` (không phải `durationMinutes × 60` từ lúc bấm), mỗi nhịp đọc lại giờ thật nên tab bị hãm nhịp
+     cũng không chạy chậm. Tới 0 là tự nộp. Màn "chưa tới giờ" tự tải lại khi tới giờ mở (hỏi lại mỗi 5 giây tới khi
+     server mở bài). Cửa trước khi bắt đầu hiện giờ đóng, số phút còn lại, và cảnh báo khi ứng viên vào muộn.
+  6. **Thư mời/nhắc lịch vòng thi** in cả khung `09:00 – 09:30`, dòng "Thời lượng" và câu "vào muộn thì thời gian làm
+     bài ngắn lại".
+
+- **Hệ quả.** Ca thi 09:00 với bài 30 phút giờ **không chặn** buổi phỏng vấn 10:00 của cùng ứng viên (trước đây chặn tới
+  ~10:35). Người không vào làm bị hệ thống nộp thay sau `ClosesAt + 1 phút` (trước là +1h+thời lượng+5′).
+
+- **Kiểm chứng.** `dotnet test` Application **2056/2056**, Infrastructure 7/7, Domain 63/63 (mới/viết lại: giờ đóng =
+  giờ hẹn + thời lượng, vào muộn còn đúng phần còn lại theo `ServerNow`, quá thời lượng thì đóng dù còn trong 1 tiếng,
+  nhận bài trong 1 phút trễ mạng rồi từ chối, hạn tự nộp theo thời lượng của vòng, thời lượng đọc/ghi trên vòng, tin
+  chưa có vòng thì không lưu được thời lượng, chặn/không chặn đổi thời lượng, kéo giờ kết thúc ca chưa đóng, ca thi tự
+  tính giờ kết thúc khi tạo/sửa, luật chồng giờ theo thời lượng). Migration chạy thật trên Postgres 17 (DB tạm):
+  chép 45′ từ cột cũ, giá trị hỏng 500 → 30, `Online_Test ` viết lệch vẫn nhận, ca thi 09:00–17:00 → 09:00–09:45,
+  ca phỏng vấn không bị chạm; `Down()` dựng lại cột đúng giá trị. FE: `tsc` hai site sạch, vitest StaffSite 90/90,
+  `check:i18n` đạt, eslint không lỗi mới.
+
+- **Chấp nhận đánh đổi.**
+  - **Người vào muộn bị hụt giờ** — đó chính là yêu cầu: bài thi là một đợt thi chung, không phải bài tự hẹn giờ.
+  - Tin có **hơn một vòng trắc nghiệm** dùng chung một ngân hàng đề, nên màn ngân hàng đề ghi cùng thời lượng cho mọi
+    vòng đó (màn tạo tin vẫn khai riêng được từng vòng).
+  - Đồng hồ vẫn có sai số bằng thời gian truyền mạng của lượt tải đề (dưới một giây), nhỏ hơn nhiều so với 1 phút
+    server còn nhận bài.

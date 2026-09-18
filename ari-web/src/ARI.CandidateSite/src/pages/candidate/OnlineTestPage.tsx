@@ -16,8 +16,26 @@ import {
   XCircle,
 } from 'lucide-react'
 import { onlineTestService } from '@ari/shared/fservices/onlineTest'
-import type { OnlineTestSubmitAck } from '@ari/shared/types/onlineTest'
-import { HOUR_CYCLE_24 } from '@ari/shared/utils/time24'
+import type { CandidateOnlineTest, OnlineTestSubmitAck } from '@ari/shared/types/onlineTest'
+import { HOUR_CYCLE_24, formatTime24 } from '@ari/shared/utils/time24'
+
+/**
+ * Đề thi kèm ĐỘ LỆCH giữa giờ server và giờ máy (ms), đo đúng lúc nhận phản hồi.
+ *
+ * Mọi mốc của bài thi (mở, đóng, đồng hồ đếm ngược) tính theo giờ server cộng độ lệch này. Tính theo
+ * giờ máy thì máy chạy nhanh vài phút sẽ báo "đã quá giờ vào làm bài" trong khi server còn chưa mở
+ * bài — đúng lỗi đã gặp — và máy chạy chậm sẽ để đồng hồ chạy quá giờ đóng rồi bị server từ chối bài.
+ */
+type TestWithClock = CandidateOnlineTest & { clockOffsetMs: number }
+
+async function loadTest(applicationId: string): Promise<TestWithClock> {
+  const test = await onlineTestService.getTest(applicationId)
+  const serverNow = test.serverNow ? new Date(test.serverNow).getTime() : NaN
+  return { ...test, clockOffsetMs: Number.isNaN(serverNow) ? 0 : serverNow - Date.now() }
+}
+
+/** Hẹn giờ quá xa thì không đặt — setTimeout tràn số ở ~24 ngày, và không ai mở sẵn trang cả ngày. */
+const MAX_WAKE_DELAY_MS = 6 * 60 * 60 * 1000
 
 function errMsg(e: unknown, fallback: string, unauthorized: string): string {
   const x = e as { response?: { data?: { message?: string }; status?: number } }
@@ -77,7 +95,6 @@ export default function CandidateOnlineTestPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [result, setResult] = useState<OnlineTestSubmitAck | null>(null)
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
   // Chống gian lận nhẹ: đếm số lần ứng viên rời khỏi bài thi (chuyển tab / mất focus cửa sổ).
   // Giá trị "sống" giữ ở ref (gửi khi nộp, kể cả tự nộp lúc hết giờ); state chỉ để hiện cảnh báo.
   const [tabSwitches, setTabSwitches] = useState(0)
@@ -88,14 +105,16 @@ export default function CandidateOnlineTestPage() {
    * Đã bấm "Bắt đầu làm bài" chưa.
    *
    * Vì sao có cửa này thay vì vào thẳng: rời bài thi là TỰ NỘP, nên luật đó phải được nói trước
-   * khi đồng hồ chạy — biết sau khi mất bài thì biết để làm gì. Đồng hồ cũng chỉ khởi động từ đây:
-   * trước đó nó chạy ngay khi tải trang, nên mở nhầm tab là mất thời gian thật.
+   * khi vào đề — biết sau khi mất bài thì biết để làm gì.
+   *
+   * Cửa này KHÔNG giữ đồng hồ lại (ADR-072): bài thi là một đợt thi có giờ đóng chung, đồng hồ đếm
+   * tới giờ đóng dù ứng viên đã bấm hay chưa. Cửa nói rõ điều đó và nói còn bao nhiêu phút.
    */
   const [started, setStarted] = useState(false)
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['online-test', applicationId],
-    queryFn: () => onlineTestService.getTest(applicationId as string),
+    queryFn: () => loadTest(applicationId as string),
     enabled: !!applicationId,
     retry: false,
   })
@@ -104,6 +123,58 @@ export default function CandidateOnlineTestPage() {
   const answeredCount = questions.filter((q) => (answers[q.id]?.length ?? 0) > 0).length
   const allAnswered = questions.length > 0 && answeredCount === questions.length
   const taking = !!data && !data.alreadySubmitted && questions.length > 0 && !result && started
+
+  // ---- Đồng hồ theo giờ SERVER --------------------------------------------------------------
+  const clockOffsetMs = data?.clockOffsetMs ?? 0
+  const serverNowMs = useCallback(() => Date.now() + clockOffsetMs, [clockOffsetMs])
+  // Nhịp đồng hồ chỉ để vẽ lại; "bây giờ" luôn đọc lại giờ thật — không bao giờ lệch theo số nhịp.
+  const [, setTick] = useState(0)
+  const nowMs = serverNowMs()
+  const opensAtMs = data?.opensAt ? new Date(data.opensAt).getTime() : null
+  const closesAtMs = data?.closesAt ? new Date(data.closesAt).getTime() : null
+
+  /** Giây còn lại tới giờ đóng bài — chung cho mọi người trong ca, không tính từ lúc bấm Bắt đầu. */
+  const secondsLeft =
+    closesAtMs != null ? Math.max(0, Math.ceil((closesAtMs - nowMs) / 1000)) : null
+
+  // Tick mỗi giây khi còn gì để đếm: chờ tới giờ mở, hoặc đang trong khung giờ thi. Mỗi nhịp đọc lại
+  // giờ thật thay vì trừ dần một biến đếm — tab bị trình duyệt hãm nhịp khi ẩn cũng không làm đồng hồ
+  // chạy chậm hơn giờ đóng.
+  const ticking = !!data && data.cvPassed && !result && !data.alreadySubmitted && !data.expired
+  useEffect(() => {
+    if (!ticking) return
+    const id = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [ticking])
+
+  /**
+   * Tới giờ mở thì tự tải lại để nhận đề; tới giờ đóng mà chưa bắt đầu thì tải lại để nói "hết hạn".
+   * Ứng viên đang chờ trước màn hình không phải tự bấm F5 — và không bao giờ bấm được sớm hơn server.
+   */
+  const reloadedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!data || result || started) return
+    let key: string | null = null
+    // Hỏi lại mỗi 5 giây cho tới khi server mở bài: độ lệch giờ đo được có sai số bằng thời gian
+    // truyền mạng, nên lượt hỏi đầu có thể tới sớm hơn server vài trăm mili-giây.
+    if (!data.canStart && opensAtMs != null && nowMs >= opensAtMs && secondsLeft !== 0)
+      key = `open:${data.opensAt}:${Math.floor((nowMs - opensAtMs) / 5000)}`
+    else if (data.canStart && secondsLeft === 0) key = `close:${data.closesAt}`
+    if (key && reloadedForRef.current !== key) {
+      reloadedForRef.current = key
+      void refetch()
+    }
+  }, [data, result, started, nowMs, opensAtMs, secondsLeft, refetch])
+
+  // Chờ ở màn "chưa tới giờ" mà tab bị ẩn thì setInterval có thể bị hãm tới cả phút — đặt thêm một
+  // hẹn giờ đúng lúc mở bài để không trễ.
+  useEffect(() => {
+    if (!data || data.canStart || opensAtMs == null) return
+    const delay = opensAtMs - serverNowMs()
+    if (delay <= 0 || delay > MAX_WAKE_DELAY_MS) return
+    const id = setTimeout(() => setTick((n) => n + 1), delay + 500)
+    return () => clearTimeout(id)
+  }, [data, opensAtMs, serverNowMs])
 
   const select = (questionId: string, optionIndex: number, multiple: boolean) => {
     setAnswers((prev) => {
@@ -135,29 +206,15 @@ export default function CandidateOnlineTestPage() {
     [applicationId, submitting, result, allAnswered, answers, t]
   )
 
-  // Đồng hồ chỉ chạy TỪ LÚC BẤM BẮT ĐẦU — trước đó nó khởi động ngay khi tải trang, nên
-  // mở nhầm tab là mất thời gian làm bài thật.
-  useEffect(() => {
-    if (started && data && !data.alreadySubmitted && data.questions.length > 0) {
-      setTimeLeft((prev) => (prev === null ? data.durationMinutes * 60 : prev))
-    }
-  }, [started, data])
-
-  // Tick mỗi giây.
-  useEffect(() => {
-    if (!taking || timeLeft === null || timeLeft <= 0) return
-    const id = setInterval(() => setTimeLeft((s) => (s !== null ? s - 1 : s)), 1000)
-    return () => clearInterval(id)
-  }, [taking, timeLeft])
-
-  // Hết giờ → tự nộp (kể cả khi chưa trả lời hết).
+  // Tới giờ đóng bài → tự nộp (kể cả khi chưa trả lời hết). Server còn nhận thêm ~1 phút cho đường
+  // truyền, nên bài nộp đúng lúc này luôn tới kịp.
   const autoSubmittedRef = useRef(false)
   useEffect(() => {
-    if (taking && timeLeft === 0 && !autoSubmittedRef.current) {
+    if (taking && secondsLeft === 0 && !autoSubmittedRef.current) {
       autoSubmittedRef.current = true
       void submit(true)
     }
-  }, [taking, timeLeft, submit])
+  }, [taking, secondsLeft, submit])
 
   /**
    * Rời khỏi bài thi = TỰ NỘP ngay.
@@ -248,8 +305,11 @@ export default function CandidateOnlineTestPage() {
             </span>
             <h2 className="text-base font-bold text-ink-800">{t('page.window.expiredTitle')}</h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-ink-600">
-              {data.opensAt
-                ? t('page.window.expiredDetail', { time: fmtWhen(data.opensAt) })
+              {data.opensAt && data.closesAt
+                ? t('page.window.expiredDetail', {
+                    time: fmtWhen(data.opensAt),
+                    closes: formatTime24(data.closesAt),
+                  })
                 : t('page.window.expiredDetailNoTime')}
             </p>
             <p className="mx-auto mt-3 max-w-md text-xs text-ink-500">{t('page.window.expiredContact')}</p>
@@ -263,21 +323,29 @@ export default function CandidateOnlineTestPage() {
         ) : data?.alreadySubmitted ? (
           <SubmittedCard detail={t('page.alreadyDone')} />
         ) : data && data.canStart === false && data.opensAt ? (
-          /* Cửa vào phòng thi đóng — phân biệt CHƯA TỚI GIỜ với ĐÃ QUÁ GIỜ, vì hai tình huống ấy
-             dẫn tới hai việc khác hẳn: một bên là quay lại sau, một bên là liên hệ nhân sự. */
+          /* Bài chưa mở / đã đóng — phân biệt CHƯA TỚI GIỜ với ĐÃ QUÁ GIỜ, vì hai tình huống ấy dẫn tới
+             hai việc khác hẳn: một bên là quay lại sau, một bên là liên hệ nhân sự. So theo GIỜ SERVER:
+             so theo giờ máy thì máy chạy nhanh vài phút sẽ báo "đã đóng" cho một bài chưa mở. */
           <div className="rounded-2xl border border-ink-200 bg-white p-10 text-center shadow-sm">
             <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-ink-100 text-ink-400">
               <Clock className="h-7 w-7" />
             </span>
             <h2 className="text-base font-bold text-ink-800">
-              {new Date(data.opensAt).getTime() > Date.now()
+              {opensAtMs != null && opensAtMs > nowMs
                 ? t('page.window.notYetTitle')
                 : t('page.window.closedTitle')}
             </h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-              {new Date(data.opensAt).getTime() > Date.now()
-                ? t('page.window.notYetDetail', { time: fmtWhen(data.opensAt) })
-                : t('page.window.closedDetail', { time: fmtWhen(data.opensAt) })}
+              {opensAtMs != null && opensAtMs > nowMs
+                ? t('page.window.notYetDetail', {
+                    time: fmtWhen(data.opensAt),
+                    closes: formatTime24(data.closesAt),
+                    minutes: data.durationMinutes,
+                  })
+                : t('page.window.closedDetail', {
+                    time: fmtWhen(data.opensAt),
+                    closes: formatTime24(data.closesAt),
+                  })}
             </p>
             <Link
               to="/candidate/applications"
@@ -299,8 +367,9 @@ export default function CandidateOnlineTestPage() {
           </div>
         ) : !started ? (
           /* CỬA TRƯỚC KHI BẮT ĐẦU.
-             Luật "rời bài thi là tự nộp" phải được nói Ở ĐÂY, trước khi đồng hồ chạy — một luật phạt
-             mà người bị phạt chỉ biết sau khi mất bài thì không phải luật. */
+             Luật "rời bài thi là tự nộp" phải được nói Ở ĐÂY, trước khi vào đề — một luật phạt mà
+             người bị phạt chỉ biết sau khi mất bài thì không phải luật. Cửa cũng nói thật về đồng hồ:
+             nó đang chạy tới giờ đóng chung của ca (ADR-072), không đợi ứng viên bấm. */
           <div className="rounded-2xl border border-ink-200 bg-white p-8 shadow-sm">
             <div className="text-center">
               <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
@@ -311,9 +380,30 @@ export default function CandidateOnlineTestPage() {
                 {t('page.gate.summary', {
                   count: questions.length,
                   minutes: data?.durationMinutes ?? 0,
+                  closes: formatTime24(data?.closesAt),
                 })}
               </p>
+              {secondsLeft != null && (
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700">
+                  <Clock className="h-4 w-4" /> {t('page.gate.remaining', { time: fmtTime(secondsLeft) })}
+                </p>
+              )}
             </div>
+
+            {/* Vào muộn: nói thẳng là thời gian đã bị hụt, để ứng viên không tưởng mình còn đủ giờ. */}
+            {secondsLeft != null &&
+              data?.durationMinutes != null &&
+              secondsLeft < data.durationMinutes * 60 - 60 && (
+                <p className="mx-auto mt-4 flex max-w-md items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    {t('page.gate.lateNotice', {
+                      minutes: data.durationMinutes,
+                      closes: formatTime24(data.closesAt),
+                    })}
+                  </span>
+                </p>
+              )}
 
             <ul className="mx-auto mt-5 max-w-md space-y-2 text-sm text-ink-700">
               <li className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-red-700">
@@ -324,7 +414,7 @@ export default function CandidateOnlineTestPage() {
               </li>
               <li className="flex items-start gap-2 rounded-xl border border-ink-200 px-3 py-2">
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-                <span>{t('page.gate.timerRule', { minutes: data?.durationMinutes ?? 0 })}</span>
+                <span>{t('page.gate.timerRule', { closes: formatTime24(data?.closesAt) })}</span>
               </li>
               <li className="flex items-start gap-2 rounded-xl border border-ink-200 px-3 py-2">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
@@ -349,13 +439,14 @@ export default function CandidateOnlineTestPage() {
                   total: questions.length,
                 })}
               </span>
-              {timeLeft !== null && (
+              {secondsLeft !== null && (
                 <span
                   className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold ${
-                    timeLeft <= 60 ? 'bg-red-50 text-red-600' : 'bg-brand-50 text-brand-700'
+                    secondsLeft <= 60 ? 'bg-red-50 text-red-600' : 'bg-brand-50 text-brand-700'
                   }`}
+                  title={t('page.closesAt', { closes: formatTime24(data?.closesAt) })}
                 >
-                  <Clock className="h-4 w-4" /> {t('page.timeLeft', { time: fmtTime(timeLeft) })}
+                  <Clock className="h-4 w-4" /> {t('page.timeLeft', { time: fmtTime(secondsLeft) })}
                 </span>
               )}
             </div>

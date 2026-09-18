@@ -21,7 +21,18 @@ internal static class OnlineTestData
         Title = "Backend Developer",
         OnlineTestPassScore = passScore,
         OnlineTestQuestionsPerTest = perTest,
-        OnlineTestDurationMinutes = 30,
+    };
+
+    /// <summary>
+    /// Vòng trắc nghiệm của tin — nơi DUY NHẤT giữ thời lượng bài thi (ADR-072).
+    /// </summary>
+    public static InterviewRoundConfig TestRound(Guid jobId, int durationMinutes = 30, int round = 1) => new()
+    {
+        JobPostingId = jobId,
+        RoundNumber = round,
+        RoundType = "online_test",
+        InterviewLanguage = "vi",
+        MaxDurationMinutes = durationMinutes,
     };
 
     public static ARI.Domain.Entities.Application Application(

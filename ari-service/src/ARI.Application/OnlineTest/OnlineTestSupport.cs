@@ -49,14 +49,7 @@ namespace ARI.Application.OnlineTest
         public static async Task<string?> GetOnlineTestLanguageAsync(
             IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
         {
-            var rounds = await uow.Repository<InterviewRoundConfig>()
-                .FindAsync(r => r.JobPostingId == jobPostingId, ct);
-
-            var round = rounds
-                .Where(r => string.Equals(r.RoundType, "online_test", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(r => r.RoundNumber)
-                .FirstOrDefault();
-
+            var round = await OnlineTestWindow.TestRoundAsync(uow, jobPostingId, ct);
             return OnlineTestLanguageGuard.Normalize(round?.InterviewLanguage);
         }
 
@@ -91,39 +84,20 @@ namespace ARI.Application.OnlineTest
         /// </summary>
         public static bool IsCvPassed(string? status) => ApplicationStatuses.IsCvPassed(status);
 
-        /// <summary>Vòng (RoundNumber) được cấu hình là online_test cho job — mặc định 1 nếu không có.</summary>
-        public static async Task<int> ResolveRoundAsync(IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
+        /// <summary>
+        /// Vòng thi của tin (số vòng + thời lượng bài). Tin không có vòng trắc nghiệm → vòng 1, thời
+        /// lượng mặc định — giữ hành vi cũ của các đường đọc chỉ cần một con số.
+        /// </summary>
+        public static async Task<(int Round, int DurationMinutes)> ResolveTestRoundAsync(
+            IUnitOfWork uow, Guid jobPostingId, CancellationToken ct)
         {
-            var configs = await uow.Repository<InterviewRoundConfig>().FindAsync(r => r.JobPostingId == jobPostingId, ct);
-            var online = configs.FirstOrDefault(c => c.RoundType != null && c.RoundType.ToLower() == "online_test");
-            return online?.RoundNumber ?? 1;
+            var config = await OnlineTestWindow.TestRoundAsync(uow, jobPostingId, ct);
+            return (config?.RoundNumber ?? 1, OnlineTestWindow.DurationOf(config));
         }
 
-        /// <summary>
-        /// Cửa vào phòng thi mở trong bao lâu kể từ giờ hẹn.
-        ///
-        /// Bài thi có giờ hẹn như mọi vòng khác, nhưng khác buổi phỏng vấn ở chỗ không ai ngồi đợi:
-        /// ứng viên vào muộn thì chẳng có ai để mà lỡ. Vẫn phải có cửa đóng, nếu không "giờ hẹn" chỉ
-        /// là trang trí và người thi tuần sau vẫn vào được cùng một đề.
-        /// </summary>
-        public static readonly TimeSpan EntryWindow = TimeSpan.FromHours(1);
-
-        /// <summary>
-        /// Độ trễ mạng được tính thêm vào hạn nộp — bài nộp lúc hết đồng hồ (hoặc lúc đóng trang)
-        /// vẫn phải đi hết đường truyền mới tới server.
-        /// </summary>
-        public static readonly TimeSpan SubmitGrace = TimeSpan.FromMinutes(5);
-
-        /// <summary>
-        /// Hạn chót của bài thi: sau giờ này không còn ai đang làm bài hợp lệ.
-        ///
-        /// Không phải <c>giờ đóng cửa</c> (<see cref="EntryWindow"/>): người vào ở phút thứ 59 vẫn
-        /// còn nguyên đồng hồ làm bài của mình. Người vào muộn nhất cũng phải xong trước
-        /// <c>giờ đóng cửa + thời lượng bài</c> — nên chỉ sau mốc đó, "chưa có bài" mới chắc chắn là
-        /// "không vào làm", và hệ thống mới được nộp thay (xem <see cref="OnlineTestExpiry"/>).
-        /// </summary>
-        public static DateTimeOffset SubmissionDeadline(DateTimeOffset opensAt, int durationMinutes) =>
-            opensAt + EntryWindow + TimeSpan.FromMinutes(Math.Max(0, durationMinutes)) + SubmitGrace;
+        /// <summary>Vòng (RoundNumber) được cấu hình là online_test cho job — mặc định 1 nếu không có.</summary>
+        public static async Task<int> ResolveRoundAsync(IUnitOfWork uow, Guid jobPostingId, CancellationToken ct) =>
+            (await ResolveTestRoundAsync(uow, jobPostingId, ct)).Round;
 
         /// <summary>
         /// Chấm một bài trên ĐÚNG bộ đề đã bốc cho ứng viên.

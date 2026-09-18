@@ -27,8 +27,8 @@ namespace ARI.Domain.Entities
         public int OnlineTestPassScore { get; set; } = 70;
         /// <summary>Số câu bốc ngẫu nhiên từ ngân hàng cho mỗi lượt thi. Mặc định 20.</summary>
         public int OnlineTestQuestionsPerTest { get; set; } = 20;
-        /// <summary>Thời lượng làm bài (phút). Mặc định 30.</summary>
-        public int OnlineTestDurationMinutes { get; set; } = 30;
+        // Thời lượng bài thi KHÔNG nằm ở đây: nó là MaxDurationMinutes của vòng trắc nghiệm
+        // (InterviewRoundConfig — ADR-072). Cột online_test_duration_minutes cũ đã được gộp sang đó.
 
         /// <summary>
         /// Điểm sàn (%) để AI kết luận ĐẠT một vòng phỏng vấn. Mặc định 70 — cùng mô hình với

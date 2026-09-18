@@ -17,7 +17,11 @@ export interface OnlineTestBank {
   jobTitle: string
   passScore: number
   questionsPerTest: number
-  durationMinutes: number
+  /**
+   * Thời lượng bài = số phút của vòng trắc nghiệm (ADR-072) — cùng giá trị với ô "Số phút" ở màn tạo
+   * tin. `null` khi tin chưa có vòng trắc nghiệm (không có chỗ lưu).
+   */
+  durationMinutes: number | null
   questions: OnlineTestQuestion[]
   /**
    * Ngôn ngữ đề thi lấy từ cấu hình vòng trắc nghiệm ('vi' | 'en'); null khi tin chưa có vòng
@@ -52,8 +56,16 @@ export interface CandidateOnlineTest {
 
   /** Giờ hẹn làm bài; `null` khi nhân sự chưa xếp lịch. */
   opensAt?: string | null
-  /** Hết giờ được phép VÀO thi (= `opensAt` + 1 tiếng). */
+  /**
+   * Giờ bài ĐÓNG (= `opensAt` + thời lượng — ADR-072): hạn cuối được vào, và là mốc đồng hồ đếm ngược
+   * chạm 0. Vào muộn thì còn ít thời gian hơn.
+   */
   closesAt?: string | null
+  /**
+   * Giờ server lúc trả phản hồi — đồng hồ đếm ngược tính theo độ lệch giữa giờ này và giờ máy, để máy
+   * lệch giờ không tự nộp bài sớm/muộn hay báo "đã quá giờ" khi server còn chưa mở bài.
+   */
+  serverNow?: string | null
   /** Có được bắt đầu lúc này không — sai thì `questions` về RỖNG từ server. */
   canStart?: boolean
   /**
@@ -135,7 +147,8 @@ export interface UpsertOnlineTestQuestion {
 export interface OnlineTestSettings {
   passScore: number
   questionsPerTest: number
-  durationMinutes: number
+  /** Số phút của vòng trắc nghiệm. Bỏ trống = giữ nguyên; tin chưa có vòng trắc nghiệm thì không gửi. */
+  durationMinutes?: number | null
 }
 
 /** Một dòng lỗi khi import câu hỏi từ Excel. */

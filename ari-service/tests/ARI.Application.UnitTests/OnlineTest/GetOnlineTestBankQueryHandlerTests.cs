@@ -48,7 +48,7 @@ public class GetOnlineTestBankQueryHandlerTests
     public async Task Bank_returns_settings_and_questions_sorted_with_answers_exposed()
     {
         var owner = Guid.NewGuid();
-        var job = OnlineTestData.Job(passScore: 70, perTest: 50, owner: owner); // DurationMinutes = 30
+        var job = OnlineTestData.Job(passScore: 70, perTest: 50, owner: owner);
 
         var older = OnlineTestData.Question(job.Id, type: "single", correct: new[] { 1 });
         older.CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
@@ -56,7 +56,9 @@ public class GetOnlineTestBankQueryHandlerTests
         newerBlank.CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
 
         // Seed đảo thứ tự để chứng minh sort theo CreatedAt (không phải thứ tự chèn).
-        var uow = new InMemoryUnitOfWork().Seed(job).Seed(newerBlank, older);
+        // Thời lượng đọc từ vòng trắc nghiệm (ADR-072).
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(newerBlank, older)
+            .Seed(OnlineTestData.TestRound(job.Id, durationMinutes: 30));
 
         var res = await Run(uow, new GetOnlineTestBankQuery(job.Id, owner, AppRoles.Recruiter));
 

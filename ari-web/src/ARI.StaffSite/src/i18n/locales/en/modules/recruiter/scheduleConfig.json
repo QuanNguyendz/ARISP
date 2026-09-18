@@ -15,10 +15,13 @@
     "oneCandidatePerSlot": "Each slot takes a single candidate — the hiring manager sits in with the AI for the whole session. Need more room? Create another slot.",
     "testLimit": "Candidate limit (optional)",
     "testLimitPlaceholder": "No limit",
-    "testLimitHint": "The test runs online, so many candidates can sit it in the same window. Leave blank for no limit."
+    "testLimitHint": "The test runs online, so many candidates can sit it in the same window. Leave blank for no limit.",
+    "testEndTime": "Closes at",
+    "testEndHint": "The test slot closes exactly {{minutes}} minutes after it opens (the test duration). Candidates can join any time in between, but the timer runs to the closing time — join late and they get less time. Change the duration on the question bank or job edit screen."
   },
   "validation": {
     "fillAllFields": "Please fill in date, start time and end time.",
+    "fillTestFields": "Please fill in the date and the opening time.",
     "endAfterStart": "End time must be after start time.",
     "overlapsExisting": "This time overlaps a slot you already created. The hiring manager attends with the candidate, so two slots cannot overlap."
   },

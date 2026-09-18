@@ -15,10 +15,13 @@
     "oneCandidatePerSlot": "Mỗi ca chỉ nhận một ứng viên — Hiring Manager ngồi cùng AI suốt buổi. Cần thêm chỗ thì tạo thêm ca.",
     "testLimit": "Giới hạn số ứng viên (tùy chọn)",
     "testLimitPlaceholder": "Không giới hạn",
-    "testLimitHint": "Bài thi trực tuyến nên nhiều ứng viên làm cùng một khung giờ được. Bỏ trống để không giới hạn."
+    "testLimitHint": "Bài thi trực tuyến nên nhiều ứng viên làm cùng một khung giờ được. Bỏ trống để không giới hạn.",
+    "testEndTime": "Đóng bài lúc",
+    "testEndHint": "Ca thi đóng đúng {{minutes}} phút sau giờ mở (thời lượng bài). Ứng viên vào lúc nào trong khoảng đó cũng được, nhưng đồng hồ đếm tới giờ đóng — vào muộn thì còn ít thời gian hơn. Đổi thời lượng ở màn ngân hàng đề hoặc màn sửa tin."
   },
   "validation": {
     "fillAllFields": "Vui lòng nhập ngày, giờ bắt đầu và giờ kết thúc.",
+    "fillTestFields": "Vui lòng nhập ngày và giờ mở bài.",
     "endAfterStart": "Giờ kết thúc phải sau giờ bắt đầu.",
     "overlapsExisting": "Khung giờ này chồng lên một ca đã tạo. Hiring Manager dự cùng ứng viên nên hai ca không được trùng giờ."
   },

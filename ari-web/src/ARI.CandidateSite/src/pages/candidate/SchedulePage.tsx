@@ -197,7 +197,10 @@ export default function CandidateSchedulePage({ standalone = false }: { standalo
     isTest(item)
       ? t('scheduleItem.roundLabelTest', { round: item.roundNumber })
       : t('scheduleItem.roundLabel', { round: item.roundNumber })
-  /** Bài thi đã tới giờ thì đang MỞ (còn cửa vào 1 tiếng) — "đang diễn ra" là chữ của buổi phỏng vấn. */
+  /**
+   * Bài thi đã tới giờ thì đang MỞ (tới giờ kết thúc của ca = giờ đóng bài, ADR-072) — "đang diễn ra"
+   * là chữ của buổi phỏng vấn. Server chỉ giữ lịch ở nhóm "sắp tới" tới khi bài đóng.
+   */
   const countdownOf = (item: CandidateScheduleItem) =>
     isTest(item) && new Date(item.startTime).getTime() <= now
       ? { text: t('relative.testOpen'), urgent: true }

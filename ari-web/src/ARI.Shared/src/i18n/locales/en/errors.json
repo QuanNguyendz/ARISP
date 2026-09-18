@@ -41,7 +41,10 @@
     "jobClosed": "Job posting is closed",
     "jobExpired": "Job posting has expired",
     "duplicateApplication": "You have already applied for this position",
-    "cvRequired": "Please upload your CV"
+    "cvRequired": "Please upload your CV",
+    "onlineTestBankInsufficient": "The online test question bank has fewer questions than each test draws. Add questions or lower the questions per test in the job's question bank.",
+    "cvRubricRequired": "This job has no CV scoring rubric yet. The Hiring Manager must set one up on the job page before it can be submitted or published.",
+    "onlineTestDurationLocked": "Some candidates are booked into an online test slot that has not ended yet — changing the duration now would move their closing time. Wait for those slots to end, or reschedule the candidates first."
   },
   "application": {
     "notFound": "Application not found",

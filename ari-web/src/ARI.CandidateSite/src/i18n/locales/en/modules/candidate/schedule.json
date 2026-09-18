@@ -87,7 +87,7 @@
   "prepTest": {
     "title": "Preparing for the online test",
     "item1": "Take the test online right on the Candidate Portal — no office visit and no interview code needed.",
-    "item2": "The test opens at the scheduled time and accepts entries for 1 hour.",
+    "item2": "The test opens at the scheduled time and closes at the end time shown on your schedule. You can still join late, but the timer runs to the closing time, so you get less time.",
     "item3": "You have one attempt; leaving the page mid-test submits it automatically — make sure your connection is stable."
   }
 }

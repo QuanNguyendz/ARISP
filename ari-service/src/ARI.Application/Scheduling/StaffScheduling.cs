@@ -139,6 +139,8 @@ namespace ARI.Application.Scheduling
 
             if (request.JobPostingId == Guid.Empty)
                 return Result.Failure<AvailabilitySlotResponse>("jobPostingId là bắt buộc.");
+            // Kiểm hình dạng request ngay cả với ca thi (server sẽ tự tính lại giờ kết thúc bên dưới):
+            // giờ kết thúc trước giờ bắt đầu là request hỏng, không phải một cách khai ca thi.
             if (request.EndTime <= request.StartTime)
                 return Result.Failure<AvailabilitySlotResponse>("Giờ kết thúc phải sau giờ bắt đầu.");
             if (request.StartTime <= DateTimeOffset.UtcNow)
@@ -150,15 +152,18 @@ namespace ARI.Application.Scheduling
             if (job == null) return Result.Failure<AvailabilitySlotResponse>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
             if (!ok) return Result.Failure<AvailabilitySlotResponse>("Bạn không có quyền tạo lịch cho tin này.", CommonErrorCodes.Forbidden);
 
-            // Sức chứa tuỳ LOẠI vòng, nên phải biết tin và vòng trước đã: vòng trắc nghiệm mặc định
-            // không giới hạn, vòng hội thoại đúng bằng 1 (ADR-067).
-            var roundType = await SchedulingSupport.RoundTypeAsync(
+            // Sức chứa và giờ kết thúc tuỳ LOẠI vòng, nên phải biết tin và vòng trước đã: vòng trắc
+            // nghiệm mặc định không giới hạn và đóng theo thời lượng bài, vòng hội thoại đúng bằng 1
+            // (ADR-067) và kết thúc theo giờ người dùng chọn.
+            var round = await SchedulingSupport.RoundConfigAsync(
                 _unitOfWork, request.JobPostingId, request.RoundNumber, ct);
-            var (capacityError, capacity) = SchedulingSupport.ResolveCapacity(roundType, request.Capacity);
+            var (capacityError, capacity) = SchedulingSupport.ResolveCapacity(round?.RoundType, request.Capacity);
             if (capacityError != null) return Result.Failure<AvailabilitySlotResponse>(capacityError);
 
+            var endTime = SchedulingSupport.EffectiveEndTime(round, request.StartTime, request.EndTime);
+
             var overlap = await SchedulingSupport.ValidateSlotTimeAsync(
-                _unitOfWork, request.JobPostingId, request.RoundNumber, request.StartTime, request.EndTime, null, ct);
+                _unitOfWork, request.JobPostingId, request.RoundNumber, request.StartTime, endTime, null, ct);
             if (overlap != null) return Result.Failure<AvailabilitySlotResponse>(overlap);
 
             var slot = new AvailabilitySlot
@@ -166,7 +171,7 @@ namespace ARI.Application.Scheduling
                 JobPostingId = request.JobPostingId,
                 RoundNumber = request.RoundNumber,
                 StartTime = request.StartTime,
-                EndTime = request.EndTime,
+                EndTime = endTime,
                 Timezone = string.IsNullOrWhiteSpace(request.Timezone) ? "Asia/Ho_Chi_Minh" : request.Timezone,
                 Capacity = capacity,
                 BookedCount = 0,
@@ -281,12 +286,16 @@ namespace ARI.Application.Scheduling
             if (command.StartTime <= DateTimeOffset.UtcNow)
                 return Result.Failure<AvailabilitySlotResponse>("Khung giờ phải nằm trong tương lai.");
 
+            // Ca thi: giờ kết thúc = giờ mở + thời lượng bài, server tự tính (ADR-072).
+            var round = await SchedulingSupport.RoundConfigAsync(_unitOfWork, slot.JobPostingId, slot.RoundNumber, ct);
+            var endTime = SchedulingSupport.EffectiveEndTime(round, command.StartTime, command.EndTime);
+
             var overlap = await SchedulingSupport.ValidateSlotTimeAsync(
-                _unitOfWork, slot.JobPostingId, slot.RoundNumber, command.StartTime, command.EndTime, slot.Id, ct);
+                _unitOfWork, slot.JobPostingId, slot.RoundNumber, command.StartTime, endTime, slot.Id, ct);
             if (overlap != null) return Result.Failure<AvailabilitySlotResponse>(overlap);
 
             slot.StartTime = command.StartTime;
-            slot.EndTime = command.EndTime;
+            slot.EndTime = endTime;
             slot.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<AvailabilitySlot>().Update(slot);
             await _unitOfWork.SaveChangesAsync(ct);

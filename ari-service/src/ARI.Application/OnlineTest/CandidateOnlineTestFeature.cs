@@ -35,7 +35,7 @@ namespace ARI.Application.OnlineTest
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             if (job == null) return Result.Failure<CandidateOnlineTestDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
-            var round = await OnlineTestSupport.ResolveRoundAsync(_unitOfWork, app.JobPostingId, ct);
+            var (round, duration) = await OnlineTestSupport.ResolveTestRoundAsync(_unitOfWork, app.JobPostingId, ct);
 
             var bank = (await _unitOfWork.Repository<OnlineTestQuestion>()
                 .FindAsync(q => q.JobPostingId == app.JobPostingId, ct)).ToList();
@@ -50,14 +50,14 @@ namespace ARI.Application.OnlineTest
                 .OrderByDescending(s => s.CreatedAt)
                 .FirstOrDefault();
 
-            // ---- CỬA VÀO PHÒNG THI -------------------------------------------------------------
-            // Bài thi có giờ hẹn như mọi vòng khác, nhưng khác buổi phỏng vấn ở chỗ không ai ngồi đợi —
-            // nên nếu không đóng cửa thì "giờ hẹn" chỉ là trang trí và người thi tuần sau vẫn vào được
-            // cùng một đề. Cửa mở từ giờ hẹn, đóng sau 1 tiếng.
+            // ---- KHUNG GIỜ THI (ADR-072) --------------------------------------------------------
+            // Bài mở lúc giờ hẹn và đóng lúc giờ hẹn + thời lượng bài. Vào lúc nào trong khung cũng được,
+            // nhưng đồng hồ đếm tới GIỜ ĐÓNG — vào muộn thì còn ít thời gian hơn. Không có cửa đóng thì
+            // "giờ hẹn" chỉ là trang trí và người thi tuần sau vẫn vào được cùng một đề.
             var opensAt = await OnlineTestSupport.ScheduledStartAsync(_unitOfWork, app.Id, round, ct);
-            var closesAt = opensAt?.Add(OnlineTestSupport.EntryWindow);
+            DateTimeOffset? closesAt = opensAt is { } start ? OnlineTestWindow.ClosesAt(start, duration) : null;
             var now = DateTimeOffset.UtcNow;
-            var inWindow = opensAt is { } o && closesAt is { } c && now >= o && now <= c;
+            var inWindow = opensAt is { } o && OnlineTestWindow.IsOpen(o, duration, now);
 
             // Chỉ trả câu hỏi khi hồ sơ ĐÃ qua vòng duyệt CV, ĐÚNG giờ, và chưa nộp bài.
             //
@@ -74,19 +74,19 @@ namespace ARI.Application.OnlineTest
                     .ToList()
                 : new List<CandidateTestQuestionDto>();
 
-            // Hết hạn = hệ thống đã nộp thay, HOẶC cửa đã đóng mà chưa có bài. Vế sau cần riêng vì
-            // hệ thống chỉ nộp thay sau hạn chót (đóng cửa + thời lượng bài) — trong khoảng giữa đó
-            // ứng viên đã không còn vào được nữa, và giao diện không được bảo họ "chưa có giờ".
+            // Hết hạn = hệ thống đã nộp thay, HOẶC bài đã đóng mà chưa có bài. Vế sau cần riêng vì hệ
+            // thống chỉ nộp thay sau hạn chót (giờ đóng + độ trễ mạng) — trong khoảng giữa đó ứng viên
+            // đã không còn vào được nữa, và giao diện không được bảo họ "chưa có giờ".
             var expired = submission != null
                 ? OnlineTestSubmittedBy.IsSystem(submission.SubmittedBy)
-                : closesAt is { } shut && now > shut;
+                : closesAt is { } shut && now >= shut;
 
             var dto = new CandidateOnlineTestDto(
                 app.Id,
                 app.JobPostingId,
                 job.Title,
                 round,
-                job.OnlineTestDurationMinutes,
+                duration,
                 drawnQuestions.Count,   // tổng số câu của bài — luôn có để FE biết job có đề (kể cả khi chưa pass)
                 questions,              // rỗng khi chưa duyệt CV
                 submission != null,
@@ -95,7 +95,8 @@ namespace ARI.Application.OnlineTest
                 opensAt,
                 closesAt,
                 canStart,
-                expired);
+                expired,
+                now);
 
             return Result.Success(dto);
         }
@@ -136,7 +137,7 @@ namespace ARI.Application.OnlineTest
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             if (job == null) return Result.Failure<OnlineTestSubmitAckDto>("Không tìm thấy tin tuyển dụng.", CommonErrorCodes.NotFound);
 
-            var round = await OnlineTestSupport.ResolveRoundAsync(_unitOfWork, app.JobPostingId, ct);
+            var (round, duration) = await OnlineTestSupport.ResolveTestRoundAsync(_unitOfWork, app.JobPostingId, ct);
 
             var existing = (await _unitOfWork.Repository<OnlineTestSubmission>()
                     .FindAsync(s => s.ApplicationId == app.Id && s.RoundNumber == round, ct))
@@ -152,10 +153,9 @@ namespace ARI.Application.OnlineTest
             // như vậy chỉ có thể do gọi thẳng API — và nó sẽ tiêu mất LƯỢT LÀM BÀI DUY NHẤT của
             // chính ứng viên đó.
             //
-            // Đầu bên kia KHÔNG chặn ở giờ đóng cửa: cửa 1 tiếng là cửa VÀO, còn bài thi có đồng hồ
-            // riêng — người vào ở phút thứ 59 vẫn phải được nộp bài của mình. Mốc chặn là HẠN CHÓT
-            // (đóng cửa + thời lượng bài): quá mốc đó thì bài đã thuộc về hệ thống nộp thay, và một
-            // bài tới muộn hơn chỉ có thể là đồng hồ phía trình duyệt đã bị vượt qua.
+            // Đầu bên kia chặn ở HẠN CHÓT = giờ đóng bài + độ trễ mạng (ADR-072). Đồng hồ phía trình
+            // duyệt tự nộp đúng giờ đóng, nên một bài tới muộn hơn hạn chót chỉ có thể là đồng hồ đó đã
+            // bị vượt qua — và bài lúc ấy đã thuộc về hệ thống nộp thay.
             var opensAt = await OnlineTestSupport.ScheduledStartAsync(_unitOfWork, app.Id, round, ct);
             if (opensAt is { } openTime)
             {
@@ -167,7 +167,7 @@ namespace ARI.Application.OnlineTest
                         $"Bài thi chưa mở. Bạn được vào làm bài từ {local:HH:mm} ngày {local:dd/MM/yyyy} (giờ VN).");
                 }
 
-                if (nowUtc > OnlineTestSupport.SubmissionDeadline(openTime, job.OnlineTestDurationMinutes))
+                if (nowUtc > OnlineTestWindow.SubmissionDeadline(openTime, duration))
                     return Result.Failure<OnlineTestSubmitAckDto>(
                         "Đã quá thời gian làm bài — bài thi đã đóng.", CommonErrorCodes.Conflict);
             }

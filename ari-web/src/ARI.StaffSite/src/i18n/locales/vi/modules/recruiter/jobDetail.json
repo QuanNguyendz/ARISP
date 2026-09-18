@@ -28,6 +28,7 @@
   "onlineTestBank": "Ngân hàng câu hỏi",
   "editJob": "Sửa tin",
   "submitForApproval": "Gửi HM ký duyệt",
+  "onlineTestBankShort": "Ngân hàng câu hỏi mới có {{count}}/{{required}} câu — mỗi bài thi bốc {{required}} câu nên chưa gửi HM ký duyệt được. Thêm câu hỏi hoặc giảm số câu mỗi bài.",
   "closeJob": "Đóng tin",
   "statusUpdated": "Đã cập nhật trạng thái.",
   "jobSubmittedForApproval": "Đã gửi tin cho Hiring Manager ký duyệt mô tả công việc. Ký xong tin tự đăng.",
