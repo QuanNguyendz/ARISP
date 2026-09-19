@@ -27,9 +27,11 @@ import HmAvailabilityPanel, { HM_AVAILABILITY_ANCHOR } from '@/components/hiring
 import HmApproveScheduleNotice from '@/components/hiring/HmApproveScheduleNotice'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card'
@@ -182,6 +184,16 @@ export default function HmJobDetailPage() {
               />
             </section>
 
+            {/* Tin đã đóng mà còn hồ sơ chưa khép (ADR-074) — HM chỉ xem; loại hồ sơ là việc của chủ tin. */}
+            <ClosedJobOpenApplications
+              jobStatus={job.status}
+              applications={applications}
+              canReject={false}
+              candidateHref={(appId) => `/hm/candidates/${appId}`}
+              offersHref="/hm/offers"
+              onChanged={() => void queryClient.invalidateQueries({ queryKey: ['job', id, 'applications'] })}
+            />
+
             {/*
               Cùng khối quy trình với màn tin của Recruiter — Hiring Manager phải nhìn thấy phễu y hệt
               người đang vận hành nó, nếu không hai bên bàn về hai bức tranh khác nhau.
@@ -250,6 +262,10 @@ export default function HmJobDetailPage() {
                 thay vì phải nhờ HR vào màn Playbook chung. */}
             {/* Bộ tiêu chí chấm CV (ADR-070) — HM chính soạn và sửa; lưu bộ mới là chấm lại mọi hồ sơ. */}
             <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+
+            {/* Bộ tiêu chí chấm PHỎNG VẤN (ADR-073) — HM khai cho từng tin; thiếu thì buổi phỏng vấn không ra báo
+                cáo và tin không đăng được. */}
+            <JobInterviewRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
 
             <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
 

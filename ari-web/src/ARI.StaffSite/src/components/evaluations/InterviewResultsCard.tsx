@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   ClipboardCheck,
@@ -10,6 +11,7 @@ import {
   Loader2,
   ArrowRight,
   Clock,
+  RotateCcw,
 } from 'lucide-react'
 import { roundTypeKey } from '@ari/shared/utils/roundTypes'
 import { formatDateTime24, formatTime24 } from '@ari/shared/utils/time24'
@@ -26,6 +28,8 @@ const STATE_TONE: Record<InterviewResultState, string> = {
   waiting: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
   in_progress: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
   evaluating: 'bg-ai-100 text-ai-700 dark:bg-ai-500/20 dark:text-ai-300',
+  needs_rubric: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  evaluation_failed: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
   pending_review: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
   reviewed: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
   aborted: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
@@ -197,9 +201,51 @@ export function ResultRow({
         </Link>
       ) : row.state === 'evaluating' ? (
         <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">{t('evaluatingHint')}</p>
+      ) : row.state === 'needs_rubric' ? (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t('needsRubricHint')}</p>
+      ) : row.state === 'evaluation_failed' && row.sessionId ? (
+        <RetryScoring sessionId={row.sessionId} reason={row.evaluationError} />
       ) : row.state === 'aborted' ? (
         <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">{t('abortedHint')}</p>
       ) : null}
     </li>
+  )
+}
+
+/**
+ * AI hỏng hết số lượt thử tự động (ADR-073) — nhân sự bấm để đưa buổi này vào hàng chấm lần nữa. Quyền do server
+ * quyết (chủ tin, HM chính, quản trị viên); việc chấm chạy nền và realtime làm mới khối này khi xong.
+ */
+function RetryScoring({ sessionId, reason }: { sessionId: string; reason?: string | null }) {
+  const { t } = useTranslation(INTERVIEW_RESULTS_NS)
+  const queryClient = useQueryClient()
+  const [message, setMessage] = useState<string | null>(null)
+
+  const retry = useMutation({
+    mutationFn: () => evaluationService.retrySessionEvaluation(sessionId),
+    onSuccess: () => {
+      setMessage(t('retryQueued'))
+      queryClient.invalidateQueries({ queryKey: ['evaluations'] })
+    },
+    onError: (e) =>
+      setMessage((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('retryError')),
+  })
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <p className="text-xs text-red-700 dark:text-red-300">
+        {t('failedHint', { reason: reason ? ` (${reason})` : '' })}
+      </p>
+      <button
+        type="button"
+        onClick={() => retry.mutate()}
+        disabled={retry.isPending || retry.isSuccess}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-ink-200 dark:hover:bg-white/10"
+      >
+        {retry.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+        {retry.isPending ? t('retrying') : t('retry')}
+      </button>
+      {message && <p className="text-xs text-ink-500 dark:text-ink-400">{message}</p>}
+    </div>
   )
 }

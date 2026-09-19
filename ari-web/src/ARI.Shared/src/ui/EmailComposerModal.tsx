@@ -10,6 +10,8 @@ interface EmailComposerModalProps {
   contextId: string
   /** Tham số phụ theo mẫu — thư mời phỏng vấn dùng để truyền slotId. */
   secondaryId?: string
+  /** Tham số phụ dạng chuỗi — thư kết quả phỏng vấn dùng để truyền verdict sắp chốt. */
+  variant?: string
   title?: string
   confirmLabel?: string
   onCancel: () => void
@@ -34,6 +36,7 @@ export default function EmailComposerModal({
   templateKey,
   contextId,
   secondaryId,
+  variant,
   title,
   confirmLabel,
   onCancel,
@@ -60,7 +63,7 @@ export default function EmailComposerModal({
     setPreviewing(false)
 
     emailService
-      .preview({ templateKey, contextId, secondaryId })
+      .preview({ templateKey, contextId, secondaryId, variant })
       .then((data) => {
         if (cancelled) return
         setTemplate(data)
@@ -80,7 +83,7 @@ export default function EmailComposerModal({
     return () => {
       cancelled = true
     }
-  }, [open, templateKey, contextId, secondaryId, t])
+  }, [open, templateKey, contextId, secondaryId, variant, t])
 
   /**
    * Đổ nội dung mẫu vào vùng soạn thảo — chạy SAU khi vùng đó đã được gắn vào cây DOM.

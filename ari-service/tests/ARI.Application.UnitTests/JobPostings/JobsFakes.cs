@@ -69,6 +69,9 @@ internal sealed class FakeJdGeminiProvider : IGeminiProvider
     public Task<Result<System.Collections.Generic.List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(
         CvRubricSuggestionInput input, CancellationToken ct = default)
         => throw new NotImplementedException();
+    public Task<Result<System.Collections.Generic.List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(
+        CvRubricSuggestionInput input, CancellationToken ct = default)
+        => throw new NotImplementedException();
 
     public Task<Result<CvReviewResultDto>> ReviewCvAsync(
         byte[]? cvFileBytes, string? cvMimeType, string? fallbackCvText, CancellationToken ct = default)

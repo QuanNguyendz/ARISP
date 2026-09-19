@@ -33,6 +33,7 @@ import type {
   CvRubricLevelKey,
   CvRubricSuggestionInput,
 } from '@ari/shared/fservices/cvRubric'
+import { interviewRubricService } from '@ari/shared/fservices/interviewRubric'
 import { playbookService } from '@/fservices/playbook/playbookService'
 
 export const CV_SCORING_NS = 'modules/staff/cvScoring'
@@ -51,6 +52,41 @@ const nextUid = () => `c${++uidSeed}`
 const levelCount = (c: CvRubricCriterion) =>
   CV_RUBRIC_LEVEL_KEYS.filter((k) => !!c.levels?.[k]?.trim()).length
 
+/** Bộ tiêu chí chấm CV (ADR-070) hay chấm PHỎNG VẤN (ADR-073) — cùng trình soạn, khác nguồn điền nhanh và lời gợi ý. */
+export type RubricEditorMode = 'cv' | 'interview'
+
+/** Chuỗi có bản riêng cho bộ tiêu chí phỏng vấn (khoá `interviewEditor.*`); còn lại dùng chung `editor.*`. */
+const INTERVIEW_TEXT = new Set([
+  'hint',
+  'namePlaceholder',
+  'guidePlaceholder',
+  'levelsHint',
+  'levelPlaceholder.excellent',
+  'levelPlaceholder.good',
+  'levelPlaceholder.fair',
+  'levelPlaceholder.poor',
+  'noTemplates',
+  'empty',
+  'aiNeedsContent',
+])
+
+const MODE_API = {
+  cv: {
+    templatesKey: 'cv-rubric-templates',
+    templates: () => cvRubricService.templates(),
+    suggest: (input: CvRubricSuggestionInput) => cvRubricService.suggest(input),
+    exportName: 'bo-tieu-chi-cham-cv.xlsx',
+    blankType: 'cv_rubric',
+  },
+  interview: {
+    templatesKey: 'interview-rubric-templates',
+    templates: () => interviewRubricService.templates(),
+    suggest: (input: CvRubricSuggestionInput) => interviewRubricService.suggest(input),
+    exportName: 'bo-tieu-chi-cham-phong-van.xlsx',
+    blankType: 'interview_rubric',
+  },
+} as const
+
 interface CvRubricEditorProps {
   value: CvRubricCriterion[]
   onChange: (next: CvRubricCriterion[]) => void
@@ -62,6 +98,8 @@ interface CvRubricEditorProps {
   suggestSource?: () => CvRubricSuggestionInput | null
   /** Hiện lỗi hợp lệ (tổng ≠ 100…) ngay cả khi người dùng chưa chạm vào — dùng lúc bấm Gửi/Lưu. */
   showProblems?: boolean
+  /** Mặc định `cv`. `interview`: không có ý kiểm, mẫu + AI gợi ý lấy từ nguồn của bộ tiêu chí phỏng vấn. */
+  mode?: RubricEditorMode
 }
 
 /**
@@ -78,8 +116,13 @@ export default function CvRubricEditor({
   readOnly = false,
   suggestSource,
   showProblems = false,
+  mode = 'cv',
 }: CvRubricEditorProps) {
   const { t } = useTranslation(CV_SCORING_NS)
+  const api = MODE_API[mode]
+  const forInterview = mode === 'interview'
+  /** Khoá chuỗi theo chế độ — xem INTERVIEW_TEXT. */
+  const tk = (key: string) => (forInterview && INTERVIEW_TEXT.has(key) ? `interviewEditor.${key}` : `editor.${key}`)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uids, setUids] = useState<string[]>(() => value.map(nextUid))
   const [openLevels, setOpenLevels] = useState<Record<string, boolean>>({})
@@ -96,8 +139,8 @@ export default function CvRubricEditor({
   }, [value, uids.length])
 
   const templates = useQuery({
-    queryKey: ['cv-rubric-templates'],
-    queryFn: () => cvRubricService.templates(),
+    queryKey: [api.templatesKey],
+    queryFn: () => api.templates(),
     enabled: templatesOpen,
     staleTime: 60_000,
   })
@@ -156,7 +199,8 @@ export default function CvRubricEditor({
     setPending(null)
     setWarnings(draft.warnings ?? [])
     // Bản từ nguồn khác không mang mã của tin này — bỏ mã để server sinh lại, tránh đè lên tiêu chí cũ.
-    const criteria = draft.criteria.map((c) => ({ ...c, key: null }))
+    // Bộ tiêu chí phỏng vấn không có ý kiểm: file Excel / mẫu CV có ý kiểm thì bỏ đi ngay ở đây.
+    const criteria = draft.criteria.map((c) => ({ ...c, key: null, checks: forInterview ? null : c.checks }))
     commit(criteria, criteria.map(nextUid))
   }
 
@@ -175,10 +219,10 @@ export default function CvRubricEditor({
   const suggest = () => {
     const source = suggestSource?.()
     if (!source) {
-      setError(t('editor.aiNeedsContent'))
+      setError(t(tk('aiNeedsContent')))
       return
     }
-    void run('suggest', async () => offer(await cvRubricService.suggest(source)))
+    void run('suggest', async () => offer(await api.suggest(source)))
   }
 
   const importFile = (file: File | undefined) => {
@@ -195,7 +239,7 @@ export default function CvRubricEditor({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs leading-relaxed text-ink-500 dark:text-ink-400">{t('editor.hint')}</p>
+      <p className="text-xs leading-relaxed text-ink-500 dark:text-ink-400">{t(tk('hint'))}</p>
 
       <div className="flex flex-wrap items-center gap-2">
         {suggestSource && (
@@ -228,7 +272,7 @@ export default function CvRubricEditor({
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t('editor.templatesLoading')}
                 </p>
               ) : (templates.data ?? []).length === 0 ? (
-                <p className="px-3 py-2 text-xs text-ink-500 dark:text-ink-400">{t('editor.noTemplates')}</p>
+                <p className="px-3 py-2 text-xs text-ink-500 dark:text-ink-400">{t(tk('noTemplates'))}</p>
               ) : (
                 (templates.data ?? []).map((tpl) => (
                   <button
@@ -261,7 +305,7 @@ export default function CvRubricEditor({
         </button>
         <button
           type="button"
-          onClick={() => void run('export', () => cvRubricService.downloadDraft(value))}
+          onClick={() => void run('export', () => cvRubricService.downloadDraft(value, api.exportName))}
           disabled={busy !== null || value.length === 0}
           className={TOOL_BTN}
         >
@@ -270,7 +314,7 @@ export default function CvRubricEditor({
         </button>
         <button
           type="button"
-          onClick={() => void run('blank', () => playbookService.downloadRubricTemplate('cv_rubric'))}
+          onClick={() => void run('blank', () => playbookService.downloadRubricTemplate(api.blankType))}
           disabled={busy !== null}
           className="inline-flex items-center gap-1 px-1 text-xs font-medium text-brand-600 hover:underline disabled:opacity-50 dark:text-brand-400"
         >
@@ -319,7 +363,7 @@ export default function CvRubricEditor({
 
       {value.length === 0 ? (
         <p className="rounded-xl border border-dashed border-ink-200 px-3 py-5 text-center text-xs text-ink-500 dark:border-white/10 dark:text-ink-400">
-          {t('editor.empty')}
+          {t(tk('empty'))}
         </p>
       ) : (
         <ol className="space-y-2.5">
@@ -339,7 +383,7 @@ export default function CvRubricEditor({
                     <input
                       value={c.name}
                       onChange={(e) => patch(i, { name: e.target.value })}
-                      placeholder={t('editor.namePlaceholder')}
+                      placeholder={t(tk('namePlaceholder'))}
                       aria-label={t('editor.name')}
                       maxLength={120}
                       className={`${INPUT} min-w-[12rem] flex-1`}
@@ -376,13 +420,14 @@ export default function CvRubricEditor({
                     rows={2}
                     value={c.description ?? ''}
                     onChange={(e) => patch(i, { description: e.target.value })}
-                    placeholder={t('editor.guidePlaceholder')}
+                    placeholder={t(tk('guidePlaceholder'))}
                     aria-label={t('editor.guide')}
                     maxLength={1000}
                     className={`${INPUT} resize-y`}
                   />
 
-                  {/* Ý kiểm: quyết định vị trí điểm TRONG dải — AI chỉ trả lời có/không từng ý. */}
+                  {/* Ý kiểm: quyết định vị trí điểm TRONG dải — AI chỉ trả lời có/không từng ý. Chỉ có ở bộ chấm CV. */}
+                  {!forInterview && (
                   <div className="mt-2 rounded-xl border border-dashed border-ink-200 p-2.5 dark:border-white/10">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-700 dark:text-ink-200">
                       <ListChecks className="h-3.5 w-3.5 text-ai-600 dark:text-ai-400" />
@@ -422,6 +467,7 @@ export default function CvRubricEditor({
                       <Plus className="h-3.5 w-3.5" /> {t('editor.checks.add')}
                     </button>
                   </div>
+                  )}
 
                   <button
                     type="button"
@@ -433,7 +479,7 @@ export default function CvRubricEditor({
                   </button>
                   {open && (
                     <div className="mt-2 space-y-2">
-                      <p className="text-[11px] text-ink-500 dark:text-ink-400">{t('editor.levelsHint')}</p>
+                      <p className="text-[11px] text-ink-500 dark:text-ink-400">{t(tk('levelsHint'))}</p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {CV_RUBRIC_LEVEL_KEYS.map((level) => (
                           <label key={level} className="block">
@@ -444,7 +490,7 @@ export default function CvRubricEditor({
                               rows={2}
                               value={c.levels?.[level] ?? ''}
                               onChange={(e) => patchLevel(i, level, e.target.value)}
-                              placeholder={t(`editor.levelPlaceholder.${level}`)}
+                              placeholder={t(tk(`levelPlaceholder.${level}`))}
                               maxLength={1000}
                               className={`${INPUT} resize-y text-xs`}
                             />

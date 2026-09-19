@@ -78,6 +78,10 @@ export type InterviewResultState =
   | 'waiting'
   | 'in_progress'
   | 'evaluating'
+  /** Buổi đã xong nhưng vòng chưa có bộ tiêu chí chấm phỏng vấn — việc của Hiring Manager (ADR-073). */
+  | 'needs_rubric'
+  /** AI hỏng hết số lượt thử tự động — cần bấm "Chấm lại". */
+  | 'evaluation_failed'
   | 'pending_review'
   | 'reviewed'
   | 'aborted';
@@ -110,6 +114,10 @@ export interface InterviewResultRow {
   recordingDeletedAt?: string | null;
   /** Số lượt hỏi–đáp có lời trả lời thật — 0 là không có transcript để đọc. */
   transcriptTurns: number;
+  /** Trạng thái sinh báo cáo phía server (`pending` · `processing` · `done` · `blocked_no_rubric` · `failed`…). */
+  evaluationStatus?: string | null;
+  /** Lý do lượt chấm gần nhất thất bại. */
+  evaluationError?: string | null;
 }
 
 export interface CriterionScore {
@@ -214,4 +222,9 @@ export interface SubmitEvaluationReviewPayload {
   suggestedSalaryCurrency?: string;
   strengths?: string;
   concerns?: string;
+  /**
+   * Thư kết quả do người chốt sửa ở trình soạn (quy tắc 21, ADR-074). Bỏ trống = gửi đúng mẫu.
+   * Thư đi KÈM lệnh chốt — huỷ trình soạn là không chốt gì cả.
+   */
+  emailOverride?: { subject: string; bodyHtml: string };
 }

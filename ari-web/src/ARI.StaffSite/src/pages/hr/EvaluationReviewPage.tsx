@@ -20,6 +20,9 @@ import {
   X,
 } from 'lucide-react'
 import { evaluationService } from '@/fservices/evaluation/evaluationService'
+import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
+import { EMAIL_TEMPLATES, type EmailOverride } from '@ari/shared/fservices/email'
+import { resolveApiError } from '@ari/shared/utils/apiError'
 import EvaluationSessionPanel from '@/components/evaluations/EvaluationSessionPanel'
 import { useAuthStore } from '@ari/shared/store/auth'
 import type { EvaluationReport } from '@ari/shared/types/evaluation'
@@ -118,6 +121,14 @@ export default function EvaluationReviewPage() {
   /** Verdict nhân sự chọn khi ghi đè. null = chưa mở khối ghi đè (lúc mở sẽ đặt mặc định). */
   const [overrideVerdict, setOverrideVerdict] = useState<'pass' | 'not_pass' | null>(null)
   const [submittingAction, setSubmittingAction] = useState<'confirm' | 'override' | null>(null)
+  /**
+   * Quyết định đang chờ người chốt duyệt thư kết quả (quy tắc 21, ADR-074). Lệnh chốt CHỈ gửi khi bấm Gửi
+   * trong trình soạn — Huỷ ở đó là không chốt, không đổi trạng thái hồ sơ, không thư nào đi.
+   */
+  const [pendingDecision, setPendingDecision] = useState<{
+    kind: 'confirm' | 'override'
+    verdict: 'pass' | 'not_pass'
+  } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
@@ -278,6 +289,7 @@ export default function EvaluationReviewPage() {
     setIsOverrideMode(false)
     setOverrideReason('')
     setSubmittingAction(null)
+    setPendingDecision(null)
     if (targetId) {
       setSearchParams({})
     }
@@ -313,29 +325,60 @@ export default function EvaluationReviewPage() {
     }
   }
 
-  async function handleConfirm() {
+  /**
+   * Gửi quyết định lên server, kèm thư kết quả (nếu đã qua trình soạn). Buổi THỬ không có thư — nó không
+   * thuộc phễu tuyển dụng (ADR-051) — nên đi thẳng, không mở trình soạn.
+   */
+  async function submitDecision(
+    kind: 'confirm' | 'override',
+    verdict: 'pass' | 'not_pass',
+    emailOverride?: EmailOverride
+  ) {
     if (!selectedEvaluation) return
-    if (!fallbackReasonReady) {
-      setActionError(t('hm.fallbackRequired'))
-      return
-    }
     try {
-      setSubmittingAction('confirm')
+      setSubmittingAction(kind)
       setActionError(null)
-      await evaluationService.confirmEvaluation(selectedEvaluation, decisionExtras())
+      const extras = { ...decisionExtras(), emailOverride }
+      if (kind === 'confirm') {
+        await evaluationService.confirmEvaluation(selectedEvaluation, extras)
+      } else {
+        // Gửi ĐÚNG verdict nhân sự chọn. Trước đây service tự lật ngược verdict của AI nên hai
+        // nút chọn trên UI chỉ là trang trí — bấm gì cũng ra cùng một kết quả.
+        await evaluationService.overrideEvaluation(selectedEvaluation, overrideReason.trim(), verdict, extras)
+      }
+      setPendingDecision(null)
       await refreshListAndSelection(selectedEvaluation.id)
     } catch (submitError) {
       console.error(submitError)
-      setActionError(t('confirmError'))
+      setPendingDecision(null)
+      setActionError(resolveApiError(submitError, t, kind === 'confirm' ? 'confirmError' : 'overrideError'))
     } finally {
       setSubmittingAction(null)
     }
   }
 
-  async function handleOverride() {
+  /** Buổi thật → mở trình soạn thư kết quả trước; buổi thử → chốt luôn. */
+  function beginDecision(kind: 'confirm' | 'override', verdict: 'pass' | 'not_pass') {
+    if (selectedEvaluation?.sessionType === 'practice') {
+      void submitDecision(kind, verdict)
+      return
+    }
+    setActionError(null)
+    setPendingDecision({ kind, verdict })
+  }
+
+  function handleConfirm() {
     if (!selectedEvaluation) return
-    const trimmedReason = overrideReason.trim()
-    if (!trimmedReason) {
+    if (!fallbackReasonReady) {
+      setActionError(t('hm.fallbackRequired'))
+      return
+    }
+    beginDecision('confirm', selectedEvaluation.aiVerdict === 'not_pass' ? 'not_pass' : 'pass')
+  }
+
+  function handleOverride() {
+    if (!selectedEvaluation) return
+    if (!overrideReason.trim()) {
       setActionError(t('overrideReasonRequired'))
       return
     }
@@ -343,25 +386,7 @@ export default function EvaluationReviewPage() {
       setActionError(t('hm.fallbackRequired'))
       return
     }
-    try {
-      setSubmittingAction('override')
-      setActionError(null)
-      // Gửi ĐÚNG verdict nhân sự chọn. Trước đây service tự lật ngược verdict của AI nên hai
-      // nút chọn trên UI chỉ là trang trí — bấm gì cũng ra cùng một kết quả.
-      const verdict = overrideVerdict ?? (aiPassed ? 'not_pass' : 'pass')
-      await evaluationService.overrideEvaluation(
-        selectedEvaluation,
-        trimmedReason,
-        verdict,
-        decisionExtras()
-      )
-      await refreshListAndSelection(selectedEvaluation.id)
-    } catch (submitError) {
-      console.error(submitError)
-      setActionError(t('overrideError'))
-    } finally {
-      setSubmittingAction(null)
-    }
+    beginDecision('override', overrideVerdict ?? (aiPassed ? 'not_pass' : 'pass'))
   }
 
   const counts = useMemo(() => {
@@ -1271,6 +1296,29 @@ export default function EvaluationReviewPage() {
                   {submittingAction === 'override' ? t('confirming') : t('saveAndSendResult')}
                 </button>
               )}
+
+              {selectedEvaluation.sessionType !== 'practice' && (
+                <p className="mt-3 text-xs text-ink-500 dark:text-ink-400">{t('resultEmail.hint')}</p>
+              )}
+
+              <EmailComposerModal
+                open={pendingDecision !== null}
+                templateKey={EMAIL_TEMPLATES.InterviewResult}
+                contextId={selectedEvaluation.applicationId}
+                secondaryId={selectedEvaluation.id}
+                variant={pendingDecision?.verdict}
+                title={t(
+                  pendingDecision?.verdict === 'pass' ? 'resultEmail.titlePass' : 'resultEmail.titleNotPass'
+                )}
+                confirmLabel={t('resultEmail.send')}
+                sending={submittingAction !== null}
+                onCancel={() => setPendingDecision(null)}
+                onSend={(override) =>
+                  pendingDecision
+                    ? submitDecision(pendingDecision.kind, pendingDecision.verdict, override)
+                    : undefined
+                }
+              />
             </div>
           ) : (
             <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-4 sm:p-6 shadow-card">
