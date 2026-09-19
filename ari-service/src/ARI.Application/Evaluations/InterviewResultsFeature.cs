@@ -25,8 +25,15 @@ namespace ARI.Application.Evaluations
         /// <summary>Ứng viên đã nhập mã, đang ở phòng chờ.</summary>
         public const string Waiting = "waiting";
         public const string InProgress = "in_progress";
-        /// <summary>Buổi đã kết thúc, AI đang viết báo cáo.</summary>
+        /// <summary>Buổi đã kết thúc, AI đang viết báo cáo (hoặc đang chờ tới lượt / đang thử lại sau một lần lỗi).</summary>
         public const string Evaluating = "evaluating";
+        /// <summary>
+        /// Buổi đã kết thúc nhưng vòng chưa có bộ tiêu chí chấm phỏng vấn — việc của Hiring Manager (ADR-073).
+        /// Khai xong là báo cáo tự sinh.
+        /// </summary>
+        public const string NeedsRubric = "needs_rubric";
+        /// <summary>AI hỏng hết số lượt thử tự động — cần người bấm "Chấm lại".</summary>
+        public const string EvaluationFailed = "evaluation_failed";
         /// <summary>Có báo cáo, chờ Hiring Manager chốt.</summary>
         public const string PendingReview = "pending_review";
         public const string Reviewed = "reviewed";
@@ -74,6 +81,11 @@ namespace ARI.Application.Evaluations
 
         /// <summary>Số lượt hỏi–đáp đã có câu trả lời — 0 nghĩa là không có transcript để đọc.</summary>
         public int TranscriptTurns { get; set; }
+
+        /// <summary>Trạng thái sinh báo cáo (xem <see cref="EvaluationStatuses"/>) — null với buổi chưa đóng.</summary>
+        public string? EvaluationStatus { get; set; }
+        /// <summary>Lý do lượt chấm gần nhất thất bại — hiện kèm nút "Chấm lại".</summary>
+        public string? EvaluationError { get; set; }
     }
 
     /// <summary>
@@ -201,6 +213,8 @@ namespace ARI.Application.Evaluations
                 row.RecordingExpiresAt = session.RecordingExpiresAt;
                 row.RecordingDeletedAt = session.RecordingDeletedAt;
                 row.TranscriptTurns = answered.TryGetValue(session.Id, out var n) ? n : 0;
+                row.EvaluationStatus = session.EvaluationStatus;
+                row.EvaluationError = session.EvaluationError;
 
                 if (evaluations.TryGetValue(session.Id, out var eval))
                 {
@@ -225,7 +239,15 @@ namespace ARI.Application.Evaluations
                     {
                         InterviewSessionStatuses.Waiting => InterviewResultStates.Waiting,
                         InterviewSessionStatuses.Active => InterviewResultStates.InProgress,
-                        InterviewSessionStatuses.Completed => InterviewResultStates.Evaluating,
+                        // Trước ADR-073 "đã xong mà chưa có báo cáo" luôn là "AI đang chấm" — kể cả khi báo cáo
+                        // không bao giờ tới vì tin thiếu bộ tiêu chí. Nay nói đúng lý do và ai phải làm gì.
+                        InterviewSessionStatuses.Completed => session.EvaluationStatus switch
+                        {
+                            EvaluationStatuses.BlockedNoRubric => InterviewResultStates.NeedsRubric,
+                            EvaluationStatuses.Failed when session.EvaluationAttempts >= EvaluationStatuses.MaxAttempts
+                                => InterviewResultStates.EvaluationFailed,
+                            _ => InterviewResultStates.Evaluating,
+                        },
                         InterviewSessionStatuses.Aborted or InterviewSessionStatuses.Error => InterviewResultStates.Aborted,
                         _ => InterviewResultStates.Scheduled,
                     };

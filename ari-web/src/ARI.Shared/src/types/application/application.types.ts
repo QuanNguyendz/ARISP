@@ -185,6 +185,13 @@ export interface MyPracticeLanguage extends MyEvalLanguage {
 }
 
 /** Buổi phỏng vấn thử đã làm — lối vào trang xem lại (ADR-051). */
+/**
+ * Nhận xét AI của buổi thử đang ở đâu (ADR-073) — server suy ra: `done` có nhận xét · `pending` đang chấm (kể cả
+ * đang tự thử lại) · `needs_rubric` vị trí chưa có bộ tiêu chí · `no_answers` không có câu trả lời · `failed` hỏng
+ * sau nhiều lần thử. `null` với phiên chưa kết thúc.
+ */
+export type PracticeEvaluationState = 'done' | 'pending' | 'needs_rubric' | 'no_answers' | 'failed'
+
 export interface MyPracticeSessionItem {
   id: string
   applicationId: string
@@ -196,6 +203,7 @@ export interface MyPracticeSessionItem {
   endedAt?: string | null
   durationSeconds?: number | null
   hasEvaluation: boolean
+  evaluationState?: PracticeEvaluationState | null
   overallScore?: number | null
   turnCount: number
 }
@@ -252,6 +260,7 @@ export interface MyPracticeReview {
   evaluation?: MyPracticeEvaluation | null
   /** Phiên đã đóng nhưng AI chưa chấm xong. */
   evaluationPending: boolean
+  evaluationState?: PracticeEvaluationState | null
 }
 
 /** Chi tiết một hồ sơ ứng tuyển của chính ứng viên. */

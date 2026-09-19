@@ -25,7 +25,14 @@ namespace ARI.Application.Emails
         /// <summary>Thư mời nhận việc (ADR-061, Phase 5). Ngữ cảnh: <c>applicationId</c>.</summary>
         public const string OfferSent = "offer_sent";
 
-        public static readonly string[] All = { InterviewInvite, ApplicationRejected, OfferSent };
+        /// <summary>
+        /// Thư kết quả vòng phỏng vấn — gửi KÈM lệnh Hiring Manager chốt kết quả (ADR-074).
+        /// Ngữ cảnh: <c>applicationId</c> + <c>evaluationId</c> + <c>variant</c> = verdict sắp chốt
+        /// (<c>pass</c>/<c>not_pass</c>); biến thể thư (qua vòng / vòng cuối / cảm ơn) do server suy ra.
+        /// </summary>
+        public const string InterviewResult = "interview_result";
+
+        public static readonly string[] All = { InterviewInvite, ApplicationRejected, OfferSent, InterviewResult };
 
         private static readonly HashSet<string> AllSet = new(All, StringComparer.OrdinalIgnoreCase);
 

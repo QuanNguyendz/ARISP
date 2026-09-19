@@ -162,7 +162,16 @@ def _rubric_block(ctx: SessionContext) -> str:
         if c.description:
             line += f" | standard: {c.description}"
         lines.append(line)
-    return "COMPANY SCORING RUBRIC (weights sum to 100):" + chr(10) + chr(10).join(lines)
+        # Mức neo (ADR-073): điểm của tiêu chí phải rơi vào dải có mô tả khớp với câu trả lời.
+        lv = c.levels
+        if lv is not None:
+            for band, text in (("90-100", lv.excellent), ("70-89", lv.good), ("40-69", lv.fair), ("0-39", lv.poor)):
+                if text:
+                    lines.append(f"    {band}: {text}")
+    header = "COMPANY SCORING RUBRIC (weights sum to 100"
+    if any(c.levels is not None for c in ctx.criteria):
+        header += "; when a criterion lists score bands, the score MUST fall in the band whose description matches the answers"
+    return header + "):" + chr(10) + chr(10).join(lines)
 
 
 def evaluate_prompt(

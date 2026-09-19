@@ -261,6 +261,77 @@ public class UpdateJobStatusCommandHandlerTests
         Assert.Equal("draft", job.Status);
     }
 
+    // ---------- ADR-073: tin lên job board phải có bộ tiêu chí chấm phỏng vấn cho mọi vòng hội thoại ----------
+
+    private static PlaybookDocument InterviewRubric(Guid jobId, int? round)
+    {
+        var doc = ARI.Application.UnitTests.PracticeInterview.PracticeData.Rubric(jobId);
+        if (round.HasValue)
+        {
+            doc.Scope = ARI.Application.Playbooks.PlaybookScope.ScopeRound;
+            doc.RoundNumber = round;
+        }
+        return doc;
+    }
+
+    // UTCID14c — vượt chữ ký HM có lý do vẫn không đăng được khi thiếu bộ tiêu chí phỏng vấn
+    [Fact]
+    public async Task UTCID14c_Publishing_is_refused_without_interview_criteria_even_with_a_bypass()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
+        job.HmSignOffStatus = HmSignOffStatus.Pending;
+        c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"))
+            .Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id));   // có bộ chấm CV, KHÔNG có bộ phỏng vấn
+        HiringManagerSeed.Primary(c.Uow, job.Id);
+        var req = Req("active");
+        req.HmBypassReason = "Hiring Manager nghỉ phép, vị trí cần đăng gấp";
+
+        var res = await Run(c, job.Id, req, HrA, AppRoles.HrAdmin, withRubric: false);
+
+        Assert.True(res.IsFailure);
+        Assert.Equal(ARI.Application.InterviewRubrics.InterviewRubricErrors.Required, res.ErrorCode);
+        Assert.Equal("pending", job.Status);
+    }
+
+    // UTCID14d — gửi duyệt (draft → pending) KHÔNG đòi bộ tiêu chí phỏng vấn: người khai là HM, ở bước ký.
+    [Fact]
+    public async Task UTCID14d_Submitting_for_sign_off_does_not_need_interview_criteria_yet()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: OwnerA, status: "draft");
+        c.Uow.Seed(job).Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id));
+        HiringManagerSeed.Primary(c.Uow, job.Id);
+
+        var res = await Run(c, job.Id, Req("pending"), OwnerA, AppRoles.Recruiter, withRubric: false);
+
+        Assert.True(res.IsSuccess);
+        Assert.Equal("pending", job.Status);
+    }
+
+    // UTCID14e — không có bộ chung nhưng MỌI vòng hội thoại đều có bộ riêng → đăng được (vòng trắc nghiệm không
+    // tính — xem InterviewRubricTests.Missing_rounds_ignore_online_tests_and_count_round_sets)
+    [Fact]
+    public async Task UTCID14e_Round_sets_covering_every_conversational_round_are_enough()
+    {
+        var c = NewCtx();
+        var job = JobPostingData.Job(owner: Guid.NewGuid(), status: "pending");
+        job.HmSignOffStatus = HmSignOffStatus.Pending;
+        c.Uow.Seed(job).Seed(JobPostingData.Staff(HrA, role: "hr_admin"))
+            .Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id))
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = InterviewRoundTypes.Screening },
+                  new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 2, RoundType = InterviewRoundTypes.Technical })
+            .Seed(InterviewRubric(job.Id, 1), InterviewRubric(job.Id, 2));
+        HiringManagerSeed.Primary(c.Uow, job.Id);
+        var req = Req("active");
+        req.HmBypassReason = "Hiring Manager nghỉ phép, vị trí cần đăng gấp";
+
+        var res = await Run(c, job.Id, req, HrA, AppRoles.HrAdmin, withRubric: false);
+
+        Assert.True(res.IsSuccess, res.Error);
+        Assert.Equal("active", job.Status);
+    }
+
     // UTCID15 — owner đóng tin active → closed → Success
     [Fact]
     public async Task UTCID15_Close_active()

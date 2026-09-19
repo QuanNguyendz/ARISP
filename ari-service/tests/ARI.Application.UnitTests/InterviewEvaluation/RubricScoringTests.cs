@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using ARI.Application.Evaluations;
 using ARI.Application.Playbooks;
 using ARI.Application.UnitTests.PracticeInterview;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -18,12 +20,12 @@ namespace ARI.Application.UnitTests.InterviewEvaluation;
 /// Trước đây prompt ép cứng 8 khoá tiếng Anh rồi hỏi luôn <c>score</c> tổng — con số ấy không phải
 /// trung bình có trọng số của gì cả, nên "chấm theo tiêu chí công ty" chỉ là hình thức. Nay AI chỉ
 /// chấm TỪNG tiêu chí, backend cộng có trọng số và so với <c>InterviewPassScore</c>.
+///
+/// ADR-073: việc chấm do <see cref="ARI.Application.Evaluations.InterviewEvaluator"/> làm (hàng đợi nền), và
+/// bộ tiêu chí chỉ lấy từ VÒNG → TIN — không lùi về bộ công ty.
 /// </summary>
 public class RubricScoringTests
 {
-    private static ARI.Application.Services.InterviewService Svc(InMemoryUnitOfWork uow, StubAiProvider ai)
-        => InterviewServiceFactory.Create(uow, new RecordingNotificationService(), ai, new RecordingTtsService());
-
     private static PlaybookDocument Rubric(Guid? jobId, int? round, params (string Key, string Name, decimal Weight)[] rows)
         => new()
         {
@@ -65,7 +67,7 @@ public class RubricScoringTests
         // Model tự khai 95 — con số đó phải bị bỏ qua.
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}", aiScore: 95m);
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var eval = Assert.Single(uow.Repo<Evaluation>().Items);
         Assert.Equal(74m, eval.OverallScore!.Value);          // 90*0.6 + 50*0.4, không phải 95
@@ -81,7 +83,7 @@ public class RubricScoringTests
             .Seed(Rubric(job.Id, 2, ("system_design", "Thiết kế hệ thống", 100)));
         var ai = AiScoring("{\"system_design\": 80}");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var sent = Assert.Single(ai.LastEvaluationContext!.Criteria);
         Assert.Equal("system_design", sent.Key);
@@ -104,7 +106,7 @@ public class RubricScoringTests
         // Model luôn nói "pass" — verdict phải do ngưỡng quyết định.
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}", verdict: "pass");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var eval = Assert.Single(uow.Repo<Evaluation>().Items);
         Assert.Equal(74m, eval.OverallScore!.Value);
@@ -122,7 +124,7 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(SixtyForty(job.Id));
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var eval = Assert.Single(uow.Repo<Evaluation>().Items);
         using var doc = JsonDocument.Parse(eval.CriterionScores!);
@@ -142,7 +144,7 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(SixtyForty(job.Id));
         var ai = AiScoring("{\"technical\": 80, \"communication\": 80, \"enthusiasm\": 100}");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var eval = Assert.Single(uow.Repo<Evaluation>().Items);
         Assert.Equal(80m, eval.OverallScore!.Value);              // "enthusiasm" không kéo điểm lên
@@ -161,12 +163,18 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session);
         var ai = AiScoring("{\"technical\": 10}", aiScore: 82m, verdict: "pass");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        var outcome = await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         // KHÔNG sinh báo cáo. Trước đây chỗ này lấy thẳng điểm 82 và verdict "pass" do model tự
         // đưa ra — hai con số không phải trung bình có trọng số của gì cả, mà lại quyết định
         // đậu/trượt của người thật (ADR-062).
+        Assert.Equal(EvaluationOutcome.BlockedNoRubric, outcome);
         Assert.Empty(uow.Repo<Evaluation>().Items);
+        // ADR-073: lý do được GHI lại để giao diện nói "chờ bộ tiêu chí" thay vì quay "AI đang chấm" mãi,
+        // và không tốn lượt thử — thiếu bộ tiêu chí là việc của HM, không phải lỗi của AI.
+        Assert.Equal(EvaluationStatuses.BlockedNoRubric, session.EvaluationStatus);
+        Assert.Equal(0, session.EvaluationAttempts);
+        Assert.Null(ai.LastEvaluationContext);
         // Trạng thái hồ sơ không bị đụng tới, phiên vẫn đóng bình thường.
         Assert.Equal("interview", app.Status);
     }
@@ -187,11 +195,16 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(SixtyForty(job.Id));
         var ai = AiScoring("{}", aiScore: 66m, verdict: "not_pass");
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        var outcome = await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         // Không có gì hợp lệ để ghi: không cho 0 (đánh trượt oan vì lỗi model), cũng không lấy
         // điểm 66 do model tự đưa ra.
+        Assert.Equal(EvaluationOutcome.Failed, outcome);
         Assert.Empty(uow.Repo<Evaluation>().Items);
+        // ADR-073: ghi lỗi + đếm lượt để lượt quét thử lại, thay vì mất báo cáo vĩnh viễn.
+        Assert.Equal(EvaluationStatuses.Failed, session.EvaluationStatus);
+        Assert.Equal(1, session.EvaluationAttempts);
+        Assert.False(string.IsNullOrEmpty(session.EvaluationError));
     }
 
     /// <summary>Buổi THỬ cũng chấm theo đúng rubric — ứng viên luyện tập trên cùng thước đo.</summary>
@@ -204,7 +217,7 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(SixtyForty(job.Id));
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}", aiScore: 95m);
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         var eval = Assert.Single(uow.Repo<Evaluation>().Items);
         Assert.Equal(74m, eval.OverallScore!.Value);
@@ -221,9 +234,10 @@ public class RubricScoringTests
             .Seed(SixtyForty(Guid.NewGuid()));                    // rubric của tin KHÁC
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}", aiScore: 95m);
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        var outcome = await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         // Rubric của tin khác KHÔNG áp dụng → coi như tin này chưa khai rubric → KHÔNG chấm.
+        Assert.Equal(EvaluationOutcome.BlockedNoRubric, outcome);
         Assert.Empty(uow.Repo<Evaluation>().Items);
         // Và dừng TRƯỚC khi gọi model: không tiêu token cho một bản đánh giá chắc chắn bị bỏ.
         Assert.Null(ai.LastEvaluationContext);
@@ -241,9 +255,50 @@ public class RubricScoringTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(deleted);
         var ai = AiScoring("{\"technical\": 90, \"communication\": 50}", aiScore: 95m);
 
-        await Svc(uow, ai).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        var outcome = await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
 
         // Rubric đã xoá mềm KHÔNG áp dụng → coi như chưa khai rubric → KHÔNG chấm.
+        Assert.Equal(EvaluationOutcome.BlockedNoRubric, outcome);
         Assert.Empty(uow.Repo<Evaluation>().Items);
+    }
+
+    // ---------- ADR-073: bộ tiêu chí theo TIN, không lùi về bộ công ty ----------
+
+    /// <summary>
+    /// Bộ cấp công ty chỉ là MẪU để HM chép — không phải đường lùi. Trước ADR-073 nó là đường lùi, nhưng production
+    /// không có bộ công ty nào nên mọi buổi phỏng vấn đều im lặng không ra báo cáo.
+    /// </summary>
+    [Fact]
+    public async Task Company_level_rubric_is_a_template_not_a_fallback()
+    {
+        var job = PracticeData.Job();
+        var app = PracticeData.App(job.Id, status: "interview");
+        var session = PracticeData.Session(app.Id, type: "real");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session)
+            .Seed(Rubric(null, null, ("technical", "Chuyên môn", 100)));  // chỉ có bộ cấp công ty
+        var ai = AiScoring("{\"technical\": 90}");
+
+        var outcome = await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
+
+        Assert.Equal(EvaluationOutcome.BlockedNoRubric, outcome);
+        Assert.Null(ai.LastEvaluationContext);
+    }
+
+    /// <summary>Bộ riêng của vòng thắng bộ chung của tin — vòng chuyên môn chấm theo thước đo của nó.</summary>
+    [Fact]
+    public async Task Round_rubric_wins_over_the_job_rubric()
+    {
+        var job = PracticeData.Job();
+        var app = PracticeData.App(job.Id, status: "interview");
+        var session = PracticeData.Session(app.Id, round: 2, type: "real");
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session)
+            .Seed(SixtyForty(job.Id))
+            .Seed(Rubric(job.Id, 2, ("system_design", "Thiết kế hệ thống", 100)));
+        var ai = AiScoring("{\"system_design\": 60}");
+
+        await EvaluationKit.CompleteAndEvaluateAsync(uow, session, ai);
+
+        Assert.Equal("system_design", Assert.Single(ai.LastEvaluationContext!.Criteria).Key);
+        Assert.Equal(60m, Assert.Single(uow.Repo<Evaluation>().Items).OverallScore!.Value);
     }
 }

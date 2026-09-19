@@ -97,6 +97,7 @@ namespace ARI.Application.CandidatePortal
                     s.EndedAt,
                     s.DurationSeconds,
                     HasEvaluation = eval != null,
+                    EvaluationState = EvaluationProgress.ForDisplay(s.Status, s.EvaluationStatus, s.EvaluationAttempts, eval != null),
                     OverallScore = eval?.OverallScore,
                     TurnCount = turnCountBySession.TryGetValue(s.Id, out var c) ? c : 0
                 };
@@ -201,6 +202,9 @@ namespace ARI.Application.CandidatePortal
             // để ứng viên tự luyện tập (ADR-051).
             // Phân tích từng câu đã gắn vào `turns` nên KHÔNG trả lại lần hai ở đây (tránh lặp nội dung
             // + tránh hiển thị bản sao Q&A do model chép sai).
+            var evaluationState = EvaluationProgress.ForDisplay(
+                session.Status, session.EvaluationStatus, session.EvaluationAttempts, evaluation != null);
+
             object? evalData = evaluation == null ? null : new
             {
                 evaluation.Id,
@@ -229,8 +233,10 @@ namespace ARI.Application.CandidatePortal
                 session.ClosingText,
                 Turns = turns,
                 Evaluation = evalData,
-                // Phiên đã đóng nhưng AI chưa chấm xong → FE hiện trạng thái "đang chấm".
-                EvaluationPending = evaluation == null && session.Status == "completed"
+                // ADR-073: nói rõ VÌ SAO chưa có nhận xét — đang chấm, chờ nhà tuyển dụng bổ sung tiêu chí, không có
+                // câu trả lời nào, hay đã hỏng. Trước đây mọi trường hợp đều là "đang chấm" và quay mãi.
+                EvaluationState = evaluationState,
+                EvaluationPending = evaluationState == EvaluationProgress.Pending
             });
         }
     }

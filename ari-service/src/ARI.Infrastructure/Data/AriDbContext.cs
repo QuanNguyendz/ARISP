@@ -746,6 +746,26 @@ namespace ARI.Infrastructure.Data
                 .HasFilter("scope = 'job_posting' AND document_type = 'cv_rubric' AND deleted_at IS NULL")
                 .HasDatabaseName("ux_playbook_documents_job_cv_rubric");
 
+            // Bộ tiêu chí chấm PHỎNG VẤN (ADR-073): mỗi tin một bộ chung, mỗi vòng tối đa một bộ riêng. Hai
+            // index vì bộ chung có round_number NULL — Postgres coi mọi NULL là khác nhau, một index gộp
+            // (scope_ref_id, round_number) sẽ để lọt hai bộ chung cùng sống.
+            // Dùng overload CÓ TÊN: gọi HasIndex(p => p.ScopeRefId) lần hai không tên là EF trả lại đúng index
+            // của bộ CV phía trên và ghi đè bộ lọc của nó.
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasIndex(p => p.ScopeRefId, "ux_playbook_documents_job_interview_rubric")
+                .IsUnique()
+                .HasFilter("scope = 'job_posting' AND document_type = 'interview_rubric' AND deleted_at IS NULL");
+            modelBuilder.Entity<PlaybookDocument>()
+                .HasIndex(p => new { p.ScopeRefId, p.RoundNumber }, "ux_playbook_documents_round_interview_rubric")
+                .IsUnique()
+                .HasFilter("scope = 'round' AND document_type = 'interview_rubric' AND deleted_at IS NULL");
+
+            // Lượt quét chấm báo cáo (ADR-073) chỉ đọc phiên CHƯA xong — index lọc giữ nó nhỏ khi bảng lớn dần.
+            modelBuilder.Entity<InterviewSession>()
+                .HasIndex(s => s.EvaluationStatus)
+                .HasFilter("evaluation_status IS NOT NULL AND evaluation_status <> 'done'")
+                .HasDatabaseName("idx_interview_sessions_evaluation_pending");
+
             // --- Job retry webhook nền.
             modelBuilder.Entity<WebhookDelivery>()
                 .HasIndex(w => w.NextRetryAt)

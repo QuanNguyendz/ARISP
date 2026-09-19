@@ -26,6 +26,8 @@ internal sealed class FakeCvReviewProvider : IGeminiProvider
         CvScoringAiRequest request, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<System.Collections.Generic.List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(
         CvRubricSuggestionInput input, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<Result<System.Collections.Generic.List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(
+        CvRubricSuggestionInput input, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<JdExtractionResultDto>> ExtractJobFromJdAsync(
         byte[]? jdFileBytes, string? jdMimeType, string? fallbackJdText, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<Result<CvContactVerificationResultDto>> VerifyCvContactInfoAsync(

@@ -311,7 +311,25 @@ Return ONLY a valid JSON object, without markdown:
             public List<CvRubricSuggestionItem>? Criteria { get; set; }
         }
 
-        public async Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+        private const string InterviewRubricSuggestionInstruction = @"You help a Hiring Manager draft an INTERVIEW SCORING RUBRIC for one job opening. An AI interviewer holds a spoken interview with the candidate; this rubric is used to score the candidate's ANSWERS.
+Rules:
+- Return 4 to 6 criteria that can be judged FROM INTERVIEW ANSWERS for THIS role: depth of role-specific technical knowledge, problem solving and reasoning, practical experience shown through concrete examples, clarity of explanation, attitude and collaboration. Do NOT include criteria that can only be judged from documents (degrees, certificates, years written on the CV).
+- NEVER use protected or discriminatory attributes (age, gender, marital status, religion, ethnicity, hometown, appearance, health) as criteria.
+- Weights are integers that sum to exactly 100 and reflect importance for THIS role.
+- Every text value is Vietnamese; keep technology names as-is.
+- ""name"": short criterion name. ""description"": what a strong answer demonstrates (1-2 sentences).
+- ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69), ""poor"" (0-39): concrete, observable descriptions of answers at that level (correctness, depth, concrete examples, trade-offs considered) so two interviewers would pick the same band.
+Return ONLY a valid JSON object, without markdown:
+{ ""criteria"": [ { ""name"": string, ""weight"": integer, ""description"": string, ""excellent"": string, ""good"": string, ""fair"": string, ""poor"": string } ] }";
+
+        public Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+            => SuggestRubricAsync(RubricSuggestionInstruction, input, keepChecks: true, ct);
+
+        public Task<Result<List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+            => SuggestRubricAsync(InterviewRubricSuggestionInstruction, input, keepChecks: false, ct);
+
+        private async Task<Result<List<CvRubricSuggestionItem>>> SuggestRubricAsync(
+            string instruction, CvRubricSuggestionInput input, bool keepChecks, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(input.Title))
                 return Result<List<CvRubricSuggestionItem>>.Failure("Cần tên vị trí để gợi ý bộ tiêu chí.");
@@ -326,7 +344,7 @@ Return ONLY a valid JSON object, without markdown:
 
             var requestBody = new
             {
-                system_instruction = new { parts = new[] { new { text = RubricSuggestionInstruction } } },
+                system_instruction = new { parts = new[] { new { text = instruction } } },
                 contents = new[] { new { parts = new[] { new { text = userContent } } } },
                 generationConfig = new { responseMimeType = "application/json", temperature = 0.3 },
             };
@@ -334,7 +352,7 @@ Return ONLY a valid JSON object, without markdown:
             string responseJson;
             try
             {
-                (responseJson, _) = await GetAnalysisJsonAsync(requestBody, RubricSuggestionInstruction, userContent, null, ct);
+                (responseJson, _) = await GetAnalysisJsonAsync(requestBody, instruction, userContent, null, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -347,6 +365,7 @@ Return ONLY a valid JSON object, without markdown:
                 var (json, _, _) = Unwrap(responseJson);
                 var parsed = string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<RubricSuggestionEnvelope>(json, ReadOpts);
                 var items = parsed?.Criteria?.Where(c => !string.IsNullOrWhiteSpace(c.Name)).ToList() ?? new();
+                if (!keepChecks) foreach (var item in items) item.Checks = null;
                 return items.Count == 0
                     ? Result<List<CvRubricSuggestionItem>>.Failure("AI chưa gợi ý được tiêu chí nào — hãy thử lại hoặc tự nhập.")
                     : Result<List<CvRubricSuggestionItem>>.Success(items);

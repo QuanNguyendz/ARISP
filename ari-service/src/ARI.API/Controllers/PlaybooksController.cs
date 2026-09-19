@@ -114,6 +114,27 @@ namespace ARI.API.Controllers
             return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
 
+        // ---------------- Trình soạn bộ tiêu chí chấm PHỎNG VẤN (ADR-073) — dùng chung parse/export Excel ở trên ----------------
+
+        /// <summary>Mẫu bộ tiêu chí phỏng vấn của công ty (HR Leader tải lên ở màn Playbook) để HM chép.</summary>
+        [HttpGet("interview-rubric/templates")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetInterviewRubricTemplates(CancellationToken ct)
+        {
+            var result = await _sender.Send(new ARI.Application.InterviewRubrics.GetInterviewRubricTemplatesQuery(), ct);
+            return Ok(result.Value);
+        }
+
+        /// <summary>AI gợi ý bản nháp bộ tiêu chí chấm phỏng vấn từ nội dung tin. Mỗi lần gọi là một lượt AI có phí.</summary>
+        [HttpPost("interview-rubric/suggest")]
+        [Authorize(Policy = "HiringDecision")]
+        public async Task<IActionResult> SuggestInterviewRubric([FromBody] CvRubricSuggestionInput body, CancellationToken ct)
+        {
+            if (body == null) return BadRequest(new { message = "Thiếu nội dung để gợi ý." });
+            var result = await _sender.Send(new ARI.Application.InterviewRubrics.SuggestInterviewRubricCommand(body), ct);
+            return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
+        }
+
         /// <summary>Upload một tài liệu playbook (PDF/DOCX/TXT/MD; riêng bộ tiêu chí chấm điểm là .xlsx).</summary>
         [HttpPost]
         [Authorize(Policy = "HrManagement")]

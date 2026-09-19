@@ -90,5 +90,23 @@
     "decide": "Không ghi nhận được quyết định.",
     "send": "Không gửi được thư mời cho ứng viên.",
     "withdraw": "Không thu hồi được thư mời."
+  },
+  "jobFilled": {
+    "title_one": "Tin đã đóng — còn {{count}} hồ sơ đang xử lý",
+    "title_other": "Tin đã đóng — còn {{count}} hồ sơ đang xử lý",
+    "hint": "Tin không nhận hồ sơ mới nữa, nhưng những ứng viên dưới đây vẫn đang chờ câu trả lời. Hệ thống không tự loại ai: từ chối kèm thư cảm ơn, hoặc giữ lại nếu còn vị trí phù hợp.",
+    "reject": "Từ chối & gửi thư cảm ơn",
+    "viewOffer": "Xem thư mời đang chờ",
+    "composerTitle": "Thư cảm ơn — {{name}}",
+    "composerSend": "Từ chối & gửi thư",
+    "rejectError": "Không từ chối được hồ sơ này lúc này.",
+    "status": {
+      "invited": "Đã mời nộp CV",
+      "cv_submitted": "Chờ sàng CV",
+      "hm_review": "Chờ HM duyệt",
+      "screening": "Chờ xếp lịch",
+      "interview": "Đang phỏng vấn",
+      "offer": "Đang cầm thư mời"
+    }
   }
 }

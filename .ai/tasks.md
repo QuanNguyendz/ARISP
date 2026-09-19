@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-19
 
 ---
 
@@ -20,15 +20,16 @@ _Chưa có task nào đang thực hiện._
 > hoàn thành cả 6 phase ngày 2026-08-31 trên nhánh `feature/be/hiring-manager-offer-pipeline`
 > (chi tiết từng phase ở mục Completed). **Chưa commit, chưa merge.**
 >
-> Còn dang dở, cố ý để lại: **3/6 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
-> `offer_sent`). Ba mẫu còn lại — mời vòng kế, cấp mã phỏng vấn, kết quả sau khi chốt verdict —
-> hạ tầng đã đủ, mỗi cái là "viết một builder + thêm một `case` + thêm `emailOverride` vào command".
+> Còn dang dở, cố ý để lại: **4 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
+> `offer_sent`, và từ 2026-09-19 `interview_result` — gộp cả thư "mời vòng kế" lẫn "kết quả sau khi chốt
+> verdict", ADR-074). Còn lại **thư cấp mã phỏng vấn** — hạ tầng đã đủ: "viết một builder + thêm một
+> `case` + thêm `emailOverride` vào command".
 
 ---
 
 ## Nợ kỹ thuật đã biết — `CLAUDE.md` sát ngưỡng cảnh báo
 
-`CLAUDE.md` đang **39.806 / 40.000 ký tự** — dư **194 ký tự** (2026-09-17, sau ADR-071). Thêm một đoạn bất kỳ là vượt ngưỡng
+`CLAUDE.md` đang **39.284 / 40.000 ký tự** — dư **716 ký tự** (2026-09-19, sau ADR-074: gọt dòng ADR-048 và ADR-056 — hai quyết định đã nguội — từ ~950 về ~450 ký tự mỗi dòng để có chỗ cho dòng ADR-074; trước đó ADR-073 gọt dòng ADR-066). Thêm một đoạn bất kỳ là vượt ngưỡng
 cảnh báo file bộ nhớ lớn và nạp lại mỗi phiên.
 
 **Mỗi đợt thêm một ADR nay đều phải gọt dòng cũ trước** — ADR-065 gọt 12 dòng, ADR-066 gọt thêm 16, ADR-067
@@ -263,12 +264,13 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] HR Dashboard (Phân quyền rõ ràng cho 3 role: SuperAdmin, HR Leader, Recruiter):
   - [x] Danh sách Application per Job Posting (filter, sort) – `EvaluationsController`
   - [x] Xem Evaluation Report + recording per Application per Round
-  - [ ] Confirm / Override verdict (HrReview entity có, endpoint `/evaluations/{id}/review` cần kiểm tra)
+  - [x] 2026-09-19 Confirm / Override verdict — `POST /api/interview/review/confirm`, **một báo cáo chỉ chốt một lần** (409), thư kết quả đi kèm lệnh chốt (ADR-074)
   - [x] Unit test `SubmitHrReviewAsync` — Confirm (mọi nhân sự) vs Override (chỉ HR Admin/Super Admin + bắt buộc lý do, Recruiter bị chặn), cập nhật status hồ sơ pass/not_pass, auto-progression sang vòng kế (chỉ real + có RoundConfig → tạo InterviewInvite, status→interview; practice/not_pass không progress), thông báo ứng viên realtime + Notification chống trùng (DedupKey), audit log hr_confirm/hr_override — **16 test mới, 109/109 pass** ✅ 2026-08-05
   - [x] Unit test Luồng 8 Review Interview Result (UC-64/84–90/95) — query HR đọc/giám sát kết quả: `GetEvaluationsQuery` (ẩn buổi thử, lọc theo job + trạng thái pending/completed/verdict tôn trọng HR override, phân trang + total, join tên/vị trí/review), `GetEvaluationDetailQuery` (tra theo EvaluationId hoặc fallback SessionId, ẩn practice, kèm HR review + resolve URL video buổi thật ADR-052), `GetEvaluationsByApplicationQuery` (các vòng của hồ sơ, ẩn practice, trạng thái review), `GetSessionsForHrAsync` (bảng giám sát phiên: ẩn practice, sắp mới nhất, join ứng viên/vị trí/verdict AI mới nhất + cờ có video). Confirm/Override đã phủ ở test `SubmitHrReviewAsync`. — **24 test mới, 375/375 pass** ✅ 2026-08-05
 - [x] `AuditLogService`: entity `AuditLog` đã có, ghi lại mọi action
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
-- [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
+- [x] 2026-09-19 **Email kết quả cho ứng viên qua trình soạn** sau khi Hiring Manager chốt — mẫu `interview_result` (qua vòng / vòng cuối / cảm ơn), gửi kèm lệnh chốt, ghi `email_logs` (ADR-074)
+- [x] 2026-09-19 **Thư xác nhận nhận việc** (`offer_accepted`, nối luồng thư mời) + **tự đóng tin khi số `hired` đạt `Headcount` của phiếu**; màn tin đã đóng liệt kê hồ sơ chưa khép, loại kèm thư cảm ơn qua trình soạn (ADR-074)
 - [x] **Thư mời đúng ADR-063: HM chính soạn + gửi duyệt**, gửi duyệt báo HR Leader + SA (trước đây báo nhầm HM), qua vòng cuối → báo chủ tin + HM soạn thư; link thông báo theo vai người nhận (`StaffLinks`) (ADR-068) ✅ 2026-09-15
 - [x] **Đường vào báo cáo AI sau buổi phỏng vấn thật**: danh sách "Kết quả phỏng vấn" theo vòng (ca · AI đang chấm · báo cáo · video · transcript) ở màn tin + màn hồ sơ của cả ba vai, mục "Buổi vừa kết thúc" ở màn Phòng phỏng vấn của HM, màn đánh giá có transcript đầy đủ + ca (ADR-069) ✅ 2026-09-15
 - [ ] Transcript nhảy tới đúng đoạn video của từng câu (cần mốc bắt đầu ghi hình so với phiên)
@@ -386,6 +388,17 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-19: **Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người (ADR-074, giai đoạn 2).** Sau khi ADR-073 gỡ chỗ tắc báo cáo, luồng offer lần đầu chạy tới cuối và lộ ba lỗ: thư kết quả (thư quan trọng nhất) viết cứng ở hai chỗ, gửi thẳng SMTP, không xem trước/sửa/lưu vết được — và hai nhánh chọn thư theo hai điều kiện khác nhau; chốt hai lần được; nhận việc xong không một văn bản nào, tin vẫn mở trên Job Board sau khi đủ người.
+  - **BE:** `InterviewResultEmail` (3 biến thể, `ResolveVariant` là hàm duy nhất cho cả thư lẫn trạng thái hồ sơ, `TotalRoundsAsync` dùng chung) + khoá mẫu `interview_result` + nhánh renderer (báo cáo phải thuộc hồ sơ) + `PreviewEmailQuery.Variant` (cổng xem trước của mẫu này = HM chính / quản trị viên); `ConfirmReviewRequest.EmailOverride` → `SubmitHrReviewAsync` gửi MỘT thư qua `CandidateEmailSender`; `TriggerAutoProgressionAsync` → `OpenNextRoundAsync` (không gửi thư); chốt lần hai → 409. `OfferEmail.BuildAccepted` + `RespondToOfferCommand` gửi thư xác nhận (nối `In-Reply-To` thư mời) và gọi `JobHeadcountCloser` (đóng tin, audit `job_auto_closed_headcount`, báo HM/Recruiter/HR Leader kèm số hồ sơ + thư mời còn mở; không tự loại, không tự thu hồi) — cả hai best-effort sau khi quyết định đã lưu.
+  - **FE:** `EmailComposerModal` + `emailService.preview` nhận `variant`; màn đánh giá (HR/HM) bấm chốt → mở trình soạn thư kết quả (buổi thử chốt thẳng), lỗi hiện đúng câu server qua `resolveApiError`; `ClosedJobOpenApplications` ở màn tin của HR/Recruiter/HM; `applicationService.rejectApplication` nhận `emailOverride`; i18n vi/en.
+  - **Kiểm chứng:** Application **2114/2114** (+23 test), `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm (email tắt): xem trước thư vòng 1/vòng 3 đúng biến thể; chốt vòng cuối kèm thư sửa tay → `email_logs` `was_edited`, `<script>` bị lọc, hồ sơ `pass`; chốt lần hai 409; HM soạn offer (điền sẵn từ đề xuất) → HR Leader chốt → gửi → ứng viên nhận → `hired`, thư `offer_accepted`, tin headcount 1 tự `closed` + audit + thông báo.
+
+- [x] 2026-09-19: **Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin + chấm bằng hàng đợi nền (ADR-073, giai đoạn 1).** Người dùng báo buổi thử lẫn buổi thật đều không ra báo cáo. Nguyên nhân kiểm trên production (chỉ đọc): 0 bộ `interview_rubric` → `GenerateEvaluationReportAsync` thoát sớm chỉ để lại log; báo cáo sinh ngay trong lệnh đóng phiên nên lỗi nào cũng là mất vĩnh viễn; giao diện gọi mọi trường hợp là "AI đang chấm". Kéo theo luồng offer không bao giờ chạy (không hồ sơ nào tới `pass`).
+  - **BE:** `InterviewRubricStore` (vòng → tin, bỏ lùi bộ công ty) + `InterviewRubricService.SaveAsync` (đường ghi duy nhất, bỏ ý kiểm, lưu xong đưa buổi đang chờ vào hàng) + `JobInterviewRubricController` (`GET/PUT /api/jobs/{id}/interview-rubric`, `DELETE …/rounds/{n}`) + mẫu công ty & AI gợi ý (`/api/playbooks/interview-rubric/templates|suggest`, `GeminiProvider.SuggestInterviewRubricAsync`). Chặn nạp/xoá `interview_rubric` cấp tin qua playbook thường; danh sách playbook của tin ẩn nó. Cổng `→ active` mã `interview_rubric_required`. `InterviewEvaluator` (4 kết cục, ghi `evaluation_status/attempts/error/updated_at`, báo cáo hệ thống cho buổi thật không câu trả lời, đánh giá ngôn ngữ lỗi không làm mất báo cáo) + `IEvaluationQueue` + `EvaluationHostedService` (2 worker, quét 2′, thử lại 3 lượt, nhắc HM thiếu bộ tiêu chí). `EndSessionAsync` chỉ xếp hàng. `POST /api/evaluations/sessions/{id}/retry`. Trạng thái `needs_rubric`/`evaluation_failed` (nhân sự) và `EvaluationProgress` (ứng viên). Seed dev gieo bộ tiêu chí phỏng vấn. Migration `InterviewEvaluationPipeline`.
+  - **rag-service:** `RubricCriterion.levels` + in mức neo 4 dải vào prompt chấm.
+  - **FE:** `JobInterviewRubricPanel` ở màn tin của HM/HR/Recruiter (bộ chung + bộ riêng theo vòng, banner vòng thiếu + số buổi đang chờ), `CvRubricEditor mode="interview"`, `interviewRubricService`; `InterviewResultsCard` thêm hai trạng thái + nút "Chấm lại"; Portal: danh sách buổi thử + trang xem lại nói đúng lý do, tự hỏi lại khi đang chấm; mã lỗi `interview_rubric_required` (vi/en); nhãn mẫu Playbook công ty.
+  - **Kiểm chứng:** Application **2091/2091**, Infrastructure 7/7, Domain 63/63, rag-service 37/37, `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini: chấm nền → 84 `pass`; thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI; HM nhờ AI gợi ý rồi lưu → buổi đang chờ tự chấm → 78,75; buổi thử không câu trả lời → `no_answers`; rag tắt → `failed` + lý do → "Chấm lại" → `done` + audit.
 
 - [x] 2026-09-18: **Bài trắc nghiệm là một đợt thi có giờ cố định; thời lượng có một nguồn (ADR-072).** Người dùng hỏi thời lượng bài do người cấu hình hay mặc định. Câu trả lời: có hai ô "thời lượng", ô "Số phút" của vòng trắc nghiệm ở màn tạo tin không có tác dụng gì. Người dùng muốn gộp lại, và muốn khung giờ thi thành *"bài 30 phút bắt đầu 9h thì 9h–9h30 vào lúc nào cũng được, 9h30 đóng — vào 9h15 còn 15 phút"* thay cho cửa vào 1 tiếng + đồng hồ riêng mỗi người.
   - **BE:** luật duy nhất `OnlineTestWindow` (`ClosesAt = giờ hẹn + thời lượng`, hạn nộp `+1 phút`); bỏ `EntryWindow` ở cả 7 chỗ đọc (lấy đề/nộp bài, tự nộp khi hết hạn, lịch ứng viên, Portal, bảng ứng viên, khoảng bận khi xếp lịch, thư mời/nhắc). Thời lượng = `MaxDurationMinutes` của vòng `online_test`; màn ngân hàng đề ghi vào vòng (`DurationMinutes` nullable: tin chưa có vòng thì không lưu được). Giờ kết thúc ca thi server tự tính = giờ đóng (`SchedulingSupport.EffectiveEndTime`). Chặn đổi thời lượng khi còn ứng viên giữ chỗ ở ca thi chưa đóng (mã `online_test_duration_locked`, cả màn ngân hàng đề lẫn lệnh sửa tin); đổi được thì kéo giờ kết thúc các ca chưa đóng. `CandidateOnlineTestDto.ServerNow`. Migration `MergeOnlineTestDurationIntoRoundConfig`: chép giá trị đang có hiệu lực sang vòng, đồng bộ giờ kết thúc ca thi cũ, bỏ cột `job_postings.online_test_duration_minutes`.

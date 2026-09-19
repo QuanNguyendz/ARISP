@@ -76,7 +76,9 @@ public class JobSignOffTests
         var uow = new InMemoryUnitOfWork().Seed(job)
             .Seed(new User { Id = _ownerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, FullName = "Recruiter A", IsActive = true });
         HiringManagerSeed.Primary(uow, job.Id, _hmId, _ownerId);
-        if (withRubric) uow.Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id));
+        if (withRubric)
+            uow.Seed(ARI.Application.UnitTests.CvScoring.CvScoringKit.DefaultRubric(job.Id))
+               .Seed(ARI.Application.UnitTests.PracticeInterview.PracticeData.Rubric(job.Id)); // ADR-073
         return (uow, job);
     }
 

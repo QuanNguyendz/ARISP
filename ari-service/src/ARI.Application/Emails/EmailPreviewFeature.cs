@@ -22,7 +22,8 @@ namespace ARI.Application.Emails
     /// dữ liệu hồ sơ. Phải kiểm quyền trên tin y hệt endpoint đọc hồ sơ, nếu không nó thành lỗ
     /// rò vòng qua toàn bộ công sức siết phạm vi ở Phase 1.
     /// </summary>
-    public record PreviewEmailQuery(string TemplateKey, Guid ContextId, Guid? SecondaryId, Guid? UserId, string? Role)
+    public record PreviewEmailQuery(
+        string TemplateKey, Guid ContextId, Guid? SecondaryId, Guid? UserId, string? Role, string? Variant = null)
         : IRequest<Result<RenderedEmail>>;
 
     public class PreviewEmailQueryHandler : IRequestHandler<PreviewEmailQuery, Result<RenderedEmail>>
@@ -47,10 +48,19 @@ namespace ARI.Application.Emails
                 _unitOfWork, request.ContextId, request.UserId, request.Role, ct);
             if (application == null)
                 return Result.Failure<RenderedEmail>(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
-            if (level < JobAccessLevel.Owner)
+
+            // Ai được xem trước thư = ai được bấm lệnh gửi thư đó. Thư kết quả phỏng vấn đi kèm lệnh CHỐT
+            // của Hiring Manager chính (quản trị viên chốt thay) — HM chỉ ở mức TeamMember trên tin, nên
+            // ngưỡng Owner chung sẽ chặn đúng người duy nhất cần soạn thư này, còn thả Recruiter vào.
+            var allowed = EmailTemplateKeys.InterviewResult.Equals(request.TemplateKey.Trim(), StringComparison.OrdinalIgnoreCase)
+                ? level == JobAccessLevel.Admin
+                  || await JobAccess.IsPrimaryHiringManagerAsync(_unitOfWork, application.JobPostingId, request.UserId, ct)
+                : level >= JobAccessLevel.Owner;
+            if (!allowed)
                 return Result.Failure<RenderedEmail>(JobAccessErrors.ApplicationManageForbidden, CommonErrorCodes.Forbidden);
 
-            return await _renderer.RenderAsync(request.TemplateKey, request.ContextId, request.SecondaryId, ct);
+            return await _renderer.RenderAsync(
+                request.TemplateKey, request.ContextId, request.SecondaryId, request.Variant, ct);
         }
     }
 

@@ -47,6 +47,22 @@ internal static class InterviewServiceFactory
         new MemoryCache(new MemoryCacheOptions()),
         options);
 
+    /// <summary>Overload cho lệnh đóng phiên (ADR-073): cắm hàng đợi chấm báo cáo để kiểm phiên được đưa vào hàng.</summary>
+    public static InterviewService Create(
+        IUnitOfWork uow, INotificationService notif, IAIProvider ai, ITTSService tts, IEvaluationQueue queue) => new(
+        uow,
+        ai,
+        notif,
+        new ThrowingDeepgramTokenService(),
+        new ThrowingRagIngestionService(),
+        tts,
+        new ThrowingFileStorageService(),
+        new TestScopeFactory(uow),
+        new MemoryCache(new MemoryCacheOptions()),
+        null,
+        null,
+        queue);
+
     /// <summary>
     /// Overload cho luồng lưu video Kiosk (ADR-052): cắm <see cref="IFileStorageService"/> thật
     /// (thường là <see cref="RecordingFileStorage"/>) + <see cref="InterviewOptions"/> để test

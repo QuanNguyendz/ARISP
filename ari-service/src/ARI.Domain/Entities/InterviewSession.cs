@@ -52,6 +52,21 @@ namespace ARI.Domain.Entities
         public DateTimeOffset? RecordingDeletedAt { get; set; }
         /// <summary>Câu chào kết thúc AI đã nói — lưu để transcript xem lại đủ (ADR-051).</summary>
         public string? ClosingText { get; set; }
+
+        /// <summary>
+        /// Việc sinh báo cáo đánh giá đang ở đâu — xem <see cref="ARI.Domain.Constants.EvaluationStatuses"/>
+        /// (ADR-073). Null với phiên chưa đóng.
+        /// </summary>
+        public string? EvaluationStatus { get; set; }
+
+        /// <summary>Số lượt đã gọi AI chấm phiên này — chặn vòng thử lại vô hạn khi AI lỗi mãi.</summary>
+        public int EvaluationAttempts { get; set; }
+
+        /// <summary>Lý do lượt chấm gần nhất thất bại (hiện cho nhân sự khi bấm "Chấm lại").</summary>
+        public string? EvaluationError { get; set; }
+
+        /// <summary>Lần cuối trạng thái chấm đổi — lượt quét dùng để giãn nhịp thử lại và nhận ra việc bị kẹt.</summary>
+        public DateTimeOffset? EvaluationUpdatedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
