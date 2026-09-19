@@ -33,6 +33,7 @@ namespace ARI.Application.Services
         private readonly InterviewOptions _interviewOptions;
         private readonly IMemoryCache _cache;
         private readonly ILogger<InterviewService>? _logger;
+        private readonly IEvaluationQueue? _evaluationQueue;
 
         // Cache key cho danh sách toàn bộ phiên phỏng vấn (HR view).
         private const string AllSessionsCacheKey = "interview-sessions:all";
@@ -48,9 +49,11 @@ namespace ARI.Application.Services
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             IMemoryCache cache,
             InterviewOptions? interviewOptions = null,
-            ILogger<InterviewService>? logger = null)
+            ILogger<InterviewService>? logger = null,
+            IEvaluationQueue? evaluationQueue = null)
         {
             _logger = logger;
+            _evaluationQueue = evaluationQueue;
             _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
@@ -1253,15 +1256,23 @@ namespace ARI.Application.Services
                 session.DurationSeconds = (int)(session.EndedAt.Value - session.StartedAt.Value).TotalSeconds;
             }
 
+            // Báo cáo KHÔNG sinh ở đây nữa (ADR-073). Trước đây AI được gọi ngay trong lệnh đóng phiên: lỗi AI
+            // hay thiếu bộ tiêu chí là mất báo cáo vĩnh viễn, vì phiên đã "completed" nên không lượt nào quay
+            // lại. Nay chỉ ghi "chờ chấm" — hàng đợi nền nhận việc ngay, lượt quét bảo đảm không sót.
+            var completed = status == InterviewSessionStatuses.Completed;
+            if (completed)
+            {
+                session.EvaluationStatus = EvaluationStatuses.Pending;
+                session.EvaluationAttempts = 0;
+                session.EvaluationError = null;
+                session.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            }
+
             _unitOfWork.Repository<InterviewSession>().Update(session);
             await _unitOfWork.SaveChangesAsync(ct);
             _cache.Remove(AllSessionsCacheKey); // trạng thái phiên thay đổi — xóa cache
 
-            // If session is completed, automatically trigger AI Evaluation report generation
-            if (status == "completed")
-            {
-                await GenerateEvaluationReportAsync(session.Id, ct);
-            }
+            if (completed) _evaluationQueue?.Enqueue(session.Id);
 
             await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveSessionStatus", new { status }, ct);
 
@@ -1400,16 +1411,6 @@ namespace ARI.Application.Services
             });
         }
 
-        /// <summary>Trọng số điểm nghi vấn theo loại tín hiệu — dùng chung khi chấm và khi tổng hợp.</summary>
-        private static readonly Dictionary<string, (decimal Weight, string Severity)> CheatSignalWeights = new()
-        {
-            ["fullscreen_exit"] = (8m, "medium"),   // thoát toàn màn hình
-            ["tab_hidden"] = (12m, "high"),         // chuyển tab / thu nhỏ cửa sổ
-            ["window_blur"] = (5m, "low"),          // click ra ngoài cửa sổ
-            ["shortcut_blocked"] = (3m, "low"),     // bấm phím tắt bị chặn
-            ["page_unload"] = (15m, "high"),        // đóng/tải lại trang giữa buổi
-        };
-
         /// <summary>
         /// Ghi nhận tín hiệu nghi vấn của một phiên (Kiosk thoát toàn màn hình, chuyển tab…).
         /// Trước đây `SessionHub.ReportCheatSignal` chỉ phát cảnh báo realtime rồi bỏ — không có gì
@@ -1471,10 +1472,26 @@ namespace ARI.Application.Services
             }
 
             foreach (var e in existing) _unitOfWork.Repository<Evaluation>().Delete(e);
+            session.EvaluationStatus = EvaluationStatuses.Pending;
+            session.EvaluationAttempts = 0;
+            session.EvaluationError = null;
+            session.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<InterviewSession>().Update(session);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            await GenerateEvaluationReportAsync(sessionId, ct);
-            return Result.Success(true);
+            // Đường dev/ops cần thấy kết quả ngay, nên chấm ĐỒNG BỘ bằng đúng bộ chấm của hàng đợi nền (ADR-073).
+            var outcome = await new InterviewEvaluator(_unitOfWork, _aiProvider, _notificationService)
+                .EvaluateSessionAsync(sessionId, ct);
+            return outcome switch
+            {
+                EvaluationOutcome.Done => Result.Success(true),
+                EvaluationOutcome.BlockedNoRubric => Result.Failure<bool>(
+                    "Tin chưa có bộ tiêu chí chấm phỏng vấn cho vòng này — Hiring Manager cần khai ở màn tin."),
+                EvaluationOutcome.NoAnswers => Result.Failure<bool>("Buổi thử không có câu trả lời nào để chấm."),
+                EvaluationOutcome.Skipped => Result.Failure<bool>("Phiên chưa kết thúc nên chưa chấm được."),
+                _ => Result.Failure<bool>(
+                    "Chấm lại thất bại: " + (session.EvaluationError ?? "AI không trả kết quả hợp lệ.")),
+            };
         }
 
         /// <summary>
@@ -1487,189 +1504,6 @@ namespace ARI.Application.Services
             var rounds = await _unitOfWork.Repository<InterviewRoundConfig>()
                 .QueryAsync(q => q.Where(r => r.JobPostingId == jobPostingId).Select(r => r.RoundNumber), ct);
             return rounds.Count == 0 ? 1 : Math.Max(1, rounds.Max());
-        }
-
-        private async Task GenerateEvaluationReportAsync(Guid sessionId, CancellationToken ct = default)
-        {
-            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session!.ApplicationId, ct);
-            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application!.JobPostingId, ct);
-            var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
-
-            var chatHistory = new List<QuestionAnswerDto>();
-            foreach (var q in questions.OrderBy(x => x.SequenceNumber))
-            {
-                var answers = await _unitOfWork.Repository<Answer>().FindAsync(a => a.QuestionId == q.Id, ct);
-                chatHistory.Add(new QuestionAnswerDto
-                {
-                    SequenceNumber = q.SequenceNumber,
-                    QuestionText = q.QuestionText,
-                    AnswerText = answers.FirstOrDefault()?.Transcript ?? ""
-                });
-            }
-
-            // Bộ tiêu chí do doanh nghiệp khai (playbook interview_rubric) — vòng → tin → công ty.
-            var rubricCriteria = await PlaybookScope.ResolveRubricAsync(
-                _unitOfWork, jobPosting!.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric, ct);
-
-            // BẮT BUỘC có bộ tiêu chí thì mới chấm (ADR-062).
-            //
-            // Trước đây thiếu rubric thì lấy thẳng `evalReport.Score` và `evalReport.Verdict` — tức
-            // hai con số do model tự nghĩ ra, không phải trung bình có trọng số của gì cả, đúng thứ
-            // ADR-060 sinh ra để loại bỏ. Một điểm số không giải thích được ra từ đâu mà lại quyết
-            // định đậu/trượt của người thật là thứ không được phép tồn tại âm thầm.
-            //
-            // Dừng ở đây KHÔNG làm hỏng phiên: transcript, câu hỏi, câu trả lời và bản ghi hình đã
-            // lưu xong từ trước. Nhân sự khai rubric rồi chấm lại qua /api/dev/regrade-session.
-            if (rubricCriteria.Count == 0)
-            {
-                _logger?.LogError(
-                    "Phiên {SessionId} (tin {JobPostingId}, vòng {Round}): CHƯA khai bộ tiêu chí chấm " +
-                    "phỏng vấn (playbook loại '{Type}'). Không sinh báo cáo — điểm do model tự đưa ra " +
-                    "không giải thích được và không được phép quyết định kết quả tuyển dụng.",
-                    sessionId, jobPosting.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric);
-                return;
-            }
-
-            var evalCtx = new SessionContext
-            {
-                SessionId = sessionId,
-                // RAG service cần hai trường này để truy hồi playbook đúng tin + vòng lúc chấm.
-                JobPostingId = jobPosting!.Id,
-                RoundNumber = session.RoundNumber,
-                JobDescription = jobPosting!.JobDescription,
-                CandidateCv = application.CvText ?? "",
-                SessionType = session.SessionType,
-                ChatHistory = chatHistory,
-                ScoringRubric = jobPosting.ScoringRubric ?? "{}",
-                Criteria = rubricCriteria,
-                Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage,
-                // Báo cáo viết bằng ngôn ngữ ứng viên đang dùng trên web (ADR-051).
-                ReportLanguage = session.ReportLanguage ?? session.InterviewLanguage ?? "vi"
-            };
-
-            // Call AI provider to generate Verdict, Score, Reasoning, etc.
-            var evalReport = await _aiProvider.GenerateEvaluationAsync(evalCtx, ct);
-
-            // ĐIỂM CUỐI DO BACKEND CỘNG, không lấy con số model tự đưa ra (ADR-060). Trước đây model
-            // vừa tự chọn tiêu chí trong một danh sách viết cứng, vừa tự cho điểm tổng — con số ấy
-            // không phải trung bình có trọng số của gì cả, nên "chấm theo tiêu chí" chỉ là hình thức.
-            var aiScores = ScoringRubricSupport.ParseScores(evalReport.CriterionScoresJson);
-
-            // ĐIỂM VÀ VERDICT LUÔN DO BACKEND TÍNH — không có nhánh nào lấy số của model nữa.
-            var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
-            if (!computed.HasValue)
-            {
-                // Có rubric mà model không chấm nổi tiêu chí nào: đây là lỗi của model, và cũng
-                // KHÔNG được cho 0 điểm (thiếu dữ liệu không phải là điểm kém). Không có gì hợp lệ
-                // để ghi nên dừng lại — chấm lại được sau khi sửa prompt.
-                _logger?.LogError(
-                    "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng model không trả điểm tiêu chí nào — " +
-                    "không sinh báo cáo. Chấm lại bằng /api/dev/regrade-session sau khi xử lý.",
-                    sessionId, rubricCriteria.Count);
-                return;
-            }
-
-            var overallScore = computed.Value;
-            // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm báo cáo
-            // cũ mất khả năng giải thích điểm của nó ra từ đâu.
-            var criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
-            var verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
-            
-            // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
-            // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
-            var signals = (await _unitOfWork.Repository<CheatDetectionSignal>()
-                .FindAsync(s => s.SessionId == sessionId, ct)).ToList();
-            decimal cheatScore = 0;
-            foreach (var s in signals)
-            {
-                cheatScore += CheatSignalWeights.TryGetValue(s.SignalType, out var w) ? w.Weight : 5m;
-            }
-            cheatScore = Math.Min(100m, cheatScore);
-
-            // Gộp theo loại để HR đọc nhanh: "Thoát toàn màn hình × 3".
-            var cheatSignalsJson = System.Text.Json.JsonSerializer.Serialize(
-                signals.GroupBy(s => s.SignalType).Select(g => new
-                {
-                    type = g.Key,
-                    severity = CheatSignalWeights.TryGetValue(g.Key, out var w) ? w.Severity : "low",
-                    description = $"{g.Count()} lần",
-                    timestamp = g.Max(x => x.RecordedAt)
-                }));
-
-            // Language Assessment — CHỈ chấm khi thực sự có câu trả lời để chấm; không có dữ liệu
-            // thì bỏ trống thay vì để AI đoán bừa một bậc năng lực (ADR-051).
-            LanguageAssessment? langAssess = null;
-            var hasAnswers = chatHistory.Any(qa => !string.IsNullOrWhiteSpace(qa.AnswerText));
-            if (!string.IsNullOrEmpty(jobPosting.DetectedLanguage) && hasAnswers)
-            {
-                langAssess = await _aiProvider.AssessLanguageProficiencyAsync(evalCtx, ct);
-            }
-
-            var evaluation = new Evaluation
-            {
-                SessionId = sessionId,
-                ApplicationId = application.Id,
-                RoundNumber = session.RoundNumber,
-                SessionType = session.SessionType,
-                AiVerdict = verdict,
-                OverallScore = overallScore,
-                CriterionScores = criterionScoresJson,
-                Reasoning = evalReport.Reasoning,
-                RecommendedNextStep = evalReport.RecommendedNextStep,
-                QuestionAnalyses = evalReport.QuestionAnalysesJson,
-                CheatScore = cheatScore,
-                CheatSignals = cheatSignalsJson,
-                LanguageAssessment = langAssess != null
-                    ? System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        language = evalCtx.Language,
-                        fluency = langAssess.Fluency,
-                        grammar = langAssess.Grammar,
-                        vocabulary = langAssess.Vocabulary,
-                        comprehension = langAssess.Comprehension,
-                        overall_score = langAssess.OverallScore,
-                        cefr_level = langAssess.CefrLevel,
-                        language_adherence = langAssess.LanguageAdherence,
-                        evidence = langAssess.Evidence
-                    })
-                    : null
-            };
-
-            await _unitOfWork.Repository<Evaluation>().AddAsync(evaluation, ct);
-
-            // AI KHÔNG tự đổi trạng thái hồ sơ (ADR-053). Trước đây AI chấm "not_pass" là hồ sơ bị
-            // đánh rớt ngay trước khi HR kịp xem — trái Phase 6 "HR Review & Confirm". Nay hồ sơ giữ
-            // nguyên "interview" cho tới khi HR xác nhận; FE hiện "chờ HR xác nhận" qua pendingHrReview.
-            // Buổi thử thì còn không báo HR (ADR-051).
-            var isRealSession = session.SessionType == "real";
-
-            await _unitOfWork.SaveChangesAsync(ct);
-
-            if (isRealSession)
-            {
-                // Notify HR Admin that there is a new evaluation to review
-                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveSystemEvent", new {
-                    Type = "AiEvaluationComplete",
-                    EvaluationId = evaluation.Id,
-                    ApplicationId = application.Id
-                }, ct);
-
-                // Người CHỐT kết quả là Hiring Manager (ADR-061), vậy mà trước đây chỉ nhóm `hr_admin` được
-                // đẩy sự kiện — HM không nhận thông báo nào và phải tự vào màn "Kết quả phỏng vấn" mới biết
-                // có việc. Ghi thông báo lưu lại (idempotent theo báo cáo) cho đúng người phải hành động.
-                var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, application.JobPostingId, ct);
-                if (hm != null)
-                {
-                    await OfferSupport.NotifyStaffAsync(_unitOfWork, hm.UserId, "pending",
-                        "Có kết quả phỏng vấn chờ bạn chốt",
-                        $"Ứng viên {application.CandidateName} — vị trí \"{jobPosting.Title}\", vòng {session.RoundNumber}.",
-                        "/hm/evaluations", $"hm_evaluation_ready:{evaluation.Id}", ct);
-                    await _unitOfWork.SaveChangesAsync(ct);
-                    await _notificationService.PublishUserEventAsync(hm.UserId, "ReceiveUserNotification",
-                        new { Type = "AiEvaluationComplete", EvaluationId = evaluation.Id }, ct);
-                }
-            }
         }
 
         public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)

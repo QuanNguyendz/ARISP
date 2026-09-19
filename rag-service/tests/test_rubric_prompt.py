@@ -95,3 +95,38 @@ def test_criteria_round_trip_from_camel_case_wire():
     assert ctx.criteria[0].key == "system_design"
     assert ctx.criteria[0].weight == 100
     assert ctx.criteria[0].description == "Chuẩn chấm"
+
+
+def test_level_anchors_are_rendered_under_their_criterion():
+    """ADR-073: mức neo HM khai phải tới được prompt chấm — thiếu nó thì '70 điểm' là cảm tính của model."""
+    from app.schemas import RubricLevels
+
+    _, user = evaluate_prompt(_ctx([
+        RubricCriterion(key="system_design", name="Thiết kế hệ thống", weight=100,
+                        levels=RubricLevels(excellent="Nêu đánh đổi và trường hợp biên", poor="Không trả lời được")),
+    ]))
+
+    assert "90-100: Nêu đánh đổi và trường hợp biên" in user
+    assert "0-39: Không trả lời được" in user
+    assert "MUST fall in the band" in user
+    # Dải không khai thì không in dòng rỗng.
+    assert "70-89:" not in user
+
+
+def test_levels_round_trip_from_camel_case_wire():
+    ctx = SessionContext.model_validate({
+        "sessionId": "s1",
+        "chatHistory": [],
+        "criteria": [{"key": "a", "name": "A", "weight": 100,
+                      "levels": {"excellent": "Xuất sắc", "good": None, "fair": "Tạm", "poor": None}}],
+    })
+
+    assert ctx.criteria[0].levels is not None
+    assert ctx.criteria[0].levels.excellent == "Xuất sắc"
+    assert ctx.criteria[0].levels.fair == "Tạm"
+
+
+def test_no_band_instruction_when_no_criterion_has_levels():
+    _, user = evaluate_prompt(_ctx(_company_criteria()))
+
+    assert "MUST fall in the band" not in user

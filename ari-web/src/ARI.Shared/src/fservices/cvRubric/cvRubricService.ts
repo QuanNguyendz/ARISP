@@ -140,13 +140,14 @@ export const cvRubricService = {
     return data
   },
 
-  async downloadDraft(criteria: CvRubricCriterion[]): Promise<void> {
+  /** Xuất bản nháp ra Excel. Cùng bảng mẫu cho bộ tiêu chí chấm CV lẫn chấm phỏng vấn — chỉ khác tên file. */
+  async downloadDraft(criteria: CvRubricCriterion[], fileName: string = XLSX_NAME): Promise<void> {
     const { data } = await apiClient.post<Blob>(
       '/playbooks/cv-rubric/export-sheet',
       { criteria },
       { responseType: 'blob' }
     )
-    saveBlob(data, XLSX_NAME)
+    saveBlob(data, fileName)
   },
 
   async templates(): Promise<CvRubricTemplate[]> {

@@ -22,7 +22,9 @@
     "evaluating": "AI đang chấm",
     "pending_review": "Chờ Hiring Manager chốt",
     "reviewed": "Đã chốt kết quả",
-    "aborted": "Buổi bị gián đoạn"
+    "aborted": "Buổi bị gián đoạn",
+    "needs_rubric": "Chờ bộ tiêu chí chấm",
+    "evaluation_failed": "Chấm lỗi"
   },
   "verdict": {
     "pass": "Đạt",
@@ -40,5 +42,11 @@
   "abortedHint": "Buổi này không có báo cáo. Có thể xếp lại lịch cho ứng viên.",
   "recentTitle": "Buổi vừa kết thúc",
   "recentDescription": "Các buổi phỏng vấn thật kết thúc trong 24 giờ qua — mở báo cáo AI để chốt kết quả.",
-  "recentEmpty": "Chưa có buổi nào kết thúc trong 24 giờ qua."
+  "recentEmpty": "Chưa có buổi nào kết thúc trong 24 giờ qua.",
+  "needsRubricHint": "Vòng này chưa có bộ tiêu chí chấm phỏng vấn nên AI chưa chấm được. Hiring Manager chính khai bộ tiêu chí ở màn tin — báo cáo sẽ tự sinh ngay sau đó.",
+  "failedHint": "AI chưa chấm được buổi này sau nhiều lần thử{{reason}}. Bấm \"Chấm lại\" để thử lần nữa.",
+  "retry": "Chấm lại",
+  "retrying": "Đang đưa vào hàng chấm…",
+  "retryQueued": "Đã đưa vào hàng chấm — báo cáo sẽ tự hiện khi xong.",
+  "retryError": "Không chấm lại được. Vui lòng thử lại."
 }

@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-19
 
 ---
 
@@ -28,7 +28,7 @@ _Chưa có task nào đang thực hiện._
 
 ## Nợ kỹ thuật đã biết — `CLAUDE.md` sát ngưỡng cảnh báo
 
-`CLAUDE.md` đang **39.806 / 40.000 ký tự** — dư **194 ký tự** (2026-09-17, sau ADR-071). Thêm một đoạn bất kỳ là vượt ngưỡng
+`CLAUDE.md` đang **39.627 / 40.000 ký tự** — dư **373 ký tự** (2026-09-19, sau ADR-073: gọt dòng ADR-066 từ 1.295 về ~560 ký tự để có chỗ cho quy tắc 29 + dòng ADR-073). Thêm một đoạn bất kỳ là vượt ngưỡng
 cảnh báo file bộ nhớ lớn và nạp lại mỗi phiên.
 
 **Mỗi đợt thêm một ADR nay đều phải gọt dòng cũ trước** — ADR-065 gọt 12 dòng, ADR-066 gọt thêm 16, ADR-067
@@ -386,6 +386,12 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-19: **Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin + chấm bằng hàng đợi nền (ADR-073, giai đoạn 1).** Người dùng báo buổi thử lẫn buổi thật đều không ra báo cáo. Nguyên nhân kiểm trên production (chỉ đọc): 0 bộ `interview_rubric` → `GenerateEvaluationReportAsync` thoát sớm chỉ để lại log; báo cáo sinh ngay trong lệnh đóng phiên nên lỗi nào cũng là mất vĩnh viễn; giao diện gọi mọi trường hợp là "AI đang chấm". Kéo theo luồng offer không bao giờ chạy (không hồ sơ nào tới `pass`).
+  - **BE:** `InterviewRubricStore` (vòng → tin, bỏ lùi bộ công ty) + `InterviewRubricService.SaveAsync` (đường ghi duy nhất, bỏ ý kiểm, lưu xong đưa buổi đang chờ vào hàng) + `JobInterviewRubricController` (`GET/PUT /api/jobs/{id}/interview-rubric`, `DELETE …/rounds/{n}`) + mẫu công ty & AI gợi ý (`/api/playbooks/interview-rubric/templates|suggest`, `GeminiProvider.SuggestInterviewRubricAsync`). Chặn nạp/xoá `interview_rubric` cấp tin qua playbook thường; danh sách playbook của tin ẩn nó. Cổng `→ active` mã `interview_rubric_required`. `InterviewEvaluator` (4 kết cục, ghi `evaluation_status/attempts/error/updated_at`, báo cáo hệ thống cho buổi thật không câu trả lời, đánh giá ngôn ngữ lỗi không làm mất báo cáo) + `IEvaluationQueue` + `EvaluationHostedService` (2 worker, quét 2′, thử lại 3 lượt, nhắc HM thiếu bộ tiêu chí). `EndSessionAsync` chỉ xếp hàng. `POST /api/evaluations/sessions/{id}/retry`. Trạng thái `needs_rubric`/`evaluation_failed` (nhân sự) và `EvaluationProgress` (ứng viên). Seed dev gieo bộ tiêu chí phỏng vấn. Migration `InterviewEvaluationPipeline`.
+  - **rag-service:** `RubricCriterion.levels` + in mức neo 4 dải vào prompt chấm.
+  - **FE:** `JobInterviewRubricPanel` ở màn tin của HM/HR/Recruiter (bộ chung + bộ riêng theo vòng, banner vòng thiếu + số buổi đang chờ), `CvRubricEditor mode="interview"`, `interviewRubricService`; `InterviewResultsCard` thêm hai trạng thái + nút "Chấm lại"; Portal: danh sách buổi thử + trang xem lại nói đúng lý do, tự hỏi lại khi đang chấm; mã lỗi `interview_rubric_required` (vi/en); nhãn mẫu Playbook công ty.
+  - **Kiểm chứng:** Application **2091/2091**, Infrastructure 7/7, Domain 63/63, rag-service 37/37, `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini: chấm nền → 84 `pass`; thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI; HM nhờ AI gợi ý rồi lưu → buổi đang chờ tự chấm → 78,75; buổi thử không câu trả lời → `no_answers`; rag tắt → `failed` + lý do → "Chấm lại" → `done` + audit.
 
 - [x] 2026-09-18: **Bài trắc nghiệm là một đợt thi có giờ cố định; thời lượng có một nguồn (ADR-072).** Người dùng hỏi thời lượng bài do người cấu hình hay mặc định. Câu trả lời: có hai ô "thời lượng", ô "Số phút" của vòng trắc nghiệm ở màn tạo tin không có tác dụng gì. Người dùng muốn gộp lại, và muốn khung giờ thi thành *"bài 30 phút bắt đầu 9h thì 9h–9h30 vào lúc nào cũng được, 9h30 đóng — vào 9h15 còn 15 phút"* thay cho cửa vào 1 tiếng + đồng hồ riêng mỗi người.
   - **BE:** luật duy nhất `OnlineTestWindow` (`ClosesAt = giờ hẹn + thời lượng`, hạn nộp `+1 phút`); bỏ `EntryWindow` ở cả 7 chỗ đọc (lấy đề/nộp bài, tự nộp khi hết hạn, lịch ứng viên, Portal, bảng ứng viên, khoảng bận khi xếp lịch, thư mời/nhắc). Thời lượng = `MaxDurationMinutes` của vòng `online_test`; màn ngân hàng đề ghi vào vòng (`DurationMinutes` nullable: tin chưa có vòng thì không lưu được). Giờ kết thúc ca thi server tự tính = giờ đóng (`SchedulingSupport.EffectiveEndTime`). Chặn đổi thời lượng khi còn ứng viên giữ chỗ ở ca thi chưa đóng (mã `online_test_duration_locked`, cả màn ngân hàng đề lẫn lệnh sửa tin); đổi được thì kéo giờ kết thúc các ca chưa đóng. `CandidateOnlineTestDto.ServerNow`. Migration `MergeOnlineTestDurationIntoRoundConfig`: chép giá trị đang có hiệu lực sang vòng, đồng bộ giờ kết thúc ca thi cũ, bỏ cột `job_postings.online_test_duration_minutes`.

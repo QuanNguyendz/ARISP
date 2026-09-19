@@ -95,6 +95,15 @@ class AnswerAnalysis(CamelModel):
     feedback: str = ""
 
 
+class RubricLevels(CamelModel):
+    """Mức neo của một tiêu chí — lời doanh nghiệp viết cho từng dải điểm (ADR-070/073)."""
+
+    excellent: str | None = None  # 90-100
+    good: str | None = None  # 70-89
+    fair: str | None = None  # 40-69
+    poor: str | None = None  # 0-39
+
+
 class RubricCriterion(CamelModel):
     """Tiêu chí chấm điểm do doanh nghiệp khai (ADR-060)."""
 
@@ -102,6 +111,8 @@ class RubricCriterion(CamelModel):
     name: str = ""
     weight: float = 0
     description: str | None = None
+    # Mức neo (ADR-073): có thì model chấm theo đúng mô tả từng dải, không tự nghĩ ra "7/10 là thế nào".
+    levels: RubricLevels | None = None
 
 
 class SessionContext(CamelModel):

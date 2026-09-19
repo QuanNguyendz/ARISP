@@ -2066,3 +2066,62 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
     vòng đó (màn tạo tin vẫn khai riêng được từng vòng).
   - Đồng hồ vẫn có sai số bằng thời gian truyền mạng của lượt tải đề (dưới một giây), nhỏ hơn nhiều so với 1 phút
     server còn nhận bài.
+
+### ADR-073: Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin, chấm bằng hàng đợi nền
+
+- **Ngày:** 2026-09-19
+- **Trạng thái:** Đã triển khai (giai đoạn 1). **Sửa** ADR-060/062 ở phần "chọn bộ tiêu chí vòng → tin → công ty" (bỏ
+  đường lùi về bộ công ty) và phần "sinh báo cáo ngay trong `EndSessionAsync`".
+
+- **Bối cảnh.** Người dùng báo: buổi thử lẫn buổi thật đều không bao giờ ra báo cáo, giao diện quay "AI đang chấm" mãi.
+  Kiểm chứng trên production (chỉ đọc): hệ thống có **0** tài liệu `interview_rubric`, **1** báo cáo duy nhất (buổi thử
+  2026-08-15, trước khi ADR-062 bắt buộc bộ tiêu chí); hai buổi hoàn tất gần nhất không có báo cáo. Ba lỗi chồng nhau:
+  1. `GenerateEvaluationReportAsync` thoát sớm khi không tìm được bộ tiêu chí — chỉ ghi một dòng `LogError`. Đường lùi về
+     bộ cấp công ty tồn tại trên giấy nhưng không ai tạo bộ nào.
+  2. Báo cáo sinh **ngay trong lệnh đóng phiên**, SAU khi phiên đã lưu `completed`. AI lỗi / model không trả điểm / thiếu
+     bộ tiêu chí → không có lượt nào quay lại chấm. Không có trạng thái nào ghi lại vì sao.
+  3. Giao diện suy "phiên xong mà chưa có báo cáo" thành `evaluating` (nhân sự) / `evaluationPending` (ứng viên).
+  Hệ quả dây chuyền: không báo cáo → HM không chốt được → không hồ sơ nào tới `pass` → luồng offer không bao giờ chạy.
+
+- **Quyết định.**
+  1. **Bộ tiêu chí phỏng vấn do Hiring Manager khai theo TIN** (người dùng chọn, 2026-09-19): một bộ chung áp mọi vòng hội
+     thoại + (tuỳ chọn) bộ riêng theo vòng. **Không lùi về bộ công ty** — bộ `org` chỉ còn là mẫu để chép, như bộ tiêu chí
+     chấm CV (ADR-070). Nguồn đọc duy nhất `InterviewRubricStore` (vòng → tin); đường ghi duy nhất
+     `InterviewRubricService.SaveAsync` (UNIQUE có lọc: một bộ chung sống/tin, một bộ riêng sống/(tin, vòng) — hai index vì
+     `round_number` NULL của bộ chung không bị UNIQUE bắt). Không có ý kiểm (ADR-071 là của CV). Nạp `interview_rubric`
+     cấp tin/vòng như playbook thường bị chặn ở `UploadPlaybookCommand`/`DeletePlaybookCommand`.
+  2. **Cổng lên job board:** `UpdateJobStatusCommand` chặn `→ active` khi còn vòng hội thoại chưa có bộ nào
+     (`InterviewRubricStore.MissingRoundsAsync`, vòng `online_test` không tính), mã `interview_rubric_required`, kể cả khi
+     quản trị viên vượt chữ ký HM. Không chặn ở `→ pending`: người khai là HM, đúng người ký đăng tin.
+  3. **Chấm bằng hàng đợi nền.** `EndSessionAsync` chỉ ghi `evaluation_status = pending` rồi đưa vào `IEvaluationQueue`.
+     `EvaluationHostedService` (2 worker + lượt quét 2′) gọi `InterviewEvaluator.EvaluateSessionAsync`, mỗi kết cục ghi vào
+     cột mới của `interview_sessions`: `pending | processing | done | blocked_no_rubric | no_answers | failed` +
+     `evaluation_attempts`, `evaluation_error`, `evaluation_updated_at`. Lượt quét đưa lại: `pending`; `processing` kẹt quá
+     10′; `failed` còn dưới 3 lượt (giãn 2′/4′…); `blocked_no_rubric` mà tin nay đã có bộ. Lưu bộ tiêu chí cũng đưa ngay các
+     buổi đang chờ vào hàng. Thiếu bộ tiêu chí **không** tốn lượt thử (việc của HM, không phải lỗi AI).
+  4. **Không có câu trả lời:** buổi thử → `no_answers`, không báo cáo; buổi thật → **báo cáo hệ thống** (`not_pass`, không
+     điểm, lý do nói rõ) để HM vẫn chốt/ghi đè được — hồ sơ không kẹt ở "đang phỏng vấn".
+  5. **Đánh giá ngôn ngữ là phần phụ:** lỗi ở đó không còn làm mất báo cáo đã chấm xong điểm tiêu chí.
+  6. **Nói đúng lý do.** Nhân sự: `needs_rubric` (HM khai tiêu chí ở màn tin), `evaluation_failed` + nút "Chấm lại"
+     (`POST /api/evaluations/sessions/{id}/retry` — chủ tin, HM chính, quản trị viên; ghi audit). Ứng viên:
+     `EvaluationProgress.ForDisplay` (`pending | needs_rubric | no_answers | failed | done`), trang xem lại tự hỏi lại mỗi 15″.
+  7. **Mức neo tới được prompt chấm:** rag-service `_rubric_block` in 4 dải điểm dưới từng tiêu chí khi có.
+  8. **Mỗi thành phần một nơi:** màn tin có panel `JobInterviewRubricPanel` (dùng lại `CvRubricEditor` ở
+     `mode="interview"`: mẫu công ty + AI gợi ý `SuggestInterviewRubricAsync` + Excel); mẫu Playbook công ty đổi nhãn
+     thành "Mẫu bộ tiêu chí chấm phỏng vấn".
+
+- **Migration `InterviewEvaluationPipeline`.** 4 cột + index lọc `idx_interview_sessions_evaluation_pending`; backfill phiên
+  `completed` (có báo cáo → `done`, chưa có → `pending` để hàng đợi chấm/nhận diện thiếu bộ tiêu chí); xoá MỀM bộ tiêu chí
+  phỏng vấn trùng (tin, vòng) trước khi tạo hai UNIQUE (`RAISE NOTICE` số dòng). Không bảng mới (quy tắc 24 không áp).
+
+- **Hệ quả.** Tin đang tuyển thiếu bộ tiêu chí vẫn tuyển được, nhưng HM chính nhận nhắc (mỗi ngày khi có buổi đang chờ,
+  một lần khi chưa có buổi nào); khai xong là các buổi đang chờ tự có báo cáo. Lời chào kết thúc không còn chờ AI chấm.
+
+- **Kiểm chứng.** `dotnet test` Application 2091/2091 (viết lại các test sinh báo cáo trên `InterviewEvaluator` + mới:
+  đóng phiên chỉ xếp hàng, 4 kết cục, AI lỗi rồi hồi, không chấm lần hai, lượt quét, không lùi bộ công ty, bộ vòng thắng
+  bộ tin, đường ghi bộ tiêu chí, quyền ghi, chấm lại, trạng thái hiển thị, cổng `interview_rubric_required`), Infrastructure
+  7/7, Domain 63/63; rag-service pytest 37/37. **E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini:** buổi `pending`
+  được lượt quét chấm (84 điểm = trung bình có trọng số, `pass`); tin thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI;
+  HM gọi AI gợi ý (5 tiêu chí, đủ mức neo, không ý kiểm) rồi lưu → buổi đang chờ vào hàng ngay → `done` 78,75; buổi thử
+  không câu trả lời → `no_answers` (API ứng viên trả đúng trạng thái); tắt rag-service → `failed` kèm lý do → bật lại +
+  "Chấm lại" → `done`, có audit `interview_evaluation_retried`.

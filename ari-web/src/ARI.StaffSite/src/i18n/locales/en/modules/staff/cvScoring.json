@@ -176,5 +176,44 @@
     "title": "CV scoring rubric",
     "fromRequest": "Set by the Hiring Manager on the request — the job will score CVs with it. The HM can edit it on the job screen.",
     "missing": "This request has no rubric. You can still create the job, but the Hiring Manager must add a rubric on the job screen before you submit it."
+  },
+  "interviewEditor": {
+    "hint": "The AI scores the candidate's answers against exactly these criteria: 0–100 per criterion, then a weighted average compared with the job's pass mark. Without criteria the interview produces no report.",
+    "namePlaceholder": "E.g. .NET technical knowledge",
+    "guidePlaceholder": "What does a strong answer show?",
+    "levelsHint": "Describe answers in each score band (correct fundamentals, real examples, trade-offs…) so the AI scores consistently.",
+    "levelPlaceholder": {
+      "excellent": "E.g. Explains the fundamentals correctly, covers trade-offs and edge cases",
+      "good": "E.g. Gets the main points right with an example, but not in depth",
+      "fair": "E.g. Partly right, some concepts confused",
+      "poor": "E.g. Wrong or unable to answer"
+    },
+    "noTemplates": "No templates yet — an HR Admin adds interview rubric templates on the Playbook page.",
+    "empty": "No criteria yet. Use \"AI suggest\", pick a company template, import Excel or add them by hand.",
+    "aiNeedsContent": "The job needs a title and a description before the AI can suggest criteria."
+  },
+  "interviewPanel": {
+    "title": "Interview scoring criteria",
+    "jobLevelTitle": "Shared set · applies to every interview round",
+    "roundsTitle": "By round",
+    "roundLabel": "Round {{n}} · {{type}}",
+    "roundType": {
+      "screening": "Screening",
+      "technical": "Technical",
+      "online_test": "Online test"
+    },
+    "roundUsesJob": "Uses the shared set",
+    "roundOwn": "Own set · {{count}} criteria",
+    "roundMissing": "No criteria",
+    "createOwn": "Add own set",
+    "editOwn": "Edit own set",
+    "removeOwn": "Remove own set",
+    "roundEditHint": "This set applies to this round only. Removing it makes the round use the job's shared set again.",
+    "missing": "Round {{rounds}} has no scoring criteria — its interviews will not get a report, and the job cannot be published.",
+    "waiting": "{{count}} finished interview(s) are waiting for scoring criteria. Once you save the criteria the reports are generated automatically.",
+    "empty": "No criteria yet. The job's primary Hiring Manager sets the interview scoring criteria before publishing.",
+    "saved": "Interview scoring criteria saved.",
+    "savedWithWaiting": "Saved. The waiting interviews have been queued for scoring — their reports appear automatically when done.",
+    "roundRemoved": "Own set removed — this round now uses the job's shared set."
   }
 }

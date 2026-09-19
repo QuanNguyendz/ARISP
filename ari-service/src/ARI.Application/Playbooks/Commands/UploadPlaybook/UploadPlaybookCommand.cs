@@ -67,6 +67,12 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 return Result.Failure<UploadedPlaybookDto>(
                     "Bộ tiêu chí chấm CV của tin được khai trong mục \"Bộ tiêu chí chấm CV\" ở màn tin (nhập được cả file Excel ở đó).");
 
+            // ADR-073: cùng lý lẽ cho bộ tiêu chí chấm PHỎNG VẤN — mỗi (tin, vòng) một bộ sống, lưu xong là các
+            // buổi đang chờ được chấm; chỉ trình soạn ở màn tin giữ được hai luật đó. Ở cấp công ty nó là MẪU.
+            if (documentType == ScoringRubric.TypeInterviewRubric && scope != PlaybookScope.ScopeOrg)
+                return Result.Failure<UploadedPlaybookDto>(
+                    "Bộ tiêu chí chấm phỏng vấn của tin được khai trong mục \"Bộ tiêu chí chấm phỏng vấn\" ở màn tin (nhập được cả file Excel ở đó).");
+
             // Playbook công ty không gắn tin nào; playbook vòng phải gắn đúng một vòng hội thoại có thật.
             var scopeRefId = scope == PlaybookScope.ScopeOrg ? null : request.ScopeRefId;
             var roundNumber = scope == PlaybookScope.ScopeRound ? request.RoundNumber : null;

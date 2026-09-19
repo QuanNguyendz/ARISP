@@ -176,6 +176,11 @@ namespace ARI.Infrastructure
             services.AddSingleton<ICvScoringQueue, CvScoringBackgroundQueue>();
             services.AddHostedService<CvScoringHostedService>();
 
+            // Sinh báo cáo đánh giá phỏng vấn nền (ADR-073): lệnh đóng phiên chỉ ghi "chờ chấm", hàng đợi +
+            // lượt quét 2'/lần chấm, thử lại khi AI lỗi, và tự chấm khi tin vừa được khai bộ tiêu chí.
+            services.AddSingleton<IEvaluationQueue, EvaluationBackgroundQueue>();
+            services.AddHostedService<EvaluationHostedService>();
+
             // Dọn video phỏng vấn thật quá hạn lưu (ADR-052) — quét 12h/lần.
             services.AddHostedService<RecordingRetentionHostedService>();
 

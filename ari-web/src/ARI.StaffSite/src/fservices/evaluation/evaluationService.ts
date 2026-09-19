@@ -59,6 +59,11 @@ export const evaluationService = {
    * Các buổi phỏng vấn thật của một hồ sơ theo vòng (ADR-069): ca · diễn biến · báo cáo · có video /
    * transcript. Có cả vòng AI còn đang chấm — thứ mà danh sách đánh giá không thể hiện.
    */
+  /** Chấm lại buổi phỏng vấn chưa có báo cáo (ADR-073) — chạy nền, màn hình tự cập nhật qua realtime. */
+  async retrySessionEvaluation(sessionId: string): Promise<void> {
+    await apiClient.post(`/evaluations/sessions/${sessionId}/retry`)
+  },
+
   async getApplicationInterviews(applicationId: string): Promise<InterviewResultRow[]> {
     const { data } = await apiClient.get<InterviewResultRow[]>(
       `/evaluations/application/${applicationId}/interviews`

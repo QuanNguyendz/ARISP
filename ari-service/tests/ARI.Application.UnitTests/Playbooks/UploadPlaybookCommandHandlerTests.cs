@@ -396,9 +396,12 @@ public class UploadPlaybookCommandHandlerTests
         Assert.NotNull(Assert.Single(uow.Repo<PlaybookDocument>().Items).RubricJson);
     }
 
-    /// <summary>Hiring Manager khai bộ tiêu chí chấm phỏng vấn cho chính tin của mình (ADR-060 + ADR-069).</summary>
+    /// <summary>
+    /// ADR-073: bộ tiêu chí chấm PHỎNG VẤN của tin chỉ khai qua trình soạn ở màn tin — cửa đó giữ "mỗi (tin, vòng)
+    /// một bộ sống" và đưa các buổi đang chờ vào hàng chấm. Nạp như một playbook thường thì bỏ qua cả hai luật.
+    /// </summary>
     [Fact]
-    public async Task Primary_hm_can_upload_an_interview_rubric_for_the_job()
+    public async Task Interview_rubric_for_a_job_cannot_be_uploaded_as_a_plain_playbook()
     {
         var (uow, job, hm, _) = JobWithHm();
         var sheet = RubricSheetBuilder.Build(("technical", "Chuyên môn", "100"));
@@ -407,7 +410,8 @@ public class UploadPlaybookCommandHandlerTests
             .Handle(new UploadPlaybookCommand(hm.Id, AppRoles.HiringManager, "job_posting", job.Id, null,
                 "interview_rubric", "rubric.xlsx", sheet, ".xlsx"), CancellationToken.None);
 
-        Assert.True(res.IsSuccess);
-        Assert.Equal(job.Id, Assert.Single(uow.Repo<PlaybookDocument>().Items).ScopeRefId);
+        Assert.True(res.IsFailure);
+        Assert.Contains("Bộ tiêu chí chấm phỏng vấn", res.Error);
+        Assert.Empty(uow.Repo<PlaybookDocument>().Items);
     }
 }

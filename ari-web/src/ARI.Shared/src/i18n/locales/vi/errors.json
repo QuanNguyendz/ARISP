@@ -44,6 +44,7 @@
     "cvRequired": "Vui lòng tải lên CV của bạn",
     "onlineTestBankInsufficient": "Ngân hàng đề trắc nghiệm có ít câu hơn số câu mỗi bài thi. Hãy thêm câu hỏi hoặc giảm số câu mỗi bài trong mục Ngân hàng câu hỏi của tin.",
     "cvRubricRequired": "Tin chưa có bộ tiêu chí chấm CV. Hiring Manager cần khai bộ tiêu chí trong màn tin trước khi gửi duyệt hoặc đăng tin.",
+    "interviewRubricRequired": "Có vòng phỏng vấn chưa có bộ tiêu chí chấm. Hiring Manager cần khai bộ tiêu chí chấm phỏng vấn trong màn tin trước khi đăng tin — thiếu nó thì buổi phỏng vấn không ra báo cáo.",
     "onlineTestDurationLocked": "Đang có ứng viên được hẹn làm bài trắc nghiệm mà ca thi chưa kết thúc — đổi thời lượng lúc này là đổi giờ đóng bài của họ. Hãy đợi các ca thi kết thúc, hoặc dời lịch họ sang ca khác trước."
   },
   "application": {

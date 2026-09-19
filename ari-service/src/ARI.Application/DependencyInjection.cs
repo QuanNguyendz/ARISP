@@ -49,6 +49,9 @@ namespace ARI.Application
             services.AddScoped<CvScoring.ICvScoringService, CvScoring.CvScoringService>();
             services.AddScoped<CvScoring.CvRubricService>();
             services.AddScoped<CvScoring.CvApplicationScorer>();
+            // Bộ chấm báo cáo phỏng vấn (ADR-073) — hàng đợi nền và đường chấm lại cùng gọi vào đây.
+            services.AddScoped<Evaluations.InterviewEvaluator>();
+            services.AddScoped<InterviewRubrics.InterviewRubricService>();
             services.AddScoped<InterviewService>();
             services.AddScoped<Interfaces.IInterviewService>(sp => sp.GetRequiredService<InterviewService>());
             services.AddScoped<InterviewCodeService>();

@@ -30,7 +30,7 @@
     "mustAsk": "Must-Ask Questions",
     "roundPlaybook": "Round Playbook",
     "cvRubric": "CV rubric template",
-    "interviewRubric": "Interview Scoring Rubric"
+    "interviewRubric": "Interview rubric template"
   },
   "uploadTitle": "Add company playbook",
   "uploadHint": "Applies to EVERY job. PDF / DOCX / TXT / MD — will be chunked + embedded into RAG.",

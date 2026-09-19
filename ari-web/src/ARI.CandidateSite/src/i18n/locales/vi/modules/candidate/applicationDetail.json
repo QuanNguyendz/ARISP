@@ -19,7 +19,11 @@
     "title": "Phỏng vấn thử",
     "hasReview": "Có nhận xét AI",
     "transcriptOnly": "Có nội dung hội thoại",
-    "view": "Xem lại →"
+    "view": "Xem lại →",
+    "pending": "AI đang chấm",
+    "needsRubric": "Chờ nhà tuyển dụng bổ sung tiêu chí",
+    "noAnswers": "Không có câu trả lời để nhận xét",
+    "failed": "Chưa chấm được"
   },
   "round": {
     "screening": "Sơ loại",

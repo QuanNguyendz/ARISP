@@ -163,5 +163,17 @@ namespace ARI.API.Controllers
                 _currentUserService.UserId, _currentUserService.Role, hours), ct);
             return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
         }
+
+        /// <summary>
+        /// Chấm lại một buổi phỏng vấn thật chưa có báo cáo (AI lỗi hết lượt thử, hoặc vừa khai bộ tiêu chí) —
+        /// ADR-073. Việc chấm chạy nền; màn hình tự cập nhật khi xong.
+        /// </summary>
+        [HttpPost("sessions/{sessionId:guid}/retry")]
+        public async Task<IActionResult> RetrySessionEvaluation(Guid sessionId, CancellationToken ct)
+        {
+            var result = await _sender.Send(new RetryInterviewEvaluationCommand(
+                sessionId, _currentUserService.UserId, _currentUserService.Role), ct);
+            return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(new { queued = true });
+        }
     }
 }

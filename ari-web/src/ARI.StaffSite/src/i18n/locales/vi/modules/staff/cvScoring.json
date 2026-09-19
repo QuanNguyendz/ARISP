@@ -176,5 +176,44 @@
     "title": "Bộ tiêu chí chấm CV",
     "fromRequest": "Hiring Manager đã khai trên phiếu — tin sẽ dùng bộ này để chấm CV. HM sửa được ở màn tin.",
     "missing": "Phiếu này chưa có bộ tiêu chí. Tin vẫn tạo được, nhưng Hiring Manager phải khai bộ tiêu chí ở màn tin trước khi bạn gửi duyệt."
+  },
+  "interviewEditor": {
+    "hint": "AI chấm từng câu trả lời của ứng viên theo đúng các tiêu chí này: mỗi tiêu chí 0–100 điểm, điểm cuối là trung bình có trọng số rồi so với điểm đạt của tin. Không có bộ tiêu chí thì buổi phỏng vấn không ra báo cáo.",
+    "namePlaceholder": "VD: Kiến thức chuyên môn .NET",
+    "guidePlaceholder": "Câu trả lời tốt thể hiện điều gì?",
+    "levelsHint": "Mô tả câu trả lời ở từng dải điểm (đúng bản chất, có ví dụ thực tế, nêu được đánh đổi…) để AI chấm nhất quán.",
+    "levelPlaceholder": {
+      "excellent": "VD: Giải thích đúng bản chất, nêu đánh đổi và trường hợp biên",
+      "good": "VD: Đúng ý chính, có ví dụ nhưng chưa đi sâu",
+      "fair": "VD: Đúng một phần, còn nhầm khái niệm",
+      "poor": "VD: Sai hoặc không trả lời được"
+    },
+    "noTemplates": "Chưa có mẫu nào — HR Admin thêm mẫu bộ tiêu chí phỏng vấn ở màn Playbook.",
+    "empty": "Chưa có tiêu chí nào. Bấm \"AI gợi ý\", chọn mẫu công ty, nhập Excel hoặc thêm tay.",
+    "aiNeedsContent": "Tin cần có tên vị trí và mô tả công việc để AI gợi ý."
+  },
+  "interviewPanel": {
+    "title": "Bộ tiêu chí chấm phỏng vấn",
+    "jobLevelTitle": "Bộ chung · áp mọi vòng phỏng vấn",
+    "roundsTitle": "Theo vòng",
+    "roundLabel": "Vòng {{n}} · {{type}}",
+    "roundType": {
+      "screening": "Sơ loại",
+      "technical": "Chuyên môn",
+      "online_test": "Trắc nghiệm"
+    },
+    "roundUsesJob": "Dùng bộ chung",
+    "roundOwn": "Bộ riêng · {{count}} tiêu chí",
+    "roundMissing": "Chưa có bộ tiêu chí",
+    "createOwn": "Tạo bộ riêng",
+    "editOwn": "Sửa bộ riêng",
+    "removeOwn": "Bỏ bộ riêng",
+    "roundEditHint": "Bộ riêng chỉ áp cho vòng này. Bỏ bộ riêng thì vòng quay về dùng bộ chung của tin.",
+    "missing": "Vòng {{rounds}} chưa có bộ tiêu chí — buổi phỏng vấn của vòng đó sẽ không có báo cáo, và tin chưa đăng được.",
+    "waiting": "{{count}} buổi phỏng vấn đã xong đang chờ bộ tiêu chí. Khai bộ tiêu chí là báo cáo tự sinh — không cần thao tác gì thêm.",
+    "empty": "Chưa có bộ tiêu chí. Hiring Manager chính của tin khai bộ tiêu chí chấm phỏng vấn trước khi đăng tin.",
+    "saved": "Đã lưu bộ tiêu chí chấm phỏng vấn.",
+    "savedWithWaiting": "Đã lưu. Các buổi phỏng vấn đang chờ đã được đưa vào hàng chấm — báo cáo sẽ tự hiện khi xong.",
+    "roundRemoved": "Đã bỏ bộ riêng — vòng này dùng bộ chung của tin."
   }
 }

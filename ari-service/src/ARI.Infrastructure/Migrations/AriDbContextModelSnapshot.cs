@@ -1368,6 +1368,22 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
 
+                    b.Property<int>("EvaluationAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("evaluation_attempts");
+
+                    b.Property<string>("EvaluationError")
+                        .HasColumnType("text")
+                        .HasColumnName("evaluation_error");
+
+                    b.Property<string>("EvaluationStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("evaluation_status");
+
+                    b.Property<DateTimeOffset?>("EvaluationUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluation_updated_at");
+
                     b.Property<DateTimeOffset?>("HmJoinedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("hm_joined_at");
@@ -1436,6 +1452,10 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("ix_interview_sessions_application_id");
+
+                    b.HasIndex("EvaluationStatus")
+                        .HasDatabaseName("idx_interview_sessions_evaluation_pending")
+                        .HasFilter("evaluation_status IS NOT NULL AND evaluation_status <> 'done'");
 
                     b.HasIndex("SessionType")
                         .HasDatabaseName("idx_interview_sessions_session_type");
@@ -2414,6 +2434,14 @@ namespace ARI.Infrastructure.Migrations
 
                     b.HasIndex("Scope", "ScopeRefId")
                         .HasDatabaseName("idx_playbook_documents_scope");
+
+                    b.HasIndex(new[] { "ScopeRefId" }, "ux_playbook_documents_job_interview_rubric")
+                        .IsUnique()
+                        .HasFilter("scope = 'job_posting' AND document_type = 'interview_rubric' AND deleted_at IS NULL");
+
+                    b.HasIndex(new[] { "ScopeRefId", "RoundNumber" }, "ux_playbook_documents_round_interview_rubric")
+                        .IsUnique()
+                        .HasFilter("scope = 'round' AND document_type = 'interview_rubric' AND deleted_at IS NULL");
 
                     b.ToTable("playbook_documents", (string)null);
                 });

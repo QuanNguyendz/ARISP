@@ -27,6 +27,7 @@ import HmAvailabilityPanel, { HM_AVAILABILITY_ANCHOR } from '@/components/hiring
 import HmApproveScheduleNotice from '@/components/hiring/HmApproveScheduleNotice'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
@@ -250,6 +251,10 @@ export default function HmJobDetailPage() {
                 thay vì phải nhờ HR vào màn Playbook chung. */}
             {/* Bộ tiêu chí chấm CV (ADR-070) — HM chính soạn và sửa; lưu bộ mới là chấm lại mọi hồ sơ. */}
             <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+
+            {/* Bộ tiêu chí chấm PHỎNG VẤN (ADR-073) — HM khai cho từng tin; thiếu thì buổi phỏng vấn không ra báo
+                cáo và tin không đăng được. */}
+            <JobInterviewRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
 
             <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
 
