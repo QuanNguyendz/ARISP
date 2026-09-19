@@ -90,5 +90,23 @@
     "decide": "Could not record the decision.",
     "send": "Could not send the offer to the candidate.",
     "withdraw": "Could not withdraw the offer."
+  },
+  "jobFilled": {
+    "title_one": "Job closed — {{count}} application still open",
+    "title_other": "Job closed — {{count}} applications still open",
+    "hint": "The job no longer accepts new applications, but these candidates are still waiting for an answer. Nobody is rejected automatically: reject with a thank-you email, or keep them if another role fits.",
+    "reject": "Reject & send thank-you email",
+    "viewOffer": "View pending offer",
+    "composerTitle": "Thank-you email — {{name}}",
+    "composerSend": "Reject & send email",
+    "rejectError": "Could not reject this application right now.",
+    "status": {
+      "invited": "Invited to apply",
+      "cv_submitted": "CV screening",
+      "hm_review": "Awaiting HM review",
+      "screening": "Awaiting schedule",
+      "interview": "Interviewing",
+      "offer": "Holding an offer"
+    }
   }
 }

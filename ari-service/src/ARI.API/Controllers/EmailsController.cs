@@ -25,6 +25,12 @@ namespace ARI.API.Controllers
 
         /// <summary>Tham số phụ theo từng mẫu — thư mời phỏng vấn dùng để truyền <c>slotId</c>.</summary>
         public Guid? SecondaryId { get; set; }
+
+        /// <summary>
+        /// Tham số phụ dạng chuỗi — thư kết quả phỏng vấn dùng để truyền verdict sắp chốt
+        /// (<c>pass</c>/<c>not_pass</c>) cùng <see cref="SecondaryId"/> = <c>evaluationId</c>.
+        /// </summary>
+        public string? Variant { get; set; }
     }
 
     /// <summary>
@@ -65,7 +71,7 @@ namespace ARI.API.Controllers
         {
             var result = await _sender.Send(new PreviewEmailQuery(
                 request.TemplateKey, request.ContextId, request.SecondaryId,
-                _currentUserService.UserId, _currentUserService.Role), ct);
+                _currentUserService.UserId, _currentUserService.Role, request.Variant), ct);
 
             return result.IsFailure ? MapFailure(result.ErrorCode, result.Error) : Ok(result.Value);
         }

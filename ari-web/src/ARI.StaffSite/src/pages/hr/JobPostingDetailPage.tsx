@@ -39,6 +39,7 @@ import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
 import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 /**
  * Trạng thái mà nút Duyệt / Loại ở vòng CV còn thao tác được — giống hệt màn Recruiter.
@@ -870,6 +871,16 @@ export default function JobPostingDetailPage() {
               {t('funnel.total', { count: apps.length })}
             </span>
           </div>
+
+          {/* Tin đã đóng (tự đóng khi đủ người — ADR-074, hoặc đóng tay) mà còn hồ sơ chưa khép. */}
+          <ClosedJobOpenApplications
+            jobStatus={job.status}
+            applications={apps}
+            canReject
+            candidateHref={(appId) => `/hr/candidates/${appId}`}
+            offersHref="/hr/offers"
+            onChanged={() => void loadApps(true)}
+          />
 
           {/*
             Cùng khối quy trình với màn tin của Recruiter và Hiring Manager. Ba màn nhìn cùng một

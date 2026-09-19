@@ -2125,3 +2125,59 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   HM gọi AI gợi ý (5 tiêu chí, đủ mức neo, không ý kiểm) rồi lưu → buổi đang chờ vào hàng ngay → `done` 78,75; buổi thử
   không câu trả lời → `no_answers` (API ứng viên trả đúng trạng thái); tắt rag-service → `failed` kèm lý do → bật lại +
   "Chấm lại" → `done`, có audit `interview_evaluation_retried`.
+
+### ADR-074: Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người
+
+- **Ngày:** 2026-09-19
+- **Trạng thái:** Đã triển khai (giai đoạn 2 của đợt sửa báo cáo phỏng vấn — ADR-073). **Hoàn tất** phần còn nợ của
+  ADR-061 Phase 4 ("kết quả sau khi chốt verdict" chưa có trình soạn).
+
+- **Bối cảnh.** ADR-073 gỡ chỗ tắc phía trên (không báo cáo → không ai chốt → không hồ sơ nào tới `pass`), nên luồng offer
+  lần đầu chạy được tới cuối — và lộ ba lỗ hổng ở đoạn cuối phễu:
+  1. **Thư kết quả là thư quan trọng nhất ứng viên nhận, mà là thư duy nhất không ai xem trước.** `SubmitHrReviewAsync`
+     viết cứng hai đoạn HTML (đạt / cảm ơn), `TriggerAutoProgressionAsync` viết cứng đoạn thứ ba (mời vòng kế), cả ba gửi
+     thẳng SMTP: HM không sửa được một chữ, thư không có dòng nào ở "Lịch sử email" — trái quy tắc 21. Hai nhánh còn chọn
+     thư theo hai điều kiện khác nhau (có cấu hình vòng N+1 hay không, so với `vòng ≥ tổng số vòng` của trạng thái hồ sơ),
+     nên tin khai vòng nhảy số có thể báo "chúc mừng qua hết các vòng" trong khi hồ sơ vẫn ở `interview`.
+  2. **Chốt hai lần được.** Server không chặn — bấm đúp (hay hai người cùng bấm) là hai `HrReview`, hai thư, có thể trái nhau.
+  3. **Nhận việc xong là im lặng.** Ứng viên bấm "Nhận việc" chỉ thấy trạng thái đổi trong Portal — không văn bản nào ghi
+     điều kiện đã chốt, không biết bước tiếp theo, không biết hỏi ai. Và tin vẫn `active` trên Job Board sau khi đã đủ
+     người: người ngoài tiếp tục nộp, AI tiếp tục chấm CV cho một vị trí hết chỗ.
+
+- **Quyết định.**
+  1. **Mẫu thư `interview_result` có trình soạn.** Builder `InterviewResultEmail` với 3 biến thể `next_round` /
+     `final_pass` / `not_pass`; `ResolveVariant(verdict, vòng, tổng số vòng)` là hàm DUY NHẤT quyết định cả biến thể thư
+     lẫn trạng thái hồ sơ (`interview` / `pass` / `not_pass`) — hai thứ không còn lệch được nhau. Xem trước qua
+     `POST /api/emails/preview` với `contextId = applicationId`, `secondaryId = evaluationId`, `variant = verdict sắp chốt`
+     (tham số mới, chuỗi); báo cáo phải thuộc đúng hồ sơ đang xem.
+  2. **Ai xem trước được = ai chốt được.** Với `interview_result`, cổng xem trước là HM chính hoặc quản trị viên (HM chỉ ở
+     mức `TeamMember` trên tin, ngưỡng `Owner` chung sẽ chặn đúng người duy nhất cần soạn thư này và thả Recruiter vào).
+  3. **Thư đi KÈM lệnh chốt.** `ConfirmReviewRequest.EmailOverride`; `SubmitHrReviewAsync` gửi MỘT thư qua
+     `CandidateEmailSender` (lọc HTML ở server, ghi `email_logs`, `sent_by_user_id` = người chốt). Bước mở vòng kế
+     (`OpenNextRoundAsync`) không gửi thư nữa. Buổi thử không có thư (ADR-051). Giao diện: bấm "Xác nhận"/"Lưu & gửi" mở
+     `EmailComposerModal` đã điền sẵn — Huỷ là không chốt gì.
+  4. **Một báo cáo chỉ chốt một lần** — có `HrReview` rồi thì 409 `conflict`, trước mọi thay đổi.
+  5. **Thư xác nhận nhận việc** (`OfferEmail.BuildAccepted`, khoá log `offer_accepted`): vị trí, lương, ngày bắt đầu, loại
+     hợp đồng, nơi làm, 3 bước tiếp theo, đầu mối = Recruiter phụ trách tin. Máy gửi ngay lúc ứng viên bấm nên KHÔNG qua
+     trình soạn, nhưng vẫn qua `CandidateEmailSender` (có dấu vết) và **trả lời vào luồng thư mời** (`In-Reply-To` = Message-Id
+     của thư `offer_sent`). Không dùng `EmailTemplateKeys` vì danh sách đó là các mẫu *xem trước được*.
+  6. **Tự đóng tin khi đủ người** (`JobHeadcountCloser`): sau khi `hired` đã lưu, tin `active` có phiếu mà số `hired` ≥
+     `RecruitmentRequest.Headcount` → `closed` + audit `job_auto_closed_headcount` (actor rỗng — hệ thống) + thông báo HM
+     chính, Recruiter, mọi HR Leader: "đã đủ N người; còn M hồ sơ đang xử lý; K thư mời khác vẫn hiệu lực". Tin không có
+     phiếu (trước ADR-063) thì không đoán số lượng. **Không tự loại hồ sơ, không tự thu hồi thư mời** — còn chỗ ở vị trí khác
+     hay giữ làm dự phòng là việc con người quyết. Chạy SAU khi câu "tôi nhận" đã lưu và best-effort: lỗi đóng tin không
+     được làm mất quyết định của ứng viên (HR vẫn đóng tay được).
+  7. **Tin đã đóng mà còn hồ sơ chưa khép** (tự đóng hay đóng tay): màn tin của cả ba vai hiện `ClosedJobOpenApplications`
+     — mỗi hồ sơ một thao tác: loại kèm thư cảm ơn qua trình soạn (`application_rejected`, chủ tin/quản trị viên), hoặc với
+     hồ sơ đang cầm thư mời thì dẫn về màn thư mời; HM chỉ xem.
+
+- **Không đổi schema.** Không cột mới: lý do đóng nằm ở audit, banner suy từ trạng thái tin + trạng thái hồ sơ.
+
+- **Kiểm chứng.** `dotnet test` Application 2114/2114 (mới: thư kết quả đúng biến thể + một thư/lần chốt + thư sửa tay
+  được lọc & đánh dấu + buổi thử không thư + chốt lần hai 409; xem trước `interview_result` cho HM chính, chặn Recruiter,
+  chặn báo cáo của hồ sơ khác, verdict lạ; thư xác nhận nối luồng thư mời + có lương + có đầu mối; đóng tin khi đủ, không
+  đóng khi thiếu / không phiếu / từ chối; đóng tin không chạm hồ sơ và thư mời khác). `tsc` hai site + `check:i18n` đạt.
+  **E2E trên Postgres tạm (email tắt):** HM xem trước thư vòng 1 (`next_round`) và vòng 3 (`final_pass`), verdict lạ → 400;
+  chốt vòng cuối kèm thư đã sửa (+ `<script>`) → `email_logs` `interview_result` `was_edited`, không còn `<script>`, hồ sơ
+  `pass`; chốt lần hai → 409; HM soạn offer (điền sẵn 30tr từ đề xuất) → gửi duyệt → HR Leader chốt → gửi → ứng viên nhận →
+  hồ sơ `hired`, `email_logs` có `offer_accepted`, tin (phiếu headcount 1) tự `closed`, audit + thông báo tới HM và HR Leader.

@@ -18,6 +18,8 @@ export interface PreviewEmailParams {
   templateKey: string
   contextId: string
   secondaryId?: string
+  /** Tham số phụ dạng chuỗi — thư kết quả phỏng vấn dùng để truyền verdict sắp chốt (`pass`/`not_pass`). */
+  variant?: string
 }
 
 /** Một thư đã gửi cho ứng viên — tab "Lịch sử email". */
@@ -38,6 +40,8 @@ export interface EmailLogItem {
 export const EMAIL_TEMPLATES = {
   InterviewInvite: 'interview_invite',
   ApplicationRejected: 'application_rejected',
+  /** Thư kết quả vòng phỏng vấn — ngữ cảnh: hồ sơ + báo cáo (secondaryId) + verdict (variant). ADR-074. */
+  InterviewResult: 'interview_result',
 } as const
 
 export const emailService = {

@@ -31,6 +31,7 @@ import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRu
 import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card'
@@ -182,6 +183,16 @@ export default function HmJobDetailPage() {
                 dangerouslySetInnerHTML={{ __html: job.jobDescription || '' }}
               />
             </section>
+
+            {/* Tin đã đóng mà còn hồ sơ chưa khép (ADR-074) — HM chỉ xem; loại hồ sơ là việc của chủ tin. */}
+            <ClosedJobOpenApplications
+              jobStatus={job.status}
+              applications={applications}
+              canReject={false}
+              candidateHref={(appId) => `/hm/candidates/${appId}`}
+              offersHref="/hm/offers"
+              onChanged={() => void queryClient.invalidateQueries({ queryKey: ['job', id, 'applications'] })}
+            />
 
             {/*
               Cùng khối quy trình với màn tin của Recruiter — Hiring Manager phải nhìn thấy phễu y hệt

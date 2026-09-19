@@ -56,6 +56,7 @@ import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
 import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
@@ -637,6 +638,16 @@ export default function RecruiterJobDetailPage() {
       <div className="mb-6">
         <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
       </div>
+
+      {/* Tin đã đóng (tự đóng khi đủ người — ADR-074, hoặc đóng tay) mà còn hồ sơ chưa khép. */}
+      <ClosedJobOpenApplications
+        jobStatus={job.status}
+        applications={apps}
+        canReject
+        candidateHref={(appId) => `/recruiter/candidates/${appId}`}
+        offersHref="/recruiter/offers"
+        onChanged={() => void refetchApps()}
+      />
 
       {/*
         Khối ứng viên theo lối ATS (thanh bước quy trình → danh sách → hồ sơ + CV).

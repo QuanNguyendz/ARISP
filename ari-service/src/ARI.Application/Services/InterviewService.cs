@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
+using ARI.Application.Emails;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Offers;
@@ -1494,18 +1495,6 @@ namespace ARI.Application.Services
             };
         }
 
-        /// <summary>
-        /// Tổng số vòng của job = <c>max(InterviewRoundConfig.RoundNumber)</c>. Job chưa khai báo
-        /// vòng nào thì coi như 1 vòng (khớp fallback ở <see cref="StartSessionAsync"/>).
-        /// Dùng để xác định "vòng cuối" — điều kiện duy nhất để hồ sơ được đặt "pass" (ADR-053).
-        /// </summary>
-        private async Task<int> ResolveTotalRoundsAsync(Guid jobPostingId, CancellationToken ct = default)
-        {
-            var rounds = await _unitOfWork.Repository<InterviewRoundConfig>()
-                .QueryAsync(q => q.Where(r => r.JobPostingId == jobPostingId).Select(r => r.RoundNumber), ct);
-            return rounds.Count == 0 ? 1 : Math.Max(1, rounds.Max());
-        }
-
         public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)
         {
             var evaluation = await _unitOfWork.Repository<Evaluation>().GetByIdAsync(request.EvaluationId, ct);
@@ -1515,6 +1504,11 @@ namespace ARI.Application.Services
             var hrUser = await _unitOfWork.Repository<User>().GetByIdAsync(hrUserId, ct);
             if (hrUser == null)
                 return Result.Failure<bool>("Không tìm thấy tài khoản nhân sự.");
+
+            // Một báo cáo chỉ chốt MỘT lần. Lệnh chốt đổi trạng thái hồ sơ, mở vòng kế và gửi thư kết quả —
+            // bấm hai lần (hoặc hai người cùng bấm) mà không chặn là ứng viên nhận hai thư, có khi trái nhau.
+            if (await _unitOfWork.Repository<HrReview>().CountAsync(r => r.EvaluationId == evaluation.Id, ct) > 0)
+                return Result.Failure<bool>("Kết quả vòng này đã được chốt.", CommonErrorCodes.Conflict);
 
             // ===== AI ĐÃ PHỎNG VẤN — NGƯỜI CHỐT LÀ HIRING MANAGER (ADR-061) =====
             //
@@ -1607,18 +1601,24 @@ namespace ARI.Application.Services
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
             {
+                // Biến thể thư kết quả — chỉ buổi THẬT mới có (null = không gửi thư).
+                string? resultVariant = null;
+
                 // Buổi THỬ không chạm pipeline tuyển dụng, kể cả khi có ai đó review nó (ADR-051).
                 // "Đạt" CHỈ khi đã qua vòng CUỐI của job (ADR-053): trước đây HR xác nhận pass ở
-                // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị TriggerAutoProgressionAsync ghi
-                // đè về "interview" — job không khai báo round config thì không có gì ghi đè nên
-                // ứng viên mới xong vòng 1 đã hiện "Đạt".
+                // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị bước mở vòng kế ghi đè về
+                // "interview" — job không khai báo round config thì không có gì ghi đè nên ứng viên
+                // mới xong vòng 1 đã hiện "Đạt". Nay trạng thái và biến thể thư suy từ CÙNG một hàm.
                 if (evaluation.SessionType == "real")
                 {
-                    var totalRounds = await ResolveTotalRoundsAsync(application.JobPostingId, ct);
-                    var isFinalRound = evaluation.RoundNumber >= totalRounds;
-                    application.Status = request.FinalVerdict != "pass"
-                        ? "not_pass"
-                        : (isFinalRound ? "pass" : "interview");
+                    var totalRounds = await InterviewResultEmail.TotalRoundsAsync(_unitOfWork, application.JobPostingId, ct);
+                    resultVariant = InterviewResultEmail.ResolveVariant(request.FinalVerdict, evaluation.RoundNumber, totalRounds);
+                    application.Status = resultVariant switch
+                    {
+                        InterviewResultEmail.Variants.FinalPass => ApplicationStatuses.Pass,
+                        InterviewResultEmail.Variants.NextRound => "interview",
+                        _ => "not_pass",
+                    };
                     _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
                 }
 
@@ -1644,75 +1644,24 @@ namespace ARI.Application.Services
                     }
                 }
 
-                bool hasProgressed = false;
-                // Auto-Progression Logic to Round N+1 (ADR-017 / ADR-014)
-                if (request.FinalVerdict == "pass" && evaluation.SessionType == "real")
+                // Thư kết quả (ADR-074): MỘT thư cho mỗi lần chốt, dựng bằng builder dùng chung với bản xem
+                // trước và đi qua CandidateEmailSender — bản HM đã sửa ở trình soạn là bản được gửi, và thư có
+                // dòng ở tab "Lịch sử email". Trước đây hai nhánh (qua vòng / kết thúc) tự viết HTML rồi gửi
+                // thẳng SMTP: không ai xem trước được, không ai sửa được, không để lại dấu vết.
+                // Buổi THỬ không có thư: nó không thuộc phễu tuyển dụng (ADR-051).
+                if (resultVariant != null)
                 {
-                    hasProgressed = await TriggerAutoProgressionAsync(application, evaluation.RoundNumber, frontendBaseUrl, ct);
-                }
+                    if (resultVariant == InterviewResultEmail.Variants.NextRound)
+                        await OpenNextRoundAsync(application, evaluation.RoundNumber, ct);
 
-                // Auto-send email to Candidate if not progressed
-                if (!hasProgressed)
-                {
-                    // Link trong thư phải trỏ về portal thật của môi trường đang chạy, không phải máy dev.
-                    // KHÔNG đặt mặc định localhost ở đây: `frontendBaseUrl` đến từ `FrontendUrls`,
-                    // mà giá trị đó đã được chặn ở bước boot. Bịa thêm một máy chủ nữa chỉ tạo chỗ
-                    // để link sai lọt ra ngoài mà không ai biết.
-                    var portalBase = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
-                    string emailBody;
-                    string subject;
-                    if (request.FinalVerdict == "pass")
-                    {
-                        subject = "ARISP - Chúc mừng bạn đã vượt qua vòng phỏng vấn!";
-                        emailBody = $$"""
-                            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                                <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 24px; text-align: center; color: white;">
-                                    <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">THƯ CHÚC MỪNG VƯỢT QUA VÒNG PHỎNG VẤN</h2>
-                                </div>
-                                <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                                    <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                                    <p>Chúng tôi vô cùng vui mừng thông báo rằng Anh/Chị đã chính thức vượt qua các vòng đánh giá năng lực của vị trí tuyển dụng <strong>{{jobTitle}}</strong> tại ARISP.</p>
-                                    <p>Đội ngũ tuyển dụng đánh giá rất cao năng lực chuyên môn, phong cách làm việc cũng như sự phù hợp của Anh/Chị với định hướng phát triển của chúng tôi.</p>
-                                    <p>Thư mời nhận việc chính thức (Offer Letter) sẽ được gửi tới Anh/Chị qua email và hiển thị ngay trong hồ sơ ứng tuyển trên hệ thống, kèm nút xác nhận. Bộ phận Nhân sự cũng sẽ liên hệ trực tiếp để trao đổi thêm nếu Anh/Chị cần.</p>
-                                    <p>Cảm ơn Anh/Chị đã luôn dành sự quan tâm và nỗ lực trong suốt hành trình tuyển dụng cùng ARISP.</p>
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
-                                    </div>
-                                    <p style="margin-bottom: 0;">Trân trọng,<br><strong>Trưởng Ban Tuyển Dụng ARISP</strong></p>
-                                </div>
-                                <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                                    <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                                </div>
-                            </div>
-                            """;
-                    }
-                    else
-                    {
-                        subject = "ARISP - Thư cảm ơn tham gia phỏng vấn";
-                        emailBody = $$"""
-                            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                                <div style="background: linear-gradient(135deg, #4b5563, #6b7280); padding: 24px; text-align: center; color: white;">
-                                    <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">THƯ CẢM ƠN THAM GIA PHỎNG VẤN</h2>
-                                </div>
-                                <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                                    <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                                    <p>Đội ngũ tuyển dụng ARISP chân thành cảm ơn Anh/Chị đã dành thời gian và tâm huyết tham gia quy trình ứng tuyển vào vị trí <strong>{{jobTitle}}</strong>.</p>
-                                    <p>Sau khi cân nhắc kỹ lưỡng dựa trên kết quả phỏng vấn và so sánh với định hướng hiện tại của vị trí, chúng tôi rất tiếc phải thông báo rằng chưa thể đồng hành cùng Anh/Chị trong dự án lần này.</p>
-                                    <p>Hồ sơ năng lực của Anh/Chị sẽ được lưu trữ bảo mật trong Cơ sở dữ liệu ứng viên tiềm năng của ARISP. Chúng tôi sẽ chủ động liên hệ ngay khi có những cơ hội nghề nghiệp mới phù hợp hơn với thế mạnh của Anh/Chị.</p>
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #4b5563; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(75,85,99,0.2);">Xem thông tin hồ sơ</a>
-                                    </div>
-                                    <p>Chúc Anh/Chị luôn dồi dào sức khỏe, may mắn và gặt hái được nhiều thành công rực rỡ trên con đường sự nghiệp sắp tới.</p>
-                                    <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
-                                </div>
-                                <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                                    <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                                </div>
-                            </div>
-                            """;
-                    }
-
-                    await _notificationService.SendEmailAsync(application.CandidateEmail, subject, emailBody, ct);
+                    // Link trong thư trỏ về portal thật của môi trường đang chạy: `frontendBaseUrl` đến từ
+                    // `FrontendUrls`, đã bị chặn ở bước boot nếu thiếu — không bịa mặc định localhost ở đây.
+                    var mail = InterviewResultEmail.Build(
+                        application, jobPosting, resultVariant, evaluation.RoundNumber, frontendBaseUrl);
+                    await CandidateEmailSender.SendAsync(
+                        _unitOfWork, _notificationService, EmailTemplateKeys.InterviewResult,
+                        new RenderedEmail(mail.Subject, mail.Html, application.CandidateEmail, application.CandidateName),
+                        request.EmailOverride, application.Id, application.JobPostingId, hrUserId, ct);
                 }
 
                 // Notify candidate in real-time
@@ -1821,77 +1770,34 @@ namespace ARI.Application.Services
             return Result.Success(true);
         }
 
-        private async Task<bool> TriggerAutoProgressionAsync(ARI.Domain.Entities.Application application, int currentRoundNumber, string? frontendBaseUrl = null, CancellationToken ct = default)
+        /// <summary>
+        /// Đạt vòng N và còn vòng sau → mở lời mời vòng N+1 (ADR-017 / ADR-014). KHÔNG gửi thư: thư "qua vòng"
+        /// là thư kết quả do Hiring Manager gửi kèm lệnh chốt (ADR-074), còn thư mời kèm giờ hẹn thuộc bước
+        /// nhân sự xếp lịch (ADR-048/059). Token invite chỉ để thoả cột NOT NULL, không phát ra ngoài.
+        /// </summary>
+        private async Task OpenNextRoundAsync(
+            ARI.Domain.Entities.Application application, int currentRoundNumber, CancellationToken ct)
         {
             var nextRoundNumber = currentRoundNumber + 1;
+            var hasNextRound = await _unitOfWork.Repository<InterviewRoundConfig>()
+                .CountAsync(r => r.JobPostingId == application.JobPostingId && r.RoundNumber == nextRoundNumber, ct) > 0;
+            if (!hasNextRound) return;
 
-            // Check if there is configured round configs for N+1
-            var nextRoundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
-                .FindAsync(r => r.JobPostingId == application.JobPostingId && r.RoundNumber == nextRoundNumber, ct);
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
 
-            if (nextRoundConfigs.Any())
+            var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
+                .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
+            foreach (var old in oldInvites)
+                _unitOfWork.Repository<InterviewInvite>().Delete(old);
+
+            await _unitOfWork.Repository<InterviewInvite>().AddAsync(new InterviewInvite
             {
-                var nextRound = nextRoundConfigs.First();
-                // Status = interview (đang trong giai đoạn phỏng vấn vòng kế); chi tiết vòng suy ra từ record.
-                application.Status = "interview";
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
-
-                // Tạo lời mời CHỌN LỊCH cho vòng kế (mỗi vòng cần duyệt → chỉ tạo sau khi confirm Pass).
-                var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
-                var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
-                var baseUrl = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
-                // Chỉ để thoả cột TokenHash (NOT NULL) — không dòng nào còn đối chiếu giá trị này.
-                var rawToken = Guid.NewGuid().ToString("N");
-
-                var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
-                    .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
-                foreach (var old in oldInvites)
-                    _unitOfWork.Repository<InterviewInvite>().Delete(old);
-
-                await _unitOfWork.Repository<InterviewInvite>().AddAsync(new InterviewInvite
-                {
-                    ApplicationId = application.Id,
-                    RoundNumber = nextRoundNumber,
-                    TokenHash = TokenHashing.Sha256Hex(rawToken),
-                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
-                }, ct);
-
-                // ADR-048/059: ứng viên KHÔNG tự chọn giờ nữa — chỉ dẫn về Portal để theo dõi, thư mời
-                // kèm giờ hẹn sẽ do bước nhân sự xếp lịch gửi riêng. Token invite không phát ra ngoài.
-                var portalLink = $"{baseUrl}/candidate/applications/{application.Id}";
-
-                var emailBody = $$"""
-                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 24px; text-align: center; color: white;">
-                            <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">HỆ THỐNG TUYỂN DỤNG THÔNG MINH ARISP</h2>
-                        </div>
-                        <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                            <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                            <p>Chúc mừng Anh/Chị đã hoàn thành xuất sắc vòng phỏng vấn số <strong>{{currentRoundNumber}}</strong>.</p>
-                            <p>Đội ngũ tuyển dụng ARISP trân trọng kính mời Anh/Chị tiếp tục tham gia <strong>Vòng phỏng vấn số {{nextRoundNumber}}</strong>.</p>
-                            <p><strong>Bộ phận nhân sự sẽ xếp lịch vòng {{nextRoundNumber}}</strong> và gửi Anh/Chị một thư mời riêng kèm <strong>giờ hẹn cụ thể và địa điểm</strong>. Trong thư đó, Anh/Chị bấm xác nhận tham dự hoặc báo bận để được xếp khung giờ khác.</p>
-                            <div style="margin: 30px 0; text-align: center;">
-                                <a href="{{portalLink}}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Xem tiến trình hồ sơ</a>
-                            </div>
-                            <p>Nếu gặp bất kỳ khó khăn hoặc cần hỗ trợ kỹ thuật, xin vui lòng phản hồi trực tiếp email này hoặc liên hệ bộ phận hỗ trợ tuyển dụng.</p>
-                            <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
-                        </div>
-                        <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                            <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                        </div>
-                    </div>
-                    """;
-
-                // Send email invite
-                await _notificationService.SendEmailAsync(
-                    application.CandidateEmail,
-                    $"ARISP - Mời bạn tham gia vòng phỏng vấn số {nextRoundNumber}",
-                    emailBody,
-                    ct
-                );
-                return true;
-            }
-            return false;
+                ApplicationId = application.Id,
+                RoundNumber = nextRoundNumber,
+                TokenHash = TokenHashing.Sha256Hex(Guid.NewGuid().ToString("N")),
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
+            }, ct);
         }
     }
 }

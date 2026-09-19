@@ -102,6 +102,70 @@ namespace ARI.Application.Offers
             return new Content(subject, html);
         }
 
+        /// <summary>Khoá ghi ở <c>email_logs.template_key</c> cho thư xác nhận nhận việc.</summary>
+        public const string AcceptedTemplateKey = "offer_accepted";
+
+        /// <summary>
+        /// Xác nhận ứng viên đã nhận việc (ADR-074 — hoàn thiện offer). Trước đây bấm "Nhận việc" xong ứng viên
+        /// chỉ thấy trạng thái đổi trong Portal: không một văn bản nào ghi lại điều kiện đã chốt, không biết
+        /// bước tiếp theo là gì, không biết hỏi ai. Thư do MÁY gửi ngay lúc ứng viên bấm (không ai đứng sau để
+        /// soạn) nên không qua trình soạn thảo, nhưng vẫn đi qua <c>CandidateEmailSender</c> để có dấu vết.
+        /// </summary>
+        /// <param name="contactName">Người phụ trách tuyển dụng của tin — đầu mối ứng viên liên hệ.</param>
+        public static Content BuildAccepted(
+            Offer offer, ARI.Domain.Entities.Application application, JobPosting? job, string? candidateBaseUrl,
+            string? contactName, string? contactEmail)
+        {
+            var position = offer.Position ?? job?.Title ?? "vị trí ứng tuyển";
+            var baseUrl = string.IsNullOrWhiteSpace(candidateBaseUrl) ? string.Empty : candidateBaseUrl.TrimEnd('/');
+
+            var optionalRows = string.Empty;
+            if (!string.IsNullOrWhiteSpace(offer.EmploymentType)) optionalRows += Row("Loại hợp đồng", offer.EmploymentType!);
+            if (!string.IsNullOrWhiteSpace(offer.WorkLocation)) optionalRows += Row("Nơi làm việc", offer.WorkLocation!);
+
+            // Đầu mối chỉ in khi biết — một dòng "Liên hệ: " bỏ trống còn tệ hơn không có dòng nào.
+            var contact = string.IsNullOrWhiteSpace(contactEmail)
+                ? "hãy trả lời trực tiếp thư này"
+                : $"liên hệ <strong>{(string.IsNullOrWhiteSpace(contactName) ? contactEmail : contactName)}</strong> "
+                  + $"qua <a href='mailto:{contactEmail}'>{contactEmail}</a>";
+
+            var link = string.IsNullOrEmpty(baseUrl)
+                ? string.Empty
+                : $@"
+            <div style='text-align: center; margin: 28px 0;'>
+                <a href='{baseUrl}/candidate/applications/{application.Id}/offer'
+                   style='background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>
+                   Xem lại thư mời đã nhận
+                </a>
+            </div>";
+
+            var html = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;'>
+            <h2 style='color: #0f172a; margin: 0 0 4px;'>Chào mừng {application.CandidateName} gia nhập ARISP!</h2>
+            <p style='color: #475569; margin: 0 0 20px;'>Chúng tôi đã nhận được xác nhận nhận việc của bạn cho vị trí <strong>{position}</strong>. Dưới đây là các điều kiện đã thống nhất:</p>
+
+            <table style='width: 100%; border-collapse: collapse; background: #f8fafc; border-radius: 8px; padding: 12px;'>
+                {Row("Vị trí", position)}
+                {Row("Mức lương", Money(offer.SalaryAmount, offer.SalaryCurrency) + SalaryPeriodLabel(offer.SalaryPeriod))}
+                {Row("Ngày bắt đầu làm việc", Date(offer.StartDate))}
+                {optionalRows}
+            </table>
+
+            <h3 style='color: #0f172a; margin: 24px 0 8px; font-size: 16px;'>Bước tiếp theo</h3>
+            <ol style='color: #475569; padding-left: 20px; margin: 0;'>
+                <li>Bộ phận nhân sự sẽ liên hệ trong vài ngày làm việc để hoàn tất hợp đồng lao động.</li>
+                <li>Bạn chuẩn bị giấy tờ tuỳ thân và hồ sơ nhân sự theo hướng dẫn trong thư đó.</li>
+                <li>Có mặt vào ngày bắt đầu làm việc ở trên — lịch ngày đầu tiên sẽ được gửi riêng.</li>
+            </ol>
+            {link}
+            <p style='color: #475569;'>Nếu có câu hỏi, {contact}.</p>
+            <p style='color: #475569; margin-bottom: 0;'>Trân trọng,</p>
+            <p style='color: #0f172a; font-weight: 600; margin-top: 4px;'>Đội ngũ nhân sự ARISP</p>
+        </div>";
+
+            return new Content($"[ARISP] Xác nhận nhận việc — {position}", html);
+        }
+
         /// <summary>Nhắc ứng viên khi sắp hết hạn — tác vụ nền gửi, KHÔNG qua trình soạn thảo.</summary>
         public static Content BuildReminder(
             Offer offer, ARI.Domain.Entities.Application application, JobPosting? job, string? candidateBaseUrl)

@@ -8,8 +8,8 @@ import type {
 } from '@ari/shared/types/evaluation'
 
 /**
- * Phần bổ sung của ADR-061 khi chốt kết quả phỏng vấn: lý do chốt thay Hiring Manager, và các đề
- * xuất lương/cấp bậc để điền sẵn thư mời nhận việc về sau.
+ * Phần bổ sung của ADR-061 khi chốt kết quả phỏng vấn: lý do chốt thay Hiring Manager, các đề xuất
+ * lương/cấp bậc để điền sẵn thư mời nhận việc về sau, và thư kết quả đã sửa ở trình soạn (ADR-074).
  */
 export type HiringDecisionExtras = Pick<
   SubmitEvaluationReviewPayload,
@@ -20,6 +20,7 @@ export type HiringDecisionExtras = Pick<
   | 'suggestedSalaryCurrency'
   | 'strengths'
   | 'concerns'
+  | 'emailOverride'
 >
 
 interface PaginatedResponse<T> {

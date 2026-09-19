@@ -222,4 +222,9 @@ export interface SubmitEvaluationReviewPayload {
   suggestedSalaryCurrency?: string;
   strengths?: string;
   concerns?: string;
+  /**
+   * Thư kết quả do người chốt sửa ở trình soạn (quy tắc 21, ADR-074). Bỏ trống = gửi đúng mẫu.
+   * Thư đi KÈM lệnh chốt — huỷ trình soạn là không chốt gì cả.
+   */
+  emailOverride?: { subject: string; bodyHtml: string };
 }
