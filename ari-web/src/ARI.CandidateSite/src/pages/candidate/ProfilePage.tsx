@@ -52,6 +52,7 @@ import type {
 import { useAuthStore } from '@ari/shared/store/auth'
 import { useRefreshCandidateAvatar } from '@/fservices/profile/avatarQuery'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged } from '@ari/shared/realtime/dbTableRealtime'
 
 // Kỹ năng & công nghệ phổ biến hiện nay (gợi ý nhanh để ứng viên thêm bằng 1 cú nhấp)
 const SUGGESTED_SKILLS = [
@@ -181,6 +182,29 @@ export default function ProfilePage() {
       })
       .catch(() => {})
   }, [t])
+
+  // Đọc lại sau `await` — closure của lượt render cũ không biết ứng viên vừa gõ thêm trong lúc chờ.
+  const canReplaceRef = useRef(false)
+  canReplaceRef.current =
+    !dirty && !saving && !cvUploading && !avatarUploading && !avatarToCrop && !privacySaving
+
+  /**
+   * Hồ sơ vừa đổi ở tab / thiết bị khác (ADR-057 — server chỉ gửi cho chính chủ tài khoản). Còn thay
+   * đổi chưa lưu hoặc đang tải CV / ảnh lên thì KHÔNG nạp đè: mất chữ đang gõ tệ hơn nhiều so với
+   * nhìn bản cũ thêm một lúc, và lần lưu tới sẽ trả về bản mới nhất.
+   */
+  useDbTableChanged(['candidate_accounts'], () => {
+    if (!canReplaceRef.current) return
+    void Promise.all([profileService.getProfile(), settingsService.get()])
+      .then(([nextProfile, nextSettings]) => {
+        if (!canReplaceRef.current) return
+        setProfile(nextProfile)
+        if (nextSettings && typeof nextSettings.allowHrViewProfile === 'boolean') {
+          setAllowHrViewProfile(nextSettings.allowHrViewProfile)
+        }
+      })
+      .catch(() => {})
+  })
 
   // Lưu xong: hiện dải xác nhận khoảng 2 giây rồi tự trượt xuống và tắt — không để nó nằm mãi
   // dưới màn che mất nội dung. Đặt lại `savedAt` để lần lưu sau chạy lại đúng chuỗi hiệu ứng.

@@ -48,19 +48,6 @@ namespace ARI.Application.Interviews
             return string.IsNullOrEmpty(root) ? null : $"{root}/kiosk";
         }
 
-        /// <summary>
-        /// Vòng CẦN mã = vòng của lịch đang giữ chỗ (ADR-058: dòng booking là sự thật). Không đoán từ
-        /// phiên đã xong như đường cấp mã cũ (<c>max(completed) + 1</c>): hồ sơ được xếp lại lịch của
-        /// chính vòng đó vẫn là vòng đó, và lịch là thứ nói ứng viên sắp dự vòng nào.
-        /// </summary>
-        public static async Task<InterviewBooking?> LiveBookingAsync(
-            IUnitOfWork unitOfWork, Guid applicationId, CancellationToken ct)
-            => (await unitOfWork.Repository<InterviewBooking>().FindAsync(
-                    b => b.ApplicationId == applicationId && b.Status == BookingStatus.Scheduled, ct))
-                .OrderByDescending(b => b.RoundNumber)
-                .ThenByDescending(b => b.CreatedAt)
-                .FirstOrDefault();
-
         public static async Task<ApplicationInterviewCodeDto> BuildAsync(
             IUnitOfWork unitOfWork, IConfiguration configuration,
             ARI.Domain.Entities.Application app, CancellationToken ct)
@@ -74,7 +61,7 @@ namespace ARI.Application.Interviews
             if (ApplicationStatuses.IsTerminal(app.Status))
                 return Blocked("Hồ sơ đã đóng — không cấp mã phỏng vấn.");
 
-            var live = await LiveBookingAsync(unitOfWork, app.Id, ct);
+            var live = await InterviewCodeRules.LiveBookingAsync(unitOfWork, app.Id, ct);
             if (live == null)
                 return Blocked("Ứng viên chưa có lịch phỏng vấn — xếp lịch trước rồi mới cấp mã.");
 
@@ -82,7 +69,8 @@ namespace ARI.Application.Interviews
             var roundType = await SchedulingSupport.RoundTypeAsync(unitOfWork, app.JobPostingId, round, ct);
 
             if (InterviewInviteEmail.IsOnlineTest(roundType))
-                return Blocked(InterviewCodeRules.OnlineTestReason(round), round, roundType);
+                return Blocked(InterviewCodeRules.OnlineTestReason(round,
+                    await InterviewCodeRules.HasNextRoundAsync(unitOfWork, app.JobPostingId, round, ct)), round, roundType);
 
             var entered = await InterviewCodeRules.EnteredRoomReasonAsync(unitOfWork, app.Id, round, ct);
             if (entered != null)

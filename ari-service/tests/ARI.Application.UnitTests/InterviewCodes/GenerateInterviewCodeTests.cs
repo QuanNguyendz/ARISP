@@ -129,19 +129,56 @@ public class GenerateInterviewCodeTests
     }
 
     [Fact]
-    public async Task Generate_infers_next_round_from_completed_sessions()
+    public async Task Generate_without_round_uses_the_highest_scheduled_booking()
     {
         var (ctx, svc) = Build();
         var job = InterviewCodeData.Job();
         var app = InterviewCodeData.App(job.Id);
         ctx.Uow.Seed(job).Seed(app)
             .Seed(InterviewCodeData.CompletedSession(app.Id, round: 1)) // đã xong vòng 1
-            .Seed(InterviewCodeData.Booking(app.Id, round: 2));         // đã đặt lịch vòng 2
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1))          // lịch vòng 1 vẫn "scheduled"
+            .Seed(InterviewCodeData.Booking(app.Id, round: 2));         // đã xếp lịch vòng 2
 
         var res = await svc.GenerateCodeAsync(app.Id, roundNumber: null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
-        Assert.Equal(2, res.Value.RoundNumber); // vòng kế = max(completed)+1
+        Assert.Equal(2, res.Value.RoundNumber);
+    }
+
+    [Fact]
+    public async Task Generate_without_round_after_passing_an_online_test_round_issues_for_the_next_round()
+    {
+        // Lỗi thật trên deploy: vòng 1 trắc nghiệm KHÔNG sinh phiên phỏng vấn nào, nên phép đoán cũ
+        // max(phiên đã xong) + 1 ra vòng 1 → "Vòng 1 là bài trắc nghiệm", dù Recruiter đang cấp cho vòng 2.
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app)
+            .Seed(new InterviewRoundConfig { JobPostingId = job.Id, RoundNumber = 1, RoundType = "online_test" })
+            .Seed(InterviewCodeData.RoundConfig(job.Id, round: 2))
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1))
+            .Seed(InterviewCodeData.Booking(app.Id, round: 2));
+
+        var res = await svc.GenerateCodeAsync(app.Id, roundNumber: null, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsSuccess, res.IsFailure ? res.Error : null);
+        Assert.Equal(2, res.Value.RoundNumber);
+    }
+
+    [Fact]
+    public async Task Generate_without_round_and_without_any_booking_is_rejected()
+    {
+        var (ctx, svc) = Build();
+        var job = InterviewCodeData.Job();
+        var app = InterviewCodeData.App(job.Id);
+        ctx.Uow.Seed(job).Seed(app)
+            .Seed(InterviewCodeData.Booking(app.Id, round: 1, status: "declined")); // đã trả chỗ
+
+        var res = await svc.GenerateCodeAsync(app.Id, roundNumber: null, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(res.IsFailure);
+        Assert.Contains("chưa có lịch", res.Error);
+        Assert.Empty(ctx.Uow.Repo<ARI.Domain.Entities.InterviewCode>().Items);
     }
 
     // ---------- Luật cấp mã (dùng chung mọi đường cấp) ----------

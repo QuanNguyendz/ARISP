@@ -1,0 +1,14 @@
+[Senior Backend .NET – Mức kỳ vọng của vị trí]
+Vị trí tuyển bậc 3 Senior trong khung năng lực công ty: chịu trách nhiệm một dịch vụ backend ASP.NET Core trên PostgreSQL, tự thiết kế, triển khai và vận hành, kèm cặp thành viên khác. Ứng viên Middle vững (bậc 2) vẫn được cân nhắc nếu nền tảng C#, EF Core và cơ sở dữ liệu tốt.
+
+[Senior Backend .NET – C# và ASP.NET Core]
+Kỳ vọng: async/await đúng cách (không .Result, .Wait(), async void; truyền CancellationToken); vòng đời DI Singleton, Scoped, Transient và lỗi captive dependency; middleware pipeline, filter, model validation; xử lý lỗi tập trung (ProblemDetails); Options pattern; logging có cấu trúc; HttpClientFactory.
+
+[Senior Backend .NET – EF Core và PostgreSQL]
+Kỳ vọng: đọc được SQL mà EF Core sinh ra; tránh N+1 bằng Include hoặc projection Select; AsNoTracking cho truy vấn đọc; migration an toàn trên dữ liệu thật; index B-tree, composite, partial; EXPLAIN ANALYZE; transaction, isolation level, optimistic concurrency (xmin, RowVersion); phân trang keyset.
+
+[Senior Backend .NET – Thiết kế API và kiến trúc]
+Kỳ vọng: REST đúng ngữ nghĩa (status code, idempotency, phân trang, versioning); Clean Architecture, CQRS với MediatR khi thật sự cần; Result pattern cho lỗi nghiệp vụ; phân quyền phía server; biết khi nào kiến trúc là quá mức cần thiết.
+
+[Senior Backend .NET – Vận hành, chất lượng và điểm cộng]
+Kỳ vọng: unit test và integration test (xUnit, Testcontainers), CI/CD (GitHub Actions), Docker, log, metric, tracing, xử lý sự cố production. Điểm cộng: SignalR, BackgroundService và hàng đợi nền, retry có idempotency, cache Redis, outbox pattern.

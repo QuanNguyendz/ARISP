@@ -1,0 +1,4 @@
+# Câu hỏi bắt buộc – Vòng 1 Sơ loại – Senior Backend .NET
+Hãy tóm tắt dự án .NET gần nhất của bạn: sản phẩm là gì, quy mô ra sao, và phần việc nào do chính bạn chịu trách nhiệm?
+Điều gì khiến bạn quan tâm tới vị trí Backend .NET này, và bạn muốn phát triển theo hướng nào trong 1 đến 2 năm tới?
+Hãy kể về một sự cố trên production mà bạn trực tiếp xử lý: bạn tìm ra nguyên nhân bằng cách nào và đã thay đổi gì sau đó?

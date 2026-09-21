@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Loader2, Check, FileDown, Briefcase, FileText, Eye } from 'lucide-react'
@@ -20,6 +20,7 @@ import {
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged, touchesRow, RESYNC_TABLE } from '@ari/shared/realtime/dbTableRealtime'
 
 /**
  * Trình soạn bản mô tả công việc theo mẫu công ty (ADR-064).
@@ -192,6 +193,38 @@ export default function JdComposerView() {
 
   /** Còn thay đổi chưa lưu hay không. */
   const isDirty = doc != null && savedFingerprint != null && fingerprint(doc) !== savedFingerprint
+
+  // Đọc lại sau `await` — closure của lượt render cũ không biết người dùng vừa gõ thêm trong lúc chờ.
+  const canReplaceDocRef = useRef(false)
+  canReplaceDocRef.current = !isDirty && busy === null
+
+  /**
+   * Realtime (ADR-057). Hai nguồn, hai mức an toàn khác nhau:
+   *
+   * - **Mẫu JD** đổi (HR Leader sửa tiêu đề / bật tắt mục): nạp lại mẫu NGAY, kể cả khi đang soạn dở —
+   *   mẫu chỉ quyết định khung, nội dung đã gõ nằm ở `doc.sections` theo `key` bất biến nên không mất
+   *   chữ nào. Không nạp thì Recruiter soạn theo bố cục cũ rồi xuất file theo bố cục mới.
+   * - **Bản JD này** do người khác lưu: chỉ thay khi KHÔNG còn chữ chưa lưu và không có nút nào đang
+   *   chạy. Nạp đè lên chữ đang gõ là mất dữ liệu; còn lượt lưu của chính mình thì đã khớp sẵn rồi.
+   */
+  useDbTableChanged(['jd_templates', 'jd_documents'], (changes) => {
+    if (!requestId) return
+
+    if (changes.some((c) => c.table === RESYNC_TABLE || c.table === 'jd_templates')) {
+      void jdTemplateService.get().then(setTemplate).catch(() => {})
+    }
+
+    if (touchesRow(changes, 'jd_documents', doc?.id) && canReplaceDocRef.current) {
+      void jdDocumentService
+        .get(requestId)
+        .then((jd) => {
+          if (!canReplaceDocRef.current) return
+          setDoc(jd)
+          setSavedFingerprint(fingerprint(jd))
+        })
+        .catch(() => {})
+    }
+  })
 
   /**
    * Xem trước = MỞ CHÍNH FILE sẽ được đính kèm, không phải một bản vẽ lại ở trình duyệt.

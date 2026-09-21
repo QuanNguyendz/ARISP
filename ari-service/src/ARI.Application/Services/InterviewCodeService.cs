@@ -51,14 +51,22 @@ namespace ARI.Application.Services
                 return Result.Failure<InterviewCode>("Tin tuyển dụng liên kết không tồn tại.");
             }
 
-            int finalRoundNumber = roundNumber ?? 1;
-            if (!roundNumber.HasValue)
+            // Không nói vòng → vòng của LỊCH đang giữ chỗ (luật chung với nút cấp mã trên danh sách ứng
+            // viên). Chưa có lịch nào thì không có vòng để cấp — trả thẳng lý do thay vì đoán vòng 1.
+            int finalRoundNumber;
+            if (roundNumber.HasValue)
             {
-                // Dùng ToLower() thay vì string.Equals(..., StringComparison) — EF Core/Npgsql
-                // KHÔNG dịch được overload có StringComparison sang SQL (gây lỗi 500 khi cấp mã).
-                var sessions = await _unitOfWork.Repository<InterviewSession>().FindAsync(
-                    s => s.ApplicationId == applicationId && s.Status != null && s.Status.ToLower() == "completed", ct);
-                finalRoundNumber = sessions.Any() ? sessions.Max(s => s.RoundNumber) + 1 : 1;
+                finalRoundNumber = roundNumber.Value;
+            }
+            else
+            {
+                var live = await InterviewCodeRules.LiveBookingAsync(_unitOfWork, applicationId, ct);
+                if (live == null)
+                {
+                    return Result.Failure<InterviewCode>(
+                        "Ứng viên chưa có lịch phỏng vấn — xếp lịch trước rồi mới cấp mã.");
+                }
+                finalRoundNumber = live.RoundNumber;
             }
 
             var roundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>().FindAsync(
@@ -70,7 +78,8 @@ namespace ARI.Application.Services
             // ở đây thì nhập mã tại Kiosk sẽ mở một PHIÊN PHỎNG VẤN AI cho một vòng vốn là bài thi.
             if (InterviewInviteEmail.IsOnlineTest(roundConfig?.RoundType))
             {
-                return Result.Failure<InterviewCode>(InterviewCodeRules.OnlineTestReason(finalRoundNumber));
+                return Result.Failure<InterviewCode>(InterviewCodeRules.OnlineTestReason(finalRoundNumber,
+                    await InterviewCodeRules.HasNextRoundAsync(_unitOfWork, jobPosting.Id, finalRoundNumber, ct)));
             }
 
             // ADR-015/016: mã On-site chỉ cấp khi ứng viên ĐÃ ĐẶT LỊCH buổi phỏng vấn thật của vòng

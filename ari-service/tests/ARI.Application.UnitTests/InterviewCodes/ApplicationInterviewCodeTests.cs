@@ -196,6 +196,35 @@ public class ApplicationInterviewCodeTests
     }
 
     [Fact]
+    public async Task Qua_vong_trac_nghiem_roi_xep_lich_vong_2_thi_cap_ma_vong_2()
+    {
+        // Lịch vòng 1 (trắc nghiệm) vẫn "scheduled" sau khi thi xong — vòng cần mã là vòng của lịch
+        // CAO NHẤT, không phải vòng trắc nghiệm còn nằm đó.
+        var (uow, app, job) = Seed("online_test");
+        uow.Seed(InterviewCodeData.RoundConfig(job.Id, round: 2))
+            .Seed(InterviewCodeData.Booking(app.Id, round: 2));
+
+        var res = await Issue(uow, app.Id);
+
+        Assert.True(res.IsSuccess, res.IsFailure ? res.Error : null);
+        Assert.Equal(2, res.Value.RoundNumber);
+        Assert.Equal(2, Assert.Single(LiveCodes(uow)).RoundNumber);
+    }
+
+    [Fact]
+    public async Task Qua_vong_trac_nghiem_ma_chua_xep_lich_vong_2_thi_chi_ra_buoc_tiep_theo()
+    {
+        // Lịch cao nhất vẫn là vòng trắc nghiệm — chỉ nói "không dùng mã" nghe như hệ thống cấp nhầm vòng.
+        var (uow, app, job) = Seed("online_test");
+        uow.Seed(InterviewCodeData.RoundConfig(job.Id, round: 2));
+
+        var get = await Get(uow, app.Id);
+
+        Assert.False(get.Value.CanIssue);
+        Assert.Contains("xếp lịch vòng 2", get.Value.BlockedReason);
+    }
+
+    [Fact]
     public async Task Ung_vien_da_vao_phong_thi_khong_cap_them()
     {
         // Đã nhập mã và đang chờ HM cho vào — mã mới là phòng chờ thứ hai cho cùng một người.

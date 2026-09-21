@@ -329,16 +329,27 @@ public class DbChangeRouterTests
     }
 
     [Fact]
-    public void Users_va_system_settings_chi_gui_super_admin()
+    public void System_settings_chi_gui_super_admin()
     {
-        foreach (var table in new[] { "users", "system_settings" })
-        {
-            var dispatch = DbChangeRouter.Resolve(DbChangeRouter.Parse(Payload(table)));
+        var dispatch = DbChangeRouter.Resolve(DbChangeRouter.Parse(Payload("system_settings")));
 
-            Assert.Empty(dispatch.UserIds);
-            Assert.Equal(new[] { DbChangeRouter.SuperAdminGroup }, dispatch.RoleGroups);
-            Assert.False(dispatch.BroadcastAll);
-        }
+        Assert.Empty(dispatch.UserIds);
+        Assert.Equal(new[] { DbChangeRouter.SuperAdminGroup }, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);
+    }
+
+    [Fact]
+    public void Users_gui_super_admin_va_chinh_chu_tai_khoan()
+    {
+        // Super Admin gán đội cho một Hiring Manager (ADR-065): ô "Đội" ở màn Cài đặt của CHÍNH người
+        // đó phải đổi ngay — trước đây chỉ nhóm super_admin nhận nên họ phải F5 mới thấy.
+        var userId = Guid.NewGuid();
+
+        var dispatch = DbChangeRouter.Resolve(DbChangeRouter.Parse(Payload("users", "U", userId)));
+
+        Assert.Equal(new[] { userId }, dispatch.UserIds);
+        Assert.Equal(new[] { DbChangeRouter.SuperAdminGroup }, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);
     }
 
     [Fact]
@@ -441,13 +452,17 @@ public class DbChangeRouterTests
     }
 
     [Fact]
-    public void Mau_jd_chi_gui_nhom_hr()
+    public void Mau_jd_gui_nhom_hr_va_recruiter()
     {
+        // Recruiter là người mở trình soạn JD nhiều nhất — thiếu nhóm của họ thì HR Leader đổi mẫu mà
+        // trình soạn đang mở vẫn dựng theo bố cục cũ.
         var dispatch = DbChangeRouter.Resolve(
             DbChangeRouter.Parse(Payload("jd_templates")), DbChangeLookup.Empty);
 
         Assert.Empty(dispatch.UserIds);
         Assert.Contains(DbChangeRouter.HrAdminGroup, dispatch.RoleGroups);
+        Assert.Contains(DbChangeRouter.RecruiterGroup, dispatch.RoleGroups);
+        Assert.False(dispatch.BroadcastAll);
     }
 
     [Fact]
