@@ -12,13 +12,15 @@ import {
   Loader2,
   Pencil,
   Scale,
+  ScanSearch,
   X,
 } from 'lucide-react'
-import { cvRubricProblems, cvRubricService } from '@ari/shared/fservices/cvRubric'
-import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
+import { clonePolicy, cvPolicyProblems, cvRubricProblems, cvRubricService } from '@ari/shared/fservices/cvRubric'
+import type { CvRubricCriterion, CvRubricPreview, CvScoringPolicy, JobCvRubric } from '@ari/shared/fservices/cvRubric'
 import { formatDateTime24 } from '@ari/shared/utils/time24'
 import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from './CvRubricEditor'
 import CvRubricChips from './CvRubricChips'
+import CvRubricPreviewPanel from './CvRubricPreviewPanel'
 
 type ApiError = { response?: { data?: { message?: string } } }
 const apiMessage = (e: unknown) => (e as ApiError)?.response?.data?.message
@@ -59,16 +61,26 @@ interface JobCvRubricPanelProps {
   }
 }
 
+/** Câu báo sau khi lưu — nói đúng việc hệ thống sẽ làm (ADR-075: đổi công thức thì tính lại, không gọi AI). */
+const savedNoticeKey = (saved: JobCvRubric) =>
+  saved.saveOutcome?.mode === 'recompute'
+    ? 'panel.savedRecompute'
+    : saved.saveOutcome?.mode === 'unchanged'
+      ? 'panel.savedUnchanged'
+      : 'panel.saved'
+
 /**
- * Bộ tiêu chí chấm CV của tin, ngay trong màn tin (ADR-070).
+ * Bộ tiêu chí + công thức chấm CV của tin, ngay trong màn tin (ADR-070/075).
  *
- * Mọi thành viên đội đọc được; quyền sửa do SERVER quyết (`canEdit` — HM chính hoặc quản trị viên). Lưu bản
- * mới là chấm lại mọi hồ sơ của tin, nên trước khi lưu luôn nói rõ bao nhiêu hồ sơ sẽ bị chấm lại.
+ * Mọi thành viên đội đọc được; quyền sửa do SERVER quyết (`canEdit` — HM chính hoặc quản trị viên). Trước khi lưu,
+ * HM "Xem trước tác động": điểm / khuyến nghị của từng hồ sơ sẽ đổi thế nào, và bao nhiêu hồ sơ phải hỏi AI lại.
  */
 export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanelProps) {
   const { t } = useTranslation(CV_SCORING_NS)
   const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<CvRubricCriterion[] | null>(null)
+  const [draft, setDraftState] = useState<CvRubricCriterion[] | null>(null)
+  const [draftPolicy, setDraftPolicyState] = useState<CvScoringPolicy | null>(null)
+  const [preview, setPreview] = useState<CvRubricPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [tried, setTried] = useState(false)
@@ -87,16 +99,38 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
     enabled: !!jobPostingId,
   })
 
+  // Sửa bản nháp thì bản xem trước cũ không còn đúng — bỏ đi để HM không đọc nhầm số của bản trước.
+  const setDraft = (next: CvRubricCriterion[] | null) => {
+    setDraftState(next)
+    setPreview(null)
+  }
+  const setDraftPolicy = (next: CvScoringPolicy | null) => {
+    setDraftPolicyState(next)
+    setPreview(null)
+  }
+
   const save = useMutation({
-    mutationFn: (criteria: CvRubricCriterion[]) => cvRubricService.saveForJob(jobPostingId, criteria),
+    mutationFn: ({ criteria, policy }: { criteria: CvRubricCriterion[]; policy: CvScoringPolicy }) =>
+      cvRubricService.saveForJob(jobPostingId, criteria, policy),
     onSuccess: (saved) => {
       queryClient.setQueryData(key, saved)
       queryClient.invalidateQueries({ queryKey: ['job', jobPostingId] })
       queryClient.invalidateQueries({ queryKey: ['applications'] })
       setDraft(null)
+      setDraftPolicy(null)
       setTried(false)
       setError(null)
-      setNotice(t('panel.saved'))
+      setNotice(t(savedNoticeKey(saved), { count: saved.saveOutcome?.affected ?? 0 }))
+    },
+    onError: (e) => setError(apiMessage(e) ?? t('editor.error')),
+  })
+
+  const previewRun = useMutation({
+    mutationFn: ({ criteria, policy }: { criteria: CvRubricCriterion[]; policy: CvScoringPolicy }) =>
+      cvRubricService.previewForJob(jobPostingId, criteria, policy),
+    onSuccess: (result) => {
+      setError(null)
+      setPreview(result)
     },
     onError: (e) => setError(apiMessage(e) ?? t('editor.error')),
   })
@@ -104,6 +138,8 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
   const editing = draft !== null
   const criteria = data?.criteria ?? []
   const hasRubric = criteria.length > 0
+  const draftValid =
+    !!draft && !!draftPolicy && cvRubricProblems(draft).length === 0 && cvPolicyProblems(draftPolicy).length === 0
 
   const startEdit = () => {
     setNotice(null)
@@ -115,19 +151,28 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
         checks: c.checks ? c.checks.map((x) => ({ ...x })) : [],
       }))
     )
+    setDraftPolicy(clonePolicy(data?.policy))
   }
 
   const cancel = () => {
     setDraft(null)
+    setDraftPolicy(null)
     setTried(false)
     setError(null)
   }
 
   const submit = () => {
-    if (!draft) return
+    if (!draft || !draftPolicy) return
     setTried(true)
-    if (cvRubricProblems(draft).length > 0) return
-    save.mutate(draft)
+    if (!draftValid) return
+    save.mutate({ criteria: draft, policy: draftPolicy })
+  }
+
+  const runPreview = () => {
+    if (!draft || !draftPolicy) return
+    setTried(true)
+    if (!draftValid) return
+    previewRun.mutate({ criteria: draft, policy: draftPolicy })
   }
 
   const suggestSource = () =>
@@ -226,7 +271,7 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
 
           {hasRubric && !collapsed && (
             <div id="cv-rubric-body">
-              <ReadOnlyRubric criteria={criteria} />
+              <ReadOnlyRubric criteria={criteria} policy={data?.policy ?? null} />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-ink-400">
                 <span>
                   {data?.savedAt &&
@@ -256,7 +301,7 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
       )}
       {/* Soạn trong hộp thoại rộng: panel thường nằm ở cột hẹp bên phải màn tin, không đủ chỗ cho
           bốn ô mức neo của từng tiêu chí. Portal ra body để `fixed` không bị thẻ cha có transform giữ lại. */}
-      {editing && draft && createPortal(
+      {editing && draft && draftPolicy && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" onClick={cancel} />
           <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-ink-900">
@@ -278,14 +323,23 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
             </div>
 
             <div className="space-y-3">
-              <CvRubricEditor value={draft} onChange={setDraft} suggestSource={suggestSource} showProblems={tried} />
+              <CvRubricEditor
+                value={draft}
+                onChange={setDraft}
+                suggestSource={suggestSource}
+                showProblems={tried}
+                policy={draftPolicy}
+                onPolicyChange={setDraftPolicy}
+              />
 
-              {(data?.applicationCount ?? 0) > 0 && hasRubric && (
+              {(data?.applicationCount ?? 0) > 0 && hasRubric && !preview && (
                 <div className="flex items-start gap-2 rounded-xl border border-ai-200 bg-ai-50 px-3 py-2 text-xs text-ai-800 dark:border-ai-500/30 dark:bg-ai-500/10 dark:text-ai-200">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {t('panel.rescoreWarning', { count: data?.applicationCount ?? 0 })}
                 </div>
               )}
+
+              {preview && <CvRubricPreviewPanel preview={preview} />}
 
               {error && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
@@ -293,7 +347,18 @@ export default function JobCvRubricPanel({ jobPostingId, job }: JobCvRubricPanel
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 border-t border-ink-100 pt-4 dark:border-white/10">
+              <div className="flex flex-wrap justify-end gap-2 border-t border-ink-100 pt-4 dark:border-white/10">
+                {hasRubric && (data?.applicationCount ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={runPreview}
+                    disabled={previewRun.isPending || save.isPending}
+                    className="mr-auto inline-flex items-center gap-1.5 rounded-xl border border-ai-300 px-4 py-2 text-sm font-medium text-ai-700 hover:bg-ai-50 disabled:opacity-50 dark:border-ai-500/40 dark:text-ai-300 dark:hover:bg-ai-500/10"
+                  >
+                    {previewRun.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
+                    {t('panel.preview')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={cancel}

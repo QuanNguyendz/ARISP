@@ -207,7 +207,7 @@ public class CvRubricGateTests
     public async Task Job_level_cv_rubric_cannot_be_uploaded_as_a_playbook(string scope, int? round)
     {
         var (uow, job, hm) = JobWithHm();
-        var bytes = RubricSheet.Build(CvRubricEditing.Normalize(SampleRubric()).Criteria);
+        var bytes = RubricSheet.Build(CvRubricEditing.Normalize(SampleRubric(), RubricPurpose.Cv).Criteria);
 
         var res = await new UploadPlaybookCommandHandler(uow, new StubDocumentParser(), new RecordingFileStorage(), new RecordingRagIngestionService())
             .Handle(new UploadPlaybookCommand(hm.Id, AppRoles.HiringManager, scope, job.Id, round,
@@ -222,7 +222,7 @@ public class CvRubricGateTests
     public async Task Org_cv_rubric_is_still_uploadable_as_a_template()
     {
         var uow = new InMemoryUnitOfWork();
-        var bytes = RubricSheet.Build(CvRubricEditing.Normalize(SampleRubric()).Criteria);
+        var bytes = RubricSheet.Build(CvRubricEditing.Normalize(SampleRubric(), RubricPurpose.Cv).Criteria);
 
         var res = await new UploadPlaybookCommandHandler(uow, new StubDocumentParser(), new RecordingFileStorage(), new RecordingRagIngestionService())
             .Handle(new UploadPlaybookCommand(Guid.NewGuid(), AppRoles.HrAdmin, "org", null, null,

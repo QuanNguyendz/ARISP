@@ -98,6 +98,12 @@ namespace ARI.Domain.Entities
         /// </summary>
         public string? CvRubricJson { get; set; }
 
+        /// <summary>
+        /// Công thức chấm CV cấp tin HM khai kèm bộ tiêu chí trên phiếu (ADR-075) — chép sang tin cùng bộ tiêu
+        /// chí, cùng luật ảnh chụp một chiều. <c>null</c> = mặc định.
+        /// </summary>
+        public string? CvScoringPolicyJson { get; set; }
+
         public string? EmploymentType { get; set; }
         public string? WorkMode { get; set; }
         public string? Location { get; set; }

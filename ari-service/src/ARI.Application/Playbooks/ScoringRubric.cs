@@ -31,6 +31,44 @@ namespace ARI.Application.Playbooks
         /// vài điểm luôn chỉ ra được là khác nhau ở ý nào. Không có ý kiểm thì AI tự ước lượng vị trí trong dải.
         /// </summary>
         public List<RubricCheck>? Checks { get; set; }
+
+        /// <summary>
+        /// Loại tiêu chí (ADR-075): <c>null</c> = tiêu chí CHẤM ĐIỂM; <see cref="RubricCriterionKinds.Knockout"/> =
+        /// ĐIỀU KIỆN BẮT BUỘC — AI chỉ trả lời đạt/không đạt kèm trích dẫn, không mang trọng số, không vào trung
+        /// bình. Không đạt thì khuyến nghị bị ép "Reject"; hồ sơ không bao giờ bị chặn hay tự loại (ADR-053).
+        /// Chỉ có ở bộ tiêu chí CV.
+        /// </summary>
+        public string? Kind { get; set; }
+
+        /// <summary>
+        /// Điểm tối thiểu của tiêu chí (1–100, ADR-075) — mô hình "ngưỡng từng tiêu chí": điểm tiêu chí thấp hơn
+        /// mức này thì khuyến nghị bị ép "Reject" dù điểm tổng cao. Không gọi là "điểm sàn" — từ đó đã là ngưỡng
+        /// đạt của cả buổi (<c>InterviewPassScore</c>, <c>OnlineTestPassScore</c>). Chỉ có ở bộ tiêu chí CV.
+        /// </summary>
+        public int? MinScore { get; set; }
+
+        [JsonIgnore]
+        public bool IsKnockout => string.Equals(Kind, RubricCriterionKinds.Knockout, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Loại tiêu chí (ADR-075).</summary>
+    public static class RubricCriterionKinds
+    {
+        /// <summary>Tiêu chí chấm điểm — lưu là <c>null</c> để bộ tiêu chí cũ và mới trùng từng byte.</summary>
+        public const string Scored = "scored";
+        /// <summary>Điều kiện bắt buộc (đạt / không đạt).</summary>
+        public const string Knockout = "knockout";
+    }
+
+    /// <summary>
+    /// Bộ tiêu chí dùng để chấm gì — CV và phỏng vấn dùng chung một mô hình tiêu chí nhưng khác luật (ADR-075):
+    /// điều kiện bắt buộc, điểm tối thiểu, trọng số ý kiểm chỉ có nghĩa với CV. Tham số BẮT BUỘC ở mọi hàm kiểm /
+    /// chuẩn hoá để trình biên dịch chỉ ra mọi chỗ gọi, không cửa nào vô tình áp luật CV cho bộ phỏng vấn.
+    /// </summary>
+    public enum RubricPurpose
+    {
+        Cv,
+        Interview,
     }
 
     /// <summary>Một ý kiểm của tiêu chí. <see cref="Key"/> do hệ thống sinh (<c>k1</c>, <c>k2</c>…) và giữ nguyên khi sửa chữ.</summary>
@@ -38,18 +76,30 @@ namespace ARI.Application.Playbooks
     {
         public string Key { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Trọng số của ý trong dải (ADR-075): ×1 / ×2 / ×3 — "hệ số nhân" kiểu ma trận tuyển dụng của ĐH Wyoming.
+        /// <c>null</c> = ×1 (lưu null để bộ cũ và bộ mới toàn ×1 trùng từng byte).
+        /// </summary>
+        public int? Weight { get; set; }
+
+        [JsonIgnore]
+        public int EffectiveWeight => Weight ?? 1;
     }
 
-    /// <summary>Bốn dải điểm cố định — người khai chỉ viết lời, không tự đặt ngưỡng.</summary>
+    /// <summary>
+    /// Lời neo của bốn dải điểm. Bốn dải là cố định; NGƯỠNG của dải do công thức của tin quyết định
+    /// (<see cref="CvScoringPolicy"/>, ADR-075) — mặc định 90–100 / 70–89 / 40–69 / 0–39.
+    /// </summary>
     public class RubricLevels
     {
-        /// <summary>90–100.</summary>
+        /// <summary>Dải cao nhất (mặc định 90–100).</summary>
         public string? Excellent { get; set; }
-        /// <summary>70–89.</summary>
+        /// <summary>Mặc định 70–89.</summary>
         public string? Good { get; set; }
-        /// <summary>40–69.</summary>
+        /// <summary>Mặc định 40–69.</summary>
         public string? Fair { get; set; }
-        /// <summary>0–39.</summary>
+        /// <summary>Mặc định 0–39.</summary>
         public string? Poor { get; set; }
 
         [JsonIgnore]
@@ -77,9 +127,19 @@ namespace ARI.Application.Playbooks
 
         public const int MaxCriteria = 20;
 
+        /// <summary>
+        /// Tối đa điều kiện bắt buộc mỗi bộ (ADR-075). Tài liệu tuyển dụng đều khuyên chỉ dùng điều kiện loại cho
+        /// yêu cầu thật sự thiết yếu (giấy phép, chứng chỉ bắt buộc…) — nhiều hơn là biến sàng lọc thành lọc cứng.
+        /// </summary>
+        public const int MaxKnockouts = 5;
+
         /// <summary>Tối đa ý kiểm mỗi tiêu chí — nhiều hơn thì mỗi ý nặng quá nhẹ và HM khó giữ các ý độc lập.</summary>
         public const int MaxChecks = 8;
         public const int MaxCheckLength = 200;
+
+        /// <summary>Trọng số ý kiểm cho phép (ADR-075): ×1 / ×2 / ×3.</summary>
+        public const int MinCheckWeight = 1;
+        public const int MaxCheckWeight = 3;
 
         private static readonly Regex KeyPattern = new("^[a-z][a-z0-9_]{1,39}$", RegexOptions.Compiled);
         private static readonly Regex CheckKeyPattern = new("^[a-z][a-z0-9_]{0,19}$", RegexOptions.Compiled);
@@ -141,8 +201,12 @@ namespace ARI.Application.Playbooks
         /// <summary>
         /// Kiểm bộ tiêu chí. Trả về danh sách lỗi (rỗng = hợp lệ) — trả HẾT lỗi một lượt để HR sửa file
         /// một lần, thay vì mỗi lần upload lại phát hiện thêm một lỗi.
+        ///
+        /// Luật theo <paramref name="purpose"/> (ADR-075): bộ CV được có điều kiện bắt buộc (trọng số 0, tối đa
+        /// <see cref="MaxKnockouts"/>), điểm tối thiểu từng tiêu chí và trọng số ý kiểm; tổng trọng số chỉ tính
+        /// trên tiêu chí chấm điểm. Bộ phỏng vấn không có ba thứ đó.
         /// </summary>
-        public static List<string> Validate(IReadOnlyList<RubricCriterion> criteria)
+        public static List<string> Validate(IReadOnlyList<RubricCriterion> criteria, RubricPurpose purpose)
         {
             var errors = new List<string>();
             if (criteria.Count == 0)
@@ -164,8 +228,36 @@ namespace ARI.Application.Playbooks
                 if (string.IsNullOrWhiteSpace(c.Name))
                     errors.Add($"Tiêu chí '{c.Key}' thiếu tên hiển thị.");
 
+                var label = string.IsNullOrWhiteSpace(c.Name) ? c.Key : c.Name;
+
+                if (c.Kind != null
+                    && !string.Equals(c.Kind, RubricCriterionKinds.Scored, StringComparison.OrdinalIgnoreCase)
+                    && !c.IsKnockout)
+                    errors.Add($"Loại tiêu chí '{c.Key}' không hợp lệ.");
+
+                if (purpose == RubricPurpose.Interview)
+                {
+                    if (c.IsKnockout)
+                        errors.Add($"Bộ tiêu chí phỏng vấn không có điều kiện bắt buộc — hãy đổi '{label}' thành tiêu chí chấm điểm.");
+                    if (c.MinScore != null)
+                        errors.Add($"Bộ tiêu chí phỏng vấn không dùng điểm tối thiểu của tiêu chí ('{label}').");
+                }
+
+                if (c.IsKnockout && purpose == RubricPurpose.Cv)
+                {
+                    // Điều kiện bắt buộc không tạo ra điểm: không trọng số, không dải, không ý kiểm, không điểm tối thiểu.
+                    if (c.Weight != 0)
+                        errors.Add($"Điều kiện bắt buộc '{label}' không mang trọng số.");
+                    if (c.MinScore != null || c.Levels is { IsEmpty: false } || c.Checks is { Count: > 0 })
+                        errors.Add($"Điều kiện bắt buộc '{label}' chỉ trả lời đạt/không đạt — không có mức neo, ý kiểm hay điểm tối thiểu.");
+                    continue;
+                }
+
                 if (c.Weight <= 0)
                     errors.Add($"Tiêu chí '{c.Key}' phải có trọng số lớn hơn 0.");
+
+                if (c.MinScore is { } min && (min < 1 || min > 100))
+                    errors.Add($"Điểm tối thiểu của tiêu chí '{label}' phải là số nguyên từ 1 đến 100.");
 
                 if (c.Checks is { Count: > 0 } checks)
                 {
@@ -178,13 +270,31 @@ namespace ARI.Application.Playbooks
                             errors.Add($"Tiêu chí '{c.Key}' có ý kiểm để trống.");
                         if (!IsValidCheckKey(chk.Key) || !seenChecks.Add(chk.Key))
                             errors.Add($"Ý kiểm '{chk.Key}' của tiêu chí '{c.Key}' sai mã hoặc trùng mã.");
+                        if (chk.Weight is { } w && (w < MinCheckWeight || w > MaxCheckWeight))
+                            errors.Add($"Trọng số ý kiểm '{chk.Text}' của tiêu chí '{label}' chỉ nhận ×1, ×2 hoặc ×3.");
+                        else if (chk.Weight != null && purpose == RubricPurpose.Interview)
+                            errors.Add($"Bộ tiêu chí phỏng vấn không dùng trọng số ý kiểm ('{label}').");
                     }
                 }
             }
 
-            var total = criteria.Sum(c => c.Weight);
+            if (purpose == RubricPurpose.Cv)
+            {
+                var knockouts = criteria.Count(c => c.IsKnockout);
+                if (knockouts > MaxKnockouts)
+                    errors.Add($"Tối đa {MaxKnockouts} điều kiện bắt buộc, đang có {knockouts}.");
+                if (knockouts == criteria.Count)
+                {
+                    errors.Add("Cần ít nhất một tiêu chí chấm điểm — điều kiện bắt buộc không tạo ra điểm.");
+                    return errors;
+                }
+            }
+
+            var total = criteria.Where(c => !c.IsKnockout).Sum(c => c.Weight);
             if (Math.Abs(total - 100m) > WeightTolerance)
-                errors.Add($"Tổng trọng số phải bằng 100, hiện là {total:0.##}.");
+                errors.Add(criteria.Any(c => c.IsKnockout)
+                    ? $"Tổng trọng số các tiêu chí chấm điểm phải bằng 100, hiện là {total:0.##}."
+                    : $"Tổng trọng số phải bằng 100, hiện là {total:0.##}.");
 
             return errors;
         }
@@ -285,5 +395,53 @@ namespace ARI.Application.Playbooks
                 }
                 return line;
             }));
+
+        /// <summary>
+        /// Mô tả bộ tiêu chí cho prompt CHẤM CV (ADR-075) — <b>không có con số nào</b>: không trọng số, không
+        /// ngưỡng dải, không điểm tối thiểu, không trọng số ý kiểm. AI chỉ đọc LỜI (tên, chuẩn chấm, lời neo của
+        /// từng dải, ý kiểm, điều kiện bắt buộc) và trả lời định tính; mọi con số là công thức của tin, backend
+        /// áp sau. Nhờ vậy HM đổi công thức thì điểm tính lại từ câu trả lời cũ của AI, không phải gọi AI lại
+        /// (<c>CvObservationSignature</c> băm đúng những gì hàm này in ra).
+        ///
+        /// <see cref="ToPromptText"/> giữ nguyên cho bộ phỏng vấn và văn bản RAG.
+        /// </summary>
+        public static string ToCvPromptText(IReadOnlyList<RubricCriterion> criteria)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("--- TIÊU CHÍ CHẤM ĐIỂM (mã | tên | chuẩn chấm) ---");
+            foreach (var c in criteria.Where(c => !c.IsKnockout))
+            {
+                sb.Append($"- {c.Key} | {c.Name}");
+                if (!string.IsNullOrWhiteSpace(c.Description)) sb.Append($" | chuẩn chấm: {c.Description}");
+                sb.AppendLine();
+                if (c.Levels is { IsEmpty: false } lv)
+                {
+                    if (!string.IsNullOrWhiteSpace(lv.Excellent)) sb.AppendLine($"    {BandExcellent}: {lv.Excellent}");
+                    if (!string.IsNullOrWhiteSpace(lv.Good)) sb.AppendLine($"    {BandGood}: {lv.Good}");
+                    if (!string.IsNullOrWhiteSpace(lv.Fair)) sb.AppendLine($"    {BandFair}: {lv.Fair}");
+                    if (!string.IsNullOrWhiteSpace(lv.Poor)) sb.AppendLine($"    {BandPoor}: {lv.Poor}");
+                }
+                if (c.Checks is { Count: > 0 } checks)
+                {
+                    sb.AppendLine("    ý kiểm (trả lời có/không từng ý):");
+                    foreach (var chk in checks) sb.AppendLine($"      [{chk.Key}] {chk.Text}");
+                }
+            }
+
+            var knockouts = criteria.Where(c => c.IsKnockout).ToList();
+            if (knockouts.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("--- ĐIỀU KIỆN BẮT BUỘC (mã | điều kiện | ghi chú) — trả lời đạt/không đạt, trích nguyên văn CV ---");
+                foreach (var c in knockouts)
+                {
+                    sb.Append($"- {c.Key} | {c.Name}");
+                    if (!string.IsNullOrWhiteSpace(c.Description)) sb.Append($" | ghi chú: {c.Description}");
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString().TrimEnd();
+        }
     }
 }

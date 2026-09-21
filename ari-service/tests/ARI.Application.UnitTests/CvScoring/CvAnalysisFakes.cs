@@ -179,7 +179,7 @@ internal static class CvScoringKit
     public static List<CvRubricCriterionInput> SampleRubric() => Inputs(("Kinh nghiệm", 60), ("Kỹ năng", 40));
 
     public static string SampleRubricJson()
-        => ScoringRubric.Serialize(CvRubricEditing.Normalize(SampleRubric()).Criteria);
+        => ScoringRubric.Serialize(CvRubricEditing.Normalize(SampleRubric(), RubricPurpose.Cv).Criteria);
 
     public static byte[] CvBytes(string content = "PDF-BINARY-CONTENT") => System.Text.Encoding.UTF8.GetBytes(content);
 }

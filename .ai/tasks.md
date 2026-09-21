@@ -40,9 +40,13 @@ gọt **7 dòng dài nhất** (011, 049, 051, 052, 057, 058, 060) về đúng kh
 ADR-070 gọt tiếp dòng **063** và **064** về ~600 ký tự và viết gọn khối *CV-JD Match Analysis* (vốn đã sai sau
 ADR-070), đủ chỗ cho quy tắc 28 + một dòng ADR mới.
 
-**Vẫn chưa xong.** Bảng ADR vẫn là phần lớn nhất của file, và các dòng **061, 065, 066, 067**
-(1.300–1.700 ký tự mỗi dòng) giờ là nhóm dài nhất còn lại — đợt gọt sau nên nhắm vào đó. Chưa làm ngay
-vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây giờ dễ mất đúng phần hay phải tra lại.
+**Đợt ADR-075 (2026-09-22)** đã gọt đúng nhóm đó: dòng **061** (900→~640), **067** (902→~700), **066**, **065** và
+**070**, thu được ~700 ký tự — vừa đủ cho dòng ADR-075 mới, hai câu sửa ở quy tắc 16/28 và mục *CV-JD Match Analysis*
+viết lại. File hiện **39.995 / 40.000** ký tự.
+
+**Vẫn chưa xong — nay không còn dư một ký tự nào.** Đợt ADR sau **bắt buộc** gọt trước, và nhóm dài nhất còn lại là
+**057, 059, 063, 068, 073** (700–900 ký tự mỗi dòng). Lập luận đầy đủ luôn nằm ở `.ai/architecture.md`, nên dòng trong
+bảng chỉ cần đủ để nhớ ra *quyết định* và biết *tra ở đâu*.
 
 ---
 
@@ -388,6 +392,37 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-22: **Công thức chấm CV do Hiring Manager quyết định (ADR-075)** — nhánh `feature/be/cv-scoring-formula`.
+  Trước đó HM khai được tiêu chí, trọng số và lời neo, nhưng **công thức biến câu trả lời của AI thành điểm vẫn viết
+  cứng trong backend**: 4 dải 90/70/40, mọi ý kiểm nặng như nhau, bù trừ hoàn toàn, ngưỡng khuyến nghị 80/65/50 chung
+  mọi tin, làm tròn hai lần (79,495 → 80), và FE tô màu theo ba bộ ngưỡng khác nhau — không bộ nào khớp nhãn của server.
+  - **Khung tham số, không phải biểu thức** (theo OPM · ĐH Wyoming · 4 Corner · ZYTHR · LibreTexts/R for HR · TicNote —
+    mọi nguồn đều dùng chung khung "loại theo điều kiện bắt buộc → thang có neo → cộng có trọng số → so ngưỡng"):
+    HM khai **điều kiện bắt buộc** (đạt/không đạt, ≤ 5, trọng số 0), **điểm tối thiểu từng tiêu chí**, **trọng số ý kiểm
+    ×1/×2/×3**, **ngưỡng 4 dải** và **ngưỡng khuyến nghị**. Mặc định = đúng hành vi cũ, nên tin đang chạy không đổi số nào.
+  - **Cổng chỉ ép NHÃN**: trượt điều kiện / dưới điểm tối thiểu → khuyến nghị "Chưa phù hợp" kèm lý do + trích dẫn;
+    **điểm vẫn tính, hồ sơ không bao giờ bị loại tự động** (ADR-053). "Đạt" mà AI không trích được bằng chứng → "chưa
+    xác minh", không ép nhãn.
+  - **Một bộ tính duy nhất** `CvScoreCalculator` (hàm thuần, làm tròn **một lần**) + `CvObservations` tách "AI quan sát
+    được gì" khỏi số học. **Prompt chấm CV không còn con số nào** — AI trả dải + ý kiểm, hoặc vị trí 0..1, hoặc đạt/không đạt.
+  - **Đổi công thức thì TÍNH LẠI, không gọi AI**: `CvObservationSignature` băm đúng phần AI được hỏi; bản chấm cũ phủ
+    được bộ mới thì dựng lại quan sát từ ảnh chụp và chạy lại bộ tính (`derived_from_analysis_id`, token 0). Đường nhanh
+    nằm trước cả bước đọc file CV trong `CvApplicationScorer`.
+  - **Xem trước tác động** (`POST /api/jobs/{id}/cv-rubric/preview`): điểm/khuyến nghị trước–sau từng hồ sơ, số hồ sơ đổi
+    nhãn, số hồ sơ vướng cổng, và số lượt gọi AI mà lần lưu sẽ tốn — tính trong bộ nhớ, không ghi, không gọi AI.
+  - **FE**: trình soạn có công tắc "Điều kiện bắt buộc", ô điểm tối thiểu, nút ×1/×2/×3 cho từng ý, khối "Công thức chấm"
+    (ngưỡng + công thức sống + cơ sở tham khảo), nút "Xem trước tác động"; màn hồ sơ có khối cổng với ✓/✗/? và trích dẫn;
+    màu điểm đọc từ nhãn của server (gỡ `_jobUi.scoreColor` và hai bộ ngưỡng viết cứng ở 4 màn). Excel thêm cột Loại /
+    Điểm tối thiểu, hậu tố `(x2)` và sheet "Cong thuc". Phiếu tuyển dụng mang công thức sang tin.
+  - **Migration `CvScoringFormula`**: 5 cột nullable, không default, không backfill; sau migration không hồ sơ nào bị coi
+    là cần chấm lại. Bộ tiêu chí **phỏng vấn** không đổi (tham số `RubricPurpose` bắt buộc để trình biên dịch chỉ ra mọi cửa).
+  - **Kiểm chứng:** Application **2183/2183** (+61), Domain 63/63, Infrastructure 7/7; FE `tsc` sạch, lint 0 lỗi, vitest
+    **108/108**, `check:i18n` đạt, build hai site. **E2E API cô lập 5010 + rag 8010 + Postgres tạm + Gemini thật: 33/33** —
+    3 CV thật chấm 87/60/6; đổi công thức → **0 lượt gọi AI**, điểm khớp bản xem trước (85/57/3), token 0; lưu y hệt →
+    `unchanged`; điểm tối thiểu 70 → ép Reject mà `applications.status` không đổi; thêm điều kiện JLPT N2 → AI chấm lại,
+    CV có N2 qua cổng (93), hai CV còn lại Reject trong khi nhãn-theo-điểm vẫn "Cân nhắc"; Excel khứ hồi; migration
+    Down/Up với 12 bản chấm còn nguyên. Đã dọn container, dịch vụ tạm và file thử.
 
 - [x] 2026-09-19: **Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người (ADR-074, giai đoạn 2).** Sau khi ADR-073 gỡ chỗ tắc báo cáo, luồng offer lần đầu chạy tới cuối và lộ ba lỗ: thư kết quả (thư quan trọng nhất) viết cứng ở hai chỗ, gửi thẳng SMTP, không xem trước/sửa/lưu vết được — và hai nhánh chọn thư theo hai điều kiện khác nhau; chốt hai lần được; nhận việc xong không một văn bản nào, tin vẫn mở trên Job Board sau khi đủ người.
   - **BE:** `InterviewResultEmail` (3 biến thể, `ResolveVariant` là hàm duy nhất cho cả thư lẫn trạng thái hồ sơ, `TotalRoundsAsync` dùng chung) + khoá mẫu `interview_result` + nhánh renderer (báo cáo phải thuộc hồ sơ) + `PreviewEmailQuery.Variant` (cổng xem trước của mẫu này = HM chính / quản trị viên); `ConfirmReviewRequest.EmailOverride` → `SubmitHrReviewAsync` gửi MỘT thư qua `CandidateEmailSender`; `TriggerAutoProgressionAsync` → `OpenNextRoundAsync` (không gửi thư); chốt lần hai → 409. `OfferEmail.BuildAccepted` + `RespondToOfferCommand` gửi thư xác nhận (nối `In-Reply-To` thư mời) và gọi `JobHeadcountCloser` (đóng tin, audit `job_auto_closed_headcount`, báo HM/Recruiter/HR Leader kèm số hồ sơ + thư mời còn mở; không tự loại, không tự thu hồi) — cả hai best-effort sau khi quyết định đã lưu.

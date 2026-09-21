@@ -607,6 +607,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("cv_hash");
 
+                    b.Property<Guid?>("DerivedFromAnalysisId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("derived_from_analysis_id");
+
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text")
                         .HasColumnName("error_message");
@@ -615,6 +619,11 @@ namespace ARI.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("experience_relevance");
+
+                    b.Property<string>("GateStatus")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("gate_status");
 
                     b.Property<Guid>("JobPostingId")
                         .HasColumnType("uuid")
@@ -651,6 +660,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("rubric_document_id");
 
+                    b.Property<string>("ScoringPolicy")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scoring_policy");
+
                     b.Property<string>("SeniorityAlignment")
                         .HasColumnType("text")
                         .HasColumnName("seniority_alignment");
@@ -680,6 +693,8 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DerivedFromAnalysisId");
 
                     b.HasIndex("RubricDocumentId");
 
@@ -2407,6 +2422,10 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("scope_ref_id");
 
+                    b.Property<string>("ScoringPolicyJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scoring_policy_json");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2513,6 +2532,10 @@ namespace ARI.Infrastructure.Migrations
                     b.Property<string>("CvRubricJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("cv_rubric_json");
+
+                    b.Property<string>("CvScoringPolicyJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("cv_scoring_policy_json");
 
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2976,6 +2999,11 @@ namespace ARI.Infrastructure.Migrations
 
             modelBuilder.Entity("ARI.Domain.Entities.CvJdAnalysis", b =>
                 {
+                    b.HasOne("ARI.Domain.Entities.CvJdAnalysis", null)
+                        .WithMany()
+                        .HasForeignKey("DerivedFromAnalysisId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("ARI.Domain.Entities.JobPosting", null)
                         .WithMany()
                         .HasForeignKey("JobPostingId")

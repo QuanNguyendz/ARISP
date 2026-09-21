@@ -421,7 +421,7 @@ namespace ARI.Application.Services
 
             var analysisTask = Task.Run(async () =>
             {
-                var dict = new Dictionary<Guid, (int MatchScore, string Summary, string Status, Guid? RubricId)>();
+                var dict = new Dictionary<Guid, (int MatchScore, string Summary, string Status, Guid? RubricId, string Recommendation, string? GateStatus)>();
                 try
                 {
                     if (analysisIds.Count == 0) return dict;
@@ -429,8 +429,9 @@ namespace ARI.Application.Services
                     var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                     var list = await uow.Repository<CvJdAnalysis>()
                         .QueryAsync(q => q.Where(c => analysisIds.Contains(c.Id))
-                            .Select(c => new { c.Id, c.MatchScore, c.Summary, c.Status, c.RubricDocumentId }), ct);
-                    foreach (var a in list) dict[a.Id] = (a.MatchScore, a.Summary, a.Status, a.RubricDocumentId);
+                            .Select(c => new { c.Id, c.MatchScore, c.Summary, c.Status, c.RubricDocumentId, c.OverallRecommendation, c.GateStatus }), ct);
+                    foreach (var a in list)
+                        dict[a.Id] = (a.MatchScore, a.Summary, a.Status, a.RubricDocumentId, a.OverallRecommendation, a.GateStatus);
                 }
                 catch { }
                 return dict;
@@ -605,10 +606,13 @@ namespace ARI.Application.Services
 
                 ARI.Application.CvScoring.CvScoreState.AnalysisInfo? analysisInfo = null;
                 string? analysisSummary = null;
+                string? analysisRecommendation = null, analysisGate = null;
                 if (app.CvJdAnalysisId is { } analysisId && analysisDataById.TryGetValue(analysisId, out var an))
                 {
                     analysisInfo = new ARI.Application.CvScoring.CvScoreState.AnalysisInfo(an.Status, an.RubricId, an.MatchScore);
                     analysisSummary = an.Summary;
+                    analysisRecommendation = string.IsNullOrWhiteSpace(an.Recommendation) ? null : an.Recommendation;
+                    analysisGate = an.GateStatus;
                 }
                 Guid? appLiveRubric = liveRubrics.TryGetValue(app.JobPostingId, out var liveRubricId) ? liveRubricId : null;
                 var cvFailure = ARI.Application.CvScoring.CvScoreState.FailureOf(_cvScoringInFlight, app.Id, appLiveRubric);
@@ -634,6 +638,8 @@ namespace ARI.Application.Services
                     CvScoreStatus = cvState,
                     CvScoreRetryAt = cvState == ARI.Domain.Constants.CvScoreStates.ScoringFailed ? cvFailure?.RetryAfter : null,
                     CvJdSummary = cvScore.HasValue ? analysisSummary : null,
+                    CvRecommendation = cvScore.HasValue ? analysisRecommendation : null,
+                    CvGateStatus = cvScore.HasValue ? analysisGate : null,
                     HasScheduledInterview = bookedAppIds.Contains(app.Id),
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
@@ -893,6 +899,8 @@ namespace ARI.Application.Services
             response.CvScoreRetryAt = response.CvScore.RetryAt;
             response.MatchScore = response.CvScore.Total;
             if (response.MatchScore == null) response.CvJdSummary = null;
+            response.CvRecommendation = response.MatchScore == null ? null : response.CvScore.Recommendation;
+            response.CvGateStatus = response.MatchScore == null ? null : response.CvScore.GateStatus;
 
             // Cờ đủ điều kiện cấp Interview Code: đã đặt lịch phỏng vấn thật (booking "scheduled").
             var scheduled = await _unitOfWork.Repository<InterviewBooking>().FindAsync(

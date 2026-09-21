@@ -96,6 +96,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
             // tiêu chí + trọng số và chặn ngay nếu tổng ≠ 100 — sai ở đây mà lọt xuống thì mọi điểm
             // chấm về sau đều sai mà không ai biết (ADR-060).
             string? rubricJson = null;
+            string? scoringPolicyJson = null;
             string parsedText;
             int? criteriaCount = null;
 
@@ -103,14 +104,19 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
             {
                 var parsed = RubricSheet.Parse(request.Bytes);
                 var errors = parsed.Errors.Select(e => e.Row > 0 ? $"Dòng {e.Row}: {e.Message}" : e.Message).ToList();
-                errors.AddRange(ScoringRubric.Validate(parsed.Criteria));
+                // Bộ CV được có điều kiện bắt buộc / điểm tối thiểu / trọng số ý + sheet công thức (ADR-075);
+                // bộ phỏng vấn thì không — dòng khai điều kiện bắt buộc bị từ chối kèm lời giải thích.
+                var forCv = string.Equals(documentType, ScoringRubric.TypeCvRubric, StringComparison.Ordinal);
+                errors.AddRange(ScoringRubric.Validate(parsed.Criteria, forCv ? RubricPurpose.Cv : RubricPurpose.Interview));
+                if (forCv) errors.AddRange(CvScoringPolicy.Validate(parsed.Policy));
                 if (errors.Count > 0)
                     return Result.Failure<UploadedPlaybookDto>(string.Join(" | ", errors.Take(10)));
 
                 rubricJson = ScoringRubric.Serialize(parsed.Criteria);
+                scoringPolicyJson = forCv ? CvScoringPolicy.ToStorage(parsed.Policy) : null;
                 criteriaCount = parsed.Criteria.Count;
                 // Văn bản cho RAG: chuẩn chấm từng tiêu chí để AI truy hồi khi cần diễn giải.
-                parsedText = ScoringRubric.ToPromptText(parsed.Criteria);
+                parsedText = forCv ? ScoringRubric.ToCvPromptText(parsed.Criteria) : ScoringRubric.ToPromptText(parsed.Criteria);
             }
             else
             {
@@ -160,6 +166,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                     FileFormat = fileFormat,
                     ParsedText = parsedText,
                     RubricJson = rubricJson,
+                    ScoringPolicyJson = scoringPolicyJson,
                     Status = "ready",
                     UploadedByUserId = request.UserId
                 };

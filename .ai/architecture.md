@@ -1841,6 +1841,8 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
      bộ tiêu chí (mã `cv_rubric_required`) — kể cả admin vượt chữ ký HM, vì vượt cổng cũng không làm ra được điểm.
   2. **Không có bộ tiêu chí → không gọi AI.** Không còn nhánh "AI tự cho `match_score`". `ICvScoringService.ScoreAsync`
      trả `cv_rubric_required` trước khi chạm tới AI; AI không chấm được tiêu chí nào → **thất bại, không lưu**.
+     *(ADR-075: "không chấm khi thiếu bộ tiêu chí" giữ nguyên; thêm luật **đổi công thức thì tính lại từ câu trả lời cũ
+     của AI, không gọi AI** — xem ADR-075 điểm 5.)*
      Bộ tiêu chí CV chỉ đọc ở **cấp tin** (`CvRubricStore`); `cv_rubric` cấp công ty nay chỉ là **mẫu**; upload
      `cv_rubric` ở phạm vi tin/vòng bị từ chối (phải qua trình soạn); xoá bộ đang sống trả `409` (muốn đổi thì lưu bản mới).
   3. **Mỗi tin đúng một bộ sống, mỗi lần lưu là một PHIÊN BẢN.** Partial UNIQUE
@@ -1883,6 +1885,9 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
     neo, mã để trống thì tự sinh — cho người quen soạn bảng và để lưu trữ/gửi duyệt ngoài hệ thống.
   - **Mức neo 4 dải cố định** (90–100 / 70–89 / 40–69 / 0–39): HM chỉ viết lời, không tự đặt ngưỡng. Có neo thì hai lần
     chấm cùng CV rơi vào cùng dải; không có neo thì "75" là cảm tính của model.
+    > **Bổ sung bởi ADR-075 (2026-09-22):** vẫn đúng **4 dải** và HM vẫn chỉ viết lời cho AI đọc — nhưng **ngưỡng của
+    > dải là công thức của tin**, HM chỉnh được (mặc định giữ nguyên 90/70/40). Lý lẽ "cùng CV rơi vào cùng dải" không
+    > đổi: AI chọn dải theo LỜI neo và nay **không còn thấy con số nào**.
   - **Mọi cửa (phiếu, màn tin, Excel, AI) đi qua `CvRubricEditing.Normalize`** — một bộ luật.
 
 - **Lý do.**
@@ -1999,6 +2004,9 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   - **Ý kiểm tốt phụ thuộc HM viết tốt:** ý mơ hồ ("kinh nghiệm tốt") thì trả lời có/không cũng mơ hồ. AI gợi ý và
     placeholder hướng về dấu hiệu đo được.
   - Mỗi ý nặng bằng nhau trong dải (không có trọng số con) — giữ đơn giản để HM đọc lại được phép tính.
+    > **Đảo bởi ADR-075 (2026-09-22):** mỗi ý có trọng số **×1/×2/×3** (mặc định ×1 — toàn ×1 ra đúng số cũ). Phép tính
+    > vẫn đọc lại được: màn hồ sơ in "trọng số ý đạt 2/4 → 70 + 2/4 × 19". Tiêu chí KHÔNG có ý kiểm nay nhận **vị trí
+    > 0..1** từ AI thay cho một con số, vì prompt không còn con số nào (ADR-075 điểm 4).
 
 ### ADR-072: Bài trắc nghiệm là một đợt thi có giờ cố định — đóng lúc giờ hẹn + thời lượng; thời lượng có một nguồn
 
@@ -2181,3 +2189,124 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   chốt vòng cuối kèm thư đã sửa (+ `<script>`) → `email_logs` `interview_result` `was_edited`, không còn `<script>`, hồ sơ
   `pass`; chốt lần hai → 409; HM soạn offer (điền sẵn 30tr từ đề xuất) → gửi duyệt → HR Leader chốt → gửi → ứng viên nhận →
   hồ sơ `hired`, `email_logs` có `offer_accepted`, tin (phiếu headcount 1) tự `closed`, audit + thông báo tới HM và HR Leader.
+
+---
+
+### ADR-075: Công thức chấm CV do Hiring Manager quyết định — điều kiện bắt buộc, điểm tối thiểu, ngưỡng theo tin; đổi công thức thì tính lại, không gọi AI
+
+- **Ngày:** 2026-09-22
+- **Trạng thái:** Đã triển khai. **Bổ sung** ADR-070 (mức neo 4 dải cố định, ngưỡng khuyến nghị 80/65/50) và ADR-071
+  (mỗi ý kiểm nặng bằng nhau). Không lật quy tắc 28 (không bộ tiêu chí thì không chấm) và ADR-053 (AI không bao giờ
+  ghi `Application.Status`).
+
+- **Bối cảnh.** Sau ADR-070/071, HM khai được *tiêu chí, trọng số và lời neo* — nhưng **công thức biến câu trả lời của
+  AI thành điểm vẫn viết cứng trong backend**: bốn dải 90–100 / 70–89 / 40–69 / 0–39, mọi ý kiểm nặng như nhau, trung
+  bình có trọng số thuần (bù trừ hoàn toàn), ngưỡng khuyến nghị 80/65/50. Người dùng hỏi thẳng: *"phần công thức tính
+  ra điểm đang bị cố định trong BE, tôi muốn để HM là người quyết định"*. Năm chỗ cứng và hậu quả:
+
+  | Chỗ cứng | Hậu quả |
+  |---|---|
+  | Không có tiêu chí "đạt/không đạt" | Yêu cầu thiết yếu (giấy phép, chứng chỉ bắt buộc) chỉ là một tiêu chí có trọng số — điểm cao ở chỗ khác **bù trừ** được |
+  | Mọi ý kiểm nặng bằng nhau | "≥ 4 năm .NET production" và "CV có số liệu kết quả" kéo điểm như nhau |
+  | Ngưỡng 80/65/50 chung mọi tin | Vị trí Senior và vị trí Fresher dùng chung một vạch "phù hợp" |
+  | Làm tròn hai lần (`Round(2)` rồi `(int)Round`) | 79,495 → 79,50 → **80** |
+  | FE tô màu điểm theo 75/50 và 80/60 | Cùng một điểm hiện màu khác nhau ở ba màn, và cả ba khác nhãn của server |
+
+- **Cơ sở tham khảo** (ghi lại để lần sau không phải đoán): mọi tài liệu tuyển dụng đều dùng **một khung chung** —
+  loại theo điều kiện bắt buộc → chấm theo thang có neo → cộng có trọng số → so với ngưỡng. [OPM (Mỹ) — *Training &
+  Experience Evaluations*](https://www.opm.gov/policy-data-oversight/assessment-and-selection/other-assessment-methods/training-and-experience-evaluations/)
+  (sàng yêu cầu tối thiểu trước khi chấm); [ĐH Wyoming — *Hiring Matrix*](https://www.uwyo.edu/hr/hiring-toolkit/matrix-instructions.html)
+  (thang neo theo bằng chứng, **trọng số ×1/×2/×3**, "ứng viên không đạt yêu cầu tối thiểu thì không mời phỏng vấn",
+  "mỗi đơn vị tự chọn thang phù hợp"); [4 Corner Resources — *Resume Screening Scorecard*](https://www.4cornerresources.com/blog/resume-screening-scorecard/)
+  (trọng số và ngưỡng đi tiếp **theo từng vị trí**); [ZYTHR — *Weighted Candidate Scoring Matrix*](https://zythr.com/resources/candidate-scoring-model-in-recruiting-what-it-is-and-how-to-build-one/how-to-build-a-weighted-candidate-scoring-matrix-stepbystep-template-and-examples)
+  (tách *mandatory* với *graded*, hiệu chỉnh trên hồ sơ cũ trước khi dùng); [LibreTexts HRM — *Testing and Selecting*](https://biz.libretexts.org/Courses/Prince_Georges_Community_College/BMT_2610:_Human_Resource_Management_(Duru_2021)/04:_Selection/4.05:_Testing_and_Selecting)
+  và [R for HR — *Noncompensatory approach*](https://rforhr.com/multiplecutoff.html) (bù trừ · ngưỡng từng tiêu chí ·
+  nhiều vòng lọc); [TicNote — *How to Score Resumes Objectively*](https://ticnote.com/en/blog/how-to-score-resumes)
+  (hai làn loại/chấm, ngưỡng theo mức).
+  **Không nguồn nào cho người chấm gõ biểu thức tự do** — nên ADR này mở đúng các tham số của khung đó, không mở một ô
+  công thức.
+
+- **Quyết định.**
+  1. **HM quyết định SÁU tham số, không phải một biểu thức.** Cấp tiêu chí: *loại tiêu chí* (chấm điểm /
+     **điều kiện bắt buộc**), *trọng số*, *điểm tối thiểu của tiêu chí*, *trọng số ý kiểm ×1/×2/×3*. Cấp tin
+     (`CvScoringPolicy`): *ngưỡng bốn dải* và *ngưỡng bốn nhãn khuyến nghị*. Mặc định = đúng hành vi trước ADR này,
+     nên tin cũ không đổi một con số nào.
+  2. **Cổng chỉ ép NHÃN, không đụng hồ sơ.** Điều kiện bắt buộc không đạt, hoặc tiêu chí dưới điểm tối thiểu →
+     `gate_status='fail'` và khuyến nghị bị ép `Reject`; **điểm vẫn tính, vẫn hiện**, `Application.Status` không đổi
+     (ADR-053). "Đạt" mà AI không trích được bằng chứng → `review` ("chưa xác minh"), **không** ép Reject: thiếu trích
+     dẫn là lỗi model, không phải bằng chứng ứng viên trượt (cùng lý lẽ ADR-060 với tiêu chí bị bỏ sót).
+  3. **Một bộ tính duy nhất** `CvScoreCalculator.Compute(criteria, policy, observations)` — hàm thuần, làm tròn **đúng
+     một lần**. `CvCriterionScoring` tính vị trí trong dải theo **tổng trọng số ý** (`đáy + Σw(đạt) ÷ Σw(đã trả lời) ×
+     độ rộng`). `ScoringRubric.ComputeOverall` giữ nguyên cho chấm phỏng vấn.
+  4. **Prompt chấm CV không còn con số nào.** `ScoringRubric.ToCvPromptText` chỉ đưa tên, chuẩn chấm, lời neo, ý kiểm
+     và mục "ĐIỀU KIỆN BẮT BUỘC"; AI trả `band` + `checks[]`, hoặc **`position` 0..1** cho tiêu chí không có ý kiểm,
+     hoặc `met` + trích dẫn cho điều kiện bắt buộc. Trọng số, điểm tối thiểu, ngưỡng dải, ngưỡng khuyến nghị **không
+     bao giờ tới tay model** — chúng là số học của backend.
+  5. **Đổi công thức thì TÍNH LẠI từ câu trả lời cũ của AI, không gọi AI** (`CvScoringService.TryDeriveAsync`).
+     `CvObservationSignature` băm đúng phần AI được hỏi của từng tiêu chí (khoá, loại, tên, chuẩn chấm, lời neo, chữ ý
+     kiểm) — **bỏ qua** mọi con số của công thức và cả thứ tự tiêu chí. Bản chấm cũ "phủ" được bộ đang sống thì dựng lại
+     quan sát **từ ảnh chụp** (`CvObservations.TryFromSnapshot`) rồi chạy lại bộ tính: dòng mới trỏ `derived_from_analysis_id`
+     về **bản gốc có lời gọi AI thật**, token = 0, bản cũ giữ làm lịch sử. Bớt tiêu chí cũng là "phủ"; thêm tiêu chí,
+     sửa lời neo hay thêm điều kiện bắt buộc thì mới hỏi AI lại. Đường nhanh này nằm trong `CvApplicationScorer` **trước
+     cả bước đọc file CV**, và trong chính `ScoreAsync` — nên hàng đợi, lượt quét và Portal đều đi qua nó.
+  6. **Xem trước tác động trước khi lưu** (`POST /api/jobs/{id}/cv-rubric/preview`, cùng quyền với lưu): chạy chính bộ
+     tính trên mọi hồ sơ của tin **trong bộ nhớ** — không ghi, không gọi AI — trả điểm/khuyến nghị trước–sau từng hồ sơ,
+     số hồ sơ đổi nhãn, số hồ sơ vướng cổng, và **số lượt gọi AI mà lần lưu sẽ tốn**. Đây là bước "hiệu chỉnh trên hồ sơ
+     cũ rồi mới chốt ngưỡng" của ZYTHR/TicNote.
+  7. **Lời của lệnh lưu nói đúng việc sẽ xảy ra**: `saveOutcome.mode` = `unchanged` | `recompute` | `ai_rescore`; thông
+     báo cho Recruiter chủ tin và audit (`formulaOnly`, `knockoutCount`, `minScoreCount`, `bands`, `tiers`) theo đúng mode.
+  8. **Màu điểm CV đọc từ NHÃN server trả về** (`cvTier.ts`), không từ ngưỡng viết ở màn hình — ba bộ ngưỡng cũ
+     (75/50 · 80/60 · 80/65/50) gỡ hẳn, `_jobUi.scoreColor` xoá. Danh sách hồ sơ mang thêm `cvRecommendation` +
+     `cvGateStatus`; màn hồ sơ có khối "Điều kiện của công thức" với ✓/✗/? và trích dẫn từng điều kiện.
+  9. **Bộ tiêu chí phỏng vấn không đổi một nét** (ADR-073): `RubricPurpose` là tham số **bắt buộc** của
+     `ScoringRubric.Validate` / `CvRubricEditing.Normalize`, nên trình biên dịch chỉ ra mọi cửa; bộ phỏng vấn từ chối
+     điều kiện bắt buộc kèm lời giải thích, bỏ điểm tối thiểu và trọng số ý.
+
+- **Lý do.**
+  - **Vì sao tham số chứ không phải biểu thức.** Biểu thức tự do cho HM một ô để gõ sai: điểm ra ngoài 0–100, hai tin
+    không so được với nhau, và màn hồ sơ không in lại được "vì sao 84". Khung tham số giữ được thứ quý nhất của
+    ADR-060/071 — **mọi con số đều giải thích lại được bằng tay** — mà vẫn trả quyền quyết định cho người hiểu nghề.
+  - **Vì sao cổng chỉ gắn nhãn.** Tự loại hồ sơ là lật ADR-053 và trao cho một câu trả lời của model quyền đánh trượt
+    người thật. Nhãn + lý do + trích dẫn cho Recruiter đủ thông tin để quyết, và ứng viên vẫn luôn ứng tuyển được.
+  - **Vì sao tách "AI quan sát" khỏi "số học".** Trước ADR này, đổi một con số trọng số cũng là một phiên bản bộ tiêu
+    chí mới → mỗi hồ sơ một lượt gọi AI. Nhưng trọng số **chưa bao giờ** là thứ AI trả lời. Tách ra thì phần đắt (AI đọc
+    CV) chỉ chạy khi câu hỏi đổi, còn phần rẻ (số học) chạy lại tuỳ thích — HM mới dám thử ngưỡng.
+  - **Vì sao chữ ký chứ không phải cờ "chỉ đổi công thức".** Cờ do người gọi tự khai thì sẽ có chỗ khai sai. Chữ ký suy
+    ra từ chính nội dung prompt: hai bộ hỏi AI cùng câu thì dùng lại được — đó là định nghĩa, không phải phỏng đoán.
+
+- **Hệ quả.**
+  - Migration `CvScoringFormula`: 5 cột **cho phép NULL, không default** — `playbook_documents.scoring_policy_json`,
+    `recruitment_requests.cv_scoring_policy_json`, `cv_jd_analyses.{scoring_policy, gate_status, derived_from_analysis_id}`
+    (FK tự trỏ, NoAction). NULL = mặc định nên **không backfill**, và sau migration không hồ sơ nào bị coi là cần chấm
+    lại. Không bảng mới → quy tắc 24 không phát sinh.
+  - Excel thêm cột **J (Loại)** và **K (Điểm tối thiểu)**, hậu tố `(x2)`/`(x3)` cho ý kiểm, và **sheet "Cong thuc"**;
+    `RubricSheet.ReadRows` nay đọc được sheet theo tên (trước chỉ đọc sheet đầu). File cũ một sheet → công thức mặc định.
+  - Portal ứng viên **bỏ** `overallRecommendation`: nhãn đó nay có thể bị ép "Reject" vì điều kiện nội bộ của tin.
+  - Ảnh chụp bảng điểm mang thêm `kind`, `minScore`, `met`, `gate`, `position`, `checks[].weight` — bản chấm cũ vẫn đọc
+    được (mọi trường mới đều tuỳ chọn).
+  - Cạm bẫy đã gặp: cột `scoring_policy_json` là **jsonb** nên Postgres sắp lại khoá + thêm khoảng trắng → so chuỗi để
+    biết "có đổi không" sẽ luôn báo đổi; phải so **theo nghĩa** (`CvScoringPolicy.SameAs`). Phiên bản bộ tiêu chí cũ đã
+    **xoá mềm** nên truy vấn chữ ký phải `IgnoreQueryFilters()` — `InMemoryUnitOfWork` của unit test không áp bộ lọc nên
+    không bắt được lỗi này, chỉ E2E trên Postgres thật mới bắt.
+
+- **Kiểm chứng.** `dotnet test`: Application **2183/2183** (+61: bộ tính với mọi tham số, làm tròn một lần 79,495 → 79,
+  cổng fail/review/pass, trọng số ý, dải và ngưỡng tuỳ chỉnh, chữ ký bỏ qua số học, Excel khứ hồi, luật theo mục đích,
+  prompt không số), Domain **63/63**, Infrastructure **7/7**. FE: `tsc` hai site sạch, lint 0 lỗi, vitest **108/108**,
+  `check:i18n` đạt, build hai site.
+  **E2E trên API cô lập (5010) + rag-service (8010) + Postgres tạm + Gemini thật — 33/33**: 3 CV thật (senior có JLPT N2 ·
+  mid · fresher) chấm lần đầu 87 / 60 / 6; đổi trọng số + ngưỡng dải + ngưỡng khuyến nghị → **0 lượt gọi AI**, điểm tính
+  lại đúng bằng bản xem trước (85 / 57 / 3), `derived_from_analysis_id` trỏ bản gốc, token 0; lưu y hệt → `unchanged`,
+  không tạo phiên bản; điểm tối thiểu 70 → hai CV bị ép `Reject` mà điểm giữ nguyên và `applications.status` không đổi;
+  thêm điều kiện "JLPT N2" → `ai_rescore`, AI chấm lại 3 hồ sơ, CV có N2 qua cổng (93, Strong Hire), hai CV còn lại
+  `fail` → `Reject` trong khi nhãn-theo-điểm vẫn là "Proceed with caution"; điểm của hồ sơ trượt cổng vẫn đúng bằng
+  trung bình có trọng số của các tiêu chí (kiểm lại từ ảnh chụp trong DB); Excel khứ hồi giữ điều kiện bắt buộc + sheet
+  công thức; migration Down rồi Up với 12 bản chấm trong bảng (6 bản tính lại) — cột gỡ và phục hồi đúng, dữ liệu còn
+  nguyên. Đã dọn container, dịch vụ tạm và file upload của đợt thử.
+
+- **Chấp nhận đánh đổi.**
+  - **Điểm CV giữa các tin khó so hơn**: mỗi tin có dải và ngưỡng riêng. Dashboard HR vẫn lấy trung bình điểm CV toàn
+    công ty (`GetHrDashboardQuery`) — con số đó nay là trung bình của những thước đo khác nhau.
+  - **Điều kiện bắt buộc có thể âm tính giả** khi CV không ghi rõ (CV thật hay bỏ sót giấy phép). Giảm nhẹ bằng: chỉ gắn
+    nhãn, bắt buộc trích dẫn, trạng thái "chưa xác minh" riêng, và nút xem trước trước khi lưu.
+  - **Giữ đúng bốn dải** (chỉ ngưỡng chỉnh được) để không phá mẫu Excel E–H, bộ tiêu chí phỏng vấn và các lời neo đã khai.
+  - **Sửa lời tiêu chí vẫn tốn một lượt AI mỗi hồ sơ** — chỉ phần số học là miễn phí.

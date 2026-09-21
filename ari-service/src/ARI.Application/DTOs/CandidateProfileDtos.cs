@@ -51,7 +51,9 @@ namespace ARI.Application.DTOs
         public List<string> SkillsMatched { get; set; } = new();
         public List<string> SkillsGaps { get; set; } = new();
         public string ExperienceRelevance { get; set; } = string.Empty;
-        public string OverallRecommendation { get; set; } = string.Empty;
+
+        // CỐ Ý không có nhãn khuyến nghị (ADR-075): nhãn đó theo ngưỡng nội bộ của tin và có thể bị ép "Reject" vì
+        // điều kiện bắt buộc — là đánh giá nội bộ cho nhân sự, không phải thông tin cho ứng viên.
 
         /// <summary>Nhà cung cấp AI đã tạo phân tích ("Gemini" | "GPT-4o-mini") — hiển thị trên UI.</summary>
         public string? ReviewedBy { get; set; }

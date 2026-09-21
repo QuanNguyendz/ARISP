@@ -241,6 +241,22 @@ namespace ARI.Infrastructure.Data
                 .Property(r => r.CvRubricJson)
                 .HasColumnType("jsonb");
 
+            // Công thức chấm CV do HM quyết định (ADR-075). Cả ba cột cho phép NULL và KHÔNG có default: NULL =
+            // công thức mặc định, nên dữ liệu có sẵn giữ nguyên nghĩa mà không phải backfill. (Bài học ADR-060:
+            // default EF tự sinh cho cột jsonb là "" — không hợp lệ.)
+            modelBuilder.Entity<RecruitmentRequest>()
+                .Property(r => r.CvScoringPolicyJson)
+                .HasColumnType("jsonb");
+            modelBuilder.Entity<PlaybookDocument>()
+                .Property(p => p.ScoringPolicyJson)
+                .HasColumnType("jsonb");
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.ScoringPolicy)
+                .HasColumnType("jsonb");
+            modelBuilder.Entity<CvJdAnalysis>()
+                .Property(c => c.GateStatus)
+                .HasMaxLength(16);
+
             // Mỗi ứng viên chỉ lưu một job một lần (bookmark). Partial index trên các bản ghi
             // còn hiệu lực (deleted_at IS NULL) để có thể lưu lại sau khi đã bỏ lưu (soft delete).
             modelBuilder.Entity<SavedJob>()
@@ -501,6 +517,11 @@ namespace ARI.Infrastructure.Data
             // tiêu chí sinh ra nó.
             modelBuilder.Entity<CvJdAnalysis>()
                 .HasOne<PlaybookDocument>().WithMany().HasForeignKey(c => c.RubricDocumentId)
+                .OnDelete(DeleteBehavior.NoAction);
+            // Bản tính lại theo công thức mới trỏ về bản gốc có lời gọi AI thật (ADR-075). Dòng phân tích không
+            // bao giờ bị xoá riêng lẻ (chỉ theo tin, cascade), nên NoAction không chặn thao tác nào.
+            modelBuilder.Entity<CvJdAnalysis>()
+                .HasOne<CvJdAnalysis>().WithMany().HasForeignKey(c => c.DerivedFromAnalysisId)
                 .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<SavedJob>()
                 .HasOne<JobPosting>().WithMany().HasForeignKey(s => s.JobPostingId)

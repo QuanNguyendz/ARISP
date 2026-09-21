@@ -143,7 +143,7 @@ namespace ARI.Application.InterviewRubrics
             var accessError = await InterviewRubricAccess.CheckAsync(_unitOfWork, request.JobPostingId, request.RoundNumber, actorId, request.Role, ct);
             if (accessError != null) return accessError.As<JobInterviewRubricDto>();
 
-            var normalized = CvRubricEditing.Normalize(request.Criteria);
+            var normalized = CvRubricEditing.Normalize(request.Criteria, RubricPurpose.Interview);
             if (!normalized.IsValid)
                 return Result.Failure<JobInterviewRubricDto>(string.Join(" · ", normalized.Errors.Take(10)));
 
@@ -354,7 +354,7 @@ namespace ARI.Application.InterviewRubrics
                 .ToList();
             CvRubricEditing.RebalanceWeights(rows);
 
-            var normalized = CvRubricEditing.Normalize(rows);
+            var normalized = CvRubricEditing.Normalize(rows, RubricPurpose.Interview);
             return Result.Success(new CvRubricDraftDto(CvRubricEditing.ToInput(normalized.Criteria), normalized.Errors));
         }
     }

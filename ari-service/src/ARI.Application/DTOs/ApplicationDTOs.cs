@@ -61,8 +61,52 @@ namespace ARI.Application.DTOs
         public string? SeniorityAlignment { get; set; }
         public string? ExperienceRelevance { get; set; }
 
-        /// <summary>Nhãn suy ra từ điểm (không phải phán đoán riêng của AI).</summary>
+        /// <summary>
+        /// Nhãn khuyến nghị cuối (không phải phán đoán riêng của AI): theo ngưỡng khuyến nghị của tin, và bị ép
+        /// "Reject" khi trượt cổng (ADR-075).
+        /// </summary>
         public string? Recommendation { get; set; }
+
+        // ---------------- ADR-075: công thức do HM quyết định ----------------
+
+        /// <summary>Nhãn theo riêng điểm tổng (chưa xét cổng) — để màn hình nói "theo điểm: Phù hợp, nhưng trượt điều kiện".</summary>
+        public string? ScoreRecommendation { get; set; }
+
+        /// <summary><c>pass</c> | <c>fail</c> | <c>review</c>; <c>null</c> = bộ tiêu chí không có cổng.</summary>
+        public string? GateStatus { get; set; }
+
+        /// <summary>Điều kiện bắt buộc + điểm tối thiểu của tiêu chí, theo đúng thứ tự khai.</summary>
+        public List<CvScoreGateDto> Gates { get; set; } = new();
+
+        /// <summary>Công thức đã áp cho bản chấm này (ảnh chụp — không phải công thức đang sống).</summary>
+        public Playbooks.CvScoringPolicy? Policy { get; set; }
+
+        /// <summary>Bản chấm được TÍNH LẠI theo công thức mới từ câu trả lời cũ của AI — không có lời gọi AI mới.</summary>
+        public bool Derived { get; set; }
+
+        /// <summary>Lúc AI thật sự đọc CV (bản gốc) khi <see cref="Derived"/>; ngược lại bằng <see cref="ScoredAt"/>.</summary>
+        public DateTimeOffset? ObservedAt { get; set; }
+    }
+
+    /// <summary>Một cổng của công thức (ADR-075): điều kiện bắt buộc hoặc điểm tối thiểu của một tiêu chí.</summary>
+    public class CvScoreGateDto
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        /// <summary><c>knockout</c> | <c>min_score</c>.</summary>
+        public string Type { get; set; } = string.Empty;
+        /// <summary><c>pass</c> | <c>fail</c> | <c>unknown</c>.</summary>
+        public string Outcome { get; set; } = string.Empty;
+        /// <summary>Mã lý do khi không qua: <c>knockout_failed</c> | <c>knockout_unverified</c> | <c>below_min_score</c> | <c>min_score_unscored</c>.</summary>
+        public string? Reason { get; set; }
+        /// <summary>Điểm của tiêu chí (cổng <c>min_score</c>).</summary>
+        public decimal? Score { get; set; }
+        public int? MinScore { get; set; }
+        /// <summary>Điều kiện bắt buộc bị AI đánh "đạt" mà không có trích dẫn.</summary>
+        public bool Unsupported { get; set; }
+        public string? Evidence { get; set; }
+        public string? Reasoning { get; set; }
+        public string? Description { get; set; }
     }
 
     public class CvScoreCriterionDto
@@ -88,7 +132,17 @@ namespace ARI.Application.DTOs
         /// <summary>Số ý đạt / số ý AI đã trả lời (mẫu số của phép tính vị trí).</summary>
         public int? ChecksMet { get; set; }
         public int? ChecksAnswered { get; set; }
+        /// <summary>Σ trọng số ý đạt / Σ trọng số ý đã trả lời (ADR-075) — bằng hai số trên khi mọi ý ×1.</summary>
+        public int? ChecksMetWeight { get; set; }
+        public int? ChecksAnsweredWeight { get; set; }
         public List<CvScoreCheckDto> Checks { get; set; } = new();
+
+        /// <summary>Vị trí 0..1 AI cho trong dải (tiêu chí không có ý kiểm, ADR-075).</summary>
+        public decimal? Position { get; set; }
+
+        /// <summary>Điểm tối thiểu của tiêu chí và kết quả cổng (<c>pass</c> | <c>fail</c> | <c>unknown</c>) — ADR-075.</summary>
+        public int? MinScore { get; set; }
+        public string? Gate { get; set; }
 
         public string? Evidence { get; set; }
         public string? Reasoning { get; set; }
@@ -106,6 +160,8 @@ namespace ARI.Application.DTOs
         public string? Evidence { get; set; }
         /// <summary>AI đánh đạt nhưng không trích được bằng chứng — không tính.</summary>
         public bool Unsupported { get; set; }
+        /// <summary>Trọng số ý ×1/×2/×3 (ADR-075).</summary>
+        public int Weight { get; set; } = 1;
     }
 
     public class CvRubricLevelsDto
@@ -171,6 +227,15 @@ namespace ARI.Application.DTOs
 
         /// <summary>Khi <see cref="CvScoreStatus"/> = <c>scoring_failed</c>: lúc hệ thống sẽ tự chấm lại.</summary>
         public DateTimeOffset? CvScoreRetryAt { get; set; }
+
+        /// <summary>
+        /// Nhãn khuyến nghị của điểm CV (ADR-075: theo ngưỡng của tin, bị ép "Reject" khi trượt cổng). Chỉ có khi
+        /// <see cref="MatchScore"/> có — để danh sách tô màu theo đúng công thức của tin thay vì ngưỡng viết cứng ở FE.
+        /// </summary>
+        public string? CvRecommendation { get; set; }
+
+        /// <summary>Kết quả cổng của công thức (<c>pass</c> | <c>fail</c> | <c>review</c>), chỉ khi có điểm (ADR-075).</summary>
+        public string? CvGateStatus { get; set; }
 
         /// <summary>Tóm tắt CV từ kết quả phân tích CV-JD</summary>
         public string? CvJdSummary { get; set; }

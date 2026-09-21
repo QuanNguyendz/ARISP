@@ -34,7 +34,13 @@ import {
   jobOptionLabel,
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
-import { cvRubricProblems } from '@ari/shared/fservices/cvRubric'
+import {
+  DEFAULT_CV_SCORING_POLICY,
+  clonePolicy,
+  cvPolicyProblems,
+  cvRubricProblems,
+  toPayload,
+} from '@ari/shared/fservices/cvRubric'
 import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import { profileService, type RecruiterOverview } from '@/fservices/profile/profileService'
 import { resolveApiError } from '@ari/shared/utils/apiError'
@@ -139,6 +145,8 @@ const emptyInput = (): RecruitmentRequestInput => ({
   salaryCurrency: DEFAULT_SALARY_CURRENCY,
   // ADR-070: bắt buộc — bắt đầu trống để HM chọn cách điền (AI gợi ý, mẫu công ty, Excel, gõ tay).
   cvRubric: [],
+  // ADR-075: công thức chấm đi cùng bộ tiêu chí — bắt đầu từ mặc định, HM chỉnh nếu vị trí cần.
+  cvScoringPolicy: clonePolicy(DEFAULT_CV_SCORING_POLICY),
 })
 
 /** Định dạng dải lương cho danh sách. Thoả thuận = chưa điền con số nào. */
@@ -446,7 +454,10 @@ function RequestFormModal({
     setErr('')
     setTriedSubmit(true)
     // Bộ tiêu chí sai thì server cũng chặn — chặn ở đây để lỗi hiện ngay cạnh trình soạn.
-    if (cvRubricProblems(form.cvRubric ?? []).length > 0) {
+    if (
+      cvRubricProblems(form.cvRubric ?? []).length > 0 ||
+      cvPolicyProblems(form.cvScoringPolicy ?? DEFAULT_CV_SCORING_POLICY).length > 0
+    ) {
       setErr(tRubric('editor.warnings'))
       return
     }
@@ -463,6 +474,8 @@ function RequestFormModal({
         title: form.title.trim(),
         headcount: Number(form.headcount) || 1,
         expectedStartDate: toInstant(form.expectedStartDate),
+        // Điều kiện bắt buộc gửi đi không kèm trọng số / dải / ý kiểm (ADR-075).
+        cvRubric: toPayload(form.cvRubric ?? []),
       }
       if (requestId) await recruitmentRequestService.update(requestId, payload)
       else await recruitmentRequestService.create(payload)
@@ -735,6 +748,8 @@ function RequestFormModal({
           <CvRubricEditor
             value={form.cvRubric ?? []}
             onChange={(next) => setForm((f) => ({ ...f, cvRubric: next }))}
+            policy={form.cvScoringPolicy ?? DEFAULT_CV_SCORING_POLICY}
+            onPolicyChange={(next) => setForm((f) => ({ ...f, cvScoringPolicy: next }))}
             showProblems={triedSubmit}
             suggestSource={() =>
               form.title.trim() && (form.description?.trim() || form.requirements?.trim())
@@ -885,6 +900,7 @@ function RequestDetailPanel({
           // để HM thấy đúng danh sách sẽ được lưu, thay vì bấm lưu rồi mới bị server trả lỗi.
           requestedRounds: [...new Set(detail.requestedRounds ?? [])],
           cvRubric: detail.cvRubric ?? [],
+          cvScoringPolicy: clonePolicy(detail.cvScoringPolicy),
           employmentType: detail.employmentType ?? 'full_time',
           workMode: detail.workMode ?? 'onsite',
           location: detail.location ?? '',
@@ -976,7 +992,7 @@ function RequestDetailPanel({
         <div>
           <p className="mb-1.5 text-xs font-medium text-ink-500 dark:text-ink-400">{tRubric('editor.title')}</p>
           {(detail.cvRubric ?? []).length > 0 ? (
-            <ReadOnlyRubric criteria={detail.cvRubric ?? []} />
+            <ReadOnlyRubric criteria={detail.cvRubric ?? []} policy={detail.cvScoringPolicy ?? null} />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
               {tRubric('requestMissing')}

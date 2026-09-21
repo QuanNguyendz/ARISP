@@ -1,5 +1,5 @@
 import { apiClient } from '@ari/shared/api/apiClient'
-import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
+import type { CvRubricCriterion, CvScoringPolicy } from '@ari/shared/fservices/cvRubric'
 
 /**
  * Phiếu yêu cầu tuyển dụng (ADR-063) — điểm bắt đầu bắt buộc của mọi tin tuyển dụng.
@@ -61,6 +61,9 @@ export interface RecruitmentRequestInput {
    * có bộ tiêu chí thì không chấm được CV nào.
    */
   cvRubric?: CvRubricCriterion[]
+
+  /** Công thức chấm CV đi kèm bộ tiêu chí (ADR-075) — chép sang tin cùng bộ tiêu chí. Bỏ trống = mặc định. */
+  cvScoringPolicy?: CvScoringPolicy | null
 }
 
 export interface RecruitmentRequestListItem {

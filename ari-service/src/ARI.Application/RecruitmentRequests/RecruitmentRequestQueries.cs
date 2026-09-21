@@ -243,7 +243,8 @@ namespace ARI.Application.RecruitmentRequests
                            && (isOwner || isAdmin),
 
                 CvRubric: ARI.Application.Playbooks.CvRubricEditing.ToInput(
-                    ARI.Application.Playbooks.ScoringRubric.Deserialize(req.CvRubricJson))));
+                    ARI.Application.Playbooks.ScoringRubric.Deserialize(req.CvRubricJson)),
+                CvScoringPolicy: ARI.Application.Playbooks.CvScoringPolicy.FromStorage(req.CvScoringPolicyJson)));
         }
     }
 }

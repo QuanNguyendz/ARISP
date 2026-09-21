@@ -187,7 +187,7 @@ namespace ARI.Application.RecruitmentRequests
 
             // ADR-070: "ứng viên thế nào là phù hợp" là quyết định của người có nhu cầu tuyển, và tin không
             // có bộ tiêu chí thì không chấm được CV nào — nên bắt buộc ngay trên phiếu.
-            var rubricError = RubricError(input.CvRubric);
+            var rubricError = RubricError(input.CvRubric, input.CvScoringPolicy);
             if (rubricError != null)
                 return Result.Failure(rubricError);
 
@@ -214,20 +214,23 @@ namespace ARI.Application.RecruitmentRequests
         }
 
         /// <summary>Lỗi của bộ tiêu chí chấm CV trên phiếu, hoặc null nếu hợp lệ.</summary>
-        public static string? RubricError(IReadOnlyList<CvRubricCriterionInput>? rubric)
+        public static string? RubricError(IReadOnlyList<CvRubricCriterionInput>? rubric, CvScoringPolicy? policy = null)
         {
             if (rubric == null || rubric.Count == 0)
                 return "Hãy khai bộ tiêu chí chấm CV cho vị trí này (có thể bấm \"AI gợi ý\" để có bản nháp).";
 
-            var normalized = CvRubricEditing.Normalize(rubric);
-            return normalized.IsValid
-                ? null
-                : "Bộ tiêu chí chấm CV chưa hợp lệ: " + string.Join(" · ", normalized.Errors.Take(5));
+            var normalized = CvRubricEditing.Normalize(rubric, RubricPurpose.Cv);
+            if (!normalized.IsValid)
+                return "Bộ tiêu chí chấm CV chưa hợp lệ: " + string.Join(" · ", normalized.Errors.Take(5));
+
+            // Công thức (ADR-075) đi cùng bộ tiêu chí — sai ngưỡng thì chặn ngay trên phiếu, không để tới lúc dựng tin.
+            var policyErrors = CvScoringPolicy.Validate(policy);
+            return policyErrors.Count == 0 ? null : "Công thức chấm CV chưa hợp lệ: " + string.Join(" · ", policyErrors);
         }
 
         /// <summary>Phiếu đã có bộ tiêu chí chấm CV hợp lệ chưa (phiếu lập trước ADR-070 thì chưa).</summary>
         public static bool HasRubric(RecruitmentRequest req)
-            => ScoringRubric.Validate(ScoringRubric.Deserialize(req.CvRubricJson)).Count == 0;
+            => ScoringRubric.Validate(ScoringRubric.Deserialize(req.CvRubricJson), RubricPurpose.Cv).Count == 0;
 
         public const string MissingRubricMessage =
             "Phiếu chưa có bộ tiêu chí chấm CV. Hiring Manager cần sửa phiếu để bổ sung trước.";
@@ -256,8 +259,10 @@ namespace ARI.Application.RecruitmentRequests
 
             // Ảnh chụp bộ tiêu chí (ADR-070) — đã qua cùng một bộ chuẩn hoá với màn tin, nên mã tiêu chí
             // sinh ra ở đây chính là mã tin sẽ dùng.
-            var rubric = CvRubricEditing.Normalize(input.CvRubric);
+            var rubric = CvRubricEditing.Normalize(input.CvRubric, RubricPurpose.Cv);
             entity.CvRubricJson = rubric.Criteria.Count == 0 ? null : ScoringRubric.Serialize(rubric.Criteria);
+            // Công thức đi cùng bộ tiêu chí (ADR-075); mặc định lưu null.
+            entity.CvScoringPolicyJson = rubric.Criteria.Count == 0 ? null : CvScoringPolicy.ToStorage(input.CvScoringPolicy);
             entity.EmploymentType = Trim(input.EmploymentType);
             entity.WorkMode = Trim(input.WorkMode);
             entity.Location = Trim(input.Location);

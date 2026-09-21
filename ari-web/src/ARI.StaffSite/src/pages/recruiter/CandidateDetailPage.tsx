@@ -22,14 +22,14 @@ import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
-import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import CvScoreBadge, { CvGatePill } from '@/components/cvScore/CvScoreBadge'
+import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import { interviewService } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
   appStatusBadge,
   appStatusLabel,
   initials,
-  scoreColor,
   timeAgo,
 } from './_jobUi'
 import { JobDetailSkeleton } from './_skeletons'
@@ -199,8 +199,11 @@ export default function RecruiterCandidateDetailPage() {
           <div className="flex items-center justify-between gap-2 self-stretch rounded-xl bg-ink-50 px-3 py-2 dark:bg-white/[0.03] sm:flex-col sm:items-center sm:justify-center sm:bg-transparent sm:px-0 sm:py-0 sm:dark:bg-transparent">
             <span className="text-xs text-ink-400 sm:hidden">{t('matchCVJD')}</span>
             {app.matchScore != null ? (
-              <div className={`text-2xl font-bold sm:text-3xl ${scoreColor(app.matchScore)}`}>
-                {formatScore(app.matchScore)}
+              <div className="flex flex-col items-center gap-0.5">
+                <div className={`text-2xl font-bold sm:text-3xl ${cvScoreTextClass(app.cvRecommendation)}`}>
+                  {formatScore(app.matchScore)}
+                </div>
+                <CvGatePill gateStatus={app.cvGateStatus} />
               </div>
             ) : (
               <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />

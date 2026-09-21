@@ -15,12 +15,22 @@ import {
   Quote,
   RefreshCw,
   Scale,
+  ShieldCheck,
   Sparkles,
 } from 'lucide-react'
 import { formatDateTime24 } from '@ari/shared/utils/time24'
-import type { CvScoreBand, CvScoreBreakdown as Breakdown, CvScoreCriterion, CvScoreState } from '@ari/shared/types/application'
+import type {
+  CvScoreBand,
+  CvScoreBreakdown as Breakdown,
+  CvScoreCriterion,
+  CvScoreGate,
+  CvScoreState,
+} from '@ari/shared/types/application'
+import { tierRanges } from '@ari/shared/fservices/cvRubric'
+import type { CvRecommendationKey } from '@ari/shared/fservices/cvRubric'
 import { cvRetryTime } from './useCvScoreText'
-import { bandPosition } from './bandPosition'
+import { aiPosition, bandPosition } from './bandPosition'
+import { cvScoreTextClass } from './cvTier'
 
 const NS = 'modules/staff/cvScoring'
 
@@ -65,14 +75,69 @@ function FailedScoringText({ score }: { score: Breakdown }) {
   )
 }
 
-const scoreColor = (s?: number | null) =>
-  s == null
-    ? 'text-ink-400'
-    : s >= 75
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : s >= 50
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-red-600 dark:text-red-400'
+/**
+ * Các cổng của công thức (ADR-075): điều kiện bắt buộc (đạt / không đạt kèm trích dẫn) và điểm tối thiểu của tiêu chí.
+ * Trượt cổng chỉ ép nhãn khuyến nghị — điểm vẫn tính, hồ sơ không bị loại tự động; "chưa xác minh" là việc cần người kiểm.
+ */
+function GatesBlock({
+  gates,
+  status,
+  num,
+}: {
+  gates: CvScoreGate[]
+  status?: string | null
+  num: (n?: number | null) => string
+}) {
+  const { t } = useTranslation(NS)
+  const tone =
+    status === 'fail'
+      ? 'border-red-200 bg-red-50/70 dark:border-red-500/30 dark:bg-red-500/10'
+      : status === 'review'
+        ? 'border-amber-200 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
+        : 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+
+  return (
+    <div className={`mt-4 rounded-xl border px-4 py-3 ${tone}`}>
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-700 dark:text-ink-200">
+        <ShieldCheck className="h-3.5 w-3.5" /> {t('breakdown.gates.title')}
+      </p>
+      <p className="mt-0.5 text-xs text-ink-600 dark:text-ink-300">{t(`breakdown.gates.status.${status ?? 'pass'}`)}</p>
+      <ul className="mt-2 space-y-1.5">
+        {gates.map((g) => (
+          <li key={`${g.type}-${g.key}`} className="flex items-start gap-1.5 text-sm">
+            {g.outcome === 'pass' ? (
+              <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            ) : g.outcome === 'fail' ? (
+              <CircleX className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
+            ) : (
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            )}
+            <span className="min-w-0">
+              <span className="text-ink-900 dark:text-white">
+                {g.type === 'knockout'
+                  ? g.label
+                  : t('breakdown.gates.minScore', { label: g.label, score: num(g.score), min: g.minScore })}
+              </span>
+              {g.type === 'knockout' && g.outcome === 'pass' && g.evidence && (
+                <span className="mt-0.5 block text-xs italic text-ink-500 dark:text-ink-400">“{g.evidence}”</span>
+              )}
+              {g.reason && (
+                <span
+                  className={`mt-0.5 block text-xs ${g.outcome === 'fail' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}
+                >
+                  {t(`breakdown.gates.reason.${g.reason}`, { defaultValue: g.reason })}
+                </span>
+              )}
+              {g.type === 'knockout' && g.reasoning && g.outcome !== 'pass' && (
+                <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">{g.reasoning}</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 /** Tách tóm tắt "🌟 Điểm sáng: … \n ⚠️ Điểm cần lưu ý: …" thành hai đoạn. */
 const splitSummary = (summary?: string | null) =>
@@ -105,6 +170,17 @@ export default function CvScoreBreakdown({ score }: { score?: Breakdown | null }
   const numerator = score.criteria.map((c) => `${num(c.score)}×${num(c.weight)}`).join(' + ')
   const denominator = score.criteria.map((c) => num(c.weight)).join(' + ')
 
+  // Nhãn khuyến nghị kèm khoảng điểm theo CÔNG THỨC CỦA TIN (ADR-075), không phải ngưỡng viết cứng.
+  const tiers = tierRanges(score.policy ?? undefined)
+  const recLabel = (rec?: string | null) => {
+    if (!rec) return null
+    const range = tiers[rec as CvRecommendationKey]
+    const name = t(`breakdown.recName.${rec}`, { defaultValue: rec })
+    return range ? t('breakdown.recRange', { name, from: range.from, to: range.to }) : name
+  }
+  const gates = score.gates ?? []
+  const forcedReject = score.gateStatus === 'fail'
+
   return (
     <section className={CARD} data-cv-score-state={score.state} data-cv-score={score.total ?? ''}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -116,14 +192,17 @@ export default function CvScoreBreakdown({ score }: { score?: Breakdown | null }
         </div>
         {score.total != null && (
           <div className="text-right">
-            <span className={`font-display text-4xl font-extrabold leading-none ${scoreColor(score.total)}`}>
+            <span className={`font-display text-4xl font-extrabold leading-none ${cvScoreTextClass(score.recommendation)}`}>
               {score.total}
             </span>
             <span className="ml-1 text-sm text-ink-400">{t('breakdown.outOf')}</span>
             {score.recommendation && (
               <p className="mt-1 text-xs font-medium text-ink-600 dark:text-ink-300" title={t('breakdown.recommendation')}>
-                {t(`breakdown.rec.${score.recommendation}`, { defaultValue: score.recommendation })}
+                {forcedReject ? t('breakdown.recForced') : recLabel(score.recommendation)}
               </p>
+            )}
+            {forcedReject && score.scoreRecommendation && (
+              <p className="text-[11px] text-ink-400">{t('breakdown.scoreTier', { tier: recLabel(score.scoreRecommendation) })}</p>
             )}
           </div>
         )}
@@ -157,6 +236,8 @@ export default function CvScoreBreakdown({ score }: { score?: Breakdown | null }
 
       {showNumbers && (
         <>
+          {gates.length > 0 && <GatesBlock gates={gates} status={score.gateStatus} num={num} />}
+
           {/* Phép tính bằng số thật — người đọc tự cộng lại được. */}
           <div className="mt-4 rounded-xl border border-ai-200 bg-ai-50/60 px-4 py-3 dark:border-ai-500/20 dark:bg-ai-500/10">
             <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ai-700 dark:text-ai-300">
@@ -216,9 +297,19 @@ export default function CvScoreBreakdown({ score }: { score?: Breakdown | null }
 
       {(score.scoredAt || score.rubricSavedAt) && (
         <div className="mt-4 space-y-0.5 border-t border-ink-100 pt-3 text-xs text-ink-400 dark:border-white/10">
-          {score.scoredAt && (
-            <p>{t('breakdown.meta', { time: formatDateTime24(score.scoredAt), model: score.model ?? 'AI' })}</p>
-          )}
+          {score.scoredAt &&
+            (score.derived ? (
+              // ADR-075: HM đổi công thức → điểm được tính lại từ câu trả lời cũ của AI, không có lời gọi AI mới.
+              <p>
+                {t('breakdown.derived', {
+                  time: formatDateTime24(score.scoredAt),
+                  observed: formatDateTime24(score.observedAt ?? score.scoredAt),
+                  model: score.model ?? 'AI',
+                })}
+              </p>
+            ) : (
+              <p>{t('breakdown.meta', { time: formatDateTime24(score.scoredAt), model: score.model ?? 'AI' })}</p>
+            ))}
           {score.rubricSavedAt && (
             <p>
               {t('breakdown.rubricMeta', {
@@ -240,6 +331,7 @@ export default function CvScoreBreakdown({ score }: { score?: Breakdown | null }
 function InBandPosition({ c, num, band }: { c: CvScoreCriterion; num: (n?: number | null) => string; band: CvScoreBand }) {
   const { t } = useTranslation(NS)
   const pos = bandPosition(c)
+  const ai = aiPosition(c)
   const bandLabel = t(`breakdown.band.${band}`)
   const checks = c.checks ?? []
 
@@ -250,7 +342,7 @@ function InBandPosition({ c, num, band }: { c: CvScoreCriterion; num: (n?: numbe
       </p>
       {pos ? (
         <p className="font-mono text-xs text-ink-800 dark:text-ink-100">
-          {t('breakdown.position.checklist', {
+          {t(pos.weighted ? 'breakdown.position.checklistWeighted' : 'breakdown.position.checklist', {
             band: bandLabel,
             min: num(pos.min),
             max: num(pos.max),
@@ -258,6 +350,18 @@ function InBandPosition({ c, num, band }: { c: CvScoreCriterion; num: (n?: numbe
             answered: pos.answered,
             span: num(pos.span),
             exact: num(pos.exact),
+            score: num(c.score),
+          })}
+        </p>
+      ) : ai ? (
+        <p className="font-mono text-xs text-ink-800 dark:text-ink-100">
+          {t('breakdown.position.aiPosition', {
+            band: bandLabel,
+            min: num(ai.min),
+            max: num(ai.max),
+            position: num(ai.position),
+            span: num(ai.span),
+            exact: num(ai.exact),
             score: num(c.score),
           })}
         </p>
@@ -283,6 +387,11 @@ function InBandPosition({ c, num, band }: { c: CvScoreCriterion; num: (n?: numbe
                 <span className={x.met === true ? 'text-ink-900 dark:text-white' : 'text-ink-600 dark:text-ink-300'}>
                   {x.text}
                 </span>
+                {(x.weight ?? 1) !== 1 && (
+                  <span className="ml-1 rounded bg-ai-100 px-1 text-[10px] font-semibold text-ai-700 dark:bg-ai-500/20 dark:text-ai-300">
+                    ×{x.weight}
+                  </span>
+                )}
                 {x.met === true && x.evidence && (
                   <span className="mt-0.5 block italic text-ink-500 dark:text-ink-400">“{x.evidence}”</span>
                 )}
@@ -335,6 +444,17 @@ function CriterionRow({
             {!!c.checksAnswered && (
               <span className="hidden shrink-0 rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 dark:bg-white/10 dark:text-ink-300 sm:inline">
                 {t('breakdown.checks.short', { met: c.checksMet ?? 0, total: c.checksAnswered })}
+              </span>
+            )}
+            {c.minScore != null && (
+              <span
+                className={`hidden shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium sm:inline ${
+                  c.gate === 'fail'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                    : 'bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-300'
+                }`}
+              >
+                ≥ {c.minScore}
               </span>
             )}
           </span>

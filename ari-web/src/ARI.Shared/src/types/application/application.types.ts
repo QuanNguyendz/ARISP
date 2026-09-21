@@ -343,7 +343,44 @@ export interface CvScoreCriterion {
   /** Số ý đạt / số ý AI đã trả lời. */
   checksMet?: number | null
   checksAnswered?: number | null
+  /** Σ trọng số ý đạt / Σ trọng số ý đã trả lời (ADR-075) — bằng hai số trên khi mọi ý ×1. */
+  checksMetWeight?: number | null
+  checksAnsweredWeight?: number | null
   checks?: CvScoreCheck[]
+  /** Vị trí 0..1 AI cho trong dải (tiêu chí không có ý kiểm, ADR-075). */
+  position?: number | null
+  /** Điểm tối thiểu của tiêu chí + kết quả cổng (ADR-075). */
+  minScore?: number | null
+  gate?: CvGateOutcome | null
+}
+
+/** Kết quả một cổng của công thức (ADR-075). `unknown` = chưa xác minh được — cần người kiểm, không ép khuyến nghị. */
+export type CvGateOutcome = 'pass' | 'fail' | 'unknown'
+
+/** Kết quả gộp các cổng của một bản chấm; `null` = bộ tiêu chí không có cổng. */
+export type CvGateStatus = 'pass' | 'fail' | 'review'
+
+/** Một cổng: điều kiện bắt buộc, hoặc điểm tối thiểu của một tiêu chí (ADR-075). */
+export interface CvScoreGate {
+  key: string
+  label: string
+  type: 'knockout' | 'min_score'
+  outcome: CvGateOutcome
+  /** `knockout_failed` | `knockout_unverified` | `below_min_score` | `min_score_unscored`. */
+  reason?: string | null
+  score?: number | null
+  minScore?: number | null
+  /** Điều kiện bị AI đánh "đạt" mà không trích được bằng chứng. */
+  unsupported?: boolean
+  evidence?: string | null
+  reasoning?: string | null
+  description?: string | null
+}
+
+/** Công thức cấp tin đã áp cho một bản chấm (ảnh chụp). */
+export interface CvScorePolicy {
+  bands: { excellentFrom: number; goodFrom: number; fairFrom: number }
+  tiers: { strongHireFrom: number; hireFrom: number; cautionFrom: number }
 }
 
 /** Một ý kiểm đã được AI trả lời. */
@@ -355,6 +392,8 @@ export interface CvScoreCheck {
   evidence?: string | null
   /** AI đánh đạt nhưng không trích được bằng chứng — không tính. */
   unsupported?: boolean
+  /** ×1 / ×2 / ×3 (ADR-075). */
+  weight?: number
 }
 
 /** Cách ra điểm CV — chỉ có ở màn chi tiết hồ sơ (ADR-070). */
@@ -385,8 +424,21 @@ export interface CvScoreBreakdown {
   redFlags: string[]
   seniorityAlignment?: string | null
   experienceRelevance?: string | null
-  /** Nhãn suy từ điểm: Strong Hire | Hire | Proceed with caution | Reject. */
+  /**
+   * Nhãn cuối: Strong Hire | Hire | Proceed with caution | Reject — theo ngưỡng khuyến nghị của tin, bị ép "Reject" khi
+   * trượt cổng (ADR-075).
+   */
   recommendation?: string | null
+  /** Nhãn theo riêng điểm tổng (chưa xét cổng). */
+  scoreRecommendation?: string | null
+  gateStatus?: CvGateStatus | null
+  gates?: CvScoreGate[]
+  /** Công thức đã áp cho bản chấm này. */
+  policy?: CvScorePolicy | null
+  /** Bản chấm được tính lại theo công thức mới từ câu trả lời cũ của AI — không có lời gọi AI mới. */
+  derived?: boolean
+  /** Lúc AI thật sự đọc CV. */
+  observedAt?: string | null
 }
 
 export interface HrApplicationItem {
@@ -407,6 +459,10 @@ export interface HrApplicationItem {
   cvScoreStatus?: CvScoreState | null
   /** Khi `cvScoreStatus = scoring_failed`: lúc hệ thống tự chấm lại. */
   cvScoreRetryAt?: string | null
+  /** Nhãn khuyến nghị của điểm CV (ADR-075) — theo công thức của tin; tô màu theo nhãn này, không theo số viết cứng. */
+  cvRecommendation?: string | null
+  /** Kết quả cổng của công thức — chỉ khi có điểm. */
+  cvGateStatus?: CvGateStatus | null
   cvJdSummary?: string
   /** Cách ra điểm CV — chỉ có ở màn chi tiết hồ sơ. */
   cvScore?: CvScoreBreakdown | null

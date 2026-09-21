@@ -61,7 +61,7 @@ namespace ARI.Application.InterviewRubrics
                 Checks = null,
             }).ToList();
 
-            var errors = ScoringRubric.Validate(clean);
+            var errors = ScoringRubric.Validate(clean, RubricPurpose.Interview);
             if (errors.Count > 0)
                 return Result.Failure<(PlaybookDocument, bool)>(string.Join(" | ", errors));
 
@@ -74,7 +74,7 @@ namespace ARI.Application.InterviewRubrics
             if (previous != null && string.Equals(previous.RubricJson, json, StringComparison.Ordinal))
                 return Result.Success((previous, false));
 
-            var bytes = RubricSheet.Build(clean);
+            var bytes = RubricSheet.Build(clean, null, RubricPurpose.Interview);
             var suffix = roundNumber is { } rn ? $"-vong-{rn}" : string.Empty;
             var fileName = $"bo-tieu-chi-phong-van{suffix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx";
             string storageKey;

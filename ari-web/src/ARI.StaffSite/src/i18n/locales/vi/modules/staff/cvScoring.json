@@ -1,7 +1,7 @@
 {
   "editor": {
     "title": "Bộ tiêu chí chấm CV",
-    "hint": "Hệ thống chấm CV ứng viên theo đúng các tiêu chí này: AI cho mỗi tiêu chí 0–100 điểm kèm trích dẫn từ CV, điểm cuối là trung bình có trọng số. Không có bộ tiêu chí thì không chấm được CV nào.",
+    "hint": "Hệ thống chấm CV theo đúng các tiêu chí này: AI đọc CV, chọn dải theo lời neo và trả lời từng ý kiểm kèm trích dẫn — AI không cho con số nào. Điểm cuối do công thức của tin tính ở khối \"Công thức chấm\" bên dưới. Không có bộ tiêu chí thì không chấm được CV nào.",
     "aiSuggest": "AI gợi ý",
     "aiSuggesting": "AI đang soạn…",
     "aiNeedsContent": "Nhập vị trí và mô tả hoặc yêu cầu ứng viên trước khi nhờ AI gợi ý.",
@@ -25,10 +25,10 @@
     "showLevels": "Mức neo ({{count}}/4)",
     "hideLevels": "Ẩn mức neo",
     "level": {
-      "excellent": "90–100 · Xuất sắc",
-      "good": "70–89 · Tốt",
-      "fair": "40–69 · Đạt một phần",
-      "poor": "0–39 · Chưa đạt"
+      "excellent": "{{min}}–{{max}} · Xuất sắc",
+      "good": "{{min}}–{{max}} · Tốt",
+      "fair": "{{min}}–{{max}} · Đạt một phần",
+      "poor": "{{min}}–{{max}} · Chưa đạt"
     },
     "levelPlaceholder": {
       "excellent": "VD: Từ 4 năm làm sản phẩm thật, có dẫn dắt kỹ thuật",
@@ -44,11 +44,15 @@
     "problems": {
       "empty": "Cần ít nhất 1 tiêu chí.",
       "missingName": "Có tiêu chí chưa có tên.",
-      "badWeight": "Trọng số mỗi tiêu chí phải lớn hơn 0.",
-      "total": "Tổng trọng số phải bằng 100 (đang là {{total}}).",
-      "missingGuide": "Mỗi tiêu chí cần chuẩn chấm hoặc ít nhất một mức neo.",
+      "badWeight": "Trọng số mỗi tiêu chí chấm điểm phải lớn hơn 0.",
+      "total": "Tổng trọng số các tiêu chí chấm điểm phải bằng 100 (đang là {{total}}).",
+      "missingGuide": "Mỗi tiêu chí chấm điểm cần chuẩn chấm hoặc ít nhất một mức neo.",
       "tooMany": "Tối đa 20 tiêu chí.",
-      "tooManyChecks": "Mỗi tiêu chí tối đa 8 ý kiểm."
+      "tooManyChecks": "Mỗi tiêu chí tối đa 8 ý kiểm.",
+      "noScored": "Cần ít nhất một tiêu chí chấm điểm — điều kiện bắt buộc không tạo ra điểm.",
+      "tooManyKnockouts": "Tối đa {{max}} điều kiện bắt buộc.",
+      "badMinScore": "Điểm tối thiểu của tiêu chí phải là số nguyên từ 1 đến 100.",
+      "badCheckWeight": "Trọng số ý kiểm chỉ nhận ×1, ×2 hoặc ×3."
     },
     "warnings": "Cần xem lại trước khi lưu:",
     "empty": "Chưa có tiêu chí nào. Bấm \"AI gợi ý\", chọn mẫu công ty, nhập Excel hoặc thêm tay.",
@@ -56,14 +60,25 @@
     "error": "Không thực hiện được. Vui lòng thử lại.",
     "checks": {
       "title": "Ý kiểm ({{count}})",
-      "hint": "AI chỉ trả lời có/không từng ý kèm trích dẫn; điểm trong dải = đáy dải + tỉ lệ ý đạt × độ rộng dải.",
+      "hint": "AI chỉ trả lời có/không từng ý kèm trích dẫn; điểm trong dải = đáy dải + (trọng số ý đạt ÷ trọng số ý đã trả lời) × độ rộng dải.",
       "emptyHint": "Chưa có ý kiểm — AI sẽ tự ước lượng vị trí điểm trong dải. Thêm 3–5 dấu hiệu kiểm được từ CV để hai CV cùng dải được xếp đúng thứ tự.",
       "placeholder": "VD: Có ≥ 4 năm làm .NET production",
       "item": "Ý kiểm {{n}}",
       "add": "Thêm ý kiểm",
       "remove": "Xoá ý kiểm",
-      "readOnlyTitle": "Ý kiểm (quyết định điểm trong dải):"
-    }
+      "readOnlyTitle": "Ý kiểm (quyết định điểm trong dải):",
+      "weight": "Trọng số ý",
+      "weightTitle": "Ý này nặng ×{{n}}"
+    },
+    "kind": {
+      "knockout": "Điều kiện bắt buộc",
+      "badge": "Bắt buộc",
+      "knockoutHint": "AI chỉ trả lời Đạt / Không đạt kèm trích dẫn CV; CV không nhắc tới thì tính là không đạt. Không đạt → khuyến nghị \"Chưa phù hợp\", nhưng điểm vẫn tính và hồ sơ không bị loại tự động. Chỉ dùng cho yêu cầu thật sự thiết yếu (giấy phép, chứng chỉ bắt buộc…).",
+      "notePlaceholder": "Ghi chú cho AI (tuỳ chọn) — VD: chấp nhận chứng chỉ quốc tế tương đương"
+    },
+    "minScore": "Điểm tối thiểu",
+    "minScoreHint": "Tuỳ chọn — điểm của tiêu chí thấp hơn mức này thì khuyến nghị \"Chưa phù hợp\" dù điểm tổng cao (điểm vẫn tính, hồ sơ không bị loại tự động).",
+    "minScoreChip": "Tối thiểu {{min}}"
   },
   "panel": {
     "title": "Bộ tiêu chí chấm CV",
@@ -77,12 +92,15 @@
     "saving": "Đang lưu…",
     "cancel": "Huỷ",
     "download": "Tải Excel",
-    "rescoreWarning": "Lưu bộ mới sẽ chấm lại {{count}} hồ sơ của tin theo tiêu chí mới. Điểm cũ vẫn được giữ làm lịch sử.",
-    "saved": "Đã lưu. Các hồ sơ đang được chấm lại theo bộ mới.",
+    "rescoreWarning": "Lưu thay đổi sẽ ảnh hưởng {{count}} hồ sơ: sửa lời tiêu chí, lời neo, ý kiểm hoặc thêm điều kiện bắt buộc thì AI chấm lại; chỉ đổi công thức (trọng số, ngưỡng, điểm tối thiểu, trọng số ý) thì điểm được tính lại ngay, không gọi AI. Bấm \"Xem trước tác động\" để xem trước từng hồ sơ.",
+    "saved": "Đã lưu. Các hồ sơ đang được AI chấm lại theo bộ mới. Điểm cũ vẫn được giữ làm lịch sử.",
     "readOnlyHint": "Hiring Manager chính của tin quản lý bộ tiêu chí này.",
     "loadError": "Không tải được bộ tiêu chí.",
     "collapse": "Thu gọn",
-    "expand": "Mở rộng"
+    "expand": "Mở rộng",
+    "savedRecompute": "Đã lưu công thức mới. Điểm và khuyến nghị của {{count}} hồ sơ đang được tính lại từ kết quả AI đã có — không chấm lại bằng AI.",
+    "savedUnchanged": "Không có thay đổi nào — giữ nguyên bộ tiêu chí và công thức đang dùng.",
+    "preview": "Xem trước tác động"
   },
   "status": {
     "scored": "Đã chấm",
@@ -93,7 +111,13 @@
     "no_cv": "Không có CV",
     "scoring_failed": "Chấm lỗi · sẽ thử lại",
     "retryAt": "Hệ thống tự thử lại lúc {{time}}",
-    "retryingSoon": "Hệ thống sẽ thử lại trong lượt quét kế tiếp"
+    "retryingSoon": "Hệ thống sẽ thử lại trong lượt quét kế tiếp",
+    "gate": {
+      "fail": "Trượt điều kiện",
+      "failHint": "Không đạt điều kiện bắt buộc hoặc dưới điểm tối thiểu của một tiêu chí — khuyến nghị \"Chưa phù hợp\". Hồ sơ không bị loại tự động.",
+      "review": "Cần kiểm tra",
+      "reviewHint": "Có điều kiện AI chưa xác minh được từ CV — cần người kiểm tra lại."
+    }
   },
   "breakdown": {
     "title": "Điểm CV và cách tính",
@@ -126,13 +150,7 @@
     "redFlags": "Điểm đáng lưu ý",
     "seniority": "Cấp bậc so với JD",
     "experience": "Mức phù hợp kinh nghiệm",
-    "recommendation": "Khuyến nghị (suy từ điểm)",
-    "rec": {
-      "Strong Hire": "Rất phù hợp (từ 80)",
-      "Hire": "Phù hợp (65–79)",
-      "Proceed with caution": "Cân nhắc (50–64)",
-      "Reject": "Chưa phù hợp (dưới 50)"
-    },
+    "recommendation": "Khuyến nghị (theo công thức của tin)",
     "meta": "Chấm lúc {{time}} · {{model}}",
     "rubricMeta": "Bộ tiêu chí hiện hành lưu lúc {{time}} bởi {{name}}",
     "oldRubric": "Điểm này chấm theo phiên bản bộ tiêu chí trước.",
@@ -164,7 +182,34 @@
       "title": "Điểm trong dải",
       "checklist": "Dải {{band}} ({{min}}–{{max}}) · đạt {{met}}/{{answered}} ý kiểm → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
       "ai": "Dải {{band}} ({{min}}–{{max}}) · tiêu chí chưa có ý kiểm nên vị trí trong dải do AI ước lượng.",
-      "aiNoBand": "Điểm do AI ước lượng (bản chấm trước khi có ý kiểm)."
+      "aiNoBand": "Điểm do AI ước lượng (bản chấm trước khi có ý kiểm).",
+      "checklistWeighted": "Dải {{band}} ({{min}}–{{max}}) · trọng số ý đạt {{met}}/{{answered}} → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
+      "aiPosition": "Dải {{band}} ({{min}}–{{max}}) · AI đặt vị trí {{position}} trong dải → {{min}} + {{position}} × {{span}} = {{exact}} → {{score}}"
+    },
+    "recName": {
+      "Strong Hire": "Rất phù hợp",
+      "Hire": "Phù hợp",
+      "Proceed with caution": "Cân nhắc",
+      "Reject": "Chưa phù hợp"
+    },
+    "recRange": "{{name}} ({{from}}–{{to}})",
+    "recForced": "Chưa phù hợp — trượt điều kiện của công thức",
+    "scoreTier": "Theo điểm: {{tier}}",
+    "derived": "Tính lại lúc {{time}} theo công thức mới, từ lượt AI ({{model}}) đọc CV lúc {{observed}} — không gọi AI lại.",
+    "gates": {
+      "title": "Điều kiện của công thức",
+      "status": {
+        "pass": "Đạt mọi điều kiện bắt buộc và điểm tối thiểu.",
+        "fail": "Trượt ít nhất một điều kiện — khuyến nghị bị ép \"Chưa phù hợp\". Điểm vẫn tính; hồ sơ không bị loại tự động.",
+        "review": "Có điều kiện chưa xác minh được từ CV — cần người kiểm tra lại. Khuyến nghị không bị ép."
+      },
+      "minScore": "{{label}}: {{score}} (tối thiểu {{min}})",
+      "reason": {
+        "knockout_failed": "CV không cho thấy đáp ứng điều kiện này.",
+        "knockout_unverified": "AI chưa xác minh được (không trích được bằng chứng) — cần kiểm tra tay.",
+        "below_min_score": "Thấp hơn điểm tối thiểu HM đặt cho tiêu chí.",
+        "min_score_unscored": "Tiêu chí không ra được điểm — cần kiểm tra tay."
+      }
     }
   },
   "jobChip": {
@@ -215,5 +260,63 @@
     "saved": "Đã lưu bộ tiêu chí chấm phỏng vấn.",
     "savedWithWaiting": "Đã lưu. Các buổi phỏng vấn đang chờ đã được đưa vào hàng chấm — báo cáo sẽ tự hiện khi xong.",
     "roundRemoved": "Đã bỏ bộ riêng — vòng này dùng bộ chung của tin."
+  },
+  "formula": {
+    "title": "Công thức chấm",
+    "hint": "Hiring Manager quyết định cách câu trả lời của AI thành điểm và khuyến nghị. Đổi công thức (không đổi lời tiêu chí) thì điểm được tính lại ngay từ kết quả AI đã có — không chấm lại bằng AI.",
+    "isDefault": "Đang dùng mặc định",
+    "reset": "Khôi phục mặc định",
+    "total": "Điểm CV",
+    "inBand": "Điểm từng tiêu chí = đáy dải + (trọng số ý đạt ÷ trọng số ý đã trả lời) × độ rộng dải; tiêu chí AI không chấm được bị loại khỏi cả tử lẫn mẫu.",
+    "modelCompensatory": "Mô hình bù trừ: điểm cao ở tiêu chí này bù được điểm thấp ở tiêu chí khác. Thêm điều kiện bắt buộc hoặc điểm tối thiểu ở từng tiêu chí để chặn việc bù trừ.",
+    "modelHybrid": "Mô hình lai (bù trừ + điều kiện). Khuyến nghị bị ép \"Chưa phù hợp\" nếu:",
+    "gateKnockout": "không đạt \"{{name}}\"",
+    "gateMin": "{{name}} < {{min}}",
+    "gatesNote": "Điểm vẫn tính và vẫn hiện; hồ sơ không bị loại tự động.",
+    "bandsTitle": "Ngưỡng dải điểm",
+    "bandsHint": "AI chọn dải theo lời neo; ngưỡng quyết định dải đó ứng với bao nhiêu điểm. Mỗi dải rộng ít nhất 5 điểm.",
+    "bandFrom": {
+      "excellentFrom": "Xuất sắc từ",
+      "goodFrom": "Tốt từ",
+      "fairFrom": "Đạt một phần từ"
+    },
+    "tiersTitle": "Ngưỡng khuyến nghị",
+    "tiersHint": "So với điểm CV tổng (đã làm tròn).",
+    "tierFrom": {
+      "strongHireFrom": "Rất phù hợp từ",
+      "hireFrom": "Phù hợp từ",
+      "cautionFrom": "Cân nhắc từ"
+    },
+    "problems": {
+      "badBands": "Ngưỡng dải phải là số nguyên giảm dần: Xuất sắc > Tốt > Đạt một phần > 0, và Xuất sắc < 100.",
+      "bandTooNarrow": "Mỗi dải điểm phải rộng ít nhất 5 điểm.",
+      "badTiers": "Ngưỡng khuyến nghị phải là số nguyên giảm dần trong khoảng 1–100: Rất phù hợp > Phù hợp > Cân nhắc."
+    },
+    "summaryBands": "Dải: Xuất sắc {{excellent}} · Tốt {{good}} · Đạt một phần {{fair}} · Chưa đạt {{poor}}",
+    "summaryTiers": "Khuyến nghị: Rất phù hợp từ {{strong}} · Phù hợp từ {{hire}} · Cân nhắc từ {{caution}}",
+    "summaryGates": "Chưa phù hợp nếu: {{list}}",
+    "sourcesTitle": "Cơ sở tham khảo",
+    "sourcesHint": "Các tham số theo khung chung của tài liệu tuyển dụng: loại theo điều kiện bắt buộc → chấm theo thang có neo → cộng có trọng số → so với ngưỡng.",
+    "sources": {
+      "opm": "OPM (Mỹ) — Training & Experience Evaluations: sàng yêu cầu tối thiểu trước khi chấm",
+      "uwyo": "ĐH Wyoming — Hiring Matrix: thang có neo theo bằng chứng, trọng số ×1/×2/×3, yêu cầu tối thiểu là cổng",
+      "fourCorner": "4 Corner Resources — Resume Screening Scorecard: trọng số và ngưỡng đi tiếp theo từng vị trí",
+      "zythr": "ZYTHR — Weighted Candidate Scoring Matrix: tiêu chí bắt buộc vs chấm điểm, hiệu chỉnh trên hồ sơ cũ",
+      "libretexts": "LibreTexts HRM — Testing and Selecting: mô hình bù trừ, ngưỡng từng tiêu chí, nhiều vòng lọc",
+      "ticnote": "TicNote — How to Score Resumes Objectively: hai làn loại / chấm điểm, ngưỡng theo mức"
+    }
+  },
+  "preview": {
+    "title": "Tác động nếu lưu bản này",
+    "noApplications": "Tin chưa có hồ sơ nào có CV.",
+    "recompute": "{{count}} hồ sơ được tính lại ngay (không gọi AI): {{scoreChanged}} đổi điểm, {{recChanged}} đổi khuyến nghị.",
+    "gates": "Theo công thức mới: {{fail}} hồ sơ trượt điều kiện, {{review}} hồ sơ cần kiểm tra.",
+    "aiRescore": "{{count}} hồ sơ phải được AI chấm lại (bạn đã sửa lời tiêu chí / lời neo / ý kiểm hoặc thêm điều kiện) — mỗi hồ sơ một lượt gọi AI.",
+    "pending": "{{count}} hồ sơ chưa được chấm lần nào — sẽ chấm theo bộ mới.",
+    "candidate": "Ứng viên",
+    "before": "Hiện tại",
+    "after": "Sau khi lưu",
+    "needsAi": "Chờ AI chấm lại",
+    "more": "và {{count}} hồ sơ khác"
   }
 }

@@ -23,7 +23,8 @@ import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
-import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import CvScoreBadge, { CvGatePill } from '@/components/cvScore/CvScoreBadge'
+import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import { interviewService } from '@ari/shared/fservices/interview'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { CandidateOnlineProfileModal } from './CandidatesPage'
@@ -31,7 +32,6 @@ import {
   appStatusBadge,
   appStatusLabel,
   initials,
-  scoreColor,
   timeAgo,
 } from '../recruiter/_jobUi'
 import { JobDetailSkeleton } from '../recruiter/_skeletons'
@@ -200,8 +200,11 @@ export default function HrCandidateDetailPage() {
         {(app.matchScore != null || app.cvScoreStatus) && (
           <div className="text-center">
             {app.matchScore != null ? (
-              <div className={`text-3xl font-bold ${scoreColor(app.matchScore)}`}>
-                {formatScore(app.matchScore)}
+              <div className="flex flex-col items-center gap-0.5">
+                <div className={`text-3xl font-bold ${cvScoreTextClass(app.cvRecommendation)}`}>
+                  {formatScore(app.matchScore)}
+                </div>
+                <CvGatePill gateStatus={app.cvGateStatus} />
               </div>
             ) : (
               <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />

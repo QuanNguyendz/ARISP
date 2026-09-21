@@ -12,6 +12,7 @@ import {
   Loader2,
   Plus,
   Scale,
+  ShieldCheck,
   Sparkles,
   SquareCheck,
   Trash2,
@@ -21,9 +22,14 @@ import {
 import {
   CV_RUBRIC_LEVEL_KEYS,
   CV_RUBRIC_MAX_CHECKS,
+  CV_RUBRIC_MAX_KNOCKOUTS,
+  bandRanges,
   checkCount,
+  clonePolicy,
+  cvPolicyProblems,
   cvRubricProblems,
   cvRubricService,
+  isKnockout,
   totalWeight,
 } from '@ari/shared/fservices/cvRubric'
 import type {
@@ -32,7 +38,9 @@ import type {
   CvRubricDraft,
   CvRubricLevelKey,
   CvRubricSuggestionInput,
+  CvScoringPolicy,
 } from '@ari/shared/fservices/cvRubric'
+import CvScoringFormulaEditor, { FormulaSummary } from './CvScoringFormulaEditor'
 import { interviewRubricService } from '@ari/shared/fservices/interviewRubric'
 import { playbookService } from '@/fservices/playbook/playbookService'
 
@@ -100,7 +108,16 @@ interface CvRubricEditorProps {
   showProblems?: boolean
   /** Mặc định `cv`. `interview`: không có ý kiểm, mẫu + AI gợi ý lấy từ nguồn của bộ tiêu chí phỏng vấn. */
   mode?: RubricEditorMode
+  /**
+   * Công thức cấp tin (ADR-075) — chỉ bộ CV. Truyền cả `onPolicyChange` thì trình soạn hiện khối "Công thức chấm";
+   * Excel / mẫu công ty mang công thức theo thì điền luôn công thức.
+   */
+  policy?: CvScoringPolicy
+  onPolicyChange?: (next: CvScoringPolicy) => void
 }
+
+/** Trọng số ý kiểm cho phép (ADR-075) — ×1 / ×2 / ×3. */
+const CHECK_WEIGHTS = [1, 2, 3] as const
 
 /**
  * Trình soạn bộ tiêu chí chấm CV (ADR-070) — một component cho form phiếu của HM, panel ở màn tin, và
@@ -117,6 +134,8 @@ export default function CvRubricEditor({
   suggestSource,
   showProblems = false,
   mode = 'cv',
+  policy,
+  onPolicyChange,
 }: CvRubricEditorProps) {
   const { t } = useTranslation(CV_SCORING_NS)
   const api = MODE_API[mode]
@@ -161,7 +180,10 @@ export default function CvRubricEditor({
     patch(i, { checks: update(value[i].checks ?? []) })
 
   const add = () =>
-    commit([...value, { name: '', weight: 0, description: '', levels: null, checks: [] }], [...uids, nextUid()])
+    commit(
+      [...value, { name: '', weight: 0, description: '', levels: null, checks: [], kind: null, minScore: null }],
+      [...uids, nextUid()]
+    )
 
   const remove = (i: number) =>
     commit(value.filter((_, idx) => idx !== i), uids.filter((_, idx) => idx !== i))
@@ -176,13 +198,13 @@ export default function CvRubricEditor({
     commit(next, nextUids)
   }
 
-  /** Chia đều 100 theo phần dư lớn nhất — cùng cách server làm với bản AI gợi ý. */
+  /** Chia đều 100 theo phần dư lớn nhất — chỉ trên tiêu chí chấm điểm (điều kiện bắt buộc không mang trọng số). */
   const balance = () => {
-    const n = value.length
+    const n = value.filter((c) => !isKnockout(c)).length
     if (n === 0) return
     const base = Math.floor(100 / n)
     let rest = 100 - base * n
-    commit(value.map((c) => ({ ...c, weight: base + (rest-- > 0 ? 1 : 0) })), uids)
+    commit(value.map((c) => (isKnockout(c) ? c : { ...c, weight: base + (rest-- > 0 ? 1 : 0) })), uids)
   }
 
   /** Bản nháp từ AI / mẫu / Excel: danh sách trống thì thay luôn, có sẵn thì hỏi trước. */
@@ -199,9 +221,13 @@ export default function CvRubricEditor({
     setPending(null)
     setWarnings(draft.warnings ?? [])
     // Bản từ nguồn khác không mang mã của tin này — bỏ mã để server sinh lại, tránh đè lên tiêu chí cũ.
-    // Bộ tiêu chí phỏng vấn không có ý kiểm: file Excel / mẫu CV có ý kiểm thì bỏ đi ngay ở đây.
-    const criteria = draft.criteria.map((c) => ({ ...c, key: null, checks: forInterview ? null : c.checks }))
+    // Bộ tiêu chí phỏng vấn không có ý kiểm, điều kiện bắt buộc, điểm tối thiểu: có trong file / mẫu CV thì bỏ ở đây.
+    const criteria = draft.criteria.map((c) =>
+      forInterview ? { ...c, key: null, checks: null, kind: null, minScore: null } : { ...c, key: null }
+    )
     commit(criteria, criteria.map(nextUid))
+    // File Excel / mẫu công ty mang công thức theo → điền luôn (ADR-075). Không có thì giữ công thức đang soạn.
+    if (!forInterview && draft.policy && onPolicyChange) onPolicyChange(clonePolicy(draft.policy))
   }
 
   const run = async (kind: NonNullable<typeof busy>, action: () => Promise<void>) => {
@@ -228,14 +254,18 @@ export default function CvRubricEditor({
   const importFile = (file: File | undefined) => {
     if (fileRef.current) fileRef.current.value = ''
     if (!file) return
-    void run('import', async () => offer(await cvRubricService.parseSheet(file)))
+    void run('import', async () => offer(await cvRubricService.parseSheet(file, mode)))
   }
 
   const problems = cvRubricProblems(value)
   const total = totalWeight(value)
   const totalOk = Math.abs(total - 100) <= 0.01
+  const withFormula = !forInterview && !!policy && !!onPolicyChange
+  // Nhãn dải in đúng ngưỡng của công thức đang soạn (bộ phỏng vấn dùng ngưỡng mặc định).
+  const ranges = bandRanges(!forInterview && policy && cvPolicyProblems(policy).length === 0 ? policy : undefined)
+  const knockoutCount = value.filter(isKnockout).length
 
-  if (readOnly) return <ReadOnlyRubric criteria={value} />
+  if (readOnly) return <ReadOnlyRubric criteria={value} policy={forInterview ? undefined : policy} />
 
   return (
     <div className="space-y-3">
@@ -280,7 +310,7 @@ export default function CvRubricEditor({
                     type="button"
                     onClick={() => {
                       setTemplatesOpen(false)
-                      offer({ criteria: tpl.criteria, warnings: [] })
+                      offer({ criteria: tpl.criteria, warnings: [], policy: tpl.policy ?? null })
                     }}
                     className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50 dark:text-ink-200 dark:hover:bg-white/10"
                   >
@@ -305,7 +335,7 @@ export default function CvRubricEditor({
         </button>
         <button
           type="button"
-          onClick={() => void run('export', () => cvRubricService.downloadDraft(value, api.exportName))}
+          onClick={() => void run('export', () => cvRubricService.downloadDraft(value, api.exportName, policy, mode))}
           disabled={busy !== null || value.length === 0}
           className={TOOL_BTN}
         >
@@ -370,6 +400,7 @@ export default function CvRubricEditor({
           {value.map((c, i) => {
             const uid = uids[i] ?? `idx${i}`
             const open = openLevels[uid] ?? levelCount(c) > 0
+            const knockout = !forInterview && isKnockout(c)
             return (
               <li
                 key={uid}
@@ -388,19 +419,26 @@ export default function CvRubricEditor({
                       maxLength={120}
                       className={`${INPUT} min-w-[12rem] flex-1`}
                     />
-                    <div className="relative w-28 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={Number.isFinite(c.weight) ? c.weight : 0}
-                        onChange={(e) => patch(i, { weight: Number(e.target.value) })}
-                        aria-label={t('editor.weight')}
-                        className={`${INPUT} pr-7 text-right`}
-                      />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
-                    </div>
+                    {knockout ? (
+                      // Điều kiện bắt buộc không mang trọng số — không vào trung bình (ADR-075).
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                        <ShieldCheck className="h-3.5 w-3.5" /> {t('editor.kind.badge')}
+                      </span>
+                    ) : (
+                      <div className="relative w-28 shrink-0">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={Number.isFinite(c.weight) ? c.weight : 0}
+                          onChange={(e) => patch(i, { weight: Number(e.target.value) })}
+                          aria-label={t('editor.weight')}
+                          className={`${INPUT} pr-7 text-right`}
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center">
                     <IconButton label={t('editor.moveUp')} onClick={() => move(i, -1)} disabled={i === 0}>
@@ -416,18 +454,63 @@ export default function CvRubricEditor({
                 </div>
 
                 <div className="mt-2 pl-8">
+                  {/* Công thức cấp tiêu chí (ADR-075): điều kiện bắt buộc · điểm tối thiểu. Chỉ bộ chấm CV. */}
+                  {!forInterview && (
+                    <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      <label
+                        className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink-700 dark:text-ink-200"
+                        title={t('editor.kind.knockoutHint')}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={knockout}
+                          disabled={!knockout && knockoutCount >= CV_RUBRIC_MAX_KNOCKOUTS}
+                          onChange={(e) => patch(i, { kind: e.target.checked ? 'knockout' : null })}
+                          className="h-3.5 w-3.5 rounded border-ink-300 text-amber-600 focus:ring-amber-500 disabled:opacity-40"
+                        />
+                        <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        {t('editor.kind.knockout')}
+                      </label>
+                      {!knockout && (
+                        <label
+                          className="inline-flex items-center gap-1.5 text-xs text-ink-600 dark:text-ink-300"
+                          title={t('editor.minScoreHint')}
+                        >
+                          {t('editor.minScore')}
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            step={1}
+                            value={c.minScore ?? ''}
+                            placeholder="—"
+                            onChange={(e) =>
+                              patch(i, { minScore: e.target.value === '' ? null : Math.trunc(Number(e.target.value)) })
+                            }
+                            aria-label={t('editor.minScore')}
+                            className={`${INPUT} w-20 py-1 text-right text-xs`}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {knockout && (
+                    <p className="mb-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                      {t('editor.kind.knockoutHint')}
+                    </p>
+                  )}
                   <textarea
                     rows={2}
                     value={c.description ?? ''}
                     onChange={(e) => patch(i, { description: e.target.value })}
-                    placeholder={t(tk('guidePlaceholder'))}
+                    placeholder={knockout ? t('editor.kind.notePlaceholder') : t(tk('guidePlaceholder'))}
                     aria-label={t('editor.guide')}
                     maxLength={1000}
                     className={`${INPUT} resize-y`}
                   />
 
                   {/* Ý kiểm: quyết định vị trí điểm TRONG dải — AI chỉ trả lời có/không từng ý. Chỉ có ở bộ chấm CV. */}
-                  {!forInterview && (
+                  {!forInterview && !knockout && (
                   <div className="mt-2 rounded-xl border border-dashed border-ink-200 p-2.5 dark:border-white/10">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-700 dark:text-ink-200">
                       <ListChecks className="h-3.5 w-3.5 text-ai-600 dark:text-ai-400" />
@@ -449,6 +532,36 @@ export default function CvRubricEditor({
                           maxLength={200}
                           className={`${INPUT} py-1.5 text-xs`}
                         />
+                        {/* Trọng số ý (ADR-075): ý quan trọng hơn kéo điểm trong dải nhiều hơn. */}
+                        <div
+                          role="group"
+                          aria-label={t('editor.checks.weight')}
+                          className="flex shrink-0 overflow-hidden rounded-lg border border-ink-200 dark:border-white/10"
+                        >
+                          {CHECK_WEIGHTS.map((w) => {
+                            const active = (chk.weight ?? 1) === w
+                            return (
+                              <button
+                                key={w}
+                                type="button"
+                                aria-pressed={active}
+                                title={t('editor.checks.weightTitle', { n: w })}
+                                onClick={() =>
+                                  patchChecks(i, (checks) =>
+                                    checks.map((x, k) => (k === j ? { ...x, weight: w === 1 ? null : w } : x))
+                                  )
+                                }
+                                className={`px-1.5 py-1 text-[11px] font-semibold ${
+                                  active
+                                    ? 'bg-ai-600 text-white'
+                                    : 'text-ink-500 hover:bg-ink-50 dark:text-ink-400 dark:hover:bg-white/10'
+                                }`}
+                              >
+                                ×{w}
+                              </button>
+                            )
+                          })}
+                        </div>
                         <IconButton
                           label={t('editor.checks.remove')}
                           onClick={() => patchChecks(i, (checks) => checks.filter((_, k) => k !== j))}
@@ -469,6 +582,7 @@ export default function CvRubricEditor({
                   </div>
                   )}
 
+                  {!knockout && (
                   <button
                     type="button"
                     onClick={() => setOpenLevels((s) => ({ ...s, [uid]: !open }))}
@@ -477,14 +591,15 @@ export default function CvRubricEditor({
                     <Scale className="h-3.5 w-3.5" />
                     {open ? t('editor.hideLevels') : t('editor.showLevels', { count: levelCount(c) })}
                   </button>
-                  {open && (
+                  )}
+                  {open && !knockout && (
                     <div className="mt-2 space-y-2">
                       <p className="text-[11px] text-ink-500 dark:text-ink-400">{t(tk('levelsHint'))}</p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {CV_RUBRIC_LEVEL_KEYS.map((level) => (
                           <label key={level} className="block">
                             <span className="mb-1 block text-[11px] font-semibold text-ink-600 dark:text-ink-300">
-                              {t(`editor.level.${level}`)}
+                              {t(`editor.level.${level}`, ranges[level])}
                             </span>
                             <textarea
                               rows={2}
@@ -548,10 +663,19 @@ export default function CvRubricEditor({
           {problems.map((p) => (
             <li key={p} className="flex items-center gap-1.5">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {t(`editor.problems.${p}`, { total })}
+              {t(`editor.problems.${p}`, { total, max: CV_RUBRIC_MAX_KNOCKOUTS })}
             </li>
           ))}
         </ul>
+      )}
+
+      {withFormula && (
+        <CvScoringFormulaEditor
+          policy={policy!}
+          onChange={onPolicyChange!}
+          criteria={value}
+          showProblems={touched || showProblems}
+        />
       )}
     </div>
   )
@@ -589,12 +713,25 @@ function IconButton({
 }
 
 /** Hiển thị chỉ đọc — màn tạo tin của Recruiter, màn duyệt phiếu của HR Leader, panel khi không có quyền sửa. */
-export function ReadOnlyRubric({ criteria }: { criteria: CvRubricCriterion[] }) {
+export function ReadOnlyRubric({
+  criteria,
+  policy,
+}: {
+  criteria: CvRubricCriterion[]
+  /**
+   * Công thức của bộ CV (ADR-075) — truyền vào thì hiện tóm tắt công thức + nhãn dải theo ngưỡng của tin. Bộ phỏng vấn
+   * không truyền (ngưỡng mặc định, không có khối công thức).
+   */
+  policy?: CvScoringPolicy | null
+}) {
   const { t } = useTranslation(CV_SCORING_NS)
   if (criteria.length === 0)
     return <p className="text-xs text-ink-500 dark:text-ink-400">{t('editor.readOnlyEmpty')}</p>
 
+  const ranges = bandRanges(policy && cvPolicyProblems(policy).length === 0 ? policy : undefined)
+
   return (
+    <div className="space-y-2">
     <ol className="space-y-2">
       {criteria.map((c, i) => (
         <li
@@ -605,24 +742,40 @@ export function ReadOnlyRubric({ criteria }: { criteria: CvRubricCriterion[] }) 
             <span className="text-sm font-medium text-ink-900 dark:text-white">
               {i + 1}. {c.name}
             </span>
-            <span className="shrink-0 rounded-full bg-ai-100 px-2 py-0.5 text-xs font-semibold text-ai-700 dark:bg-ai-500/20 dark:text-ai-300">
-              {c.weight}%
+            <span className="flex shrink-0 items-center gap-1">
+              {!isKnockout(c) && c.minScore != null && (
+                <span
+                  className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                  title={t('editor.minScoreHint')}
+                >
+                  {t('editor.minScoreChip', { min: c.minScore })}
+                </span>
+              )}
+              {isKnockout(c) ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                  <ShieldCheck className="h-3 w-3" /> {t('editor.kind.badge')}
+                </span>
+              ) : (
+                <span className="rounded-full bg-ai-100 px-2 py-0.5 text-xs font-semibold text-ai-700 dark:bg-ai-500/20 dark:text-ai-300">
+                  {c.weight}%
+                </span>
+              )}
             </span>
           </div>
           {c.description && (
             <p className="mt-1 text-xs leading-relaxed text-ink-600 dark:text-ink-400">{c.description}</p>
           )}
-          {levelCount(c) > 0 && (
+          {!isKnockout(c) && levelCount(c) > 0 && (
             <ul className="mt-1.5 space-y-0.5 text-[11px] leading-relaxed">
               {CV_RUBRIC_LEVEL_KEYS.filter((k) => !!c.levels?.[k]?.trim()).map((k) => (
                 <li key={k} className="text-ink-600 dark:text-ink-300">
-                  <span className="font-semibold text-ink-500 dark:text-ink-400">{t(`editor.level.${k}`)}:</span>{' '}
+                  <span className="font-semibold text-ink-500 dark:text-ink-400">{t(`editor.level.${k}`, ranges[k])}:</span>{' '}
                   {c.levels?.[k]}
                 </li>
               ))}
             </ul>
           )}
-          {checkCount(c) > 0 && (
+          {!isKnockout(c) && checkCount(c) > 0 && (
             <div className="mt-1.5">
               <p className="text-[11px] font-semibold text-ink-500 dark:text-ink-400">{t('editor.checks.readOnlyTitle')}</p>
               <ul className="mt-0.5 space-y-0.5 text-[11px] leading-relaxed text-ink-600 dark:text-ink-300">
@@ -632,6 +785,11 @@ export function ReadOnlyRubric({ criteria }: { criteria: CvRubricCriterion[] }) 
                     <li key={x.key ?? j} className="flex items-start gap-1.5">
                       <SquareCheck className="mt-0.5 h-3 w-3 shrink-0 text-ink-400" />
                       <span>{x.text}</span>
+                      {(x.weight ?? 1) !== 1 && (
+                        <span className="shrink-0 rounded bg-ai-100 px-1 text-[10px] font-semibold text-ai-700 dark:bg-ai-500/20 dark:text-ai-300">
+                          ×{x.weight}
+                        </span>
+                      )}
                     </li>
                   ))}
               </ul>
@@ -640,5 +798,7 @@ export function ReadOnlyRubric({ criteria }: { criteria: CvRubricCriterion[] }) 
         </li>
       ))}
     </ol>
+    {policy !== undefined && <FormulaSummary policy={policy} criteria={criteria} />}
+    </div>
   )
 }

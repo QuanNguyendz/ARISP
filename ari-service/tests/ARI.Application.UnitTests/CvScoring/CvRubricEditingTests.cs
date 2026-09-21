@@ -30,7 +30,7 @@ public class CvRubricEditingTests
         {
             new() { Name = "Kỹ năng", Weight = 50, Description = "a" },
             new() { Name = "Kỹ năng", Weight = 50, Description = "b" },
-        });
+        }, RubricPurpose.Cv);
 
         Assert.True(res.IsValid, string.Join(";", res.Errors));
         Assert.Equal(new[] { "ky_nang", "ky_nang_2" }, res.Criteria.Select(c => c.Key));
@@ -44,7 +44,7 @@ public class CvRubricEditingTests
         {
             new() { Key = "experience", Name = "Kinh nghiệm thực chiến", Weight = 60, Description = "a" },
             new() { Name = "Experience", Weight = 40, Description = "b" },
-        });
+        }, RubricPurpose.Cv);
 
         Assert.True(res.IsValid, string.Join(";", res.Errors));
         Assert.Equal("experience", res.Criteria[0].Key);
@@ -54,7 +54,7 @@ public class CvRubricEditingTests
     [Fact]
     public void Weights_must_total_100()
     {
-        var res = CvRubricEditing.Normalize(CvScoringKit.Inputs(("A", 50), ("B", 40)));
+        var res = CvRubricEditing.Normalize(CvScoringKit.Inputs(("A", 50), ("B", 40)), RubricPurpose.Cv);
         Assert.False(res.IsValid);
         Assert.Contains(res.Errors, e => e.Contains("100"));
     }
@@ -66,7 +66,7 @@ public class CvRubricEditingTests
         {
             new() { Name = "Có neo", Weight = 50, Levels = new RubricLevels { Good = "tốt" } },
             new() { Name = "Trống trơn", Weight = 50 },
-        });
+        }, RubricPurpose.Cv);
 
         Assert.False(res.IsValid);
         Assert.Single(res.Errors);
@@ -80,7 +80,7 @@ public class CvRubricEditingTests
         {
             new() { Name = "A", Weight = 100, Description = "x", Levels = new RubricLevels { Good = "  " } },
             new() { Name = " ", Weight = 0 },
-        });
+        }, RubricPurpose.Cv);
 
         Assert.True(res.IsValid, string.Join(";", res.Errors));
         Assert.Single(res.Criteria);
@@ -90,7 +90,7 @@ public class CvRubricEditingTests
     [Fact]
     public void Missing_name_is_reported()
     {
-        var res = CvRubricEditing.Normalize(new List<CvRubricCriterionInput> { new() { Name = "", Weight = 100, Description = "x" } });
+        var res = CvRubricEditing.Normalize(new List<CvRubricCriterionInput> { new() { Name = "", Weight = 100, Description = "x" } }, RubricPurpose.Cv);
         Assert.False(res.IsValid);
     }
 
@@ -135,15 +135,21 @@ public class CvRubricEditingTests
         Assert.Equal("tốt", parsed.Criteria[0].Levels!.Good);
         Assert.Equal("skills", parsed.Criteria[1].Key);
         Assert.Null(parsed.Criteria[1].Levels);
-        Assert.Empty(ScoringRubric.Validate(parsed.Criteria));
+        Assert.Empty(ScoringRubric.Validate(parsed.Criteria, RubricPurpose.Cv));
     }
 
     [Fact]
     public void Cv_template_parses_into_a_valid_rubric()
     {
         var parsed = RubricSheet.Parse(RubricSheet.BuildTemplate(forCv: true));
-        var normalized = CvRubricEditing.Normalize(CvRubricEditing.ToInput(parsed.Criteria));
+        var normalized = CvRubricEditing.Normalize(CvRubricEditing.ToInput(parsed.Criteria), RubricPurpose.Cv);
         Assert.True(normalized.IsValid, string.Join(";", normalized.Errors));
-        Assert.Equal(4, normalized.Criteria.Count);
+        // 4 tiêu chí chấm điểm + 1 dòng ví dụ điều kiện bắt buộc (ADR-075), cùng ví dụ điểm tối thiểu và ý ×2.
+        Assert.Equal(5, normalized.Criteria.Count);
+        Assert.Single(normalized.Criteria, c => c.IsKnockout);
+        Assert.Contains(normalized.Criteria, c => c.MinScore == 50);
+        Assert.Contains(normalized.Criteria, c => c.Checks?.Any(x => x.Weight == 2) == true);
+        Assert.NotNull(parsed.Policy);
+        Assert.True(parsed.Policy!.IsDefault);
     }
 }

@@ -61,5 +61,8 @@ namespace ARI.Application.CvScoring
 
         public static List<RubricCriterion> Criteria(PlaybookDocument? doc)
             => doc == null ? new List<RubricCriterion>() : ScoringRubric.Deserialize(doc.RubricJson);
+
+        /// <summary>Công thức cấp tin đi cùng phiên bản bộ tiêu chí (ADR-075); không khai = mặc định.</summary>
+        public static CvScoringPolicy Policy(PlaybookDocument? doc) => CvScoringPolicy.FromStorage(doc?.ScoringPolicyJson);
     }
 }

@@ -167,7 +167,7 @@ public class CvChecklistScoringTests
             },
         };
 
-        var normalized = CvRubricEditing.Normalize(input);
+        var normalized = CvRubricEditing.Normalize(input, RubricPurpose.Cv);
 
         Assert.True(normalized.IsValid, string.Join(";", normalized.Errors));
         var checks = normalized.Criteria[0].Checks!;
@@ -187,7 +187,7 @@ public class CvChecklistScoringTests
             },
         };
 
-        var normalized = CvRubricEditing.Normalize(input);
+        var normalized = CvRubricEditing.Normalize(input, RubricPurpose.Cv);
 
         Assert.False(normalized.IsValid);
         Assert.Contains(normalized.Errors, e => e.Contains("ý kiểm"));
@@ -210,7 +210,7 @@ public class CvChecklistScoringTests
         Assert.Empty(parsed.Errors);
         Assert.Equal(new[] { "≥ 4 năm .NET", "Dẫn dắt kỹ thuật" }, parsed.Criteria[0].Checks!.Select(c => c.Text));
         Assert.Equal(new[] { "k1", "k2" }, parsed.Criteria[0].Checks!.Select(c => c.Key));
-        Assert.Empty(ScoringRubric.Validate(parsed.Criteria));
+        Assert.Empty(ScoringRubric.Validate(parsed.Criteria, RubricPurpose.Cv));
     }
 
     [Fact]

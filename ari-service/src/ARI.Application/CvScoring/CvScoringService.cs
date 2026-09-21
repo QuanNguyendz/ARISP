@@ -14,6 +14,7 @@ using ARI.Application.Interfaces;
 using ARI.Application.Playbooks;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -48,6 +49,13 @@ namespace ARI.Application.CvScoring
 
         /// <summary>Tra (không chấm): bộ tiêu chí sống, khoá, và bản chấm có sẵn nếu có.</summary>
         Task<CvScoreLookup> LookupAsync(Guid jobPostingId, byte[] cvBytes, CancellationToken ct = default);
+
+        /// <summary>
+        /// Đường nhanh của ADR-075: nếu một bản chấm cũ của đúng file CV này đã hỏi AI đúng những câu mà bộ tiêu chí
+        /// đang sống hỏi (chỉ công thức khác đi), tính lại theo công thức mới từ câu trả lời cũ — KHÔNG gọi AI, không
+        /// cần đọc file CV. Trả bản chấm theo bộ đang sống (có sẵn hoặc vừa tính), hoặc <c>null</c> nếu phải hỏi AI.
+        /// </summary>
+        Task<CvJdAnalysis?> TryDeriveAsync(Guid jobPostingId, string cvHash, CancellationToken ct = default);
     }
 
     public sealed record CvScoreLookup(PlaybookDocument? Rubric, string CvHash, string? Key, CvJdAnalysis? Existing);
@@ -122,6 +130,7 @@ namespace ARI.Application.CvScoring
             var cached = await FindAsync(jobPostingId, hash, rubric.Id, ct);
             if (cached != null) return Result.Success(cached);
 
+            var policy = CvRubricStore.Policy(rubric);
             var key = CvScoringInFlight.Key(jobPostingId, hash, rubric.Id);
             using (await _inFlight.AcquireAsync(key, ct))
             {
@@ -129,15 +138,168 @@ namespace ARI.Application.CvScoring
                 cached = await FindAsync(jobPostingId, hash, rubric.Id, ct);
                 if (cached != null) return Result.Success(cached);
 
-                var result = await ScoreCoreAsync(job, rubric, criteria, hash, cvBytes, cvFileName, ct);
+                // Chỉ công thức đổi → tính lại từ câu trả lời cũ của AI, không gọi AI (ADR-075).
+                var derived = await DeriveCoreAsync(job.Id, hash, rubric, criteria, policy, ct);
+                if (derived != null)
+                {
+                    _inFlight.ClearFailure(key);
+                    return Result.Success(derived);
+                }
+
+                var result = await ScoreCoreAsync(job, rubric, criteria, policy, hash, cvBytes, cvFileName, ct);
                 if (result.IsFailure) _inFlight.RecordFailure(key, result.Error!, result.ErrorCode);
                 else _inFlight.ClearFailure(key);
                 return result;
             }
         }
 
+        public async Task<CvJdAnalysis?> TryDeriveAsync(Guid jobPostingId, string cvHash, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(cvHash)) return null;
+            var rubric = await CvRubricStore.LiveAsync(_unitOfWork, jobPostingId, ct);
+            var criteria = CvRubricStore.Criteria(rubric);
+            if (rubric == null || criteria.Count == 0) return null;
+
+            var existing = await FindAsync(jobPostingId, cvHash, rubric.Id, ct);
+            if (existing != null) return existing;
+
+            var key = CvScoringInFlight.Key(jobPostingId, cvHash, rubric.Id);
+            using (await _inFlight.AcquireAsync(key, ct))
+            {
+                existing = await FindAsync(jobPostingId, cvHash, rubric.Id, ct);
+                if (existing != null) return existing;
+
+                var derived = await DeriveCoreAsync(jobPostingId, cvHash, rubric, criteria, CvRubricStore.Policy(rubric), ct);
+                if (derived != null) _inFlight.ClearFailure(key);
+                return derived;
+            }
+        }
+
+        /// <summary>Số bản chấm cũ tối đa được xét làm nguồn tính lại (mới nhất trước).</summary>
+        private const int MaxDonors = 10;
+
+        /// <summary>
+        /// Tính lại theo công thức của bộ tiêu chí đang sống từ một bản chấm CŨ của cùng (tin, file CV) — ADR-075.
+        ///
+        /// Bản cũ dùng được khi bộ tiêu chí của nó "phủ" bộ đang sống (<see cref="CvObservationSignature.Covers"/>):
+        /// mọi tiêu chí đang sống đều có ở bản cũ và AI đã được hỏi đúng cùng câu hỏi. Khi đó mọi khác biệt chỉ là
+        /// số học (trọng số, điểm tối thiểu, trọng số ý kiểm, ngưỡng dải, ngưỡng khuyến nghị), và câu trả lời cũ
+        /// của AI — lưu trong ảnh chụp — là đủ.
+        ///
+        /// Phải chạy trong khoá <see cref="CvScoringInFlight"/> của (tin, file, bộ đang sống), cùng khoá với đường gọi AI.
+        /// </summary>
+        private async Task<CvJdAnalysis?> DeriveCoreAsync(
+            Guid jobPostingId, string hash, PlaybookDocument live, List<RubricCriterion> criteria, CvScoringPolicy policy,
+            CancellationToken ct)
+        {
+            var liveId = live.Id;
+            var donors = await _unitOfWork.Repository<CvJdAnalysis>().QueryAsync(
+                q => q.Where(a => a.JobPostingId == jobPostingId && a.CvHash == hash
+                                  && a.RubricDocumentId != null && a.RubricDocumentId != liveId
+                                  && (a.Status == CvAnalysisStatuses.Completed || a.Status == CvAnalysisStatuses.InvalidCv))
+                      .OrderByDescending(a => a.CreatedAt)
+                      .Take(MaxDonors), ct);
+            if (donors.Count == 0) return null;
+
+            var liveSignature = CvObservationSignature.Of(criteria);
+            var donorRubricIds = donors.Select(d => d.RubricDocumentId!.Value).Distinct().ToList();
+            // Phiên bản cũ đã bị XOÁ MỀM — phải bỏ bộ lọc toàn cục của ISoftDelete. (InMemoryUnitOfWork của unit test
+            // không áp bộ lọc nên không bắt được lỗi thiếu IgnoreQueryFilters — kiểm trên Postgres thật.)
+            var donorRubrics = await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(
+                q => q.IgnoreQueryFilters()
+                      .Where(p => donorRubricIds.Contains(p.Id))
+                      .Select(p => new { p.Id, p.RubricJson }), ct);
+            var signatureById = donorRubrics.ToDictionary(
+                p => p.Id, p => SignatureOf(p.Id, p.RubricJson));
+
+            foreach (var donor in donors)
+            {
+                if (!signatureById.TryGetValue(donor.RubricDocumentId!.Value, out var donorSignature)) continue;
+                if (!CvObservationSignature.Covers(donorSignature, liveSignature)) continue;
+
+                var derived = BuildDerived(donor, live, criteria, policy);
+                if (derived == null) continue;
+
+                var repo = _unitOfWork.Repository<CvJdAnalysis>();
+                await repo.AddAsync(derived, ct);
+                try
+                {
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // UNIQUE (tin, CV, bộ tiêu chí): tiến trình khác vừa ghi đúng khoá này → dùng bản đó.
+                    repo.Delete(derived);
+                    var winner = await FindAsync(jobPostingId, hash, liveId, ct);
+                    if (winner != null) return winner;
+                    _logger.LogError(ex, "Lưu bản tính lại điểm CV thất bại cho tin {JobId}", jobPostingId);
+                    return null;
+                }
+
+                _logger.LogInformation(
+                    "Tính lại điểm CV theo công thức mới (không gọi AI): tin {JobId}, bản gốc {RootId} → {Score}",
+                    jobPostingId, derived.DerivedFromAnalysisId, derived.MatchScore);
+                return derived;
+            }
+
+            return null;
+        }
+
+        /// <summary>Chữ ký theo id tài liệu — phiên bản bộ tiêu chí không bao giờ bị sửa sau khi chèn, nên cache vô hạn trong TTL.</summary>
+        private IReadOnlyDictionary<string, string> SignatureOf(Guid rubricDocumentId, string? rubricJson)
+            => _cache.GetOrCreate($"cv-scoring:signature:v{CvObservationSignature.Version}:{rubricDocumentId}", entry =>
+            {
+                entry.SlidingExpiration = TimeSpan.FromHours(6);
+                return (IReadOnlyDictionary<string, string>)CvObservationSignature.Of(ScoringRubric.Deserialize(rubricJson));
+            })!;
+
+        /// <summary>Dựng bản chấm theo bộ đang sống từ bản cũ. <c>null</c> = ảnh chụp cũ không đủ căn cứ.</summary>
+        private static CvJdAnalysis? BuildDerived(
+            CvJdAnalysis donor, PlaybookDocument live, List<RubricCriterion> criteria, CvScoringPolicy policy)
+        {
+            var root = donor.DerivedFromAnalysisId ?? donor.Id;
+            var derived = new CvJdAnalysis
+            {
+                JobPostingId = donor.JobPostingId,
+                CvHash = donor.CvHash,
+                RubricDocumentId = live.Id,
+                DerivedFromAnalysisId = root,
+                Summary = donor.Summary,
+                SkillsMatched = donor.SkillsMatched,
+                SkillsGaps = donor.SkillsGaps,
+                RedFlags = donor.RedFlags,
+                ExperienceRelevance = donor.ExperienceRelevance,
+                SeniorityAlignment = donor.SeniorityAlignment,
+                AiModel = donor.AiModel,
+                Status = donor.Status,
+                ErrorMessage = donor.ErrorMessage,
+                // Không có lời gọi AI nào — token của lượt gốc nằm ở bản gốc, không cộng hai lần.
+                PromptTokens = 0,
+                CompletionTokens = 0,
+                ProcessingTimeMs = 0,
+                RawResponse = string.IsNullOrWhiteSpace(donor.RawResponse) ? "{}" : donor.RawResponse,
+                ScoringPolicy = policy.ToSnapshotJson(),
+            };
+
+            // File không phải CV thì công thức nào cũng vậy.
+            if (donor.Status == CvAnalysisStatuses.InvalidCv) return derived;
+
+            var observations = CvObservations.TryFromSnapshot(
+                CvScoreSnapshot.Parse(donor.CriterionScores), CvScoringPolicy.FromStorage(donor.ScoringPolicy), criteria);
+            if (observations == null) return null;
+
+            var result = CvScoreCalculator.Compute(criteria, policy, observations);
+            if (result.Score is not { } score) return null;
+
+            derived.MatchScore = score;
+            derived.CriterionScores = CvScoreSnapshot.Serialize(result);
+            derived.OverallRecommendation = result.Recommendation!;
+            derived.GateStatus = result.GateStatus;
+            return derived;
+        }
+
         private async Task<Result<CvJdAnalysis>> ScoreCoreAsync(
-            JobPosting job, PlaybookDocument rubric, List<RubricCriterion> criteria,
+            JobPosting job, PlaybookDocument rubric, List<RubricCriterion> criteria, CvScoringPolicy policy,
             string hash, byte[] cvBytes, string cvFileName, CancellationToken ct)
         {
             var ext = Path.GetExtension(cvFileName ?? string.Empty).ToLowerInvariant();
@@ -159,6 +321,7 @@ namespace ARI.Application.CvScoring
 
             var (jdText, jdPdf) = await BuildJdAsync(job, ct);
             var rubricInstruction = await BuildRubricInstructionAsync(job.Id, criteria, ct);
+            // Điều kiện bắt buộc cũng phải được trả lời đủ — cùng danh sách mã bắt buộc với tiêu chí chấm điểm.
 
             var ai = await _gemini.AnalyzeCvJdMatchAsync(new CvScoringAiRequest(
                 jdText,
@@ -190,32 +353,33 @@ namespace ARI.Application.CvScoring
                     CompletionTokens = dto.CompletionTokens,
                     ProcessingTimeMs = dto.ProcessingTimeMs,
                     RawResponse = SafeJson(dto.RawResponse),
+                    ScoringPolicy = policy.ToSnapshotJson(),
                 };
             }
             else
             {
-                // ĐIỂM CUỐI DO BACKEND CỘNG. Không có nhánh nào lấy điểm tổng từ AI (ADR-070).
-                var indexed = CvScoreSnapshot.IndexAiResults(criteria, dto.Criteria);
-                var overall = ScoringRubric.ComputeOverall(criteria, CvScoreSnapshot.Scores(criteria, indexed));
-                if (overall == null)
+                // ĐIỂM CUỐI DO BACKEND CỘNG theo công thức của tin. Không có nhánh nào lấy điểm tổng từ AI (ADR-070/075).
+                var result = CvScoreCalculator.Compute(criteria, policy, CvObservations.FromAi(criteria, dto.Criteria));
+                if (result.Score is not { } score)
                     return Result.Failure<CvJdAnalysis>(
                         "AI chưa chấm được tiêu chí nào của bộ tiêu chí — sẽ thử lại sau.", CvScoringErrors.NoCriterionScored);
 
-                var score = (int)Math.Round(overall.Value, MidpointRounding.AwayFromZero);
                 analysis = new CvJdAnalysis
                 {
                     JobPostingId = job.Id,
                     CvHash = hash,
                     RubricDocumentId = rubric.Id,
                     MatchScore = score,
-                    CriterionScores = CvScoreSnapshot.Serialize(criteria, indexed),
+                    CriterionScores = CvScoreSnapshot.Serialize(result),
+                    ScoringPolicy = policy.ToSnapshotJson(),
+                    GateStatus = result.GateStatus,
                     Summary = dto.Summary,
                     SkillsMatched = JsonSerializer.Serialize(dto.SkillsMatched ?? new List<string>()),
                     SkillsGaps = JsonSerializer.Serialize(dto.SkillsGaps ?? new List<string>()),
                     RedFlags = JsonSerializer.Serialize(dto.RedFlags ?? new List<string>()),
                     ExperienceRelevance = dto.ExperienceRelevance,
                     SeniorityAlignment = string.IsNullOrWhiteSpace(dto.SeniorityAlignment) ? null : dto.SeniorityAlignment,
-                    OverallRecommendation = CvScoreSnapshot.Recommendation(score),
+                    OverallRecommendation = result.Recommendation!,
                     AiModel = dto.Provider,
                     Status = CvAnalysisStatuses.Completed,
                     PromptTokens = dto.PromptTokens,
@@ -314,7 +478,8 @@ namespace ARI.Application.CvScoring
         private async Task<string> BuildRubricInstructionAsync(Guid jobPostingId, List<RubricCriterion> criteria, CancellationToken ct)
         {
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine(ScoringRubric.ToPromptText(criteria));
+            // Không con số nào (ADR-075) — công thức là việc của backend.
+            sb.AppendLine(ScoringRubric.ToCvPromptText(criteria));
 
             var docs = await _unitOfWork.Repository<PlaybookDocument>().QueryAsync(
                 q => q.Where(p => p.DeletedAt == null

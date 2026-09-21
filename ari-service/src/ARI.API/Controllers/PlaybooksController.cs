@@ -68,7 +68,7 @@ namespace ARI.API.Controllers
         [HttpPost("cv-rubric/parse-sheet")]
         [Authorize(Policy = "InternalStaff")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> ParseCvRubricSheet(IFormFile file, CancellationToken ct)
+        public async Task<IActionResult> ParseCvRubricSheet(IFormFile file, [FromQuery] string? mode, CancellationToken ct)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "Hãy chọn file Excel." });
@@ -78,16 +78,20 @@ namespace ARI.API.Controllers
                 return BadRequest(new { message = "Kích thước file không được vượt quá 15MB." });
 
             var bytes = await PlaybookUpload.ReadAsync(file, ct);
-            var result = await _sender.Send(new ParseCvRubricSheetCommand(bytes), ct);
+            var result = await _sender.Send(new ParseCvRubricSheetCommand(bytes, PurposeOf(mode)), ct);
             return result.IsFailure ? BadRequest(new { message = result.Error, code = result.ErrorCode }) : Ok(result.Value);
         }
+
+        /// <summary>Trình soạn bộ tiêu chí phỏng vấn dùng chung parse/export — <c>mode=interview</c> áp luật phỏng vấn (ADR-075).</summary>
+        private static RubricPurpose PurposeOf(string? mode)
+            => string.Equals(mode?.Trim(), "interview", StringComparison.OrdinalIgnoreCase) ? RubricPurpose.Interview : RubricPurpose.Cv;
 
         /// <summary>Xuất bản nháp đang soạn ra file Excel.</summary>
         [HttpPost("cv-rubric/export-sheet")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> ExportCvRubricSheet([FromBody] SaveCvRubricRequest body, CancellationToken ct)
         {
-            var result = await _sender.Send(new ExportCvRubricSheetQuery(body?.Criteria ?? new()), ct);
+            var result = await _sender.Send(new ExportCvRubricSheetQuery(body?.Criteria ?? new(), body?.Policy, PurposeOf(body?.Mode)), ct);
             return result.IsFailure
                 ? BadRequest(new { message = result.Error, code = result.ErrorCode })
                 : File(result.Value!, RubricSheet.XlsxContentType, "bo-tieu-chi-cham-cv.xlsx");
