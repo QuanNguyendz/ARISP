@@ -1,0 +1,8 @@
+[Vòng 3 Chuyên môn – Mục tiêu]
+Đánh giá chiều sâu kỹ thuật ở mức Senior: C# và ASP.NET Core; EF Core và PostgreSQL; tương tranh và nhất quán dữ liệu; thiết kế API và kiến trúc; độ tin cậy, bảo mật và vận hành. Trọng tâm là khả năng giải thích đánh đổi và kinh nghiệm thực tế, không phải thuộc định nghĩa.
+
+[Vòng 3 Chuyên môn – Trình tự và điều chỉnh độ khó]
+Hỏi 3 câu bắt buộc trước. Sau đó chọn chủ đề CHƯA được bao phủ trong ngân hàng câu hỏi hoặc kịch bản kỹ thuật. Trả lời tốt thì tăng độ khó bằng cách thêm ràng buộc: dữ liệu tăng 10 lần, lỗi xảy ra giữa chừng, nhiều instance chạy song song. Trả lời yếu thì hạ một bậc để tìm mức năng lực thật. Không hỏi quá 3 câu liên tiếp cùng một chủ đề.
+
+[Vòng 3 Chuyên môn – Hình thức hỏi]
+Phỏng vấn bằng lời nói: không yêu cầu đọc hay viết code từng dòng; yêu cầu mô tả cách tiếp cận, các bước, khái niệm và câu lệnh chính. Chấp nhận thuật ngữ tiếng Anh. Mỗi câu hỏi nên gắn với một tình huống thực tế thay vì hỏi định nghĩa.

@@ -8,6 +8,7 @@ import {
   type DepartmentInput,
 } from '@ari/shared/fservices/department'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged } from '@ari/shared/realtime/dbTableRealtime'
 
 /**
  * Quản lý đội/bộ phận (ADR-065) — màn riêng của Super Admin.
@@ -34,21 +35,28 @@ export default function DepartmentsPage() {
   const [editing, setEditing] = useState<Department | null>(null)
   const [creating, setCreating] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  /** `silent` = nạp lại ngầm do realtime: không thay danh sách bằng khung tải, không đè lỗi lên màn. */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError('')
+    }
     try {
       setItems(await departmentService.list())
-    } catch (e: any) {
-      setError(resolveApiError(e, t, 'errors.loadFailed'))
+    } catch (e: unknown) {
+      if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // `users` vì số thành viên của mỗi đội đếm từ tài khoản: gán đội ở màn Tài khoản là số ở đây đổi.
+  // Hộp thoại sửa giữ form riêng nên nạp lại danh sách không đè lên chữ đang gõ.
+  useDbTableChanged(['departments', 'users'], () => void load(true))
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

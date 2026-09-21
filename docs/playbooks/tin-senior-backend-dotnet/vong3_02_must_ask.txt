@@ -1,0 +1,4 @@
+# Câu hỏi bắt buộc – Vòng 3 Chuyên môn – Senior Backend .NET
+Một API trả danh sách viết bằng ASP.NET Core và EF Core trên PostgreSQL ngày càng chậm khi dữ liệu tăng. Bạn chẩn đoán và xử lý theo trình tự nào?
+Hai request đồng thời cùng đặt chỗ cho suất cuối cùng của một khung giờ. Bạn ngăn việc đặt trùng như thế nào ở tầng ứng dụng và tầng cơ sở dữ liệu?
+Bạn tổ chức một solution ASP.NET Core theo Clean Architecture như thế nào, và khi nào bạn thấy cách tổ chức đó là quá mức cần thiết?

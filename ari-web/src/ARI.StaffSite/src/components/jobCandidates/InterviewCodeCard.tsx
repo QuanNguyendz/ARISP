@@ -16,6 +16,8 @@ import { formatDateTime24, formatTime24 } from '@ari/shared/utils/time24'
 
 interface Props {
   applicationId: string
+  /** Khoảng cách ngoài — mặc định hợp với danh sách ứng viên; màn hồ sơ đặt trong khối thao tác. */
+  className?: string
 }
 
 /**
@@ -30,8 +32,11 @@ interface Props {
  *
  * **Bấm lại không làm mất mã.** "Cấp mã" khi đang có mã chỉ trả lại mã đó; thay mã là một nút riêng
  * có xác nhận, vì mã cũ hết hiệu lực ngay — ứng viên làm từ nhà có thể đang cầm nó.
+ *
+ * Đường cấp mã DUY NHẤT của nhân sự (danh sách ứng viên + màn hồ sơ): server chọn vòng theo lịch đang
+ * giữ chỗ, nên qua vòng trắc nghiệm rồi xếp lịch vòng 2 thì mã ra đúng vòng 2.
  */
-export default function InterviewCodeCard({ applicationId }: Props) {
+export default function InterviewCodeCard({ applicationId, className = 'mb-4' }: Props) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
   const queryClient = useQueryClient()
   // Nằm dưới tiền tố ['application', id] — realtime (bảng interview_codes) huỷ đúng tiền tố đó khi mã
@@ -71,7 +76,7 @@ export default function InterviewCodeCard({ applicationId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="mb-4 flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-3 text-xs text-ink-500 dark:border-white/10">
+      <div className={`${className} flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-3 text-xs text-ink-500 dark:border-white/10`}>
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t('code.loading')}
       </div>
     )
@@ -79,7 +84,7 @@ export default function InterviewCodeCard({ applicationId }: Props) {
 
   if (isError || !data) {
     return (
-      <p className="mb-4 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
+      <p className={`${className} flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400`}>
         <AlertCircle className="h-3.5 w-3.5" /> {t('code.loadError')}
       </p>
     )
@@ -88,7 +93,7 @@ export default function InterviewCodeCard({ applicationId }: Props) {
   // Server nói không cấp được (vừa vào phòng, hồ sơ vừa đóng…) — nói lý do thay vì một nút bấm là lỗi.
   if (!data.canIssue) {
     return data.blockedReason ? (
-      <p className="mb-4 flex items-start gap-1.5 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-600 dark:border-white/10 dark:bg-white/5 dark:text-ink-300">
+      <p className={`${className} flex items-start gap-1.5 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-600 dark:border-white/10 dark:bg-white/5 dark:text-ink-300`}>
         <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {data.blockedReason}
       </p>
     ) : null
@@ -109,7 +114,7 @@ export default function InterviewCodeCard({ applicationId }: Props) {
     'inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-ink-200 dark:hover:bg-white/10'
 
   return (
-    <section className="mb-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+    <section className={`${className} rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
           <KeyRound className="h-4 w-4 text-brand-600 dark:text-brand-400" />

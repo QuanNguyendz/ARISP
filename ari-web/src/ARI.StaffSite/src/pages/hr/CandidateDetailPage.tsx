@@ -1,20 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import {
-  ArrowLeft,
-  FileText,
-  ExternalLink,
-  KeyRound,
-  Loader2,
-  Mail,
-  Phone,
-  Briefcase,
-  Copy,
-  Check,
-  CheckCircle2,
-  CalendarClock,
-  UserCheck,
-} from 'lucide-react'
+import { ArrowLeft, FileText, ExternalLink, Mail, Phone, Briefcase, UserCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorAlert } from '@ari/shared/ui'
 import AssignSchedulePanel from '@ari/shared/ui/AssignSchedulePanel'
@@ -25,7 +11,7 @@ import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
 import CvScoreBadge, { CvGatePill } from '@/components/cvScore/CvScoreBadge'
 import { cvScoreTextClass } from '@/components/cvScore/cvTier'
-import { interviewService } from '@ari/shared/fservices/interview'
+import InterviewCodeCard from '@/components/jobCandidates/InterviewCodeCard'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { CandidateOnlineProfileModal } from './CandidatesPage'
 import {
@@ -52,10 +38,6 @@ export default function HrCandidateDetailPage() {
   const [app, setApp] = useState<HrApplicationItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [coding, setCoding] = useState(false)
-  const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null)
-  const [copied, setCopied] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
 
   useEffect(() => {
@@ -94,32 +76,6 @@ export default function HrCandidateDetailPage() {
     }
   }, [id])
 
-  const genCode = async () => {
-    if (!id) return
-    setCoding(true)
-    setError('')
-    setNotice('')
-    try {
-      const r = await interviewService.generateCode(id)
-      setCode({ code: r.code, expiresAt: r.expiresAt })
-    } catch (e) {
-      setError(apiErr(e, t('codeError')))
-    } finally {
-      setCoding(false)
-    }
-  }
-
-  const copyCode = async () => {
-    if (!code) return
-    try {
-      await navigator.clipboard.writeText(code.code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      /* ignore */
-    }
-  }
-
   const refreshApp = async () => {
     if (!id) return
     try {
@@ -154,11 +110,6 @@ export default function HrCandidateDetailPage() {
       </Link>
 
       {error && <ErrorAlert message={error} onDismiss={() => setError('')} />}
-      {notice && (
-        <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
-          <CheckCircle2 className="h-4 w-4" /> {notice}
-        </div>
-      )}
 
       <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 sm:p-6 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -256,38 +207,8 @@ export default function HrCandidateDetailPage() {
                   <ExternalLink className="ml-auto h-3.5 w-3.5 text-ink-400" />
                 </button>
               )}
-              <button
-                onClick={genCode}
-                disabled={coding || !app.hasScheduledInterview}
-                title={app.hasScheduledInterview ? undefined : t('noSchedule')}
-                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-3 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {coding ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <KeyRound className="h-4 w-4" />
-                )}{' '}
-                {t('generateCode')}
-              </button>
-              {!app.hasScheduledInterview && (
-                <p className="-mt-1 flex items-center gap-1.5 text-xs text-ink-400">
-                  <CalendarClock className="h-3.5 w-3.5" /> {t('waitForSchedule')}
-                </p>
-              )}
-              {code && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <p className="mb-1 text-xs text-emerald-700 dark:text-emerald-400">
-                    {t('codeTitle')}
-                  </p>
-                  <button
-                    onClick={copyCode}
-                    className="flex w-full items-center justify-between font-mono text-base sm:text-lg font-bold tracking-widest text-emerald-700 dark:text-emerald-300"
-                  >
-                    {code.code}
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </button>
-                </div>
-              )}
+              {/* Cùng thẻ cấp mã với danh sách ứng viên của tin — vòng do server chọn theo lịch. */}
+              <InterviewCodeCard applicationId={app.id} className="" />
             </div>
           </div>
 

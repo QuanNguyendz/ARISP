@@ -44,6 +44,14 @@ import {
 import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import { profileService, type RecruiterOverview } from '@/fservices/profile/profileService'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged, touchesRow } from '@ari/shared/realtime/dbTableRealtime'
+
+/**
+ * Bảng mà màn này phải nghe. `job_postings` có mặt vì cờ "đã dựng thành tin" (`jobPostingId`,
+ * `canCreateJob`) suy từ bảng TIN chứ không nằm trên dòng phiếu (ADR-066): Recruiter dựng tin xong,
+ * dòng phiếu không đổi gì.
+ */
+const REALTIME_TABLES = ['recruitment_requests', 'job_postings'] as const
 
 /**
  * Màn phiếu yêu cầu tuyển dụng (ADR-063) — MỘT view dùng chung cho cả ba vai trò.
@@ -185,24 +193,33 @@ export default function RecruitmentRequestsView() {
   // HR Leader lập phiếu là tự đặt mình vào cả hai đầu của các cổng mà ADR-061/063 dựng lên để tách.
   const canAuthor = role === ROLE.HiringManager
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  /**
+   * `silent` = nạp lại NGẦM do realtime: không bật khung tải (nó thay cả danh sách lẫn cột chi tiết,
+   * tức là gỡ luôn ô lý do người dùng đang gõ) và không đè lỗi lên màn vì một lượt nền hỏng.
+   */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError('')
+    }
     try {
       setItems(await recruitmentRequestService.list({
         ...(statusFilter === 'all' ? {} : { status: statusFilter }),
         ...(priorityFilter === 'all' ? {} : { priority: priorityFilter }),
       }))
-    } catch (e: any) {
-      setError(resolveApiError(e, t, 'errors.loadFailed'))
+    } catch (e: unknown) {
+      if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [statusFilter, priorityFilter, t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Phiếu vừa được duyệt / trả lại / phân công / dựng thành tin — ba bên đang mở màn này phải thấy ngay.
+  useDbTableChanged(REALTIME_TABLES, () => void load(true))
 
   const statusOptions = useMemo(
     () => [
@@ -834,7 +851,11 @@ function RequestDetailPanel({
         setRecruiters(usable)
         // Xếp gợi ý theo phòng ban (ADR-061: department chỉ để gợi ý, KHÔNG dùng phân quyền).
         const sameDept = usable.find((r) => r.department && r.department === d.department)
-        setChosenRecruiter(sameDept?.id ?? usable[0]?.id ?? '')
+        // Giữ lựa chọn HR Leader đã bấm nếu người đó vẫn còn trong danh sách: lượt nạp lại do
+        // realtime không được lặng lẽ đổi Recruiter ngay trước khi họ bấm Duyệt.
+        setChosenRecruiter((current) =>
+          usable.some((r) => r.id === current) ? current : sameDept?.id ?? usable[0]?.id ?? ''
+        )
       }
     } catch (e: any) {
       setErr(resolveApiError(e, t, 'errors.loadFailed'))
@@ -844,6 +865,14 @@ function RequestDetailPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  // Chỉ nạp lại khi chính phiếu này đổi (hoặc có tin mới — cờ "đã dựng thành tin" nằm ở bảng tin).
+  // Ô lý do trả lại / thu hồi là state riêng nên không bị đè.
+  useDbTableChanged(REALTIME_TABLES, (changes) => {
+    if (touchesRow(changes, 'recruitment_requests', id) || changes.some((c) => c.table === 'job_postings')) {
+      void load()
+    }
+  })
 
   /** Mở một ô lý do luôn bắt đầu từ trống — lý do đóng phiếu không được trôi sang lần mở lại sau. */
   const openRevoke = (next: 'reopen' | 'close') => {

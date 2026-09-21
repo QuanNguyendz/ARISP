@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Shield, MapPin, Plus, X, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
@@ -6,6 +6,7 @@ import { PageHeader, ErrorAlert } from '@ari/shared/ui'
 import { adminService, type SystemSettingItem } from '@/fservices/admin'
 import { SettingsSkeleton } from './_skeletons'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged } from '@ari/shared/realtime/dbTableRealtime'
 
 type TabId = 'auth' | 'interview'
 
@@ -20,6 +21,10 @@ const SETTING_KEYS = {
   // còn tệ hơn là không có màn nào, vì nó khiến người cấu hình tin rằng tích hợp đang chạy.
 } as const
 
+/** Dấu vân tay của nội dung màn — so với bản đã lưu để biết còn thay đổi chưa lưu không. */
+const snapshotOf = (domains: string[], values: Record<string, string>) =>
+  JSON.stringify({ domains, values })
+
 export default function SuperAdminSettingsPage() {
   const { t } = useTranslation('modules/super-admin/settings')
   const [tab, setTab] = useState<TabId>('auth')
@@ -32,28 +37,55 @@ export default function SuperAdminSettingsPage() {
   const [domainInput, setDomainInput] = useState('')
   const [values, setValues] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      setError('')
+  /**
+   * Bản đã lưu trên server (tên miền + các ô), để biết màn còn thay đổi chưa lưu hay không. Ô gõ tên
+   * miền chưa bấm "Thêm" cũng tính là đang sửa dở.
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const isDirty =
+    domainInput.trim() !== '' || (savedSnapshot != null && snapshotOf(domains, values) !== savedSnapshot)
+
+  // Đọc lại sau `await` — closure của lượt render cũ không biết người dùng vừa sửa thêm trong lúc chờ.
+  const canReplaceRef = useRef(false)
+  canReplaceRef.current = !isDirty && !saving
+
+  /** `silent` = nạp lại ngầm do realtime: không thay cả màn bằng khung tải, không đè lỗi lên màn. */
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true)
+        setError('')
+      }
       try {
         const settings = await adminService.getSettings()
+        if (silent && !canReplaceRef.current) return
         const map: Record<string, string> = {}
         settings.forEach((s) => (map[s.key] = s.value))
+        const nextDomains = (map[SETTING_KEYS.allowedEmailDomains] || '')
+          .split(',')
+          .map((d) => d.trim())
+          .filter(Boolean)
         setValues(map)
-        setDomains(
-          (map[SETTING_KEYS.allowedEmailDomains] || '')
-            .split(',')
-            .map((d) => d.trim())
-            .filter(Boolean)
-        )
-      } catch (e: any) {
-        setError(resolveApiError(e, t, 'errors.loadFailed'))
+        setDomains(nextDomains)
+        setSavedSnapshot(snapshotOf(nextDomains, map))
+      } catch (e: unknown) {
+        if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
       } finally {
-        setLoading(false)
+        if (!silent) setLoading(false)
       }
-    })()
-  }, [t])
+    },
+    [t]
+  )
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // Super Admin khác vừa lưu cài đặt (ADR-057). Đang sửa dở thì KHÔNG nạp đè — bấm Lưu sau đó sẽ ghi
+  // bản của người này, nhưng ít ra không có chữ nào biến mất dưới tay họ.
+  useDbTableChanged(['system_settings'], () => {
+    if (canReplaceRef.current) void load(true)
+  })
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase().replace(/^@/, '')
@@ -95,6 +127,8 @@ export default function SuperAdminSettingsPage() {
     setSaved(false)
     try {
       await adminService.updateSettings(buildPayload())
+      // Bản vừa lưu thành mốc "đã lưu" mới — không thì màn bị coi là sửa dở mãi và realtime bị chặn.
+      setSavedSnapshot(snapshotOf(domains, values))
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e: any) {

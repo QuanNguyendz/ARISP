@@ -1,0 +1,8 @@
+[Vòng 3 – Kịch bản kỹ thuật – Lưu dữ liệu rồi gửi email thông báo (outbox)]
+Bối cảnh: sau khi lưu hồ sơ ứng tuyển vào cơ sở dữ liệu, hệ thống phải gửi email xác nhận. Thỉnh thoảng dữ liệu đã lưu nhưng email không đi, hoặc email bị gửi hai lần. Hỏi lần lượt: (1) vì sao gửi email ngay trong request là không an toàn; (2) thiết kế lại để không mất và không trùng thông báo; (3) nếu dịch vụ email sập 30 phút thì sao. Điểm cần nghe: transactional outbox, tác vụ nền đọc outbox, retry có backoff, idempotency key hoặc bảng đã xử lý, at-least-once kèm khử trùng lặp.
+
+[Vòng 3 – Kịch bản kỹ thuật – API bên thứ ba chậm và không ổn định]
+Bối cảnh: một endpoint phải gọi API bên thứ ba, có lúc phản hồi mất 10 giây hoặc trả lỗi 503, kéo chậm toàn bộ hệ thống. Hỏi lần lượt: (1) vì sao cả hệ thống chậm theo; (2) biện pháp bảo vệ; (3) trải nghiệm người dùng khi bên thứ ba sập. Điểm cần nghe: timeout, HttpClientFactory, retry có backoff và jitter chỉ cho lỗi tạm thời, circuit breaker (Polly), không giữ transaction cơ sở dữ liệu trong lúc gọi ra ngoài, chuyển sang xử lý bất đồng bộ hoặc trả dữ liệu cache.
+
+[Vòng 3 – Kịch bản kỹ thuật – Xuất báo cáo Excel một triệu dòng]
+Bối cảnh: người dùng bấm xuất báo cáo khoảng một triệu dòng, request bị timeout và bộ nhớ server tăng vọt. Hỏi lần lượt: (1) vì sao hỏng; (2) thiết kế lại; (3) báo kết quả cho người dùng thế nào. Điểm cần nghe: không nạp hết vào bộ nhớ, đọc theo lô hoặc stream (AsAsyncEnumerable, keyset), ghi file theo luồng, chạy nền rồi thông báo khi xong (SignalR hoặc email kèm link tải có hạn), kiểm tra quyền trên dữ liệu được xuất.

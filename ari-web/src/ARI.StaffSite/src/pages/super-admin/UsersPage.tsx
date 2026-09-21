@@ -33,6 +33,7 @@ import {
 import { departmentService, type Department } from '@ari/shared/fservices/department'
 import { StatsGridSkeleton, TableSkeleton } from './_skeletons'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged } from '@ari/shared/realtime/dbTableRealtime'
 
 const PAGE_SIZE = 10
 
@@ -89,9 +90,12 @@ export default function UsersPage() {
   // Chỉ đội đang hoạt động: đội đã tắt vẫn hiện được TÊN ở dòng cũ (server trả kèm), nhưng không
   // gán mới vào được.
   const [departments, setDepartments] = useState<Department[]>([])
-  useEffect(() => {
+  const loadDepartments = useCallback(() => {
     void departmentService.list(true).then(setDepartments).catch(() => setDepartments([]))
   }, [])
+  useEffect(() => {
+    loadDepartments()
+  }, [loadDepartments])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -103,9 +107,12 @@ export default function UsersPage() {
     }
   }, [])
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  /** `silent` = nạp lại ngầm do realtime: không thay bảng bằng khung tải, không đè lỗi lên màn. */
+  const loadUsers = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError('')
+    }
     try {
       const res = await adminService.listUsers({
         search: search || undefined,
@@ -115,10 +122,10 @@ export default function UsersPage() {
       })
       setUsers(res.items)
       setTotal(res.totalCount)
-    } catch (e: any) {
-      setError(resolveApiError(e, t, 'errors.loadFailed'))
+    } catch (e: unknown) {
+      if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [search, roleFilter, page, t])
 
@@ -129,6 +136,15 @@ export default function UsersPage() {
   useEffect(() => {
     loadStats()
   }, [loadStats])
+
+  // Super Admin khác (hoặc tab khác) vừa tạo / khoá / đổi vai trò / gán đội (ADR-057). Hộp thoại
+  // xác nhận giữ bản chụp của dòng đang thao tác, nên nạp lại bảng không làm đổi đích của nó.
+  useDbTableChanged(['users'], () => {
+    void loadUsers(true)
+    void loadStats()
+  })
+  // Đội vừa tạo / tắt thì ô chọn đội trên từng dòng phải đổi theo — gán vào đội đã tắt server sẽ chặn.
+  useDbTableChanged(['departments'], loadDepartments)
 
   // Mở modal tạo staff khi có ?create=1
   useEffect(() => {

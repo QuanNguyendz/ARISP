@@ -10,6 +10,7 @@ import {
 
 import { API_BASE_URL } from '@ari/shared/config/constants'
 import { createApplicationChangeBatcher, type ApplicationChangeBatcher } from './applicationRealtime'
+import { publishDbTableChanged, RESYNC_TABLE } from './dbTableRealtime'
 
 /** Yêu cầu layout nhân sự tải lại chuông thông báo tức thời. */
 const refreshStaffBell = () => window.dispatchEvent(new Event(STAFF_NOTIF_REFRESH_EVENT))
@@ -49,6 +50,14 @@ const handleDbChange = (
   applications: ApplicationChangeBatcher,
   payload: DbChangePayload
 ) => {
+  // Màn giữ state cục bộ nghe sự kiện này theo tên bảng (`useDbTableChanged`). Phát cho MỌI bảng,
+  // kể cả bảng không có nhánh bên dưới — màn mới không phải quay lại sửa hàm này mới có realtime.
+  publishDbTableChanged(
+    payload?.op === 'resync'
+      ? { table: RESYNC_TABLE, op: 'resync' }
+      : { table: payload?.t ?? RESYNC_TABLE, op: payload?.op, id: payload?.id ?? null }
+  )
+
   if (payload?.op === 'resync') {
     queryClient.invalidateQueries()
     applications.push() // màn dùng state cục bộ cũng phải nạp lại
@@ -179,8 +188,15 @@ const handleDbChange = (
       queryClient.invalidateQueries({ queryKey: ['my-account-requests'] })
       break
 
-    // Bảng chưa cần phản ánh lên UI — im lặng bỏ qua (khác nhánh eventType bên dưới, ở đây việc
-    // không map là chuyện bình thường vì trigger gắn trên toàn bộ bảng).
+    // Hồ sơ của chính ứng viên (server chỉ gửi cho chủ tài khoản). Ảnh đại diện ở header đọc qua
+    // react-query nên phải huỷ ở đây; còn màn Hồ sơ giữ state cục bộ, nghe qua `useDbTableChanged`.
+    case 'candidate_accounts':
+      queryClient.invalidateQueries({ queryKey: ['candidate-avatar'] })
+      break
+
+    // Các bảng còn lại (phiếu tuyển dụng, mẫu JD, bản JD, đội, cài đặt hệ thống…) do màn state cục
+    // bộ tự nghe qua `publishDbTableChanged` ở đầu hàm — không có cache react-query nào để huỷ.
+    // Bảng không màn nào nghe thì im lặng bỏ qua: trigger gắn trên toàn bộ bảng nên đây là bình thường.
     default:
       break
   }

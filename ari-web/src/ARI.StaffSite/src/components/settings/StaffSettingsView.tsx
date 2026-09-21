@@ -9,6 +9,7 @@ import {
   type StaffProfile,
   type StaffSettings,
 } from '@/fservices/profile/profileService'
+import { useDbTableChanged, touchesRow } from '@ari/shared/realtime/dbTableRealtime'
 
 type TabId = 'profile' | 'notifications' | 'security'
 
@@ -43,6 +44,7 @@ export default function StaffSettingsView() {
   // Tên hiển thị ở topbar/sidebar đọc từ store — đổi họ tên phải cập nhật luôn, nếu không
   // người dùng lưu xong vẫn thấy tên cũ cho tới lần đăng nhập sau.
   const updateUser = useAuthStore((state) => state.updateUser)
+  const myId = useAuthStore((state) => state.user?.id)
 
   useEffect(() => {
     let active = true
@@ -73,6 +75,23 @@ export default function StaffSettingsView() {
       active = false
     }
   }, [t])
+
+  /**
+   * Tài khoản của CHÍNH MÌNH vừa đổi ở nơi khác (ADR-057) — thường là Super Admin gán đội (ADR-065).
+   * Ô "Đội" chỉ đọc nên luôn cập nhật; ô họ tên chỉ cập nhật khi người dùng chưa sửa nó, để không nạp
+   * đè lên chữ đang gõ.
+   */
+  useDbTableChanged(['users'], (changes) => {
+    if (!myId || !touchesRow(changes, 'users', myId)) return
+    void profileService
+      .getProfile()
+      .then((res) => {
+        setDepartment(res.department ?? '')
+        setFullName((current) => (current === profile?.fullName ? res.fullName : current))
+        setProfile(res)
+      })
+      .catch(() => {})
+  })
 
   const toggleSetting = async (key: keyof StaffSettings) => {
     const previous = settings

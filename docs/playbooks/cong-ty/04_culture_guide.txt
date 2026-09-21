@@ -1,0 +1,14 @@
+[Văn hoá – Chủ động và chịu trách nhiệm (ownership)]
+Biểu hiện tốt: nhận việc và theo tới cùng, báo sớm rủi ro hoặc trễ hạn, theo dõi kết quả sau khi phát hành (release, deploy), sửa tận gốc chứ không vá tạm rồi quên. Câu hỏi gợi mở: "Kể về lần bạn phát hiện một vấn đề không thuộc phần việc của mình – bạn đã làm gì?"
+
+[Văn hoá – Minh bạch và phản hồi thẳng thắn]
+Biểu hiện tốt: góp ý trong code review dựa trên lý lẽ và dữ liệu, tiếp nhận góp ý không phòng thủ, nói rõ khi không biết, bất đồng thì trao đổi trực tiếp rồi tôn trọng quyết định chung (disagree and commit). Câu hỏi gợi mở: "Lần gần nhất bạn không đồng ý với đồng nghiệp hoặc trưởng nhóm về một quyết định kỹ thuật – diễn biến ra sao?"
+
+[Văn hoá – Học hỏi liên tục]
+Biểu hiện tốt: học có phương pháp (đọc tài liệu gốc, thử nghiệm nhỏ, ghi chép lại), áp dụng điều mới học vào công việc và đo được kết quả, chia sẻ lại cho nhóm. Câu hỏi gợi mở: "Điều gần nhất bạn tự học và đã áp dụng được vào dự án là gì?"
+
+[Văn hoá – Hướng tới người dùng và chất lượng]
+Biểu hiện tốt: hiểu tính năng giải quyết vấn đề gì cho người dùng, coi test, xử lý lỗi và hiệu năng là một phần của "xong việc", biết khi nào nên đơn giản hoá để giao sớm. Câu hỏi gợi mở: "Kể về một lần bạn phải cân bằng giữa deadline và chất lượng."
+
+[Văn hoá – Hợp tác]
+Biểu hiện tốt: hỗ trợ đồng đội, chia sẻ kiến thức, viết tài liệu và ghi chú bàn giao, phối hợp tốt với QA, Product Owner, thiết kế. Câu hỏi gợi mở: "Bạn đã giúp một thành viên mới hoặc một đồng nghiệp đang gặp khó khăn như thế nào?"

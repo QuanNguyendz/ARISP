@@ -17,6 +17,7 @@ import {
 import JdPaperPreview from '@/components/jdPreview/JdPaperPreview'
 import { useContainerWidth } from '@/components/jdPreview/useContainerWidth'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged } from '@ari/shared/realtime/dbTableRealtime'
 
 /**
  * Cấu hình mẫu bản mô tả công việc của công ty (ADR-064) — màn riêng của HR Leader.
@@ -46,20 +47,39 @@ export default function JdTemplatePage() {
   // Tờ giấy A4 rộng cố định 794px rồi thu nhỏ cho vừa cột — phải biết bề ngang thật của cột.
   const { ref: previewBoxRef, width: previewWidth } = useContainerWidth()
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  /** Bản đã lưu trên server, để biết màn còn thay đổi chưa lưu hay không. */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const isDirty = template != null && savedSnapshot != null && JSON.stringify(template) !== savedSnapshot
+
+  // Đọc lại sau `await` — closure của lượt render cũ không biết người dùng vừa sửa thêm trong lúc chờ.
+  const canReplaceRef = useRef(false)
+  canReplaceRef.current = !isDirty && !saving && !uploading
+
+  /** `silent` = nạp lại ngầm do realtime: không thay cả màn bằng khung tải, không đè lỗi lên màn. */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
-      setTemplate(await jdTemplateService.get())
-    } catch (e: any) {
-      setError(resolveApiError(e, t, 'errors.loadFailed'))
+      const next = await jdTemplateService.get()
+      // Người dùng bắt đầu sửa trong lúc lượt nền đang chạy thì giữ chữ của họ.
+      if (silent && !canReplaceRef.current) return
+      setTemplate(next)
+      setSavedSnapshot(JSON.stringify(next))
+    } catch (e: unknown) {
+      if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Một HR Leader khác vừa lưu mẫu (ADR-057). Đang sửa dở thì KHÔNG nạp đè — mất chữ đang gõ tệ hơn
+  // nhiều so với nhìn bản cũ thêm một lúc; lần lưu của chính mình sẽ nạp lại bản mới nhất.
+  useDbTableChanged(['jd_templates'], () => {
+    if (canReplaceRef.current) void load(true)
+  })
 
   const patch = (changes: Partial<JdTemplate>) =>
     setTemplate((prev) => (prev ? { ...prev, ...changes } : prev))

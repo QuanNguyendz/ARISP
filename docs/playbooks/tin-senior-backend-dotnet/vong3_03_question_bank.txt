@@ -1,0 +1,29 @@
+[Vòng 3 – Câu hỏi gợi ý – async/await và thread pool trong ASP.NET Core]
+Vì sao gọi .Result hoặc .Wait() trong một request ASP.NET Core là nguy hiểm? Bạn truyền và tôn trọng CancellationToken ra sao khi client huỷ request? Khi nào ConfigureAwait(false) còn có ý nghĩa? Đào sâu: thread pool starvation biểu hiện thế nào và bạn phát hiện bằng công cụ gì?
+
+[Vòng 3 – Câu hỏi gợi ý – Dependency Injection và middleware]
+Singleton, Scoped và Transient khác nhau thế nào? Điều gì xảy ra khi một Singleton giữ DbContext (captive dependency)? Thứ tự middleware ảnh hưởng thế nào tới authentication, authorization và xử lý lỗi? Đào sâu: dùng service Scoped bên trong BackgroundService như thế nào?
+
+[Vòng 3 – Câu hỏi gợi ý – EF Core: truy vấn, tracking, migration]
+Lỗi N+1 xuất hiện khi nào trong EF Core và bạn phát hiện, xử lý ra sao? Khi nào dùng AsNoTracking, khi nào dùng projection Select? Bạn triển khai migration đổi tên hoặc tách cột trên bảng hàng triệu dòng đang chạy production thế nào để không gián đoạn?
+
+[Vòng 3 – Câu hỏi gợi ý – PostgreSQL: index và kế hoạch truy vấn]
+Bạn đọc EXPLAIN ANALYZE để tìm điểm nghẽn như thế nào? Khi nào dùng index composite, partial index hay GIN? Vì sao thêm index có thể làm chậm hệ thống? Đào sâu: phân trang OFFSET khác phân trang keyset ở điểm nào khi dữ liệu lớn?
+
+[Vòng 3 – Câu hỏi gợi ý – Transaction, isolation, concurrency]
+Các mức isolation Read Committed, Repeatable Read, Serializable khác nhau thế nào trong PostgreSQL? Optimistic concurrency (xmin, RowVersion) khác pessimistic locking (SELECT … FOR UPDATE) ra sao, khi nào chọn cái nào? Đào sâu: bạn xử lý deadlock hoặc lỗi serialization failure thế nào?
+
+[Vòng 3 – Câu hỏi gợi ý – Thiết kế REST API]
+Bạn thiết kế endpoint tạo đơn thế nào để client retry an toàn (idempotency key)? Chọn status code nào cho lỗi validation, lỗi nghiệp vụ, xung đột dữ liệu? Bạn version API và giữ tương thích ngược ra sao?
+
+[Vòng 3 – Câu hỏi gợi ý – Bảo mật API]
+Bạn triển khai xác thực JWT và refresh token an toàn thế nào? Lỗi IDOR là gì và bạn chặn nó ở đâu (phân quyền theo dữ liệu phía server)? Bạn quản lý secret như connection string, API key giữa môi trường dev và production ra sao?
+
+[Vòng 3 – Câu hỏi gợi ý – Kiểm thử]
+Bạn phân chia unit test và integration test thế nào cho một handler có truy cập cơ sở dữ liệu? Vì sao dùng Testcontainers thay cho database in-memory? Bạn kiểm thử một luồng có gọi dịch vụ bên ngoài ra sao?
+
+[Vòng 3 – Câu hỏi gợi ý – Realtime, tác vụ nền, cache]
+SignalR chạy trên nhiều instance cần gì (backplane)? Bạn thiết kế tác vụ nền bằng BackgroundService, Channel hoặc hàng đợi thế nào để không mất việc khi ứng dụng khởi động lại? Khi nào dùng IMemoryCache, khi nào dùng Redis, và bạn làm mất hiệu lực cache (cache invalidation) ra sao?
+
+[Vòng 3 – Câu hỏi gợi ý – CI/CD, Docker, quan sát hệ thống]
+Pipeline CI/CD của bạn gồm những bước nào trước khi lên production? Bạn tối ưu Docker image cho ứng dụng .NET thế nào (multi-stage build)? Khi có sự cố, bạn dựa vào log, metric, tracing nào để khoanh vùng?
