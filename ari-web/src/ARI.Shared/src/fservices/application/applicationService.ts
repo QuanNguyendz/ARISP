@@ -80,8 +80,15 @@ export const applicationService = {
    * `emailOverride`: nội dung thư mời do nhân sự sửa ở trình soạn thảo (ADR-061) — gửi KÈM lệnh
    * này chứ không phải một lời gọi riêng, để huỷ trình soạn = không chốt chỗ, không gửi thư.
    */
-  async rejectApplication(applicationId: string): Promise<void> {
-    await apiClient.post(`/applications/${applicationId}/reject`)
+  /**
+   * Loại hồ sơ + gửi thư cảm ơn. `emailOverride`: thư do nhân sự sửa ở trình soạn thảo (ADR-061) — bỏ
+   * trống thì server dùng đúng mẫu `application_rejected`.
+   */
+  async rejectApplication(
+    applicationId: string,
+    emailOverride?: { subject: string; bodyHtml: string }
+  ): Promise<void> {
+    await apiClient.post(`/applications/${applicationId}/reject`, emailOverride ? { emailOverride } : undefined)
   },
 
   async hasPracticeSession(applicationId: string): Promise<{ available: boolean }> {

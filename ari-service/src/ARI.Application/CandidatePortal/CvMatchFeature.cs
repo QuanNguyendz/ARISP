@@ -109,7 +109,6 @@ namespace ARI.Application.CandidatePortal
                     SkillsMatched = PortalSupport.DeserializeStringList(cached.SkillsMatched),
                     SkillsGaps = PortalSupport.DeserializeStringList(cached.SkillsGaps),
                     ExperienceRelevance = cached.ExperienceRelevance,
-                    OverallRecommendation = cached.OverallRecommendation,
                     ReviewedBy = cached.AiModel
                 };
                 return Result.Success(resp);

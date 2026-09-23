@@ -134,6 +134,10 @@ internal sealed class StubAiProvider : IAIProvider
     public LanguageAssessment Language { get; set; } = new() { OverallScore = 75m, CefrLevel = "B2" };
     public int EvaluationCallCount { get; private set; }
     public int QuestionCallCount { get; private set; }
+    /// <summary>Đặt để mô phỏng AI lỗi khi chấm (ADR-073: lỗi được ghi thành <c>failed</c> để thử lại).</summary>
+    public Exception? EvaluationError { get; set; }
+    /// <summary>Đặt để mô phỏng đánh giá ngôn ngữ lỗi — báo cáo vẫn phải được ghi (ADR-073).</summary>
+    public Exception? LanguageError { get; set; }
 
     /// <summary>Ngữ cảnh lần chấm gần nhất — để kiểm bộ tiêu chí doanh nghiệp có tới được AI không (ADR-060).</summary>
     public SessionContext? LastEvaluationContext { get; private set; }
@@ -150,10 +154,12 @@ internal sealed class StubAiProvider : IAIProvider
     {
         EvaluationCallCount++;
         LastEvaluationContext = ctx;
+        if (EvaluationError != null) throw EvaluationError;
         return Task.FromResult(Evaluation);
     }
     public Task<string> DetectLanguageRequirementAsync(string jdText, CancellationToken ct) => Task.FromResult("vi");
-    public Task<LanguageAssessment> AssessLanguageProficiencyAsync(SessionContext ctx, CancellationToken ct) => Task.FromResult(Language);
+    public Task<LanguageAssessment> AssessLanguageProficiencyAsync(SessionContext ctx, CancellationToken ct)
+        => LanguageError != null ? Task.FromException<LanguageAssessment>(LanguageError) : Task.FromResult(Language);
     public Task<string> CompleteJsonAsync(string systemInstruction, string userContent,
         IReadOnlyList<AiAttachment>? attachments = null, CancellationToken ct = default) => Task.FromResult("{}");
 }

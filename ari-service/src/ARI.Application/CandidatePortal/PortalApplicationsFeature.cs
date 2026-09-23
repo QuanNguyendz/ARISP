@@ -587,7 +587,9 @@ namespace ARI.Application.CandidatePortal
                     p.StartedAt,
                     p.EndedAt,
                     p.DurationSeconds,
-                    HasEvaluation = evalDict.ContainsKey(p.Id)
+                    HasEvaluation = evalDict.ContainsKey(p.Id),
+                    EvaluationState = ARI.Application.Evaluations.EvaluationProgress.ForDisplay(
+                        p.Status, p.EvaluationStatus, p.EvaluationAttempts, evalDict.ContainsKey(p.Id))
                 }).ToList()
             });
         }

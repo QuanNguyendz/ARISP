@@ -98,5 +98,11 @@
     "candidateSaid": "Candidate answered",
     "showAll": "Show all {{count}} turns",
     "collapse": "Collapse"
+  },
+  "resultEmail": {
+    "hint": "Confirming opens the result email to the candidate so you can review and edit it before it is sent.",
+    "titlePass": "Result email — Pass",
+    "titleNotPass": "Result email — Not pass",
+    "send": "Confirm result & send email"
   }
 }

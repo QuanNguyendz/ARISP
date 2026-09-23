@@ -85,7 +85,7 @@ public class OfferFlowTests
             .Handle(new SendOfferCommand(offerId, actor ?? _ownerId, role), CancellationToken.None);
 
     private Task<Result<bool>> Respond(InMemoryUnitOfWork uow, Guid offerId, string decision, string? note = null)
-        => new RespondToOfferCommandHandler(uow, new RecordingNotificationService())
+        => new RespondToOfferCommandHandler(uow, new RecordingNotificationService(), new EmptyConfiguration())
             .Handle(new RespondToOfferCommand(offerId, decision, note, _candidateAccountId, "cand@example.io"),
                 CancellationToken.None);
 
@@ -463,6 +463,127 @@ public class OfferFlowTests
         Assert.Equal(ApplicationStatuses.Hired, app.Status); // điểm kết thúc thành công của phễu
     }
 
+    // ===== Nhận việc: thư xác nhận + tự đóng tin khi đủ người (ADR-074) =====
+
+    private static JobPosting JobOf(InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app)
+        => uow.Repo<JobPosting>().Items.Single(j => j.Id == app.JobPostingId);
+
+    private static RecruitmentRequest LinkRequest(InMemoryUnitOfWork uow, JobPosting job, int headcount)
+    {
+        var request = new RecruitmentRequest
+        {
+            Id = Guid.NewGuid(), Title = job.Title, Headcount = headcount, Status = "approved",
+            RequestedByUserId = Guid.NewGuid(),
+        };
+        uow.Seed(request);
+        job.RecruitmentRequestId = request.Id;
+        return request;
+    }
+
+    [Fact]
+    public async Task Nhan_viec_gui_thu_xac_nhan_noi_dung_luong_thu_moi_va_co_dau_moi_lien_he()
+    {
+        var (uow, app, offer) = await SentOffer();
+        var offerLog = uow.Repo<EmailLog>().Items.Single(e => e.TemplateKey == "offer_sent");
+
+        var res = await Respond(uow, offer.Id, "accept");
+
+        Assert.True(res.IsSuccess, res.Error);
+        var log = uow.Repo<EmailLog>().Items.Single(e => e.TemplateKey == OfferEmail.AcceptedTemplateKey);
+        Assert.Equal(app.Id, log.ApplicationId);
+        Assert.Null(log.SentByUserId);                         // máy gửi, không ai bấm nút
+        Assert.Equal(offerLog.MessageId, log.InReplyTo);       // nằm cùng luồng với thư mời
+        Assert.Contains("Xác nhận nhận việc", log.Subject);
+        Assert.Contains("25.000.000 VND", log.BodyHtml);        // điều kiện đã chốt được ghi lại
+        Assert.Contains("owner@corp.io", log.BodyHtml);        // biết hỏi ai
+    }
+
+    [Fact]
+    public async Task Tu_choi_thi_khong_co_thu_xac_nhan_va_tin_van_mo()
+    {
+        var (uow, app, offer) = await SentOffer();
+        LinkRequest(uow, JobOf(uow, app), headcount: 1);
+
+        await Respond(uow, offer.Id, "decline");
+
+        Assert.DoesNotContain(uow.Repo<EmailLog>().Items, e => e.TemplateKey == OfferEmail.AcceptedTemplateKey);
+        Assert.Equal("active", JobOf(uow, app).Status);
+    }
+
+    [Fact]
+    public async Task Du_nguoi_thi_tin_tu_dong_va_bao_HM_Recruiter_HR_Leader()
+    {
+        var (uow, app, offer) = await SentOffer();
+        var job = JobOf(uow, app);
+        LinkRequest(uow, job, headcount: 1);
+
+        var res = await Respond(uow, offer.Id, "accept");
+
+        Assert.True(res.IsSuccess, res.Error);
+        Assert.Equal("closed", job.Status);
+        Assert.Contains(uow.Repo<AuditLog>().Items,
+            a => a.Action == JobHeadcountCloser.AuditAction && a.EntityId == job.Id && a.ActorUserId == null);
+        var notices = uow.Repo<Notification>().Items.Where(n => n.DedupKey!.StartsWith($"job_filled:{job.Id}:")).ToList();
+        Assert.Contains(notices, n => n.RecipientUserId == _hmId && n.Link == $"/hm/jobs/{job.Id}");
+        Assert.Contains(notices, n => n.RecipientUserId == _ownerId && n.Link == $"/recruiter/my-jobs/{job.Id}");
+        Assert.Contains(notices, n => n.RecipientUserId == _hrLeaderId && n.Link == $"/hr/jobs/{job.Id}");
+    }
+
+    [Fact]
+    public async Task Chua_du_nguoi_thi_tin_van_mo()
+    {
+        var (uow, app, offer) = await SentOffer();
+        LinkRequest(uow, JobOf(uow, app), headcount: 2);
+
+        await Respond(uow, offer.Id, "accept");
+
+        Assert.Equal("active", JobOf(uow, app).Status);
+        Assert.DoesNotContain(uow.Repo<AuditLog>().Items, a => a.Action == JobHeadcountCloser.AuditAction);
+    }
+
+    [Fact]
+    public async Task Tin_khong_co_phieu_thi_khong_doan_so_luong()
+    {
+        var (uow, app, offer) = await SentOffer();   // tin cũ trước ADR-063: không có phiếu
+
+        await Respond(uow, offer.Id, "accept");
+
+        Assert.Equal("active", JobOf(uow, app).Status);
+    }
+
+    [Fact]
+    public async Task Dong_tin_khong_dung_toi_ho_so_va_thu_moi_khac_chi_bao_so_luong()
+    {
+        var (uow, app, offer) = await SentOffer();
+        var job = JobOf(uow, app);
+        LinkRequest(uow, job, headcount: 1);
+        var midFunnel = new ARI.Domain.Entities.Application
+        {
+            Id = Guid.NewGuid(), JobPostingId = job.Id, CandidateEmail = "b@example.io", CandidateName = "B",
+            Status = ApplicationStatuses.Interview,
+        };
+        var otherOffered = new ARI.Domain.Entities.Application
+        {
+            Id = Guid.NewGuid(), JobPostingId = job.Id, CandidateEmail = "c@example.io", CandidateName = "C",
+            Status = ApplicationStatuses.Offer,
+        };
+        var otherOffer = new Offer
+        {
+            Id = Guid.NewGuid(), ApplicationId = otherOffered.Id, JobPostingId = job.Id, Status = OfferStatus.Sent,
+            CreatedByUserId = _ownerId,
+        };
+        uow.Seed(midFunnel).Seed(otherOffered).Seed(otherOffer);
+
+        await Respond(uow, offer.Id, "accept");
+
+        Assert.Equal("closed", job.Status);
+        Assert.Equal(ApplicationStatuses.Interview, midFunnel.Status);   // con người quyết, không phải máy
+        Assert.Equal(OfferStatus.Sent, otherOffer.Status);                // không tự thu hồi thư mời
+        var notice = uow.Repo<Notification>().Items.First(n => n.DedupKey!.StartsWith($"job_filled:{job.Id}:"));
+        Assert.Contains("Còn 2 hồ sơ", notice.Body);
+        Assert.Contains("1 thư mời khác", notice.Body);
+    }
+
     [Fact]
     public async Task Ung_vien_tu_choi_thi_ho_so_thanh_offer_declined()
     {
@@ -480,7 +601,7 @@ public class OfferFlowTests
     {
         var (uow, _, offer) = await SentOffer();
 
-        var res = await new RespondToOfferCommandHandler(uow, new RecordingNotificationService())
+        var res = await new RespondToOfferCommandHandler(uow, new RecordingNotificationService(), new EmptyConfiguration())
             .Handle(new RespondToOfferCommand(offer.Id, "accept", null, Guid.NewGuid(), "khac@example.io"),
                 CancellationToken.None);
 

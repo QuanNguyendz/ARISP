@@ -66,21 +66,65 @@ namespace ARI.Application.CvScoring
             // Điểm AI tự cho trước ADR-070 không được giải thích như điểm theo tiêu chí — không hiện gì.
             if (!CvScoreState.IsDisplayable(analysis.Status, analysis.RubricDocumentId)) return dto;
 
+            // Công thức đã áp cho CHÍNH bản chấm này (ảnh chụp). Bản chấm trước ADR-075 không có → công thức mặc định,
+            // đúng là công thức đã sinh ra con số của nó.
+            var legacyPolicy = string.IsNullOrWhiteSpace(analysis.ScoringPolicy);
+            var policy = CvScoringPolicy.FromStorage(analysis.ScoringPolicy);
+            dto.Policy = policy;
+
             var views = CvScoreSnapshot.Parse(analysis.CriterionScores);
-            var scored = views.Where(v => v.Score.HasValue && (v.Weight ?? 0) > 0).ToList();
+            var scored = views.Where(v => !v.IsKnockout && v.Score.HasValue && (v.Weight ?? 0) > 0).ToList();
             var totalWeight = scored.Sum(v => v.Weight!.Value);
             var weightedSum = scored.Sum(v => Math.Clamp(v.Score!.Value, 0m, 100m) * v.Weight!.Value);
 
             dto.TotalWeight = totalWeight;
             dto.WeightedSum = weightedSum;
-            dto.ExactTotal = totalWeight > 0 ? Math.Round(weightedSum / totalWeight, 2, MidpointRounding.AwayFromZero) : null;
+            // Bản chấm mới làm tròn MỘT lần từ số chưa làm tròn → hiện 2 chữ số bằng cách CẮT để luôn khớp số cuối
+            // (79,495 → "79,49 → 79"). Bản cũ làm tròn 2 lần — giữ cách hiện cũ để khớp đúng số nó đã lưu.
+            dto.ExactTotal = totalWeight <= 0 ? null
+                : legacyPolicy ? Math.Round(weightedSum / totalWeight, 2, MidpointRounding.AwayFromZero)
+                : CvScoreCalculator.DisplayExact(weightedSum / totalWeight);
 
             foreach (var v in views)
             {
+                var label = string.IsNullOrWhiteSpace(v.Label) ? v.Key : v.Label!;
+
+                if (v.IsKnockout)
+                {
+                    dto.Gates.Add(new CvScoreGateDto
+                    {
+                        Key = v.Key,
+                        Label = label,
+                        Type = "knockout",
+                        Outcome = v.Gate ?? CvGateOutcomes.Unknown,
+                        Reason = v.GateReason,
+                        Unsupported = v.Unsupported == true,
+                        Evidence = v.Evidence,
+                        Reasoning = v.Reasoning,
+                        Description = v.Description,
+                    });
+                    continue;
+                }
+
+                if (v.MinScore is { } min)
+                {
+                    dto.Gates.Add(new CvScoreGateDto
+                    {
+                        Key = v.Key,
+                        Label = label,
+                        Type = "min_score",
+                        Outcome = v.Gate ?? CvGateOutcomes.Unknown,
+                        Reason = v.GateReason,
+                        Score = v.Score,
+                        MinScore = min,
+                        Description = v.Description,
+                    });
+                }
+
                 var item = new CvScoreCriterionDto
                 {
                     Key = v.Key,
-                    Label = string.IsNullOrWhiteSpace(v.Label) ? v.Key : v.Label!,
+                    Label = label,
                     Weight = v.Weight,
                     Score = v.Score,
                     Evidence = v.Evidence,
@@ -93,6 +137,9 @@ namespace ARI.Application.CvScoring
                         Fair = v.Levels.Fair,
                         Poor = v.Levels.Poor,
                     },
+                    Position = v.Position,
+                    MinScore = v.MinScore,
+                    Gate = v.Gate,
                 };
 
                 if (v.Checks is { Count: > 0 } checks)
@@ -104,16 +151,19 @@ namespace ARI.Application.CvScoring
                         Met = x.Met,
                         Evidence = x.Evidence,
                         Unsupported = x.Unsupported == true,
+                        Weight = x.Weight ?? 1,
                     }).ToList();
                     item.ChecksMet = checks.Count(x => x.Met == true);
                     item.ChecksAnswered = checks.Count(x => x.Met != null);
+                    item.ChecksMetWeight = checks.Where(x => x.Met == true).Sum(x => x.Weight ?? 1);
+                    item.ChecksAnsweredWeight = checks.Where(x => x.Met != null).Sum(x => x.Weight ?? 1);
                 }
 
                 if (v.Score is { } s && (v.Weight ?? 0) > 0 && totalWeight > 0)
                 {
                     item.Contribution = Math.Round(Math.Clamp(s, 0m, 100m) * v.Weight!.Value / totalWeight, 2, MidpointRounding.AwayFromZero);
-                    item.Band = ScoringRubric.NormalizeBand(v.Band) ?? BandOf(s);
-                    if (ScoringRubric.BandRange(item.Band) is { } range)
+                    item.Band = ScoringRubric.NormalizeBand(v.Band) ?? policy.Bands.BandOf(s);
+                    if (policy.Bands.Range(item.Band) is { } range)
                     {
                         item.BandMin = range.Min;
                         item.BandMax = range.Max;
@@ -137,10 +187,21 @@ namespace ARI.Application.CvScoring
             dto.SeniorityAlignment = analysis.SeniorityAlignment;
             dto.ExperienceRelevance = analysis.ExperienceRelevance;
             dto.Recommendation = analysis.OverallRecommendation;
+            dto.ScoreRecommendation = policy.Tier(analysis.MatchScore);
+            dto.GateStatus = analysis.GateStatus;
+
+            // Bản tính lại (ADR-075): AI đọc CV ở bản gốc — màn hình nói đúng "tính lại lúc … từ lượt AI chấm lúc …".
+            dto.ObservedAt = analysis.CreatedAt;
+            if (analysis.DerivedFromAnalysisId is { } rootId)
+            {
+                dto.Derived = true;
+                var root = await uow.Repository<CvJdAnalysis>().GetByIdAsync(rootId, ct);
+                if (root != null) dto.ObservedAt = root.CreatedAt;
+            }
             return dto;
         }
 
-        /// <summary>Dải điểm cố định của mức neo (<see cref="Playbooks.RubricLevels"/>).</summary>
+        /// <summary>Dải điểm theo ngưỡng MẶC ĐỊNH — chỉ còn cho dữ liệu cũ không lưu công thức.</summary>
         public static string BandOf(decimal score) => ScoringRubric.BandOf(score);
 
         private static List<string> ReadList(string? json)

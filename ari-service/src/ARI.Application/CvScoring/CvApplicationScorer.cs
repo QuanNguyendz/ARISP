@@ -95,45 +95,57 @@ namespace ARI.Application.CvScoring
             var rubric = await CvRubricStore.LiveAsync(_unitOfWork, app.JobPostingId, ct);
             if (rubric == null) return; // chờ HM khai — lượt quét lo phần nhắc
 
+            CvJdAnalysis? current = null;
             if (app.CvJdAnalysisId is { } currentId)
             {
-                var current = await _unitOfWork.Repository<CvJdAnalysis>().GetByIdAsync(currentId, ct);
+                current = await _unitOfWork.Repository<CvJdAnalysis>().GetByIdAsync(currentId, ct);
                 if (current?.RubricDocumentId == rubric.Id) return; // đã chấm theo bộ hiện hành
             }
 
             var appKey = AppKey(app.Id, rubric.Id);
-            byte[]? bytes;
-            try
-            {
-                bytes = await _fileStorage.ReadAllBytesAsync(app.CvFileUrl!, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Không đọc được file CV của hồ sơ {AppId}", app.Id);
-                bytes = null;
-            }
-            if (bytes is not { Length: > 0 })
-            {
-                _inFlight.RecordFailure(appKey, "Không đọc được file CV đã lưu.", CvScoringErrors.CvUnreadable);
-                await PublishApplicationChangedAsync(app, ct);
-                return;
-            }
 
-            var result = await _scoring.ScoreAsync(app.JobPostingId, bytes, Path.GetFileName(app.CvFileUrl!), ct);
-            if (result.IsFailure)
+            // Đường nhanh (ADR-075): HM chỉ đổi công thức → tính lại từ câu trả lời cũ của AI, không đọc file, không
+            // gọi AI. File CV của hồ sơ không bao giờ đổi sau khi nộp, nên mã băm của bản chấm hiện tại là mã của file.
+            var scored = current is { CvHash.Length: > 0 }
+                ? await _scoring.TryDeriveAsync(app.JobPostingId, current.CvHash, ct)
+                : null;
+
+            if (scored == null)
             {
-                if (result.ErrorCode == CvScoringErrors.RubricRequired) return; // bộ tiêu chí vừa bị thay giữa chừng
-                var failure = _inFlight.RecordFailure(appKey, result.Error!, result.ErrorCode);
-                _logger.LogWarning("Chấm CV hồ sơ {AppId} thất bại (lần {Attempt}, thử lại lúc {RetryAt}): {Error}",
-                    app.Id, failure.Attempts, failure.RetryAfter, result.Error);
-                // Lỗi không đổi dòng nào trong DB nên trigger realtime không bắn — phải đẩy tay, nếu không màn
-                // nhân sự đứng mãi ở "Đang chấm CV" dù lượt chấm đã hỏng.
-                await PublishApplicationChangedAsync(app, ct);
-                return;
+                byte[]? bytes;
+                try
+                {
+                    bytes = await _fileStorage.ReadAllBytesAsync(app.CvFileUrl!, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex, "Không đọc được file CV của hồ sơ {AppId}", app.Id);
+                    bytes = null;
+                }
+                if (bytes is not { Length: > 0 })
+                {
+                    _inFlight.RecordFailure(appKey, "Không đọc được file CV đã lưu.", CvScoringErrors.CvUnreadable);
+                    await PublishApplicationChangedAsync(app, ct);
+                    return;
+                }
+
+                var result = await _scoring.ScoreAsync(app.JobPostingId, bytes, Path.GetFileName(app.CvFileUrl!), ct);
+                if (result.IsFailure)
+                {
+                    if (result.ErrorCode == CvScoringErrors.RubricRequired) return; // bộ tiêu chí vừa bị thay giữa chừng
+                    var failure = _inFlight.RecordFailure(appKey, result.Error!, result.ErrorCode);
+                    _logger.LogWarning("Chấm CV hồ sơ {AppId} thất bại (lần {Attempt}, thử lại lúc {RetryAt}): {Error}",
+                        app.Id, failure.Attempts, failure.RetryAfter, result.Error);
+                    // Lỗi không đổi dòng nào trong DB nên trigger realtime không bắn — phải đẩy tay, nếu không màn
+                    // nhân sự đứng mãi ở "Đang chấm CV" dù lượt chấm đã hỏng.
+                    await PublishApplicationChangedAsync(app, ct);
+                    return;
+                }
+                scored = result.Value!;
             }
 
             _inFlight.ClearFailure(appKey);
-            app.CvJdAnalysisId = result.Value!.Id;
+            app.CvJdAnalysisId = scored.Id;
             _unitOfWork.Repository<Domain.Entities.Application>().Update(app);
             await _unitOfWork.SaveChangesAsync(ct);
 

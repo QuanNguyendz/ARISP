@@ -45,6 +45,8 @@ internal sealed class FakeGeminiProvider : IGeminiProvider
 
     public Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
         => Task.FromResult(SuggestResult);
+    public Task<Result<List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+        => Task.FromResult(SuggestResult);
 
     public Task<Result<CvReviewResultDto>> ReviewCvAsync(
         byte[]? cvFileBytes, string? cvMimeType, string? fallbackCvText, CancellationToken ct = default)
@@ -164,6 +166,12 @@ internal static class CvScoringKit
                 p.ScopeRefId == job.Id && p.DeletedAt == null
                 && p.Scope == PlaybookScope.ScopeJobPosting && p.DocumentType == ScoringRubric.TypeCvRubric);
             if (!has) uow.Seed(DefaultRubric(job.Id));
+
+            // ADR-073: tin lên job board còn cần bộ tiêu chí chấm PHỎNG VẤN (bộ chung của tin).
+            var hasInterview = uow.Repo<PlaybookDocument>().Items.Any(p =>
+                p.ScopeRefId == job.Id && p.DeletedAt == null
+                && p.Scope == PlaybookScope.ScopeJobPosting && p.DocumentType == ScoringRubric.TypeInterviewRubric);
+            if (!hasInterview) uow.Seed(ARI.Application.UnitTests.PracticeInterview.PracticeData.Rubric(job.Id));
         }
     }
 
@@ -171,7 +179,7 @@ internal static class CvScoringKit
     public static List<CvRubricCriterionInput> SampleRubric() => Inputs(("Kinh nghiệm", 60), ("Kỹ năng", 40));
 
     public static string SampleRubricJson()
-        => ScoringRubric.Serialize(CvRubricEditing.Normalize(SampleRubric()).Criteria);
+        => ScoringRubric.Serialize(CvRubricEditing.Normalize(SampleRubric(), RubricPurpose.Cv).Criteria);
 
     public static byte[] CvBytes(string content = "PDF-BINARY-CONTENT") => System.Text.Encoding.UTF8.GetBytes(content);
 }

@@ -23,6 +23,7 @@ import OnlineTestAnswerSheetModal from './OnlineTestAnswerSheetModal'
 import InterviewCodeCard from './InterviewCodeCard'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
 import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import { useCvScoreText } from '@/components/cvScore/useCvScoreText'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
@@ -748,7 +749,13 @@ function CandidateTable({
                   {age != null ? t('pipeline.ageValue', { count: age }) : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <CvScoreBadge score={a.matchScore} status={a.cvScoreStatus} retryAt={a.cvScoreRetryAt} />
+                  <CvScoreBadge
+                    score={a.matchScore}
+                    status={a.cvScoreStatus}
+                    retryAt={a.cvScoreRetryAt}
+                    gateStatus={a.cvGateStatus}
+                    className={`text-sm font-semibold ${cvScoreTextClass(a.cvRecommendation)}`}
+                  />
                 </td>
                 {showTestScore && (
                   <td className="whitespace-nowrap px-4 py-3">

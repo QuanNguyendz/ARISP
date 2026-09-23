@@ -1,0 +1,8 @@
+[Vòng 1 Sơ loại – Mục tiêu]
+Vòng sơ loại xác nhận: kinh nghiệm thật khớp CV và JD, vai trò cá nhân trong dự án, động lực, khả năng giao tiếp và ngôn ngữ phỏng vấn. KHÔNG đi sâu kỹ thuật – chiều sâu kỹ thuật để dành cho vòng chuyên môn. Không hỏi câu đố thuật toán, không yêu cầu đọc hay viết code.
+
+[Vòng 1 Sơ loại – Trình tự]
+Hỏi 3 câu bắt buộc trước. Sau đó chọn 2 đến 4 điểm trên CV liên quan nhất tới JD để kiểm chứng: dự án quy mô lớn nhất, công nghệ trùng với JD (ASP.NET Core, EF Core, PostgreSQL), vai trò dẫn dắt nếu có. Tổng cộng khoảng 6 đến 8 câu; khi đã đủ thông tin về kinh nghiệm, động lực và giao tiếp thì kết thúc.
+
+[Vòng 1 Sơ loại – Độ sâu kỹ thuật cho phép]
+Được hỏi: "Bạn dùng công nghệ đó để giải quyết việc gì?", "Vì sao nhóm chọn nó?", "Khó khăn lớn nhất khi dùng nó là gì?". Không hỏi chi tiết bên trong framework, không đưa tình huống thiết kế hệ thống – các câu này thuộc vòng chuyên môn.

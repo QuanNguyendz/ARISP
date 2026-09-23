@@ -32,7 +32,25 @@ namespace ARI.Application.CvScoring
         /// <summary>Số hồ sơ có CV của tin — lưu bộ tiêu chí mới là chấm lại chừng ấy hồ sơ.</summary>
         int ApplicationCount,
         /// <summary>Số hồ sơ đang chờ chấm / chấm lại theo bộ hiện hành.</summary>
-        int PendingCount);
+        int PendingCount,
+        /// <summary>Công thức cấp tin đang dùng (ADR-075) — luôn có, không khai thì là mặc định.</summary>
+        CvScoringPolicy Policy,
+        /// <summary>Chỉ có ở phản hồi của lệnh LƯU: lần lưu vừa rồi dẫn tới việc gì.</summary>
+        CvRubricSaveOutcomeDto? SaveOutcome = null);
+
+    /// <summary>Tác động của một lần lưu bộ tiêu chí / công thức (ADR-075).</summary>
+    public record CvRubricSaveOutcomeDto(
+        /// <summary><c>unchanged</c> | <c>recompute</c> (chỉ đổi công thức — tính lại, không gọi AI) | <c>ai_rescore</c>.</summary>
+        string Mode,
+        /// <summary>Số hồ sơ có CV bị ảnh hưởng.</summary>
+        int Affected);
+
+    public static class CvRubricSaveModes
+    {
+        public const string Unchanged = "unchanged";
+        public const string Recompute = "recompute";
+        public const string AiRescore = "ai_rescore";
+    }
 
     public record GetJobCvRubricQuery(Guid JobPostingId, Guid? UserId, string? Role) : IRequest<Result<JobCvRubricDto>>;
 
@@ -73,12 +91,15 @@ namespace ARI.Application.CvScoring
 
             return Result.Success(new JobCvRubricDto(
                 CvRubricEditing.ToInput(CvRubricStore.Criteria(live)),
-                live?.Id, live?.CreatedAt, savedBy, canEdit, appCount, pending));
+                live?.Id, live?.CreatedAt, savedBy, canEdit, appCount, pending,
+                CvRubricStore.Policy(live)));
         }
     }
 
     public record SaveJobCvRubricCommand(
-        Guid JobPostingId, IReadOnlyList<CvRubricCriterionInput> Criteria, Guid? UserId, string? Role)
+        Guid JobPostingId, IReadOnlyList<CvRubricCriterionInput> Criteria, Guid? UserId, string? Role,
+        /// <summary>Công thức cấp tin (ADR-075). <c>null</c> = mặc định.</summary>
+        CvScoringPolicy? Policy = null)
         : IRequest<Result<JobCvRubricDto>>;
 
     public class SaveJobCvRubricCommandHandler : IRequestHandler<SaveJobCvRubricCommand, Result<JobCvRubricDto>>
@@ -110,22 +131,28 @@ namespace ARI.Application.CvScoring
                     ? Result.Failure<JobCvRubricDto>(accessError)
                     : Result.Failure<JobCvRubricDto>(accessError, accessCode);
 
-            var normalized = CvRubricEditing.Normalize(request.Criteria);
-            if (!normalized.IsValid)
-                return Result.Failure<JobCvRubricDto>(string.Join(" · ", normalized.Errors.Take(10)));
+            var normalized = CvRubricEditing.Normalize(request.Criteria, RubricPurpose.Cv);
+            var errors = normalized.Errors.Concat(CvScoringPolicy.Validate(request.Policy)).ToList();
+            if (errors.Count > 0)
+                return Result.Failure<JobCvRubricDto>(string.Join(" · ", errors.Take(10)));
 
-            var saved = await _rubrics.SaveForJobAsync(request.JobPostingId, normalized.Criteria, actorId, ct);
+            var saved = await _rubrics.SaveForJobAsync(request.JobPostingId, normalized.Criteria, request.Policy, actorId, ct);
             if (saved.IsFailure)
                 return saved.ErrorCode == null
                     ? Result.Failure<JobCvRubricDto>(saved.Error!)
                     : Result.Failure<JobCvRubricDto>(saved.Error!, saved.ErrorCode);
+
+            var mode = !saved.Value.Changed ? CvRubricSaveModes.Unchanged
+                : saved.Value.FormulaOnly ? CvRubricSaveModes.Recompute
+                : CvRubricSaveModes.AiRescore;
 
             if (saved.Value.Changed)
             {
                 var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(request.JobPostingId, ct);
                 if (job != null)
                 {
-                    await AuditSupport.WriteAsync(_unitOfWork, actorId, job, normalized.Criteria.Count, ct);
+                    await AuditSupport.WriteAsync(_unitOfWork, actorId, job, normalized.Criteria,
+                        CvRubricStore.Policy(saved.Value.Document), saved.Value.FormulaOnly, ct);
 
                     // Recruiter chủ tin cần biết: điểm hồ sơ sắp thay đổi, và tin (nếu đang bị chặn) đã gửi
                     // duyệt được.
@@ -135,8 +162,12 @@ namespace ARI.Application.CvScoring
                         {
                             RecipientUserId = job.CreatedByUserId,
                             Type = "system",
-                            Title = "Bộ tiêu chí chấm CV đã được cập nhật",
-                            Body = $"Tin \"{job.Title}\" có bộ tiêu chí chấm CV mới — các hồ sơ đang được chấm lại.",
+                            Title = saved.Value.FormulaOnly
+                                ? "Công thức chấm CV đã được cập nhật"
+                                : "Bộ tiêu chí chấm CV đã được cập nhật",
+                            Body = saved.Value.FormulaOnly
+                                ? $"Tin \"{job.Title}\" có công thức chấm CV mới — điểm và khuyến nghị của các hồ sơ đang được tính lại (không chấm lại bằng AI)."
+                                : $"Tin \"{job.Title}\" có bộ tiêu chí chấm CV mới — các hồ sơ đang được chấm lại.",
                             Link = await StaffLinks.JobAsync(_unitOfWork, job.CreatedByUserId, job.Id, ct),
                             DedupKey = $"cv_rubric_saved:{job.Id}:{saved.Value.Document.Id}",
                             IsRead = false,
@@ -159,15 +190,33 @@ namespace ARI.Application.CvScoring
                 }
             }
 
-            return await _sender.Send(new GetJobCvRubricQuery(request.JobPostingId, request.UserId, request.Role), ct);
+            var current = await _sender.Send(new GetJobCvRubricQuery(request.JobPostingId, request.UserId, request.Role), ct);
+            return current.IsFailure
+                ? current
+                : Result.Success(current.Value! with
+                {
+                    SaveOutcome = new CvRubricSaveOutcomeDto(mode, mode == CvRubricSaveModes.Unchanged ? 0 : current.Value!.ApplicationCount),
+                });
         }
 
         private static class AuditSupport
         {
-            public static Task WriteAsync(IUnitOfWork uow, Guid actorId, JobPosting job, int criteriaCount, CancellationToken ct)
+            public static Task WriteAsync(
+                IUnitOfWork uow, Guid actorId, JobPosting job, IReadOnlyList<RubricCriterion> criteria,
+                CvScoringPolicy policy, bool formulaOnly, CancellationToken ct)
                 => Admin.AdminSupport.WriteAuditAsync(uow, actorId, "job_cv_rubric_saved",
                     nameof(JobPosting), job.Id,
-                    AuditMetadata.Serialize(new { jobTitle = job.Title, criteriaCount }), ct);
+                    AuditMetadata.Serialize(new
+                    {
+                        jobTitle = job.Title,
+                        criteriaCount = criteria.Count,
+                        // ADR-075: công thức là quyết định của HM — audit ghi đủ để tra lại ai đặt ngưỡng nào, khi nào.
+                        formulaOnly,
+                        knockoutCount = criteria.Count(c => c.IsKnockout),
+                        minScoreCount = criteria.Count(c => c.MinScore != null),
+                        bands = policy.Bands,
+                        tiers = policy.Tiers,
+                    }), ct);
         }
     }
 
@@ -175,10 +224,13 @@ namespace ARI.Application.CvScoring
     //  Công cụ điền nhanh — không lưu gì
     // ---------------------------------------------------------------------------------
 
-    public record CvRubricDraftDto(IReadOnlyList<CvRubricCriterionInput> Criteria, IReadOnlyList<string> Warnings);
+    /// <param name="Policy">Công thức đọc được từ file (sheet "Cong thuc"); <c>null</c> = file không khai → trình soạn giữ công thức đang có.</param>
+    public record CvRubricDraftDto(
+        IReadOnlyList<CvRubricCriterionInput> Criteria, IReadOnlyList<string> Warnings, CvScoringPolicy? Policy = null);
 
     /// <summary>Đọc file Excel thành bản nháp cho trình soạn. Lỗi trả về dạng cảnh báo để người dùng sửa ngay trên web.</summary>
-    public record ParseCvRubricSheetCommand(byte[] Bytes) : IRequest<Result<CvRubricDraftDto>>;
+    /// <param name="Purpose">Bộ CV hay bộ phỏng vấn — trình soạn phỏng vấn dùng chung cửa này (ADR-073/075).</param>
+    public record ParseCvRubricSheetCommand(byte[] Bytes, RubricPurpose Purpose = RubricPurpose.Cv) : IRequest<Result<CvRubricDraftDto>>;
 
     public class ParseCvRubricSheetCommandHandler : IRequestHandler<ParseCvRubricSheetCommand, Result<CvRubricDraftDto>>
     {
@@ -194,32 +246,39 @@ namespace ARI.Application.CvScoring
                 return Task.FromResult(Result.Failure<CvRubricDraftDto>(reason));
             }
 
-            var normalized = CvRubricEditing.Normalize(CvRubricEditing.ToInput(parsed.Criteria));
+            var normalized = CvRubricEditing.Normalize(CvRubricEditing.ToInput(parsed.Criteria), request.Purpose);
+            var forCv = request.Purpose == RubricPurpose.Cv;
             var warnings = parsed.Errors.Select(e => e.Row > 0 ? $"Dòng {e.Row}: {e.Message}" : e.Message)
                 .Concat(normalized.Errors)
+                .Concat(forCv ? CvScoringPolicy.Validate(parsed.Policy) : Enumerable.Empty<string>())
                 .ToList();
 
             return Task.FromResult(Result.Success(new CvRubricDraftDto(
-                CvRubricEditing.ToInput(normalized.Criteria), warnings)));
+                CvRubricEditing.ToInput(normalized.Criteria), warnings, forCv ? parsed.Policy : null)));
         }
     }
 
     /// <summary>Xuất bản nháp đang soạn ra file Excel (không đòi hợp lệ — để gửi người khác góp ý).</summary>
-    public record ExportCvRubricSheetQuery(IReadOnlyList<CvRubricCriterionInput> Criteria) : IRequest<Result<byte[]>>;
+    public record ExportCvRubricSheetQuery(
+        IReadOnlyList<CvRubricCriterionInput> Criteria, CvScoringPolicy? Policy = null, RubricPurpose Purpose = RubricPurpose.Cv)
+        : IRequest<Result<byte[]>>;
 
     public class ExportCvRubricSheetQueryHandler : IRequestHandler<ExportCvRubricSheetQuery, Result<byte[]>>
     {
         public Task<Result<byte[]>> Handle(ExportCvRubricSheetQuery request, CancellationToken ct)
         {
-            var normalized = CvRubricEditing.Normalize(request.Criteria);
+            var normalized = CvRubricEditing.Normalize(request.Criteria, request.Purpose);
             return Task.FromResult(normalized.Criteria.Count == 0
                 ? Result.Failure<byte[]>("Chưa có tiêu chí nào để xuất.")
-                : Result.Success(RubricSheet.Build(normalized.Criteria)));
+                : Result.Success(RubricSheet.Build(normalized.Criteria, request.Policy, request.Purpose)));
         }
     }
 
     /// <summary>Một mẫu bộ tiêu chí của công ty (playbook <c>cv_rubric</c> cấp công ty do HR Leader tải lên).</summary>
-    public record CvRubricTemplateDto(Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<CvRubricCriterionInput> Criteria);
+    public record CvRubricTemplateDto(
+        Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<CvRubricCriterionInput> Criteria,
+        /// <summary>Công thức đi kèm mẫu (ADR-075) — mẫu không khai thì là mặc định.</summary>
+        CvScoringPolicy? Policy = null);
 
     public record GetCvRubricTemplatesQuery : IRequest<Result<List<CvRubricTemplateDto>>>;
 
@@ -243,7 +302,8 @@ namespace ARI.Application.CvScoring
                     d.Id,
                     System.IO.Path.GetFileNameWithoutExtension(d.FileName),
                     d.CreatedAt,
-                    CvRubricEditing.ToInput(ScoringRubric.Deserialize(d.RubricJson))))
+                    CvRubricEditing.ToInput(ScoringRubric.Deserialize(d.RubricJson)),
+                    CvScoringPolicy.FromStorage(d.ScoringPolicyJson)))
                 .Where(t => t.Criteria.Count > 0)
                 .ToList();
 
@@ -285,7 +345,8 @@ namespace ARI.Application.CvScoring
                 .ToList();
             CvRubricEditing.RebalanceWeights(rows);
 
-            var normalized = CvRubricEditing.Normalize(rows);
+            // AI chỉ gợi ý TIÊU CHÍ; công thức (ngưỡng, điều kiện bắt buộc) là quyết định của HM — bản nháp không đụng tới.
+            var normalized = CvRubricEditing.Normalize(rows, RubricPurpose.Cv);
             return Result.Success(new CvRubricDraftDto(CvRubricEditing.ToInput(normalized.Criteria), normalized.Errors));
         }
     }

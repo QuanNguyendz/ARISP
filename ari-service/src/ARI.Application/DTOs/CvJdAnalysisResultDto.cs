@@ -79,9 +79,27 @@ namespace ARI.Application.DTOs
         [JsonPropertyName("band")]
         public string? Band { get; set; }
 
-        /// <summary><c>null</c> khi model không chấm được — tiêu chí bị loại khỏi phép tính, không tính 0.</summary>
+        /// <summary>
+        /// Số điểm AI ước lượng — chỉ còn để đọc câu trả lời kiểu cũ (trước ADR-075). Prompt hiện hành không hỏi số:
+        /// AI trả <see cref="Position"/>. <c>null</c> khi model không chấm được — tiêu chí bị loại khỏi phép tính.
+        /// </summary>
         [JsonPropertyName("score")]
+        [JsonConverter(typeof(LenientNullableDecimalConverter))]
         public decimal? Score { get; set; }
+
+        /// <summary>
+        /// Vị trí trong dải, 0..1 (ADR-075) — với tiêu chí KHÔNG có ý kiểm: 0 = vừa chạm lời neo của dải, 0,5 = đạt rõ
+        /// với nhiều bằng chứng, 1 = sát lời neo của dải trên. Backend đổi ra điểm theo ngưỡng dải của tin, nên AI
+        /// không cần (và không được) biết dải đó là bao nhiêu điểm.
+        /// </summary>
+        [JsonPropertyName("position")]
+        [JsonConverter(typeof(LenientNullableDecimalConverter))]
+        public decimal? Position { get; set; }
+
+        /// <summary>Câu trả lời cho ĐIỀU KIỆN BẮT BUỘC (ADR-075): đạt / không đạt. Đạt mà không trích dẫn thì không tính là đạt.</summary>
+        [JsonPropertyName("met")]
+        [JsonConverter(typeof(LenientNullableBoolConverter))]
+        public bool? Met { get; set; }
 
         /// <summary>Câu trả lời có/không cho từng ý kiểm của tiêu chí.</summary>
         [JsonPropertyName("checks")]
@@ -140,6 +158,35 @@ namespace ARI.Application.DTOs
         public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options)
         {
             if (value is { } v) writer.WriteBooleanValue(v);
+            else writer.WriteNullValue();
+        }
+    }
+
+    /// <summary>
+    /// Số viết lệch kiểu (<c>"0.5"</c>, <c>"75"</c>, <c>"0,5"</c>) không được làm hỏng cả lượt chấm; không đọc được thì
+    /// coi như AI không trả lời (null) — tiêu chí bị loại khỏi phép tính thay vì cả lượt thất bại.
+    /// </summary>
+    public sealed class LenientNullableDecimalConverter : JsonConverter<decimal?>
+    {
+        public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Number: return reader.TryGetDecimal(out var d) ? d : null;
+                case JsonTokenType.Null: return null;
+                case JsonTokenType.String:
+                    var s = (reader.GetString() ?? string.Empty).Trim().Replace("%", string.Empty).Replace(',', '.');
+                    return decimal.TryParse(s, System.Globalization.NumberStyles.Number,
+                        System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+                default:
+                    reader.Skip();
+                    return null;
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
+        {
+            if (value is { } v) writer.WriteNumberValue(v);
             else writer.WriteNullValue();
         }
     }

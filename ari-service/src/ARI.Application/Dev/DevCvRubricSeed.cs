@@ -64,7 +64,8 @@ namespace ARI.Application.Dev
                 },
             };
 
-            await rubrics.SaveForJobAsync(job.Id, criteria, actorId, ct);
+            // Công thức mặc định (ADR-075) — seed giữ đúng điểm như trước.
+            await rubrics.SaveForJobAsync(job.Id, criteria, null, actorId, ct);
         }
     }
 }

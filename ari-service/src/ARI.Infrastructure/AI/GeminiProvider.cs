@@ -174,18 +174,22 @@ CRITICAL: First verify the document is actually a CV/Resume. If it is not, set "
 If it IS a CV:
 1. Identify the seniority the JD requires (Fresher, Junior, Mid, Senior).
 2. Work out the candidate's PROFESSIONAL experience. Academic projects and short internships DO NOT count as professional experience for Senior roles.
-3. Evaluate EVERY criterion of the rubric exactly once. Base everything ONLY on evidence written in the CV — no evidence means a low band; never assume.
-   a. ""band"": choose ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69) or ""poor"" (0-39). When the criterion lists band descriptions, pick the band whose description the evidence matches; otherwise judge against the criterion's scoring guide.
-      - For criteria about experience or seniority: if the JD requires Senior (e.g. 4+ years) and the candidate has under 1 year of professional experience, the band MUST be ""poor"" and the score MUST NOT exceed 30.
+3. Evaluate EVERY scoring criterion (section ""TIÊU CHÍ CHẤM ĐIỂM"") exactly once. Base everything ONLY on evidence written in the CV — no evidence means a low band; never assume. You never give numbers: the company's own formula turns your qualitative answers into points.
+   a. ""band"": choose ""excellent"" (clearly exceeds what the role needs), ""good"" (clearly meets it), ""fair"" (partly meets it) or ""poor"" (does not meet it). When the criterion lists band descriptions (lines ""excellent:"", ""good:"", ""fair:"", ""poor:""), pick the band whose description the evidence matches; otherwise judge against the criterion's scoring guide.
+      - For criteria about experience or seniority: if the JD requires Senior (e.g. 4+ years) and the candidate has under 1 year of professional experience, the band MUST be ""poor"" and ""position"" MUST be 0.
       - Check depth: hands-on production work (building systems, optimisation, ownership) ranks higher than surface-level API usage or keyword lists.
    b. If the criterion has a checklist (""ý kiểm"", items written as [key] text), answer EVERY item in ""checks"" as { ""key"", ""met"", ""evidence"" }:
       - ""met"": true ONLY when the CV explicitly proves the item, and then quote that proof verbatim in ""evidence"" (at most 200 characters). Otherwise ""met"": false and ""evidence"" is an empty string.
-      - Judge each item on its own; do not change the band because of the checklist. The system computes the exact score inside the band from your answers, so set ""score"" to null for these criteria.
-   c. If the criterion has NO checklist, give ""score"" as an integer inside the chosen band: the bottom of the band when the evidence barely meets the band description, the middle when it clearly meets it with several pieces of evidence, the top when it is close to the next band's description (100 only when it clearly exceeds every aspect). Use ""checks"": [].
+      - Judge each item on its own; do not change the band because of the checklist. The system computes the exact position inside the band from your answers, so set ""position"" to null for these criteria.
+   c. If the criterion has NO checklist, give ""position"" = where the evidence sits inside the chosen band, a number from 0 to 1: 0 when the evidence barely meets the band description, 0.5 when it clearly meets it with several pieces of evidence, 1 when it is close to the next band's description (1 in ""excellent"" only when it clearly exceeds every aspect). Use ""checks"": [].
+   - ""met"": null for scoring criteria.
    - ""evidence"": quote the CV verbatim for the criterion as a whole (short, at most 300 characters; join several quotes with "" … ""). Use an empty string when the CV has nothing relevant.
    - ""reasoning"": 1-2 sentences explaining why the evidence falls in that band, referring to the band descriptions / scoring guide.
-4. Do NOT produce an overall score. The system computes it from your criterion scores and the rubric weights.
-5. Anything listed under ""KHÔNG ĐƯỢC DÙNG ĐỂ CHẤM ĐIỂM"" must never influence any score.
+4. Answer EVERY required condition (section ""ĐIỀU KIỆN BẮT BUỘC"", if present) exactly once, as { ""key"", ""met"", ""evidence"", ""reasoning"" } with ""band"": null, ""position"": null, ""checks"": []:
+   - ""met"": true ONLY when the CV explicitly proves the condition, and then quote that proof verbatim in ""evidence"". A condition the CV does not mention is NOT met (""met"": false, ""evidence"": """") — never assume.
+   - A required condition must never influence the band of any scoring criterion.
+5. Do NOT produce an overall score or recommendation. The system computes them with the company's formula.
+6. Anything listed under ""KHÔNG ĐƯỢC DÙNG ĐỂ CHẤM ĐIỂM"" must never influence any answer.
 
 LANGUAGE RULE: every text value (analysis_reasoning, seniority_alignment, tech_depth_analysis, reasoning, summary, skills_matched, skills_gaps, red_flags, experience_relevance) MUST be written in VIETNAMESE. Keep proper nouns / technical terms as-is (C#, .NET, PostgreSQL, React...). The ""evidence"" quotes stay in the CV's original language.
 
@@ -195,7 +199,7 @@ Return ONLY a valid JSON object, without markdown formatting:
   ""analysis_reasoning"": string (lập luận từng bước),
   ""seniority_alignment"": string (khoảng cách cấp bậc giữa JD và CV),
   ""tech_depth_analysis"": string (chiều sâu thực chiến so với kiến thức bề mặt),
-  ""criteria"": [ { ""key"": string (exactly one of the rubric keys), ""band"": ""excellent"" | ""good"" | ""fair"" | ""poor"", ""score"": integer 0-100 or null (null for criteria with a checklist), ""checks"": [ { ""key"": string (exactly one of this criterion's checklist keys), ""met"": boolean, ""evidence"": string } ], ""evidence"": string, ""reasoning"": string } ],
+  ""criteria"": [ { ""key"": string (exactly one of the rubric keys), ""band"": ""excellent"" | ""good"" | ""fair"" | ""poor"" | null (null for required conditions), ""position"": number 0-1 or null (null for criteria with a checklist and for required conditions), ""met"": boolean or null (required conditions only), ""checks"": [ { ""key"": string (exactly one of this criterion's checklist keys), ""met"": boolean, ""evidence"": string } ], ""evidence"": string, ""reasoning"": string } ],
   ""summary"": string (ĐÚNG 2 đoạn, ngăn cách bằng '\n'. Đoạn 1 bắt đầu bằng '🌟 Điểm sáng: '. Đoạn 2 bắt đầu bằng '⚠️ Điểm cần lưu ý: '. Mỗi đoạn 2-4 câu.),
   ""skills_matched"": string[] (mỗi phần tử một kỹ năng khớp, kèm mức độ ngắn trong ngoặc),
   ""skills_gaps"": string[] (mỗi phần tử một kỹ năng/kinh nghiệm còn thiếu),
@@ -213,8 +217,8 @@ Return ONLY a valid JSON object, without markdown formatting:
                 return Result<CvJdAnalysisResultDto>.Failure("Either PDF file bytes or fallback text must be provided.");
 
             var systemInstruction = CvScoringInstruction
-                + "\n\n--- SCORING RUBRIC (mã | tên | trọng số | chuẩn chấm) ---\n" + request.RubricInstruction
-                + "\n\nREQUIRED criterion keys (score each exactly once, no other keys): "
+                + "\n\n--- SCORING RUBRIC ---\n" + request.RubricInstruction
+                + "\n\nREQUIRED criterion keys (answer each exactly once, no other keys): "
                 + string.Join(", ", request.CriterionKeys);
 
             var hasJdPdf = IsPdf(request.JdPdf);
@@ -301,7 +305,7 @@ Rules:
 - Weights are integers that sum to exactly 100 and reflect importance for THIS role.
 - Every text value is Vietnamese; keep technology names as-is.
 - ""name"": short criterion name. ""description"": what a strong candidate shows in the CV (1-2 sentences).
-- ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69), ""poor"" (0-39): concrete, observable descriptions (years, named technologies, measurable results) so two reviewers would pick the same band.
+- ""excellent"" (clearly exceeds the role's needs), ""good"" (clearly meets them), ""fair"" (partly meets them), ""poor"" (does not meet them): concrete, observable descriptions (years, named technologies, measurable results) so two reviewers would pick the same band. Never write point ranges — the company sets them.
 - ""checks"": 3 to 5 short yes/no items, each verifiable from the CV text alone and each a DISTINCT sign of strength for this criterion (e.g. ""Có ≥ 3 năm làm C#/.NET production"", ""Có số liệu kết quả đo được (%, số người dùng)""). They decide the exact score inside a band, so do not just restate the band descriptions, and never use protected attributes.
 Return ONLY a valid JSON object, without markdown:
 { ""criteria"": [ { ""name"": string, ""weight"": integer, ""description"": string, ""excellent"": string, ""good"": string, ""fair"": string, ""poor"": string, ""checks"": string[] } ] }";
@@ -311,7 +315,25 @@ Return ONLY a valid JSON object, without markdown:
             public List<CvRubricSuggestionItem>? Criteria { get; set; }
         }
 
-        public async Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+        private const string InterviewRubricSuggestionInstruction = @"You help a Hiring Manager draft an INTERVIEW SCORING RUBRIC for one job opening. An AI interviewer holds a spoken interview with the candidate; this rubric is used to score the candidate's ANSWERS.
+Rules:
+- Return 4 to 6 criteria that can be judged FROM INTERVIEW ANSWERS for THIS role: depth of role-specific technical knowledge, problem solving and reasoning, practical experience shown through concrete examples, clarity of explanation, attitude and collaboration. Do NOT include criteria that can only be judged from documents (degrees, certificates, years written on the CV).
+- NEVER use protected or discriminatory attributes (age, gender, marital status, religion, ethnicity, hometown, appearance, health) as criteria.
+- Weights are integers that sum to exactly 100 and reflect importance for THIS role.
+- Every text value is Vietnamese; keep technology names as-is.
+- ""name"": short criterion name. ""description"": what a strong answer demonstrates (1-2 sentences).
+- ""excellent"" (90-100), ""good"" (70-89), ""fair"" (40-69), ""poor"" (0-39): concrete, observable descriptions of answers at that level (correctness, depth, concrete examples, trade-offs considered) so two interviewers would pick the same band.
+Return ONLY a valid JSON object, without markdown:
+{ ""criteria"": [ { ""name"": string, ""weight"": integer, ""description"": string, ""excellent"": string, ""good"": string, ""fair"": string, ""poor"": string } ] }";
+
+        public Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+            => SuggestRubricAsync(RubricSuggestionInstruction, input, keepChecks: true, ct);
+
+        public Task<Result<List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default)
+            => SuggestRubricAsync(InterviewRubricSuggestionInstruction, input, keepChecks: false, ct);
+
+        private async Task<Result<List<CvRubricSuggestionItem>>> SuggestRubricAsync(
+            string instruction, CvRubricSuggestionInput input, bool keepChecks, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(input.Title))
                 return Result<List<CvRubricSuggestionItem>>.Failure("Cần tên vị trí để gợi ý bộ tiêu chí.");
@@ -326,7 +348,7 @@ Return ONLY a valid JSON object, without markdown:
 
             var requestBody = new
             {
-                system_instruction = new { parts = new[] { new { text = RubricSuggestionInstruction } } },
+                system_instruction = new { parts = new[] { new { text = instruction } } },
                 contents = new[] { new { parts = new[] { new { text = userContent } } } },
                 generationConfig = new { responseMimeType = "application/json", temperature = 0.3 },
             };
@@ -334,7 +356,7 @@ Return ONLY a valid JSON object, without markdown:
             string responseJson;
             try
             {
-                (responseJson, _) = await GetAnalysisJsonAsync(requestBody, RubricSuggestionInstruction, userContent, null, ct);
+                (responseJson, _) = await GetAnalysisJsonAsync(requestBody, instruction, userContent, null, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -347,6 +369,7 @@ Return ONLY a valid JSON object, without markdown:
                 var (json, _, _) = Unwrap(responseJson);
                 var parsed = string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<RubricSuggestionEnvelope>(json, ReadOpts);
                 var items = parsed?.Criteria?.Where(c => !string.IsNullOrWhiteSpace(c.Name)).ToList() ?? new();
+                if (!keepChecks) foreach (var item in items) item.Checks = null;
                 return items.Count == 0
                     ? Result<List<CvRubricSuggestionItem>>.Failure("AI chưa gợi ý được tiêu chí nào — hãy thử lại hoặc tự nhập.")
                     : Result<List<CvRubricSuggestionItem>>.Success(items);

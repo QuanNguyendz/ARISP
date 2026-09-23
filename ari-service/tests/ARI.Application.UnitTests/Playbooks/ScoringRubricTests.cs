@@ -22,7 +22,7 @@ public class ScoringRubricValidateTests
     [Fact]
     public void Accepts_a_well_formed_rubric()
     {
-        var errors = ScoringRubric.Validate(new[] { C("technical", 60), C("communication", 40) });
+        var errors = ScoringRubric.Validate(new[] { C("technical", 60), C("communication", 40) }, RubricPurpose.Cv);
 
         Assert.Empty(errors);
     }
@@ -33,14 +33,14 @@ public class ScoringRubricValidateTests
     [InlineData(60, 50)]   // thừa
     public void Rejects_weights_not_summing_to_100(int a, int b)
     {
-        var errors = ScoringRubric.Validate(new[] { C("technical", a), C("communication", b) });
+        var errors = ScoringRubric.Validate(new[] { C("technical", a), C("communication", b) }, RubricPurpose.Cv);
 
         Assert.Contains(errors, e => e.Contains("Tổng trọng số phải bằng 100"));
     }
 
     [Fact]
     public void Rejects_empty_rubric()
-        => Assert.Contains(ScoringRubric.Validate(Array.Empty<RubricCriterion>()),
+        => Assert.Contains(ScoringRubric.Validate(Array.Empty<RubricCriterion>(), RubricPurpose.Cv),
             e => e.Contains("trống"));
 
     [Fact]
@@ -51,7 +51,7 @@ public class ScoringRubricValidateTests
             C("Kỹ Thuật", 50),                       // khoá không phải snake_case
             C("technical", 50),
             C("technical", 0, name: ""),             // trùng khoá + thiếu tên + trọng số 0
-        });
+        }, RubricPurpose.Cv);
 
         Assert.Contains(errors, e => e.Contains("không hợp lệ"));
         Assert.Contains(errors, e => e.Contains("bị trùng"));
@@ -65,7 +65,7 @@ public class ScoringRubricValidateTests
         => Assert.Empty(ScoringRubric.Validate(new[]
         {
             C("technical", 33.33m), C("communication", 33.33m), C("culture_fit", 33.34m),
-        }));
+        }, RubricPurpose.Cv));
 }
 
 public class ScoringRubricComputeTests
@@ -185,7 +185,8 @@ public class RubricSheetTests
             var parsed = RubricSheet.Parse(RubricSheet.BuildTemplate(forCv));
 
             Assert.Empty(parsed.Errors);
-            Assert.Empty(ScoringRubric.Validate(parsed.Criteria));   // mẫu phải cộng tròn 100
+            // Mẫu phải cộng tròn 100 — và mẫu CV (có một dòng điều kiện bắt buộc ví dụ) phải hợp lệ theo luật CV.
+            Assert.Empty(ScoringRubric.Validate(parsed.Criteria, forCv ? RubricPurpose.Cv : RubricPurpose.Interview));
             Assert.All(parsed.Criteria, c => Assert.False(string.IsNullOrWhiteSpace(c.Description)));
         }
     }

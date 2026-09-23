@@ -4,11 +4,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
+using ARI.Application.Emails;
 using ARI.Application.Interfaces;
 using ARI.Application.Offers;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ARI.Application.CandidatePortal
 {
@@ -90,11 +93,17 @@ namespace ARI.Application.CandidatePortal
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notifications;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<RespondToOfferCommandHandler>? _logger;
 
-        public RespondToOfferCommandHandler(IUnitOfWork unitOfWork, INotificationService notifications)
+        public RespondToOfferCommandHandler(
+            IUnitOfWork unitOfWork, INotificationService notifications, IConfiguration configuration,
+            ILogger<RespondToOfferCommandHandler>? logger = null)
         {
             _unitOfWork = unitOfWork;
             _notifications = notifications;
+            _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task<Result<bool>> Handle(RespondToOfferCommand request, CancellationToken ct)
@@ -163,7 +172,62 @@ namespace ARI.Application.CandidatePortal
             await _notifications.PublishGroupEventAsync("hr_admin", "ReceiveApplicationStatusUpdate",
                 new { ApplicationId = app.Id, Status = app.Status }, ct);
 
+            // Hai hệ quả của việc NHẬN việc, chạy SAU khi quyết định của ứng viên đã lưu: lỗi ở đây không được
+            // phép làm mất câu "tôi nhận" — ứng viên đã bấm, thư mời đã đóng, hồ sơ đã `hired`.
+            if (accepted)
+            {
+                await SendAcceptanceEmailAsync(offer, app, job, ct);
+                if (job != null) await CloseJobIfFilledAsync(job, ct);
+            }
+
             return Result.Success(true);
+        }
+
+        /// <summary>Thư xác nhận nhận việc (ADR-074) — trả lời vào đúng luồng thư mời đã gửi, nếu có.</summary>
+        private async Task SendAcceptanceEmailAsync(
+            Offer offer, ARI.Domain.Entities.Application app, JobPosting? job, CancellationToken ct)
+        {
+            try
+            {
+                // Đầu mối liên hệ = Recruiter phụ trách tin (người vận hành phễu và thủ tục nhận việc).
+                var contact = job == null ? null : await _unitOfWork.Repository<User>().GetByIdAsync(job.CreatedByUserId, ct);
+                var mail = OfferEmail.BuildAccepted(offer, app, job, FrontendUrls.Candidate(_configuration),
+                    contact?.FullName, contact?.Email);
+
+                var offerThread = (await _unitOfWork.Repository<EmailLog>().FindAsync(
+                        e => e.ApplicationId == app.Id && e.TemplateKey == EmailTemplateKeys.OfferSent && e.MessageId != null, ct))
+                    .OrderByDescending(e => e.CreatedAt)
+                    .FirstOrDefault();
+
+                await CandidateEmailSender.SendAsync(_unitOfWork, _notifications, OfferEmail.AcceptedTemplateKey,
+                    new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName),
+                    over: null, app.Id, app.JobPostingId, sentByUserId: null, ct, offerThread?.MessageId);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Không gửi được thư xác nhận nhận việc cho offer {OfferId}.", offer.Id);
+            }
+        }
+
+        /// <summary>Đủ người thì đóng tin (ADR-074) — best-effort: đóng hụt thì HR vẫn đóng tay được.</summary>
+        private async Task CloseJobIfFilledAsync(JobPosting job, CancellationToken ct)
+        {
+            try
+            {
+                var outcome = await JobHeadcountCloser.CloseIfFilledAsync(_unitOfWork, job, ct);
+                if (outcome == null) return;
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                foreach (var recipient in outcome.Notified)
+                    await _notifications.PublishUserEventAsync(recipient, "ReceiveUserNotification",
+                        new { Type = "JobFilled", JobId = job.Id }, ct);
+                await _notifications.PublishAllEventAsync("ReceivePublicJobUpdate",
+                    new { JobId = job.Id, Status = job.Status }, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Không tự đóng được tin {JobId} khi đã tuyển đủ người.", job.Id);
+            }
         }
     }
 }

@@ -19,7 +19,11 @@
     "title": "Practice Sessions",
     "hasReview": "AI notes available",
     "transcriptOnly": "Transcript available",
-    "view": "Review →"
+    "view": "Review →",
+    "pending": "AI is grading",
+    "needsRubric": "Waiting for the employer's criteria",
+    "noAnswers": "No answers to review",
+    "failed": "Could not be graded"
   },
   "round": {
     "screening": "Screening",

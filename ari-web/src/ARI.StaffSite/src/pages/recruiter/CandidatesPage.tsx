@@ -17,7 +17,8 @@ import { applicationService } from '@ari/shared/fservices/application'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import { resolveAssetUrl } from '@ari/shared/config/constants'
 import { formatScore } from '@ari/shared/utils/format'
-import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import CvScoreBadge, { CvGatePill } from '@/components/cvScore/CvScoreBadge'
+import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 
 import { statusMeta, type Group } from '../_candidateStatus'
@@ -38,12 +39,6 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime())
     ? '—'
     : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function scoreColor(score: number): string {
-  if (score >= 80) return 'text-emerald-600 dark:text-emerald-400'
-  if (score >= 60) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
 }
 
 export default function RecruiterCandidatesPage() {
@@ -491,8 +486,11 @@ export default function RecruiterCandidatesPage() {
                                                   </td>
                                                   <td className="py-2.5 px-3 text-sm">
                                                     {typeof app.matchScore === 'number' ? (
-                                                      <span className={`font-semibold text-xs ${scoreColor(app.matchScore)}`}>
-                                                        Điểm CV: {formatScore(app.matchScore)}
+                                                      <span className="inline-flex items-center gap-1 text-xs">
+                                                        <span className={`font-semibold ${cvScoreTextClass(app.cvRecommendation)}`}>
+                                                          Điểm CV: {formatScore(app.matchScore)}
+                                                        </span>
+                                                        <CvGatePill gateStatus={app.cvGateStatus} />
                                                       </span>
                                                     ) : (
                                                       <CvScoreBadge status={app.cvScoreStatus} retryAt={app.cvScoreRetryAt} />

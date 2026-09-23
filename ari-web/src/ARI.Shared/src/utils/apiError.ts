@@ -74,6 +74,8 @@ const CODE_KEYS: Record<string, string> = {
   // Cổng rời bản nháp của tin (UpdateJobStatusCommand)
   online_test_bank_insufficient: 'job.onlineTestBankInsufficient',
   cv_rubric_required: 'job.cvRubricRequired',
+  // Cổng lên job board: vòng phỏng vấn chưa có bộ tiêu chí chấm (ADR-073)
+  interview_rubric_required: 'job.interviewRubricRequired',
 
   // Đổi thời lượng bài thi khi còn ca thi chưa đóng (OnlineTestWindow — ADR-072)
   online_test_duration_locked: 'job.onlineTestDurationLocked',

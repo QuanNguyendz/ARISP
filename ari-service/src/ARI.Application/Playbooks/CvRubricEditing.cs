@@ -17,6 +17,10 @@ namespace ARI.Application.Playbooks
         public RubricLevels? Levels { get; set; }
         /// <summary>Ý kiểm — mã để trống với ý mới (hệ thống sinh <c>k1</c>, <c>k2</c>…), ý đã có gửi lại mã cũ.</summary>
         public List<RubricCheck>? Checks { get; set; }
+        /// <summary><c>null</c>/<c>"scored"</c> = tiêu chí chấm điểm · <c>"knockout"</c> = điều kiện bắt buộc (ADR-075).</summary>
+        public string? Kind { get; set; }
+        /// <summary>Điểm tối thiểu của tiêu chí (1–100), chỉ với tiêu chí chấm điểm của bộ CV (ADR-075).</summary>
+        public int? MinScore { get; set; }
     }
 
     /// <summary>
@@ -40,7 +44,12 @@ namespace ARI.Application.Playbooks
             public bool IsValid => Errors.Count == 0;
         }
 
-        public static NormalizeResult Normalize(IEnumerable<CvRubricCriterionInput>? input)
+        /// <param name="purpose">
+        /// Bộ CV: điều kiện bắt buộc được bỏ trọng số / mức neo / ý kiểm / điểm tối thiểu (chúng vô nghĩa với câu
+        /// hỏi đạt–không đạt). Bộ phỏng vấn: bỏ điểm tối thiểu và trọng số ý kiểm; tiêu chí khai là điều kiện bắt
+        /// buộc bị <see cref="ScoringRubric.Validate"/> từ chối kèm lời giải thích thay vì âm thầm đổi loại (ADR-075).
+        /// </param>
+        public static NormalizeResult Normalize(IEnumerable<CvRubricCriterionInput>? input, RubricPurpose purpose)
         {
             var rows = (input ?? Enumerable.Empty<CvRubricCriterionInput>())
                 .Where(r => r != null && !(string.IsNullOrWhiteSpace(r.Name) && string.IsNullOrWhiteSpace(r.Key) && r.Weight == 0))
@@ -83,29 +92,60 @@ namespace ARI.Application.Playbooks
                     Poor = Clean(r.Levels.Poor, MaxTextLength),
                 };
 
-                criteria.Add(new RubricCriterion
-                {
-                    Key = key,
-                    Name = name,
-                    Weight = Math.Round(r.Weight, 2, MidpointRounding.AwayFromZero),
-                    Description = Clean(r.Description, MaxTextLength),
-                    Levels = levels is { IsEmpty: false } ? levels : null,
-                    Checks = NormalizeChecks(r.Checks),
-                });
+                var kind = NormalizeKind(r.Kind);
+                var knockout = string.Equals(kind, RubricCriterionKinds.Knockout, StringComparison.Ordinal);
+                var checks = NormalizeChecks(r.Checks);
+                if (purpose == RubricPurpose.Interview && checks != null)
+                    foreach (var chk in checks) chk.Weight = null;
+
+                criteria.Add(knockout && purpose == RubricPurpose.Cv
+                    // Điều kiện bắt buộc chỉ hỏi đạt/không đạt — trọng số, dải, ý kiểm, điểm tối thiểu không có
+                    // nghĩa gì; trình soạn giữ chúng ở máy người dùng để bật lại không mất.
+                    ? new RubricCriterion
+                    {
+                        Key = key,
+                        Name = name,
+                        Weight = 0,
+                        Description = Clean(r.Description, MaxTextLength),
+                        Kind = RubricCriterionKinds.Knockout,
+                    }
+                    : new RubricCriterion
+                    {
+                        Key = key,
+                        Name = name,
+                        Weight = Math.Round(r.Weight, 2, MidpointRounding.AwayFromZero),
+                        Description = Clean(r.Description, MaxTextLength),
+                        Levels = levels is { IsEmpty: false } ? levels : null,
+                        Checks = checks,
+                        Kind = kind,
+                        MinScore = purpose == RubricPurpose.Cv ? r.MinScore : null,
+                    });
             }
 
             if (criteria.Count > 0 || errors.Count == 0)
-                errors.AddRange(ScoringRubric.Validate(criteria));
+                errors.AddRange(ScoringRubric.Validate(criteria, purpose));
 
             // Chấm CV mà không nói "thế nào là tốt" thì model tự nghĩ ra chuẩn — đúng thứ ADR-060 đi
-            // bỏ. Bắt buộc ít nhất một trong hai: chuẩn chấm hoặc mức neo.
-            foreach (var c in criteria)
+            // bỏ. Bắt buộc ít nhất một trong hai: chuẩn chấm hoặc mức neo. Điều kiện bắt buộc tự nó đã là
+            // chuẩn (tên điều kiện là câu hỏi đạt/không đạt), nên không đòi thêm.
+            foreach (var c in criteria.Where(c => !c.IsKnockout))
             {
                 if (string.IsNullOrWhiteSpace(c.Description) && c.Levels == null)
                     errors.Add($"Tiêu chí \"{c.Name}\" cần chuẩn chấm hoặc ít nhất một mức neo.");
             }
 
             return new NormalizeResult(criteria, errors);
+        }
+
+        /// <summary>
+        /// <c>"scored"</c> / rỗng → <c>null</c> (để bộ tiêu chí cũ và mới trùng từng byte); <c>"knockout"</c> giữ nguyên;
+        /// giá trị lạ giữ nguyên để <see cref="ScoringRubric.Validate"/> báo lỗi thay vì đoán.
+        /// </summary>
+        private static string? NormalizeKind(string? kind)
+        {
+            var k = kind?.Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(k) || k == RubricCriterionKinds.Scored) return null;
+            return k;
         }
 
         /// <summary>Đổi danh sách tiêu chí đã lưu về dạng input (để trình soạn tải lên và gửi lại).</summary>
@@ -117,7 +157,9 @@ namespace ARI.Application.Playbooks
                 Weight = c.Weight,
                 Description = c.Description,
                 Levels = c.Levels,
-                Checks = c.Checks?.Select(x => new RubricCheck { Key = x.Key, Text = x.Text }).ToList(),
+                Checks = c.Checks?.Select(x => new RubricCheck { Key = x.Key, Text = x.Text, Weight = x.Weight }).ToList(),
+                Kind = c.IsKnockout ? RubricCriterionKinds.Knockout : null,
+                MinScore = c.MinScore,
             }).ToList();
 
         /// <summary>
@@ -128,7 +170,9 @@ namespace ARI.Application.Playbooks
         {
             var rows = (input ?? Enumerable.Empty<RubricCheck>())
                 .Where(x => x != null && !string.IsNullOrWhiteSpace(x.Text))
-                .Select(x => (Key: x.Key?.Trim().ToLowerInvariant(), Text: Clean(x.Text, ScoringRubric.MaxCheckLength)!))
+                // ×1 lưu là null (ADR-075) — bộ cũ và bộ mới toàn ×1 trùng từng byte.
+                .Select(x => (Key: x.Key?.Trim().ToLowerInvariant(), Text: Clean(x.Text, ScoringRubric.MaxCheckLength)!,
+                    Weight: x.Weight == 1 ? (int?)null : x.Weight))
                 .GroupBy(x => x.Text, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
@@ -152,7 +196,7 @@ namespace ARI.Application.Playbooks
                     key = $"k{n}";
                     taken.Add(key);
                 }
-                result.Add(new RubricCheck { Key = key, Text = r.Text });
+                result.Add(new RubricCheck { Key = key, Text = r.Text, Weight = r.Weight });
             }
             return result;
         }
@@ -161,8 +205,11 @@ namespace ARI.Application.Playbooks
         /// Chia lại trọng số cho tròn 100 (phương pháp phần dư lớn nhất) — dùng cho bản nháp AI gợi ý,
         /// vì model hay trả 33/33/33 hoặc tổng 95. Người dùng vẫn sửa được sau đó.
         /// </summary>
-        public static void RebalanceWeights(List<CvRubricCriterionInput> rows)
+        public static void RebalanceWeights(List<CvRubricCriterionInput> all)
         {
+            // Điều kiện bắt buộc không mang trọng số (ADR-075) — chỉ chia trên tiêu chí chấm điểm.
+            foreach (var k in all.Where(IsKnockoutInput)) k.Weight = 0;
+            var rows = all.Where(r => !IsKnockoutInput(r)).ToList();
             if (rows.Count == 0) return;
             var raw = rows.Select(r => r.Weight > 0 ? r.Weight : 1m).ToList();
             var total = raw.Sum();
@@ -176,6 +223,9 @@ namespace ARI.Application.Playbooks
             for (int i = 0; i < rows.Count; i++)
                 rows[i].Weight = floors[i];
         }
+
+        private static bool IsKnockoutInput(CvRubricCriterionInput r)
+            => string.Equals(NormalizeKind(r.Kind), RubricCriterionKinds.Knockout, StringComparison.Ordinal);
 
         /// <summary>"Kinh nghiệm .NET &amp; Cloud" → "kinh_nghiem_net_cloud". Luôn khớp mẫu mã của ScoringRubric.</summary>
         public static string Slugify(string name)

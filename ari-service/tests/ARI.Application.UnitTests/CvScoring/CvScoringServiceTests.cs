@@ -124,7 +124,7 @@ public class CvScoringServiceTests
     }
 
     [Fact]
-    public async Task Rubric_names_weights_and_keys_reach_the_ai()
+    public async Task Rubric_names_and_keys_reach_the_ai_but_no_formula_number_does()
     {
         var job = Job();
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(DefaultRubric(job.Id));
@@ -134,7 +134,9 @@ public class CvScoringServiceTests
 
         var req = gemini.LastRequest!;
         Assert.Contains("Kinh nghiệm", req.RubricInstruction);
-        Assert.Contains("70", req.RubricInstruction);
+        // ADR-075: trọng số là công thức của HM, backend áp sau — AI không thấy (đổi trọng số thì tính lại, không hỏi AI).
+        Assert.DoesNotContain("trọng số", req.RubricInstruction);
+        Assert.DoesNotContain("70", req.RubricInstruction);
         Assert.Equal(new[] { "experience", "education" }, req.CriterionKeys);
         Assert.DoesNotContain("40/40/20", req.JdText);           // bỏ câu trọng số mặc định cũ
         Assert.NotNull(req.CvPdf);                                // CV PDF gửi nguyên file

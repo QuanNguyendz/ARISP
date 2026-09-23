@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-19
 
 ---
 
@@ -20,15 +20,16 @@ _Chưa có task nào đang thực hiện._
 > hoàn thành cả 6 phase ngày 2026-08-31 trên nhánh `feature/be/hiring-manager-offer-pipeline`
 > (chi tiết từng phase ở mục Completed). **Chưa commit, chưa merge.**
 >
-> Còn dang dở, cố ý để lại: **3/6 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
-> `offer_sent`). Ba mẫu còn lại — mời vòng kế, cấp mã phỏng vấn, kết quả sau khi chốt verdict —
-> hạ tầng đã đủ, mỗi cái là "viết một builder + thêm một `case` + thêm `emailOverride` vào command".
+> Còn dang dở, cố ý để lại: **4 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
+> `offer_sent`, và từ 2026-09-19 `interview_result` — gộp cả thư "mời vòng kế" lẫn "kết quả sau khi chốt
+> verdict", ADR-074). Còn lại **thư cấp mã phỏng vấn** — hạ tầng đã đủ: "viết một builder + thêm một
+> `case` + thêm `emailOverride` vào command".
 
 ---
 
 ## Nợ kỹ thuật đã biết — `CLAUDE.md` sát ngưỡng cảnh báo
 
-`CLAUDE.md` đang **39.806 / 40.000 ký tự** — dư **194 ký tự** (2026-09-17, sau ADR-071). Thêm một đoạn bất kỳ là vượt ngưỡng
+`CLAUDE.md` đang **39.284 / 40.000 ký tự** — dư **716 ký tự** (2026-09-19, sau ADR-074: gọt dòng ADR-048 và ADR-056 — hai quyết định đã nguội — từ ~950 về ~450 ký tự mỗi dòng để có chỗ cho dòng ADR-074; trước đó ADR-073 gọt dòng ADR-066). Thêm một đoạn bất kỳ là vượt ngưỡng
 cảnh báo file bộ nhớ lớn và nạp lại mỗi phiên.
 
 **Mỗi đợt thêm một ADR nay đều phải gọt dòng cũ trước** — ADR-065 gọt 12 dòng, ADR-066 gọt thêm 16, ADR-067
@@ -39,9 +40,13 @@ gọt **7 dòng dài nhất** (011, 049, 051, 052, 057, 058, 060) về đúng kh
 ADR-070 gọt tiếp dòng **063** và **064** về ~600 ký tự và viết gọn khối *CV-JD Match Analysis* (vốn đã sai sau
 ADR-070), đủ chỗ cho quy tắc 28 + một dòng ADR mới.
 
-**Vẫn chưa xong.** Bảng ADR vẫn là phần lớn nhất của file, và các dòng **061, 065, 066, 067**
-(1.300–1.700 ký tự mỗi dòng) giờ là nhóm dài nhất còn lại — đợt gọt sau nên nhắm vào đó. Chưa làm ngay
-vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây giờ dễ mất đúng phần hay phải tra lại.
+**Đợt ADR-075 (2026-09-22)** đã gọt đúng nhóm đó: dòng **061** (900→~640), **067** (902→~700), **066**, **065** và
+**070**, thu được ~700 ký tự — vừa đủ cho dòng ADR-075 mới, hai câu sửa ở quy tắc 16/28 và mục *CV-JD Match Analysis*
+viết lại. File hiện **39.995 / 40.000** ký tự.
+
+**Vẫn chưa xong — nay không còn dư một ký tự nào.** Đợt ADR sau **bắt buộc** gọt trước, và nhóm dài nhất còn lại là
+**057, 059, 063, 068, 073** (700–900 ký tự mỗi dòng). Lập luận đầy đủ luôn nằm ở `.ai/architecture.md`, nên dòng trong
+bảng chỉ cần đủ để nhớ ra *quyết định* và biết *tra ở đâu*.
 
 ---
 
@@ -210,7 +215,8 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [ ] **On-site:** Kiosk mode frontend: nhập Interview Code → validate → vào interview room
 - [ ] Audit log: ghi lại creation time, usage time, `application_id` cho mỗi Interview Code
 - [x] Cấp mã vào phòng ngay trên danh sách ứng viên (vòng sơ loại/chuyên môn); sơ loại gửi link Kiosk kèm mã cho ứng viên làm từ nhà, chuyên môn đưa mã tận tay tại văn phòng; một mã sống mỗi vòng (ADR-016 bổ sung) ✅ 2026-09-15
-- [ ] Kiểm quyền theo tin cho `POST /interview/generate-code` + `generate-code-batch` (hiện chỉ policy `InternalStaff`, lệch quy tắc 19)
+- [ ] Kiểm quyền theo tin cho `POST /interview/generate-code` + `generate-code-batch` (hiện chỉ policy `InternalStaff`, lệch quy tắc 19) — màn hồ sơ đã chuyển sang `/applications/{id}/interview-code` (có kiểm quyền); còn màn Phỏng vấn (`CandidateRow`, `SlotCard`) gọi đường cũ
+- [x] Sửa cấp mã vòng 2 sau vòng 1 trắc nghiệm bị từ chối "Vòng 1 là bài trắc nghiệm": vòng không truyền lấy theo lịch đang giữ chỗ (`InterviewCodeRules.LiveBookingAsync`); màn hồ sơ Recruiter/HR dùng `InterviewCodeCard` ✅ 2026-09-19
 - [x] HM duyệt hồ sơ KHÔNG còn kèm lịch rảnh — lịch khai riêng ở "Lịch tôi có mặt được"; ca thi trắc nghiệm đứng ngoài luật chồng giờ + luật "HM không dự hai buổi" (ADR-067 sửa đổi) ✅ 2026-09-14
 
 ### Phase 4 – AI Interview Core
@@ -241,6 +247,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] `RagService`: retrieve logic – merge JD/CV chunks + Playbook chunks theo weighted scope — **Hybrid retriever (RRF + scope weight) trong RAG service Python** ✅ 2026-06-26
 - [x] Playbook theo tin/theo vòng quản lý **ngay trong màn tin**, người thêm/xoá là **Hiring Manager chính** (HR Leader vẫn làm được, Recruiter chỉ đọc); màn Playbook của HR chỉ còn playbook công ty (ADR-069) ✅ 2026-09-15
 - [x] Validation ở server cho mọi cửa upload: phạm vi, loại tài liệu (12 loại), đuôi file theo loại, ≤15MB, vòng hội thoại có thật, tin lưu trữ; lệnh xoá kiểm quyền theo phạm vi (ADR-069) ✅ 2026-09-15
+- [x] Bộ playbook mẫu tối ưu cho pipeline RAG: playbook công ty (5 loại) + playbook một tin Senior Backend .NET (12 file theo tin/vòng) + 3 bộ tiêu chí Excel — `docs/playbooks/` ✅ 2026-09-19
 - [ ] Validation: virus scan (optional)
 
 ### Phase 5 – Multi-round & Auto-progression
@@ -263,12 +270,13 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] HR Dashboard (Phân quyền rõ ràng cho 3 role: SuperAdmin, HR Leader, Recruiter):
   - [x] Danh sách Application per Job Posting (filter, sort) – `EvaluationsController`
   - [x] Xem Evaluation Report + recording per Application per Round
-  - [ ] Confirm / Override verdict (HrReview entity có, endpoint `/evaluations/{id}/review` cần kiểm tra)
+  - [x] 2026-09-19 Confirm / Override verdict — `POST /api/interview/review/confirm`, **một báo cáo chỉ chốt một lần** (409), thư kết quả đi kèm lệnh chốt (ADR-074)
   - [x] Unit test `SubmitHrReviewAsync` — Confirm (mọi nhân sự) vs Override (chỉ HR Admin/Super Admin + bắt buộc lý do, Recruiter bị chặn), cập nhật status hồ sơ pass/not_pass, auto-progression sang vòng kế (chỉ real + có RoundConfig → tạo InterviewInvite, status→interview; practice/not_pass không progress), thông báo ứng viên realtime + Notification chống trùng (DedupKey), audit log hr_confirm/hr_override — **16 test mới, 109/109 pass** ✅ 2026-08-05
   - [x] Unit test Luồng 8 Review Interview Result (UC-64/84–90/95) — query HR đọc/giám sát kết quả: `GetEvaluationsQuery` (ẩn buổi thử, lọc theo job + trạng thái pending/completed/verdict tôn trọng HR override, phân trang + total, join tên/vị trí/review), `GetEvaluationDetailQuery` (tra theo EvaluationId hoặc fallback SessionId, ẩn practice, kèm HR review + resolve URL video buổi thật ADR-052), `GetEvaluationsByApplicationQuery` (các vòng của hồ sơ, ẩn practice, trạng thái review), `GetSessionsForHrAsync` (bảng giám sát phiên: ẩn practice, sắp mới nhất, join ứng viên/vị trí/verdict AI mới nhất + cờ có video). Confirm/Override đã phủ ở test `SubmitHrReviewAsync`. — **24 test mới, 375/375 pass** ✅ 2026-08-05
 - [x] `AuditLogService`: entity `AuditLog` đã có, ghi lại mọi action
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
-- [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
+- [x] 2026-09-19 **Email kết quả cho ứng viên qua trình soạn** sau khi Hiring Manager chốt — mẫu `interview_result` (qua vòng / vòng cuối / cảm ơn), gửi kèm lệnh chốt, ghi `email_logs` (ADR-074)
+- [x] 2026-09-19 **Thư xác nhận nhận việc** (`offer_accepted`, nối luồng thư mời) + **tự đóng tin khi số `hired` đạt `Headcount` của phiếu**; màn tin đã đóng liệt kê hồ sơ chưa khép, loại kèm thư cảm ơn qua trình soạn (ADR-074)
 - [x] **Thư mời đúng ADR-063: HM chính soạn + gửi duyệt**, gửi duyệt báo HR Leader + SA (trước đây báo nhầm HM), qua vòng cuối → báo chủ tin + HM soạn thư; link thông báo theo vai người nhận (`StaffLinks`) (ADR-068) ✅ 2026-09-15
 - [x] **Đường vào báo cáo AI sau buổi phỏng vấn thật**: danh sách "Kết quả phỏng vấn" theo vòng (ca · AI đang chấm · báo cáo · video · transcript) ở màn tin + màn hồ sơ của cả ba vai, mục "Buổi vừa kết thúc" ở màn Phòng phỏng vấn của HM, màn đánh giá có transcript đầy đủ + ca (ADR-069) ✅ 2026-09-15
 - [ ] Transcript nhảy tới đúng đoạn video của từng câu (cần mốc bắt đầu ghi hình so với phiên)
@@ -289,6 +297,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Interview recording: trường `recording_url` trong `InterviewSession` đã có
 - [x] 2026-08-15: **Realtime tầng database (ADR-057)** – trigger `arisp_notify_change()` + `LISTEN/NOTIFY` → `DbChangeListenerHostedService` → SignalR; `DbChangeRouter` định tuyến người nhận (mặc định đóng)
 - [x] 2026-08-15: Vá lỗ hổng `JobReassigned` – FE không có `case` bắt event nên chuông hai bên chỉ sáng sau khi F5
+- [x] 2026-09-19: Realtime cho màn giữ state cục bộ – sự kiện chung `db-table:changed` + `useDbTableChanged`; nối phiếu tuyển dụng, trình soạn JD, mẫu JD, đội, tài khoản, cài đặt hệ thống, cài đặt nhân sự, hồ sơ ứng viên
 - [ ] Redis backplane cho SignalR – bắt buộc trước khi chạy nhiều instance backend (hiện `AddSignalR()` in-process)
 
 ### Phase 8 – Cheat Detection
@@ -366,6 +375,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Vẽ lại sơ đồ Use-case Overview sau ADR-068 (bỏ nhánh "Job has a Hiring Manager?", JD "No" → `rejected` → sửa/gửi lại, thao tác chuyển HM, HM soạn thư mời) — 2026-09-15
 - [x] Sơ đồ swimlane **luồng tính Match Score CV–JD** vẽ theo code (`docs/diagrams/arisp-cv-jd-match-score.drawio`) — 2026-09-17
 - [x] Chuyển sơ đồ **tổng quan chấm CV–JD** sang tiếng Anh, bỏ ví dụ, thêm khung chú giải (`docs/diagrams/arisp-cv-scoring-overview.drawio`) — 2026-09-19
+- [x] **Dữ liệu MOCK trên production:** hồ sơ `a1f946c4-a4a6-400a-aa37-4ad7e3c6ffec` (ứng viên `quannguyen23.a@gmail.com`, tin BACKEND DEVELOP) đã qua đủ 3 vòng, dừng ở `pass` để test luồng offer — 2026-09-19
 
 ### Phase 13 – Polish & Scale
 - [ ] Redis caching (session data, slot availability, frequently accessed evaluations)
@@ -386,6 +396,70 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 ---
 
 ## Completed
+
+- [x] 2026-09-22: **Công thức chấm CV do Hiring Manager quyết định (ADR-075)** — nhánh `feature/be/cv-scoring-formula`.
+  Trước đó HM khai được tiêu chí, trọng số và lời neo, nhưng **công thức biến câu trả lời của AI thành điểm vẫn viết
+  cứng trong backend**: 4 dải 90/70/40, mọi ý kiểm nặng như nhau, bù trừ hoàn toàn, ngưỡng khuyến nghị 80/65/50 chung
+  mọi tin, làm tròn hai lần (79,495 → 80), và FE tô màu theo ba bộ ngưỡng khác nhau — không bộ nào khớp nhãn của server.
+  - **Khung tham số, không phải biểu thức** (theo OPM · ĐH Wyoming · 4 Corner · ZYTHR · LibreTexts/R for HR · TicNote —
+    mọi nguồn đều dùng chung khung "loại theo điều kiện bắt buộc → thang có neo → cộng có trọng số → so ngưỡng"):
+    HM khai **điều kiện bắt buộc** (đạt/không đạt, ≤ 5, trọng số 0), **điểm tối thiểu từng tiêu chí**, **trọng số ý kiểm
+    ×1/×2/×3**, **ngưỡng 4 dải** và **ngưỡng khuyến nghị**. Mặc định = đúng hành vi cũ, nên tin đang chạy không đổi số nào.
+  - **Cổng chỉ ép NHÃN**: trượt điều kiện / dưới điểm tối thiểu → khuyến nghị "Chưa phù hợp" kèm lý do + trích dẫn;
+    **điểm vẫn tính, hồ sơ không bao giờ bị loại tự động** (ADR-053). "Đạt" mà AI không trích được bằng chứng → "chưa
+    xác minh", không ép nhãn.
+  - **Một bộ tính duy nhất** `CvScoreCalculator` (hàm thuần, làm tròn **một lần**) + `CvObservations` tách "AI quan sát
+    được gì" khỏi số học. **Prompt chấm CV không còn con số nào** — AI trả dải + ý kiểm, hoặc vị trí 0..1, hoặc đạt/không đạt.
+  - **Đổi công thức thì TÍNH LẠI, không gọi AI**: `CvObservationSignature` băm đúng phần AI được hỏi; bản chấm cũ phủ
+    được bộ mới thì dựng lại quan sát từ ảnh chụp và chạy lại bộ tính (`derived_from_analysis_id`, token 0). Đường nhanh
+    nằm trước cả bước đọc file CV trong `CvApplicationScorer`.
+  - **Xem trước tác động** (`POST /api/jobs/{id}/cv-rubric/preview`): điểm/khuyến nghị trước–sau từng hồ sơ, số hồ sơ đổi
+    nhãn, số hồ sơ vướng cổng, và số lượt gọi AI mà lần lưu sẽ tốn — tính trong bộ nhớ, không ghi, không gọi AI.
+  - **FE**: trình soạn có công tắc "Điều kiện bắt buộc", ô điểm tối thiểu, nút ×1/×2/×3 cho từng ý, khối "Công thức chấm"
+    (ngưỡng + công thức sống + cơ sở tham khảo), nút "Xem trước tác động"; màn hồ sơ có khối cổng với ✓/✗/? và trích dẫn;
+    màu điểm đọc từ nhãn của server (gỡ `_jobUi.scoreColor` và hai bộ ngưỡng viết cứng ở 4 màn). Excel thêm cột Loại /
+    Điểm tối thiểu, hậu tố `(x2)` và sheet "Cong thuc". Phiếu tuyển dụng mang công thức sang tin.
+  - **Migration `CvScoringFormula`**: 5 cột nullable, không default, không backfill; sau migration không hồ sơ nào bị coi
+    là cần chấm lại. Bộ tiêu chí **phỏng vấn** không đổi (tham số `RubricPurpose` bắt buộc để trình biên dịch chỉ ra mọi cửa).
+  - **Kiểm chứng:** Application **2183/2183** (+61), Domain 63/63, Infrastructure 7/7; FE `tsc` sạch, lint 0 lỗi, vitest
+    **108/108**, `check:i18n` đạt, build hai site. **E2E API cô lập 5010 + rag 8010 + Postgres tạm + Gemini thật: 33/33** —
+    3 CV thật chấm 87/60/6; đổi công thức → **0 lượt gọi AI**, điểm khớp bản xem trước (85/57/3), token 0; lưu y hệt →
+    `unchanged`; điểm tối thiểu 70 → ép Reject mà `applications.status` không đổi; thêm điều kiện JLPT N2 → AI chấm lại,
+    CV có N2 qua cổng (93), hai CV còn lại Reject trong khi nhãn-theo-điểm vẫn "Cân nhắc"; Excel khứ hồi; migration
+    Down/Up với 12 bản chấm còn nguyên. Đã dọn container, dịch vụ tạm và file thử.
+
+- [x] 2026-09-19: **Realtime cho các màn giữ state cục bộ (bổ sung ADR-057).** Server định tuyến `recruitment_requests`, `jd_templates`, `jd_documents`, `departments`, `system_settings`, `candidate_accounts` từ lâu, nhưng FE không có nhánh nào đón, và các màn đó dùng `useState` nên `invalidateQueries` không chạm tới được. Hệ quả: HR Leader duyệt / trả lại phiếu thì HM và Recruiter phải F5 mới thấy.
+  - **FE (Shared):** `realtime/dbTableRealtime.ts` — sự kiện DOM chung `db-table:changed` do `handleDbChange` phát cho MỌI bảng (`resync` = bảng `*`), `onDbTableChanged` (lọc bảng, gom đợt ghi sát nhau 250ms, `resync` luôn lọt qua), hook `useDbTableChanged`, `touchesRow`. Màn mới chỉ cần gọi hook với tên bảng, không phải sửa `handleDbChange`. `candidate_accounts` còn huỷ `['candidate-avatar']`.
+  - **Màn:** danh sách + chi tiết phiếu (nghe thêm `job_postings` vì cờ "đã dựng thành tin" suy từ bảng tin; giữ Recruiter HR Leader đã chọn), trình soạn JD (mẫu nạp lại ngay; bản JD chỉ nạp khi không có chữ chưa lưu và không nút nào đang chạy), mẫu JD, đội, tài khoản (+ ô chọn đội), cài đặt hệ thống, cài đặt nhân sự (ô "Đội"), hồ sơ ứng viên. Nạp lại do realtime luôn **ngầm** (không khung tải, không đè lỗi); màn có form **không nạp đè khi còn thay đổi chưa lưu** và kiểm lại sau `await`.
+  - **BE (`DbChangeRouter`):** `jd_templates` gửi thêm nhóm `recruiter` (người dùng trình soạn JD nhiều nhất lại không nhận được); `users` gửi thêm chính chủ tài khoản (Super Admin gán đội thì màn Cài đặt của người đó đổi ngay).
+  - **Kiểm chứng:** router 56/56 (2 test mới/sửa), `dbTableRealtime.test.ts` 6 test, StaffSite 96/96, `tsc` hai site sạch, eslint không lỗi mới (chỉ còn cảnh báo `any` có sẵn).
+
+- [x] 2026-09-19: **Dữ liệu MOCK trên production — một ứng viên đã qua đủ các vòng, dừng ở bước offer.** Người dùng cần một hồ sơ trên bản deploy tới được bước thư mời để test luồng offer. Chèn thẳng DB (một transaction, chạy thử ROLLBACK trước rồi mới COMMIT; chỉ INSERT, không sửa dòng có sẵn) theo schema bản đang deploy (ADR-072), cho tài khoản sẵn có `quannguyen23.a@gmail.com` vào tin **BACKEND DEVELOP** (`28d640e3…`, HM Nguyễn Anh Quân, Recruiter Phạm Trung Hiếu).
+  - **Hồ sơ `a1f946c4-a4a6-400a-aa37-4ad7e3c6ffec`** — `pass`, HM đã duyệt hồ sơ. Vòng 1 trắc nghiệm 7/8 = 87.5 (bộ đề tái tạo đúng thuật toán bốc đề `DrawQuestions`, đối chiếu bằng .NET). Vòng 2 sơ loại 82.5 và vòng 3 chuyên môn 78.2: mỗi vòng có ca + lịch HM + mã Kiosk đã dùng + phiên thật (HM vào phòng, cho vào) + transcript + báo cáo AI (ảnh chụp tiêu chí) + HM chốt Đạt, chia sẻ kết quả cho ứng viên. Vòng 3 kèm đề xuất Junior, 12–15 triệu VND (thư mời điền sẵn 15 triệu). Chuông "soạn thư mời" cho HM + Recruiter.
+  - **Không có:** bản ghi hình, phân tích CV (tin chưa có bộ tiêu chí chấm CV — quy tắc 28), email nào gửi ra ngoài. Không ảnh hưởng tác vụ nền: lịch đã xác nhận + đã có phiên/bài nộp nên không bị nhắc lịch hay đánh no-show; migration ADR-073 sẽ đặt `evaluation_status = done`.
+  - **Gỡ:** mọi dòng đều treo dưới hồ sơ trên (phiên → câu hỏi/câu trả lời/báo cáo/HM chốt; lịch, ca, mã, bài thi, lịch HM, audit `hr_confirm`, 2 thông báo `offer_needed:{hồ sơ}:*`). Offer/email tạo khi test sau này cũng treo dưới `application_id` này.
+
+- [x] 2026-09-19: **Sửa lỗi cấp mã vòng 2 sau vòng 1 trắc nghiệm ("Vòng 1 là bài trắc nghiệm…" dù đang cấp cho vòng 2).** Người dùng gặp trên deploy ở màn hồ sơ ứng viên. Nguyên nhân: nút "Cấp mã" ở màn hồ sơ (Recruiter + HR) gọi đường cũ `POST /interview/generate-code` không kèm vòng, và `GenerateCodeAsync` đoán vòng bằng `max(phiên đã xong) + 1` — vòng trắc nghiệm không sinh phiên phỏng vấn nào nên phép đoán luôn ra vòng 1, rồi bị luật "vòng trắc nghiệm không dùng mã" chặn. Thẻ cấp mã ở danh sách ứng viên của tin không dính vì chọn vòng theo lịch.
+  - **BE:** `LiveBookingAsync` (lịch `scheduled` của vòng cao nhất) chuyển từ `ApplicationInterviewCodeSupport` sang `InterviewCodeRules` — luật chung cho mọi đường cấp mã; `GenerateCodeAsync` không nhận vòng thì dùng nó, không có lịch thì trả lý do "chưa có lịch" thay vì đoán vòng 1. Bỏ hẳn phép đoán từ phiên đã xong. Lịch vòng trắc nghiệm vẫn `scheduled` sau khi thi, nên qua bài thi mà chưa xếp lịch vòng kế thì lý do chặn chỉ ra bước tiếp theo ("xếp lịch vòng N+1 trước") khi tin có vòng sau (`OnlineTestReason(round, hasNextRound)` + `HasNextRoundAsync`).
+  - **FE:** màn hồ sơ Recruiter + HR bỏ nút cấp mã riêng (và state `notice` chết) → dùng `InterviewCodeCard` (cùng thẻ với danh sách ứng viên: đúng vòng, kiểm quyền theo tin, lý do khi chưa cấp được, link vào phòng cho vòng làm từ nhà); thẻ nhận `className`. Gỡ 5 khoá i18n không còn dùng (vi/en × 2 màn).
+  - **Kiểm chứng:** test mới tái hiện đúng ca lỗi ở cả hai đường (vòng 1 `online_test` + lịch vòng 1 & 2 → mã vòng 2), không lịch → "chưa có lịch", chưa xếp vòng 2 → lý do chỉ bước tiếp theo. Application **2118/2118**, Domain 63/63, Infrastructure 7/7; `tsc` StaffSite sạch, eslint sạch, StaffSite 90/90.
+
+- [x] 2026-09-19: **Bộ playbook mẫu kích hoạt RAG — công ty + một tin (`docs/playbooks/`).** Soạn theo đúng cách pipeline đọc tài liệu: chunker tách theo dòng trống (≥1000 ký tự thì cắt cứng 500), truy hồi top-5 chung với CV/JD, câu bắt buộc tách theo dòng, prompt chấm CV gộp khung năng lực + dấu hiệu (công ty + tin) cắt ở 6000 ký tự.
+  - **Công ty (5 file .txt):** compliance (7 nhóm, căn cứ BLLĐ 2019 khoản 8 Điều 3/Điều 8 + NĐ 13/2023, mỗi đoạn chứa từ khoá ứng viên có thể nói để được truy hồi), khung năng lực 4 bậc, dấu hiệu cần đào sâu, văn hoá (mẫu — cần thay bằng giá trị thật), phong cách viết theo tình huống.
+  - **Tin Senior Backend .NET (12 file .txt + 3 .xlsx):** khung năng lực + dấu hiệu cấp tin (vào chấm CV); vòng 1 và vòng 3 mỗi vòng có playbook vòng, 3 câu bắt buộc, ngân hàng câu hỏi, đáp án mong đợi (mỗi câu bắt buộc có đoạn đáp án cùng từ khoá); vòng 3 thêm kịch bản kỹ thuật + dấu hiệu theo vòng. Bộ tiêu chí chấm CV (mức neo + ý kiểm), bộ tiêu chí phỏng vấn chung (chuyên môn) và riêng vòng 1.
+  - **Kiểm chứng:** chunker thật của rag-service: 73 chunk, dài nhất 709 ký tự; parser câu bắt buộc (port 1:1) ra đúng 3 câu/vòng; ngân sách chấm CV 4031/6000; 3 file Excel qua `RubricSheet.Parse` + `ScoringRubric.Validate` + `CvRubricEditing.Normalize` không lỗi.
+  - **Phát hiện kèm (chưa sửa):** `.md` được màn upload cho chọn nhưng `DocumentParserService` từ chối; `.docx`/`.pdf` mất ranh giới đoạn khi parse.
+
+- [x] 2026-09-19: **Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người (ADR-074, giai đoạn 2).** Sau khi ADR-073 gỡ chỗ tắc báo cáo, luồng offer lần đầu chạy tới cuối và lộ ba lỗ: thư kết quả (thư quan trọng nhất) viết cứng ở hai chỗ, gửi thẳng SMTP, không xem trước/sửa/lưu vết được — và hai nhánh chọn thư theo hai điều kiện khác nhau; chốt hai lần được; nhận việc xong không một văn bản nào, tin vẫn mở trên Job Board sau khi đủ người.
+  - **BE:** `InterviewResultEmail` (3 biến thể, `ResolveVariant` là hàm duy nhất cho cả thư lẫn trạng thái hồ sơ, `TotalRoundsAsync` dùng chung) + khoá mẫu `interview_result` + nhánh renderer (báo cáo phải thuộc hồ sơ) + `PreviewEmailQuery.Variant` (cổng xem trước của mẫu này = HM chính / quản trị viên); `ConfirmReviewRequest.EmailOverride` → `SubmitHrReviewAsync` gửi MỘT thư qua `CandidateEmailSender`; `TriggerAutoProgressionAsync` → `OpenNextRoundAsync` (không gửi thư); chốt lần hai → 409. `OfferEmail.BuildAccepted` + `RespondToOfferCommand` gửi thư xác nhận (nối `In-Reply-To` thư mời) và gọi `JobHeadcountCloser` (đóng tin, audit `job_auto_closed_headcount`, báo HM/Recruiter/HR Leader kèm số hồ sơ + thư mời còn mở; không tự loại, không tự thu hồi) — cả hai best-effort sau khi quyết định đã lưu.
+  - **FE:** `EmailComposerModal` + `emailService.preview` nhận `variant`; màn đánh giá (HR/HM) bấm chốt → mở trình soạn thư kết quả (buổi thử chốt thẳng), lỗi hiện đúng câu server qua `resolveApiError`; `ClosedJobOpenApplications` ở màn tin của HR/Recruiter/HM; `applicationService.rejectApplication` nhận `emailOverride`; i18n vi/en.
+  - **Kiểm chứng:** Application **2114/2114** (+23 test), `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm (email tắt): xem trước thư vòng 1/vòng 3 đúng biến thể; chốt vòng cuối kèm thư sửa tay → `email_logs` `was_edited`, `<script>` bị lọc, hồ sơ `pass`; chốt lần hai 409; HM soạn offer (điền sẵn từ đề xuất) → HR Leader chốt → gửi → ứng viên nhận → `hired`, thư `offer_accepted`, tin headcount 1 tự `closed` + audit + thông báo.
+
+- [x] 2026-09-19: **Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin + chấm bằng hàng đợi nền (ADR-073, giai đoạn 1).** Người dùng báo buổi thử lẫn buổi thật đều không ra báo cáo. Nguyên nhân kiểm trên production (chỉ đọc): 0 bộ `interview_rubric` → `GenerateEvaluationReportAsync` thoát sớm chỉ để lại log; báo cáo sinh ngay trong lệnh đóng phiên nên lỗi nào cũng là mất vĩnh viễn; giao diện gọi mọi trường hợp là "AI đang chấm". Kéo theo luồng offer không bao giờ chạy (không hồ sơ nào tới `pass`).
+  - **BE:** `InterviewRubricStore` (vòng → tin, bỏ lùi bộ công ty) + `InterviewRubricService.SaveAsync` (đường ghi duy nhất, bỏ ý kiểm, lưu xong đưa buổi đang chờ vào hàng) + `JobInterviewRubricController` (`GET/PUT /api/jobs/{id}/interview-rubric`, `DELETE …/rounds/{n}`) + mẫu công ty & AI gợi ý (`/api/playbooks/interview-rubric/templates|suggest`, `GeminiProvider.SuggestInterviewRubricAsync`). Chặn nạp/xoá `interview_rubric` cấp tin qua playbook thường; danh sách playbook của tin ẩn nó. Cổng `→ active` mã `interview_rubric_required`. `InterviewEvaluator` (4 kết cục, ghi `evaluation_status/attempts/error/updated_at`, báo cáo hệ thống cho buổi thật không câu trả lời, đánh giá ngôn ngữ lỗi không làm mất báo cáo) + `IEvaluationQueue` + `EvaluationHostedService` (2 worker, quét 2′, thử lại 3 lượt, nhắc HM thiếu bộ tiêu chí). `EndSessionAsync` chỉ xếp hàng. `POST /api/evaluations/sessions/{id}/retry`. Trạng thái `needs_rubric`/`evaluation_failed` (nhân sự) và `EvaluationProgress` (ứng viên). Seed dev gieo bộ tiêu chí phỏng vấn. Migration `InterviewEvaluationPipeline`.
+  - **rag-service:** `RubricCriterion.levels` + in mức neo 4 dải vào prompt chấm.
+  - **FE:** `JobInterviewRubricPanel` ở màn tin của HM/HR/Recruiter (bộ chung + bộ riêng theo vòng, banner vòng thiếu + số buổi đang chờ), `CvRubricEditor mode="interview"`, `interviewRubricService`; `InterviewResultsCard` thêm hai trạng thái + nút "Chấm lại"; Portal: danh sách buổi thử + trang xem lại nói đúng lý do, tự hỏi lại khi đang chấm; mã lỗi `interview_rubric_required` (vi/en); nhãn mẫu Playbook công ty.
+  - **Kiểm chứng:** Application **2091/2091**, Infrastructure 7/7, Domain 63/63, rag-service 37/37, `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini: chấm nền → 84 `pass`; thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI; HM nhờ AI gợi ý rồi lưu → buổi đang chờ tự chấm → 78,75; buổi thử không câu trả lời → `no_answers`; rag tắt → `failed` + lý do → "Chấm lại" → `done` + audit.
 
 - [x] 2026-09-18: **Bài trắc nghiệm là một đợt thi có giờ cố định; thời lượng có một nguồn (ADR-072).** Người dùng hỏi thời lượng bài do người cấu hình hay mặc định. Câu trả lời: có hai ô "thời lượng", ô "Số phút" của vòng trắc nghiệm ở màn tạo tin không có tác dụng gì. Người dùng muốn gộp lại, và muốn khung giờ thi thành *"bài 30 phút bắt đầu 9h thì 9h–9h30 vào lúc nào cũng được, 9h30 đóng — vào 9h15 còn 15 phút"* thay cho cửa vào 1 tiếng + đồng hồ riêng mỗi người.
   - **BE:** luật duy nhất `OnlineTestWindow` (`ClosesAt = giờ hẹn + thời lượng`, hạn nộp `+1 phút`); bỏ `EntryWindow` ở cả 7 chỗ đọc (lấy đề/nộp bài, tự nộp khi hết hạn, lịch ứng viên, Portal, bảng ứng viên, khoảng bận khi xếp lịch, thư mời/nhắc). Thời lượng = `MaxDurationMinutes` của vòng `online_test`; màn ngân hàng đề ghi vào vòng (`DurationMinutes` nullable: tin chưa có vòng thì không lưu được). Giờ kết thúc ca thi server tự tính = giờ đóng (`SchedulingSupport.EffectiveEndTime`). Chặn đổi thời lượng khi còn ứng viên giữ chỗ ở ca thi chưa đóng (mã `online_test_duration_locked`, cả màn ngân hàng đề lẫn lệnh sửa tin); đổi được thì kéo giờ kết thúc các ca chưa đóng. `CandidateOnlineTestDto.ServerNow`. Migration `MergeOnlineTestDurationIntoRoundConfig`: chép giá trị đang có hiệu lực sang vòng, đồng bộ giờ kết thúc ca thi cũ, bỏ cột `job_postings.online_test_duration_minutes`.

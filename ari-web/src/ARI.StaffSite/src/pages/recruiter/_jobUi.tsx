@@ -132,9 +132,6 @@ export const sessionStatusBadge = (s: string): string =>
     error: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
   } as Record<string, string>)[s] || 'bg-ink-100 dark:bg-white/10 text-ink-600 dark:text-ink-300'
 
-export const scoreColor = (s?: number | null) =>
-  s == null ? 'text-ink-400' : s >= 75 ? 'text-emerald-600 dark:text-emerald-400' : s >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
-
 export const initials = (name?: string | null) =>
   (name || 'U')
     .trim()

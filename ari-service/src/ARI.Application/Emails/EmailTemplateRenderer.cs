@@ -21,8 +21,9 @@ namespace ARI.Application.Emails
     /// </summary>
     public interface IEmailTemplateRenderer
     {
+        /// <param name="variant">Tham số phụ dạng chuỗi theo mẫu — thư kết quả phỏng vấn dùng để truyền verdict sắp chốt.</param>
         Task<Result<RenderedEmail>> RenderAsync(
-            string templateKey, Guid contextId, Guid? secondaryId, CancellationToken ct);
+            string templateKey, Guid contextId, Guid? secondaryId, string? variant, CancellationToken ct);
     }
 
     public class EmailTemplateRenderer : IEmailTemplateRenderer
@@ -37,7 +38,7 @@ namespace ARI.Application.Emails
         }
 
         public async Task<Result<RenderedEmail>> RenderAsync(
-            string templateKey, Guid contextId, Guid? secondaryId, CancellationToken ct)
+            string templateKey, Guid contextId, Guid? secondaryId, string? variant, CancellationToken ct)
         {
             var key = (templateKey ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -46,6 +47,7 @@ namespace ARI.Application.Emails
                 EmailTemplateKeys.InterviewInvite => await RenderInterviewInviteAsync(contextId, secondaryId, ct),
                 EmailTemplateKeys.ApplicationRejected => await RenderApplicationRejectedAsync(contextId, ct),
                 EmailTemplateKeys.OfferSent => await RenderOfferAsync(contextId, ct),
+                EmailTemplateKeys.InterviewResult => await RenderInterviewResultAsync(contextId, secondaryId, variant, ct),
                 _ => Result.Failure<RenderedEmail>($"Không biết mẫu thư '{templateKey}'.", CommonErrorCodes.NotFound),
             };
         }
@@ -100,6 +102,37 @@ namespace ARI.Application.Emails
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             var mail = ARI.Application.Offers.OfferEmail.Build(
                 offer, app, job, _configuration["Frontend:CandidateBaseUrl"]);
+
+            return Result.Success(new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName));
+        }
+
+        /// <summary>
+        /// Thư kết quả vòng phỏng vấn — cùng builder và cùng hàm suy biến thể với lệnh chốt, nên thứ HM
+        /// sửa trong trình soạn đúng là thứ ứng viên nhận (ADR-074).
+        /// </summary>
+        private async Task<Result<RenderedEmail>> RenderInterviewResultAsync(
+            Guid applicationId, Guid? evaluationId, string? verdict, CancellationToken ct)
+        {
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                .GetByIdAsync(applicationId, ct);
+            if (app == null)
+                return Result.Failure<RenderedEmail>(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
+
+            // Báo cáo phải THUỘC hồ sơ đang xem — quyền đã kiểm trên hồ sơ, không phải trên báo cáo.
+            var evaluation = evaluationId is { } eid && eid != Guid.Empty
+                ? await _unitOfWork.Repository<Evaluation>().GetByIdAsync(eid, ct)
+                : null;
+            if (evaluation == null || evaluation.ApplicationId != app.Id)
+                return Result.Failure<RenderedEmail>("Không tìm thấy báo cáo đánh giá của hồ sơ này.", CommonErrorCodes.NotFound);
+
+            if (verdict is not ("pass" or "not_pass"))
+                return Result.Failure<RenderedEmail>("Chọn kết quả Đạt/Không đạt trước khi xem thư.");
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+            var totalRounds = await InterviewResultEmail.TotalRoundsAsync(_unitOfWork, app.JobPostingId, ct);
+            var mail = InterviewResultEmail.Build(
+                app, job, InterviewResultEmail.ResolveVariant(verdict, evaluation.RoundNumber, totalRounds),
+                evaluation.RoundNumber, FrontendUrls.Candidate(_configuration));
 
             return Result.Success(new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName));
         }

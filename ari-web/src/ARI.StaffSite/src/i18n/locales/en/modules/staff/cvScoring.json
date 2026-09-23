@@ -1,7 +1,7 @@
 {
   "editor": {
     "title": "CV scoring rubric",
-    "hint": "Candidate CVs are scored strictly against these criteria: AI gives each criterion 0–100 with quotes from the CV, and the final score is the weighted average. Without a rubric no CV can be scored.",
+    "hint": "CVs are scored strictly against these criteria: the AI reads the CV, picks a band from your anchors and answers each checklist item with a quote — it never gives a number. The final score comes from this job's formula in the \"Scoring formula\" block below. Without a rubric no CV can be scored.",
     "aiSuggest": "AI suggest",
     "aiSuggesting": "AI is drafting…",
     "aiNeedsContent": "Enter the position and a description or candidate requirements before asking AI.",
@@ -25,10 +25,10 @@
     "showLevels": "Score bands ({{count}}/4)",
     "hideLevels": "Hide score bands",
     "level": {
-      "excellent": "90–100 · Excellent",
-      "good": "70–89 · Good",
-      "fair": "40–69 · Partial",
-      "poor": "0–39 · Not met"
+      "excellent": "{{min}}–{{max}} · Excellent",
+      "good": "{{min}}–{{max}} · Good",
+      "fair": "{{min}}–{{max}} · Partial",
+      "poor": "{{min}}–{{max}} · Not met"
     },
     "levelPlaceholder": {
       "excellent": "e.g. 4+ years shipping real products, technical leadership",
@@ -44,11 +44,15 @@
     "problems": {
       "empty": "At least 1 criterion is required.",
       "missingName": "A criterion has no name.",
-      "badWeight": "Each weight must be greater than 0.",
-      "total": "Weights must add up to 100 (currently {{total}}).",
-      "missingGuide": "Each criterion needs a scoring guide or at least one score band.",
+      "badWeight": "Each scored criterion needs a weight greater than 0.",
+      "total": "Weights of the scored criteria must add up to 100 (currently {{total}}).",
+      "missingGuide": "Each scored criterion needs a scoring guide or at least one score band.",
       "tooMany": "At most 20 criteria.",
-      "tooManyChecks": "At most 8 checklist items per criterion."
+      "tooManyChecks": "At most 8 checklist items per criterion.",
+      "noScored": "At least one scored criterion is required — required conditions do not produce a score.",
+      "tooManyKnockouts": "At most {{max}} required conditions.",
+      "badMinScore": "A criterion minimum must be a whole number from 1 to 100.",
+      "badCheckWeight": "Checklist item weights can only be ×1, ×2 or ×3."
     },
     "warnings": "Review before saving:",
     "empty": "No criteria yet. Use \"AI suggest\", pick a company template, import Excel or add them manually.",
@@ -56,14 +60,25 @@
     "error": "Something went wrong. Please try again.",
     "checks": {
       "title": "Checklist ({{count}})",
-      "hint": "The AI only answers yes/no per item with a quote; the score inside the band = band floor + share of items met × band width.",
+      "hint": "The AI only answers yes/no per item with a quote; the score inside the band = band floor + (weight of items met ÷ weight of items answered) × band width.",
       "emptyHint": "No checklist yet — the AI will estimate where the score sits inside the band. Add 3–5 signals verifiable from a CV so two CVs in the same band are ranked correctly.",
       "placeholder": "e.g. 4+ years of production .NET",
       "item": "Checklist item {{n}}",
       "add": "Add checklist item",
       "remove": "Remove checklist item",
-      "readOnlyTitle": "Checklist (decides the score inside the band):"
-    }
+      "readOnlyTitle": "Checklist (decides the score inside the band):",
+      "weight": "Item weight",
+      "weightTitle": "This item weighs ×{{n}}"
+    },
+    "kind": {
+      "knockout": "Required condition",
+      "badge": "Required",
+      "knockoutHint": "The AI only answers Met / Not met with a quote from the CV; if the CV does not mention it, it is not met. Not met → recommendation \"Not a fit\", but the score is still calculated and the application is never rejected automatically. Use only for truly essential requirements (licences, mandatory certificates…).",
+      "notePlaceholder": "Note for the AI (optional) — e.g. equivalent international certificates are accepted"
+    },
+    "minScore": "Minimum",
+    "minScoreHint": "Optional — if this criterion scores below it, the recommendation becomes \"Not a fit\" even with a high total (the score is kept, the application is not rejected automatically).",
+    "minScoreChip": "Min {{min}}"
   },
   "panel": {
     "title": "CV scoring rubric",
@@ -77,12 +92,15 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "download": "Download Excel",
-    "rescoreWarning": "Saving a new rubric re-scores {{count}} applications of this job. Previous scores are kept as history.",
-    "saved": "Saved. Applications are being re-scored with the new rubric.",
+    "rescoreWarning": "Saving affects {{count}} applications: editing criterion text, anchors or checklist items, or adding a required condition makes the AI re-score them; changing only the formula (weights, thresholds, minimums, item weights) recalculates the scores immediately without calling the AI. Use \"Preview impact\" to see each application first.",
+    "saved": "Saved. Applications are being re-scored by the AI with the new rubric. Previous scores are kept as history.",
     "readOnlyHint": "The job's primary Hiring Manager manages this rubric.",
     "loadError": "Could not load the rubric.",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "savedRecompute": "New formula saved. Scores and recommendations of {{count}} applications are being recalculated from the existing AI results — no AI re-scoring.",
+    "savedUnchanged": "Nothing changed — the current rubric and formula are kept.",
+    "preview": "Preview impact"
   },
   "status": {
     "scored": "Scored",
@@ -93,7 +111,13 @@
     "no_cv": "No CV",
     "scoring_failed": "Scoring failed · will retry",
     "retryAt": "Retries automatically at {{time}}",
-    "retryingSoon": "Retries on the next scoring sweep"
+    "retryingSoon": "Retries on the next scoring sweep",
+    "gate": {
+      "fail": "Failed condition",
+      "failHint": "A required condition is not met or a criterion is below its minimum — recommendation \"Not a fit\". The application is not rejected automatically.",
+      "review": "Needs review",
+      "reviewHint": "A condition could not be verified from the CV by the AI — a person should check it."
+    }
   },
   "breakdown": {
     "title": "CV score and how it was calculated",
@@ -126,13 +150,7 @@
     "redFlags": "Red flags",
     "seniority": "Seniority vs JD",
     "experience": "Experience relevance",
-    "recommendation": "Recommendation (derived from score)",
-    "rec": {
-      "Strong Hire": "Strong fit (80+)",
-      "Hire": "Good fit (65–79)",
-      "Proceed with caution": "Consider (50–64)",
-      "Reject": "Not a fit (below 50)"
-    },
+    "recommendation": "Recommendation (from this job's formula)",
     "meta": "Scored {{time}} · {{model}}",
     "rubricMeta": "Current rubric saved {{time}} by {{name}}",
     "oldRubric": "This score was calculated with a previous rubric version.",
@@ -164,7 +182,34 @@
       "title": "Score inside the band",
       "checklist": "{{band}} band ({{min}}–{{max}}) · {{met}}/{{answered}} items met → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
       "ai": "{{band}} band ({{min}}–{{max}}) · this criterion has no checklist, so the AI estimated the position inside the band.",
-      "aiNoBand": "Score estimated by the AI (scored before checklists existed)."
+      "aiNoBand": "Score estimated by the AI (scored before checklists existed).",
+      "checklistWeighted": "{{band}} band ({{min}}–{{max}}) · weight of items met {{met}}/{{answered}} → {{min}} + {{met}}/{{answered}} × {{span}} = {{exact}} → {{score}}",
+      "aiPosition": "{{band}} band ({{min}}–{{max}}) · the AI placed it at {{position}} inside the band → {{min}} + {{position}} × {{span}} = {{exact}} → {{score}}"
+    },
+    "recName": {
+      "Strong Hire": "Strong fit",
+      "Hire": "Good fit",
+      "Proceed with caution": "Consider",
+      "Reject": "Not a fit"
+    },
+    "recRange": "{{name}} ({{from}}–{{to}})",
+    "recForced": "Not a fit — a formula condition failed",
+    "scoreTier": "By score: {{tier}}",
+    "derived": "Recalculated {{time}} with the new formula from the AI ({{model}}) reading of {{observed}} — the AI was not called again.",
+    "gates": {
+      "title": "Formula conditions",
+      "status": {
+        "pass": "All required conditions and minimums are met.",
+        "fail": "At least one condition failed — the recommendation is forced to \"Not a fit\". The score is kept; the application is not rejected automatically.",
+        "review": "Some conditions could not be verified from the CV — a person should check them. The recommendation is not forced."
+      },
+      "minScore": "{{label}}: {{score}} (minimum {{min}})",
+      "reason": {
+        "knockout_failed": "The CV does not show this condition is met.",
+        "knockout_unverified": "The AI could not verify it (no supporting quote) — check manually.",
+        "below_min_score": "Below the minimum the Hiring Manager set for this criterion.",
+        "min_score_unscored": "The criterion produced no score — check manually."
+      }
     }
   },
   "jobChip": {
@@ -176,5 +221,102 @@
     "title": "CV scoring rubric",
     "fromRequest": "Set by the Hiring Manager on the request — the job will score CVs with it. The HM can edit it on the job screen.",
     "missing": "This request has no rubric. You can still create the job, but the Hiring Manager must add a rubric on the job screen before you submit it."
+  },
+  "interviewEditor": {
+    "hint": "The AI scores the candidate's answers against exactly these criteria: 0–100 per criterion, then a weighted average compared with the job's pass mark. Without criteria the interview produces no report.",
+    "namePlaceholder": "E.g. .NET technical knowledge",
+    "guidePlaceholder": "What does a strong answer show?",
+    "levelsHint": "Describe answers in each score band (correct fundamentals, real examples, trade-offs…) so the AI scores consistently.",
+    "levelPlaceholder": {
+      "excellent": "E.g. Explains the fundamentals correctly, covers trade-offs and edge cases",
+      "good": "E.g. Gets the main points right with an example, but not in depth",
+      "fair": "E.g. Partly right, some concepts confused",
+      "poor": "E.g. Wrong or unable to answer"
+    },
+    "noTemplates": "No templates yet — an HR Admin adds interview rubric templates on the Playbook page.",
+    "empty": "No criteria yet. Use \"AI suggest\", pick a company template, import Excel or add them by hand.",
+    "aiNeedsContent": "The job needs a title and a description before the AI can suggest criteria."
+  },
+  "interviewPanel": {
+    "title": "Interview scoring criteria",
+    "jobLevelTitle": "Shared set · applies to every interview round",
+    "roundsTitle": "By round",
+    "roundLabel": "Round {{n}} · {{type}}",
+    "roundType": {
+      "screening": "Screening",
+      "technical": "Technical",
+      "online_test": "Online test"
+    },
+    "roundUsesJob": "Uses the shared set",
+    "roundOwn": "Own set · {{count}} criteria",
+    "roundMissing": "No criteria",
+    "createOwn": "Add own set",
+    "editOwn": "Edit own set",
+    "removeOwn": "Remove own set",
+    "roundEditHint": "This set applies to this round only. Removing it makes the round use the job's shared set again.",
+    "missing": "Round {{rounds}} has no scoring criteria — its interviews will not get a report, and the job cannot be published.",
+    "waiting": "{{count}} finished interview(s) are waiting for scoring criteria. Once you save the criteria the reports are generated automatically.",
+    "empty": "No criteria yet. The job's primary Hiring Manager sets the interview scoring criteria before publishing.",
+    "saved": "Interview scoring criteria saved.",
+    "savedWithWaiting": "Saved. The waiting interviews have been queued for scoring — their reports appear automatically when done.",
+    "roundRemoved": "Own set removed — this round now uses the job's shared set."
+  },
+  "formula": {
+    "title": "Scoring formula",
+    "hint": "The Hiring Manager decides how the AI's answers become a score and a recommendation. Changing the formula (not the criterion text) recalculates scores immediately from the existing AI results — no AI re-scoring.",
+    "isDefault": "Using defaults",
+    "reset": "Reset to defaults",
+    "total": "CV score",
+    "inBand": "Each criterion = band floor + (weight of items met ÷ weight of items answered) × band width; criteria the AI could not score are left out of both numerator and denominator.",
+    "modelCompensatory": "Compensatory model: a high score on one criterion can make up for a low score on another. Add required conditions or per-criterion minimums to stop that.",
+    "modelHybrid": "Hybrid model (compensatory + conditions). The recommendation is forced to \"Not a fit\" if:",
+    "gateKnockout": "\"{{name}}\" is not met",
+    "gateMin": "{{name}} < {{min}}",
+    "gatesNote": "The score is still calculated and shown; the application is never rejected automatically.",
+    "bandsTitle": "Band thresholds",
+    "bandsHint": "The AI picks a band from your anchors; the thresholds decide how many points that band is worth. Each band must be at least 5 points wide.",
+    "bandFrom": {
+      "excellentFrom": "Excellent from",
+      "goodFrom": "Good from",
+      "fairFrom": "Partial from"
+    },
+    "tiersTitle": "Recommendation thresholds",
+    "tiersHint": "Compared with the (rounded) total CV score.",
+    "tierFrom": {
+      "strongHireFrom": "Strong fit from",
+      "hireFrom": "Good fit from",
+      "cautionFrom": "Consider from"
+    },
+    "problems": {
+      "badBands": "Band thresholds must be whole numbers in decreasing order: Excellent > Good > Partial > 0, with Excellent below 100.",
+      "bandTooNarrow": "Each band must be at least 5 points wide.",
+      "badTiers": "Recommendation thresholds must be whole numbers in decreasing order within 1–100: Strong fit > Good fit > Consider."
+    },
+    "summaryBands": "Bands: Excellent {{excellent}} · Good {{good}} · Partial {{fair}} · Not met {{poor}}",
+    "summaryTiers": "Recommendation: Strong fit from {{strong}} · Good fit from {{hire}} · Consider from {{caution}}",
+    "summaryGates": "Not a fit if: {{list}}",
+    "sourcesTitle": "References",
+    "sourcesHint": "The parameters follow the common frame of recruitment guidance: screen out on required conditions → score on an anchored scale → weighted sum → compare with thresholds.",
+    "sources": {
+      "opm": "US OPM — Training & Experience Evaluations: screen minimum requirements before scoring",
+      "uwyo": "University of Wyoming — Hiring Matrix: evidence-anchored scale, ×1/×2/×3 weights, minimums as a gate",
+      "fourCorner": "4 Corner Resources — Resume Screening Scorecard: weights and advancement thresholds per role",
+      "zythr": "ZYTHR — Weighted Candidate Scoring Matrix: mandatory vs graded criteria, calibrate on past applicants",
+      "libretexts": "LibreTexts HRM — Testing and Selecting: compensatory, multiple cutoff, multiple hurdle models",
+      "ticnote": "TicNote — How to Score Resumes Objectively: knockout lane vs scored lane, tiered thresholds"
+    }
+  },
+  "preview": {
+    "title": "Impact if you save this version",
+    "noApplications": "This job has no applications with a CV yet.",
+    "recompute": "{{count}} applications are recalculated immediately (no AI call): {{scoreChanged}} change score, {{recChanged}} change recommendation.",
+    "gates": "Under the new formula: {{fail}} applications fail a condition, {{review}} need review.",
+    "aiRescore": "{{count}} applications must be re-scored by the AI (you edited criterion text / anchors / checklist items or added a condition) — one AI call each.",
+    "pending": "{{count}} applications have never been scored — they will be scored with the new rubric.",
+    "candidate": "Candidate",
+    "before": "Now",
+    "after": "After saving",
+    "needsAi": "Awaiting AI re-scoring",
+    "more": "and {{count}} more"
   }
 }

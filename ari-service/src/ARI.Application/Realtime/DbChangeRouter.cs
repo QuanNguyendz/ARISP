@@ -95,6 +95,7 @@ namespace ARI.Application.Realtime
 
         public const string HrAdminGroup = "hr_admin";
         public const string SuperAdminGroup = "super_admin";
+        public const string RecruiterGroup = "recruiter";
 
         /// <summary>Bảng chỉ mang <c>application_id</c> — cần tra hồ sơ để biết ứng viên + chủ tin.</summary>
         private static readonly HashSet<string> ApplicationScopedTables = new(StringComparer.Ordinal)
@@ -281,9 +282,11 @@ namespace ARI.Application.Realtime
 
                 // Mẫu JD của công ty (ADR-064): cấu hình dùng chung, HR Leader sở hữu. Đổi mẫu thì
                 // trình soạn JD đang mở phải thấy ngay — nếu không, Recruiter soạn theo bố cục cũ
-                // rồi xuất ra file theo bố cục mới.
+                // rồi xuất ra file theo bố cục mới. Recruiter là người DÙNG trình soạn nhiều nhất,
+                // nên thiếu nhóm của họ thì câu trên chỉ đúng với HR Leader.
                 case "jd_templates":
                     groups.Add(HrAdminGroup);
+                    groups.Add(RecruiterGroup);
                     break;
 
                 // Bản JD đã soạn cho một phiếu (ADR-064). Chỉ người SOẠN và nhóm HR Leader —
@@ -305,7 +308,14 @@ namespace ARI.Application.Realtime
                     groups.Add(HrAdminGroup);
                     break;
 
+                // Tài khoản nhân sự: Super Admin quản lý, và CHÍNH CHỦ tài khoản (id của row là id
+                // người dùng) — Super Admin gán đội cho họ (ADR-065) thì ô "Đội" ở màn Cài đặt của họ
+                // phải đổi ngay, vì đó là giá trị sẽ bị ghi cứng vào phiếu họ lập.
                 case "users":
+                    Add(users, change.Id);
+                    groups.Add(SuperAdminGroup);
+                    break;
+
                 case "system_settings":
                     groups.Add(SuperAdminGroup);
                     break;

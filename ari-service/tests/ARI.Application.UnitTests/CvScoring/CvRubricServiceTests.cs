@@ -35,7 +35,7 @@ public class CvRubricServiceTests
         var rag = new RecordingRagIngestionService();
         var storage = new RecordingFileStorage();
 
-        var res = await RubricService(uow, queue, rag, storage).SaveForJobAsync(job.Id, TwoCriteria(), Guid.NewGuid(), CancellationToken.None);
+        var res = await RubricService(uow, queue, rag, storage).SaveForJobAsync(job.Id, TwoCriteria(), null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.True(res.Value.Changed);
@@ -55,7 +55,7 @@ public class CvRubricServiceTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(old);
         var rag = new RecordingRagIngestionService();
 
-        var res = await RubricService(uow, rag: rag).SaveForJobAsync(job.Id, TwoCriteria(), Guid.NewGuid(), CancellationToken.None);
+        var res = await RubricService(uow, rag: rag).SaveForJobAsync(job.Id, TwoCriteria(), null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.NotNull(old.DeletedAt);
@@ -73,8 +73,8 @@ public class CvRubricServiceTests
         var queue = new RecordingCvScoringQueue();
         var service = RubricService(uow, queue);
 
-        await service.SaveForJobAsync(job.Id, TwoCriteria(), Guid.NewGuid(), CancellationToken.None);
-        var again = await service.SaveForJobAsync(job.Id, TwoCriteria(), Guid.NewGuid(), CancellationToken.None);
+        await service.SaveForJobAsync(job.Id, TwoCriteria(), null, Guid.NewGuid(), CancellationToken.None);
+        var again = await service.SaveForJobAsync(job.Id, TwoCriteria(), null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.False(again.Value.Changed);
         Assert.Single(uow.Repo<PlaybookDocument>().Items);
@@ -90,7 +90,7 @@ public class CvRubricServiceTests
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(old);
         var rag = new RecordingRagIngestionService { ThrowOnIngest = true };
 
-        var res = await RubricService(uow, rag: rag).SaveForJobAsync(job.Id, TwoCriteria(), Guid.NewGuid(), CancellationToken.None);
+        var res = await RubricService(uow, rag: rag).SaveForJobAsync(job.Id, TwoCriteria(), null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Null(old.DeletedAt);
@@ -104,7 +104,7 @@ public class CvRubricServiceTests
         var uow = new InMemoryUnitOfWork().Seed(job);
         var bad = new[] { new RubricCriterion { Key = "a", Name = "A", Weight = 50 } };
 
-        var res = await RubricService(uow).SaveForJobAsync(job.Id, bad, Guid.NewGuid(), CancellationToken.None);
+        var res = await RubricService(uow).SaveForJobAsync(job.Id, bad, null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(res.IsFailure);
         Assert.Empty(uow.Repo<PlaybookDocument>().Items);
@@ -129,6 +129,41 @@ public class CvRubricServiceTests
         Assert.Equal(new[] { "experience", "skills" }, CvRubricStore.Criteria(live).Select(c => c.Key));
     }
 
+    /// <summary>ADR-075: công thức đi cùng bộ tiêu chí từ phiếu sang tin, và sửa công thức là một phiên bản mới.</summary>
+    [Fact]
+    public async Task Request_formula_is_copied_to_the_job_and_can_be_changed_afterwards()
+    {
+        var job = Job();
+        var policy = new CvScoringPolicy
+        {
+            Bands = new CvBandCuts { ExcellentFrom = 85, GoodFrom = 65, FairFrom = 40 },
+            Tiers = new CvTierCuts { StrongHireFrom = 85, HireFrom = 70, CautionFrom = 55 },
+        };
+        var request = new RecruitmentRequest
+        {
+            RequestedByUserId = Guid.NewGuid(),
+            CvRubricJson = ScoringRubric.Serialize(TwoCriteria()),
+            CvScoringPolicyJson = CvScoringPolicy.ToStorage(policy),
+        };
+        var uow = new InMemoryUnitOfWork().Seed(job);
+        var service = RubricService(uow);
+
+        Assert.True((await service.CopyFromRequestAsync(job, request, CancellationToken.None)).IsSuccess);
+        var live = (await CvRubricStore.LiveAsync(uow, job.Id))!;
+        Assert.True(CvRubricStore.Policy(live).SameAs(policy));
+
+        // Lưu y hệt (kể cả công thức) → không tạo phiên bản mới.
+        var same = await service.SaveForJobAsync(job.Id, CvRubricStore.Criteria(live), policy, Guid.NewGuid(), CancellationToken.None);
+        Assert.False(same.Value!.Changed);
+
+        // Chỉ đổi ngưỡng khuyến nghị → phiên bản mới, và là thay đổi CHỈ CÔNG THỨC.
+        policy.Tiers.HireFrom = 60;
+        var changed = await service.SaveForJobAsync(job.Id, CvRubricStore.Criteria(live), policy, Guid.NewGuid(), CancellationToken.None);
+        Assert.True(changed.Value!.Changed);
+        Assert.True(changed.Value.FormulaOnly);
+        Assert.Equal(60, CvRubricStore.Policy(changed.Value.Document).Tiers.HireFrom);
+    }
+
     [Fact]
     public async Task Legacy_request_without_rubric_copies_nothing()
     {
@@ -147,7 +182,7 @@ public class CvRubricServiceTests
     {
         public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
             => Task.FromResult((TResponse)(object)Result.Success(new JobCvRubricDto(
-                Array.Empty<CvRubricCriterionInput>(), null, null, null, true, 0, 0)));
+                Array.Empty<CvRubricCriterionInput>(), null, null, null, true, 0, 0, CvScoringPolicy.Default)));
         public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default) where TRequest : IRequest => Task.CompletedTask;
         public Task<object?> Send(object request, CancellationToken cancellationToken = default) => Task.FromResult<object?>(null);
         public System.Collections.Generic.IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

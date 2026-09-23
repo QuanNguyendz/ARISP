@@ -39,9 +39,24 @@ namespace ARI.Application.CvScoring
             public string? Reasoning { get; set; }
             /// <summary>Dải AI chọn (excellent | good | fair | poor).</summary>
             public string? Band { get; set; }
-            /// <summary><c>checklist</c> = vị trí trong dải tính từ ý kiểm · <c>ai</c> = AI ước lượng.</summary>
+            /// <summary><c>checklist</c> = vị trí trong dải tính từ ý kiểm · <c>ai</c> = từ vị trí / số AI cho.</summary>
             public string? ScoreSource { get; set; }
             public List<CheckItem>? Checks { get; set; }
+
+            // ---- ADR-075 ----
+            /// <summary><c>knockout</c> = điều kiện bắt buộc; bỏ trống = tiêu chí chấm điểm.</summary>
+            public string? Kind { get; set; }
+            /// <summary>Điểm tối thiểu của tiêu chí lúc chấm.</summary>
+            public int? MinScore { get; set; }
+            /// <summary>Điều kiện bắt buộc: đạt (có trích dẫn) / không đạt / null = AI không trả lời.</summary>
+            public bool? Met { get; set; }
+            /// <summary>Điều kiện bắt buộc bị đánh "đạt" mà không có trích dẫn.</summary>
+            public bool? Unsupported { get; set; }
+            /// <summary>Kết quả cổng: <c>pass</c> | <c>fail</c> | <c>unknown</c>.</summary>
+            public string? Gate { get; set; }
+            public string? GateReason { get; set; }
+            /// <summary>Vị trí 0..1 AI cho trong dải (tiêu chí không có ý kiểm).</summary>
+            public decimal? Position { get; set; }
         }
 
         public sealed class CheckItem
@@ -53,77 +68,72 @@ namespace ARI.Application.CvScoring
             public string? Evidence { get; set; }
             /// <summary>AI đánh "đạt" nhưng không trích được bằng chứng — không tính.</summary>
             public bool? Unsupported { get; set; }
+            /// <summary>Trọng số ý lúc chấm (ADR-075); bỏ trống = ×1.</summary>
+            public int? Weight { get; set; }
         }
 
         public sealed record View(
             string Key, decimal? Score, string? Label, decimal? Weight, string? Description,
             RubricLevels? Levels, string? Evidence, string? Reasoning,
-            string? Band = null, string? ScoreSource = null, IReadOnlyList<CheckItem>? Checks = null);
-
-        /// <summary>Điểm AI theo mã tiêu chí (khớp không phân biệt hoa thường / khoảng trắng).</summary>
-        public static Dictionary<string, CvCriterionAiResult> IndexAiResults(
-            IReadOnlyList<RubricCriterion> criteria, IEnumerable<CvCriterionAiResult>? results)
+            string? Band = null, string? ScoreSource = null, IReadOnlyList<CheckItem>? Checks = null,
+            string? Kind = null, int? MinScore = null, bool? Met = null, bool? Unsupported = null,
+            string? Gate = null, string? GateReason = null, decimal? Position = null)
         {
-            var map = new Dictionary<string, CvCriterionAiResult>(StringComparer.OrdinalIgnoreCase);
-            foreach (var r in results ?? Enumerable.Empty<CvCriterionAiResult>())
-            {
-                if (r == null || string.IsNullOrWhiteSpace(r.Key)) continue;
-                var normalized = r.Key.Trim().Replace(' ', '_');
-                var match = criteria.FirstOrDefault(c => string.Equals(c.Key, normalized, StringComparison.OrdinalIgnoreCase));
-                if (match == null || map.ContainsKey(match.Key)) continue; // mã lạ / chấm trùng → bỏ
-                map[match.Key] = r;
-            }
-            return map;
+            public bool IsKnockout => string.Equals(Kind, RubricCriterionKinds.Knockout, StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Điểm hợp lệ (đã ra được) theo mã — đầu vào của <see cref="ScoringRubric.ComputeOverall"/>. Điểm từng tiêu chí
-        /// đi qua <see cref="CvCriterionScoring.Resolve"/>: có ý kiểm thì vị trí trong dải do backend tính.
-        /// </summary>
-        public static Dictionary<string, decimal> Scores(
-            IReadOnlyList<RubricCriterion> criteria, IReadOnlyDictionary<string, CvCriterionAiResult> indexed)
-        {
-            var scores = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            foreach (var c in criteria)
-            {
-                indexed.TryGetValue(c.Key, out var ai);
-                if (CvCriterionScoring.Resolve(c, ai).Score is { } s) scores[c.Key] = s;
-            }
-            return scores;
-        }
-
-        public static string Serialize(
-            IReadOnlyList<RubricCriterion> criteria, IReadOnlyDictionary<string, CvCriterionAiResult> indexed)
+        /// <summary>Ảnh chụp của một kết quả áp công thức — đủ để giải thích lại con số mà không cần bộ tiêu chí sống.</summary>
+        public static string Serialize(CvScoreResult result)
         {
             var snapshot = new Dictionary<string, Item>();
-            for (int i = 0; i < criteria.Count; i++)
+            for (int i = 0; i < result.Criteria.Count; i++)
             {
-                var c = criteria[i];
-                indexed.TryGetValue(c.Key, out var ai);
-                var outcome = CvCriterionScoring.Resolve(c, ai);
-                snapshot[c.Key] = new Item
-                {
-                    Order = i,
-                    Score = outcome.Score,
-                    Label = c.Name,
-                    Weight = c.Weight,
-                    Description = c.Description,
-                    Levels = c.Levels,
-                    Evidence = string.IsNullOrWhiteSpace(ai?.Evidence) ? null : ai!.Evidence.Trim(),
-                    Reasoning = string.IsNullOrWhiteSpace(ai?.Reasoning) ? null : ai!.Reasoning.Trim(),
-                    Band = outcome.Band,
-                    ScoreSource = outcome.Source,
-                    Checks = outcome.Checks.Count == 0
-                        ? null
-                        : outcome.Checks.Select(x => new CheckItem
-                        {
-                            Key = x.Key,
-                            Text = x.Text,
-                            Met = x.Met,
-                            Evidence = x.Evidence,
-                            Unsupported = x.Unsupported ? true : null,
-                        }).ToList(),
-                };
+                var r = result.Criteria[i];
+                var c = r.Criterion;
+                var outcome = r.Outcome;
+                snapshot[c.Key] = c.IsKnockout
+                    ? new Item
+                    {
+                        Order = i,
+                        Label = c.Name,
+                        Weight = 0,
+                        Description = c.Description,
+                        Evidence = r.Evidence,
+                        Reasoning = r.Reasoning,
+                        Kind = RubricCriterionKinds.Knockout,
+                        Met = r.KnockoutMet,
+                        Unsupported = r.KnockoutUnsupported ? true : null,
+                        Gate = r.Gate,
+                        GateReason = r.GateReason,
+                    }
+                    : new Item
+                    {
+                        Order = i,
+                        Score = outcome.Score,
+                        Label = c.Name,
+                        Weight = c.Weight,
+                        Description = c.Description,
+                        Levels = c.Levels,
+                        Evidence = r.Evidence,
+                        Reasoning = r.Reasoning,
+                        Band = outcome.Band,
+                        ScoreSource = outcome.Source,
+                        Position = outcome.Position,
+                        MinScore = c.MinScore,
+                        Gate = r.Gate,
+                        GateReason = r.GateReason,
+                        Checks = outcome.Checks.Count == 0
+                            ? null
+                            : outcome.Checks.Select(x => new CheckItem
+                            {
+                                Key = x.Key,
+                                Text = x.Text,
+                                Met = x.Met,
+                                Evidence = x.Evidence,
+                                Unsupported = x.Unsupported ? true : null,
+                                Weight = x.Weight == 1 ? null : x.Weight,
+                            }).ToList(),
+                    };
             }
             return JsonSerializer.Serialize(snapshot, JsonOpts);
         }
@@ -157,7 +167,8 @@ namespace ARI.Application.CvScoring
                             var hasOrder = prop.Value.TryGetProperty("order", out _);
                             result.Add((hasOrder ? item.Order : 1000 + position, new View(
                                 prop.Name, item.Score, item.Label, item.Weight, item.Description,
-                                item.Levels, item.Evidence, item.Reasoning, item.Band, item.ScoreSource, item.Checks)));
+                                item.Levels, item.Evidence, item.Reasoning, item.Band, item.ScoreSource, item.Checks,
+                                item.Kind, item.MinScore, item.Met, item.Unsupported, item.Gate, item.GateReason, item.Position)));
                             break;
                     }
                 }
@@ -171,22 +182,7 @@ namespace ARI.Application.CvScoring
             return result.OrderBy(r => r.Order).Select(r => r.View).ToList();
         }
 
-        // ---------- Khuyến nghị suy ra từ ĐIỂM (không hỏi AI) ----------
-
-        public const int StrongHireFrom = 80;
-        public const int HireFrom = 65;
-        public const int CautionFrom = 50;
-
-        /// <summary>
-        /// Nhãn khuyến nghị suy thẳng từ điểm có trọng số. Trước ADR-070 AI tự chọn nhãn này, nên có lúc
-        /// điểm 45 đi kèm "Hire" — hai phán đoán tổng thể không cùng một gốc.
-        /// </summary>
-        public static string Recommendation(int score) => score switch
-        {
-            >= StrongHireFrom => "Strong Hire",
-            >= HireFrom => "Hire",
-            >= CautionFrom => "Proceed with caution",
-            _ => "Reject",
-        };
+        // Nhãn khuyến nghị suy thẳng từ điểm (không hỏi AI — trước ADR-070 AI tự chọn nhãn, nên có lúc điểm 45 đi kèm
+        // "Hire"). Ngưỡng nay là công thức của tin: CvScoringPolicy.Tier + cổng của CvScoreCalculator (ADR-075).
     }
 }

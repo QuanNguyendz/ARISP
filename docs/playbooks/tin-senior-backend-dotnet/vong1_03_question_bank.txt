@@ -1,0 +1,11 @@
+[Vòng 1 – Câu hỏi gợi ý – Kiểm chứng kinh nghiệm theo CV]
+Hệ thống bạn làm phục vụ khoảng bao nhiêu người dùng hoặc bao nhiêu request, dữ liệu lớn cỡ nào? Nhóm có bao nhiêu người và vai trò của bạn là gì? CV có ghi một công nghệ trùng với JD – bạn đã dùng nó để giải quyết việc gì? Việc khó nhất bạn tự tay làm trong dự án đó là gì?
+
+[Vòng 1 – Câu hỏi gợi ý – Quy trình làm việc nhóm và code review]
+Nhóm của bạn làm việc theo quy trình nào (Scrum, Kanban) và bạn tham gia ước lượng, lập kế hoạch ra sao? Code review ở nhóm bạn diễn ra thế nào, một góp ý review đáng nhớ bạn nhận hoặc đưa ra là gì? Bạn xử lý thế nào khi bất đồng với đồng nghiệp về một quyết định kỹ thuật?
+
+[Vòng 1 – Câu hỏi gợi ý – Học hỏi và phát triển]
+Công nghệ hoặc kỹ năng gần nhất bạn tự học là gì, và bạn đã áp dụng nó vào công việc thế nào? Bạn cập nhật kiến thức .NET mới (phiên bản mới, tính năng mới) bằng cách nào?
+
+[Vòng 1 – Câu hỏi gợi ý – Giao tiếp kỹ thuật]
+Hãy giải thích cho một người không làm kỹ thuật, ví dụ Product Owner, vì sao một tính năng cần thêm thời gian để viết test hoặc để trả nợ kỹ thuật. Bạn thường viết loại tài liệu kỹ thuật nào (README, tài liệu API, ghi chú quyết định) và cho ai đọc?

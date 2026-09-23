@@ -898,6 +898,7 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
 - **Tính chất đáng lưu ý:** NOTIFY **transactional** — chỉ gửi khi transaction COMMIT, rollback thì không sinh sự kiện giả. Đây là thứ mà cơ chế push thủ công ở tầng ứng dụng không bảo đảm được (code có thể push xong rồi transaction mới rollback).
 - **Sửa kèm:** thêm `case 'JobReassigned'` ở FE (lỗ hổng nêu trong Bối cảnh). Thực ra chỉ riêng trigger trên bảng `notifications` đã làm chuông sáng đúng, vì `ReassignJobCommand` có ghi row `Notification` — minh hoạ trực tiếp cho việc lớp lỗi này biến mất chứ không phải được vá từng cái.
 - **Kiểm chứng:** 29 unit test mới cho `DbChangeRouter` → **721/721 pass**; typecheck cả staff lẫn candidate site pass. Chạy thật trên container `pgvector/pgvector:pg17` **trắng**: áp đủ 27 migration → **30 trigger** (`document_chunks` đúng mức STATEMENT, 29 bảng còn lại ROW); `INSERT`/`UPDATE`/`DELETE` đều phát NOTIFY kèm `op` = `I`/`U`/`D` và khoá định tuyến (`recipient_user_id` xuất hiện đúng trong `r`); **`ROLLBACK` không phát gì** — xác nhận tính transactional; chèn **200 dòng** `document_chunks` chỉ sinh **1** event `op="S"` — xác nhận trigger statement-level chặn được bão sự kiện lúc rag-service nạp lại tài liệu; `Down()` gỡ sạch về **0 trigger**, áp lại rồi gọi lại `arisp_attach_change_triggers()` vẫn đúng **30** (không nhân đôi).
+- **Bổ sung 2026-09-19 — lối vào cho màn giữ state cục bộ.** Nhánh `ReceiveDbChange` ở FE chỉ huỷ cache react-query, nên màn dùng `useState` (phiếu tuyển dụng, trình soạn/mẫu JD, đội, tài khoản, cài đặt) không nghe được gì dù server đã định tuyến bảng của chúng. `handleDbChange` nay phát sự kiện DOM `db-table:changed` `{table, op, id}` cho **mọi** bảng (`resync` → `table: '*'`); màn đăng ký bằng `useDbTableChanged([...bảng], handler)` (`@ari/shared/realtime/dbTableRealtime`), có gom đợt 250ms. **Luật cho màn có form:** nạp lại ngầm (không khung tải), và **không nạp đè khi còn thay đổi chưa lưu** — kiểm cả trước lẫn sau `await`. Router mở rộng: `jd_templates` → thêm `role_recruiter`; `users` → thêm chính chủ tài khoản.
 - **Cấu hình:** `Realtime:DbListener:Enabled` (mặc định `true`) + `Realtime:DbListener:Channel` (`arisp_changes`). Tên kênh đi thẳng vào câu lệnh `LISTEN` (không tham số hoá được) nên bị chặn bằng regex `^[a-z_][a-z0-9_]*$`, sai định dạng thì rơi về mặc định.
 - **Đồng bộ môi trường kèm theo:** `docker/.env` máy dev vốn còn trỏ **Supabase** bằng tên biến cũ `DB_CONNECTION_STRING` (chạy được nhờ nhánh fallback ở `Infrastructure/DependencyInjection.cs`), nay chuyển sang container `pgvector:pg17` chạy local với `PGDATA_PATH=./pgdata` — local và production dùng chung một cấu hình, dữ liệu vẫn tách rời hoàn toàn (`docker/pgdata` trên máy dev vs `/var/lib/arisp/pgdata` trên VPS). Thêm `docker/pgdata/` vào `.gitignore`. **Quy tắc bất di bất dịch:** không bao giờ đặt chuỗi kết nối VPS vào `docker/.env` — backend chạy EF migration lúc boot nên cắm nhầm là migration áp thẳng lên dữ liệu thật.
 
@@ -1841,6 +1842,8 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
      bộ tiêu chí (mã `cv_rubric_required`) — kể cả admin vượt chữ ký HM, vì vượt cổng cũng không làm ra được điểm.
   2. **Không có bộ tiêu chí → không gọi AI.** Không còn nhánh "AI tự cho `match_score`". `ICvScoringService.ScoreAsync`
      trả `cv_rubric_required` trước khi chạm tới AI; AI không chấm được tiêu chí nào → **thất bại, không lưu**.
+     *(ADR-075: "không chấm khi thiếu bộ tiêu chí" giữ nguyên; thêm luật **đổi công thức thì tính lại từ câu trả lời cũ
+     của AI, không gọi AI** — xem ADR-075 điểm 5.)*
      Bộ tiêu chí CV chỉ đọc ở **cấp tin** (`CvRubricStore`); `cv_rubric` cấp công ty nay chỉ là **mẫu**; upload
      `cv_rubric` ở phạm vi tin/vòng bị từ chối (phải qua trình soạn); xoá bộ đang sống trả `409` (muốn đổi thì lưu bản mới).
   3. **Mỗi tin đúng một bộ sống, mỗi lần lưu là một PHIÊN BẢN.** Partial UNIQUE
@@ -1883,6 +1886,9 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
     neo, mã để trống thì tự sinh — cho người quen soạn bảng và để lưu trữ/gửi duyệt ngoài hệ thống.
   - **Mức neo 4 dải cố định** (90–100 / 70–89 / 40–69 / 0–39): HM chỉ viết lời, không tự đặt ngưỡng. Có neo thì hai lần
     chấm cùng CV rơi vào cùng dải; không có neo thì "75" là cảm tính của model.
+    > **Bổ sung bởi ADR-075 (2026-09-22):** vẫn đúng **4 dải** và HM vẫn chỉ viết lời cho AI đọc — nhưng **ngưỡng của
+    > dải là công thức của tin**, HM chỉnh được (mặc định giữ nguyên 90/70/40). Lý lẽ "cùng CV rơi vào cùng dải" không
+    > đổi: AI chọn dải theo LỜI neo và nay **không còn thấy con số nào**.
   - **Mọi cửa (phiếu, màn tin, Excel, AI) đi qua `CvRubricEditing.Normalize`** — một bộ luật.
 
 - **Lý do.**
@@ -1999,6 +2005,9 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
   - **Ý kiểm tốt phụ thuộc HM viết tốt:** ý mơ hồ ("kinh nghiệm tốt") thì trả lời có/không cũng mơ hồ. AI gợi ý và
     placeholder hướng về dấu hiệu đo được.
   - Mỗi ý nặng bằng nhau trong dải (không có trọng số con) — giữ đơn giản để HM đọc lại được phép tính.
+    > **Đảo bởi ADR-075 (2026-09-22):** mỗi ý có trọng số **×1/×2/×3** (mặc định ×1 — toàn ×1 ra đúng số cũ). Phép tính
+    > vẫn đọc lại được: màn hồ sơ in "trọng số ý đạt 2/4 → 70 + 2/4 × 19". Tiêu chí KHÔNG có ý kiểm nay nhận **vị trí
+    > 0..1** từ AI thay cho một con số, vì prompt không còn con số nào (ADR-075 điểm 4).
 
 ### ADR-072: Bài trắc nghiệm là một đợt thi có giờ cố định — đóng lúc giờ hẹn + thời lượng; thời lượng có một nguồn
 
@@ -2066,3 +2075,239 @@ có thật** của tin (vòng trắc nghiệm không có AI phỏng vấn).
     vòng đó (màn tạo tin vẫn khai riêng được từng vòng).
   - Đồng hồ vẫn có sai số bằng thời gian truyền mạng của lượt tải đề (dưới một giây), nhỏ hơn nhiều so với 1 phút
     server còn nhận bài.
+
+### ADR-073: Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin, chấm bằng hàng đợi nền
+
+- **Ngày:** 2026-09-19
+- **Trạng thái:** Đã triển khai (giai đoạn 1). **Sửa** ADR-060/062 ở phần "chọn bộ tiêu chí vòng → tin → công ty" (bỏ
+  đường lùi về bộ công ty) và phần "sinh báo cáo ngay trong `EndSessionAsync`".
+
+- **Bối cảnh.** Người dùng báo: buổi thử lẫn buổi thật đều không bao giờ ra báo cáo, giao diện quay "AI đang chấm" mãi.
+  Kiểm chứng trên production (chỉ đọc): hệ thống có **0** tài liệu `interview_rubric`, **1** báo cáo duy nhất (buổi thử
+  2026-08-15, trước khi ADR-062 bắt buộc bộ tiêu chí); hai buổi hoàn tất gần nhất không có báo cáo. Ba lỗi chồng nhau:
+  1. `GenerateEvaluationReportAsync` thoát sớm khi không tìm được bộ tiêu chí — chỉ ghi một dòng `LogError`. Đường lùi về
+     bộ cấp công ty tồn tại trên giấy nhưng không ai tạo bộ nào.
+  2. Báo cáo sinh **ngay trong lệnh đóng phiên**, SAU khi phiên đã lưu `completed`. AI lỗi / model không trả điểm / thiếu
+     bộ tiêu chí → không có lượt nào quay lại chấm. Không có trạng thái nào ghi lại vì sao.
+  3. Giao diện suy "phiên xong mà chưa có báo cáo" thành `evaluating` (nhân sự) / `evaluationPending` (ứng viên).
+  Hệ quả dây chuyền: không báo cáo → HM không chốt được → không hồ sơ nào tới `pass` → luồng offer không bao giờ chạy.
+
+- **Quyết định.**
+  1. **Bộ tiêu chí phỏng vấn do Hiring Manager khai theo TIN** (người dùng chọn, 2026-09-19): một bộ chung áp mọi vòng hội
+     thoại + (tuỳ chọn) bộ riêng theo vòng. **Không lùi về bộ công ty** — bộ `org` chỉ còn là mẫu để chép, như bộ tiêu chí
+     chấm CV (ADR-070). Nguồn đọc duy nhất `InterviewRubricStore` (vòng → tin); đường ghi duy nhất
+     `InterviewRubricService.SaveAsync` (UNIQUE có lọc: một bộ chung sống/tin, một bộ riêng sống/(tin, vòng) — hai index vì
+     `round_number` NULL của bộ chung không bị UNIQUE bắt). Không có ý kiểm (ADR-071 là của CV). Nạp `interview_rubric`
+     cấp tin/vòng như playbook thường bị chặn ở `UploadPlaybookCommand`/`DeletePlaybookCommand`.
+  2. **Cổng lên job board:** `UpdateJobStatusCommand` chặn `→ active` khi còn vòng hội thoại chưa có bộ nào
+     (`InterviewRubricStore.MissingRoundsAsync`, vòng `online_test` không tính), mã `interview_rubric_required`, kể cả khi
+     quản trị viên vượt chữ ký HM. Không chặn ở `→ pending`: người khai là HM, đúng người ký đăng tin.
+  3. **Chấm bằng hàng đợi nền.** `EndSessionAsync` chỉ ghi `evaluation_status = pending` rồi đưa vào `IEvaluationQueue`.
+     `EvaluationHostedService` (2 worker + lượt quét 2′) gọi `InterviewEvaluator.EvaluateSessionAsync`, mỗi kết cục ghi vào
+     cột mới của `interview_sessions`: `pending | processing | done | blocked_no_rubric | no_answers | failed` +
+     `evaluation_attempts`, `evaluation_error`, `evaluation_updated_at`. Lượt quét đưa lại: `pending`; `processing` kẹt quá
+     10′; `failed` còn dưới 3 lượt (giãn 2′/4′…); `blocked_no_rubric` mà tin nay đã có bộ. Lưu bộ tiêu chí cũng đưa ngay các
+     buổi đang chờ vào hàng. Thiếu bộ tiêu chí **không** tốn lượt thử (việc của HM, không phải lỗi AI).
+  4. **Không có câu trả lời:** buổi thử → `no_answers`, không báo cáo; buổi thật → **báo cáo hệ thống** (`not_pass`, không
+     điểm, lý do nói rõ) để HM vẫn chốt/ghi đè được — hồ sơ không kẹt ở "đang phỏng vấn".
+  5. **Đánh giá ngôn ngữ là phần phụ:** lỗi ở đó không còn làm mất báo cáo đã chấm xong điểm tiêu chí.
+  6. **Nói đúng lý do.** Nhân sự: `needs_rubric` (HM khai tiêu chí ở màn tin), `evaluation_failed` + nút "Chấm lại"
+     (`POST /api/evaluations/sessions/{id}/retry` — chủ tin, HM chính, quản trị viên; ghi audit). Ứng viên:
+     `EvaluationProgress.ForDisplay` (`pending | needs_rubric | no_answers | failed | done`), trang xem lại tự hỏi lại mỗi 15″.
+  7. **Mức neo tới được prompt chấm:** rag-service `_rubric_block` in 4 dải điểm dưới từng tiêu chí khi có.
+  8. **Mỗi thành phần một nơi:** màn tin có panel `JobInterviewRubricPanel` (dùng lại `CvRubricEditor` ở
+     `mode="interview"`: mẫu công ty + AI gợi ý `SuggestInterviewRubricAsync` + Excel); mẫu Playbook công ty đổi nhãn
+     thành "Mẫu bộ tiêu chí chấm phỏng vấn".
+
+- **Migration `InterviewEvaluationPipeline`.** 4 cột + index lọc `idx_interview_sessions_evaluation_pending`; backfill phiên
+  `completed` (có báo cáo → `done`, chưa có → `pending` để hàng đợi chấm/nhận diện thiếu bộ tiêu chí); xoá MỀM bộ tiêu chí
+  phỏng vấn trùng (tin, vòng) trước khi tạo hai UNIQUE (`RAISE NOTICE` số dòng). Không bảng mới (quy tắc 24 không áp).
+
+- **Hệ quả.** Tin đang tuyển thiếu bộ tiêu chí vẫn tuyển được, nhưng HM chính nhận nhắc (mỗi ngày khi có buổi đang chờ,
+  một lần khi chưa có buổi nào); khai xong là các buổi đang chờ tự có báo cáo. Lời chào kết thúc không còn chờ AI chấm.
+
+- **Kiểm chứng.** `dotnet test` Application 2091/2091 (viết lại các test sinh báo cáo trên `InterviewEvaluator` + mới:
+  đóng phiên chỉ xếp hàng, 4 kết cục, AI lỗi rồi hồi, không chấm lần hai, lượt quét, không lùi bộ công ty, bộ vòng thắng
+  bộ tin, đường ghi bộ tiêu chí, quyền ghi, chấm lại, trạng thái hiển thị, cổng `interview_rubric_required`), Infrastructure
+  7/7, Domain 63/63; rag-service pytest 37/37. **E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini:** buổi `pending`
+  được lượt quét chấm (84 điểm = trung bình có trọng số, `pass`); tin thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI;
+  HM gọi AI gợi ý (5 tiêu chí, đủ mức neo, không ý kiểm) rồi lưu → buổi đang chờ vào hàng ngay → `done` 78,75; buổi thử
+  không câu trả lời → `no_answers` (API ứng viên trả đúng trạng thái); tắt rag-service → `failed` kèm lý do → bật lại +
+  "Chấm lại" → `done`, có audit `interview_evaluation_retried`.
+
+### ADR-074: Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người
+
+- **Ngày:** 2026-09-19
+- **Trạng thái:** Đã triển khai (giai đoạn 2 của đợt sửa báo cáo phỏng vấn — ADR-073). **Hoàn tất** phần còn nợ của
+  ADR-061 Phase 4 ("kết quả sau khi chốt verdict" chưa có trình soạn).
+
+- **Bối cảnh.** ADR-073 gỡ chỗ tắc phía trên (không báo cáo → không ai chốt → không hồ sơ nào tới `pass`), nên luồng offer
+  lần đầu chạy được tới cuối — và lộ ba lỗ hổng ở đoạn cuối phễu:
+  1. **Thư kết quả là thư quan trọng nhất ứng viên nhận, mà là thư duy nhất không ai xem trước.** `SubmitHrReviewAsync`
+     viết cứng hai đoạn HTML (đạt / cảm ơn), `TriggerAutoProgressionAsync` viết cứng đoạn thứ ba (mời vòng kế), cả ba gửi
+     thẳng SMTP: HM không sửa được một chữ, thư không có dòng nào ở "Lịch sử email" — trái quy tắc 21. Hai nhánh còn chọn
+     thư theo hai điều kiện khác nhau (có cấu hình vòng N+1 hay không, so với `vòng ≥ tổng số vòng` của trạng thái hồ sơ),
+     nên tin khai vòng nhảy số có thể báo "chúc mừng qua hết các vòng" trong khi hồ sơ vẫn ở `interview`.
+  2. **Chốt hai lần được.** Server không chặn — bấm đúp (hay hai người cùng bấm) là hai `HrReview`, hai thư, có thể trái nhau.
+  3. **Nhận việc xong là im lặng.** Ứng viên bấm "Nhận việc" chỉ thấy trạng thái đổi trong Portal — không văn bản nào ghi
+     điều kiện đã chốt, không biết bước tiếp theo, không biết hỏi ai. Và tin vẫn `active` trên Job Board sau khi đã đủ
+     người: người ngoài tiếp tục nộp, AI tiếp tục chấm CV cho một vị trí hết chỗ.
+
+- **Quyết định.**
+  1. **Mẫu thư `interview_result` có trình soạn.** Builder `InterviewResultEmail` với 3 biến thể `next_round` /
+     `final_pass` / `not_pass`; `ResolveVariant(verdict, vòng, tổng số vòng)` là hàm DUY NHẤT quyết định cả biến thể thư
+     lẫn trạng thái hồ sơ (`interview` / `pass` / `not_pass`) — hai thứ không còn lệch được nhau. Xem trước qua
+     `POST /api/emails/preview` với `contextId = applicationId`, `secondaryId = evaluationId`, `variant = verdict sắp chốt`
+     (tham số mới, chuỗi); báo cáo phải thuộc đúng hồ sơ đang xem.
+  2. **Ai xem trước được = ai chốt được.** Với `interview_result`, cổng xem trước là HM chính hoặc quản trị viên (HM chỉ ở
+     mức `TeamMember` trên tin, ngưỡng `Owner` chung sẽ chặn đúng người duy nhất cần soạn thư này và thả Recruiter vào).
+  3. **Thư đi KÈM lệnh chốt.** `ConfirmReviewRequest.EmailOverride`; `SubmitHrReviewAsync` gửi MỘT thư qua
+     `CandidateEmailSender` (lọc HTML ở server, ghi `email_logs`, `sent_by_user_id` = người chốt). Bước mở vòng kế
+     (`OpenNextRoundAsync`) không gửi thư nữa. Buổi thử không có thư (ADR-051). Giao diện: bấm "Xác nhận"/"Lưu & gửi" mở
+     `EmailComposerModal` đã điền sẵn — Huỷ là không chốt gì.
+  4. **Một báo cáo chỉ chốt một lần** — có `HrReview` rồi thì 409 `conflict`, trước mọi thay đổi.
+  5. **Thư xác nhận nhận việc** (`OfferEmail.BuildAccepted`, khoá log `offer_accepted`): vị trí, lương, ngày bắt đầu, loại
+     hợp đồng, nơi làm, 3 bước tiếp theo, đầu mối = Recruiter phụ trách tin. Máy gửi ngay lúc ứng viên bấm nên KHÔNG qua
+     trình soạn, nhưng vẫn qua `CandidateEmailSender` (có dấu vết) và **trả lời vào luồng thư mời** (`In-Reply-To` = Message-Id
+     của thư `offer_sent`). Không dùng `EmailTemplateKeys` vì danh sách đó là các mẫu *xem trước được*.
+  6. **Tự đóng tin khi đủ người** (`JobHeadcountCloser`): sau khi `hired` đã lưu, tin `active` có phiếu mà số `hired` ≥
+     `RecruitmentRequest.Headcount` → `closed` + audit `job_auto_closed_headcount` (actor rỗng — hệ thống) + thông báo HM
+     chính, Recruiter, mọi HR Leader: "đã đủ N người; còn M hồ sơ đang xử lý; K thư mời khác vẫn hiệu lực". Tin không có
+     phiếu (trước ADR-063) thì không đoán số lượng. **Không tự loại hồ sơ, không tự thu hồi thư mời** — còn chỗ ở vị trí khác
+     hay giữ làm dự phòng là việc con người quyết. Chạy SAU khi câu "tôi nhận" đã lưu và best-effort: lỗi đóng tin không
+     được làm mất quyết định của ứng viên (HR vẫn đóng tay được).
+  7. **Tin đã đóng mà còn hồ sơ chưa khép** (tự đóng hay đóng tay): màn tin của cả ba vai hiện `ClosedJobOpenApplications`
+     — mỗi hồ sơ một thao tác: loại kèm thư cảm ơn qua trình soạn (`application_rejected`, chủ tin/quản trị viên), hoặc với
+     hồ sơ đang cầm thư mời thì dẫn về màn thư mời; HM chỉ xem.
+
+- **Không đổi schema.** Không cột mới: lý do đóng nằm ở audit, banner suy từ trạng thái tin + trạng thái hồ sơ.
+
+- **Kiểm chứng.** `dotnet test` Application 2114/2114 (mới: thư kết quả đúng biến thể + một thư/lần chốt + thư sửa tay
+  được lọc & đánh dấu + buổi thử không thư + chốt lần hai 409; xem trước `interview_result` cho HM chính, chặn Recruiter,
+  chặn báo cáo của hồ sơ khác, verdict lạ; thư xác nhận nối luồng thư mời + có lương + có đầu mối; đóng tin khi đủ, không
+  đóng khi thiếu / không phiếu / từ chối; đóng tin không chạm hồ sơ và thư mời khác). `tsc` hai site + `check:i18n` đạt.
+  **E2E trên Postgres tạm (email tắt):** HM xem trước thư vòng 1 (`next_round`) và vòng 3 (`final_pass`), verdict lạ → 400;
+  chốt vòng cuối kèm thư đã sửa (+ `<script>`) → `email_logs` `interview_result` `was_edited`, không còn `<script>`, hồ sơ
+  `pass`; chốt lần hai → 409; HM soạn offer (điền sẵn 30tr từ đề xuất) → gửi duyệt → HR Leader chốt → gửi → ứng viên nhận →
+  hồ sơ `hired`, `email_logs` có `offer_accepted`, tin (phiếu headcount 1) tự `closed`, audit + thông báo tới HM và HR Leader.
+
+---
+
+### ADR-075: Công thức chấm CV do Hiring Manager quyết định — điều kiện bắt buộc, điểm tối thiểu, ngưỡng theo tin; đổi công thức thì tính lại, không gọi AI
+
+- **Ngày:** 2026-09-22
+- **Trạng thái:** Đã triển khai. **Bổ sung** ADR-070 (mức neo 4 dải cố định, ngưỡng khuyến nghị 80/65/50) và ADR-071
+  (mỗi ý kiểm nặng bằng nhau). Không lật quy tắc 28 (không bộ tiêu chí thì không chấm) và ADR-053 (AI không bao giờ
+  ghi `Application.Status`).
+
+- **Bối cảnh.** Sau ADR-070/071, HM khai được *tiêu chí, trọng số và lời neo* — nhưng **công thức biến câu trả lời của
+  AI thành điểm vẫn viết cứng trong backend**: bốn dải 90–100 / 70–89 / 40–69 / 0–39, mọi ý kiểm nặng như nhau, trung
+  bình có trọng số thuần (bù trừ hoàn toàn), ngưỡng khuyến nghị 80/65/50. Người dùng hỏi thẳng: *"phần công thức tính
+  ra điểm đang bị cố định trong BE, tôi muốn để HM là người quyết định"*. Năm chỗ cứng và hậu quả:
+
+  | Chỗ cứng | Hậu quả |
+  |---|---|
+  | Không có tiêu chí "đạt/không đạt" | Yêu cầu thiết yếu (giấy phép, chứng chỉ bắt buộc) chỉ là một tiêu chí có trọng số — điểm cao ở chỗ khác **bù trừ** được |
+  | Mọi ý kiểm nặng bằng nhau | "≥ 4 năm .NET production" và "CV có số liệu kết quả" kéo điểm như nhau |
+  | Ngưỡng 80/65/50 chung mọi tin | Vị trí Senior và vị trí Fresher dùng chung một vạch "phù hợp" |
+  | Làm tròn hai lần (`Round(2)` rồi `(int)Round`) | 79,495 → 79,50 → **80** |
+  | FE tô màu điểm theo 75/50 và 80/60 | Cùng một điểm hiện màu khác nhau ở ba màn, và cả ba khác nhãn của server |
+
+- **Cơ sở tham khảo** (ghi lại để lần sau không phải đoán): mọi tài liệu tuyển dụng đều dùng **một khung chung** —
+  loại theo điều kiện bắt buộc → chấm theo thang có neo → cộng có trọng số → so với ngưỡng. [OPM (Mỹ) — *Training &
+  Experience Evaluations*](https://www.opm.gov/policy-data-oversight/assessment-and-selection/other-assessment-methods/training-and-experience-evaluations/)
+  (sàng yêu cầu tối thiểu trước khi chấm); [ĐH Wyoming — *Hiring Matrix*](https://www.uwyo.edu/hr/hiring-toolkit/matrix-instructions.html)
+  (thang neo theo bằng chứng, **trọng số ×1/×2/×3**, "ứng viên không đạt yêu cầu tối thiểu thì không mời phỏng vấn",
+  "mỗi đơn vị tự chọn thang phù hợp"); [4 Corner Resources — *Resume Screening Scorecard*](https://www.4cornerresources.com/blog/resume-screening-scorecard/)
+  (trọng số và ngưỡng đi tiếp **theo từng vị trí**); [ZYTHR — *Weighted Candidate Scoring Matrix*](https://zythr.com/resources/candidate-scoring-model-in-recruiting-what-it-is-and-how-to-build-one/how-to-build-a-weighted-candidate-scoring-matrix-stepbystep-template-and-examples)
+  (tách *mandatory* với *graded*, hiệu chỉnh trên hồ sơ cũ trước khi dùng); [LibreTexts HRM — *Testing and Selecting*](https://biz.libretexts.org/Courses/Prince_Georges_Community_College/BMT_2610:_Human_Resource_Management_(Duru_2021)/04:_Selection/4.05:_Testing_and_Selecting)
+  và [R for HR — *Noncompensatory approach*](https://rforhr.com/multiplecutoff.html) (bù trừ · ngưỡng từng tiêu chí ·
+  nhiều vòng lọc); [TicNote — *How to Score Resumes Objectively*](https://ticnote.com/en/blog/how-to-score-resumes)
+  (hai làn loại/chấm, ngưỡng theo mức).
+  **Không nguồn nào cho người chấm gõ biểu thức tự do** — nên ADR này mở đúng các tham số của khung đó, không mở một ô
+  công thức.
+
+- **Quyết định.**
+  1. **HM quyết định SÁU tham số, không phải một biểu thức.** Cấp tiêu chí: *loại tiêu chí* (chấm điểm /
+     **điều kiện bắt buộc**), *trọng số*, *điểm tối thiểu của tiêu chí*, *trọng số ý kiểm ×1/×2/×3*. Cấp tin
+     (`CvScoringPolicy`): *ngưỡng bốn dải* và *ngưỡng bốn nhãn khuyến nghị*. Mặc định = đúng hành vi trước ADR này,
+     nên tin cũ không đổi một con số nào.
+  2. **Cổng chỉ ép NHÃN, không đụng hồ sơ.** Điều kiện bắt buộc không đạt, hoặc tiêu chí dưới điểm tối thiểu →
+     `gate_status='fail'` và khuyến nghị bị ép `Reject`; **điểm vẫn tính, vẫn hiện**, `Application.Status` không đổi
+     (ADR-053). "Đạt" mà AI không trích được bằng chứng → `review` ("chưa xác minh"), **không** ép Reject: thiếu trích
+     dẫn là lỗi model, không phải bằng chứng ứng viên trượt (cùng lý lẽ ADR-060 với tiêu chí bị bỏ sót).
+  3. **Một bộ tính duy nhất** `CvScoreCalculator.Compute(criteria, policy, observations)` — hàm thuần, làm tròn **đúng
+     một lần**. `CvCriterionScoring` tính vị trí trong dải theo **tổng trọng số ý** (`đáy + Σw(đạt) ÷ Σw(đã trả lời) ×
+     độ rộng`). `ScoringRubric.ComputeOverall` giữ nguyên cho chấm phỏng vấn.
+  4. **Prompt chấm CV không còn con số nào.** `ScoringRubric.ToCvPromptText` chỉ đưa tên, chuẩn chấm, lời neo, ý kiểm
+     và mục "ĐIỀU KIỆN BẮT BUỘC"; AI trả `band` + `checks[]`, hoặc **`position` 0..1** cho tiêu chí không có ý kiểm,
+     hoặc `met` + trích dẫn cho điều kiện bắt buộc. Trọng số, điểm tối thiểu, ngưỡng dải, ngưỡng khuyến nghị **không
+     bao giờ tới tay model** — chúng là số học của backend.
+  5. **Đổi công thức thì TÍNH LẠI từ câu trả lời cũ của AI, không gọi AI** (`CvScoringService.TryDeriveAsync`).
+     `CvObservationSignature` băm đúng phần AI được hỏi của từng tiêu chí (khoá, loại, tên, chuẩn chấm, lời neo, chữ ý
+     kiểm) — **bỏ qua** mọi con số của công thức và cả thứ tự tiêu chí. Bản chấm cũ "phủ" được bộ đang sống thì dựng lại
+     quan sát **từ ảnh chụp** (`CvObservations.TryFromSnapshot`) rồi chạy lại bộ tính: dòng mới trỏ `derived_from_analysis_id`
+     về **bản gốc có lời gọi AI thật**, token = 0, bản cũ giữ làm lịch sử. Bớt tiêu chí cũng là "phủ"; thêm tiêu chí,
+     sửa lời neo hay thêm điều kiện bắt buộc thì mới hỏi AI lại. Đường nhanh này nằm trong `CvApplicationScorer` **trước
+     cả bước đọc file CV**, và trong chính `ScoreAsync` — nên hàng đợi, lượt quét và Portal đều đi qua nó.
+  6. **Xem trước tác động trước khi lưu** (`POST /api/jobs/{id}/cv-rubric/preview`, cùng quyền với lưu): chạy chính bộ
+     tính trên mọi hồ sơ của tin **trong bộ nhớ** — không ghi, không gọi AI — trả điểm/khuyến nghị trước–sau từng hồ sơ,
+     số hồ sơ đổi nhãn, số hồ sơ vướng cổng, và **số lượt gọi AI mà lần lưu sẽ tốn**. Đây là bước "hiệu chỉnh trên hồ sơ
+     cũ rồi mới chốt ngưỡng" của ZYTHR/TicNote.
+  7. **Lời của lệnh lưu nói đúng việc sẽ xảy ra**: `saveOutcome.mode` = `unchanged` | `recompute` | `ai_rescore`; thông
+     báo cho Recruiter chủ tin và audit (`formulaOnly`, `knockoutCount`, `minScoreCount`, `bands`, `tiers`) theo đúng mode.
+  8. **Màu điểm CV đọc từ NHÃN server trả về** (`cvTier.ts`), không từ ngưỡng viết ở màn hình — ba bộ ngưỡng cũ
+     (75/50 · 80/60 · 80/65/50) gỡ hẳn, `_jobUi.scoreColor` xoá. Danh sách hồ sơ mang thêm `cvRecommendation` +
+     `cvGateStatus`; màn hồ sơ có khối "Điều kiện của công thức" với ✓/✗/? và trích dẫn từng điều kiện.
+  9. **Bộ tiêu chí phỏng vấn không đổi một nét** (ADR-073): `RubricPurpose` là tham số **bắt buộc** của
+     `ScoringRubric.Validate` / `CvRubricEditing.Normalize`, nên trình biên dịch chỉ ra mọi cửa; bộ phỏng vấn từ chối
+     điều kiện bắt buộc kèm lời giải thích, bỏ điểm tối thiểu và trọng số ý.
+
+- **Lý do.**
+  - **Vì sao tham số chứ không phải biểu thức.** Biểu thức tự do cho HM một ô để gõ sai: điểm ra ngoài 0–100, hai tin
+    không so được với nhau, và màn hồ sơ không in lại được "vì sao 84". Khung tham số giữ được thứ quý nhất của
+    ADR-060/071 — **mọi con số đều giải thích lại được bằng tay** — mà vẫn trả quyền quyết định cho người hiểu nghề.
+  - **Vì sao cổng chỉ gắn nhãn.** Tự loại hồ sơ là lật ADR-053 và trao cho một câu trả lời của model quyền đánh trượt
+    người thật. Nhãn + lý do + trích dẫn cho Recruiter đủ thông tin để quyết, và ứng viên vẫn luôn ứng tuyển được.
+  - **Vì sao tách "AI quan sát" khỏi "số học".** Trước ADR này, đổi một con số trọng số cũng là một phiên bản bộ tiêu
+    chí mới → mỗi hồ sơ một lượt gọi AI. Nhưng trọng số **chưa bao giờ** là thứ AI trả lời. Tách ra thì phần đắt (AI đọc
+    CV) chỉ chạy khi câu hỏi đổi, còn phần rẻ (số học) chạy lại tuỳ thích — HM mới dám thử ngưỡng.
+  - **Vì sao chữ ký chứ không phải cờ "chỉ đổi công thức".** Cờ do người gọi tự khai thì sẽ có chỗ khai sai. Chữ ký suy
+    ra từ chính nội dung prompt: hai bộ hỏi AI cùng câu thì dùng lại được — đó là định nghĩa, không phải phỏng đoán.
+
+- **Hệ quả.**
+  - Migration `CvScoringFormula`: 5 cột **cho phép NULL, không default** — `playbook_documents.scoring_policy_json`,
+    `recruitment_requests.cv_scoring_policy_json`, `cv_jd_analyses.{scoring_policy, gate_status, derived_from_analysis_id}`
+    (FK tự trỏ, NoAction). NULL = mặc định nên **không backfill**, và sau migration không hồ sơ nào bị coi là cần chấm
+    lại. Không bảng mới → quy tắc 24 không phát sinh.
+  - Excel thêm cột **J (Loại)** và **K (Điểm tối thiểu)**, hậu tố `(x2)`/`(x3)` cho ý kiểm, và **sheet "Cong thuc"**;
+    `RubricSheet.ReadRows` nay đọc được sheet theo tên (trước chỉ đọc sheet đầu). File cũ một sheet → công thức mặc định.
+  - Portal ứng viên **bỏ** `overallRecommendation`: nhãn đó nay có thể bị ép "Reject" vì điều kiện nội bộ của tin.
+  - Ảnh chụp bảng điểm mang thêm `kind`, `minScore`, `met`, `gate`, `position`, `checks[].weight` — bản chấm cũ vẫn đọc
+    được (mọi trường mới đều tuỳ chọn).
+  - Cạm bẫy đã gặp: cột `scoring_policy_json` là **jsonb** nên Postgres sắp lại khoá + thêm khoảng trắng → so chuỗi để
+    biết "có đổi không" sẽ luôn báo đổi; phải so **theo nghĩa** (`CvScoringPolicy.SameAs`). Phiên bản bộ tiêu chí cũ đã
+    **xoá mềm** nên truy vấn chữ ký phải `IgnoreQueryFilters()` — `InMemoryUnitOfWork` của unit test không áp bộ lọc nên
+    không bắt được lỗi này, chỉ E2E trên Postgres thật mới bắt.
+
+- **Kiểm chứng.** `dotnet test`: Application **2183/2183** (+61: bộ tính với mọi tham số, làm tròn một lần 79,495 → 79,
+  cổng fail/review/pass, trọng số ý, dải và ngưỡng tuỳ chỉnh, chữ ký bỏ qua số học, Excel khứ hồi, luật theo mục đích,
+  prompt không số), Domain **63/63**, Infrastructure **7/7**. FE: `tsc` hai site sạch, lint 0 lỗi, vitest **108/108**,
+  `check:i18n` đạt, build hai site.
+  **E2E trên API cô lập (5010) + rag-service (8010) + Postgres tạm + Gemini thật — 33/33**: 3 CV thật (senior có JLPT N2 ·
+  mid · fresher) chấm lần đầu 87 / 60 / 6; đổi trọng số + ngưỡng dải + ngưỡng khuyến nghị → **0 lượt gọi AI**, điểm tính
+  lại đúng bằng bản xem trước (85 / 57 / 3), `derived_from_analysis_id` trỏ bản gốc, token 0; lưu y hệt → `unchanged`,
+  không tạo phiên bản; điểm tối thiểu 70 → hai CV bị ép `Reject` mà điểm giữ nguyên và `applications.status` không đổi;
+  thêm điều kiện "JLPT N2" → `ai_rescore`, AI chấm lại 3 hồ sơ, CV có N2 qua cổng (93, Strong Hire), hai CV còn lại
+  `fail` → `Reject` trong khi nhãn-theo-điểm vẫn là "Proceed with caution"; điểm của hồ sơ trượt cổng vẫn đúng bằng
+  trung bình có trọng số của các tiêu chí (kiểm lại từ ảnh chụp trong DB); Excel khứ hồi giữ điều kiện bắt buộc + sheet
+  công thức; migration Down rồi Up với 12 bản chấm trong bảng (6 bản tính lại) — cột gỡ và phục hồi đúng, dữ liệu còn
+  nguyên. Đã dọn container, dịch vụ tạm và file upload của đợt thử.
+
+- **Chấp nhận đánh đổi.**
+  - **Điểm CV giữa các tin khó so hơn**: mỗi tin có dải và ngưỡng riêng. Dashboard HR vẫn lấy trung bình điểm CV toàn
+    công ty (`GetHrDashboardQuery`) — con số đó nay là trung bình của những thước đo khác nhau.
+  - **Điều kiện bắt buộc có thể âm tính giả** khi CV không ghi rõ (CV thật hay bỏ sót giấy phép). Giảm nhẹ bằng: chỉ gắn
+    nhãn, bắt buộc trích dẫn, trạng thái "chưa xác minh" riêng, và nút xem trước trước khi lưu.
+  - **Giữ đúng bốn dải** (chỉ ngưỡng chỉnh được) để không phá mẫu Excel E–H, bộ tiêu chí phỏng vấn và các lời neo đã khai.
+  - **Sửa lời tiêu chí vẫn tốn một lượt AI mỗi hồ sơ** — chỉ phần số học là miễn phí.

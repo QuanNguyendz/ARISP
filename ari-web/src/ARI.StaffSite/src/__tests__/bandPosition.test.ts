@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandPosition } from '@/components/cvScore/bandPosition'
+import { aiPosition, bandPosition } from '@/components/cvScore/bandPosition'
 import { checkCount, cvRubricProblems } from '@ari/shared/fservices/cvRubric'
 import type { CvScoreCriterion } from '@ari/shared/types/application'
 
@@ -12,7 +12,30 @@ describe('bandPosition', () => {
     const pos = bandPosition(
       criterion({ scoreSource: 'checklist', bandMin: 90, bandMax: 100, checksMet: 2, checksAnswered: 4, score: 95 })
     )
-    expect(pos).toEqual({ min: 90, max: 100, span: 10, met: 2, answered: 4, exact: 95 })
+    expect(pos).toEqual({ min: 90, max: 100, span: 10, met: 2, answered: 4, weighted: false, exact: 95 })
+  })
+
+  // ADR-075: ý kiểm có trọng số → tử / mẫu là tổng trọng số, đúng như server.
+  it('uses the weights of the checklist items when they are not all ×1', () => {
+    const pos = bandPosition(
+      criterion({
+        scoreSource: 'checklist',
+        bandMin: 70,
+        bandMax: 89,
+        checksMet: 1,
+        checksAnswered: 3,
+        checksMetWeight: 2,
+        checksAnsweredWeight: 4,
+        checks: [
+          { key: 'k1', text: 'a', met: true, weight: 2 },
+          { key: 'k2', text: 'b', met: false },
+          { key: 'k3', text: 'c', met: false },
+        ],
+        score: 80,
+      })
+    )
+    expect(pos).toMatchObject({ met: 2, answered: 4, weighted: true })
+    expect(pos?.exact).toBeCloseTo(79.5, 5) // 70 + 19 × 2/4
   })
 
   it('keeps the unrounded value so the rounding step stays visible', () => {
@@ -26,6 +49,19 @@ describe('bandPosition', () => {
     expect(bandPosition(criterion({ scoreSource: 'ai', bandMin: 70, bandMax: 89 }))).toBeNull()
     expect(bandPosition(criterion({ scoreSource: 'checklist', bandMin: 90, bandMax: 100, checksAnswered: 0 }))).toBeNull()
     expect(bandPosition(criterion({}))).toBeNull()
+  })
+})
+
+describe('aiPosition', () => {
+  it('maps the position the AI gave onto the band of this job', () => {
+    const pos = aiPosition(criterion({ scoreSource: 'ai', bandMin: 70, bandMax: 89, position: 0.5, score: 80 }))
+    expect(pos).toMatchObject({ min: 70, max: 89, span: 19, position: 0.5 })
+    expect(pos?.exact).toBeCloseTo(79.5, 5)
+  })
+
+  it('is null for old scores where the AI gave a number instead of a position', () => {
+    expect(aiPosition(criterion({ scoreSource: 'ai', bandMin: 70, bandMax: 89 }))).toBeNull()
+    expect(aiPosition(criterion({ scoreSource: 'checklist', bandMin: 70, bandMax: 89, position: 0.5 }))).toBeNull()
   })
 })
 

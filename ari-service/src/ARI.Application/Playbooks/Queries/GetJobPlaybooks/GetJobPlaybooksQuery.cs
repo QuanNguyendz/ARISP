@@ -38,10 +38,12 @@ namespace ARI.Application.Playbooks.Queries.GetJobPlaybooks
                 return Result.Failure<JobPlaybooksDto>("Bạn không thuộc đội tuyển dụng của tin này.", CommonErrorCodes.Forbidden);
 
             var jobId = job.Id;
-            // Bộ tiêu chí chấm CV có panel riêng (ADR-070) — không lặp lại ở đây kèm nút xoá không dùng được.
+            // Hai bộ tiêu chí chấm điểm có panel riêng — chấm CV (ADR-070) và chấm phỏng vấn (ADR-073) — không lặp
+            // lại ở đây kèm nút xoá không dùng được.
             var items = await PlaybookListing.LoadAsync(_unitOfWork,
                 q => q.Where(d => d.ScopeRefId == jobId
                                   && d.DocumentType != ScoringRubric.TypeCvRubric
+                                  && d.DocumentType != ScoringRubric.TypeInterviewRubric
                                   && (d.Scope == PlaybookScope.ScopeJobPosting || d.Scope == PlaybookScope.ScopeRound)), ct);
 
             // Cả tin trước, rồi theo vòng — đúng thứ tự AI ghép ngữ cảnh cho một buổi phỏng vấn.

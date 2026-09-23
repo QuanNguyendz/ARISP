@@ -850,7 +850,15 @@ export default function ApplicationDetailPage() {
                         <span>
                           {p.hasEvaluation
                             ? t('practiceList.hasReview')
-                            : t('practiceList.transcriptOnly')}
+                            : p.evaluationState === 'pending'
+                              ? t('practiceList.pending')
+                              : p.evaluationState === 'needs_rubric'
+                                ? t('practiceList.needsRubric')
+                                : p.evaluationState === 'no_answers'
+                                  ? t('practiceList.noAnswers')
+                                  : p.evaluationState === 'failed'
+                                    ? t('practiceList.failed')
+                                    : t('practiceList.transcriptOnly')}
                         </span>
                         <span className="font-semibold text-ai-700">
                           {t('practiceList.view')}

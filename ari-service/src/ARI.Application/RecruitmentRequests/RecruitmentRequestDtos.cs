@@ -47,7 +47,10 @@ namespace ARI.Application.RecruitmentRequests
         /// <summary>
         /// Bộ tiêu chí chấm CV (ADR-070) — BẮT BUỘC. Tiêu chí mới để trống <c>Key</c>, hệ thống tự sinh.
         /// </summary>
-        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput>? CvRubric = null);
+        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput>? CvRubric = null,
+
+        /// <summary>Công thức chấm CV cấp tin đi kèm bộ tiêu chí (ADR-075). Bỏ trống = mặc định.</summary>
+        ARI.Application.Playbooks.CvScoringPolicy? CvScoringPolicy = null);
 
     /// <summary>Một dòng trong danh sách phiếu.</summary>
     public record RecruitmentRequestListItemDto(
@@ -141,5 +144,8 @@ namespace ARI.Application.RecruitmentRequests
         bool CanRevoke,
 
         /// <summary>Bộ tiêu chí chấm CV HM khai trên phiếu (ADR-070). Rỗng với phiếu lập trước đó.</summary>
-        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput> CvRubric);
+        IReadOnlyList<ARI.Application.Playbooks.CvRubricCriterionInput> CvRubric,
+
+        /// <summary>Công thức chấm CV HM khai kèm bộ tiêu chí (ADR-075) — luôn có, không khai thì là mặc định.</summary>
+        ARI.Application.Playbooks.CvScoringPolicy CvScoringPolicy);
 }

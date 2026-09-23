@@ -24,7 +24,7 @@ import {
   normalizeSalaryCurrency,
 } from '@ari/shared/utils/jobOptions'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
-import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
+import type { CvRubricCriterion, CvScoringPolicy } from '@ari/shared/fservices/cvRubric'
 import { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import CvRubricChips from '@/components/cvRubric/CvRubricChips'
 import { resolveApiError } from '@ari/shared/utils/apiError'
@@ -179,6 +179,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
    * ĐỌC để Recruiter biết tin sẽ chấm CV theo gì, và biết trước khi phiếu cũ chưa có bộ tiêu chí.
    */
   const [requestRubric, setRequestRubric] = useState<CvRubricCriterion[] | null>(null)
+  // Công thức chấm HM khai kèm bộ tiêu chí (ADR-075) — cũng tự chép sang tin.
+  const [requestPolicy, setRequestPolicy] = useState<CvScoringPolicy | null>(null)
   // Luôn mở ra ở dạng thu gọn (chip tên + trọng số): bản đầy đủ dài cả màn hình mà Recruiter chỉ cần đọc kỹ
   // khi thật sự cần. Đổi phiếu thì thu gọn lại.
   const [requestRubricOpen, setRequestRubricOpen] = useState(false)
@@ -186,6 +188,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
   useEffect(() => {
     setRequestRubricOpen(false)
+    setRequestPolicy(null)
     if (mode !== 'create' || !recruitmentRequestId) {
       setRequestRubric(null)
       return
@@ -194,7 +197,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     recruitmentRequestService
       .getById(recruitmentRequestId)
       .then((rr) => {
-        if (!cancelled) setRequestRubric(rr.cvRubric ?? [])
+        if (!cancelled) {
+          setRequestRubric(rr.cvRubric ?? [])
+          setRequestPolicy(rr.cvScoringPolicy ?? null)
+        }
       })
       .catch(() => {
         if (!cancelled) setRequestRubric(null)
@@ -709,7 +715,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                       <p className="mb-3 mt-1 text-xs text-ink-500 dark:text-ink-400">{tRubric('createJob.fromRequest')}</p>
                       {requestRubricOpen ? (
                         <div id="request-cv-rubric-body">
-                          <ReadOnlyRubric criteria={requestRubric} />
+                          <ReadOnlyRubric criteria={requestRubric} policy={requestPolicy} />
                         </div>
                       ) : (
                         <CvRubricChips
