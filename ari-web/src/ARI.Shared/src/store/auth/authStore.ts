@@ -1,6 +1,44 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, AuthTokens, AuthResponse } from '@ari/shared/types/auth';
+
+/**
+ * Phạm vi lưu phiên đăng nhập:
+ * - 'local'   → localStorage: chia sẻ mọi tab cùng origin (mặc định — dùng cho Candidate site).
+ * - 'session' → sessionStorage: MỖI TAB một phiên riêng (Staff site) nên 2 tài khoản staff mở ở
+ *               2 tab của cùng trình duyệt KHÔNG ghi đè token của nhau; refresh (F5) vẫn giữ đúng
+ *               tài khoản của tab đó (trước đây token dùng chung → F5 tab này nhảy sang tài khoản
+ *               tab kia rồi văng ra /403 → trang 404).
+ * Mỗi site chọn bằng `configureAuthStorage(kind)` lúc bootstrap (giống `configureApiClient`).
+ */
+type AuthStorageKind = 'local' | 'session';
+let authStorageKind: AuthStorageKind = 'local';
+
+// StateStorage ổn định — chọn session/local ở TỪNG lần đọc/ghi, không chốt cứng lúc import, nên
+// đổi `authStorageKind` trước khi rehydrate là có hiệu lực ngay.
+const dynamicAuthStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      return (authStorageKind === 'session' ? sessionStorage : localStorage).getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      (authStorageKind === 'session' ? sessionStorage : localStorage).setItem(name, value);
+    } catch {
+      /* private mode / storage bị chặn — phiên vẫn sống trong RAM của tab, chỉ không lưu lại */
+    }
+  },
+  removeItem: (name: string): void => {
+    try {
+      (authStorageKind === 'session' ? sessionStorage : localStorage).removeItem(name);
+    } catch {
+      /* ignore */
+    }
+  },
+};
 
 interface JwtPayload {
   sub?: string;
@@ -102,6 +140,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'arisp-auth',
+      // Storage do site chọn qua `configureAuthStorage` lúc bootstrap. `skipHydration` để KHÔNG tự
+      // nạp lúc import (khi đó `authStorageKind` còn là mặc định) — site set kind xong mới rehydrate
+      // đúng storage của mình.
+      storage: createJSONStorage(() => dynamicAuthStorage),
+      skipHydration: true,
       // v1: tên lưu ở v0 được giải mã bằng `atob` nên tiếng Việt bị hỏng và nằm lì trong
       // localStorage tới khi hết hạn đăng nhập (7 ngày) — refresh token KHÔNG cập nhật lại
       // `user`. Migrate giải lại tên từ chính access token đang lưu bằng bộ giải mã đã sửa,
@@ -128,3 +171,14 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+/**
+ * Chọn phạm vi lưu phiên cho site rồi NẠP LẠI state ngay (sync-storage nên có hiệu lực đồng bộ,
+ * lần render đầu đã thấy đúng phiên). Gọi đúng một lần lúc bootstrap, TRƯỚC khi render:
+ *   - Staff:     configureAuthStorage('session')  // mỗi tab một tài khoản, F5 giữ nguyên
+ *   - Candidate: configureAuthStorage('local')    // giữ đăng nhập chung mọi tab như trước
+ */
+export function configureAuthStorage(kind: AuthStorageKind): void {
+  authStorageKind = kind;
+  void useAuthStore.persist.rehydrate();
+}
