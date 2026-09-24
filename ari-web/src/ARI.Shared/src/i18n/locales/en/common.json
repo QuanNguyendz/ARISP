@@ -139,5 +139,11 @@
   "notFoundPage": {
     "title": "Page not found",
     "backToHome": "Back to home"
+  },
+  "forbiddenPage": {
+    "title": "You do not have access to this page",
+    "description": "This page belongs to a different role. Head back to your workspace, or contact an administrator if you believe you need access.",
+    "descriptionWithRole": "This page belongs to a different role — your account is {{role}}. Head back to your workspace, or contact an administrator if you believe you need access.",
+    "backToWorkspace": "Back to my workspace"
   }
 }

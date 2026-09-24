@@ -139,5 +139,11 @@
   "notFoundPage": {
     "title": "Trang không tìm thấy",
     "backToHome": "Quay về trang chủ"
+  },
+  "forbiddenPage": {
+    "title": "Bạn không có quyền vào trang này",
+    "description": "Trang này dành cho vai trò khác. Hãy quay về khu làm việc của bạn, hoặc liên hệ quản trị viên nếu bạn cho rằng mình cần quyền truy cập.",
+    "descriptionWithRole": "Trang này dành cho vai trò khác — tài khoản của bạn đang là {{role}}. Hãy quay về khu làm việc của bạn, hoặc liên hệ quản trị viên nếu bạn cho rằng mình cần quyền truy cập.",
+    "backToWorkspace": "Về khu làm việc của tôi"
   }
 }
