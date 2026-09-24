@@ -143,6 +143,12 @@ namespace ARI.Infrastructure
                     "Cấu hình qua biến môi trường Storage__Provider hoặc user-secrets.");
             }
 
+            // Bộ chuyển DOCX→PDF cho bản xem trước. Singleton vì nó giữ một hàng đợi MỘT LÀN dùng
+            // chung: hai tiến trình LibreOffice chạy song song sẽ tranh thư mục hồ sơ và cùng hỏng.
+            // Thiếu LibreOffice không phải lỗi cấu hình — service tự báo `IsAvailable = false` và
+            // giao diện lùi về bộ dựng phía trình duyệt.
+            services.AddSingleton<IDocumentPdfConverter, Documents.LibreOfficePdfConverter>();
+
             // === Media stack phỏng vấn realtime (ADR-043/044): real provider nếu có API key, else Mock ===
             var mediaOptions = new Media.MediaOptions();
             configuration.GetSection("Media").Bind(mediaOptions);

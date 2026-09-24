@@ -1,4 +1,5 @@
 import { apiClient } from '@ari/shared/api/apiClient'
+import { API_BASE_URL } from '@ari/shared/config/constants'
 import type {
   Application,
   ApplicationDetail,
@@ -120,6 +121,9 @@ export const applicationService = {
       coverLetter: string
       noticePeriod: string
       cvFile?: File | null
+      /** Kết quả bước "Xác thực thông tin" vừa chạy: match | mismatch. Bỏ trống = không đối chiếu được. */
+      contactVerificationStatus?: 'match' | 'mismatch' | null
+      contactVerificationDetails?: string | null
     }
   ): Promise<{ id: string; status: string }> {
     const formData = new FormData()
@@ -127,6 +131,10 @@ export const applicationService = {
     formData.append('candidatePhone', payload.candidatePhone)
     formData.append('coverLetter', payload.coverLetter)
     formData.append('noticePeriod', payload.noticePeriod)
+    if (payload.contactVerificationStatus)
+      formData.append('contactVerificationStatus', payload.contactVerificationStatus)
+    if (payload.contactVerificationDetails)
+      formData.append('contactVerificationDetails', payload.contactVerificationDetails)
     if (payload.cvFile) formData.append('cvFile', payload.cvFile)
 
     const { data } = await apiClient.post<{ id: string; status: string }>(
@@ -158,4 +166,15 @@ export const applicationService = {
       mismatchDetails: data.mismatch_details
     }
   },
+}
+
+/**
+ * URL bản PDF do server dựng cho một CV — truyền vào `pdfUrl` của `DocumentPreview`.
+ *
+ * Trả URL tuyệt đối vì trình xem dùng nó để nhận ra đây là endpoint của API (phải kèm token) chứ
+ * không phải file trong kho. Endpoint 404 khi môi trường chưa cài bộ chuyển đổi — trình xem tự lùi
+ * về file gốc, nên nơi gọi không cần kiểm gì trước.
+ */
+export function cvPreviewUrl(applicationId: string): string {
+  return `${API_BASE_URL}/applications/${applicationId}/cv-preview`
 }

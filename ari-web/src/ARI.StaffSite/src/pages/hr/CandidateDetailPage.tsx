@@ -8,7 +8,9 @@ import { affectsApplication, onApplicationsChanged } from '@ari/shared/realtime/
 import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
 import { applicationService } from '@ari/shared/fservices/application'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import ApplicationFormCard from '@/components/applications/ApplicationFormCard'
 import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
+import OnlineTestResultCard from '@/components/onlineTest/OnlineTestResultCard'
 import CvScoreBadge, { CvGatePill } from '@/components/cvScore/CvScoreBadge'
 import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import InterviewCodeCard from '@/components/jobCandidates/InterviewCodeCard'
@@ -26,6 +28,7 @@ import { formatScore } from '@ari/shared/utils/format'
 import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
 import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
 import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
+import { cvPreviewUrl } from '@ari/shared/fservices/application'
 
 function apiErr(e: unknown, fallback: string): string {
   return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
@@ -167,8 +170,27 @@ export default function HrCandidateDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* Những gì ứng viên tự khai lúc nộp: liên hệ đã xác nhận · đối chiếu với CV · thư giới thiệu ·
+              thời gian báo trước khi nghỉ. Nằm sẵn trong DB từ lúc ứng tuyển mà chưa màn nào kê ra. */}
+          <ApplicationFormCard
+            app={app}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+          />
+
           {/* Điểm CV kèm cách tính (ADR-070): từng tiêu chí, trọng số, bằng chứng — không chỉ một con số. */}
           <CvScoreBreakdown score={app.cvScore} />
+
+          {/* Kết quả vòng trắc nghiệm (ADR-049). Vòng này KHÔNG sinh `Evaluation`, nên khối "Kết quả
+              phỏng vấn" bên dưới trống ở đó — thiếu thẻ này thì bảng phễu hiện điểm bài thi còn màn hồ
+              sơ lại không có con số nào. Tự ẩn khi ứng viên chưa nộp bài. */}
+          <OnlineTestResultCard
+            applicationId={app.id}
+            candidateName={app.candidateName}
+            score={app.onlineTestScore}
+            passed={app.onlineTestPassed}
+            expired={app.onlineTestExpired}
+            className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+          />
 
           {/* Kết quả phỏng vấn theo vòng (ADR-069): ca đã gán · diễn biến · báo cáo AI · video · transcript,
               kèm nút tới đúng báo cáo. Thay cho hai khối cũ (danh sách đánh giá + danh sách phiên) vốn không
@@ -198,7 +220,8 @@ export default function HrCandidateDetailPage() {
                   onClick={() =>
                     openDocument(
                       resolveAssetUrl(app.cvFileUrl),
-                      `${app.candidateName || t('candidate')} - CV`
+                      `${app.candidateName || t('candidate')} - CV`,
+                      cvPreviewUrl(app.id)
                     )
                   }
                   className="flex w-full items-center gap-3 rounded-xl border border-ink-100 dark:border-white/10 p-3 text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-white/5"

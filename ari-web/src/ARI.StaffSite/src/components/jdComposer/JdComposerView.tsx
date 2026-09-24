@@ -186,9 +186,23 @@ export default function JdComposerView() {
     if (file) setSavedAt(Date.now())
   }
 
-  const download = async (format: 'pdf' | 'docx') => {
+  /**
+   * Xuất file theo định dạng được chọn rồi **mở ngay trong trình xem của ứng dụng**.
+   *
+   * Bản cũ `window.open(file.viewUrl)`, và `viewUrl` là thứ tầng lưu trữ trả về — KHÔNG phải lúc nào
+   * cũng là URL tuyệt đối. Bộ lưu trữ nội bộ trả đường dẫn tương đối (`/uploads/jd/x.pdf`), mà
+   * `window.open` phân giải nó theo origin của FRONTEND chứ không phải của API, nên ở môi trường dev
+   * (web `:3001`, API `:5000`) tab mới luôn mở ra trang 404 của Vite. Production dùng R2 nên `viewUrl`
+   * là URL tuyệt đối và không dính lỗi này — cùng một dòng code, hai kết quả khác nhau.
+   *
+   * Kể cả khi đã ghép đúng origin thì việc mở tab mới vẫn chia đôi hành vi theo định dạng: trình duyệt
+   * dựng được PDF nhưng không dựng được DOCX, nên bấm DOCX là file rơi thẳng vào mục tải xuống. Trình
+   * xem của ứng dụng dựng được cả hai (docx-preview) và tự ghép origin, nên hai nút giống nhau ở mọi
+   * môi trường; ai cần file thật thì bấm "Tải về" ngay trên đầu trình xem.
+   */
+  const exportAs = async (format: 'pdf' | 'docx') => {
     const file = await generate(format)
-    if (file) window.open(file.viewUrl, '_blank', 'noopener')
+    if (file) openDocument(file.viewUrl, file.fileName)
   }
 
   /** Còn thay đổi chưa lưu hay không. */
@@ -488,7 +502,7 @@ export default function JdComposerView() {
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => download('pdf')}
+                  onClick={() => exportAs('pdf')}
                   disabled={busy !== null}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-ink-200 px-3 py-2.5 text-sm font-medium text-ink-700 disabled:opacity-60 dark:border-white/10 dark:text-ink-200"
                 >
@@ -500,7 +514,7 @@ export default function JdComposerView() {
                   PDF
                 </button>
                 <button
-                  onClick={() => download('docx')}
+                  onClick={() => exportAs('docx')}
                   disabled={busy !== null}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-ink-200 px-3 py-2.5 text-sm font-medium text-ink-700 disabled:opacity-60 dark:border-white/10 dark:text-ink-200"
                 >
