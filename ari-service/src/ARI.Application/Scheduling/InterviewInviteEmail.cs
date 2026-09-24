@@ -290,6 +290,88 @@ namespace ARI.Application.Scheduling
         }
 
         /// <summary>
+        /// Thư nhắc GIỜ cho người ĐÃ xác nhận tham dự.
+        ///
+        /// Khác hẳn <see cref="BuildReminderAsync"/>: người này đã trả lời rồi, nên hai nút
+        /// Xác nhận/Từ chối là vô nghĩa (mỗi lịch chỉ phản hồi một lần). Thứ họ cần là giờ, địa điểm
+        /// và việc phải chuẩn bị — đúng những dòng của thư mời, nhắc lại gọn.
+        /// </summary>
+        public static async Task<Content> BuildTimeReminderAsync(
+            IUnitOfWork unitOfWork,
+            IConfiguration configuration,
+            ARI.Domain.Entities.Application app,
+            JobPosting? job,
+            int round,
+            DateTimeOffset startTimeUtc,
+            CancellationToken ct = default)
+        {
+            var jobTitle = job?.Title ?? "vị trí ứng tuyển";
+            var roundConfig = (await unitOfWork.Repository<InterviewRoundConfig>()
+                    .FindAsync(r => r.JobPostingId == app.JobPostingId && r.RoundNumber == round, ct))
+                .FirstOrDefault();
+            var roundType = roundConfig?.RoundType;
+            var onlineTest = IsOnlineTest(roundType);
+            var remote = IsRemoteRound(roundType);
+
+            var whenText = WhenText(startTimeUtc, roundConfig);
+            var baseUrl = FrontendUrls.Candidate(configuration);
+            var portalLink = $"{baseUrl}/portal/schedule/{app.Id}";
+
+            // Cùng bảng thông tin với thư mời, dựng bằng CHÍNH các hàm đó — nhắc lại một giờ hẹn bằng
+            // câu chữ khác thư gốc là cách chắc chắn nhất để hai bên hiểu hai đằng.
+            var locationHtml = onlineTest
+                ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Thời lượng</td>"
+                  + $"<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>{OnlineTestWindow.DurationOf(roundConfig)} phút</strong> — đồng hồ đếm tới giờ đóng bài.</td></tr>"
+                : remote
+                    ? "<tr><td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Hình thức</td>"
+                      + "<td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>Trực tuyến</strong> — bạn tham gia từ nhà.</td></tr>"
+                    : await BuildLocationRowsAsync(unitOfWork, ct);
+
+            var prepHtml = onlineTest
+                ? "<p style='color:#475569; font-size:13px;'>Bạn chỉ có <strong>một lượt làm bài</strong> — hãy chuẩn bị đường truyền ổn định và vào đúng giờ.</p>"
+                : remote
+                    ? "<p style='color:#475569; font-size:13px;'>Hãy kiểm tra <strong>micro, camera và đường truyền</strong> trước giờ hẹn. Nhân sự sẽ gửi <strong>Mã phỏng vấn</strong> trước khi bắt đầu.</p>"
+                    : "<p style='color:#475569; font-size:13px;'>Hãy có mặt tại văn phòng <strong>trước giờ hẹn khoảng 10 phút</strong>. Nhân sự sẽ cấp <strong>Mã phỏng vấn</strong> cho bạn tại chỗ.</p>";
+
+            var subject = $"[ARISP] Nhắc {AppointmentNoun(roundType)} vòng {round} - vị trí {jobTitle}";
+
+            var html = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+            <h2 style='color:#4f46e5; margin:0 0 16px;'>Nhắc {AppointmentNoun(roundType)} - {jobTitle}</h2>
+            <p style='color:#334155; font-size:15px;'>Chào <strong>{app.CandidateName}</strong>,</p>
+            <p style='color:#334155; font-size:15px;'>Bạn đã <strong>xác nhận tham dự</strong> {AppointmentNoun(roundType)} <strong>vòng {round}</strong>. Đây là thư nhắc lại lịch hẹn:</p>
+
+            <table role='presentation' cellpadding='0' cellspacing='0' style='width:100%; margin:18px 0; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; background-color:#f8fafc;'>
+                <tr>
+                    <td style='padding:6px 0; color:#64748b; font-size:14px; width:110px;'>Thời gian</td>
+                    <td style='padding:6px 0; color:#0f172a; font-size:15px;'><strong>{whenText}</strong></td>
+                </tr>
+                {locationHtml}
+                <tr>
+                    <td style='padding:6px 0; color:#64748b; font-size:14px;'>Vị trí</td>
+                    <td style='padding:6px 0; color:#0f172a; font-size:15px;'>{jobTitle}</td>
+                </tr>
+            </table>
+
+            {prepHtml}
+
+            <div style='background-color:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin:16px 0;'>
+                <p style='margin:0; color:#9a3412; font-size:13px;'>
+                    {NoShowConsequenceHtml(roundType)}
+                    Có việc đột xuất? Hãy <strong>liên hệ trực tiếp bộ phận nhân sự</strong> càng sớm càng tốt — hệ thống không tự xếp lại lịch.
+                </p>
+            </div>
+
+            <p style='color:#334155; font-size:14px;'>Xem lại lịch hẹn trong Candidate Portal: <a href='{portalLink}' style='color:#4f46e5;'>{portalLink}</a></p>
+            <hr style='border:none; border-top:1px solid #e2e8f0; margin:22px 0;' />
+            <p style='color:#334155; font-size:14px; margin:0;'>Trân trọng,</p>
+            <p style='color:#334155; font-size:14px; margin:4px 0 0;'><strong>Đội ngũ nhân sự ARISP</strong></p>
+        </div>";
+
+            return new Content(subject, html);
+        }
+
+        /// <summary>
         /// Địa điểm + chỉ dẫn lấy từ cấu hình hệ thống. Chưa cấu hình thì bỏ hẳn dòng địa điểm
         /// thay vì in địa chỉ rỗng — thư mời thiếu địa chỉ còn hơn thư mời có địa chỉ sai.
         /// </summary>

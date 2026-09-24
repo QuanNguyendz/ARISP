@@ -110,7 +110,25 @@
     "view": "View",
     "expiredBanner": "The system cancelled this booking because the candidate did not confirm in time. You can move them to another slot.",
     "reasonRejected": "Rejection reason:",
-    "reasonDeclined": "Decline reason:"
+    "reasonDeclined": "Decline reason:",
+    "remindState": {
+      "confirm": {
+        "label": "Ask to confirm",
+        "title": "The candidate has not responded — send an email and notification asking them to confirm or decline."
+      },
+      "remind": {
+        "label": "Remind time",
+        "title": "The candidate has confirmed — send an email and notification with the time and what to prepare."
+      },
+      "past": {
+        "label": "Remind",
+        "title": "The appointment time has passed, so a reminder is pointless. Schedule another slot instead."
+      },
+      "closed": {
+        "label": "Remind",
+        "title": "This booking is no longer active (declined or cancelled) — schedule another slot."
+      }
+    }
   },
   "state": {
     "pending": "Awaiting confirmation",

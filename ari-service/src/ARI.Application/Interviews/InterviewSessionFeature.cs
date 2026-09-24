@@ -101,14 +101,20 @@ namespace ARI.Application.Interviews
     // POST /api/interview/management/booking/{bookingId}/remind
     // ============================================================
 
-    public record SendBookingReminderCommand(Guid BookingId, Guid? UserId, string? Role) : IRequest<Result<bool>>;
+    /// <summary>
+    /// <paramref name="Over"/> = bản thư nhân sự đã sửa trong trình soạn (quy tắc 21). Null = gửi đúng mẫu.
+    /// Thư đi KÈM lệnh này, nên bấm Huỷ ở trình soạn là không thư nào rời hệ thống.
+    /// </summary>
+    public record SendBookingReminderCommand(
+        Guid BookingId, Guid? UserId, string? Role, ARI.Application.Emails.EmailOverride? Over = null)
+        : IRequest<Result<bool>>;
 
     public class SendBookingReminderCommandHandler : IRequestHandler<SendBookingReminderCommand, Result<bool>>
     {
         private readonly IInterviewService _interviewService;
         public SendBookingReminderCommandHandler(IInterviewService interviewService) { _interviewService = interviewService; }
         public async Task<Result<bool>> Handle(SendBookingReminderCommand request, CancellationToken ct)
-            => await _interviewService.SendBookingReminderAsync(request.BookingId, request.UserId, request.Role, ct);
+            => await _interviewService.SendBookingReminderAsync(request.BookingId, request.UserId, request.Role, request.Over, ct);
     }
 
     // ============================================================
