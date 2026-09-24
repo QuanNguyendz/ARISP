@@ -7,6 +7,7 @@ import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatTime24 } from '@ari/shared/utils/time24'
 import HmAvailabilityFields, {
   hasBlockingIssue,
+  type BusyWindow,
   toLocalInput,
   toPayload,
   type DraftWindow,
@@ -87,6 +88,8 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
 
   const [round, setRound] = useState<number | null>(null)
   const [windows, setWindows] = useState<HmAvailabilityWindow[]>([])
+  /** Khung của các vòng KHÁC trong cùng tin — chỉ để chặn trùng giờ, không sửa được ở tab này. */
+  const [otherRounds, setOtherRounds] = useState<HmAvailabilityWindow[]>([])
   const [rows, setRows] = useState<DraftWindow[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -102,7 +105,12 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
       setLoading(true)
       setError('')
       try {
-        const data = await scheduleService.getHmAvailability(jobPostingId, r)
+        // Nạp khung của MỌI vòng trong một lượt: vòng đang xem để hiện và sửa, các vòng còn lại để
+        // chặn khai trùng giờ. Lịch rảnh là lịch của MỘT NGƯỜI — trước đây màn này chỉ nhìn thấy
+        // vòng đang mở nên vòng 2 và vòng 3 khai đè lên nhau mà không ai nói gì.
+        const all = await scheduleService.getHmAvailability(jobPostingId)
+        setOtherRounds(all.filter((w) => w.roundNumber !== r))
+        const data = all.filter((w) => w.roundNumber === r)
         setWindows(data)
         // Chỉ nạp khung CHƯA BẮT ĐẦU vào ô sửa: khung đang chạy gửi lại sẽ bị luật "giờ bắt đầu
         // phải ở tương lai" từ chối, và người dùng không hiểu vì sao một khung đang hợp lệ lại đỏ.
@@ -129,6 +137,16 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
     if (round != null) void load(round)
   }, [round, load])
 
+  const busyElsewhere = useMemo<BusyWindow[]>(
+    () =>
+      otherRounds.map((w) => ({
+        start: new Date(w.startTime).getTime(),
+        end: new Date(w.endTime).getTime(),
+        label: t('availability.roundLabel', { number: w.roundNumber, defaultValue: `Vòng ${w.roundNumber}` }),
+      })),
+    [otherRounds, t]
+  )
+
   const running = useMemo(() => {
     const now = Date.now()
     return windows.filter((w) => new Date(w.startTime).getTime() <= now)
@@ -140,7 +158,7 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
     setError('')
     setSaved(null)
     try {
-      const res = await scheduleService.setHmAvailability(jobPostingId, round, toPayload(rows))
+      const res = await scheduleService.setHmAvailability(jobPostingId, round, toPayload(rows, busyElsewhere))
       setSaved(res)
       syncOtherViews()
       await load(round)
@@ -259,7 +277,7 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
                 </p>
               )}
 
-              <HmAvailabilityFields rows={rows} onChange={setRows} disabled={busy} />
+              <HmAvailabilityFields rows={rows} onChange={setRows} disabled={busy} busy={busyElsewhere} />
 
               {error && (
                 <p className="flex items-start gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
@@ -289,7 +307,7 @@ export default function HmAvailabilityPanel({ jobPostingId, rounds, canEdit }: P
               <button
                 type="button"
                 onClick={() => void save()}
-                disabled={busy || hasBlockingIssue(rows)}
+                disabled={busy || hasBlockingIssue(rows, busyElsewhere)}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
