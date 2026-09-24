@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { authService } from '@ari/shared/fservices/auth'
 import { useAuthStore } from '@ari/shared/store/auth'
+import { homePathForRole } from '@ari/shared/utils/roles'
 
 /**
  * Chỉ còn 2 trạng thái vẽ ra màn hình. Mọi thất bại kiểu "thử lại bằng tài khoản khác"
@@ -31,23 +32,6 @@ const MESSAGE_KEYS: Record<string, string> = {
   account_disabled: 'oauthCallback.accountDisabled',
   external_authentication_failed: 'oauthCallback.externalFailed',
   no_email_from_provider: 'oauthCallback.noEmail',
-}
-
-// Get dashboard path based on role
-function getRoleDashboard(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_')
-  switch (r) {
-    case 'super_admin':
-      return '/super-admin/dashboard'
-    case 'hr_admin':
-      return '/hr/dashboard'
-    case 'recruiter':
-      return '/recruiter/dashboard'
-    case 'candidate':
-      return '/'
-    default:
-      return '/hr/dashboard'
-  }
 }
 
 interface OAuthCallbackPageProps {
@@ -78,15 +62,20 @@ export default function OAuthCallbackPage({ loginPath = '/auth/login' }: OAuthCa
     const describe = (fallback: string) => (code && MESSAGE_KEYS[code] ? t(MESSAGE_KEYS[code]) : t(fallback))
 
     if (parsedCallback.accessToken) {
-      const role = parsedCallback.role ?? 'Hr_admin'
-      setAuthFromResponse({
+      // `role` lấy từ store chứ không từ hash: `setAuthFromResponse` đã hợp nhất role của
+      // response với claim trong JWT, nên hash thiếu `role` vẫn ra đúng vai trò thật.
+      const user = setAuthFromResponse({
         accessToken: parsedCallback.accessToken,
         refreshToken: new URLSearchParams(window.location.hash.slice(1)).get('refresh_token') ?? '',
         fullName: '',
-        role: role,
+        role: parsedCallback.role ?? '',
       })
       window.history.replaceState({}, '', '/auth/callback')
-      navigate(getRoleDashboard(role), { replace: true })
+      // Trang chủ đọc từ BẢNG DÙNG CHUNG `ROLE_HOME`. Trước đây đây là một `switch` chép tay
+      // thiếu `hiring_manager`, nên HM đăng nhập Google xong bị ném vào `/hr/dashboard` →
+      // `ProtectedRoute` chặn → `/403`, dù token đã hợp lệ. Vai trò lạ rơi về `/`, nơi
+      // `StaffHomeRedirect` / trang chủ ứng viên tự định tuyến tiếp — không đoán bừa dashboard.
+      navigate(homePathForRole(user.role) ?? '/', { replace: true })
       return
     }
 

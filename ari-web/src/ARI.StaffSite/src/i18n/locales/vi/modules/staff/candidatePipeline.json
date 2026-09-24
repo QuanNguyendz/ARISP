@@ -36,6 +36,7 @@
     "ageValue": "{{count}} tuổi",
     "appliedAt": "Ngày ứng tuyển",
     "cv": "Hồ sơ CV",
+    "cvDownload": "Tải bản gốc",
     "noCv": "Ứng viên chưa nộp CV.",
     "selectPage": "Chọn cả trang",
     "selectedCount": "Đã chọn {{count}} hồ sơ",
@@ -103,5 +104,14 @@
     "blank": "Bỏ trống",
     "picked": "đã khoanh",
     "expiredNotice": "Ứng viên được hẹn giờ nhưng không vào làm bài. Khi hết hạn, hệ thống tự động nộp một bài trống — vì vậy mọi câu bên dưới đều bỏ trắng."
+  },
+  "applicationForm": {
+    "title": "Thông tin ứng tuyển",
+    "hint": "Ứng viên tự khai trên biểu mẫu lúc nộp hồ sơ.",
+    "noticePeriod": "Báo trước khi nghỉ việc",
+    "coverLetter": "Thư giới thiệu",
+    "noCoverLetter": "Ứng viên không viết thư giới thiệu.",
+    "hasCoverLetter": "có thư giới thiệu",
+    "noCoverLetterShort": "không có thư giới thiệu"
   }
 }

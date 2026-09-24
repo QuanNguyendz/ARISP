@@ -63,6 +63,44 @@ namespace ARI.Application.Scheduling
         }
 
         /// <summary>
+        /// Khung còn hiệu lực của CÙNG TIN nhưng ở VÒNG KHÁC, do chính Hiring Manager hiện tại khai.
+        ///
+        /// <b>Vì sao cần.</b> Lịch rảnh là lịch của MỘT NGƯỜI. Luật "không chồng lấn" trước đây chỉ
+        /// soi trong phạm vi một vòng, nên khai vòng 2 rảnh 14:00–15:00 rồi sang tab vòng 3 khai đúng
+        /// 14:00–15:00 lần nữa là lọt — và Recruiter xếp được hai ca cùng giờ cho cùng một người, mỗi
+        /// ca ở một vòng, mà không luật nào bắt được (ba luật xếp ca của ADR-067 đều so trong phạm vi
+        /// một vòng hoặc một ca).
+        /// </summary>
+        public static async Task<List<HiringManagerAvailability>> OtherRoundWindowsAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, int roundNumber, CancellationToken ct)
+        {
+            var hm = await JobAccess.PrimaryHiringManagerAsync(unitOfWork, jobPostingId, ct);
+            if (hm == null) return new List<HiringManagerAvailability>();
+
+            var now = DateTimeOffset.UtcNow;
+            var rows = await unitOfWork.Repository<HiringManagerAvailability>().FindAsync(
+                a => a.JobPostingId == jobPostingId && a.RoundNumber != roundNumber && a.EndTime > now
+                     && a.HiringManagerUserId == hm.UserId, ct);
+            return rows.OrderBy(a => a.RoundNumber).ThenBy(a => a.StartTime).ToList();
+        }
+
+        /// <summary>
+        /// Khung ĐÃ CÓ đầu tiên đụng vào danh sách vừa khai, hoặc <c>null</c> nếu không có.
+        ///
+        /// Một hàm cho mọi phép so "cái mới với cái đã có" — khung đang diễn ra và khung của vòng khác
+        /// khác nhau ở chỗ LẤY tập nào, không khác ở luật. Tách ra vì đây là phần duy nhất kiểm được
+        /// bằng test mà không cần dựng cả tầng dữ liệu.
+        /// </summary>
+        public static HiringManagerAvailability? FirstClash(
+            IEnumerable<HiringManagerAvailability> existing,
+            IEnumerable<HmAvailabilityWindowInput> incoming)
+        {
+            var list = incoming as IList<HmAvailabilityWindowInput> ?? incoming.ToList();
+            return existing.FirstOrDefault(
+                e => list.Any(w => Overlaps(e.StartTime, e.EndTime, w.StartTime, w.EndTime)));
+        }
+
+        /// <summary>
         /// Ca <paramref name="slotStart"/>–<paramref name="slotEnd"/> có nằm TRỌN trong một khung giờ
         /// rảnh nào không.
         ///
@@ -73,6 +111,27 @@ namespace ARI.Application.Scheduling
         public static bool IsCovered(
             IEnumerable<HiringManagerAvailability> windows, DateTimeOffset slotStart, DateTimeOffset slotEnd)
             => windows.Any(w => w.StartTime <= slotStart && w.EndTime >= slotEnd);
+
+        /// <summary>
+        /// Hai khoảng thời gian có CHỒNG LẤN nhau không (nửa mở: chạm đầu-cuối thì không tính).
+        ///
+        /// 10:00–11:00 và 11:00–12:00 là hai khung liền nhau hợp lệ — người khai đang mô tả một buổi
+        /// rảnh liên tục bằng hai dòng. 10:00–11:00 và 10:30–12:00 thì không: chúng nói về cùng một
+        /// khoảng 10:30–11:00 hai lần.
+        /// </summary>
+        public static bool Overlaps(
+            DateTimeOffset aStart, DateTimeOffset aEnd, DateTimeOffset bStart, DateTimeOffset bEnd)
+            => aStart < bEnd && bStart < aEnd;
+
+        /// <summary>Mô tả MỘT khung theo giờ VN — dùng trong thông báo lỗi để chỉ đúng dòng bị trùng.</summary>
+        public static string DescribeOne(DateTimeOffset start, DateTimeOffset end)
+        {
+            var s = start.ToOffset(TimeSpan.FromHours(7));
+            var e = end.ToOffset(TimeSpan.FromHours(7));
+            return s.Date == e.Date
+                ? $"{s:dd/MM} {s:HH:mm}–{e:HH:mm}"
+                : $"{s:dd/MM HH:mm} – {e:dd/MM HH:mm}";
+        }
 
         /// <summary>Mô tả các khung giờ theo giờ VN để đưa thẳng vào thông báo lỗi cho Recruiter.</summary>
         public static string Describe(IEnumerable<HiringManagerAvailability> windows)
@@ -123,6 +182,24 @@ namespace ARI.Application.Scheduling
 
                 // Trùng khít thì bỏ: HM bấm gửi hai lần không nên sinh ra hai dòng y hệt.
                 if (cleaned.Any(c => c.StartTime == w.StartTime && c.EndTime == w.EndTime)) continue;
+
+                // CHỒNG LẤN MỘT PHẦN thì chặn, không lặng lẽ gộp.
+                //
+                // Trước đây chỉ loại được bản sao TRÙNG KHÍT, nên 22:50–23:20 và 23:00–23:30 cùng đi
+                // qua: hai dòng nói về cùng khoảng 23:00–23:20, và màn khai lịch hiện hai khung như
+                // thể đó là hai buổi rảnh khác nhau. Luật khớp giờ vẫn chạy đúng (`IsCovered` chỉ hỏi
+                // "có khung nào phủ trọn ca không"), nên đây là lỗi về thứ NGƯỜI ĐỌC hiểu, không phải
+                // về thứ máy tính ra — mà lịch rảnh sinh ra chính là để người khác đọc.
+                //
+                // Chặn chứ không gộp: gộp là sửa dữ liệu của người dùng mà không hỏi, và họ thường
+                // đang định sửa dòng cũ chứ không định khai thêm. Bên Recruiter xếp ca cũng chặn
+                // trùng giờ chứ không tự dồn, giữ cho hai màn nói cùng một thứ.
+                var clash = cleaned.FirstOrDefault(c => Overlaps(c.StartTime, c.EndTime, w.StartTime, w.EndTime));
+                if (clash != null)
+                    return (cleaned,
+                        $"Hai khung giờ chồng lên nhau: {DescribeOne(clash.StartTime, clash.EndTime)} " +
+                        $"và {DescribeOne(w.StartTime, w.EndTime)}. Hãy gộp thành một khung hoặc tách rời nhau.");
+
                 cleaned.Add(w with { Note = string.IsNullOrWhiteSpace(w.Note) ? null : w.Note.Trim() });
             }
 
@@ -296,6 +373,36 @@ namespace ARI.Application.Scheduling
 
             var (windows, error) = HmAvailabilitySupport.Sanitize(request.Windows);
             if (error != null) return Result.Failure<HmAvailabilitySaveResult>(error);
+
+            // Khung ĐANG DIỄN RA không có trong danh sách gửi lên (`Sanitize` đòi giờ bắt đầu ở tương
+            // lai) và `ReplaceAsync` cũng cố ý không xoá nó. Không kiểm ở đây thì luật "không chồng
+            // lấn" chỉ có hiệu lực trong phạm vi MỘT lần bấm gửi: khai 23:00–23:30 vẫn chồng lên khung
+            // 22:00–23:30 đang chạy, và màn xếp lịch của Recruiter lại hiện hai khung nói về cùng một
+            // khoảng thời gian — đúng thứ vừa đi sửa, chỉ khác đường vào.
+            var nowUtc = DateTimeOffset.UtcNow;
+            var running = (await HmAvailabilitySupport.ActiveWindowsAsync(
+                    _unitOfWork, request.JobPostingId, round, ct))
+                .Where(w => w.StartTime <= nowUtc)
+                .ToList();
+            var clash = HmAvailabilitySupport.FirstClash(running, windows);
+            if (clash != null)
+                return Result.Failure<HmAvailabilitySaveResult>(
+                    $"Khung giờ mới chồng lên khung đang diễn ra ({HmAvailabilitySupport.DescribeOne(clash.StartTime, clash.EndTime)}). " +
+                    "Hãy xoá khung đó trước, hoặc chọn giờ bắt đầu sau khi nó kết thúc.");
+
+            // Lịch rảnh là lịch của MỘT NGƯỜI, nên nó phải nhất quán qua CẢ CÁC VÒNG. Trước đây mọi
+            // phép kiểm đều đóng khung trong một vòng: khai vòng 2 rảnh 14:00–15:00 rồi sang tab vòng 3
+            // khai đúng khoảng đó lần nữa là lọt, và Recruiter xếp được hai ca cùng giờ cho cùng một
+            // người — mỗi ca ở một vòng nên không luật xếp ca nào bắt được.
+            var otherRounds = await HmAvailabilitySupport.OtherRoundWindowsAsync(
+                _unitOfWork, request.JobPostingId, round, ct);
+            var crossRound = HmAvailabilitySupport.FirstClash(otherRounds, windows);
+            if (crossRound != null)
+                return Result.Failure<HmAvailabilitySaveResult>(
+                    $"Khung giờ mới chồng lên lịch rảnh đã khai ở vòng {crossRound.RoundNumber} " +
+                    $"({HmAvailabilitySupport.DescribeOne(crossRound.StartTime, crossRound.EndTime)}). " +
+                    "Cùng một khoảng thời gian không thể vừa dành cho vòng này vừa dành cho vòng kia — " +
+                    "hãy sửa khung ở vòng đó trước, hoặc chọn giờ khác.");
 
             var replaced = await HmAvailabilityWriteGate.ReplaceAsync(
                 _unitOfWork, request.JobPostingId, round, gate.OwnerUserId, windows, ct);

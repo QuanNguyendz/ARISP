@@ -196,6 +196,30 @@ public class GetMyApplicationsQueryHandlerTests
     }
 
     [Fact]
+    public async Task Da_chot_nhung_khong_chia_se_thi_KHONG_con_cho_HR()
+    {
+        // Chốt kết quả và chia sẻ báo cáo là HAI quyết định. Bốn cờ chia sẻ mặc định TẮT, nên lấy
+        // `ShareEvaluation` làm dấu hiệu "đã duyệt" khiến mọi hồ sơ đã chốt vẫn hiện "chờ HR" —
+        // kể cả người vừa được mời sang vòng sau.
+        var job = JobBoardData.PublicJob();
+        var app = PortalAppsData.App(job.Id);
+        var session = PortalAppsData.Session(app.Id, status: "completed");
+        var eval = PortalAppsData.Eval(session.Id, app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(eval)
+            .Seed(PortalAppsData.Review(eval.Id, shareEval: false));
+
+        var arr = PortalAppsData.Json(await Run(Handler(uow), null));
+
+        Assert.False(arr[0].GetProperty("PendingHrReview").GetBoolean());
+
+        // KẾT LUẬN hiện ngay: lệnh chốt đã gửi kèm thư báo đạt/không đạt cho ứng viên (ADR-074).
+        var round = arr[0].GetProperty("Rounds")[0];
+        Assert.Equal("pass", round.GetProperty("Verdict").GetString());
+        // Nhưng ĐIỂM SỐ vẫn chờ HR chia sẻ — nó thuộc báo cáo chi tiết, không nằm trong thư.
+        Assert.Equal(JsonValueKind.Null, round.GetProperty("OverallScore").ValueKind);
+    }
+
+    [Fact]
     public async Task UTCID12_Shared_eval_and_feedback()
     {
         var job = JobBoardData.PublicJob();
@@ -350,6 +374,23 @@ public class GetMyApplicationDetailQueryHandlerTests
         var obj = PortalAppsData.Json(await Run(Handler(uow), app.Id));
         var round1 = obj.GetProperty("Sessions")[0];
         Assert.True(round1.GetProperty("PendingHrReview").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, round1.GetProperty("Evaluation").ValueKind);
+    }
+
+    [Fact]
+    public async Task Chi_tiet_da_chot_nhung_khong_chia_se_thi_KHONG_con_cho_HR()
+    {
+        var job = JobBoardData.PublicJob();
+        var app = PortalAppsData.App(job.Id);
+        var session = PortalAppsData.Session(app.Id, status: "completed");
+        var eval = PortalAppsData.Eval(session.Id, app.Id);
+        var uow = new InMemoryUnitOfWork().Seed(job).Seed(app).Seed(session).Seed(eval)
+            .Seed(PortalAppsData.Review(eval.Id, shareEval: false));
+
+        var obj = PortalAppsData.Json(await Run(Handler(uow), app.Id));
+        var round1 = obj.GetProperty("Sessions")[0];
+
+        Assert.False(round1.GetProperty("PendingHrReview").GetBoolean());
         Assert.Equal(JsonValueKind.Null, round1.GetProperty("Evaluation").ValueKind);
     }
 

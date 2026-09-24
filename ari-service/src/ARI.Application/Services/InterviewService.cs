@@ -16,6 +16,7 @@ using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using ARI.Domain.Constants;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,6 +34,8 @@ namespace ARI.Application.Services
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly InterviewOptions _interviewOptions;
         private readonly IMemoryCache _cache;
+        /// <summary>Chỉ dùng để dựng link trong thư gửi ứng viên (`Frontend:CandidateBaseUrl`).</summary>
+        private readonly IConfiguration _configuration;
         private readonly ILogger<InterviewService>? _logger;
         private readonly IEvaluationQueue? _evaluationQueue;
 
@@ -49,6 +52,7 @@ namespace ARI.Application.Services
             IFileStorageService fileStorage,
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             IMemoryCache cache,
+            IConfiguration configuration,
             InterviewOptions? interviewOptions = null,
             ILogger<InterviewService>? logger = null,
             IEvaluationQueue? evaluationQueue = null)
@@ -56,6 +60,7 @@ namespace ARI.Application.Services
             _logger = logger;
             _evaluationQueue = evaluationQueue;
             _fileStorage = fileStorage;
+            _configuration = configuration;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
             _notificationService = notificationService;
@@ -393,7 +398,7 @@ namespace ARI.Application.Services
 
         /// <summary>Gửi email + notification nhắc lịch phỏng vấn cho ứng viên. Chỉ chủ tin hoặc admin.</summary>
         public async Task<Result<bool>> SendBookingReminderAsync(
-            Guid bookingId, Guid? userId, string? role, CancellationToken ct = default)
+            Guid bookingId, Guid? userId, string? role, EmailOverride? over = null, CancellationToken ct = default)
         {
             var booking = await _unitOfWork.Repository<InterviewBooking>().GetByIdAsync(bookingId, ct);
             if (booking == null) return Result.Failure<bool>("Không tìm thấy lịch phỏng vấn.", CommonErrorCodes.NotFound);
@@ -411,6 +416,17 @@ namespace ARI.Application.Services
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             var jobTitle = job?.Title ?? "vị trí ứng tuyển";
 
+            // Nhắc được hay không, và nhắc CÁI GÌ, do một hàm duy nhất quyết định (`ScheduleReminder`)
+            // — giao diện bật/tắt nút bằng đúng hàm đó, nên nút sáng mà server từ chối là chuyện không
+            // xảy ra nữa. Lịch đã đóng (báo bận / bị huỷ) hoặc đã qua giờ thì lời nhắc vô nghĩa: gửi đi
+            // chỉ làm ứng viên tới một buổi không còn tồn tại.
+            var reminderState = ScheduleReminder.Resolve(
+                booking.Status, booking.ConfirmationStatus, slot.StartTime, DateTimeOffset.UtcNow);
+            if (!ScheduleReminder.CanSend(reminderState))
+                return Result.Failure<bool>(ScheduleReminder.BlockedMessage(reminderState), CommonErrorCodes.Conflict);
+
+            var needsConfirm = reminderState == ScheduleReminder.States.ConfirmNeeded;
+
             var local = slot.StartTime.ToOffset(TimeSpan.FromHours(7));
             var whenText = $"{local:HH:mm} ngày {local:dd/MM/yyyy} (giờ VN)";
             var roundType = await SchedulingSupport.RoundTypeAsync(_unitOfWork, app.JobPostingId, booking.RoundNumber, ct);
@@ -423,9 +439,23 @@ namespace ARI.Application.Services
                 await notifRepo.AddAsync(new ARI.Domain.Entities.Notification
                 {
                     CandidateAccountId = app.CandidateAccountId.Value,
+                    // Khoá chống trùng BẮT BUỘC: `notifications` có unique index (người nhận, dedup_key),
+                    // mà `DedupKey` mặc định là chuỗi RỖNG — bỏ trống thì lời nhắc thứ hai cho cùng một
+                    // ứng viên đâm vào chính lời nhắc thứ nhất và cả lệnh đổ bằng 500 (23505). Nhắc lịch
+                    // là việc LẶP LẠI được theo thiết kế, nên khoá phải khác nhau từng lần gửi.
+                    //
+                    // Dùng Guid chứ không phải `Ticks` như vài chỗ khác trong dự án: đồng hồ hệ thống
+                    // Windows chỉ nhích ~15ms một lần, nên hai cú bấm liên tiếp lấy ra ĐÚNG một giá trị
+                    // Ticks — tức là vẫn đâm nhau, chỉ hiếm hơn.
+                    DedupKey = $"schedule_reminder:{booking.Id}:{Guid.NewGuid():N}",
                     Type = "schedule_reminder",
-                    Title = $"Nhắc nhở {appointment}",
-                    Body = $"Nhắc nhở: Bạn có {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng đăng nhập Candidate Portal để kiểm tra.",
+                    // Hai việc khác nhau thì phải nói khác nhau: người chưa phản hồi cần BẤM xác nhận,
+                    // người đã xác nhận chỉ cần nhớ giờ. Một câu chung chung cho cả hai là câu không
+                    // nói cho ai biết phải làm gì.
+                    Title = needsConfirm ? $"Vui lòng xác nhận {appointment}" : $"Nhắc nhở {appointment}",
+                    Body = needsConfirm
+                        ? $"Bạn chưa xác nhận {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng vào Candidate Portal xác nhận tham dự hoặc báo bận."
+                        : $"Nhắc nhở: Bạn có {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng có mặt đúng giờ.",
                     Link = $"/portal/schedule/{app.Id}",
                     IsRead = false
                 }, ct);
@@ -433,28 +463,44 @@ namespace ARI.Application.Services
                     new { Type = "InterviewReminder", ApplicationId = app.Id, RoundNumber = booking.RoundNumber }, ct);
             }
 
-            // 2. Send Email
-            var subject = $"[ARISP] - Nhắc nhở {appointment} vị trí {jobTitle}";
-            var html = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
-                    <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
-                    <p>Đây là thư nhắc nhở về {appointment} <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{jobTitle}</strong>:</p>
-                    <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
-                    <p>Trạng thái hiện tại: <strong>{(booking.ConfirmationStatus == "confirmed" ? "Đã xác nhận" : "Chờ xác nhận")}</strong>.</p>
-                    <p>Vui lòng chuẩn bị sẵn sàng và truy cập hệ thống đúng giờ.</p>
-                    <br/>
-                    <p>Trân trọng,</p>
-                    <p><strong>Đội ngũ tuyển dụng ARISP</strong></p>
-                </div>";
+            // 2. Send Email — dựng bằng CHÍNH builder của thư mời/thư nhắc tự động, không viết HTML tay
+            // ở đây nữa. Bản cũ tự ghép một khối HTML riêng, nên thư nhắc nói "Trạng thái hiện tại: Chờ
+            // xác nhận" mà không có nút nào để xác nhận — ứng viên đọc xong không làm được gì.
+            var mail = needsConfirm
+                ? await InterviewInviteEmail.BuildReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, booking.Id, slot.StartTime, ct)
+                : await InterviewInviteEmail.BuildTimeReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, slot.StartTime, ct);
+            var subject = mail.Subject;
+            var html = mail.Html;
 
-            try { await _notificationService.SendEmailAsync(app.CandidateEmail, subject, html, ct); } catch { }
+            // Đi qua `CandidateEmailSender` như MỌI thư gửi ứng viên khác: ghi `email_logs` (nên tab
+            // "Lịch sử email" thấy được) và trả về việc thư có ra khỏi hệ thống hay không.
+            //
+            // Bản cũ là `try { ... } catch { }` trần, còn controller thì luôn trả "Đã gửi nhắc nhở tới
+            // ứng viên." — nghĩa là SMTP hỏng vẫn báo thành công, và không có dấu vết nào ở đâu để đối
+            // chiếu. Đúng trạng thái "gửi mà không ai biết có gửi được không" mà `CandidateEmailSender`
+            // sinh ra để xoá.
+            //
+            // Trả lời vào ĐÚNG luồng thư mời (`InviteEmailMessageId`) nếu có, để ứng viên đọc thư nhắc
+            // ngay dưới thư hẹn giờ thay vì phải đi tìm lại.
+            var sent = await CandidateEmailSender.SendAsync(
+                _unitOfWork, _notificationService,
+                EmailTemplateKeys.ScheduleReminder,
+                new RenderedEmail(subject, html, app.CandidateEmail, app.CandidateName),
+                over,
+                applicationId: app.Id, jobPostingId: app.JobPostingId,
+                sentByUserId: userId, ct,
+                inReplyToMessageId: booking.InviteEmailMessageId);
 
             booking.Reminder24hSent = true;
             booking.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<InterviewBooking>().Update(booking);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            return Result.Success(true);
+            // `true` = thư đã ra khỏi hệ thống. `false` = chuông trong Portal vẫn có, nhưng email thì
+            // KHÔNG — nói thẳng thay vì để người gửi tin là ứng viên đã nhận được mail.
+            return Result.Success(sent.Sent);
         }
 
         /// <summary>Dời MỘT ứng viên sang ca khác — wrapper mỏng của bản nhiều người để chỉ có một đường code.</summary>
@@ -656,6 +702,9 @@ namespace ARI.Application.Services
                     await notifRepo.AddAsync(new ARI.Domain.Entities.Notification
                     {
                         CandidateAccountId = app.CandidateAccountId.Value,
+                        // Cùng lý do với thư nhắc lịch: dời lịch lần thứ hai cho cùng ứng viên sẽ đâm
+                        // vào unique index (người nhận, dedup_key) nếu khoá để rỗng.
+                        DedupKey = $"schedule_rescheduled:{booking.Id}:{Guid.NewGuid():N}",
                         Type = "schedule_rescheduled",
                         Title = "Lịch phỏng vấn đã được dời",
                         Body = $"Lịch phỏng vấn của bạn đã được chuyển sang thời gian mới: {whenText}. Vui lòng đăng nhập Candidate Portal để XÁC NHẬN.",
@@ -668,14 +717,26 @@ namespace ARI.Application.Services
                         new { Type = "InterviewRescheduled", ApplicationId = app.Id }, ct);
                 }
 
+                // Thư này BẢO ứng viên vào Portal xác nhận, nên nó phải mang theo đường đi. Trước đây
+                // câu chữ có mà nút không — ứng viên phải tự nhớ địa chỉ cổng rồi tự dò lại hồ sơ, đúng
+                // lúc ta vừa đổi giờ hẹn của họ. Gốc URL lấy từ `FrontendUrls` như mọi lá thư khác;
+                // chưa cấu hình thì bỏ hẳn nút chứ không in ra một link cụt.
+                var portalLink = $"{FrontendUrls.Candidate(_configuration)}/portal/schedule/{app.Id}";
+                var confirmButton = portalLink.StartsWith("/", StringComparison.Ordinal)
+                    ? string.Empty
+                    : $@"
+                        <div style='text-align: center; margin: 24px 0;'>
+                            <a href='{portalLink}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xác nhận lịch mới</a>
+                        </div>";
+
                 var subject = $"[ARISP] - Lịch phỏng vấn của bạn đã được dời sang {whenText}";
                 var html = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
                         <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
                         <p>Bộ phận nhân sự vừa dời lịch phỏng vấn <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{job?.Title ?? "ứng tuyển"}</strong> của bạn:</p>
                         <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
-                        <p>Vui lòng đăng nhập Candidate Portal để <strong>xác nhận lịch mới này</strong>.</p>
-                        <br/>
+                        <p>Vui lòng vào Candidate Portal để <strong>xác nhận lịch mới này</strong>.</p>
+                        {confirmButton}
                         <p>Trân trọng,</p>
                         <p><strong>Đội ngũ nhân sự ARISP</strong></p>
                     </div>";
@@ -868,6 +929,7 @@ namespace ARI.Application.Services
                     BookingStatus = b.Status,
                     CandidateState = ResolveCandidateState(b.Status, b.ConfirmationStatus, b.DeclinedBy),
                     OccupiesSeat = string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase),
+                    RemindState = ScheduleReminder.Resolve(b.Status, b.ConfirmationStatus, slot.StartTime, nowUtc),
                     ApplicationStatus = app?.Status,
                     SessionId = sess?.Id,
                     SessionStatus = sess?.Status,

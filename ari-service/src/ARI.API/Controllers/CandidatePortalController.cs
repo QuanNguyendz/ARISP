@@ -20,6 +20,11 @@ namespace ARI.API.Controllers
         public string? CandidatePhone { get; set; }
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }
+
+        /// <summary>Kết quả bước "Xác thực thông tin" màn ứng tuyển vừa chạy: match | mismatch. Bỏ trống = không đối chiếu được.</summary>
+        public string? ContactVerificationStatus { get; set; }
+        public string? ContactVerificationDetails { get; set; }
+
         public Microsoft.AspNetCore.Http.IFormFile? CvFile { get; set; }
     }
 
@@ -203,7 +208,7 @@ namespace ARI.API.Controllers
 
             var result = await _sender.Send(new ApplyToJobCommand(
                 jobPostingId, candidateId, form.CandidateName!, form.CandidatePhone!, form.CoverLetter, form.NoticePeriod!,
-                bytes, fileName), ct);
+                bytes, fileName, form.ContactVerificationStatus, form.ContactVerificationDetails), ct);
 
             if (result.IsFailure)
             {

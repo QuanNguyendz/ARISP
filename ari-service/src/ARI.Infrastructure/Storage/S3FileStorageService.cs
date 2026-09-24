@@ -79,6 +79,21 @@ namespace ARI.Infrastructure.Storage
             return Task.FromResult(_s3.GetPreSignedURL(request));
         }
 
+        public async Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(storageKey)) return;
+
+            using var ms = new MemoryStream(content);
+            await _s3.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName = _options.Bucket,
+                Key = storageKey.TrimStart('/'),
+                InputStream = ms,
+                ContentType = NormalizeContentType(contentType),
+                DisablePayloadSigning = true // R2 yêu cầu để tránh lỗi chữ ký streaming
+            }, ct);
+        }
+
         public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default)
         {
             if (string.IsNullOrEmpty(storageKey))

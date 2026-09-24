@@ -420,7 +420,7 @@ namespace ARI.Infrastructure.Services
             var notif = scope.ServiceProvider.GetRequiredService<INotificationService>();
             var email = scope.ServiceProvider.GetRequiredService<IEmailService>();
             var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-            var candidateBaseUrl = config["Frontend:CandidateBaseUrl"];
+            var candidateBaseUrl = ARI.Application.Common.FrontendUrls.Candidate(config);
 
             var now = DateTimeOffset.UtcNow;
             var pending = (await unitOfWork.Repository<Offer>().FindAsync(

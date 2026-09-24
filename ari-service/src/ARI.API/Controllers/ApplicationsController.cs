@@ -108,6 +108,28 @@ namespace ARI.API.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Bản PDF của CV để DỰNG BẢN XEM TRƯỚC (không phải để tải về — tải về vẫn dùng file gốc).
+        ///
+        /// 404 ở đây là câu trả lời hợp lệ, không phải sự cố: môi trường chưa cài bộ chuyển đổi, hoặc
+        /// file Word hỏng. Giao diện bắt 404 rồi lùi về bộ dựng phía trình duyệt.
+        /// </summary>
+        [HttpGet("{id}/cv-preview")]
+        [Authorize(Policy = "InternalStaff")]
+        public async Task<IActionResult> GetCvPreview(Guid id, CancellationToken ct)
+        {
+            var result = await _sender.Send(
+                new GetCvPreviewQuery(id, _currentUserService.UserId, _currentUserService.Role), ct);
+            if (result.IsFailure)
+                return MapFailure(result.ErrorCode, result.Error);
+
+            // `inline`: đây là bản để XEM. Đặt `attachment` là quay lại đúng cái bệnh vừa chữa xong —
+            // mở trang một cái là file rơi vào thư mục tải xuống.
+            Response.Headers.ContentDisposition =
+                $"inline; filename=\"{Uri.EscapeDataString(result.Value.FileName)}\"";
+            return File(result.Value.Content, "application/pdf");
+        }
+
         [HttpPatch("{id}/status")]
         [Authorize(Policy = "InternalStaff")]
         public async Task<IActionResult> UpdateApplicationStatus(Guid id, [FromBody] UpdateApplicationStatusRequest request, CancellationToken ct)

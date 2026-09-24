@@ -36,6 +36,7 @@
     "ageValue": "{{count}} yrs",
     "appliedAt": "Applied on",
     "cv": "CV",
+    "cvDownload": "Download original",
     "noCv": "This candidate has not submitted a CV.",
     "selectPage": "Select all on page",
     "selectedCount": "{{count}} selected",
@@ -103,5 +104,14 @@
     "blank": "Blank",
     "picked": "picked",
     "expiredNotice": "The candidate was scheduled but never started the test. When it expired, the system submitted a blank test — so every question below is unanswered."
+  },
+  "applicationForm": {
+    "title": "Application form",
+    "hint": "Filled in by the candidate when they applied.",
+    "noticePeriod": "Notice period",
+    "coverLetter": "Cover letter",
+    "noCoverLetter": "The candidate did not write a cover letter.",
+    "hasCoverLetter": "cover letter included",
+    "noCoverLetterShort": "no cover letter"
   }
 }

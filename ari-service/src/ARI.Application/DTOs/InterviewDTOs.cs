@@ -248,6 +248,15 @@ namespace ARI.Application.DTOs
         /// <summary>Ứng viên này có đang chiếm một chỗ của ca không (BookingStatus = "scheduled").</summary>
         public bool OccupiesSeat { get; set; }
 
+        /// <summary>
+        /// Nút "Nhắc lịch" đang ở trạng thái nào — xem <see cref="ARI.Application.Scheduling.ScheduleReminder.States"/>:
+        /// <c>confirm</c> (nhắc xác nhận) · <c>remind</c> (nhắc giờ) · <c>past</c> · <c>closed</c>.
+        ///
+        /// Server tính, giao diện chỉ đọc: lệnh gửi dùng CHÍNH hàm này để chấp nhận hay từ chối, nên
+        /// nút sáng mà bấm vào bị từ chối là chuyện không xảy ra.
+        /// </summary>
+        public string RemindState { get; set; } = ARI.Application.Scheduling.ScheduleReminder.States.ConfirmNeeded;
+
         /// <summary>Trạng thái hồ sơ ứng tuyển (không phải trạng thái lịch) — để giao diện phân biệt
         /// "lịch bị đóng" với "hồ sơ đã bị loại khỏi quy trình".</summary>
         public string? ApplicationStatus { get; set; }

@@ -346,6 +346,9 @@ public class JdDocumentFlowTests
         public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default)
             => Task.FromResult($"{folder.ToSegment()}/{Guid.NewGuid()}-{originalFileName}");
 
+        public Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default)
             => Task.FromResult($"/files/{storageKey}");
 

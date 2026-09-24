@@ -183,6 +183,10 @@ namespace ARI.Application.DTOs
         public string? CvText { get; set; }
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }
+
+        /// <summary>Kết quả đối chiếu thông tin liên hệ với CV lúc nộp: match | mismatch (null = không chạy được).</summary>
+        public string? ContactVerificationStatus { get; set; }
+        public string? ContactVerificationDetails { get; set; }
     }
 
     public class ApplicationResponse
@@ -265,6 +269,14 @@ namespace ARI.Application.DTOs
 
         public string? CoverLetter { get; set; }
         public string? NoticePeriod { get; set; }
+
+        /// <summary>
+        /// Bước "Xác thực thông tin" ở màn ứng tuyển (match | mismatch; null = hồ sơ cũ hoặc không
+        /// đối chiếu được). Nhân sự cần thấy: ứng viên đã được cảnh báo lệch thông tin mà vẫn nộp.
+        /// </summary>
+        public string? ContactVerificationStatus { get; set; }
+        public string? ContactVerificationDetails { get; set; }
+
         public decimal? InterviewScore { get; set; }
         public DateTimeOffset? InterviewDate { get; set; }
 

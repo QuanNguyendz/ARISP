@@ -9,7 +9,7 @@
     "resultDetail": "{{correct}}/{{total}} correct.",
     "alreadyDone": "You have already completed this test.",
     "noTest": "This position has no online test. You don't need to take one.",
-    "progress": "Answered {{answered}}/{{total}} questions · Pass score: {{pass}}/100",
+    "progress": "Answered {{answered}}/{{total}} questions",
     "timeLeft": "Time left: {{time}}",
     "closesAt": "The test closes at {{closes}}",
     "multiHint": "Select multiple",

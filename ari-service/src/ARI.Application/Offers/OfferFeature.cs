@@ -545,8 +545,7 @@ namespace ARI.Application.Offers
                 AuditMetadata.Serialize(new { candidate = app.CandidateName, salary = offer.SalaryAmount }), ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            var baseUrl = _configuration["Frontend:CandidateBaseUrl"];
-            var mail = OfferEmail.Build(offer, app, job, baseUrl);
+            var mail = OfferEmail.Build(offer, app, job, FrontendUrls.Candidate(_configuration));
             await CandidateEmailSender.SendAsync(
                 _unitOfWork, _notifications, EmailTemplateKeys.OfferSent,
                 new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName),

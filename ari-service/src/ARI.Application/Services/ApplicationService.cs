@@ -120,6 +120,8 @@ namespace ARI.Application.Services
                 CurrentRound = currentRound,
                 CoverLetter = application.CoverLetter,
                 NoticePeriod = application.NoticePeriod,
+                ContactVerificationStatus = application.ContactVerificationStatus,
+                ContactVerificationDetails = application.ContactVerificationDetails,
                 InterviewScore = interviewScore,
                 InterviewDate = interviewDate,
                 // Chỉ hiện điểm chấm theo bộ tiêu chí (ADR-070) — điểm AI tự cho trước đây và "0" của file
@@ -156,6 +158,8 @@ namespace ARI.Application.Services
                 CvText = request.CvText,
                 CoverLetter = request.CoverLetter,
                 NoticePeriod = request.NoticePeriod,
+                ContactVerificationStatus = request.ContactVerificationStatus,
+                ContactVerificationDetails = request.ContactVerificationDetails,
                 Source = source,
                 Status = "cv_submitted"
             };
@@ -305,6 +309,8 @@ namespace ARI.Application.Services
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
                         NoticePeriod = a.NoticePeriod,
+                        ContactVerificationStatus = a.ContactVerificationStatus,
+                        ContactVerificationDetails = a.ContactVerificationDetails,
                         HmDecision = a.HmDecision,
                         HmDecisionNote = a.HmDecisionNote,
                         HmDecidedAt = a.HmDecidedAt
@@ -337,6 +343,8 @@ namespace ARI.Application.Services
             public Guid? CvJdAnalysisId { get; set; }
             public string? CoverLetter { get; set; }
             public string? NoticePeriod { get; set; }
+            public string? ContactVerificationStatus { get; set; }
+            public string? ContactVerificationDetails { get; set; }
             public string? HmDecision { get; set; }
             public string? HmDecisionNote { get; set; }
             public DateTimeOffset? HmDecidedAt { get; set; }
@@ -644,6 +652,8 @@ namespace ARI.Application.Services
                     CurrentRound = currentRound,
                     CoverLetter = app.CoverLetter,
                     NoticePeriod = app.NoticePeriod,
+                    ContactVerificationStatus = app.ContactVerificationStatus,
+                    ContactVerificationDetails = app.ContactVerificationDetails,
                     HmDecision = app.HmDecision,
                     HmDecisionNote = app.HmDecisionNote,
                     HmDecidedAt = app.HmDecidedAt,
@@ -760,6 +770,8 @@ namespace ARI.Application.Services
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
                         NoticePeriod = a.NoticePeriod,
+                        ContactVerificationStatus = a.ContactVerificationStatus,
+                        ContactVerificationDetails = a.ContactVerificationDetails,
                         HmDecision = a.HmDecision,
                         HmDecisionNote = a.HmDecisionNote,
                         HmDecidedAt = a.HmDecidedAt
@@ -814,6 +826,8 @@ namespace ARI.Application.Services
                         CvJdAnalysisId = a.CvJdAnalysisId,
                         CoverLetter = a.CoverLetter,
                         NoticePeriod = a.NoticePeriod,
+                        ContactVerificationStatus = a.ContactVerificationStatus,
+                        ContactVerificationDetails = a.ContactVerificationDetails,
                         HmDecision = a.HmDecision,
                         HmDecisionNote = a.HmDecisionNote,
                         HmDecidedAt = a.HmDecidedAt
@@ -861,6 +875,26 @@ namespace ARI.Application.Services
             DateTimeOffset? interviewDate = null;
             string? scheduleConfirmationStatus = null;
             string? scheduleDeclineReason = null;
+            // Bài trắc nghiệm của vòng hiện tại. Danh sách hồ sơ vốn đã trả ba giá trị này (xem
+            // `testsTask` trong `MapApplicationsAsync`) nhưng màn CHI TIẾT thì không — nên bảng phễu
+            // hiện "Chưa đạt · 40/100" còn mở đúng hồ sơ đó ra thì không còn dấu vết nào của bài thi.
+            // Vòng trắc nghiệm không sinh `Evaluation`, nên `InterviewScore` cũng trống ở đó: thiếu
+            // khối này thì màn chi tiết không có con số nào nói ứng viên làm bài ra sao.
+            decimal? onlineTestScore = null;
+            bool? onlineTestPassed = null;
+            bool? onlineTestExpired = null;
+            if (currentRound.HasValue)
+            {
+                var submission = (await _unitOfWork.Repository<OnlineTestSubmission>()
+                    .FindAsync(t => t.ApplicationId == id && t.RoundNumber == currentRound.Value, ct))
+                    .FirstOrDefault();
+                if (submission != null)
+                {
+                    onlineTestScore = submission.Score;
+                    onlineTestPassed = submission.IsPassed;
+                    onlineTestExpired = OnlineTestSubmittedBy.IsSystem(submission.SubmittedBy);
+                }
+            }
             if (currentRound.HasValue)
             {
                 var eval = (await _unitOfWork.Repository<Evaluation>()
@@ -890,6 +924,9 @@ namespace ARI.Application.Services
             }
 
             var response = MapToResponse(application, jobPosting, currentRound, score, interviewDate);
+            response.OnlineTestScore = onlineTestScore;
+            response.OnlineTestPassed = onlineTestPassed;
+            response.OnlineTestExpired = onlineTestExpired;
 
             // Cách ra điểm CV (ADR-070): trạng thái + từng tiêu chí + phép tính. Màn chi tiết là nơi
             // HM / Recruiter kiểm lại con số trước khi duyệt hồ sơ.

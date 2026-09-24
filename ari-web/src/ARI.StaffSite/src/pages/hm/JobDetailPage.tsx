@@ -209,6 +209,15 @@ export default function HmJobDetailPage() {
               candidateHref={(a) => `/hm/candidates/${a.id}`}
               evaluationHref={(evaluationId) => `/hm/evaluations?id=${evaluationId}`}
               statusLabel={(s) => t(`applicationStatus.${s}`, { defaultValue: s })}
+              /*
+                Cột này chỉ rộng 2/3 màn hình (dải panel chuyên môn của HM chiếm 1/3 còn lại), trong
+                khi khối hồ sơ cần chỗ cho danh sách + hồ sơ + khung đọc CV nằm cạnh nhau. Cho nó giữ
+                bề rộng tối thiểu rồi trượt ngang, thay vì ép co lại cho vừa cột.
+
+                Chỉ bật từ `lg` trở lên: dưới ngưỡng đó trang đã xếp một cột, khối hồ sơ có trọn bề
+                ngang rồi — ép bề rộng tối thiểu ở đó chỉ tạo ra thanh trượt vô cớ trên điện thoại.
+              */
+              bodyMinWidthClass="lg:min-w-[64rem]"
               hmDecision={
                 isTheHiringManager
                   ? {

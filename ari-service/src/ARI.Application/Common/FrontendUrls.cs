@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 
 namespace ARI.Application.Common
@@ -35,22 +37,47 @@ namespace ARI.Application.Common
         public const string DevStaff = "http://localhost:3001";
 
         /// <summary>
-        /// Gốc cổng ứng viên. Trả về chuỗi rỗng khi chưa cấu hình — trạng thái mà bước kiểm lúc boot
-        /// đã loại trừ ở mọi môi trường thật, nên ở đây không ném lỗi để một lá thư thiếu link không
-        /// kéo đổ cả thao tác nghiệp vụ đang chạy.
+        /// Gốc cổng ứng viên để GHÉP LINK. Trả về chuỗi rỗng khi chưa cấu hình — trạng thái mà bước
+        /// kiểm lúc boot đã loại trừ ở mọi môi trường thật, nên ở đây không ném lỗi để một lá thư
+        /// thiếu link không kéo đổ cả thao tác nghiệp vụ đang chạy.
         /// </summary>
-        public static string Candidate(IConfiguration configuration) =>
-            Read(configuration, CandidateKey) ?? Read(configuration, StaffKey) ?? string.Empty;
+        public static string Candidate(IConfiguration configuration) => CandidateOrigins(configuration).FirstOrDefault() ?? string.Empty;
 
-        /// <summary>Gốc cổng nhân sự.</summary>
-        public static string Staff(IConfiguration configuration) =>
-            Read(configuration, StaffKey) ?? Read(configuration, LegacyStaffKey) ?? string.Empty;
+        /// <summary>Gốc cổng nhân sự để GHÉP LINK.</summary>
+        public static string Staff(IConfiguration configuration) => StaffOrigins(configuration).FirstOrDefault() ?? string.Empty;
 
-        /// <summary>Bỏ dấu <c>/</c> cuối để nơi gọi ghép đường dẫn mà không sinh ra <c>//</c>.</summary>
-        private static string? Read(IConfiguration configuration, string key)
+        /// <summary>
+        /// TẤT CẢ origin của cổng ứng viên — dành cho danh sách CORS, nơi nhiều tên miền cùng hợp lệ
+        /// (ví dụ apex + www). Ghép link thì dùng <see cref="Candidate"/>.
+        /// </summary>
+        public static string[] CandidateOrigins(IConfiguration configuration) =>
+            Read(configuration, CandidateKey) ?? Read(configuration, StaffKey) ?? Array.Empty<string>();
+
+        /// <summary>Tất cả origin của cổng nhân sự — xem <see cref="CandidateOrigins"/>.</summary>
+        public static string[] StaffOrigins(IConfiguration configuration) =>
+            Read(configuration, StaffKey) ?? Read(configuration, LegacyStaffKey) ?? Array.Empty<string>();
+
+        /// <summary>
+        /// Tách theo dấu phẩy và bỏ dấu <c>/</c> cuối mỗi origin.
+        ///
+        /// <b>Vì sao phải tách.</b> Danh sách CORS vẫn luôn hiểu khoá này là chuỗi ngăn bởi dấu phẩy,
+        /// nên khai hai tên miền là cấu hình HỢP LỆ. Trước đây hàm này trả nguyên chuỗi, nên khai
+        /// <c>"https://a.vn,https://www.a.vn"</c> thì CORS chạy đúng còn mọi nút trong thư thành
+        /// <c>https://a.vn,https://www.a.vn/portal/...</c> — một link hỏng, không lỗi, không log.
+        /// Ghép link chỉ dùng được một gốc, nên lấy cái đầu tiên: origin chính tắc.
+        /// </summary>
+        private static string[]? Read(IConfiguration configuration, string key)
         {
             var value = configuration[key];
-            return string.IsNullOrWhiteSpace(value) ? null : value.Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(value)) return null;
+
+            var origins = value
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(o => o.TrimEnd('/'))
+                .Where(o => o.Length > 0)
+                .ToArray();
+
+            return origins.Length > 0 ? origins : null;
         }
     }
 }
