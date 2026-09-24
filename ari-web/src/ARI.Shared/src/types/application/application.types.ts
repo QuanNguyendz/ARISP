@@ -83,6 +83,8 @@ export interface MyApplicationItem {
   id: string
   jobPostingId: string
   jobTitle?: string | null
+  /** Tin đã kết thúc tuyển (đóng VÀ qua ngày đi làm dự kiến) — xem `JobClosure` phía server. */
+  jobClosed?: boolean
   location?: string | null
   department?: string | null
   interviewMode?: string | null
@@ -268,6 +270,8 @@ export interface MyApplicationDetail {
   id: string
   jobPostingId: string
   jobTitle?: string | null
+  /** Tin đã đóng hoặc lưu trữ — vị trí này không còn tuyển. */
+  jobClosed?: boolean
   jobDescription?: string | null
   location?: string | null
   department?: string | null
@@ -471,6 +475,13 @@ export interface HrApplicationItem {
   currentRound?: number | null
   coverLetter?: string
   noticePeriod?: string
+  /**
+   * Bước "Xác thực thông tin" lúc ứng tuyển: `match` | `mismatch`. Trống = hồ sơ nộp trước khi có
+   * tính năng này, hoặc lần đó không đối chiếu được (mất mạng, CV không đọc ra chữ).
+   */
+  contactVerificationStatus?: string | null
+  /** Chi tiết chỗ lệch — chỉ có nghĩa khi `contactVerificationStatus = mismatch`. */
+  contactVerificationDetails?: string | null
   /** Cổng duyệt của Hiring Manager (ADR-061): pending | approved | rejected | bypassed. */
   hmDecision?: string | null
   hmDecisionNote?: string | null

@@ -293,13 +293,37 @@ function RoundPlaceholder({
   t,
   onlineTest,
   applicationId,
+  eliminated,
 }: {
   s: MyApplicationSession
   t: (key: string, opts?: any) => string
   /** Bài trắc nghiệm của hồ sơ này — chỉ dựng cho ĐÚNG vòng mà nó thuộc về. */
   onlineTest?: CandidateOnlineTest | null
   applicationId: string
+  /** Hồ sơ đã dừng ở vòng này hoặc một vòng TRƯỚC đó — xem `eliminatedFrom`. */
+  eliminated?: boolean
 }) {
+  /*
+    Hồ sơ đã dừng ở một vòng trước: vòng này KHÔNG diễn ra nữa.
+
+    Kiểm trước mọi nhánh khác vì các nhánh đó đọc trạng thái của riêng từng vòng — một vòng chưa
+    xếp lịch vẫn là "Chưa phỏng vấn", một phiên chưa đóng vẫn là "Đang diễn ra". Đúng theo dữ liệu
+    của vòng đó, nhưng sai với thực tế của ứng viên: họ đã nhận thư báo không phù hợp rồi.
+  */
+  if (eliminated && !s.hrFinalVerdict) {
+    return (
+      <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
+          <XCircle className="h-6 w-6" />
+        </div>
+        <p className="mt-3 font-semibold text-ink-700">
+          {t('eliminated.title', { round: s.roundNumber })}
+        </p>
+        <p className="mt-1 text-sm text-ink-500">{t('eliminated.description')}</p>
+      </div>
+    )
+  }
+
   /*
     Vòng TRẮC NGHIỆM có mặt bằng riêng, không dùng chung với vòng hội thoại (ADR-049/059).
     Nó làm trực tuyến tại nhà: không cần tới văn phòng, không cần Kiosk, không có Mã phỏng vấn,
@@ -509,6 +533,34 @@ function RoundPlaceholder({
       </div>
     )
   }
+  // Đã chốt nhưng HR chưa chia sẻ báo cáo chi tiết.
+  //
+  // Kết luận vẫn phải hiện: lệnh chốt đã gửi thư báo đạt/không đạt cho ứng viên (ADR-074), nên để
+  // màn hình nói "chưa có báo cáo" là bắt họ tự hỏi lá thư kia có thật không. Cái CHƯA có là điểm
+  // số, tiêu chí và bản ghi — nói đúng thứ còn thiếu thay vì phủ nhận cả kết quả.
+  if (s.hrFinalVerdict) {
+    const passed = s.hrFinalVerdict === 'pass'
+    return (
+      <div
+        className={`rounded-2xl border p-6 text-center shadow-card sm:p-10 ${
+          passed ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/50'
+        }`}
+      >
+        <div
+          className={`mx-auto grid h-12 w-12 place-items-center rounded-full ${
+            passed ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+          }`}
+        >
+          {passed ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
+        </div>
+        <p className="mt-3 font-semibold text-ink-800">
+          {t(passed ? 'resultOnly.passTitle' : 'resultOnly.notPassTitle', { round: s.roundNumber })}
+        </p>
+        <p className="mt-1 text-sm text-ink-500">{t('resultOnly.description')}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-card sm:p-10">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
@@ -526,12 +578,15 @@ function RoundButton({
   active,
   onClick,
   t,
+  eliminated,
 }: {
   s: MyApplicationSession
   active: boolean
   onClick: () => void
   t: (key: string, opts?: any) => string
   onlineTest?: CandidateOnlineTest | null
+  /** Hồ sơ đã dừng ở vòng này hoặc một vòng TRƯỚC đó — xem `eliminatedFrom`. */
+  eliminated?: boolean
 }) {
   // Vòng trắc nghiệm lấy điểm từ BÀI THI, không phải từ phiên phỏng vấn — hai nguồn khác nhau cho
   // hai loại vòng khác nhau. Trước đây thẻ vòng này luôn hiện "—" vì nó chỉ biết `s.evaluation`.
@@ -541,11 +596,18 @@ function RoundButton({
   const shownScore = isTestRound ? undefined : s.evaluation?.overallScore
 
   const getBadge = () => {
+    // Kết luận của người chốt đứng TRƯỚC và KHÔNG cần có báo cáo kèm theo: thư kết quả đã báo
+    // đạt/không đạt cho ứng viên rồi (ADR-074), còn báo cáo chi tiết chỉ hiện khi HR chia sẻ.
+    // Điều kiện cũ `s.evaluation && verdict` đòi phải có báo cáo, nên người đã đạt vẫn thấy "Chờ HR".
     const verdict = s.hrFinalVerdict || s.evaluation?.aiVerdict
-    if (s.evaluation && verdict) {
+    if (verdict) {
       return verdict === 'pass'
         ? { cls: 'bg-emerald-50 text-emerald-700', icon: Check, label: t('badge.pass') }
         : { cls: 'bg-red-50 text-red-700', icon: XCircle, label: t('badge.notPass') }
+    }
+    // Đã dừng ở vòng trước → các vòng sau cũng mang kết cục đó, không phải "Chưa phỏng vấn".
+    if (eliminated) {
+      return { cls: 'bg-red-50 text-red-700', icon: XCircle, label: t('badge.notPass') }
     }
     if (s.pendingHrReview) {
       return { cls: 'bg-amber-50 text-amber-700', icon: Clock, label: t('badge.pendingHr') }
@@ -704,6 +766,37 @@ export default function ApplicationDetailPage() {
     [detail, selectedId]
   )
 
+  /**
+   * Vòng mà hồ sơ DỪNG LẠI — từ đó trở đi mọi vòng đều mang kết cục "không phù hợp".
+   *
+   * Không suy từ trạng thái của từng vòng, vì trạng thái đó chỉ kể chuyện của riêng nó: vòng chưa
+   * xếp lịch vẫn là "Chưa phỏng vấn", phiên chưa đóng vẫn là "Đang diễn ra". Ứng viên thì đã nhận
+   * thư báo không phù hợp và mọi vòng sau sẽ không bao giờ diễn ra.
+   *
+   * Hai đường dẫn tới đây: bị loại ở một VÒNG (có kết luận `not_pass`), hoặc bị loại từ khâu DUYỆT
+   * CV (chưa vòng nào có kết luận, nhưng hồ sơ đã đóng) — trường hợp sau tính là dừng từ vòng 1.
+   */
+  const eliminatedFrom = useMemo(() => {
+    if (!detail) return null
+    const rounds = detail.sessions
+      .filter((s) => (s.hrFinalVerdict || s.evaluation?.aiVerdict) === 'not_pass')
+      .map((s) => s.roundNumber)
+    if (rounds.length > 0) return Math.min(...rounds)
+    // Tên trạng thái lấy từ `ApplicationStatuses`: loại ở khâu CV là `cv_rejected` (KHÔNG phải
+    // "rejected"), `failed` là tên cũ còn sót trong dữ liệu. `withdrawn` không tính — ứng viên tự
+    // rút thì không phải họ "không phù hợp".
+    const closed = ['not_pass', 'cv_rejected', 'failed']
+    if (closed.includes(detail.status)) return 1
+
+    // Tin đã KẾT THÚC tuyển (qua ngày đi làm dự kiến) mà hồ sơ vẫn còn treo giữa phễu: vị trí đã
+    // khép lại, nên hồ sơ cũng vậy. Suy ở đây chứ không ghi vào hồ sơ — trạng thái thật của hồ sơ
+    // là dữ liệu vận hành của nhân sự, không phải chỗ để đóng dấu một kết luận do thời gian sinh ra.
+    const settled = ['pass', 'offer', 'hired', 'offer_declined', 'withdrawn']
+    return detail.jobClosed && !settled.includes(detail.status) ? 1 : null
+  }, [detail])
+
+  const isEliminated = (round: number) => eliminatedFrom !== null && round >= eliminatedFrom
+
   const jobTitle = detail?.jobTitle || t('position')
 
   return (
@@ -733,6 +826,17 @@ export default function ApplicationDetailPage() {
       ) : !detail ? null : (
         <main className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 py-6 lg:grid-cols-[320px_1fr] lg:gap-8">
           <div className="space-y-5">
+            {/* Tin đã đóng: nói thẳng ngay đầu trang. Không có dòng này thì ứng viên chỉ thấy hồ sơ
+                của mình bỗng dừng lại mà không biết vì sao — vị trí đã thôi tuyển. */}
+            {detail.jobClosed && (
+              <div className="rounded-2xl border border-ink-200 bg-ink-50 p-4 shadow-card">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ink-700">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" /> {t('jobClosed.title')}
+                </div>
+                <p className="mt-1 text-xs text-ink-500">{t('jobClosed.description')}</p>
+              </div>
+            )}
+
             {detail.upcomingInterview && (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 shadow-card">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -805,6 +909,7 @@ export default function ApplicationDetailPage() {
                           onClick={() => setSelectedId(s.id)}
                           t={t}
                           onlineTest={onlineTest}
+                          eliminated={isEliminated(s.roundNumber)}
                         />
                       </div>
                     ))}
@@ -818,6 +923,7 @@ export default function ApplicationDetailPage() {
                         onClick={() => setSelectedId(s.id)}
                         t={t}
                         onlineTest={onlineTest}
+                        eliminated={isEliminated(s.roundNumber)}
                       />
                     ))}
                   </div>
@@ -896,6 +1002,7 @@ export default function ApplicationDetailPage() {
                 t={t}
                 onlineTest={onlineTest}
                 applicationId={id ?? ''}
+                eliminated={isEliminated(selected.roundNumber)}
               />
             )}
           </div>
