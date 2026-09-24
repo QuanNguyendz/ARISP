@@ -3,10 +3,16 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { installStaleChunkReload } from '@ari/shared/utils/staleChunkReload'
+import { configureAuthStorage } from '@ari/shared/store/auth'
 import App from './app/App'
 
 // i18n configuration
 import './i18n'
+
+// Staff: mỗi tab một phiên đăng nhập riêng (sessionStorage). 2 tài khoản staff mở ở 2 tab cùng
+// trình duyệt không ghi đè token nhau; refresh (F5) giữ nguyên tài khoản của tab đó (hết cảnh
+// nhảy sang tài khoản tab kia rồi văng /403 → 404). Phải gọi TRƯỚC khi render. Xem authStore.
+configureAuthStorage('session')
 
 // Tab mở từ trước lúc deploy trỏ tới chunk hash cũ đã bị xoá → route lazy-load
 // không mở được. Tự reload 1 lần để lấy index mới thay vì bắt người dùng F5 tay.
