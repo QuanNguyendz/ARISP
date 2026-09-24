@@ -7,6 +7,7 @@ using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Interfaces;
+using ARI.Application.Jobs;
 using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using MediatR;
@@ -51,7 +52,10 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
                         Title = j.Title,
                         Department = j.Department,
                         InterviewMode = j.InterviewMode,
-                        Status = (j.Status == "active" && j.ApplicationDeadline.HasValue && j.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : j.Status,
+                        // Trạng thái THÔ ở đây; luật hiển thị chạy sau khi nạp xong (xem `JobClosure`)
+                        // vì nó cần ngày đi làm trên phiếu — một phép ghép mà SQL ở đây không làm được.
+                        Status = j.Status,
+                        RecruitmentRequestId = j.RecruitmentRequestId,
                         DetectedLanguage = j.DetectedLanguage,
                         LanguageRequirement = j.LanguageRequirement,
                         CreatedAt = j.CreatedAt,
@@ -74,6 +78,30 @@ namespace ARI.Application.Jobs.Queries.GetAdminJobs
                         HmSignOffStatus = j.HmSignOffStatus,
                     });
             }, ct);
+
+            // Tin "đã đóng" theo NGHĨA NHÂN SỰ: đóng cửa nhận hồ sơ VÀ đã qua ngày đi làm dự kiến.
+            // Tin vừa hết hạn nộp vẫn nằm ở nhóm đang chạy, vì HM/HR còn phải chốt kết quả cho những
+            // người đã nộp — xếp nó vào nhóm đã đóng ngay là làm mất việc khỏi tầm mắt của họ.
+            var nowUtc = DateTimeOffset.UtcNow;
+            var requestIds = jobList
+                .Where(j => j.RecruitmentRequestId.HasValue)
+                .Select(j => j.RecruitmentRequestId!.Value)
+                .Distinct()
+                .ToList();
+            var startDateByRequest = requestIds.Count == 0
+                ? new Dictionary<Guid, DateTimeOffset?>()
+                : (await _unitOfWork.Repository<RecruitmentRequest>()
+                        .QueryAsync(q => q.Where(r => requestIds.Contains(r.Id))
+                            .Select(r => new { r.Id, r.ExpectedStartDate }), ct))
+                    .GroupBy(r => r.Id)
+                    .ToDictionary(g => g.Key, g => g.First().ExpectedStartDate);
+
+            foreach (var j in jobList)
+            {
+                DateTimeOffset? expectedStart = j.RecruitmentRequestId is { } rid
+                    && startDateByRequest.TryGetValue(rid, out var sd) ? sd : null;
+                j.Status = JobClosure.DisplayStatus(j.Status, j.ApplicationDeadline, expectedStart, nowUtc);
+            }
 
             // Đếm ứng viên theo tin bằng SQL GROUP BY (không nạp Application/CvText).
             var jobIds = jobList.Select(j => j.Id).ToList();

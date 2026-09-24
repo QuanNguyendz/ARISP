@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Sparkles,
   MapPin,
+  Lock,
   Mail,
   Phone,
   Check,
@@ -51,6 +52,26 @@ type TFunction = (key: string, options?: Record<string, unknown>) => string
 // Số hồ sơ hiển thị mỗi trang trong danh sách ứng tuyển của ứng viên.
 const APPLICATIONS_PER_PAGE = 5
 
+/**
+ * Màu của nhãn trạng thái.
+ *
+ * Để cạnh nhãn và nhóm trong CÙNG một hàm (`metaOf`) là có chủ đích: trước đây nhãn lấy từ đây còn
+ * màu thì thẻ tự tra `statusCls[app.status]` bằng trạng thái THÔ, nên một hồ sơ hiện "Không phù hợp"
+ * vẫn mang màu xanh của `cv_submitted`. Bốn thứ mô tả cùng một trạng thái thì phải ra từ một chỗ.
+ */
+const STATUS_CLS: Record<string, string> = {
+  invited: 'bg-brand-50 text-brand-700 ring-brand-200',
+  cv_submitted: 'bg-brand-50 text-brand-700 ring-brand-200',
+  cv_rejected: 'bg-red-50 text-red-700 ring-red-200',
+  screening: 'bg-brand-50 text-brand-700 ring-brand-200',
+  interview: 'bg-amber-50 text-amber-700 ring-amber-200',
+  pass: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  not_pass: 'bg-red-50 text-red-700 ring-red-200',
+  withdrawn: 'bg-ink-100 text-ink-500 ring-ink-200',
+}
+
+const NEUTRAL_CLS = 'bg-ink-100 text-ink-600 ring-ink-200'
+
 function metaOf(t: TFunction, status: string) {
   const labels: Record<
     string,
@@ -65,13 +86,26 @@ function metaOf(t: TFunction, status: string) {
     not_pass: { label: t('applications.status.notPass'), group: 'done', icon: XCircle },
     withdrawn: { label: t('applications.status.withdrawn'), group: 'done', icon: XCircle },
   }
-  return (
-    labels[status] ?? {
-      label: status,
-      group: 'processing' as const,
-      icon: Clock,
-    }
-  )
+  const base = labels[status] ?? {
+    label: status,
+    group: 'processing' as const,
+    icon: Clock,
+  }
+  return { ...base, cls: STATUS_CLS[status] ?? NEUTRAL_CLS }
+}
+
+/** Kết cục đã có rồi thì tin đóng không đổi được nữa. */
+const SETTLED_STATUSES = ['pass', 'not_pass', 'cv_rejected', 'offer', 'hired', 'offer_declined', 'withdrawn']
+
+/**
+ * Hồ sơ đã bị loại — vì chính trạng thái của nó, hoặc vì tin đã kết thúc tuyển khi nó còn dở dang.
+ *
+ * Tách riêng khỏi "nhóm done" vì `pass` cũng nằm trong nhóm đó: người đã đạt đang CHỜ thư mời, thẻ
+ * của họ không được làm mờ như một hồ sơ đã trượt.
+ */
+function isEliminated(app: MyApplicationItem): boolean {
+  if (app.status === 'not_pass' || app.status === 'withdrawn' || app.status === 'cv_rejected') return true
+  return !!app.jobClosed && !SETTLED_STATUSES.includes(app.status)
 }
 
 /**
@@ -81,6 +115,22 @@ function metaOf(t: TFunction, status: string) {
  */
 function statusMetaOf(t: TFunction, app: MyApplicationItem) {
   const base = metaOf(t, app.status)
+
+  // Tin đã KẾT THÚC tuyển (đóng VÀ qua ngày đi làm dự kiến) mà hồ sơ còn treo giữa phễu: vị trí đã
+  // khép lại nên hồ sơ cũng vậy. Suy ở đây chứ không ghi vào hồ sơ — trạng thái thật là dữ liệu vận
+  // hành của nhân sự, không phải chỗ đóng dấu một kết luận do thời gian sinh ra.
+  if (app.jobClosed && !SETTLED_STATUSES.includes(app.status)) {
+    return {
+      ...base,
+      label: t('applications.status.notPass'),
+      group: 'done' as const,
+      icon: XCircle,
+      // Mang luôn màu của `not_pass`: nhãn nói "Không phù hợp" mà màu vẫn là xanh của trạng thái cũ
+      // thì thẻ tự mâu thuẫn với chính nó.
+      cls: STATUS_CLS.not_pass,
+    }
+  }
+
   const passed = app.passedRounds ?? 0
   const total = app.totalRounds ?? 1
   if (passed > 0 && (app.status === 'interview' || app.status === 'screening')) {
@@ -88,6 +138,7 @@ function statusMetaOf(t: TFunction, app: MyApplicationItem) {
       ...base,
       label: t('applications.status.roundPassed', { passed, total }),
       icon: Check,
+      cls: 'bg-brand-50 text-brand-700 ring-brand-200',
     }
   }
   return base
@@ -97,8 +148,13 @@ function statusMetaOf(t: TFunction, app: MyApplicationItem) {
  * Nhóm hiển thị của một hồ sơ — phản ánh quy trình:
  * có việc cần ứng viên làm (mã phỏng vấn còn hiệu lực, hoặc đã qua CV và còn lượt phỏng vấn thử)
  * → "Cần hành động"; còn lại theo trạng thái gốc (HR xem hồ sơ → Đang xử lý; pass/not_pass → Đã hoàn tất).
+ *
+ * Nhóm phải khớp với NHÃN đang hiện trên thẻ. Mã phỏng vấn và lượt phỏng vấn thử của một hồ sơ đã
+ * khép lại vẫn còn nguyên trong dữ liệu, nên hai lối tắt "cần hành động" bên dưới từng xếp một hồ sơ
+ * ghi "Không phù hợp" vào ô "Cần hành động" — bộ lọc nói một đằng, cái thẻ nói một nẻo.
  */
 function groupOf(t: TFunction, app: MyApplicationItem): Exclude<FilterKey, 'all'> {
+  if (isEliminated(app)) return 'done'
   if (app.interviewCode) return 'action'
   if (app.practiceAvailable) return 'action'
   return statusMetaOf(t, app).group
@@ -281,26 +337,16 @@ function CardFooter({
 
 function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
   const meta = statusMetaOf(t, app)
-  const passedMidway =
-    (app.passedRounds ?? 0) > 0 && (app.status === 'interview' || app.status === 'screening')
-  const statusCls: Record<string, string> = {
-    invited: 'bg-brand-50 text-brand-700 ring-brand-200',
-    cv_submitted: 'bg-brand-50 text-brand-700 ring-brand-200',
-    cv_rejected: 'bg-red-50 text-red-700 ring-red-200',
-    screening: 'bg-brand-50 text-brand-700 ring-brand-200',
-    interview: 'bg-amber-50 text-amber-700 ring-amber-200',
-    pass: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    not_pass: 'bg-red-50 text-red-700 ring-red-200',
-    withdrawn: 'bg-ink-100 text-ink-500 ring-ink-200',
-  }
   const StatusIcon = meta.icon
   const Icon = deptIcon(app.department)
   const [copied, setCopied] = useState(false)
-  const hasCode = !!app.interviewCode
-  const isClosed =
-    app.status === 'not_pass' || app.status === 'withdrawn' || app.status === 'cv_rejected'
+  // Mã phỏng vấn và lượt phỏng vấn thử còn nguyên trong dữ liệu của một hồ sơ đã bị loại, nên không
+  // chặn ở đây thì thẻ ghi "Không phù hợp" vẫn đội dải "Cần hành động" màu vàng và mời ứng viên vào
+  // phòng thi.
+  const isClosed = isEliminated(app)
+  const hasCode = !!app.interviewCode && !isClosed
   // Practice chỉ hiện khi backend xác nhận đủ điều kiện (ĐÃ QUA vòng CV — ADR-038) và chưa có mã On-site.
-  const showPractice = app.practiceAvailable && !hasCode
+  const showPractice = app.practiceAvailable && !hasCode && !isClosed
 
   const copyCode = () => {
     if (!app.interviewCode) return
@@ -338,11 +384,22 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
               <div className="min-w-0 flex-1">
-                <h3
-                  className={`break-words font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
-                >
-                  {app.jobTitle || t('applications.jobPosting')}
-                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3
+                    className={`break-words font-semibold ${isClosed ? 'text-ink-700' : 'text-ink-900 group-hover:text-brand-700'}`}
+                  >
+                    {app.jobTitle || t('applications.jobPosting')}
+                  </h3>
+                  {/* Tin đã kết thúc tuyển — nói ngay trên thẻ, không bắt mở chi tiết mới biết.
+                      Tách khỏi nhãn trạng thái bên phải: đó là kết cục của HỒ SƠ, còn đây là tình
+                      trạng của TIN — hai thứ khác nhau và có thể không đi cùng nhau (người đã đạt
+                      vẫn nằm trong một tin đã đóng). */}
+                  {app.jobClosed && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-semibold text-ink-500">
+                      <Lock className="h-3 w-3" /> {t('applications.jobClosed')}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500">
                   <MapPin className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">
@@ -353,11 +410,7 @@ function ApplicationCard({ t, app }: { t: TFunction; app: MyApplicationItem }) {
               </div>
               <div className="flex shrink-0 flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
                 <span
-                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${
-                    passedMidway
-                      ? 'bg-brand-50 text-brand-700 ring-brand-200'
-                      : statusCls[app.status] || 'bg-ink-100 text-ink-600 ring-ink-200'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:px-3 ${meta.cls}`}
                 >
                   <StatusIcon className="h-3.5 w-3.5" /> {meta.label}
                 </span>
