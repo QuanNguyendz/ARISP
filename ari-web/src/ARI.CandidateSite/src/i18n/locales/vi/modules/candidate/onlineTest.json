@@ -9,7 +9,7 @@
     "resultDetail": "Đúng {{correct}}/{{total}} câu.",
     "alreadyDone": "Bạn đã hoàn thành bài thi này.",
     "noTest": "Vị trí này chưa có bài thi trắc nghiệm. Bạn không cần làm bài.",
-    "progress": "Đã trả lời {{answered}}/{{total}} câu · Điểm đạt: {{pass}}/100",
+    "progress": "Đã trả lời {{answered}}/{{total}} câu",
     "timeLeft": "Thời gian còn lại: {{time}}",
     "closesAt": "Bài thi đóng lúc {{closes}}",
     "multiHint": "Chọn nhiều đáp án",
