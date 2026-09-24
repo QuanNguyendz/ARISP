@@ -31,7 +31,10 @@
       "args": [
         "-y",
         "@drawio/mcp@1.5.0"
-      ]
+      ],
+      "env": {
+        "npm_config_ignore_scripts": "true"
+      }
     }
   }
 }
