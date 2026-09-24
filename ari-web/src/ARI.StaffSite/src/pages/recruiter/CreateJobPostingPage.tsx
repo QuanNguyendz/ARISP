@@ -449,9 +449,32 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       roundsTouchedRef.current = false
       if (rr?.requestedRounds?.length) setRounds(roundsFromRequest(rr.requestedRounds, 'vi'))
 
+      // LỚP 1 — phiếu. Áp trước cả khi biết có bản JD hay không, vì bản JD chỉ ĐÈ LÊN những ô nó
+      // thực sự mang giá trị. Bản trước `return` ngay trong nhánh JD nên ô nào bản JD bỏ trống
+      // (hay gặp nhất: nơi làm việc, cấp bậc) thì giá trị HM đã khai trên phiếu không bao giờ tới
+      // được màn này — người dựng tin phải gõ lại đúng thứ đã có sẵn trong hệ thống.
+      if (rr) {
+        setTitle(rr.title)
+        setDepartment(rr.department || '')
+        setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
+        if (rr.employmentType) setEmploymentType(rr.employmentType)
+        if (rr.workMode) setWorkMode(rr.workMode)
+        if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
+        if (rr.location) setLocation(rr.location)
+        if (rr.headcount) setVacancies(rr.headcount)
+        if (rr.salaryMin != null || rr.salaryMax != null) {
+          setSalaryIsNegotiable(false)
+          setSalaryMin(rr.salaryMin ?? '')
+          setSalaryMax(rr.salaryMax ?? '')
+          // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
+          // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
+          setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
+        }
+      }
+
       const jd = composed?.jd
-      // Bản JD đã XUẤT FILE đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ HM sẽ mở ra
-      // để ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
+      // LỚP 2 — bản JD đã XUẤT FILE đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ
+      // HM sẽ mở ra để ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
       if (jd?.generatedFileStorageKey) {
         setTitle(jd.title)
         setDepartment(jd.department || '')
@@ -461,7 +484,6 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         if (jd.experienceLevel) setExperienceLevel(jd.experienceLevel)
         if (jd.location) setLocation(jd.location)
         if (jd.vacancies) setVacancies(jd.vacancies)
-        else if (rr?.headcount) setVacancies(rr.headcount)
         if (jd.applicationDeadline) setApplicationDeadline(toDateInput(jd.applicationDeadline))
         if (jd.salaryMin != null || jd.salaryMax != null) {
           setSalaryIsNegotiable(false)
@@ -488,25 +510,6 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             applyInterviewLanguage(s.interviewLanguage)
           })
           .catch(() => {})
-        return
-      }
-
-      if (!rr) return
-      setTitle(rr.title)
-      setDepartment(rr.department || '')
-      setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
-      if (rr.employmentType) setEmploymentType(rr.employmentType)
-      if (rr.workMode) setWorkMode(rr.workMode)
-      if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
-      if (rr.location) setLocation(rr.location)
-      if (rr.headcount) setVacancies(rr.headcount)
-      if (rr.salaryMin != null || rr.salaryMax != null) {
-        setSalaryIsNegotiable(false)
-        setSalaryMin(rr.salaryMin ?? '')
-        setSalaryMax(rr.salaryMax ?? '')
-        // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
-        // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
-        setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
       }
     })()
     return () => {

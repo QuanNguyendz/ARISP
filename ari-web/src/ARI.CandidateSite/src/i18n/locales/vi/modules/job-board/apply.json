@@ -13,6 +13,12 @@
     "notFound": "Không tìm thấy tin tuyển dụng.",
     "backToJobs": "Về danh sách việc làm"
   },
+  "alreadyApplied": {
+    "title": "Bạn đã ứng tuyển vị trí này",
+    "description": "Hồ sơ của bạn cho vị trí {{job}} đang được xử lý. Mỗi vị trí chỉ nhận một hồ sơ — muốn nộp CV khác, bạn cần rút hồ sơ hiện tại trước.",
+    "viewApplication": "Xem hồ sơ đã nộp",
+    "backToJob": "Quay lại tin tuyển dụng"
+  },
   "cv": {
     "title": "CV ứng tuyển",
     "helpText": "Mặc định dùng CV trong hồ sơ. Bạn có thể nộp CV khác cho riêng tin này.",
