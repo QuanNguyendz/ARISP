@@ -343,10 +343,11 @@ namespace ARI.API
                   }
                 : Array.Empty<string>();
 
-            var allowedOrigins = FrontendUrls.Staff(builder.Configuration)
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Concat(FrontendUrls.Candidate(builder.Configuration)
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            // `*Origins` trả về CẢ danh sách (khoá cấu hình ngăn bởi dấu phẩy); ghép link trong thư thì
+            // dùng `FrontendUrls.Staff/Candidate` — chỉ lấy origin đầu tiên. Việc tách từng nằm ở đây,
+            // nên nơi khác tưởng khoá này luôn là một URL đơn (xem `FrontendUrls.Read`).
+            var allowedOrigins = FrontendUrls.StaffOrigins(builder.Configuration)
+                .Concat(FrontendUrls.CandidateOrigins(builder.Configuration))
                 .Concat(localDevOrigins)
                 .Distinct()
                 .ToArray();

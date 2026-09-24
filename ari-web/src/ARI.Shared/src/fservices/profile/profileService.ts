@@ -75,7 +75,6 @@ export interface CvMatchAnalysis {
   skillsMatched: string[]
   skillsGaps: string[]
   experienceRelevance: string
-  overallRecommendation: string
   reviewedBy?: string | null
 }
 

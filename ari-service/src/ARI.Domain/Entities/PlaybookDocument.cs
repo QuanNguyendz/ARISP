@@ -22,6 +22,12 @@ namespace ARI.Domain.Entities
         /// văn bản cho RAG truy hồi; trộn hai thứ thì một lỗi định dạng sẽ làm hỏng cả việc chấm.
         /// </summary>
         public string? RubricJson { get; set; }
+
+        /// <summary>
+        /// Công thức chấm CV cấp tin (ngưỡng dải + ngưỡng khuyến nghị) đi CÙNG phiên bản bộ tiêu chí — ADR-075.
+        /// <c>null</c> = mặc định. Chỉ có ý nghĩa với <c>cv_rubric</c> (của tin, hoặc mẫu công ty).
+        /// </summary>
+        public string? ScoringPolicyJson { get; set; }
         public string Status { get; set; } = "processing"; // processing | ready | error
         public string? ErrorMessage { get; set; }
         public Guid UploadedByUserId { get; set; }

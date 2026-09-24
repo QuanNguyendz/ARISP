@@ -175,6 +175,7 @@
     "completeNow": "Complete Now",
     "findJobsNow": "Find Jobs Now",
     "exploreJobs": "Browse suitable IT jobs and apply now.",
+    "jobClosed": "Closed",
     "status": {
       "new": "New Application",
       "invited": "Invited",

@@ -1,0 +1,26 @@
+[Vòng 3 – Đáp án mong đợi – API danh sách chậm dần khi dữ liệu tăng (EF Core, PostgreSQL)]
+Câu trả lời tốt theo trình tự đo trước, sửa sau: (1) đo thời gian từng phần (log, APM, tracing) để biết chậm ở cơ sở dữ liệu hay ở ứng dụng; (2) bật log SQL của EF Core, tìm N+1, truy vấn kéo thừa cột hoặc thừa dòng; (3) chạy EXPLAIN ANALYZE, tìm Seq Scan, thêm index khớp WHERE và ORDER BY (composite); (4) AsNoTracking và projection Select cho truy vấn đọc; (5) đổi phân trang OFFSET sang keyset khi trang sâu; (6) cân nhắc cache cho dữ liệu ít thay đổi. Mức Senior: nêu đánh đổi của index (ghi chậm hơn, tốn dung lượng) và đo lại sau khi sửa. Chưa đạt: nhảy ngay vào "thêm cache" hoặc "nâng cấp server" mà không đo.
+
+[Vòng 3 – Đáp án mong đợi – Chống đặt trùng suất cuối cùng (concurrency, race condition)]
+Câu trả lời tốt: nhận ra race condition của kiểu "đọc, kiểm tra còn chỗ, rồi ghi". Ràng buộc phải nằm ở cơ sở dữ liệu: UPDATE có điều kiện nguyên tử (tăng số đã đặt WHERE số đã đặt < sức chứa, rồi kiểm tra số dòng bị ảnh hưởng), hoặc khoá dòng SELECT … FOR UPDATE trong transaction, hoặc unique index để một suất chỉ có một người. Tầng ứng dụng: optimistic concurrency (xmin, RowVersion), bắt DbUpdateConcurrencyException để báo hết chỗ hoặc thử lại. Mức Senior: giải thích vì sao lock trong bộ nhớ (lock, SemaphoreSlim) không đủ khi chạy nhiều instance. Chưa đạt: chỉ chặn ở frontend hoặc chỉ dùng lock trong bộ nhớ.
+
+[Vòng 3 – Đáp án mong đợi – Clean Architecture trong ASP.NET Core]
+Câu trả lời tốt: Domain (entity, luật nghiệp vụ, không phụ thuộc framework), Application (use case, interface, CQRS khi cần), Infrastructure (EF Core, dịch vụ bên ngoài), API mỏng; phụ thuộc hướng vào trong; test được use case mà không cần cơ sở dữ liệu thật. Mức Senior: nói được chi phí – nhiều lớp, nhiều ánh xạ, chậm với tính năng nhỏ – và khi nào nên đơn giản hơn (CRUD nhỏ, dịch vụ ngắn hạn, nhóm nhỏ), ví dụ vertical slice. Chưa đạt: chỉ kể tên các lớp, không giải thích vì sao hay khi nào không nên dùng.
+
+[Vòng 3 – Đáp án mong đợi – async/await, thread pool và CancellationToken]
+Câu trả lời tốt: .Result và .Wait() chặn luồng, gây thread pool starvation và có thể deadlock; async void không bắt được exception; truyền CancellationToken từ request xuống EF Core và HttpClient để dừng việc khi client huỷ; ASP.NET Core không có SynchronizationContext nên ConfigureAwait(false) chủ yếu có ý nghĩa trong thư viện. Chưa đạt: cho rằng async làm code chạy nhanh hơn hoặc chạy song song.
+
+[Vòng 3 – Đáp án mong đợi – Vòng đời DI và captive dependency]
+Câu trả lời tốt: Singleton một thể hiện cho cả ứng dụng, Scoped một thể hiện cho mỗi request, Transient tạo mới mỗi lần yêu cầu; DbContext là Scoped và không thread-safe; Singleton giữ service Scoped (captive dependency) làm DbContext sống mãi và bị dùng chung giữa các request; trong BackgroundService phải tạo scope bằng IServiceScopeFactory. Chưa đạt: không biết DbContext là Scoped, hoặc đăng ký mọi thứ Singleton "cho nhanh".
+
+[Vòng 3 – Đáp án mong đợi – Idempotency và retry an toàn cho REST API]
+Câu trả lời tốt: client gửi idempotency key; server lưu key cùng kết quả với ràng buộc unique, request trùng thì trả lại kết quả cũ thay vì tạo mới; chỉ retry lỗi tạm thời; GET, PUT, DELETE vốn idempotent còn POST thì không. Chưa đạt: cho rằng chỉ cần khoá nút bấm ở frontend.
+
+[Vòng 3 – Đáp án mong đợi – Bảo mật: phân quyền, IDOR, secret]
+Câu trả lời tốt: xác thực chỉ trả lời "là ai", phân quyền phải kiểm tra quyền trên TỪNG bản ghi ở server (bản ghi có thuộc người dùng hoặc phạm vi của họ không); không tin id, role hay phạm vi do client gửi lên; trả 404 hoặc 403 nhất quán; secret nằm trong biến môi trường hoặc secret store, không commit lên git. Chưa đạt: chỉ kiểm tra đã đăng nhập, hoặc chỉ ẩn nút ở giao diện.
+
+[Vòng 3 – Đáp án mong đợi – Kịch bản lưu dữ liệu rồi gửi email (outbox)]
+Câu trả lời tốt: ghi bản ghi nghiệp vụ và bản ghi outbox trong CÙNG một transaction; tác vụ nền đọc outbox, gửi, đánh dấu đã gửi; retry có backoff; phía nhận khử trùng lặp bằng id thông điệp (at-least-once kết hợp idempotent). Dịch vụ email sập thì thông điệp nằm chờ trong outbox, không mất. Chưa đạt: gửi email ngay trong request rồi try/catch bỏ qua lỗi.
+
+[Vòng 3 – Đáp án mong đợi – Kịch bản API bên thứ ba không ổn định (timeout, retry, circuit breaker)]
+Câu trả lời tốt: đặt timeout ngắn; dùng HttpClientFactory; retry có backoff và jitter chỉ cho lỗi tạm thời (5xx, timeout), không retry lỗi 4xx; circuit breaker để ngừng gọi khi bên thứ ba sập; không giữ transaction hay khoá trong lúc gọi ra ngoài; khi cần thì xử lý bất đồng bộ qua hàng đợi hoặc trả dữ liệu cache kèm thông báo rõ ràng. Chưa đạt: tăng timeout thật dài hoặc retry vô hạn.

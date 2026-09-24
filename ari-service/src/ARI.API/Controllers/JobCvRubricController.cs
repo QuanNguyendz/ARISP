@@ -41,11 +41,25 @@ namespace ARI.API.Controllers
         public async Task<IActionResult> Save(Guid jobId, [FromBody] SaveCvRubricRequest body, CancellationToken ct)
         {
             var result = await _sender.Send(new SaveJobCvRubricCommand(
-                jobId, body?.Criteria ?? new List<CvRubricCriterionInput>(), _currentUser.UserId, _currentUser.Role), ct);
+                jobId, body?.Criteria ?? new List<CvRubricCriterionInput>(), _currentUser.UserId, _currentUser.Role,
+                body?.Policy), ct);
             return result.IsFailure ? PlaybookUpload.MapFailure(this, result.ErrorCode, result.Error) : Ok(result.Value);
         }
 
-        /// <summary>Tải bộ tiêu chí đang dùng về dạng Excel.</summary>
+        /// <summary>
+        /// Xem trước tác động của bản nháp bộ tiêu chí / công thức lên mọi hồ sơ của tin (ADR-075) — tính trong bộ nhớ,
+        /// không ghi, không gọi AI. Cùng quyền với lưu.
+        /// </summary>
+        [HttpPost("preview")]
+        public async Task<IActionResult> Preview(Guid jobId, [FromBody] SaveCvRubricRequest body, CancellationToken ct)
+        {
+            var result = await _sender.Send(new PreviewJobCvRubricQuery(
+                jobId, body?.Criteria ?? new List<CvRubricCriterionInput>(), body?.Policy,
+                _currentUser.UserId, _currentUser.Role), ct);
+            return result.IsFailure ? PlaybookUpload.MapFailure(this, result.ErrorCode, result.Error) : Ok(result.Value);
+        }
+
+        /// <summary>Tải bộ tiêu chí đang dùng về dạng Excel (kèm sheet công thức).</summary>
         [HttpGet("export")]
         public async Task<IActionResult> Export(Guid jobId, CancellationToken ct)
         {
@@ -53,7 +67,7 @@ namespace ARI.API.Controllers
             if (current.IsFailure)
                 return PlaybookUpload.MapFailure(this, current.ErrorCode, current.Error);
 
-            var file = await _sender.Send(new ExportCvRubricSheetQuery(current.Value!.Criteria), ct);
+            var file = await _sender.Send(new ExportCvRubricSheetQuery(current.Value!.Criteria, current.Value.Policy), ct);
             return file.IsFailure
                 ? BadRequest(new { message = file.Error, code = file.ErrorCode })
                 : File(file.Value!, RubricSheet.XlsxContentType, "bo-tieu-chi-cham-cv.xlsx");
@@ -63,5 +77,11 @@ namespace ARI.API.Controllers
     public class SaveCvRubricRequest
     {
         public List<CvRubricCriterionInput> Criteria { get; set; } = new();
+
+        /// <summary>Công thức cấp tin (ADR-075); bỏ trống = mặc định.</summary>
+        public CvScoringPolicy? Policy { get; set; }
+
+        /// <summary>Chỉ dùng ở <c>export-sheet</c>: <c>interview</c> = bộ tiêu chí phỏng vấn (không cột J–K, không sheet công thức).</summary>
+        public string? Mode { get; set; }
     }
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Emails;
 using ARI.Application.Evaluations;
 using ARI.Application.Services;
 using ARI.Application.UnitTests.TestSupport;
@@ -429,5 +430,107 @@ public class SubmitHrReviewTests
         Assert.Equal("Middle", review.SuggestedLevel);
         Assert.Equal(25_000_000m, review.SuggestedSalaryMin);
         Assert.Equal("Nền tảng .NET vững", review.Strengths);
+    }
+
+    // ---------- Thư kết quả đi cùng lệnh chốt (quy tắc 21, ADR-074) ----------
+
+    private static EmailLog ResultEmail(InMemoryUnitOfWork uow)
+        => Assert.Single(uow.Repo<EmailLog>().Items, e => e.TemplateKey == EmailTemplateKeys.InterviewResult);
+
+    [Fact]
+    public async Task Final_pass_sends_one_logged_result_email_signed_by_the_reviewer()
+    {
+        var (uow, _, app, eval) = Seed(aiVerdict: "pass");
+        var notif = new RecordingNotificationService();
+
+        var res = await Run(uow, notif, HrReviewData.Request(eval.Id, "pass"));
+
+        Assert.True(res.IsSuccess, res.Error);
+        var log = ResultEmail(uow);
+        Assert.Equal(app.Id, log.ApplicationId);
+        Assert.Equal(_hrId, log.SentByUserId);            // dấu vết "ai đã gửi thư này"
+        Assert.False(log.WasEdited);
+        Assert.Contains("vượt qua vòng phỏng vấn", log.Subject);
+        Assert.Single(notif.Emails);                        // đúng MỘT thư — không còn đường gửi SMTP thẳng
+    }
+
+    [Fact]
+    public async Task Passing_a_middle_round_sends_only_the_next_round_email()
+    {
+        // Trước đây nhánh mở vòng kế tự gửi thư riêng, còn nhánh kết thúc gửi thư khác — một lần chốt có
+        // thể phát hai thư. Nay biến thể thư và trạng thái hồ sơ suy từ CÙNG một hàm.
+        var (uow, job, app, eval) = Seed(aiVerdict: "pass", round: 1);
+        uow.Seed(HrReviewData.RoundConfig(job.Id, round: 2));
+        var notif = new RecordingNotificationService();
+
+        var res = await Run(uow, notif, HrReviewData.Request(eval.Id, "pass"));
+
+        Assert.True(res.IsSuccess, res.Error);
+        Assert.Equal("interview", app.Status);
+        Assert.Contains("qua vòng 1", ResultEmail(uow).Subject);
+        Assert.Single(notif.Emails);
+    }
+
+    [Fact]
+    public async Task Not_pass_sends_the_thank_you_email()
+    {
+        var (uow, _, _, eval) = Seed(aiVerdict: "not_pass");
+
+        var res = await Run(uow, new RecordingNotificationService(), HrReviewData.Request(eval.Id, "not_pass"));
+
+        Assert.True(res.IsSuccess, res.Error);
+        Assert.Contains("cảm ơn", ResultEmail(uow).Subject);
+    }
+
+    [Fact]
+    public async Task Edited_email_from_the_composer_is_sanitized_and_marked_edited()
+    {
+        var (uow, _, _, eval) = Seed(aiVerdict: "pass");
+        var notif = new RecordingNotificationService();
+        var request = HrReviewData.Request(eval.Id, "pass");
+        request.EmailOverride = new EmailOverride
+        {
+            Subject = "Chúc mừng Anh A",
+            BodyHtml = "<p>Hẹn gặp anh ngày đầu tiên.</p><script>alert(1)</script>",
+        };
+
+        var res = await Run(uow, notif, request);
+
+        Assert.True(res.IsSuccess, res.Error);
+        var log = ResultEmail(uow);
+        Assert.True(log.WasEdited);
+        Assert.Equal("Chúc mừng Anh A", log.Subject);
+        Assert.Contains("Hẹn gặp anh", log.BodyHtml);
+        Assert.DoesNotContain("<script", log.BodyHtml);       // lọc ở server, không tin trình soạn
+        Assert.Equal(log.BodyHtml, Assert.Single(notif.Emails).Body); // lưu đúng bản đã gửi
+    }
+
+    [Fact]
+    public async Task Practice_review_sends_no_email()
+    {
+        var (uow, _, _, eval) = Seed(aiVerdict: "pass", sessionType: "practice");
+        var notif = new RecordingNotificationService();
+
+        var res = await Run(uow, notif, HrReviewData.Request(eval.Id, "pass"));
+
+        Assert.True(res.IsSuccess, res.Error);
+        Assert.Empty(notif.Emails);                          // ADR-051: buổi thử không thuộc phễu
+        Assert.Empty(uow.Repo<EmailLog>().Items);
+    }
+
+    [Fact]
+    public async Task A_report_can_only_be_confirmed_once()
+    {
+        var (uow, _, app, eval) = Seed(aiVerdict: "pass");
+        var notif = new RecordingNotificationService();
+        await Run(uow, notif, HrReviewData.Request(eval.Id, "pass"));
+
+        var again = await Run(uow, notif, HrReviewData.Request(eval.Id, "not_pass", overrideReason: "Đổi ý sau khi họp nhóm"));
+
+        Assert.True(again.IsFailure);
+        Assert.Equal(CommonErrorCodes.Conflict, again.ErrorCode);
+        Assert.Single(uow.Repo<Domain.Entities.HrReview>().Items);
+        Assert.Single(notif.Emails);                          // ứng viên không nhận thư thứ hai trái ngược
+        Assert.Equal("pass", app.Status);
     }
 }

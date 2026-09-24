@@ -8,21 +8,26 @@ import {
   FileText,
   Mail,
   Phone,
-  MapPin,
   Loader2,
   Check,
   X,
   Send,
   ExternalLink,
   BarChart3,
+  Download,
 } from 'lucide-react'
-import { DocumentPreview } from '@ari/shared/document/DocumentViewer'
+import { DocumentPreview, downloadName } from '@ari/shared/document/DocumentViewer'
+import { resolveAssetUrl } from '@ari/shared/config/constants'
+import { cvPreviewUrl } from '@ari/shared/fservices/application'
+import { HorizontalScrollArea } from '@ari/shared/ui'
 import { formatScore } from '@ari/shared/utils/format'
 import { roundTypeKey } from '@ari/shared/utils/roundTypes'
 import OnlineTestAnswerSheetModal from './OnlineTestAnswerSheetModal'
 import InterviewCodeCard from './InterviewCodeCard'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import ApplicationFormCard from '@/components/applications/ApplicationFormCard'
 import CvScoreBadge from '@/components/cvScore/CvScoreBadge'
+import { cvScoreTextClass } from '@/components/cvScore/cvTier'
 import { useCvScoreText } from '@/components/cvScore/useCvScoreText'
 import type { HrApplicationItem } from '@ari/shared/types/application'
 import {
@@ -139,6 +144,16 @@ export interface CandidatePipelineProps {
    * danh sách. Không truyền = ẩn (Hiring Manager xem hồ sơ nhưng không phát mã; server cũng chặn).
    */
   canIssueInterviewCode?: boolean
+
+  /**
+   * Bề rộng tối thiểu của khối HỒ SƠ khi chỗ đặt không đủ rộng (màn tin của Hiring Manager chỉ dành
+   * cho nó 2/3 chiều ngang, 1/3 còn lại là dải panel chuyên môn). Có giá trị thì khối hồ sơ giữ
+   * nguyên bề rộng đó và **trượt ngang** để xem hết, kèm một thanh kéo ở trên.
+   *
+   * Chỉ bọc khối hồ sơ — thanh bước quy trình ở trên đã tự cuộn ngang theo cách riêng của nó, lồng
+   * thêm một tầng trượt nữa là bắt người dùng kéo hai lần cho cùng một việc.
+   */
+  bodyMinWidthClass?: string
 }
 
 const CARD = 'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-card'
@@ -168,7 +183,12 @@ function scrollParentOf(el: HTMLElement | null): HTMLElement | null {
   let node = el?.parentElement ?? null
   while (node) {
     const overflowY = getComputedStyle(node).overflowY
-    if (overflowY === 'auto' || overflowY === 'scroll') return node
+    // Phải cuộn dọc được THẬT. Một khung chỉ đặt `overflow-x: auto` (màn tin của Hiring Manager bọc
+    // khối này trong một khung trượt ngang) vẫn bị CSS tính `overflow-y` thành `auto` — nhận nhầm nó
+    // là phần tử cuộn thì lệnh bù bên dưới cộng vào một `scrollTop` không bao giờ nhúc nhích, và cả
+    // trang lại giật đúng như lỗi mà đoạn này sinh ra để chữa.
+    const scrollable = node.scrollHeight > node.clientHeight
+    if ((overflowY === 'auto' || overflowY === 'scroll') && scrollable) return node
     node = node.parentElement
   }
   return null
@@ -288,6 +308,7 @@ export default function CandidatePipeline({
   batchBusy,
   onlineTestResultsHref,
   canIssueInterviewCode,
+  bodyMinWidthClass,
 }: CandidatePipelineProps) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
 
@@ -425,6 +446,139 @@ export default function CandidatePipeline({
     )
   }
 
+  /* Khối hồ sơ: thanh bước ở trên đứng ngoài, vì chỉ khối này mới cần trượt ngang. */
+  const body = (
+    <div className={CARD}>
+      <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 dark:border-white/10">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
+          <Users className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+          {activeStage?.label}
+          <span className="text-sm font-normal text-ink-400">
+            {t('pipeline.resultCount', { count: activeStage?.count ?? 0 })}
+          </span>
+        </h2>
+
+        <div className="flex items-center gap-2">
+          {/* Bảng điểm nằm ở ĐÚNG vòng trắc nghiệm, không phải trong màn ngân hàng câu hỏi: nó
+              trả lời câu hỏi của người đang nhìn danh sách ứng viên, không phải của người đang
+              soạn đề. */}
+          {onTestRound && onlineTestResultsHref && (
+            <a
+              href={onlineTestResultsHref}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
+            >
+              <BarChart3 className="h-3.5 w-3.5" /> {t('pipeline.testResults')}
+            </a>
+          )}
+
+          {selected && (
+            <button
+              onClick={() => changeSelection(null)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" /> {t('pipeline.backToList')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {activeStage?.count === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-14 text-center">
+          <Users className="h-8 w-8 text-ink-300" />
+          <p className="text-sm text-ink-500 dark:text-ink-400">{t('pipeline.emptyStage')}</p>
+        </div>
+      ) : selected ? (
+        /* Đã chọn một người: danh sách thu về cột hẹp bên trái, hồ sơ + CV chiếm phần còn lại —
+           vẫn chuyển qua lại giữa các ứng viên bằng một cú bấm, không phải quay ra quay vào. */
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+          <CandidateRail
+            items={activeStage.items}
+            selectedId={selected.id}
+            onPick={changeSelection}
+          />
+          <CandidateDetail
+            app={selected}
+            statusLabel={statusLabel}
+            statusBadge={statusBadge}
+            processingAppId={processingAppId}
+            onApprove={onApprove}
+            onReject={onReject}
+            onInvite={onInvite}
+            inviteRound={inviteTargetRound(selected, rounds)}
+            isInvitePending={isInvitePending}
+            candidateHref={candidateHref}
+            evaluationHref={evaluationHref}
+            hmDecision={hmDecision}
+            showInterviewCode={!!canIssueInterviewCode && needsInterviewCode(selected, rounds)}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Chỉ hiện khi có người được chọn — một thanh luôn nằm đó mà không bấm được chỉ tốn chỗ. */}
+          {selectedCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-ink-100 bg-brand-50/60 px-5 py-3 dark:border-white/10 dark:bg-brand-500/10">
+              <span className="text-sm font-medium text-ink-700 dark:text-ink-200">
+                {t('pipeline.selectedCount', { count: selectedCount })}
+              </span>
+              <div className="ml-auto flex flex-wrap gap-2">
+                {/* Xếp lịch có nghĩa ở bước "Chờ xếp lịch" (vòng 1) và ở từng bước VÒNG.
+                    Ở bước sàng CV thì thao tác đúng là duyệt, không phải mời. */}
+                {schedulingRound != null && onBatchInvite && (
+                  <button
+                    disabled={batchBusy || batchInviteRound == null}
+                    onClick={() => batchInviteRound != null && onBatchInvite(batchInviteRound)}
+                    title={batchInviteRound == null ? t('actions.scheduleMixedRounds') : undefined}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    <Send className="h-4 w-4" />{' '}
+                    {batchInviteRound != null && batchInviteRound > schedulingRound
+                      ? t('actions.scheduleNextRound', { round: batchInviteRound })
+                      : t('actions.schedule')}
+                  </button>
+                )}
+                {activeStage?.id === 'new' && onBatchApprove && (
+                  <button
+                    disabled={batchBusy}
+                    onClick={onBatchApprove}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {batchBusy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                    {t('actions.approve')}
+                  </button>
+                )}
+                {onBatchReject && (
+                  <button
+                    disabled={batchBusy}
+                    onClick={onBatchReject}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-500/30"
+                  >
+                    <X className="h-4 w-4" /> {t('actions.reject')}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <CandidateTable
+            items={activeStage.items}
+            onPick={changeSelection}
+            statusLabel={statusLabel}
+            statusBadge={statusBadge}
+            selectedIds={selectedIds}
+            onToggleSelect={onToggleSelect}
+            onToggleSelectAll={onToggleSelectAll}
+            showTestScore={onTestRound}
+            onViewTest={setAnswerSheetOf}
+          />
+        </>
+      )}
+    </div>
+  )
+
   return (
     <div ref={rootRef} className="space-y-4">
       {answerSheetOf && (
@@ -437,135 +591,11 @@ export default function CandidatePipeline({
 
       <StageBar stages={stages} activeId={activeStage?.id} onPick={setStageId} />
 
-      <div className={CARD}>
-        <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 dark:border-white/10">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-ink-900 dark:text-white">
-            <Users className="h-5 w-5 text-brand-600 dark:text-brand-400" />
-            {activeStage?.label}
-            <span className="text-sm font-normal text-ink-400">
-              {t('pipeline.resultCount', { count: activeStage?.count ?? 0 })}
-            </span>
-          </h2>
-
-          <div className="flex items-center gap-2">
-            {/* Bảng điểm nằm ở ĐÚNG vòng trắc nghiệm, không phải trong màn ngân hàng câu hỏi: nó
-                trả lời câu hỏi của người đang nhìn danh sách ứng viên, không phải của người đang
-                soạn đề. */}
-            {onTestRound && onlineTestResultsHref && (
-              <a
-                href={onlineTestResultsHref}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
-              >
-                <BarChart3 className="h-3.5 w-3.5" /> {t('pipeline.testResults')}
-              </a>
-            )}
-
-            {selected && (
-              <button
-                onClick={() => changeSelection(null)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" /> {t('pipeline.backToList')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {activeStage?.count === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-14 text-center">
-            <Users className="h-8 w-8 text-ink-300" />
-            <p className="text-sm text-ink-500 dark:text-ink-400">{t('pipeline.emptyStage')}</p>
-          </div>
-        ) : selected ? (
-          /* Đã chọn một người: danh sách thu về cột hẹp bên trái, hồ sơ + CV chiếm phần còn lại —
-             vẫn chuyển qua lại giữa các ứng viên bằng một cú bấm, không phải quay ra quay vào. */
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
-            <CandidateRail
-              items={activeStage.items}
-              selectedId={selected.id}
-              onPick={changeSelection}
-            />
-            <CandidateDetail
-              app={selected}
-              statusLabel={statusLabel}
-              statusBadge={statusBadge}
-              processingAppId={processingAppId}
-              onApprove={onApprove}
-              onReject={onReject}
-              onInvite={onInvite}
-              inviteRound={inviteTargetRound(selected, rounds)}
-              isInvitePending={isInvitePending}
-              candidateHref={candidateHref}
-              evaluationHref={evaluationHref}
-              hmDecision={hmDecision}
-              showInterviewCode={!!canIssueInterviewCode && needsInterviewCode(selected, rounds)}
-            />
-          </div>
-        ) : (
-          <>
-            {/* Chỉ hiện khi có người được chọn — một thanh luôn nằm đó mà không bấm được chỉ tốn chỗ. */}
-            {selectedCount > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-ink-100 bg-brand-50/60 px-5 py-3 dark:border-white/10 dark:bg-brand-500/10">
-                <span className="text-sm font-medium text-ink-700 dark:text-ink-200">
-                  {t('pipeline.selectedCount', { count: selectedCount })}
-                </span>
-                <div className="ml-auto flex flex-wrap gap-2">
-                  {/* Xếp lịch có nghĩa ở bước "Chờ xếp lịch" (vòng 1) và ở từng bước VÒNG.
-                      Ở bước sàng CV thì thao tác đúng là duyệt, không phải mời. */}
-                  {schedulingRound != null && onBatchInvite && (
-                    <button
-                      disabled={batchBusy || batchInviteRound == null}
-                      onClick={() => batchInviteRound != null && onBatchInvite(batchInviteRound)}
-                      title={batchInviteRound == null ? t('actions.scheduleMixedRounds') : undefined}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
-                    >
-                      <Send className="h-4 w-4" />{' '}
-                      {batchInviteRound != null && batchInviteRound > schedulingRound
-                        ? t('actions.scheduleNextRound', { round: batchInviteRound })
-                        : t('actions.schedule')}
-                    </button>
-                  )}
-                  {activeStage?.id === 'new' && onBatchApprove && (
-                    <button
-                      disabled={batchBusy}
-                      onClick={onBatchApprove}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
-                    >
-                      {batchBusy ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Check className="h-4 w-4" />
-                      )}
-                      {t('actions.approve')}
-                    </button>
-                  )}
-                  {onBatchReject && (
-                    <button
-                      disabled={batchBusy}
-                      onClick={onBatchReject}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-500/30"
-                    >
-                      <X className="h-4 w-4" /> {t('actions.reject')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <CandidateTable
-              items={activeStage.items}
-              onPick={changeSelection}
-              statusLabel={statusLabel}
-              statusBadge={statusBadge}
-              selectedIds={selectedIds}
-              onToggleSelect={onToggleSelect}
-              onToggleSelectAll={onToggleSelectAll}
-              showTestScore={onTestRound}
-              onViewTest={setAnswerSheetOf}
-            />
-          </>
-        )}
-      </div>
+      {bodyMinWidthClass ? (
+        <HorizontalScrollArea innerClassName={bodyMinWidthClass}>{body}</HorizontalScrollArea>
+      ) : (
+        body
+      )}
     </div>
   )
 }
@@ -748,7 +778,13 @@ function CandidateTable({
                   {age != null ? t('pipeline.ageValue', { count: age }) : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <CvScoreBadge score={a.matchScore} status={a.cvScoreStatus} retryAt={a.cvScoreRetryAt} />
+                  <CvScoreBadge
+                    score={a.matchScore}
+                    status={a.cvScoreStatus}
+                    retryAt={a.cvScoreRetryAt}
+                    gateStatus={a.cvGateStatus}
+                    className={`text-sm font-semibold ${cvScoreTextClass(a.cvRecommendation)}`}
+                  />
                 </td>
                 {showTestScore && (
                   <td className="whitespace-nowrap px-4 py-3">
@@ -764,8 +800,9 @@ function CandidateTable({
                               : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
                           }`}
                         >
+                          {/* `formatScore` ĐÃ kèm "/100" — nối thêm nữa ra "40/100/100". */}
                           {a.onlineTestPassed ? t('pipeline.testPassed') : t('pipeline.testFailed')}{' '}
-                          · {formatScore(a.onlineTestScore)}/100
+                          · {formatScore(a.onlineTestScore)}
                         </span>
                         {/* Bài hệ thống nộp thay khi hết hạn: "0 điểm do không làm" khác hẳn "0 điểm
                             do làm sai hết" với người quyết định loại hay giữ. */}
@@ -892,7 +929,6 @@ function CandidateDetail({
   showInterviewCode?: boolean
 }) {
   const { t } = useTranslation('modules/staff/candidatePipeline')
-  const age = ageFrom(app.candidateDateOfBirth)
   const busy = processingAppId === app.id
   const cvScoreText = useCvScoreText()
 
@@ -940,15 +976,13 @@ function CandidateDetail({
         </span>
       </div>
 
-      {/* ---- Thông tin cá nhân ---- */}
+      {/* ---- Thông tin cá nhân ----
+          Khu vực và độ tuổi lấy từ hồ sơ cá nhân của ứng viên — hai ô KHÔNG bắt buộc mà hầu hết
+          không ai điền, nên chúng gần như luôn in ra "—" và chỉ tốn chỗ trong một panel vốn đã hẹp.
+          Ai cần vẫn xem được ở trang hồ sơ đầy đủ. */}
       <dl className="mb-4 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
         <Row icon={<Phone className="h-3.5 w-3.5" />} label={t('pipeline.colContact')} value={app.candidatePhone} />
         <Row icon={<Mail className="h-3.5 w-3.5" />} label="Email" value={app.candidateEmail} />
-        <Row icon={<MapPin className="h-3.5 w-3.5" />} label={t('pipeline.colArea')} value={app.candidateLocation} />
-        <Row
-          label={t('pipeline.colAge')}
-          value={age != null ? t('pipeline.ageValue', { count: age }) : null}
-        />
         <Row label={t('pipeline.appliedAt')} value={new Date(app.createdAt).toLocaleDateString('vi-VN')} />
         <Row
           label={t('pipeline.colMatch')}
@@ -968,6 +1002,13 @@ function CandidateDetail({
           ))}
         </div>
       )}
+
+      {/* ---- Ứng viên tự khai gì lúc nộp hồ sơ ----
+          Thư giới thiệu, thời gian báo trước khi nghỉ và kết quả đối chiếu thông tin với CV: ba thứ
+          nằm sẵn trong DB từ lúc ứng tuyển mà không màn nào của nhân sự kê ra. */}
+      <div className="mb-4 rounded-xl border border-ink-200 p-4 dark:border-white/10">
+        <ApplicationFormCard app={app} defaultOpen={false} />
+      </div>
 
       {/* ---- Nút thao tác: giữ nguyên luật của trang, chỉ đổi chỗ đặt ---- */}
       {!closed && (
@@ -1073,12 +1114,35 @@ function CandidateDetail({
           Trước đây phải mở lớp phủ cho từng người rồi đóng lại; sàng lọc mười hồ sơ là hai mươi cú
           bấm thừa. Dùng chung `DocumentPreview` với lớp phủ nên không có bộ dựng tài liệu thứ hai. */}
       <div className="rounded-xl border border-ink-200 dark:border-white/10">
-        <div className="flex items-center gap-2 border-b border-ink-100 px-3 py-2 text-sm font-medium text-ink-700 dark:border-white/10 dark:text-ink-200">
-          <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> {t('pipeline.cv')}
+        <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2 text-sm font-medium text-ink-700 dark:border-white/10 dark:text-ink-200">
+          <span className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-brand-600 dark:text-brand-400" /> {t('pipeline.cv')}
+          </span>
+          {/* Lối thoát khi khung dựng không giống bản gốc. `docx-preview` là bản dựng GẦN ĐÚNG, không
+              phải Word: mẫu CV dùng khung nổi hay chia cột thì nó xếp sai chỗ. Người sàng hồ sơ phải
+              luôn lấy được file thật mà không cần rời màn hình này. */}
+          {app.cvFileUrl && (
+            <a
+              href={resolveAssetUrl(app.cvFileUrl)}
+              download={downloadName(app.candidateName || 'CV', app.cvFileUrl)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-xs font-medium text-ink-600 hover:bg-ink-50 dark:border-white/10 dark:text-ink-300 dark:hover:bg-white/10"
+            >
+              <Download className="h-3.5 w-3.5" /> {t('pipeline.cvDownload')}
+            </a>
+          )}
         </div>
         <div className="h-[32rem]">
           {app.cvFileUrl ? (
-            <DocumentPreview url={app.cvFileUrl} fileName={`${app.candidateName || 'CV'}.pdf`} />
+            /* Tên hiển thị KHÔNG kèm đuôi: `DocumentPreview` suy định dạng từ tên trước, URL sau.
+               Gắn cứng ".pdf" vào đây là nói dối nó — CV .docx bị dựng bằng nhánh PDF, và một
+               `<iframe>` trỏ vào blob kiểu Word thì Chrome TẢI FILE VỀ ngay lúc mở trang. */
+            <DocumentPreview
+              url={app.cvFileUrl}
+              fileName={app.candidateName || 'CV'}
+              pdfUrl={cvPreviewUrl(app.id)}
+            />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <FileText className="h-8 w-8 text-ink-300" />
@@ -1106,7 +1170,9 @@ function Row({
         {icon}
         {label}
       </dt>
-      <dd className="min-w-0 flex-1 truncate text-sm text-ink-800 dark:text-ink-100">
+      {/* `truncate` ở đây từng cắt cụt email ("phongvg04…") mà không để lại đường nào đọc tiếp —
+          ô này hẹp sẵn vì panel chia đôi. Cho xuống dòng: hai dòng email vẫn hơn một dòng vô dụng. */}
+      <dd className="min-w-0 flex-1 break-words text-sm text-ink-800 dark:text-ink-100">
         {value || '—'}
       </dd>
     </div>

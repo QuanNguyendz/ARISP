@@ -31,9 +31,15 @@
     "writtenIn": "Bản nhận xét này được AI viết bằng {{lang}} — theo ngôn ngữ bạn đang dùng lúc bắt đầu buổi thử.",
     "scoresByCriteria": "Điểm theo tiêu chí",
     "pendingTitle": "AI đang chấm buổi thử",
-    "pendingDescription": "Nội dung hội thoại đã được lưu. Bản nhận xét sẽ xuất hiện ở đây sau ít phút, hãy tải lại trang.",
+    "pendingDescription": "Nội dung hội thoại đã được lưu. Bản nhận xét sẽ tự hiện ở đây khi AI chấm xong — thường chỉ vài phút.",
     "emptyTitle": "Chưa có nhận xét AI",
-    "emptyDescription": "Buổi thử này chưa được chấm — bạn vẫn xem lại được toàn bộ nội dung hội thoại bên dưới."
+    "emptyDescription": "Buổi thử này chưa được chấm — bạn vẫn xem lại được toàn bộ nội dung hội thoại bên dưới.",
+    "needsRubricTitle": "Chờ nhà tuyển dụng bổ sung tiêu chí chấm",
+    "needsRubricDescription": "Vị trí này chưa có bộ tiêu chí chấm phỏng vấn nên AI chưa nhận xét được. Nhận xét sẽ tự có khi nhà tuyển dụng bổ sung — bạn vẫn xem lại được toàn bộ hội thoại bên dưới.",
+    "noAnswersTitle": "Không có câu trả lời để nhận xét",
+    "noAnswersDescription": "Buổi thử kết thúc khi bạn chưa trả lời câu nào nên AI không có gì để nhận xét.",
+    "failedTitle": "AI chưa nhận xét được buổi thử này",
+    "failedDescription": "Hệ thống đã thử nhiều lần nhưng chưa chấm được. Nội dung hội thoại vẫn được lưu đầy đủ bên dưới."
   },
   "criterionLabels": {
     "technical": "Kiến thức kỹ thuật",

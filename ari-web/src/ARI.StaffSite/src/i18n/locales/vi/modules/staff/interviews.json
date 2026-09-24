@@ -110,7 +110,25 @@
     "view": "Xem",
     "expiredBanner": "Hệ thống tự huỷ lịch vì ứng viên không xác nhận trong thời hạn. Có thể dời sang ca khác.",
     "reasonRejected": "Lý do loại:",
-    "reasonDeclined": "Lý do từ chối:"
+    "reasonDeclined": "Lý do từ chối:",
+    "remindState": {
+      "confirm": {
+        "label": "Nhắc xác nhận",
+        "title": "Ứng viên chưa phản hồi lịch — gửi thư + thông báo nhắc họ vào xác nhận hoặc báo bận."
+      },
+      "remind": {
+        "label": "Nhắc giờ",
+        "title": "Ứng viên đã xác nhận — gửi thư + thông báo nhắc lại giờ và việc cần chuẩn bị."
+      },
+      "past": {
+        "label": "Nhắc lịch",
+        "title": "Đã qua giờ hẹn nên không nhắc được nữa. Nếu ứng viên không tham dự, hãy xếp lại một ca khác."
+      },
+      "closed": {
+        "label": "Nhắc lịch",
+        "title": "Lịch không còn hiệu lực (ứng viên báo bận hoặc ca đã huỷ) — hãy xếp lại một ca khác."
+      }
+    }
   },
   "state": {
     "pending": "Chờ xác nhận",

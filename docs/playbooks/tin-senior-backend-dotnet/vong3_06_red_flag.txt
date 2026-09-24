@@ -1,0 +1,14 @@
+[Vòng 3 – Dấu hiệu cần đào sâu – async và tài nguyên]
+Dùng .Result, .Wait() hoặc async void trong code web; tạo HttpClient mới cho mỗi request; đăng ký DbContext là Singleton; không biết CancellationToken. Đào sâu: "Điều gì xảy ra với thread pool khi hàng trăm request cùng chặn chờ như vậy?"
+
+[Vòng 3 – Dấu hiệu cần đào sâu – dữ liệu và hiệu năng]
+Đề xuất cache hoặc nâng cấp server trước khi đo; cho rằng thêm index luôn nhanh hơn; không đọc được kế hoạch truy vấn; tải cả bảng lên bộ nhớ rồi mới lọc bằng LINQ. Đào sâu: "Bạn đo bằng gì để biết chỗ chậm trước khi sửa?"
+
+[Vòng 3 – Dấu hiệu cần đào sâu – tương tranh và nhất quán dữ liệu]
+Đặt chỗ bằng "đọc, kiểm tra, rồi ghi" mà không khoá; dựa vào lock trong bộ nhớ khi chạy nhiều instance; gọi dịch vụ bên ngoài bên trong transaction; không tính tới lỗi xảy ra giữa chừng. Đào sâu: "Nếu chạy ba instance cùng lúc thì cách này còn đúng không?"
+
+[Vòng 3 – Dấu hiệu cần đào sâu – bảo mật]
+Ghép chuỗi để tạo câu SQL; tin id, role hoặc phạm vi dữ liệu do client gửi lên; chỉ ẩn nút ở giao diện thay cho kiểm tra quyền ở server; lưu secret trong code hoặc file cấu hình commit lên git; ghi log dữ liệu nhạy cảm. Đào sâu: "Người dùng đổi id trên URL thành id của người khác thì chuyện gì xảy ra?"
+
+[Vòng 3 – Dấu hiệu cần đào sâu – áp kiến trúc theo khuôn]
+Áp Clean Architecture, microservices hoặc CQRS cho mọi thứ mà không nói được lợi ích và chi phí; không kể được lần nào mình chọn giải pháp đơn giản hơn. Đào sâu: "Kể một lần bạn quyết định KHÔNG dùng một pattern – vì sao?"

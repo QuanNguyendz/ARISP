@@ -22,6 +22,15 @@ internal static class RubricSheetBuilder
 
     public static byte[] Build(params (string Key, string Name, string Weight, string? Description)[] rows)
     {
+        var wide = new string?[rows.Length][];
+        for (int i = 0; i < rows.Length; i++)
+            wide[i] = new[] { rows[i].Key, rows[i].Name, rows[i].Weight, rows[i].Description };
+        return Build(wide);
+    }
+
+    /// <summary>Dòng đủ cột (A–K) — để kiểm các cột ADR-075 (J = Loại, K = Điểm tối thiểu).</summary>
+    public static byte[] Build(params string?[][] rows)
+    {
         using var mem = new MemoryStream();
         using (var doc = SpreadsheetDocument.Create(mem, SpreadsheetDocumentType.Workbook))
         {
@@ -40,10 +49,7 @@ internal static class RubricSheetBuilder
 
             sheetData.Append(Row(sharedPart, 1, "Mã tiêu chí", "Tên hiển thị", "Trọng số", "Chuẩn chấm"));
             for (int i = 0; i < rows.Length; i++)
-            {
-                var (key, name, weight, description) = rows[i];
-                sheetData.Append(Row(sharedPart, (uint)(i + 2), key, name, weight, description));
-            }
+                sheetData.Append(Row(sharedPart, (uint)(i + 2), rows[i]));
 
             wbPart.Workbook.Save();
         }

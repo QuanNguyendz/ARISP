@@ -24,7 +24,7 @@ import {
   normalizeSalaryCurrency,
 } from '@ari/shared/utils/jobOptions'
 import type { CreateJobPostingRequest, RoundConfig, JobPosting } from '@ari/shared/types/job'
-import type { CvRubricCriterion } from '@ari/shared/fservices/cvRubric'
+import type { CvRubricCriterion, CvScoringPolicy } from '@ari/shared/fservices/cvRubric'
 import { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import CvRubricChips from '@/components/cvRubric/CvRubricChips'
 import { resolveApiError } from '@ari/shared/utils/apiError'
@@ -179,6 +179,8 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
    * ĐỌC để Recruiter biết tin sẽ chấm CV theo gì, và biết trước khi phiếu cũ chưa có bộ tiêu chí.
    */
   const [requestRubric, setRequestRubric] = useState<CvRubricCriterion[] | null>(null)
+  // Công thức chấm HM khai kèm bộ tiêu chí (ADR-075) — cũng tự chép sang tin.
+  const [requestPolicy, setRequestPolicy] = useState<CvScoringPolicy | null>(null)
   // Luôn mở ra ở dạng thu gọn (chip tên + trọng số): bản đầy đủ dài cả màn hình mà Recruiter chỉ cần đọc kỹ
   // khi thật sự cần. Đổi phiếu thì thu gọn lại.
   const [requestRubricOpen, setRequestRubricOpen] = useState(false)
@@ -186,6 +188,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
 
   useEffect(() => {
     setRequestRubricOpen(false)
+    setRequestPolicy(null)
     if (mode !== 'create' || !recruitmentRequestId) {
       setRequestRubric(null)
       return
@@ -194,7 +197,10 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
     recruitmentRequestService
       .getById(recruitmentRequestId)
       .then((rr) => {
-        if (!cancelled) setRequestRubric(rr.cvRubric ?? [])
+        if (!cancelled) {
+          setRequestRubric(rr.cvRubric ?? [])
+          setRequestPolicy(rr.cvScoringPolicy ?? null)
+        }
       })
       .catch(() => {
         if (!cancelled) setRequestRubric(null)
@@ -443,9 +449,32 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
       roundsTouchedRef.current = false
       if (rr?.requestedRounds?.length) setRounds(roundsFromRequest(rr.requestedRounds, 'vi'))
 
+      // LỚP 1 — phiếu. Áp trước cả khi biết có bản JD hay không, vì bản JD chỉ ĐÈ LÊN những ô nó
+      // thực sự mang giá trị. Bản trước `return` ngay trong nhánh JD nên ô nào bản JD bỏ trống
+      // (hay gặp nhất: nơi làm việc, cấp bậc) thì giá trị HM đã khai trên phiếu không bao giờ tới
+      // được màn này — người dựng tin phải gõ lại đúng thứ đã có sẵn trong hệ thống.
+      if (rr) {
+        setTitle(rr.title)
+        setDepartment(rr.department || '')
+        setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
+        if (rr.employmentType) setEmploymentType(rr.employmentType)
+        if (rr.workMode) setWorkMode(rr.workMode)
+        if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
+        if (rr.location) setLocation(rr.location)
+        if (rr.headcount) setVacancies(rr.headcount)
+        if (rr.salaryMin != null || rr.salaryMax != null) {
+          setSalaryIsNegotiable(false)
+          setSalaryMin(rr.salaryMin ?? '')
+          setSalaryMax(rr.salaryMax ?? '')
+          // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
+          // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
+          setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
+        }
+      }
+
       const jd = composed?.jd
-      // Bản JD đã XUẤT FILE đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ HM sẽ mở ra
-      // để ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
+      // LỚP 2 — bản JD đã XUẤT FILE đầy đủ hơn hẳn vài dòng HM gõ trên phiếu, và file đã sinh chính là thứ
+      // HM sẽ mở ra để ký duyệt. Gắn thẳng file, không bắt người dùng tải xuống rồi tải lên lại.
       if (jd?.generatedFileStorageKey) {
         setTitle(jd.title)
         setDepartment(jd.department || '')
@@ -455,7 +484,6 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
         if (jd.experienceLevel) setExperienceLevel(jd.experienceLevel)
         if (jd.location) setLocation(jd.location)
         if (jd.vacancies) setVacancies(jd.vacancies)
-        else if (rr?.headcount) setVacancies(rr.headcount)
         if (jd.applicationDeadline) setApplicationDeadline(toDateInput(jd.applicationDeadline))
         if (jd.salaryMin != null || jd.salaryMax != null) {
           setSalaryIsNegotiable(false)
@@ -482,25 +510,6 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
             applyInterviewLanguage(s.interviewLanguage)
           })
           .catch(() => {})
-        return
-      }
-
-      if (!rr) return
-      setTitle(rr.title)
-      setDepartment(rr.department || '')
-      setJobDescription(jdDraftFromRequest(rr.description, rr.requirements, t))
-      if (rr.employmentType) setEmploymentType(rr.employmentType)
-      if (rr.workMode) setWorkMode(rr.workMode)
-      if (rr.experienceLevel) setExperienceLevel(rr.experienceLevel)
-      if (rr.location) setLocation(rr.location)
-      if (rr.headcount) setVacancies(rr.headcount)
-      if (rr.salaryMin != null || rr.salaryMax != null) {
-        setSalaryIsNegotiable(false)
-        setSalaryMin(rr.salaryMin ?? '')
-        setSalaryMax(rr.salaryMax ?? '')
-        // Phiếu lập khi ô này còn gõ tự do có thể mang "usd"/"vnd" — không chuẩn hoá thì danh sách
-        // chọn hiện trống mà giá trị lạ vẫn đi thẳng lên server.
-        setSalaryCurrency(normalizeSalaryCurrency(rr.salaryCurrency))
       }
     })()
     return () => {
@@ -709,7 +718,7 @@ export default function CreateJobPostingPage({ mode }: CreateJobPostingPageProps
                       <p className="mb-3 mt-1 text-xs text-ink-500 dark:text-ink-400">{tRubric('createJob.fromRequest')}</p>
                       {requestRubricOpen ? (
                         <div id="request-cv-rubric-body">
-                          <ReadOnlyRubric criteria={requestRubric} />
+                          <ReadOnlyRubric criteria={requestRubric} policy={requestPolicy} />
                         </div>
                       ) : (
                         <CvRubricChips

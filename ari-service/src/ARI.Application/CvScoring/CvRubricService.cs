@@ -39,23 +39,33 @@ namespace ARI.Application.CvScoring
         }
 
         /// <param name="criteria">Đã qua <see cref="CvRubricEditing.Normalize"/>.</param>
-        /// <returns>Tài liệu sống sau khi lưu, và cờ có thật sự đổi gì không.</returns>
-        public async Task<Result<(PlaybookDocument Document, bool Changed)>> SaveForJobAsync(
-            Guid jobPostingId, IReadOnlyList<RubricCriterion> criteria, Guid actorUserId, CancellationToken ct)
+        /// <param name="policy">Công thức cấp tin (ADR-075); <c>null</c> = mặc định. Luôn truyền tường minh — lưu bộ tiêu chí mà
+        /// quên công thức là âm thầm đưa công thức của tin về mặc định.</param>
+        /// <returns>Tài liệu sống sau khi lưu, cờ có thật sự đổi gì không, và có phải CHỈ đổi công thức không.</returns>
+        public async Task<Result<CvRubricSaveResult>> SaveForJobAsync(
+            Guid jobPostingId, IReadOnlyList<RubricCriterion> criteria, CvScoringPolicy? policy, Guid actorUserId,
+            CancellationToken ct)
         {
-            var errors = ScoringRubric.Validate(criteria);
+            var errors = ScoringRubric.Validate(criteria, RubricPurpose.Cv);
+            errors.AddRange(CvScoringPolicy.Validate(policy));
             if (errors.Count > 0)
-                return Result.Failure<(PlaybookDocument, bool)>(string.Join(" | ", errors));
+                return Result.Failure<CvRubricSaveResult>(string.Join(" | ", errors));
 
             var json = ScoringRubric.Serialize(criteria);
+            var effectivePolicy = (policy ?? CvScoringPolicy.Default).Normalized();
             var previous = await CvRubricStore.LiveAsync(_unitOfWork, jobPostingId, ct);
 
             // Lưu lại đúng bộ đang dùng thì không tạo phiên bản mới — nếu không, bấm Lưu hai lần là chấm lại
-            // toàn bộ hồ sơ một lần vô ích.
-            if (previous != null && string.Equals(previous.RubricJson, json, StringComparison.Ordinal))
-                return Result.Success((previous, false));
+            // toàn bộ hồ sơ một lần vô ích. Công thức so theo NGHĨA: cột jsonb tự sắp lại chuỗi JSON.
+            if (previous != null && string.Equals(previous.RubricJson, json, StringComparison.Ordinal)
+                && CvRubricStore.Policy(previous).SameAs(effectivePolicy))
+                return Result.Success(new CvRubricSaveResult(previous, false, false));
 
-            var bytes = RubricSheet.Build(criteria);
+            // Bộ cũ đã hỏi AI đúng những câu bộ mới hỏi → chỉ số học đổi, hồ sơ được TÍNH LẠI không gọi AI.
+            var formulaOnly = previous != null && CvObservationSignature.Covers(
+                CvObservationSignature.Of(CvRubricStore.Criteria(previous)), CvObservationSignature.Of(criteria));
+
+            var bytes = RubricSheet.Build(criteria, effectivePolicy);
             var fileName = $"bo-tieu-chi-cham-cv-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx";
             string storageKey;
             try
@@ -64,7 +74,7 @@ namespace ARI.Application.CvScoring
             }
             catch (Exception ex)
             {
-                return Result.Failure<(PlaybookDocument, bool)>($"Không lưu được file bộ tiêu chí: {ex.Message}", CommonErrorCodes.ServerError);
+                return Result.Failure<CvRubricSaveResult>($"Không lưu được file bộ tiêu chí: {ex.Message}", CommonErrorCodes.ServerError);
             }
 
             // Gỡ chunk của bản cũ TRƯỚC khi xoá mềm (ADR-025) — lỗi thì dừng, bản cũ vẫn nguyên vẹn.
@@ -77,7 +87,7 @@ namespace ARI.Application.CvScoring
                 catch (Exception ex)
                 {
                     await _fileStorage.DeleteAsync(storageKey, ct);
-                    return Result.Failure<(PlaybookDocument, bool)>(
+                    return Result.Failure<CvRubricSaveResult>(
                         $"Không gỡ được bộ tiêu chí cũ khỏi kho tri thức của AI: {ex.Message}. Vui lòng thử lại.",
                         CommonErrorCodes.ServerError);
                 }
@@ -87,7 +97,7 @@ namespace ARI.Application.CvScoring
                 await _unitOfWork.SaveChangesAsync(ct);
             }
 
-            var parsedText = ScoringRubric.ToPromptText(criteria);
+            var parsedText = ScoringRubric.ToCvPromptText(criteria);
             var document = new PlaybookDocument
             {
                 Scope = PlaybookScope.ScopeJobPosting,
@@ -98,6 +108,7 @@ namespace ARI.Application.CvScoring
                 FileFormat = "xlsx",
                 ParsedText = parsedText,
                 RubricJson = json,
+                ScoringPolicyJson = CvScoringPolicy.ToStorage(effectivePolicy),
                 Status = "ready",
                 UploadedByUserId = actorUserId,
             };
@@ -117,7 +128,7 @@ namespace ARI.Application.CvScoring
                 await _fileStorage.DeleteAsync(storageKey, ct);
                 await TryRestoreAsync(previous, jobPostingId, ct);
                 _logger.LogWarning(ex, "Lưu bộ tiêu chí CV cho tin {JobId} thất bại", jobPostingId);
-                return Result.Failure<(PlaybookDocument, bool)>(
+                return Result.Failure<CvRubricSaveResult>(
                     "Bộ tiêu chí vừa được người khác cập nhật. Hãy tải lại trang rồi lưu lại.", CommonErrorCodes.Conflict);
             }
 
@@ -134,7 +145,7 @@ namespace ARI.Application.CvScoring
             }
 
             _queue.EnqueueJob(jobPostingId);
-            return Result.Success((document, true));
+            return Result.Success(new CvRubricSaveResult(document, true, formulaOnly));
         }
 
         private async Task TryRestoreAsync(PlaybookDocument? previous, Guid jobPostingId, CancellationToken ct)
@@ -164,7 +175,9 @@ namespace ARI.Application.CvScoring
             var criteria = ScoringRubric.Deserialize(request.CvRubricJson);
             if (criteria.Count == 0) return Result.Success();
 
-            var saved = await SaveForJobAsync(job.Id, criteria, request.RequestedByUserId, ct);
+            // Công thức đi cùng bộ tiêu chí (ADR-075) — cùng luật ảnh chụp một chiều.
+            var saved = await SaveForJobAsync(
+                job.Id, criteria, CvScoringPolicy.FromStorage(request.CvScoringPolicyJson), request.RequestedByUserId, ct);
             if (saved.IsSuccess) return Result.Success();
             return saved.ErrorCode == null ? Result.Failure(saved.Error!) : Result.Failure(saved.Error!, saved.ErrorCode);
         }
@@ -173,4 +186,10 @@ namespace ARI.Application.CvScoring
         public static List<RubricCriterion> FromRequest(RecruitmentRequest request)
             => ScoringRubric.Deserialize(request.CvRubricJson);
     }
+
+    /// <param name="Changed">Có tạo phiên bản mới không (lưu y hệt = không).</param>
+    /// <param name="FormulaOnly">
+    /// Phiên bản mới chỉ khác bộ cũ ở CÔNG THỨC (ADR-075) — hồ sơ được tính lại từ câu trả lời cũ của AI, không gọi AI.
+    /// </param>
+    public sealed record CvRubricSaveResult(PlaybookDocument Document, bool Changed, bool FormulaOnly);
 }

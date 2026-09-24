@@ -51,6 +51,7 @@ const JobApplyPage = lazy(() => import('@pages/job-board/ApplyPage'))
 const KioskPage = lazy(() => import('@pages/kiosk/KioskPage'))
 const KioskInterviewPage = lazy(() => import('@pages/kiosk/KioskInterviewPage'))
 const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
+const ForbiddenPage = lazy(() => import('@ari/shared/ui/ForbiddenPage'))
 
 /** Fallback nhẹ khi đang tải chunk của page. */
 function RouteFallback() {
@@ -80,7 +81,7 @@ function App() {
     <DocumentViewerProvider>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/403" element={<NotFoundPage />} />
+          <Route path="/403" element={<ForbiddenPage />} />
 
           {/* ==================== PUBLIC ROUTES ==================== */}
           {/* Job board công khai cho khách + ứng viên (site này chỉ phục vụ ứng viên — ADR-046). */}

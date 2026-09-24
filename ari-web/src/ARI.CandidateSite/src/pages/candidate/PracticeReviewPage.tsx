@@ -151,6 +151,31 @@ export default function PracticeReviewPage() {
     }
   }, [sessionId, t])
 
+  // Đang chấm → tự hỏi lại mỗi 15 giây để nhận xét tự hiện, không bắt ứng viên tải lại trang (ADR-073).
+  const pending = !!review?.evaluationPending
+  useEffect(() => {
+    if (!sessionId || !pending) return
+    const timer = window.setInterval(() => {
+      interviewService
+        .getMyPracticeReview(sessionId)
+        .then((d) => setReview(d))
+        .catch(() => {
+          /* lỗi mạng tạm thời — lượt kế tiếp thử lại */
+        })
+    }, 15_000)
+    return () => window.clearInterval(timer)
+  }, [sessionId, pending])
+
+  /** Vì sao chưa có nhận xét — khoá i18n `evaluation.<key>Title|Description`. */
+  const emptyKey =
+    review?.evaluationState === 'needs_rubric'
+      ? 'needsRubric'
+      : review?.evaluationState === 'no_answers'
+        ? 'noAnswers'
+        : review?.evaluationState === 'failed'
+          ? 'failed'
+          : 'empty'
+
   const transcriptText = useMemo(() => {
     if (!review) return ''
     const lines = review.turns.flatMap((turn) => {
@@ -291,8 +316,9 @@ export default function PracticeReviewPage() {
                   <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400">
                     <FileText className="h-6 w-6" />
                   </div>
-                  <p className="mt-3 font-semibold text-ink-700">{t('evaluation.emptyTitle')}</p>
-                  <p className="mt-1 text-sm text-ink-500">{t('evaluation.emptyDescription')}</p>
+                  {/* ADR-073: nói VÌ SAO chưa có nhận xét thay vì một câu chung chung. */}
+                  <p className="mt-3 font-semibold text-ink-700">{t(`evaluation.${emptyKey}Title`)}</p>
+                  <p className="mt-1 text-sm text-ink-500">{t(`evaluation.${emptyKey}Description`)}</p>
                 </div>
               ) : (
                 <>

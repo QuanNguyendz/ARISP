@@ -143,6 +143,12 @@ namespace ARI.Infrastructure
                     "Cấu hình qua biến môi trường Storage__Provider hoặc user-secrets.");
             }
 
+            // Bộ chuyển DOCX→PDF cho bản xem trước. Singleton vì nó giữ một hàng đợi MỘT LÀN dùng
+            // chung: hai tiến trình LibreOffice chạy song song sẽ tranh thư mục hồ sơ và cùng hỏng.
+            // Thiếu LibreOffice không phải lỗi cấu hình — service tự báo `IsAvailable = false` và
+            // giao diện lùi về bộ dựng phía trình duyệt.
+            services.AddSingleton<IDocumentPdfConverter, Documents.LibreOfficePdfConverter>();
+
             // === Media stack phỏng vấn realtime (ADR-043/044): real provider nếu có API key, else Mock ===
             var mediaOptions = new Media.MediaOptions();
             configuration.GetSection("Media").Bind(mediaOptions);
@@ -175,6 +181,11 @@ namespace ARI.Infrastructure
             // Chấm CV nền theo bộ tiêu chí (ADR-070): hàng đợi + lượt quét tự lành 10'/lần.
             services.AddSingleton<ICvScoringQueue, CvScoringBackgroundQueue>();
             services.AddHostedService<CvScoringHostedService>();
+
+            // Sinh báo cáo đánh giá phỏng vấn nền (ADR-073): lệnh đóng phiên chỉ ghi "chờ chấm", hàng đợi +
+            // lượt quét 2'/lần chấm, thử lại khi AI lỗi, và tự chấm khi tin vừa được khai bộ tiêu chí.
+            services.AddSingleton<IEvaluationQueue, EvaluationBackgroundQueue>();
+            services.AddHostedService<EvaluationHostedService>();
 
             // Dọn video phỏng vấn thật quá hạn lưu (ADR-052) — quét 12h/lần.
             services.AddHostedService<RecordingRetentionHostedService>();

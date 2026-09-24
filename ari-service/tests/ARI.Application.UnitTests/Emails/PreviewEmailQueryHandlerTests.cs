@@ -15,11 +15,12 @@ internal sealed class FakeEmailTemplateRenderer : IEmailTemplateRenderer
 {
     public Result<RenderedEmail> Result_ { get; set; } =
         Result.Success(new RenderedEmail("Chủ đề", "<p>Xin chào</p>", "cand@corp.io", "Nguyen Van A"));
-    public (string Key, Guid ContextId, Guid? SecondaryId)? LastCall { get; private set; }
+    public (string Key, Guid ContextId, Guid? SecondaryId, string? Variant)? LastCall { get; private set; }
 
-    public Task<Result<RenderedEmail>> RenderAsync(string templateKey, Guid contextId, Guid? secondaryId, CancellationToken ct)
+    public Task<Result<RenderedEmail>> RenderAsync(
+        string templateKey, Guid contextId, Guid? secondaryId, string? variant, CancellationToken ct)
     {
-        LastCall = (templateKey, contextId, secondaryId);
+        LastCall = (templateKey, contextId, secondaryId, variant);
         return Task.FromResult(Result_);
     }
 }
@@ -32,6 +33,8 @@ public class PreviewEmailQueryHandlerTests
 {
     private static readonly Guid OwnerId = Guid.NewGuid();
 
+    private static readonly Guid HmId = Guid.NewGuid();
+
     private static (InMemoryUnitOfWork uow, ARI.Domain.Entities.Application app) Seed()
     {
         var job = new JobPosting { Id = Guid.NewGuid(), Title = "Backend Developer", CreatedByUserId = OwnerId, Status = "active" };
@@ -41,7 +44,12 @@ public class PreviewEmailQueryHandlerTests
             Status = ApplicationStatuses.Interview,
         };
         var uow = new InMemoryUnitOfWork().Seed(job).Seed(app)
-            .Seed(new User { Id = OwnerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, IsActive = true });
+            .Seed(new User { Id = OwnerId, Email = "owner@corp.io", Role = RoleNames.Recruiter, IsActive = true })
+            .Seed(new User { Id = HmId, Email = "hm@corp.io", Role = RoleNames.HiringManager, IsActive = true })
+            .Seed(new JobHiringTeamMember
+            {
+                JobPostingId = job.Id, UserId = HmId, RoleOnJob = JobTeamRoles.HiringManager, IsPrimary = true,
+            });
         return (uow, app);
     }
 
@@ -100,5 +108,36 @@ public class PreviewEmailQueryHandlerTests
         Assert.Equal("Chủ đề", res.Value.Subject);
         Assert.Equal(app.Id, renderer.LastCall!.Value.ContextId);
         Assert.Equal(EmailTemplateKeys.ApplicationRejected, renderer.LastCall.Value.Key);
+    }
+
+    // ===== Thư kết quả phỏng vấn (ADR-074): người xem trước = người được chốt =====
+
+    [Fact]
+    public async Task UTCID05_Interview_result_primary_hiring_manager_can_preview_with_variant()
+    {
+        var (uow, app) = Seed();
+        var renderer = new FakeEmailTemplateRenderer();
+        var evaluationId = Guid.NewGuid();
+
+        var res = await new PreviewEmailQueryHandler(uow, renderer).Handle(
+            new PreviewEmailQuery(EmailTemplateKeys.InterviewResult, app.Id, evaluationId, HmId, AppRoles.HiringManager, "pass"),
+            CancellationToken.None);
+
+        Assert.True(res.IsSuccess, res.Error);                       // HM chỉ là TeamMember trên tin mà vẫn qua
+        Assert.Equal(evaluationId, renderer.LastCall!.Value.SecondaryId);
+        Assert.Equal("pass", renderer.LastCall.Value.Variant);
+    }
+
+    [Fact]
+    public async Task UTCID06_Interview_result_recruiter_owner_forbidden()
+    {
+        var (uow, app) = Seed();
+        var renderer = new FakeEmailTemplateRenderer();
+
+        var res = await Run(uow, renderer, EmailTemplateKeys.InterviewResult, app.Id, OwnerId, AppRoles.Recruiter);
+
+        Assert.True(res.IsFailure);                                   // chủ tin không chốt kết quả → không soạn thư đó
+        Assert.Equal(CommonErrorCodes.Forbidden, res.ErrorCode);
+        Assert.Null(renderer.LastCall);
     }
 }

@@ -98,5 +98,11 @@
     "candidateSaid": "Ứng viên trả lời",
     "showAll": "Xem toàn bộ {{count}} lượt",
     "collapse": "Thu gọn"
+  },
+  "resultEmail": {
+    "hint": "Bấm chốt sẽ mở thư báo kết quả cho ứng viên để bạn xem và sửa trước khi gửi.",
+    "titlePass": "Thư báo kết quả — Đạt",
+    "titleNotPass": "Thư báo kết quả — Không đạt",
+    "send": "Chốt kết quả & gửi thư"
   }
 }

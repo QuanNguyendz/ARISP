@@ -19,7 +19,11 @@
     "title": "Phỏng vấn thử",
     "hasReview": "Có nhận xét AI",
     "transcriptOnly": "Có nội dung hội thoại",
-    "view": "Xem lại →"
+    "view": "Xem lại →",
+    "pending": "AI đang chấm",
+    "needsRubric": "Chờ nhà tuyển dụng bổ sung tiêu chí",
+    "noAnswers": "Không có câu trả lời để nhận xét",
+    "failed": "Chưa chấm được"
   },
   "round": {
     "screening": "Sơ loại",
@@ -37,8 +41,8 @@
     "notStarted": "Chưa phỏng vấn",
     "missed": "Quá hạn",
     "practice": "Thử",
-    "pass": "Pass",
-    "notPass": "Not Pass",
+    "pass": "Đạt",
+    "notPass": "Không phù hợp",
     "pendingHr": "Chờ HR",
     "inProgress": "Đang diễn ra",
     "noResult": "Chưa có kết quả",
@@ -97,7 +101,20 @@
   },
   "pendingHrReview": {
     "title": "Kết quả đang chờ HR Admin xác nhận",
-    "description": "AI đã hoàn tất chấm điểm vòng {round}. Bạn sẽ nhận thông báo ngay khi HR xác nhận và chia sẻ kết quả."
+    "description": "AI đã hoàn tất chấm điểm vòng {{round}}. Bạn sẽ nhận thông báo ngay khi HR xác nhận và chia sẻ kết quả."
+  },
+  "jobClosed": {
+    "title": "Tin tuyển dụng đã đóng",
+    "description": "Vị trí này không còn tuyển. Hồ sơ của bạn được giữ lại trong hệ thống để tham khảo cho các cơ hội khác."
+  },
+  "eliminated": {
+    "title": "Vòng {{round}}: Không phù hợp",
+    "description": "Hồ sơ của bạn đã dừng lại ở vòng trước đó, nên vòng này không diễn ra."
+  },
+  "resultOnly": {
+    "passTitle": "Vòng {{round}}: Đạt",
+    "notPassTitle": "Vòng {{round}}: Không phù hợp",
+    "description": "Kết quả chi tiết (điểm, tiêu chí đánh giá, bản ghi) sẽ hiển thị tại đây nếu bộ phận nhân sự chia sẻ."
   },
   "noReport": {
     "title": "Chưa có báo cáo cho vòng này",

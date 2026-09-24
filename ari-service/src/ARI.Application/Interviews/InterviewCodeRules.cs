@@ -16,9 +16,37 @@ namespace ARI.Application.Interviews
     /// </summary>
     public static class InterviewCodeRules
     {
-        /// <summary>Lý do không cấp mã cho vòng trắc nghiệm (ADR-049: bài thi làm trong Portal).</summary>
-        public static string OnlineTestReason(int round) =>
-            $"Vòng {round} là bài trắc nghiệm làm trực tuyến — không dùng mã phỏng vấn.";
+        /// <summary>
+        /// Lý do không cấp mã cho vòng trắc nghiệm (ADR-049: bài thi làm trong Portal). Lịch vòng trắc
+        /// nghiệm vẫn "scheduled" sau khi thi xong, nên ứng viên đã qua bài thi mà chưa được xếp lịch vòng
+        /// kế thì lịch cao nhất vẫn là vòng trắc nghiệm — câu trả lời phải chỉ ra bước tiếp theo, không
+        /// chỉ nói "không dùng mã" (nghe như hệ thống đang cấp nhầm vòng).
+        /// </summary>
+        public static string OnlineTestReason(int round, bool hasNextRound = false) =>
+            hasNextRound
+                ? $"Vòng {round} là bài trắc nghiệm làm trực tuyến — không dùng mã phỏng vấn. "
+                  + $"Ứng viên qua bài thi thì xếp lịch vòng {round + 1} trước, mã sẽ cấp cho vòng đó."
+                : $"Vòng {round} là bài trắc nghiệm làm trực tuyến — không dùng mã phỏng vấn.";
+
+        /// <summary>Tin có khai vòng sau vòng này không — để lý do chặn chỉ ra bước tiếp theo.</summary>
+        public static async Task<bool> HasNextRoundAsync(
+            IUnitOfWork unitOfWork, Guid jobPostingId, int round, CancellationToken ct)
+            => await SchedulingSupport.RoundConfigAsync(unitOfWork, jobPostingId, round + 1, ct) != null;
+
+        /// <summary>
+        /// Lịch đang giữ chỗ của vòng cao nhất — vòng CẦN mã khi chỗ gọi không nói vòng nào (ADR-058:
+        /// dòng booking là sự thật). Không đoán bằng <c>max(phiên đã xong) + 1</c>: vòng TRẮC NGHIỆM
+        /// không sinh phiên phỏng vấn nào, nên qua bài thi vòng 1 rồi xếp lịch vòng 2 thì phép đoán đó
+        /// vẫn ra vòng 1 — và cấp mã bị từ chối vì "vòng 1 là bài trắc nghiệm". Lịch mới là thứ nói ứng
+        /// viên sắp dự vòng nào; hồ sơ xếp lại lịch của chính vòng đó vẫn là vòng đó.
+        /// </summary>
+        public static async Task<InterviewBooking?> LiveBookingAsync(
+            IUnitOfWork unitOfWork, Guid applicationId, CancellationToken ct)
+            => (await unitOfWork.Repository<InterviewBooking>().FindAsync(
+                    b => b.ApplicationId == applicationId && b.Status == BookingStatus.Scheduled, ct))
+                .OrderByDescending(b => b.RoundNumber)
+                .ThenByDescending(b => b.CreatedAt)
+                .FirstOrDefault();
 
         /// <summary>
         /// Ứng viên đã VÀO PHÒNG vòng này chưa (đang chờ HM, đang phỏng vấn, hoặc đã xong). Trả lý do

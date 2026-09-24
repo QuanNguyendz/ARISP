@@ -34,6 +34,12 @@ namespace ARI.Application.Interfaces
         Task<Result<List<CvRubricSuggestionItem>>> SuggestCvRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default);
 
         /// <summary>
+        /// Gợi ý bản nháp bộ tiêu chí chấm PHỎNG VẤN từ nội dung tin (ADR-073) — tiêu chí chấm được từ câu trả
+        /// của ứng viên, không phải từ CV. Trường <c>Checks</c> của kết quả luôn rỗng: ý kiểm chỉ dùng cho CV.
+        /// </summary>
+        Task<Result<List<CvRubricSuggestionItem>>> SuggestInterviewRubricAsync(CvRubricSuggestionInput input, CancellationToken ct = default);
+
+        /// <summary>
         /// Đánh giá CV độc lập (không gắn JD): chấm điểm tổng thể, điểm mạnh, gợi ý cải thiện.
         /// </summary>
         Task<Result<CvReviewResultDto>> ReviewCvAsync(

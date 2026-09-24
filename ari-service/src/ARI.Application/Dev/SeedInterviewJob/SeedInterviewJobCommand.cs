@@ -58,17 +58,20 @@ namespace ARI.Application.Dev.SeedInterviewJob
         private readonly IPasswordHasher _passwordHasher;
         private readonly IInterviewCodeService _interviewCodeService;
         private readonly CvScoring.CvRubricService _cvRubrics;
+        private readonly InterviewRubrics.InterviewRubricService _interviewRubrics;
 
         public SeedInterviewJobCommandHandler(
             IUnitOfWork unitOfWork,
             IPasswordHasher passwordHasher,
             IInterviewCodeService interviewCodeService,
-            CvScoring.CvRubricService cvRubrics)
+            CvScoring.CvRubricService cvRubrics,
+            InterviewRubrics.InterviewRubricService interviewRubrics)
         {
             _unitOfWork = unitOfWork;
             _passwordHasher = passwordHasher;
             _interviewCodeService = interviewCodeService;
             _cvRubrics = cvRubrics;
+            _interviewRubrics = interviewRubrics;
         }
 
         public async Task<Result<SeedInterviewJobResult>> Handle(SeedInterviewJobCommand request, CancellationToken ct)
@@ -145,6 +148,9 @@ namespace ARI.Application.Dev.SeedInterviewJob
 
             // 3c) Bộ tiêu chí chấm CV (ADR-070) — bắt buộc với mọi tin.
             await DevCvRubricSeed.EnsureAsync(_unitOfWork, _cvRubrics, job, staff.Id, ct);
+
+            // 3d) Bộ tiêu chí chấm phỏng vấn (ADR-073) — bộ chung áp cả vòng sơ loại lẫn chuyên môn.
+            await DevInterviewRubricSeed.EnsureAsync(_unitOfWork, _interviewRubrics, job, staff.Id, ct);
 
             // 4) Cấu hình 3 vòng — mốc để backend biết đâu là vòng CUỐI (chỉ khi đó mới "Đạt").
             var existingRounds = (await _unitOfWork.Repository<InterviewRoundConfig>()

@@ -55,6 +55,26 @@ namespace ARI.Domain.Entities
         public int CompletionTokens { get; set; }
         public int ProcessingTimeMs { get; set; }
 
+        /// <summary>
+        /// Ảnh chụp công thức cấp tin đã áp (ngưỡng dải + ngưỡng khuyến nghị) — ADR-075. <c>null</c> ở bản chấm
+        /// trước ADR-075 (khi đó công thức là mặc định 90/70/40 · 80/65/50).
+        /// </summary>
+        public string? ScoringPolicy { get; set; }           // JSONB
+
+        /// <summary>
+        /// Kết quả cổng: <c>pass</c> | <c>fail</c> | <c>review</c>, <c>null</c> khi bộ tiêu chí không có cổng —
+        /// xem <see cref="Constants.CvGateStatuses"/> (ADR-075). Lưu cột riêng để danh sách hồ sơ gắn nhãn được mà
+        /// không phải đọc ảnh chụp.
+        /// </summary>
+        public string? GateStatus { get; set; }
+
+        /// <summary>
+        /// Bản chấm này được TÍNH LẠI theo công thức mới từ câu trả lời của AI ở bản chấm gốc — không gọi AI
+        /// (ADR-075). Trỏ về bản gốc có lời gọi AI thật (không trỏ vào một bản tính lại khác). <c>null</c> =
+        /// bản này do AI chấm.
+        /// </summary>
+        public Guid? DerivedFromAnalysisId { get; set; }
+
         public string RawResponse { get; set; } = "{}";      // JSONB - lưu raw để debug
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

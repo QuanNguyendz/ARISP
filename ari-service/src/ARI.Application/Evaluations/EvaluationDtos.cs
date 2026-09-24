@@ -36,6 +36,12 @@ namespace ARI.Application.Evaluations
         /// <summary>Điểm mạnh / điểm cần lưu ý về ứng viên.</summary>
         public string? Strengths { get; set; }
         public string? Concerns { get; set; }
+
+        /// <summary>
+        /// Thư kết quả do người chốt sửa ở trình soạn thảo (quy tắc 21, ADR-074). Null = gửi đúng mẫu.
+        /// Thư đi KÈM lệnh chốt: bấm Huỷ ở trình soạn là không chốt, không đổi trạng thái, không thư nào đi.
+        /// </summary>
+        public ARI.Application.Emails.EmailOverride? EmailOverride { get; set; }
     }
 
     /// <summary>Một lượt hỏi–đáp của buổi phỏng vấn, đúng như đã diễn ra.</summary>

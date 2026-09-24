@@ -6,6 +6,7 @@ using ARI.Application.DTOs;
 using ARI.Application.Options;
 using ARI.Application.Services;
 using ARI.Application.UnitTests.TestSupport;
+using ARI.Domain.Constants;
 using ARI.Domain.Entities;
 using Xunit;
 
@@ -228,7 +229,9 @@ public class PracticeConductTests
         Assert.Equal("completed", session.Status);                 // vượt cap → đóng phiên
         Assert.Equal("Cảm ơn bạn đã tham gia.", session.ClosingText);
         Assert.Equal(12, uow.Repo<Question>().Items.Count);        // không thêm câu hỏi mới
-        Assert.Equal(1, ai.EvaluationCallCount);                   // sinh đánh giá khi đóng
+        // ADR-073: đóng phiên chỉ ghi "chờ chấm" — hàng đợi nền mới gọi AI, không chặn lời chào kết thúc.
+        Assert.Equal(EvaluationStatuses.Pending, session.EvaluationStatus);
+        Assert.Equal(0, ai.EvaluationCallCount);
     }
 
     [Fact]
@@ -262,6 +265,9 @@ public class PracticeConductTests
         var ai = new StubAiProvider();
 
         var res = await Svc(uow, notif, ai, new()).EndSessionAsync(session.Id, "completed", CancellationToken.None);
+        // ADR-073: báo cáo do hàng đợi nền sinh — chạy đúng bộ chấm mà hàng đợi dùng.
+        await ARI.Application.UnitTests.InterviewEvaluation.EvaluationKit.Evaluator(uow, ai, notif)
+            .EvaluateSessionAsync(session.Id, CancellationToken.None);
 
         Assert.True(res.IsSuccess);
         Assert.Equal("completed", session.Status);
@@ -329,7 +335,7 @@ public class PracticeConductTests
         Assert.True(res.IsSuccess);
         Assert.Equal("completed", session.Status);
         Assert.False(string.IsNullOrEmpty(session.ClosingText)); // AI nói câu kết
-        Assert.Equal(1, ai.EvaluationCallCount);
+        Assert.Equal(EvaluationStatuses.Pending, session.EvaluationStatus); // chờ hàng đợi nền chấm (ADR-073)
     }
 
     [Fact]

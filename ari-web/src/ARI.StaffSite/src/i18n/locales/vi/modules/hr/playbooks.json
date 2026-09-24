@@ -30,7 +30,7 @@
     "mustAsk": "Câu hỏi bắt buộc",
     "roundPlaybook": "Playbook theo vòng",
     "cvRubric": "Mẫu bộ tiêu chí chấm CV",
-    "interviewRubric": "Tiêu chí chấm phỏng vấn"
+    "interviewRubric": "Mẫu bộ tiêu chí chấm phỏng vấn"
   },
   "uploadTitle": "Thêm playbook công ty",
   "uploadHint": "Áp cho MỌI tin tuyển dụng. PDF / DOCX / TXT / MD — sẽ được chunk + embed vào RAG.",

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ARI.Application.Common;
 using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
+using ARI.Application.Emails;
 using ARI.Application.Evaluations;
 using ARI.Application.Interfaces;
 using ARI.Application.Offers;
@@ -15,6 +16,7 @@ using ARI.Application.Scheduling;
 using ARI.Domain.Entities;
 using ARI.Domain.Constants;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -32,7 +34,10 @@ namespace ARI.Application.Services
         private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly InterviewOptions _interviewOptions;
         private readonly IMemoryCache _cache;
+        /// <summary>Chỉ dùng để dựng link trong thư gửi ứng viên (`Frontend:CandidateBaseUrl`).</summary>
+        private readonly IConfiguration _configuration;
         private readonly ILogger<InterviewService>? _logger;
+        private readonly IEvaluationQueue? _evaluationQueue;
 
         // Cache key cho danh sách toàn bộ phiên phỏng vấn (HR view).
         private const string AllSessionsCacheKey = "interview-sessions:all";
@@ -47,11 +52,15 @@ namespace ARI.Application.Services
             IFileStorageService fileStorage,
             Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             IMemoryCache cache,
+            IConfiguration configuration,
             InterviewOptions? interviewOptions = null,
-            ILogger<InterviewService>? logger = null)
+            ILogger<InterviewService>? logger = null,
+            IEvaluationQueue? evaluationQueue = null)
         {
             _logger = logger;
+            _evaluationQueue = evaluationQueue;
             _fileStorage = fileStorage;
+            _configuration = configuration;
             _unitOfWork = unitOfWork;
             _aiProvider = aiProvider;
             _notificationService = notificationService;
@@ -389,7 +398,7 @@ namespace ARI.Application.Services
 
         /// <summary>Gửi email + notification nhắc lịch phỏng vấn cho ứng viên. Chỉ chủ tin hoặc admin.</summary>
         public async Task<Result<bool>> SendBookingReminderAsync(
-            Guid bookingId, Guid? userId, string? role, CancellationToken ct = default)
+            Guid bookingId, Guid? userId, string? role, EmailOverride? over = null, CancellationToken ct = default)
         {
             var booking = await _unitOfWork.Repository<InterviewBooking>().GetByIdAsync(bookingId, ct);
             if (booking == null) return Result.Failure<bool>("Không tìm thấy lịch phỏng vấn.", CommonErrorCodes.NotFound);
@@ -407,6 +416,17 @@ namespace ARI.Application.Services
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             var jobTitle = job?.Title ?? "vị trí ứng tuyển";
 
+            // Nhắc được hay không, và nhắc CÁI GÌ, do một hàm duy nhất quyết định (`ScheduleReminder`)
+            // — giao diện bật/tắt nút bằng đúng hàm đó, nên nút sáng mà server từ chối là chuyện không
+            // xảy ra nữa. Lịch đã đóng (báo bận / bị huỷ) hoặc đã qua giờ thì lời nhắc vô nghĩa: gửi đi
+            // chỉ làm ứng viên tới một buổi không còn tồn tại.
+            var reminderState = ScheduleReminder.Resolve(
+                booking.Status, booking.ConfirmationStatus, slot.StartTime, DateTimeOffset.UtcNow);
+            if (!ScheduleReminder.CanSend(reminderState))
+                return Result.Failure<bool>(ScheduleReminder.BlockedMessage(reminderState), CommonErrorCodes.Conflict);
+
+            var needsConfirm = reminderState == ScheduleReminder.States.ConfirmNeeded;
+
             var local = slot.StartTime.ToOffset(TimeSpan.FromHours(7));
             var whenText = $"{local:HH:mm} ngày {local:dd/MM/yyyy} (giờ VN)";
             var roundType = await SchedulingSupport.RoundTypeAsync(_unitOfWork, app.JobPostingId, booking.RoundNumber, ct);
@@ -419,9 +439,23 @@ namespace ARI.Application.Services
                 await notifRepo.AddAsync(new ARI.Domain.Entities.Notification
                 {
                     CandidateAccountId = app.CandidateAccountId.Value,
+                    // Khoá chống trùng BẮT BUỘC: `notifications` có unique index (người nhận, dedup_key),
+                    // mà `DedupKey` mặc định là chuỗi RỖNG — bỏ trống thì lời nhắc thứ hai cho cùng một
+                    // ứng viên đâm vào chính lời nhắc thứ nhất và cả lệnh đổ bằng 500 (23505). Nhắc lịch
+                    // là việc LẶP LẠI được theo thiết kế, nên khoá phải khác nhau từng lần gửi.
+                    //
+                    // Dùng Guid chứ không phải `Ticks` như vài chỗ khác trong dự án: đồng hồ hệ thống
+                    // Windows chỉ nhích ~15ms một lần, nên hai cú bấm liên tiếp lấy ra ĐÚNG một giá trị
+                    // Ticks — tức là vẫn đâm nhau, chỉ hiếm hơn.
+                    DedupKey = $"schedule_reminder:{booking.Id}:{Guid.NewGuid():N}",
                     Type = "schedule_reminder",
-                    Title = $"Nhắc nhở {appointment}",
-                    Body = $"Nhắc nhở: Bạn có {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng đăng nhập Candidate Portal để kiểm tra.",
+                    // Hai việc khác nhau thì phải nói khác nhau: người chưa phản hồi cần BẤM xác nhận,
+                    // người đã xác nhận chỉ cần nhớ giờ. Một câu chung chung cho cả hai là câu không
+                    // nói cho ai biết phải làm gì.
+                    Title = needsConfirm ? $"Vui lòng xác nhận {appointment}" : $"Nhắc nhở {appointment}",
+                    Body = needsConfirm
+                        ? $"Bạn chưa xác nhận {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng vào Candidate Portal xác nhận tham dự hoặc báo bận."
+                        : $"Nhắc nhở: Bạn có {appointment} (vòng {booking.RoundNumber}) cho vị trí {jobTitle} vào lúc {whenText}. Vui lòng có mặt đúng giờ.",
                     Link = $"/portal/schedule/{app.Id}",
                     IsRead = false
                 }, ct);
@@ -429,28 +463,44 @@ namespace ARI.Application.Services
                     new { Type = "InterviewReminder", ApplicationId = app.Id, RoundNumber = booking.RoundNumber }, ct);
             }
 
-            // 2. Send Email
-            var subject = $"[ARISP] - Nhắc nhở {appointment} vị trí {jobTitle}";
-            var html = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
-                    <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
-                    <p>Đây là thư nhắc nhở về {appointment} <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{jobTitle}</strong>:</p>
-                    <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
-                    <p>Trạng thái hiện tại: <strong>{(booking.ConfirmationStatus == "confirmed" ? "Đã xác nhận" : "Chờ xác nhận")}</strong>.</p>
-                    <p>Vui lòng chuẩn bị sẵn sàng và truy cập hệ thống đúng giờ.</p>
-                    <br/>
-                    <p>Trân trọng,</p>
-                    <p><strong>Đội ngũ tuyển dụng ARISP</strong></p>
-                </div>";
+            // 2. Send Email — dựng bằng CHÍNH builder của thư mời/thư nhắc tự động, không viết HTML tay
+            // ở đây nữa. Bản cũ tự ghép một khối HTML riêng, nên thư nhắc nói "Trạng thái hiện tại: Chờ
+            // xác nhận" mà không có nút nào để xác nhận — ứng viên đọc xong không làm được gì.
+            var mail = needsConfirm
+                ? await InterviewInviteEmail.BuildReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, booking.Id, slot.StartTime, ct)
+                : await InterviewInviteEmail.BuildTimeReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, slot.StartTime, ct);
+            var subject = mail.Subject;
+            var html = mail.Html;
 
-            try { await _notificationService.SendEmailAsync(app.CandidateEmail, subject, html, ct); } catch { }
+            // Đi qua `CandidateEmailSender` như MỌI thư gửi ứng viên khác: ghi `email_logs` (nên tab
+            // "Lịch sử email" thấy được) và trả về việc thư có ra khỏi hệ thống hay không.
+            //
+            // Bản cũ là `try { ... } catch { }` trần, còn controller thì luôn trả "Đã gửi nhắc nhở tới
+            // ứng viên." — nghĩa là SMTP hỏng vẫn báo thành công, và không có dấu vết nào ở đâu để đối
+            // chiếu. Đúng trạng thái "gửi mà không ai biết có gửi được không" mà `CandidateEmailSender`
+            // sinh ra để xoá.
+            //
+            // Trả lời vào ĐÚNG luồng thư mời (`InviteEmailMessageId`) nếu có, để ứng viên đọc thư nhắc
+            // ngay dưới thư hẹn giờ thay vì phải đi tìm lại.
+            var sent = await CandidateEmailSender.SendAsync(
+                _unitOfWork, _notificationService,
+                EmailTemplateKeys.ScheduleReminder,
+                new RenderedEmail(subject, html, app.CandidateEmail, app.CandidateName),
+                over,
+                applicationId: app.Id, jobPostingId: app.JobPostingId,
+                sentByUserId: userId, ct,
+                inReplyToMessageId: booking.InviteEmailMessageId);
 
             booking.Reminder24hSent = true;
             booking.UpdatedAt = DateTimeOffset.UtcNow;
             _unitOfWork.Repository<InterviewBooking>().Update(booking);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            return Result.Success(true);
+            // `true` = thư đã ra khỏi hệ thống. `false` = chuông trong Portal vẫn có, nhưng email thì
+            // KHÔNG — nói thẳng thay vì để người gửi tin là ứng viên đã nhận được mail.
+            return Result.Success(sent.Sent);
         }
 
         /// <summary>Dời MỘT ứng viên sang ca khác — wrapper mỏng của bản nhiều người để chỉ có một đường code.</summary>
@@ -652,6 +702,9 @@ namespace ARI.Application.Services
                     await notifRepo.AddAsync(new ARI.Domain.Entities.Notification
                     {
                         CandidateAccountId = app.CandidateAccountId.Value,
+                        // Cùng lý do với thư nhắc lịch: dời lịch lần thứ hai cho cùng ứng viên sẽ đâm
+                        // vào unique index (người nhận, dedup_key) nếu khoá để rỗng.
+                        DedupKey = $"schedule_rescheduled:{booking.Id}:{Guid.NewGuid():N}",
                         Type = "schedule_rescheduled",
                         Title = "Lịch phỏng vấn đã được dời",
                         Body = $"Lịch phỏng vấn của bạn đã được chuyển sang thời gian mới: {whenText}. Vui lòng đăng nhập Candidate Portal để XÁC NHẬN.",
@@ -664,14 +717,26 @@ namespace ARI.Application.Services
                         new { Type = "InterviewRescheduled", ApplicationId = app.Id }, ct);
                 }
 
+                // Thư này BẢO ứng viên vào Portal xác nhận, nên nó phải mang theo đường đi. Trước đây
+                // câu chữ có mà nút không — ứng viên phải tự nhớ địa chỉ cổng rồi tự dò lại hồ sơ, đúng
+                // lúc ta vừa đổi giờ hẹn của họ. Gốc URL lấy từ `FrontendUrls` như mọi lá thư khác;
+                // chưa cấu hình thì bỏ hẳn nút chứ không in ra một link cụt.
+                var portalLink = $"{FrontendUrls.Candidate(_configuration)}/portal/schedule/{app.Id}";
+                var confirmButton = portalLink.StartsWith("/", StringComparison.Ordinal)
+                    ? string.Empty
+                    : $@"
+                        <div style='text-align: center; margin: 24px 0;'>
+                            <a href='{portalLink}' style='background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 15px;'>Xác nhận lịch mới</a>
+                        </div>";
+
                 var subject = $"[ARISP] - Lịch phỏng vấn của bạn đã được dời sang {whenText}";
                 var html = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee;'>
                         <h3 style='color: #333;'>Chào {app.CandidateName},</h3>
                         <p>Bộ phận nhân sự vừa dời lịch phỏng vấn <strong>vòng {booking.RoundNumber}</strong> cho vị trí <strong>{job?.Title ?? "ứng tuyển"}</strong> của bạn:</p>
                         <p style='text-align: center; font-size: 18px; font-weight: bold; color: #007bff; margin: 24px 0;'>{whenText}</p>
-                        <p>Vui lòng đăng nhập Candidate Portal để <strong>xác nhận lịch mới này</strong>.</p>
-                        <br/>
+                        <p>Vui lòng vào Candidate Portal để <strong>xác nhận lịch mới này</strong>.</p>
+                        {confirmButton}
                         <p>Trân trọng,</p>
                         <p><strong>Đội ngũ nhân sự ARISP</strong></p>
                     </div>";
@@ -864,6 +929,7 @@ namespace ARI.Application.Services
                     BookingStatus = b.Status,
                     CandidateState = ResolveCandidateState(b.Status, b.ConfirmationStatus, b.DeclinedBy),
                     OccupiesSeat = string.Equals(b.Status, BookingStatus.Scheduled, StringComparison.OrdinalIgnoreCase),
+                    RemindState = ScheduleReminder.Resolve(b.Status, b.ConfirmationStatus, slot.StartTime, nowUtc),
                     ApplicationStatus = app?.Status,
                     SessionId = sess?.Id,
                     SessionStatus = sess?.Status,
@@ -1253,15 +1319,23 @@ namespace ARI.Application.Services
                 session.DurationSeconds = (int)(session.EndedAt.Value - session.StartedAt.Value).TotalSeconds;
             }
 
+            // Báo cáo KHÔNG sinh ở đây nữa (ADR-073). Trước đây AI được gọi ngay trong lệnh đóng phiên: lỗi AI
+            // hay thiếu bộ tiêu chí là mất báo cáo vĩnh viễn, vì phiên đã "completed" nên không lượt nào quay
+            // lại. Nay chỉ ghi "chờ chấm" — hàng đợi nền nhận việc ngay, lượt quét bảo đảm không sót.
+            var completed = status == InterviewSessionStatuses.Completed;
+            if (completed)
+            {
+                session.EvaluationStatus = EvaluationStatuses.Pending;
+                session.EvaluationAttempts = 0;
+                session.EvaluationError = null;
+                session.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            }
+
             _unitOfWork.Repository<InterviewSession>().Update(session);
             await _unitOfWork.SaveChangesAsync(ct);
             _cache.Remove(AllSessionsCacheKey); // trạng thái phiên thay đổi — xóa cache
 
-            // If session is completed, automatically trigger AI Evaluation report generation
-            if (status == "completed")
-            {
-                await GenerateEvaluationReportAsync(session.Id, ct);
-            }
+            if (completed) _evaluationQueue?.Enqueue(session.Id);
 
             await _notificationService.PublishInterviewSessionEventAsync(sessionId, "ReceiveSessionStatus", new { status }, ct);
 
@@ -1400,16 +1474,6 @@ namespace ARI.Application.Services
             });
         }
 
-        /// <summary>Trọng số điểm nghi vấn theo loại tín hiệu — dùng chung khi chấm và khi tổng hợp.</summary>
-        private static readonly Dictionary<string, (decimal Weight, string Severity)> CheatSignalWeights = new()
-        {
-            ["fullscreen_exit"] = (8m, "medium"),   // thoát toàn màn hình
-            ["tab_hidden"] = (12m, "high"),         // chuyển tab / thu nhỏ cửa sổ
-            ["window_blur"] = (5m, "low"),          // click ra ngoài cửa sổ
-            ["shortcut_blocked"] = (3m, "low"),     // bấm phím tắt bị chặn
-            ["page_unload"] = (15m, "high"),        // đóng/tải lại trang giữa buổi
-        };
-
         /// <summary>
         /// Ghi nhận tín hiệu nghi vấn của một phiên (Kiosk thoát toàn màn hình, chuyển tab…).
         /// Trước đây `SessionHub.ReportCheatSignal` chỉ phát cảnh báo realtime rồi bỏ — không có gì
@@ -1471,205 +1535,26 @@ namespace ARI.Application.Services
             }
 
             foreach (var e in existing) _unitOfWork.Repository<Evaluation>().Delete(e);
+            session.EvaluationStatus = EvaluationStatuses.Pending;
+            session.EvaluationAttempts = 0;
+            session.EvaluationError = null;
+            session.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            _unitOfWork.Repository<InterviewSession>().Update(session);
             await _unitOfWork.SaveChangesAsync(ct);
 
-            await GenerateEvaluationReportAsync(sessionId, ct);
-            return Result.Success(true);
-        }
-
-        /// <summary>
-        /// Tổng số vòng của job = <c>max(InterviewRoundConfig.RoundNumber)</c>. Job chưa khai báo
-        /// vòng nào thì coi như 1 vòng (khớp fallback ở <see cref="StartSessionAsync"/>).
-        /// Dùng để xác định "vòng cuối" — điều kiện duy nhất để hồ sơ được đặt "pass" (ADR-053).
-        /// </summary>
-        private async Task<int> ResolveTotalRoundsAsync(Guid jobPostingId, CancellationToken ct = default)
-        {
-            var rounds = await _unitOfWork.Repository<InterviewRoundConfig>()
-                .QueryAsync(q => q.Where(r => r.JobPostingId == jobPostingId).Select(r => r.RoundNumber), ct);
-            return rounds.Count == 0 ? 1 : Math.Max(1, rounds.Max());
-        }
-
-        private async Task GenerateEvaluationReportAsync(Guid sessionId, CancellationToken ct = default)
-        {
-            var session = await _unitOfWork.Repository<InterviewSession>().GetByIdAsync(sessionId, ct);
-            var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(session!.ApplicationId, ct);
-            var jobPosting = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application!.JobPostingId, ct);
-            var questions = await _unitOfWork.Repository<Question>().FindAsync(q => q.SessionId == sessionId, ct);
-
-            var chatHistory = new List<QuestionAnswerDto>();
-            foreach (var q in questions.OrderBy(x => x.SequenceNumber))
+            // Đường dev/ops cần thấy kết quả ngay, nên chấm ĐỒNG BỘ bằng đúng bộ chấm của hàng đợi nền (ADR-073).
+            var outcome = await new InterviewEvaluator(_unitOfWork, _aiProvider, _notificationService)
+                .EvaluateSessionAsync(sessionId, ct);
+            return outcome switch
             {
-                var answers = await _unitOfWork.Repository<Answer>().FindAsync(a => a.QuestionId == q.Id, ct);
-                chatHistory.Add(new QuestionAnswerDto
-                {
-                    SequenceNumber = q.SequenceNumber,
-                    QuestionText = q.QuestionText,
-                    AnswerText = answers.FirstOrDefault()?.Transcript ?? ""
-                });
-            }
-
-            // Bộ tiêu chí do doanh nghiệp khai (playbook interview_rubric) — vòng → tin → công ty.
-            var rubricCriteria = await PlaybookScope.ResolveRubricAsync(
-                _unitOfWork, jobPosting!.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric, ct);
-
-            // BẮT BUỘC có bộ tiêu chí thì mới chấm (ADR-062).
-            //
-            // Trước đây thiếu rubric thì lấy thẳng `evalReport.Score` và `evalReport.Verdict` — tức
-            // hai con số do model tự nghĩ ra, không phải trung bình có trọng số của gì cả, đúng thứ
-            // ADR-060 sinh ra để loại bỏ. Một điểm số không giải thích được ra từ đâu mà lại quyết
-            // định đậu/trượt của người thật là thứ không được phép tồn tại âm thầm.
-            //
-            // Dừng ở đây KHÔNG làm hỏng phiên: transcript, câu hỏi, câu trả lời và bản ghi hình đã
-            // lưu xong từ trước. Nhân sự khai rubric rồi chấm lại qua /api/dev/regrade-session.
-            if (rubricCriteria.Count == 0)
-            {
-                _logger?.LogError(
-                    "Phiên {SessionId} (tin {JobPostingId}, vòng {Round}): CHƯA khai bộ tiêu chí chấm " +
-                    "phỏng vấn (playbook loại '{Type}'). Không sinh báo cáo — điểm do model tự đưa ra " +
-                    "không giải thích được và không được phép quyết định kết quả tuyển dụng.",
-                    sessionId, jobPosting.Id, session.RoundNumber, ScoringRubric.TypeInterviewRubric);
-                return;
-            }
-
-            var evalCtx = new SessionContext
-            {
-                SessionId = sessionId,
-                // RAG service cần hai trường này để truy hồi playbook đúng tin + vòng lúc chấm.
-                JobPostingId = jobPosting!.Id,
-                RoundNumber = session.RoundNumber,
-                JobDescription = jobPosting!.JobDescription,
-                CandidateCv = application.CvText ?? "",
-                SessionType = session.SessionType,
-                ChatHistory = chatHistory,
-                ScoringRubric = jobPosting.ScoringRubric ?? "{}",
-                Criteria = rubricCriteria,
-                Language = session.InterviewLanguage ?? jobPosting.DetectedLanguage,
-                // Báo cáo viết bằng ngôn ngữ ứng viên đang dùng trên web (ADR-051).
-                ReportLanguage = session.ReportLanguage ?? session.InterviewLanguage ?? "vi"
+                EvaluationOutcome.Done => Result.Success(true),
+                EvaluationOutcome.BlockedNoRubric => Result.Failure<bool>(
+                    "Tin chưa có bộ tiêu chí chấm phỏng vấn cho vòng này — Hiring Manager cần khai ở màn tin."),
+                EvaluationOutcome.NoAnswers => Result.Failure<bool>("Buổi thử không có câu trả lời nào để chấm."),
+                EvaluationOutcome.Skipped => Result.Failure<bool>("Phiên chưa kết thúc nên chưa chấm được."),
+                _ => Result.Failure<bool>(
+                    "Chấm lại thất bại: " + (session.EvaluationError ?? "AI không trả kết quả hợp lệ.")),
             };
-
-            // Call AI provider to generate Verdict, Score, Reasoning, etc.
-            var evalReport = await _aiProvider.GenerateEvaluationAsync(evalCtx, ct);
-
-            // ĐIỂM CUỐI DO BACKEND CỘNG, không lấy con số model tự đưa ra (ADR-060). Trước đây model
-            // vừa tự chọn tiêu chí trong một danh sách viết cứng, vừa tự cho điểm tổng — con số ấy
-            // không phải trung bình có trọng số của gì cả, nên "chấm theo tiêu chí" chỉ là hình thức.
-            var aiScores = ScoringRubricSupport.ParseScores(evalReport.CriterionScoresJson);
-
-            // ĐIỂM VÀ VERDICT LUÔN DO BACKEND TÍNH — không có nhánh nào lấy số của model nữa.
-            var computed = ScoringRubric.ComputeOverall(rubricCriteria, aiScores);
-            if (!computed.HasValue)
-            {
-                // Có rubric mà model không chấm nổi tiêu chí nào: đây là lỗi của model, và cũng
-                // KHÔNG được cho 0 điểm (thiếu dữ liệu không phải là điểm kém). Không có gì hợp lệ
-                // để ghi nên dừng lại — chấm lại được sau khi sửa prompt.
-                _logger?.LogError(
-                    "Phiên {SessionId}: có bộ tiêu chí ({Count}) nhưng model không trả điểm tiêu chí nào — " +
-                    "không sinh báo cáo. Chấm lại bằng /api/dev/regrade-session sau khi xử lý.",
-                    sessionId, rubricCriteria.Count);
-                return;
-            }
-
-            var overallScore = computed.Value;
-            // Ảnh chụp nhãn + trọng số tại thời điểm chấm: rubric sửa về sau vẫn không làm báo cáo
-            // cũ mất khả năng giải thích điểm của nó ra từ đâu.
-            var criterionScoresJson = ScoringRubric.SerializeScoreSnapshot(rubricCriteria, aiScores);
-            var verdict = overallScore >= jobPosting.InterviewPassScore ? "pass" : "not_pass";
-            
-            // Tín hiệu nghi vấn: chấm theo trọng số từng loại (trước đây chỉ "có tín hiệu = 10 điểm"
-            // và danh sách bị ghi cứng "[]" nên HR không bao giờ thấy chi tiết) — ADR-054.
-            var signals = (await _unitOfWork.Repository<CheatDetectionSignal>()
-                .FindAsync(s => s.SessionId == sessionId, ct)).ToList();
-            decimal cheatScore = 0;
-            foreach (var s in signals)
-            {
-                cheatScore += CheatSignalWeights.TryGetValue(s.SignalType, out var w) ? w.Weight : 5m;
-            }
-            cheatScore = Math.Min(100m, cheatScore);
-
-            // Gộp theo loại để HR đọc nhanh: "Thoát toàn màn hình × 3".
-            var cheatSignalsJson = System.Text.Json.JsonSerializer.Serialize(
-                signals.GroupBy(s => s.SignalType).Select(g => new
-                {
-                    type = g.Key,
-                    severity = CheatSignalWeights.TryGetValue(g.Key, out var w) ? w.Severity : "low",
-                    description = $"{g.Count()} lần",
-                    timestamp = g.Max(x => x.RecordedAt)
-                }));
-
-            // Language Assessment — CHỈ chấm khi thực sự có câu trả lời để chấm; không có dữ liệu
-            // thì bỏ trống thay vì để AI đoán bừa một bậc năng lực (ADR-051).
-            LanguageAssessment? langAssess = null;
-            var hasAnswers = chatHistory.Any(qa => !string.IsNullOrWhiteSpace(qa.AnswerText));
-            if (!string.IsNullOrEmpty(jobPosting.DetectedLanguage) && hasAnswers)
-            {
-                langAssess = await _aiProvider.AssessLanguageProficiencyAsync(evalCtx, ct);
-            }
-
-            var evaluation = new Evaluation
-            {
-                SessionId = sessionId,
-                ApplicationId = application.Id,
-                RoundNumber = session.RoundNumber,
-                SessionType = session.SessionType,
-                AiVerdict = verdict,
-                OverallScore = overallScore,
-                CriterionScores = criterionScoresJson,
-                Reasoning = evalReport.Reasoning,
-                RecommendedNextStep = evalReport.RecommendedNextStep,
-                QuestionAnalyses = evalReport.QuestionAnalysesJson,
-                CheatScore = cheatScore,
-                CheatSignals = cheatSignalsJson,
-                LanguageAssessment = langAssess != null
-                    ? System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        language = evalCtx.Language,
-                        fluency = langAssess.Fluency,
-                        grammar = langAssess.Grammar,
-                        vocabulary = langAssess.Vocabulary,
-                        comprehension = langAssess.Comprehension,
-                        overall_score = langAssess.OverallScore,
-                        cefr_level = langAssess.CefrLevel,
-                        language_adherence = langAssess.LanguageAdherence,
-                        evidence = langAssess.Evidence
-                    })
-                    : null
-            };
-
-            await _unitOfWork.Repository<Evaluation>().AddAsync(evaluation, ct);
-
-            // AI KHÔNG tự đổi trạng thái hồ sơ (ADR-053). Trước đây AI chấm "not_pass" là hồ sơ bị
-            // đánh rớt ngay trước khi HR kịp xem — trái Phase 6 "HR Review & Confirm". Nay hồ sơ giữ
-            // nguyên "interview" cho tới khi HR xác nhận; FE hiện "chờ HR xác nhận" qua pendingHrReview.
-            // Buổi thử thì còn không báo HR (ADR-051).
-            var isRealSession = session.SessionType == "real";
-
-            await _unitOfWork.SaveChangesAsync(ct);
-
-            if (isRealSession)
-            {
-                // Notify HR Admin that there is a new evaluation to review
-                await _notificationService.PublishGroupEventAsync("hr_admin", "ReceiveSystemEvent", new {
-                    Type = "AiEvaluationComplete",
-                    EvaluationId = evaluation.Id,
-                    ApplicationId = application.Id
-                }, ct);
-
-                // Người CHỐT kết quả là Hiring Manager (ADR-061), vậy mà trước đây chỉ nhóm `hr_admin` được
-                // đẩy sự kiện — HM không nhận thông báo nào và phải tự vào màn "Kết quả phỏng vấn" mới biết
-                // có việc. Ghi thông báo lưu lại (idempotent theo báo cáo) cho đúng người phải hành động.
-                var hm = await JobAccess.PrimaryHiringManagerAsync(_unitOfWork, application.JobPostingId, ct);
-                if (hm != null)
-                {
-                    await OfferSupport.NotifyStaffAsync(_unitOfWork, hm.UserId, "pending",
-                        "Có kết quả phỏng vấn chờ bạn chốt",
-                        $"Ứng viên {application.CandidateName} — vị trí \"{jobPosting.Title}\", vòng {session.RoundNumber}.",
-                        "/hm/evaluations", $"hm_evaluation_ready:{evaluation.Id}", ct);
-                    await _unitOfWork.SaveChangesAsync(ct);
-                    await _notificationService.PublishUserEventAsync(hm.UserId, "ReceiveUserNotification",
-                        new { Type = "AiEvaluationComplete", EvaluationId = evaluation.Id }, ct);
-                }
-            }
         }
 
         public async Task<Result<bool>> SubmitHrReviewAsync(Guid hrUserId, ConfirmReviewRequest request, string? frontendBaseUrl = null, CancellationToken ct = default)
@@ -1681,6 +1566,11 @@ namespace ARI.Application.Services
             var hrUser = await _unitOfWork.Repository<User>().GetByIdAsync(hrUserId, ct);
             if (hrUser == null)
                 return Result.Failure<bool>("Không tìm thấy tài khoản nhân sự.");
+
+            // Một báo cáo chỉ chốt MỘT lần. Lệnh chốt đổi trạng thái hồ sơ, mở vòng kế và gửi thư kết quả —
+            // bấm hai lần (hoặc hai người cùng bấm) mà không chặn là ứng viên nhận hai thư, có khi trái nhau.
+            if (await _unitOfWork.Repository<HrReview>().CountAsync(r => r.EvaluationId == evaluation.Id, ct) > 0)
+                return Result.Failure<bool>("Kết quả vòng này đã được chốt.", CommonErrorCodes.Conflict);
 
             // ===== AI ĐÃ PHỎNG VẤN — NGƯỜI CHỐT LÀ HIRING MANAGER (ADR-061) =====
             //
@@ -1773,18 +1663,24 @@ namespace ARI.Application.Services
             var application = await _unitOfWork.Repository<ARI.Domain.Entities.Application>().GetByIdAsync(evaluation.ApplicationId, ct);
             if (application != null)
             {
+                // Biến thể thư kết quả — chỉ buổi THẬT mới có (null = không gửi thư).
+                string? resultVariant = null;
+
                 // Buổi THỬ không chạm pipeline tuyển dụng, kể cả khi có ai đó review nó (ADR-051).
                 // "Đạt" CHỈ khi đã qua vòng CUỐI của job (ADR-053): trước đây HR xác nhận pass ở
-                // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị TriggerAutoProgressionAsync ghi
-                // đè về "interview" — job không khai báo round config thì không có gì ghi đè nên
-                // ứng viên mới xong vòng 1 đã hiện "Đạt".
+                // vòng bất kỳ là hồ sơ thành "pass" ngay, rồi mới bị bước mở vòng kế ghi đè về
+                // "interview" — job không khai báo round config thì không có gì ghi đè nên ứng viên
+                // mới xong vòng 1 đã hiện "Đạt". Nay trạng thái và biến thể thư suy từ CÙNG một hàm.
                 if (evaluation.SessionType == "real")
                 {
-                    var totalRounds = await ResolveTotalRoundsAsync(application.JobPostingId, ct);
-                    var isFinalRound = evaluation.RoundNumber >= totalRounds;
-                    application.Status = request.FinalVerdict != "pass"
-                        ? "not_pass"
-                        : (isFinalRound ? "pass" : "interview");
+                    var totalRounds = await InterviewResultEmail.TotalRoundsAsync(_unitOfWork, application.JobPostingId, ct);
+                    resultVariant = InterviewResultEmail.ResolveVariant(request.FinalVerdict, evaluation.RoundNumber, totalRounds);
+                    application.Status = resultVariant switch
+                    {
+                        InterviewResultEmail.Variants.FinalPass => ApplicationStatuses.Pass,
+                        InterviewResultEmail.Variants.NextRound => "interview",
+                        _ => "not_pass",
+                    };
                     _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
                 }
 
@@ -1810,75 +1706,24 @@ namespace ARI.Application.Services
                     }
                 }
 
-                bool hasProgressed = false;
-                // Auto-Progression Logic to Round N+1 (ADR-017 / ADR-014)
-                if (request.FinalVerdict == "pass" && evaluation.SessionType == "real")
+                // Thư kết quả (ADR-074): MỘT thư cho mỗi lần chốt, dựng bằng builder dùng chung với bản xem
+                // trước và đi qua CandidateEmailSender — bản HM đã sửa ở trình soạn là bản được gửi, và thư có
+                // dòng ở tab "Lịch sử email". Trước đây hai nhánh (qua vòng / kết thúc) tự viết HTML rồi gửi
+                // thẳng SMTP: không ai xem trước được, không ai sửa được, không để lại dấu vết.
+                // Buổi THỬ không có thư: nó không thuộc phễu tuyển dụng (ADR-051).
+                if (resultVariant != null)
                 {
-                    hasProgressed = await TriggerAutoProgressionAsync(application, evaluation.RoundNumber, frontendBaseUrl, ct);
-                }
+                    if (resultVariant == InterviewResultEmail.Variants.NextRound)
+                        await OpenNextRoundAsync(application, evaluation.RoundNumber, ct);
 
-                // Auto-send email to Candidate if not progressed
-                if (!hasProgressed)
-                {
-                    // Link trong thư phải trỏ về portal thật của môi trường đang chạy, không phải máy dev.
-                    // KHÔNG đặt mặc định localhost ở đây: `frontendBaseUrl` đến từ `FrontendUrls`,
-                    // mà giá trị đó đã được chặn ở bước boot. Bịa thêm một máy chủ nữa chỉ tạo chỗ
-                    // để link sai lọt ra ngoài mà không ai biết.
-                    var portalBase = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
-                    string emailBody;
-                    string subject;
-                    if (request.FinalVerdict == "pass")
-                    {
-                        subject = "ARISP - Chúc mừng bạn đã vượt qua vòng phỏng vấn!";
-                        emailBody = $$"""
-                            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                                <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 24px; text-align: center; color: white;">
-                                    <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">THƯ CHÚC MỪNG VƯỢT QUA VÒNG PHỎNG VẤN</h2>
-                                </div>
-                                <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                                    <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                                    <p>Chúng tôi vô cùng vui mừng thông báo rằng Anh/Chị đã chính thức vượt qua các vòng đánh giá năng lực của vị trí tuyển dụng <strong>{{jobTitle}}</strong> tại ARISP.</p>
-                                    <p>Đội ngũ tuyển dụng đánh giá rất cao năng lực chuyên môn, phong cách làm việc cũng như sự phù hợp của Anh/Chị với định hướng phát triển của chúng tôi.</p>
-                                    <p>Thư mời nhận việc chính thức (Offer Letter) sẽ được gửi tới Anh/Chị qua email và hiển thị ngay trong hồ sơ ứng tuyển trên hệ thống, kèm nút xác nhận. Bộ phận Nhân sự cũng sẽ liên hệ trực tiếp để trao đổi thêm nếu Anh/Chị cần.</p>
-                                    <p>Cảm ơn Anh/Chị đã luôn dành sự quan tâm và nỗ lực trong suốt hành trình tuyển dụng cùng ARISP.</p>
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #059669; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(5,150,105,0.2);">Xem kết quả chi tiết</a>
-                                    </div>
-                                    <p style="margin-bottom: 0;">Trân trọng,<br><strong>Trưởng Ban Tuyển Dụng ARISP</strong></p>
-                                </div>
-                                <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                                    <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                                </div>
-                            </div>
-                            """;
-                    }
-                    else
-                    {
-                        subject = "ARISP - Thư cảm ơn tham gia phỏng vấn";
-                        emailBody = $$"""
-                            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                                <div style="background: linear-gradient(135deg, #4b5563, #6b7280); padding: 24px; text-align: center; color: white;">
-                                    <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">THƯ CẢM ƠN THAM GIA PHỎNG VẤN</h2>
-                                </div>
-                                <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                                    <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                                    <p>Đội ngũ tuyển dụng ARISP chân thành cảm ơn Anh/Chị đã dành thời gian và tâm huyết tham gia quy trình ứng tuyển vào vị trí <strong>{{jobTitle}}</strong>.</p>
-                                    <p>Sau khi cân nhắc kỹ lưỡng dựa trên kết quả phỏng vấn và so sánh với định hướng hiện tại của vị trí, chúng tôi rất tiếc phải thông báo rằng chưa thể đồng hành cùng Anh/Chị trong dự án lần này.</p>
-                                    <p>Hồ sơ năng lực của Anh/Chị sẽ được lưu trữ bảo mật trong Cơ sở dữ liệu ứng viên tiềm năng của ARISP. Chúng tôi sẽ chủ động liên hệ ngay khi có những cơ hội nghề nghiệp mới phù hợp hơn với thế mạnh của Anh/Chị.</p>
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="{{portalBase}}/candidate/applications/{{application.Id}}" style="background-color: #4b5563; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(75,85,99,0.2);">Xem thông tin hồ sơ</a>
-                                    </div>
-                                    <p>Chúc Anh/Chị luôn dồi dào sức khỏe, may mắn và gặt hái được nhiều thành công rực rỡ trên con đường sự nghiệp sắp tới.</p>
-                                    <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
-                                </div>
-                                <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                                    <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                                </div>
-                            </div>
-                            """;
-                    }
-
-                    await _notificationService.SendEmailAsync(application.CandidateEmail, subject, emailBody, ct);
+                    // Link trong thư trỏ về portal thật của môi trường đang chạy: `frontendBaseUrl` đến từ
+                    // `FrontendUrls`, đã bị chặn ở bước boot nếu thiếu — không bịa mặc định localhost ở đây.
+                    var mail = InterviewResultEmail.Build(
+                        application, jobPosting, resultVariant, evaluation.RoundNumber, frontendBaseUrl);
+                    await CandidateEmailSender.SendAsync(
+                        _unitOfWork, _notificationService, EmailTemplateKeys.InterviewResult,
+                        new RenderedEmail(mail.Subject, mail.Html, application.CandidateEmail, application.CandidateName),
+                        request.EmailOverride, application.Id, application.JobPostingId, hrUserId, ct);
                 }
 
                 // Notify candidate in real-time
@@ -1987,77 +1832,34 @@ namespace ARI.Application.Services
             return Result.Success(true);
         }
 
-        private async Task<bool> TriggerAutoProgressionAsync(ARI.Domain.Entities.Application application, int currentRoundNumber, string? frontendBaseUrl = null, CancellationToken ct = default)
+        /// <summary>
+        /// Đạt vòng N và còn vòng sau → mở lời mời vòng N+1 (ADR-017 / ADR-014). KHÔNG gửi thư: thư "qua vòng"
+        /// là thư kết quả do Hiring Manager gửi kèm lệnh chốt (ADR-074), còn thư mời kèm giờ hẹn thuộc bước
+        /// nhân sự xếp lịch (ADR-048/059). Token invite chỉ để thoả cột NOT NULL, không phát ra ngoài.
+        /// </summary>
+        private async Task OpenNextRoundAsync(
+            ARI.Domain.Entities.Application application, int currentRoundNumber, CancellationToken ct)
         {
             var nextRoundNumber = currentRoundNumber + 1;
+            var hasNextRound = await _unitOfWork.Repository<InterviewRoundConfig>()
+                .CountAsync(r => r.JobPostingId == application.JobPostingId && r.RoundNumber == nextRoundNumber, ct) > 0;
+            if (!hasNextRound) return;
 
-            // Check if there is configured round configs for N+1
-            var nextRoundConfigs = await _unitOfWork.Repository<InterviewRoundConfig>()
-                .FindAsync(r => r.JobPostingId == application.JobPostingId && r.RoundNumber == nextRoundNumber, ct);
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
+            var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
 
-            if (nextRoundConfigs.Any())
+            var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
+                .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
+            foreach (var old in oldInvites)
+                _unitOfWork.Repository<InterviewInvite>().Delete(old);
+
+            await _unitOfWork.Repository<InterviewInvite>().AddAsync(new InterviewInvite
             {
-                var nextRound = nextRoundConfigs.First();
-                // Status = interview (đang trong giai đoạn phỏng vấn vòng kế); chi tiết vòng suy ra từ record.
-                application.Status = "interview";
-                _unitOfWork.Repository<ARI.Domain.Entities.Application>().Update(application);
-
-                // Tạo lời mời CHỌN LỊCH cho vòng kế (mỗi vòng cần duyệt → chỉ tạo sau khi confirm Pass).
-                var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(application.JobPostingId, ct);
-                var ttlHours = job?.InviteTokenTtlHours is { } h && h > 0 ? h : 48;
-                var baseUrl = (frontendBaseUrl ?? string.Empty).TrimEnd('/');
-                // Chỉ để thoả cột TokenHash (NOT NULL) — không dòng nào còn đối chiếu giá trị này.
-                var rawToken = Guid.NewGuid().ToString("N");
-
-                var oldInvites = await _unitOfWork.Repository<InterviewInvite>()
-                    .FindAsync(i => i.ApplicationId == application.Id && i.RoundNumber == nextRoundNumber && i.ScheduledAt == null, ct);
-                foreach (var old in oldInvites)
-                    _unitOfWork.Repository<InterviewInvite>().Delete(old);
-
-                await _unitOfWork.Repository<InterviewInvite>().AddAsync(new InterviewInvite
-                {
-                    ApplicationId = application.Id,
-                    RoundNumber = nextRoundNumber,
-                    TokenHash = TokenHashing.Sha256Hex(rawToken),
-                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
-                }, ct);
-
-                // ADR-048/059: ứng viên KHÔNG tự chọn giờ nữa — chỉ dẫn về Portal để theo dõi, thư mời
-                // kèm giờ hẹn sẽ do bước nhân sự xếp lịch gửi riêng. Token invite không phát ra ngoài.
-                var portalLink = $"{baseUrl}/candidate/applications/{application.Id}";
-
-                var emailBody = $$"""
-                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 24px; text-align: center; color: white;">
-                            <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">HỆ THỐNG TUYỂN DỤNG THÔNG MINH ARISP</h2>
-                        </div>
-                        <div style="padding: 32px 24px; background-color: #ffffff; color: #334155; line-height: 1.6;">
-                            <p style="margin-top: 0; font-size: 16px;">Kính gửi Anh/Chị <strong>{{application.CandidateName}}</strong>,</p>
-                            <p>Chúc mừng Anh/Chị đã hoàn thành xuất sắc vòng phỏng vấn số <strong>{{currentRoundNumber}}</strong>.</p>
-                            <p>Đội ngũ tuyển dụng ARISP trân trọng kính mời Anh/Chị tiếp tục tham gia <strong>Vòng phỏng vấn số {{nextRoundNumber}}</strong>.</p>
-                            <p><strong>Bộ phận nhân sự sẽ xếp lịch vòng {{nextRoundNumber}}</strong> và gửi Anh/Chị một thư mời riêng kèm <strong>giờ hẹn cụ thể và địa điểm</strong>. Trong thư đó, Anh/Chị bấm xác nhận tham dự hoặc báo bận để được xếp khung giờ khác.</p>
-                            <div style="margin: 30px 0; text-align: center;">
-                                <a href="{{portalLink}}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(37,99,235,0.2);">Xem tiến trình hồ sơ</a>
-                            </div>
-                            <p>Nếu gặp bất kỳ khó khăn hoặc cần hỗ trợ kỹ thuật, xin vui lòng phản hồi trực tiếp email này hoặc liên hệ bộ phận hỗ trợ tuyển dụng.</p>
-                            <p style="margin-bottom: 0;">Trân trọng,<br><strong>Ban Tuyển Dụng ARISP</strong></p>
-                        </div>
-                        <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                            <p style="margin: 0;">Đây là thư điện tử tự động từ hệ thống ARISP. Vui lòng không trả lời trực tiếp thư này.</p>
-                        </div>
-                    </div>
-                    """;
-
-                // Send email invite
-                await _notificationService.SendEmailAsync(
-                    application.CandidateEmail,
-                    $"ARISP - Mời bạn tham gia vòng phỏng vấn số {nextRoundNumber}",
-                    emailBody,
-                    ct
-                );
-                return true;
-            }
-            return false;
+                ApplicationId = application.Id,
+                RoundNumber = nextRoundNumber,
+                TokenHash = TokenHashing.Sha256Hex(Guid.NewGuid().ToString("N")),
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(ttlHours),
+            }, ct);
         }
     }
 }

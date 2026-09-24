@@ -1,0 +1,10 @@
+[Khung năng lực kỹ sư – Nguyên tắc xếp bậc]
+Xếp bậc theo PHẠM VI ẢNH HƯỞNG và MỨC TỰ CHỦ có bằng chứng (việc đã làm, kết quả đo được), không theo số năm kinh nghiệm hay chức danh. Bốn trục đánh giá: chuyên môn kỹ thuật; giải quyết vấn đề và đánh đổi; giao tiếp và hợp tác; trách nhiệm và chủ động.
+
+[Khung năng lực – Bậc 1 Junior và Bậc 2 Middle]
+Bậc 1 Junior: làm tốt task đã được chia nhỏ, cần hướng dẫn và review kỹ; hiểu ngôn ngữ và framework chính; phạm vi một chức năng.
+Bậc 2 Middle: tự chủ một tính năng từ thiết kế API, dữ liệu tới triển khai và test; tự xử lý lỗi production thông thường; phạm vi một module; review được code của người khác.
+
+[Khung năng lực – Bậc 3 Senior và Bậc 4 Lead]
+Bậc 3 Senior: chịu trách nhiệm một dịch vụ hoặc hệ thống con; thiết kế và giải thích được đánh đổi (hiệu năng, nhất quán dữ liệu, chi phí, độ phức tạp); chẩn đoán sự cố phức tạp tới nguyên nhân gốc; kèm cặp người khác; có kết quả đo được.
+Bậc 4 Lead/Principal: định hướng kiến trúc cho nhiều hệ thống hoặc nhiều nhóm; ra quyết định kỹ thuật có ghi chép; nâng chuẩn chất lượng và năng lực của cả nhóm.

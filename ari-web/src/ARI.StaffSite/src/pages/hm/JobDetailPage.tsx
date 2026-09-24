@@ -27,9 +27,11 @@ import HmAvailabilityPanel, { HM_AVAILABILITY_ANCHOR } from '@/components/hiring
 import HmApproveScheduleNotice from '@/components/hiring/HmApproveScheduleNotice'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { isOnlineTestRound } from '@ari/shared/utils/roundTypes'
 import { formatSalary } from '@/components/hiring/hiringConfig'
 import type { HrApplicationItem } from '@ari/shared/types/application'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-6 shadow-card'
@@ -182,6 +184,16 @@ export default function HmJobDetailPage() {
               />
             </section>
 
+            {/* Tin đã đóng mà còn hồ sơ chưa khép (ADR-074) — HM chỉ xem; loại hồ sơ là việc của chủ tin. */}
+            <ClosedJobOpenApplications
+              jobStatus={job.status}
+              applications={applications}
+              canReject={false}
+              candidateHref={(appId) => `/hm/candidates/${appId}`}
+              offersHref="/hm/offers"
+              onChanged={() => void queryClient.invalidateQueries({ queryKey: ['job', id, 'applications'] })}
+            />
+
             {/*
               Cùng khối quy trình với màn tin của Recruiter — Hiring Manager phải nhìn thấy phễu y hệt
               người đang vận hành nó, nếu không hai bên bàn về hai bức tranh khác nhau.
@@ -197,6 +209,15 @@ export default function HmJobDetailPage() {
               candidateHref={(a) => `/hm/candidates/${a.id}`}
               evaluationHref={(evaluationId) => `/hm/evaluations?id=${evaluationId}`}
               statusLabel={(s) => t(`applicationStatus.${s}`, { defaultValue: s })}
+              /*
+                Cột này chỉ rộng 2/3 màn hình (dải panel chuyên môn của HM chiếm 1/3 còn lại), trong
+                khi khối hồ sơ cần chỗ cho danh sách + hồ sơ + khung đọc CV nằm cạnh nhau. Cho nó giữ
+                bề rộng tối thiểu rồi trượt ngang, thay vì ép co lại cho vừa cột.
+
+                Chỉ bật từ `lg` trở lên: dưới ngưỡng đó trang đã xếp một cột, khối hồ sơ có trọn bề
+                ngang rồi — ép bề rộng tối thiểu ở đó chỉ tạo ra thanh trượt vô cớ trên điện thoại.
+              */
+              bodyMinWidthClass="lg:min-w-[64rem]"
               hmDecision={
                 isTheHiringManager
                   ? {
@@ -250,6 +271,10 @@ export default function HmJobDetailPage() {
                 thay vì phải nhờ HR vào màn Playbook chung. */}
             {/* Bộ tiêu chí chấm CV (ADR-070) — HM chính soạn và sửa; lưu bộ mới là chấm lại mọi hồ sơ. */}
             <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+
+            {/* Bộ tiêu chí chấm PHỎNG VẤN (ADR-073) — HM khai cho từng tin; thiếu thì buổi phỏng vấn không ra báo
+                cáo và tin không đăng được. */}
+            <JobInterviewRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
 
             <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
 

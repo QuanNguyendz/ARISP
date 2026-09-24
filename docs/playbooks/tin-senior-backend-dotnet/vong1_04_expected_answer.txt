@@ -1,0 +1,11 @@
+[Vòng 1 – Đáp án mong đợi – Dự án .NET gần nhất và phần việc cá nhân]
+Câu trả lời tốt: nêu sản phẩm và người dùng; quy mô bằng con số (người dùng, request, dữ liệu, số người trong nhóm); stack chính (ASP.NET Core, EF Core, PostgreSQL hoặc SQL Server); tách bạch phần việc của chính ứng viên với phần của nhóm; ít nhất một quyết định kỹ thuật ứng viên đưa ra kèm lý do; kết quả đo được. Mức đạt tối thiểu: vai trò rõ và một ví dụ cụ thể. Chưa đạt: chỉ liệt kê công nghệ, không nói được mình đã làm gì.
+
+[Vòng 1 – Đáp án mong đợi – Động lực và định hướng phát triển]
+Câu trả lời tốt: liên hệ cụ thể với nội dung công việc trong JD (backend, dữ liệu, hệ thống realtime, sản phẩm của công ty); định hướng phát triển rõ và khớp vị trí (chiều sâu kỹ thuật, dẫn dắt kỹ thuật, kiến trúc). Chưa đạt: câu trả lời chung chung, dùng cho công ty nào cũng được. Nhắc tới thu nhập hay sự ổn định là bình thường, không trừ điểm; chỉ đánh giá mức hiểu công việc và độ rõ ràng của định hướng.
+
+[Vòng 1 – Đáp án mong đợi – Xử lý sự cố production]
+Câu trả lời tốt: mô tả triệu chứng và mức ảnh hưởng (người dùng nào, trong bao lâu); cách khoanh vùng (log, metric, tracing, tái hiện lỗi); nguyên nhân gốc chứ không dừng ở triệu chứng; cách khắc phục tạm thời và lâu dài; thay đổi sau đó (thêm test, thêm cảnh báo, postmortem không đổ lỗi). Chưa đạt: không có ví dụ thật, chỉ "khởi động lại server", hoặc đổ lỗi cho người khác.
+
+[Vòng 1 – Đáp án mong đợi – Bất đồng kỹ thuật và code review]
+Câu trả lời tốt: tranh luận dựa trên tiêu chí chung và dữ liệu (benchmark, thử nghiệm nhỏ), tách con người khỏi vấn đề, lắng nghe lập luận bên kia, cam kết với quyết định chung sau khi đã chốt, ghi lại quyết định. Chưa đạt: áp đặt ý mình, hoặc im lặng làm theo rồi phàn nàn.

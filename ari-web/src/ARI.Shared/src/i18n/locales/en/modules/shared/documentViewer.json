@@ -1,10 +1,12 @@
 {
   "documentViewer": {
-    "defaultFileName": "Document",
-    "docxError": "Cannot display DOCX file directly (may be due to CORS or corrupted file). Please download to view.",
-    "loading": "Building document content...",
-    "download": "Download",
     "close": "Close",
+    "defaultFileName": "Document",
+    "docxError": "Could not load the DOCX for preview. Try again, or download the file.",
+    "download": "Download",
+    "fileMissing": "File not found on the server (404). It may have been deleted, or uploaded in a different environment from the one running now.",
+    "loading": "Building document content...",
+    "pdfError": "Could not load the PDF for preview. Try again, or download the file.",
     "unsupportedFormat": "This file format is not supported for direct viewing. Please download to open."
   }
 }

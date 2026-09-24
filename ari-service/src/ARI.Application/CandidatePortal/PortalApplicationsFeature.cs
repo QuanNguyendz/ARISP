@@ -70,9 +70,28 @@ namespace ARI.Application.CandidatePortal
                 var jobIds = appsList.Select(a => a.JobPostingId).Distinct().ToList();
                 var jobsDict = (await _unitOfWork.Repository<JobPosting>()
                         .QueryAsync(q => q.Where(j => jobIds.Contains(j.Id))
-                            .Select(j => new { j.Id, j.Title, j.Location, j.Department, j.InterviewMode })))
+                            .Select(j => new
+                            {
+                                j.Id, j.Title, j.Location, j.Department, j.InterviewMode,
+                                j.Status, j.ApplicationDeadline, j.RecruitmentRequestId,
+                            })))
                     .GroupBy(j => j.Id)
                     .ToDictionary(g => g.Key, g => g.First());
+
+                // Ngày đi làm dự kiến của từng phiếu — mốc để biết tin đã KẾT THÚC tuyển hay chỉ vừa
+                // đóng (xem `JobClosure`). Nạp một lượt cho cả danh sách, không hỏi lại từng hồ sơ.
+                var requestIds = jobsDict.Values
+                    .Where(j => j.RecruitmentRequestId.HasValue)
+                    .Select(j => j.RecruitmentRequestId!.Value)
+                    .Distinct()
+                    .ToList();
+                var startDateByRequest = requestIds.Count == 0
+                    ? new Dictionary<Guid, DateTimeOffset?>()
+                    : (await _unitOfWork.Repository<RecruitmentRequest>()
+                            .QueryAsync(q => q.Where(r => requestIds.Contains(r.Id))
+                                .Select(r => new { r.Id, r.ExpectedStartDate })))
+                        .GroupBy(r => r.Id)
+                        .ToDictionary(g => g.Key, g => g.First().ExpectedStartDate);
 
                 // Batch fetch CV–JD analyses (chỉ match score)
                 var analysisIds = appsList.Where(a => a.CvJdAnalysisId.HasValue).Select(a => a.CvJdAnalysisId!.Value).Distinct().ToList();
@@ -155,6 +174,12 @@ namespace ARI.Application.CandidatePortal
                     .Select(a =>
                     {
                         jobsDict.TryGetValue(a.JobPostingId, out var job);
+
+                        // Tin đã KẾT THÚC tuyển chưa — dùng CHUNG một hàm với màn chi tiết (`JobClosure`).
+                        DateTimeOffset? expectedStart = job?.RecruitmentRequestId is { } rid
+                            && startDateByRequest.TryGetValue(rid, out var sd) ? sd : null;
+                        var jobFinished = job != null && ARI.Application.Jobs.JobClosure.IsFinished(
+                            job.Status, job.ApplicationDeadline, expectedStart, nowUtc);
                         // Chỉ điểm chấm theo bộ tiêu chí (ADR-070) — không hiện điểm AI cũ hay "0" của file không phải CV.
                         int? matchScore = a.CvJdAnalysisId.HasValue
                                           && analysisDict.TryGetValue(a.CvJdAnalysisId.Value, out var an)
@@ -211,15 +236,29 @@ namespace ARI.Application.CandidatePortal
                                 string? verdict = null;
                                 decimal? overall = null;
                                 bool hasEval = evalBySession.TryGetValue(s.Id, out var ev);
-                                bool shared = hasEval && reviewByEval.TryGetValue(ev!.Id, out var rv) && rv.ShareEvaluation;
-                                // Chỉ lộ verdict/điểm khi HR đã chia sẻ kết quả vòng đó (giữ nguyên mô hình bảo mật)
-                                if (shared)
-                                {
-                                    verdict = ev!.AiVerdict;
-                                    overall = ev.OverallScore;
-                                }
-                                // Vòng đã hoàn tất + AI đã có đánh giá nhưng HR chưa chia sẻ → đang chờ HR xác nhận
-                                if (s.Status == "completed" && hasEval && !shared)
+                                // `rv` khai riêng: `hasEval` false thì `TryGetValue` không chạy, mà
+                                // `out var` trong biểu thức nối bằng `&&` bị coi là chưa gán.
+                                ARI.Domain.Entities.HrReview? rv = null;
+                                bool reviewed = hasEval && reviewByEval.TryGetValue(ev!.Id, out rv);
+                                bool shared = reviewed && rv!.ShareEvaluation;
+
+                                // KẾT LUẬN đạt/không đạt hiện ngay khi đã chốt, KHÔNG chờ cờ chia sẻ:
+                                // lệnh chốt luôn gửi kèm thư kết quả cho ứng viên (ADR-074), nên giấu nó
+                                // trên Portal là để màn hình nói ngược với lá thư họ vừa nhận.
+                                //
+                                // Lấy `FinalVerdict` của người chốt chứ KHÔNG phải `AiVerdict`: HM có quyền
+                                // đảo kết luận của AI, và thư gửi đi mang quyết định của HM.
+                                if (reviewed) verdict = rv!.FinalVerdict;
+
+                                // ĐIỂM SỐ thì vẫn chờ HR chia sẻ — nó thuộc báo cáo chi tiết, không nằm trong thư.
+                                if (shared) overall = ev!.OverallScore;
+                                // "Chờ HR" = CHƯA AI CHỐT, không phải "chốt rồi mà chưa chia sẻ".
+                                //
+                                // Hai việc này tách hẳn nhau và `HrReview` nói rõ điều đó: sự TỒN TẠI của dòng
+                                // review là "đã chốt", còn `ShareEvaluation` là cổng công bố báo cáo cho ứng viên.
+                                // Bốn cờ chia sẻ đều mặc định FALSE, nên gộp hai thứ làm một khiến mọi hồ sơ đã
+                                // duyệt vẫn hiện "đang chờ HR xác nhận" — kể cả người đã được mời sang vòng sau.
+                                if (s.Status == "completed" && hasEval && !reviewed)
                                     pendingHrReview = true;
                                 return new
                                 {
@@ -281,6 +320,7 @@ namespace ARI.Application.CandidatePortal
                             a.Id,
                             a.JobPostingId,
                             JobTitle = job?.Title,
+                            JobClosed = jobFinished,
                             Location = job?.Location,
                             Department = job?.Department,
                             InterviewMode = job?.InterviewMode,
@@ -394,6 +434,15 @@ namespace ARI.Application.CandidatePortal
 
             // Lịch phỏng vấn sắp tới (booking đã đặt) cho hồ sơ này
             var nowUtc = DateTimeOffset.UtcNow;
+
+            // Tin đã KẾT THÚC tuyển chưa (khác "vừa đóng") — mốc là ngày đi làm dự kiến trên phiếu.
+            // Xem `JobClosure`: tin vừa đóng vì hết hạn nộp vẫn còn thời gian cho HM/HR chốt kết quả,
+            // nên chưa báo gì cho ứng viên ở thời điểm đó.
+            var recruitmentRequest = job?.RecruitmentRequestId is { } reqId
+                ? await _unitOfWork.Repository<RecruitmentRequest>().GetByIdAsync(reqId, ct)
+                : null;
+            var jobFinished = ARI.Application.Jobs.JobClosure.IsFinished(job, recruitmentRequest, nowUtc);
+
             var bookings = (await _unitOfWork.Repository<InterviewBooking>()
                 .FindAsync(b => b.ApplicationId == id)).ToList();
             var slotIds = bookings.Select(b => b.AvailabilitySlotId).Distinct().ToList();
@@ -471,13 +520,17 @@ namespace ARI.Application.CandidatePortal
                         reviewDict.TryGetValue(evaluation.Id, out var review);
                         bool sharedEval = review != null && review.ShareEvaluation;
 
-                        // Vòng đã hoàn tất + AI đã chấm nhưng HR chưa chia sẻ → đang chờ HR xác nhận.
-                        if (s.Status == "completed" && !sharedEval)
+                        // "Chờ HR" = CHƯA AI CHỐT. Xem ghi chú dài ở nhánh danh sách phía trên: chốt
+                        // kết quả và chia sẻ báo cáo là hai quyết định khác nhau, và cờ chia sẻ mặc
+                        // định tắt — nên lấy cờ chia sẻ làm dấu hiệu "đã duyệt" là luôn sai.
+                        if (s.Status == "completed" && review == null)
                             pendingHrReview = true;
 
                         if (review != null)
                         {
-                            hrFinalVerdict = sharedEval ? review.FinalVerdict : null;
+                            // Xem ghi chú ở nhánh danh sách: kết luận đã đi kèm thư kết quả nên hiện ngay,
+                            // còn báo cáo chi tiết (điểm, tiêu chí, transcript, bản ghi) vẫn chờ HR chia sẻ.
+                            hrFinalVerdict = review.FinalVerdict;
                             transcriptShared = review.ShareTranscript;
                             if (review.ShareRecording && !string.IsNullOrEmpty(s.RecordingUrl))
                                 recordingUrl = await _fileStorage.GetUrlAsync(s.RecordingUrl);
@@ -555,6 +608,9 @@ namespace ARI.Application.CandidatePortal
                 app.Id,
                 app.JobPostingId,
                 JobTitle = job?.Title,
+                // Tin đã kết thúc tuyển — ứng viên phải biết vị trí mình ứng tuyển không còn tuyển nữa,
+                // thay vì tự suy ra từ việc hồ sơ bỗng dừng lại.
+                JobClosed = jobFinished,
                 JobDescription = job?.JobDescription,
                 Location = job?.Location,
                 Department = job?.Department,
@@ -587,7 +643,9 @@ namespace ARI.Application.CandidatePortal
                     p.StartedAt,
                     p.EndedAt,
                     p.DurationSeconds,
-                    HasEvaluation = evalDict.ContainsKey(p.Id)
+                    HasEvaluation = evalDict.ContainsKey(p.Id),
+                    EvaluationState = ARI.Application.Evaluations.EvaluationProgress.ForDisplay(
+                        p.Status, p.EvaluationStatus, p.EvaluationAttempts, evalDict.ContainsKey(p.Id))
                 }).ToList()
             });
         }
@@ -800,7 +858,12 @@ namespace ARI.Application.CandidatePortal
     public record ApplyToJobCommand(
         Guid JobPostingId, Guid CandidateId,
         string CandidateName, string CandidatePhone, string? CoverLetter, string NoticePeriod,
-        byte[]? AttachedBytes, string? AttachedFileName) : IRequest<Result<PortalApplyOutcome>>;
+        byte[]? AttachedBytes, string? AttachedFileName,
+        // Kết quả bước "Xác thực thông tin" mà chính màn ứng tuyển vừa chạy. Nhận từ client là có
+        // chủ ý: bước đối chiếu chạy trên FILE ứng viên đang cầm, trước khi hồ sơ tồn tại. Đây là
+        // ghi chú hiển thị cho nhân sự, không phải cổng chặn — nên không cần server chạy lại.
+        string? ContactVerificationStatus = null,
+        string? ContactVerificationDetails = null) : IRequest<Result<PortalApplyOutcome>>;
 
     public class ApplyToJobCommandHandler : IRequestHandler<ApplyToJobCommand, Result<PortalApplyOutcome>>
     {
@@ -901,7 +964,9 @@ namespace ARI.Application.CandidatePortal
                 CvFileUrl = cvFileUrl,
                 CvText = cvText,
                 CoverLetter = command.CoverLetter?.Trim(),
-                NoticePeriod = command.NoticePeriod.Trim()
+                NoticePeriod = command.NoticePeriod.Trim(),
+                ContactVerificationStatus = NormalizeVerification(command.ContactVerificationStatus),
+                ContactVerificationDetails = Truncate(command.ContactVerificationDetails?.Trim(), 2000)
             };
 
             var result = await _applicationService.SubmitApplicationAsync(serviceRequest, "job_board", ct);
@@ -913,5 +978,16 @@ namespace ARI.Application.CandidatePortal
 
             return Result.Success(new PortalApplyOutcome(false, null, result.Value));
         }
+
+        /// <summary>Chỉ nhận đúng hai giá trị đã biết — chuỗi lạ từ client không được vào DB.</summary>
+        private static string? NormalizeVerification(string? raw) => raw?.Trim().ToLowerInvariant() switch
+        {
+            "match" => "match",
+            "mismatch" => "mismatch",
+            _ => null
+        };
+
+        private static string? Truncate(string? text, int max) =>
+            string.IsNullOrWhiteSpace(text) ? null : (text.Length <= max ? text : text.Substring(0, max));
     }
 }

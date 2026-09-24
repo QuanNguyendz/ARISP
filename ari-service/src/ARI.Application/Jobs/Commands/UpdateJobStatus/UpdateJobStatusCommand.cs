@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -128,6 +129,19 @@ namespace ARI.Application.Jobs.Commands.UpdateJobStatus
                     return Result.Failure<JobPostingResponse>(
                         "Tin chưa có bộ tiêu chí chấm CV. Hiring Manager cần khai bộ tiêu chí trong màn tin trước khi gửi duyệt hoặc đăng tin.",
                         CvRubricRequiredCode);
+            }
+
+            // ADR-073: buổi phỏng vấn chỉ ra báo cáo khi vòng của nó có bộ tiêu chí. Chặn ở cổng LÊN job board —
+            // không ở cổng gửi duyệt, vì người khai là Hiring Manager, đúng người ký đăng tin. Quản trị viên vượt
+            // chữ ký HM cũng bị chặn: vượt chữ ký không làm ra bộ tiêu chí. Trước ADR-073 thiếu bộ tiêu chí chỉ lộ
+            // ra SAU buổi phỏng vấn, dưới dạng một báo cáo không bao giờ tới.
+            if (targetStatus == "active")
+            {
+                var missingRounds = await ARI.Application.Playbooks.InterviewRubricStore.MissingRoundsAsync(_unitOfWork, job.Id, ct);
+                if (missingRounds.Count > 0)
+                    return Result.Failure<JobPostingResponse>(
+                        $"Tin chưa có bộ tiêu chí chấm phỏng vấn cho vòng {string.Join(", ", missingRounds)}. Hiring Manager cần khai bộ tiêu chí trong màn tin trước khi đăng tin.",
+                        ARI.Application.InterviewRubrics.InterviewRubricErrors.Required);
             }
 
             // CASE A: Từ chối ('rejected') -> Bắt buộc Admin + có lý do

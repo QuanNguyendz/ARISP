@@ -67,6 +67,12 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                 return Result.Failure<UploadedPlaybookDto>(
                     "Bộ tiêu chí chấm CV của tin được khai trong mục \"Bộ tiêu chí chấm CV\" ở màn tin (nhập được cả file Excel ở đó).");
 
+            // ADR-073: cùng lý lẽ cho bộ tiêu chí chấm PHỎNG VẤN — mỗi (tin, vòng) một bộ sống, lưu xong là các
+            // buổi đang chờ được chấm; chỉ trình soạn ở màn tin giữ được hai luật đó. Ở cấp công ty nó là MẪU.
+            if (documentType == ScoringRubric.TypeInterviewRubric && scope != PlaybookScope.ScopeOrg)
+                return Result.Failure<UploadedPlaybookDto>(
+                    "Bộ tiêu chí chấm phỏng vấn của tin được khai trong mục \"Bộ tiêu chí chấm phỏng vấn\" ở màn tin (nhập được cả file Excel ở đó).");
+
             // Playbook công ty không gắn tin nào; playbook vòng phải gắn đúng một vòng hội thoại có thật.
             var scopeRefId = scope == PlaybookScope.ScopeOrg ? null : request.ScopeRefId;
             var roundNumber = scope == PlaybookScope.ScopeRound ? request.RoundNumber : null;
@@ -90,6 +96,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
             // tiêu chí + trọng số và chặn ngay nếu tổng ≠ 100 — sai ở đây mà lọt xuống thì mọi điểm
             // chấm về sau đều sai mà không ai biết (ADR-060).
             string? rubricJson = null;
+            string? scoringPolicyJson = null;
             string parsedText;
             int? criteriaCount = null;
 
@@ -97,14 +104,19 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
             {
                 var parsed = RubricSheet.Parse(request.Bytes);
                 var errors = parsed.Errors.Select(e => e.Row > 0 ? $"Dòng {e.Row}: {e.Message}" : e.Message).ToList();
-                errors.AddRange(ScoringRubric.Validate(parsed.Criteria));
+                // Bộ CV được có điều kiện bắt buộc / điểm tối thiểu / trọng số ý + sheet công thức (ADR-075);
+                // bộ phỏng vấn thì không — dòng khai điều kiện bắt buộc bị từ chối kèm lời giải thích.
+                var forCv = string.Equals(documentType, ScoringRubric.TypeCvRubric, StringComparison.Ordinal);
+                errors.AddRange(ScoringRubric.Validate(parsed.Criteria, forCv ? RubricPurpose.Cv : RubricPurpose.Interview));
+                if (forCv) errors.AddRange(CvScoringPolicy.Validate(parsed.Policy));
                 if (errors.Count > 0)
                     return Result.Failure<UploadedPlaybookDto>(string.Join(" | ", errors.Take(10)));
 
                 rubricJson = ScoringRubric.Serialize(parsed.Criteria);
+                scoringPolicyJson = forCv ? CvScoringPolicy.ToStorage(parsed.Policy) : null;
                 criteriaCount = parsed.Criteria.Count;
                 // Văn bản cho RAG: chuẩn chấm từng tiêu chí để AI truy hồi khi cần diễn giải.
-                parsedText = ScoringRubric.ToPromptText(parsed.Criteria);
+                parsedText = forCv ? ScoringRubric.ToCvPromptText(parsed.Criteria) : ScoringRubric.ToPromptText(parsed.Criteria);
             }
             else
             {
@@ -154,6 +166,7 @@ namespace ARI.Application.Playbooks.Commands.UploadPlaybook
                     FileFormat = fileFormat,
                     ParsedText = parsedText,
                     RubricJson = rubricJson,
+                    ScoringPolicyJson = scoringPolicyJson,
                     Status = "ready",
                     UploadedByUserId = request.UserId
                 };

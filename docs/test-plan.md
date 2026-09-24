@@ -614,10 +614,18 @@
 | New_user_defaults_active_recruiter | User mới IsActive, Role 'recruiter', DeletedAt null. |
 | New_job_posting_is_soft_deletable | JobPosting hỗ trợ ISoftDelete. |
 
-## A9. Chấm CV theo bộ tiêu chí — ADR-070 (64)
+## A9. Chấm CV theo bộ tiêu chí — ADR-070/071/075 (125)
 
-> File: `tests/ARI.Application.UnitTests/CvScoring/*`. Fake dùng chung ở `CvAnalysisFakes.cs`
-> (`FakeGeminiProvider` đếm lượt gọi AI, `RecordingCvScoringQueue`, `CvScoringKit`).
+> File: `tests/ARI.Application.UnitTests/CvScoring/*` và `Playbooks/CvScoringFormulaRulesTests.cs`. Fake dùng chung ở
+> `CvAnalysisFakes.cs` (`FakeGeminiProvider` đếm lượt gọi AI, `RecordingCvScoringQueue`, `CvScoringKit`).
+
+### Công thức chấm do HM quyết định — ADR-075 (61)
+
+| Nhóm | Kiểm chứng |
+|---|---|
+| `CvScoreCalculatorTests` (18) | Công thức mặc định ra **đúng số cũ** (68 · 95); làm tròn **một lần** (79,495 → 79); điều kiện bắt buộc không vào trung bình, trượt → ép `Reject` mà **giữ điểm**, "đạt" không trích dẫn → `review` (không ép), bỏ sót → `review`; điểm tối thiểu: dưới → `fail`, bằng → `pass`, tiêu chí không ra điểm → `review` + loại khỏi phép tính; trọng số ý ×2 (79,5 → 80), ý bỏ sót ngoài mẫu, ý "đạt" không trích dẫn vẫn nằm ở mẫu; dải và ngưỡng khuyến nghị tuỳ chỉnh; vị trí 0..1; chuẩn hoá vị trí trả theo thang 100 |
+| `CvScoringFormulaRulesTests` (24) | Công thức mặc định lưu là `null`, khứ hồi JSON, so **theo nghĩa** (jsonb sắp lại khoá vẫn là "không đổi"); ngưỡng dải/khuyến nghị sai thứ tự hoặc dải hẹp < 5 điểm bị chặn; knockout không trọng số, cần ít nhất một tiêu chí chấm điểm, tối đa 5 điều kiện, điểm tối thiểu 1–100, trọng số ý ∈ {1,2,3}; bộ **phỏng vấn** từ chối điều kiện bắt buộc + điểm tối thiểu; chuẩn hoá giữ JSON **trùng từng byte** với bộ trước ADR-075; prompt CV **không có "trọng số" và không có số của dải**, có mục ĐIỀU KIỆN BẮT BUỘC, `ToPromptText` (phỏng vấn) giữ nguyên; chữ ký bỏ qua trọng số/điểm tối thiểu/trọng số ý/công thức/thứ tự, đổi khi đổi tên–chuẩn chấm–lời neo–ý kiểm–loại; bớt tiêu chí vẫn "phủ", thêm thì không; Excel khứ hồi cột Loại/Điểm tối thiểu/`(x2)`/sheet công thức, file cũ một sheet → mặc định |
+| `CvFormulaRescoringTests` (19) | Đổi trọng số → **`AnalyzeCallCount == 0`**, `DerivedFromAnalysisId` trỏ bản gốc, token 0, bản cũ còn nguyên; đổi ngưỡng khuyến nghị / ngưỡng dải / bớt tiêu chí → cũng tính lại; thêm điều kiện bắt buộc hoặc sửa chuẩn chấm → **gọi AI**; `invalid_cv` chuyển tiếp không gọi AI; chuỗi tính lại vẫn trỏ **bản gốc**; bản chấm trước ADR-070 không làm nguồn; hàng đợi tính lại **không đọc file CV**; xem trước tính đúng điểm/khuyến nghị và **không ghi gì**, đếm đúng số hồ sơ cần AI, Recruiter bị chặn; ảnh chụp + breakdown có cổng, `ScoreRecommendation` tách khỏi nhãn bị ép |
 
 ### CvScoringService (15)
 | Test | Kiểm chứng |

@@ -31,9 +31,15 @@
     "writtenIn": "These notes were written by the AI in {{lang}} — the language you were using when the session started.",
     "scoresByCriteria": "Scores by criteria",
     "pendingTitle": "AI is still grading this session",
-    "pendingDescription": "Your transcript is already saved. The notes will appear here in a few minutes — reload the page.",
+    "pendingDescription": "Your transcript is already saved. The notes appear here automatically once the AI has finished — usually within a few minutes.",
     "emptyTitle": "No AI notes yet",
-    "emptyDescription": "This session has not been graded — you can still read the full transcript below."
+    "emptyDescription": "This session has not been graded — you can still read the full transcript below.",
+    "needsRubricTitle": "Waiting for the employer's scoring criteria",
+    "needsRubricDescription": "This position has no interview scoring criteria yet, so the AI cannot write notes. They will appear automatically once the employer adds them — you can still read the full transcript below.",
+    "noAnswersTitle": "No answers to review",
+    "noAnswersDescription": "The session ended before you answered any question, so there is nothing for the AI to review.",
+    "failedTitle": "The AI could not review this session",
+    "failedDescription": "The system tried several times without success. Your full transcript is still saved below."
   },
   "criterionLabels": {
     "technical": "Technical knowledge",

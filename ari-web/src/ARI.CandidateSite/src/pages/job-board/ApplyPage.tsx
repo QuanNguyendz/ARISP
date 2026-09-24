@@ -66,6 +66,17 @@ export default function ApplyPage() {
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  /**
+   * Hồ sơ ứng viên ĐÃ nộp cho chính tin này và chưa rút. `null` = chưa có (màn `loading` phủ hết quãng
+   * chưa biết, vì lượt gọi này nằm cùng `Promise.all` với tin tuyển dụng). `id` có thể `null` khi tin
+   * này đến từ 409 mà server không kèm khoá hồ sơ.
+   *
+   * Trước đây cửa chặn duy nhất nằm ở nút "Ứng tuyển" của màn chi tiết tin: gõ thẳng `/jobs/:id/apply`
+   * là vào được biểu mẫu, điền hết, tải CV lên, chạy cả bước đối chiếu thông tin — rồi server mới trả
+   * 409. Tệ hơn, nhánh bắt lỗi nuốt luôn 409 và `navigate` sang danh sách hồ sơ y như lúc nộp thành
+   * công, nên ứng viên tin rằng CV mới đã thay CV cũ trong khi KHÔNG có gì được lưu.
+   */
+  const [alreadyApplied, setAlreadyApplied] = useState<{ id: string | null } | null>(null)
   // Validate theo từng trường: chỉ hiện lỗi khi trường đã blur (rời focus) hoặc sau khi bấm gửi.
   // Đang gõ thì xoá trạng thái touched của trường đó → không nhắc lỗi liên tục mỗi ký tự.
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set())
@@ -91,11 +102,19 @@ export default function ApplyPage() {
     if (!id) return
     let active = true
     setLoading(true)
-    Promise.all([jobService.getJobPostingById(id), profileService.getProfile().catch(() => null)])
-      .then(([j, p]) => {
+    Promise.all([
+      jobService.getJobPostingById(id),
+      profileService.getProfile().catch(() => null),
+      // Nguồn sự thật là SERVER, không phải nút bấm đã đưa người dùng tới đây. Hỏng thì coi như chưa
+      // nộp và để server chặn ở bước gửi — không khoá biểu mẫu vì một lần gọi mạng lỗi.
+      applicationService.getMyApplications().catch(() => []),
+    ])
+      .then(([j, p, mine]) => {
         if (!active) return
         setJob(j)
         setProfile(p)
+        const mineForJob = mine.find((a) => a.jobPostingId === id && a.status !== 'withdrawn')
+        setAlreadyApplied(mineForJob ? { id: mineForJob.id } : null)
         if (p) {
           setFullName(p.fullName || '')
           setPhone(p.phone || '')
@@ -144,7 +163,14 @@ export default function ApplyPage() {
     return e
   }, [fullName, phone, noticePeriod, cvSource, cvFile, hasProfileCv, t])
 
-  const executeSubmit = async () => {
+  /**
+   * `verification` đi theo THAM SỐ chứ không đọc từ state: bước đối chiếu vừa chạy xong ngay trước
+   * lệnh này, mà `setState` thì chưa kịp vào lần render nào — đọc state ở đây là gửi kết quả của
+   * lần bấm TRƯỚC (hoặc `null`) xuống server.
+   */
+  const executeSubmit = async (
+    verification?: { status: 'match' | 'mismatch'; details?: string | null } | null
+  ) => {
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -154,6 +180,8 @@ export default function ApplyPage() {
         coverLetter: coverLetter.trim(),
         noticePeriod: noticePeriod.trim(),
         cvFile: cvSource === 'upload' ? cvFile : null,
+        contactVerificationStatus: verification?.status ?? null,
+        contactVerificationDetails: verification?.details ?? null,
       })
       // Làm mới cache hồ sơ ứng tuyển để nút "Ứng tuyển" ở danh sách/chi tiết đổi ngay
       // sang "Đã ứng tuyển" khi ứng viên quay lại (dùng chung query key ['my-applications']).
@@ -161,9 +189,14 @@ export default function ApplyPage() {
       navigate('/candidate/applications')
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string } } }
+      // 409 = server nói đã có hồ sơ cho tin này. Tới được đây nghĩa là hồ sơ vừa sinh ra ở tab khác
+      // sau khi màn này nạp xong. Hiện đúng màn "đã ứng tuyển" bên dưới — KHÔNG điều hướng lặng lẽ
+      // như lúc nộp thành công, vì CV vừa chọn không hề được lưu.
       if (e?.response?.status === 409) {
         queryClient.invalidateQueries({ queryKey: ['my-applications'] })
-        navigate('/candidate/applications')
+        const applicationId = (err as { response?: { data?: { applicationId?: string } } })?.response
+          ?.data?.applicationId
+        setAlreadyApplied({ id: applicationId ?? null })
         return
       }
       if (e?.response?.status === 401 || e?.response?.status === 403) {
@@ -184,6 +217,10 @@ export default function ApplyPage() {
     if (!id) return
 
     setVerifyingInfo(true)
+    // Kết quả đối chiếu đi KÈM hồ sơ xuống server (`applications.contact_verification_*`): nhân sự
+    // phải thấy được ứng viên này đã bị cảnh báo lệch thông tin mà vẫn bấm nộp. Không đối chiếu được
+    // (mất mạng, CV không đọc ra chữ) thì để TRỐNG — không bịa ra "khớp".
+    let verdict: { status: 'match' | 'mismatch'; details?: string | null } | null = null
     try {
       // Đối chiếu thông tin form với nội dung file CV bằng Code C# (0 token AI)
       const res = await applicationService.verifyCvContactInfo({
@@ -197,6 +234,7 @@ export default function ApplyPage() {
         setShowVerificationModal(true)
         return
       }
+      if (res) verdict = { status: 'match' as const, details: null }
     } catch (err) {
       console.error('Lỗi đối chiếu CV:', err)
       // Nếu có lỗi mạng hoặc file không đọc được, vẫn cho phép nộp tiếp
@@ -205,7 +243,7 @@ export default function ApplyPage() {
     }
 
     // Nếu thông tin khớp hoặc không có sai lệch -> Nộp hồ sơ luôn
-    await executeSubmit()
+    await executeSubmit(verdict)
   }
 
   const goBack = () => navigate(`/jobs/${id}`)
@@ -249,6 +287,40 @@ export default function ApplyPage() {
           >
             {t('loading.backToJobs')}
           </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Đã có hồ sơ cho tin này → KHÔNG dựng biểu mẫu. Luật nộp lại nằm ở server (chỉ hồ sơ đã tự rút mới
+  // nộp lại được); màn này chỉ nói đúng điều đó thay vì để người dùng điền xong rồi mới biết.
+  if (alreadyApplied) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-ink-50 px-6">
+        <div className="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-7 text-center shadow-card">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <h1 className="font-display text-xl font-extrabold text-ink-900">
+            {t('alreadyApplied.title')}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-ink-500">
+            {t('alreadyApplied.description', { job: job.title })}
+          </p>
+          <div className="mt-7 flex flex-col gap-2.5">
+            <Link
+              to={alreadyApplied.id ? `/candidate/applications/${alreadyApplied.id}` : '/candidate/applications'}
+              className="rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              {t('alreadyApplied.viewApplication')}
+            </Link>
+            <Link
+              to={`/jobs/${id}`}
+              className="rounded-xl border border-ink-200 px-4 py-3 text-sm font-medium text-ink-700 transition hover:bg-ink-50"
+            >
+              {t('alreadyApplied.backToJob')}
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -621,7 +693,10 @@ export default function ApplyPage() {
               <button
                 onClick={async () => {
                   setShowVerificationModal(false)
-                  await executeSubmit()
+                  await executeSubmit({
+                    status: 'mismatch',
+                    details: verificationResult?.mismatchDetails ?? null,
+                  })
                 }}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
               >

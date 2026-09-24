@@ -22,7 +22,9 @@
     "evaluating": "AI is scoring",
     "pending_review": "Awaiting the Hiring Manager",
     "reviewed": "Result confirmed",
-    "aborted": "Interview interrupted"
+    "aborted": "Interview interrupted",
+    "needs_rubric": "Waiting for scoring criteria",
+    "evaluation_failed": "Scoring failed"
   },
   "verdict": {
     "pass": "Pass",
@@ -40,5 +42,11 @@
   "abortedHint": "This interview has no report. You can reschedule the candidate.",
   "recentTitle": "Just finished",
   "recentDescription": "Real interviews that ended in the last 24 hours — open the AI report to confirm the result.",
-  "recentEmpty": "No interview ended in the last 24 hours."
+  "recentEmpty": "No interview ended in the last 24 hours.",
+  "needsRubricHint": "This round has no interview scoring criteria, so the AI could not score it. The job's primary Hiring Manager sets the criteria on the job page — the report is generated right after.",
+  "failedHint": "The AI could not score this interview after several attempts{{reason}}. Click \"Retry scoring\" to try again.",
+  "retry": "Retry scoring",
+  "retrying": "Queueing…",
+  "retryQueued": "Queued for scoring — the report appears automatically when done.",
+  "retryError": "Could not retry scoring. Please try again."
 }

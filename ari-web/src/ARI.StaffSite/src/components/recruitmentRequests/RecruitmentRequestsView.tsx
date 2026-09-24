@@ -34,10 +34,24 @@ import {
   jobOptionLabel,
 } from '@ari/shared/utils/jobOptions'
 import { useAuthStore } from '@ari/shared/store/auth'
-import { cvRubricProblems } from '@ari/shared/fservices/cvRubric'
+import {
+  DEFAULT_CV_SCORING_POLICY,
+  clonePolicy,
+  cvPolicyProblems,
+  cvRubricProblems,
+  toPayload,
+} from '@ari/shared/fservices/cvRubric'
 import CvRubricEditor, { CV_SCORING_NS, ReadOnlyRubric } from '@/components/cvRubric/CvRubricEditor'
 import { profileService, type RecruiterOverview } from '@/fservices/profile/profileService'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { useDbTableChanged, touchesRow } from '@ari/shared/realtime/dbTableRealtime'
+
+/**
+ * Bảng mà màn này phải nghe. `job_postings` có mặt vì cờ "đã dựng thành tin" (`jobPostingId`,
+ * `canCreateJob`) suy từ bảng TIN chứ không nằm trên dòng phiếu (ADR-066): Recruiter dựng tin xong,
+ * dòng phiếu không đổi gì.
+ */
+const REALTIME_TABLES = ['recruitment_requests', 'job_postings'] as const
 
 /**
  * Màn phiếu yêu cầu tuyển dụng (ADR-063) — MỘT view dùng chung cho cả ba vai trò.
@@ -139,6 +153,8 @@ const emptyInput = (): RecruitmentRequestInput => ({
   salaryCurrency: DEFAULT_SALARY_CURRENCY,
   // ADR-070: bắt buộc — bắt đầu trống để HM chọn cách điền (AI gợi ý, mẫu công ty, Excel, gõ tay).
   cvRubric: [],
+  // ADR-075: công thức chấm đi cùng bộ tiêu chí — bắt đầu từ mặc định, HM chỉnh nếu vị trí cần.
+  cvScoringPolicy: clonePolicy(DEFAULT_CV_SCORING_POLICY),
 })
 
 /** Định dạng dải lương cho danh sách. Thoả thuận = chưa điền con số nào. */
@@ -177,24 +193,33 @@ export default function RecruitmentRequestsView() {
   // HR Leader lập phiếu là tự đặt mình vào cả hai đầu của các cổng mà ADR-061/063 dựng lên để tách.
   const canAuthor = role === ROLE.HiringManager
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  /**
+   * `silent` = nạp lại NGẦM do realtime: không bật khung tải (nó thay cả danh sách lẫn cột chi tiết,
+   * tức là gỡ luôn ô lý do người dùng đang gõ) và không đè lỗi lên màn vì một lượt nền hỏng.
+   */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError('')
+    }
     try {
       setItems(await recruitmentRequestService.list({
         ...(statusFilter === 'all' ? {} : { status: statusFilter }),
         ...(priorityFilter === 'all' ? {} : { priority: priorityFilter }),
       }))
-    } catch (e: any) {
-      setError(resolveApiError(e, t, 'errors.loadFailed'))
+    } catch (e: unknown) {
+      if (!silent) setError(resolveApiError(e, t, 'errors.loadFailed'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [statusFilter, priorityFilter, t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Phiếu vừa được duyệt / trả lại / phân công / dựng thành tin — ba bên đang mở màn này phải thấy ngay.
+  useDbTableChanged(REALTIME_TABLES, () => void load(true))
 
   const statusOptions = useMemo(
     () => [
@@ -446,7 +471,10 @@ function RequestFormModal({
     setErr('')
     setTriedSubmit(true)
     // Bộ tiêu chí sai thì server cũng chặn — chặn ở đây để lỗi hiện ngay cạnh trình soạn.
-    if (cvRubricProblems(form.cvRubric ?? []).length > 0) {
+    if (
+      cvRubricProblems(form.cvRubric ?? []).length > 0 ||
+      cvPolicyProblems(form.cvScoringPolicy ?? DEFAULT_CV_SCORING_POLICY).length > 0
+    ) {
       setErr(tRubric('editor.warnings'))
       return
     }
@@ -463,6 +491,8 @@ function RequestFormModal({
         title: form.title.trim(),
         headcount: Number(form.headcount) || 1,
         expectedStartDate: toInstant(form.expectedStartDate),
+        // Điều kiện bắt buộc gửi đi không kèm trọng số / dải / ý kiểm (ADR-075).
+        cvRubric: toPayload(form.cvRubric ?? []),
       }
       if (requestId) await recruitmentRequestService.update(requestId, payload)
       else await recruitmentRequestService.create(payload)
@@ -735,6 +765,8 @@ function RequestFormModal({
           <CvRubricEditor
             value={form.cvRubric ?? []}
             onChange={(next) => setForm((f) => ({ ...f, cvRubric: next }))}
+            policy={form.cvScoringPolicy ?? DEFAULT_CV_SCORING_POLICY}
+            onPolicyChange={(next) => setForm((f) => ({ ...f, cvScoringPolicy: next }))}
             showProblems={triedSubmit}
             suggestSource={() =>
               form.title.trim() && (form.description?.trim() || form.requirements?.trim())
@@ -819,7 +851,11 @@ function RequestDetailPanel({
         setRecruiters(usable)
         // Xếp gợi ý theo phòng ban (ADR-061: department chỉ để gợi ý, KHÔNG dùng phân quyền).
         const sameDept = usable.find((r) => r.department && r.department === d.department)
-        setChosenRecruiter(sameDept?.id ?? usable[0]?.id ?? '')
+        // Giữ lựa chọn HR Leader đã bấm nếu người đó vẫn còn trong danh sách: lượt nạp lại do
+        // realtime không được lặng lẽ đổi Recruiter ngay trước khi họ bấm Duyệt.
+        setChosenRecruiter((current) =>
+          usable.some((r) => r.id === current) ? current : sameDept?.id ?? usable[0]?.id ?? ''
+        )
       }
     } catch (e: any) {
       setErr(resolveApiError(e, t, 'errors.loadFailed'))
@@ -829,6 +865,14 @@ function RequestDetailPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  // Chỉ nạp lại khi chính phiếu này đổi (hoặc có tin mới — cờ "đã dựng thành tin" nằm ở bảng tin).
+  // Ô lý do trả lại / thu hồi là state riêng nên không bị đè.
+  useDbTableChanged(REALTIME_TABLES, (changes) => {
+    if (touchesRow(changes, 'recruitment_requests', id) || changes.some((c) => c.table === 'job_postings')) {
+      void load()
+    }
+  })
 
   /** Mở một ô lý do luôn bắt đầu từ trống — lý do đóng phiếu không được trôi sang lần mở lại sau. */
   const openRevoke = (next: 'reopen' | 'close') => {
@@ -885,6 +929,7 @@ function RequestDetailPanel({
           // để HM thấy đúng danh sách sẽ được lưu, thay vì bấm lưu rồi mới bị server trả lỗi.
           requestedRounds: [...new Set(detail.requestedRounds ?? [])],
           cvRubric: detail.cvRubric ?? [],
+          cvScoringPolicy: clonePolicy(detail.cvScoringPolicy),
           employmentType: detail.employmentType ?? 'full_time',
           workMode: detail.workMode ?? 'onsite',
           location: detail.location ?? '',
@@ -957,6 +1002,10 @@ function RequestDetailPanel({
             value={jobOptionLabel(EXPERIENCE_LEVELS, detail.experienceLevel)}
           />
           <Field label={t('form.workMode')} value={jobOptionLabel(WORK_MODES, detail.workMode)} />
+          {/* Nơi làm việc: ô này có trên biểu mẫu lập phiếu và được lưu xuống DB từ đầu, nhưng bảng đọc
+              dưới đây quên kê ra — người duyệt phiếu không thấy HM đã khai địa điểm nào, và bản JD
+              khởi tạo từ phiếu thì chép được `Location` nên lỗi chỉ lộ ở đúng màn này. */}
+          <Field label={t('form.location')} value={detail.location || '—'} />
           <Field label={t('detail.assignedRecruiter')} value={detail.assignedRecruiterName || '—'} />
         </dl>
 
@@ -976,7 +1025,7 @@ function RequestDetailPanel({
         <div>
           <p className="mb-1.5 text-xs font-medium text-ink-500 dark:text-ink-400">{tRubric('editor.title')}</p>
           {(detail.cvRubric ?? []).length > 0 ? (
-            <ReadOnlyRubric criteria={detail.cvRubric ?? []} />
+            <ReadOnlyRubric criteria={detail.cvRubric ?? []} policy={detail.cvScoringPolicy ?? null} />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
               {tRubric('requestMissing')}

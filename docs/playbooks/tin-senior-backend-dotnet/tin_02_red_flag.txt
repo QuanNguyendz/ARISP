@@ -1,0 +1,2 @@
+[Senior Backend .NET – Dấu hiệu cần kiểm chứng từ CV]
+CV ghi "Senior" nhưng kinh nghiệm chủ yếu là .NET Framework cũ hoặc WebForms, chưa có ASP.NET Core; chỉ có CRUD đơn giản, không có dấu hiệu tối ưu truy vấn hay xử lý dữ liệu lớn; liệt kê nhiều công nghệ không gắn với dự án cụ thể. Đây là tín hiệu để hỏi kỹ trong buổi phỏng vấn, không tự loại hồ sơ. Đào sâu: "Dự án gần nhất bạn dùng ASP.NET Core và EF Core ở phiên bản nào, cho phần việc gì?"

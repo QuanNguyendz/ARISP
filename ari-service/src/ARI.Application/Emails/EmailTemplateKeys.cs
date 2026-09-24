@@ -25,7 +25,24 @@ namespace ARI.Application.Emails
         /// <summary>Thư mời nhận việc (ADR-061, Phase 5). Ngữ cảnh: <c>applicationId</c>.</summary>
         public const string OfferSent = "offer_sent";
 
-        public static readonly string[] All = { InterviewInvite, ApplicationRejected, OfferSent };
+        /// <summary>
+        /// Thư kết quả vòng phỏng vấn — gửi KÈM lệnh Hiring Manager chốt kết quả (ADR-074).
+        /// Ngữ cảnh: <c>applicationId</c> + <c>evaluationId</c> + <c>variant</c> = verdict sắp chốt
+        /// (<c>pass</c>/<c>not_pass</c>); biến thể thư (qua vòng / vòng cuối / cảm ơn) do server suy ra.
+        /// </summary>
+        public const string InterviewResult = "interview_result";
+
+        /// <summary>
+        /// Thư nhắc lịch do nhân sự bấm gửi. Ngữ cảnh: <c>applicationId</c> + <c>bookingId</c>.
+        ///
+        /// Hai biến thể, do <see cref="ARI.Application.Scheduling.ScheduleReminder"/> suy ra chứ không
+        /// do người gửi chọn: ứng viên CHƯA phản hồi thì nhắc vào xác nhận (kèm hai nút Xác nhận/Báo
+        /// bận), ĐÃ xác nhận thì nhắc giờ và việc cần chuẩn bị.
+        /// </summary>
+        public const string ScheduleReminder = "schedule_reminder";
+
+        public static readonly string[] All =
+            { InterviewInvite, ApplicationRejected, OfferSent, InterviewResult, ScheduleReminder };
 
         private static readonly HashSet<string> AllSet = new(All, StringComparer.OrdinalIgnoreCase);
 

@@ -8,7 +8,7 @@
 ## Trạng thái hiện tại
 
 **Phase:** 0 – Setup & Foundation  
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-19
 
 ---
 
@@ -20,15 +20,16 @@ _Chưa có task nào đang thực hiện._
 > hoàn thành cả 6 phase ngày 2026-08-31 trên nhánh `feature/be/hiring-manager-offer-pipeline`
 > (chi tiết từng phase ở mục Completed). **Chưa commit, chưa merge.**
 >
-> Còn dang dở, cố ý để lại: **3/6 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
-> `offer_sent`). Ba mẫu còn lại — mời vòng kế, cấp mã phỏng vấn, kết quả sau khi chốt verdict —
-> hạ tầng đã đủ, mỗi cái là "viết một builder + thêm một `case` + thêm `emailOverride` vào command".
+> Còn dang dở, cố ý để lại: **4 mẫu thư có trình soạn** (`interview_invite`, `application_rejected`,
+> `offer_sent`, và từ 2026-09-19 `interview_result` — gộp cả thư "mời vòng kế" lẫn "kết quả sau khi chốt
+> verdict", ADR-074). Còn lại **thư cấp mã phỏng vấn** — hạ tầng đã đủ: "viết một builder + thêm một
+> `case` + thêm `emailOverride` vào command".
 
 ---
 
 ## Nợ kỹ thuật đã biết — `CLAUDE.md` sát ngưỡng cảnh báo
 
-`CLAUDE.md` đang **39.806 / 40.000 ký tự** — dư **194 ký tự** (2026-09-17, sau ADR-071). Thêm một đoạn bất kỳ là vượt ngưỡng
+`CLAUDE.md` đang **39.284 / 40.000 ký tự** — dư **716 ký tự** (2026-09-19, sau ADR-074: gọt dòng ADR-048 và ADR-056 — hai quyết định đã nguội — từ ~950 về ~450 ký tự mỗi dòng để có chỗ cho dòng ADR-074; trước đó ADR-073 gọt dòng ADR-066). Thêm một đoạn bất kỳ là vượt ngưỡng
 cảnh báo file bộ nhớ lớn và nạp lại mỗi phiên.
 
 **Mỗi đợt thêm một ADR nay đều phải gọt dòng cũ trước** — ADR-065 gọt 12 dòng, ADR-066 gọt thêm 16, ADR-067
@@ -39,9 +40,13 @@ gọt **7 dòng dài nhất** (011, 049, 051, 052, 057, 058, 060) về đúng kh
 ADR-070 gọt tiếp dòng **063** và **064** về ~600 ký tự và viết gọn khối *CV-JD Match Analysis* (vốn đã sai sau
 ADR-070), đủ chỗ cho quy tắc 28 + một dòng ADR mới.
 
-**Vẫn chưa xong.** Bảng ADR vẫn là phần lớn nhất của file, và các dòng **061, 065, 066, 067**
-(1.300–1.700 ký tự mỗi dòng) giờ là nhóm dài nhất còn lại — đợt gọt sau nên nhắm vào đó. Chưa làm ngay
-vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây giờ dễ mất đúng phần hay phải tra lại.
+**Đợt ADR-075 (2026-09-22)** đã gọt đúng nhóm đó: dòng **061** (900→~640), **067** (902→~700), **066**, **065** và
+**070**, thu được ~700 ký tự — vừa đủ cho dòng ADR-075 mới, hai câu sửa ở quy tắc 16/28 và mục *CV-JD Match Analysis*
+viết lại. File hiện **39.995 / 40.000** ký tự.
+
+**Vẫn chưa xong — nay không còn dư một ký tự nào.** Đợt ADR sau **bắt buộc** gọt trước, và nhóm dài nhất còn lại là
+**057, 059, 063, 068, 073** (700–900 ký tự mỗi dòng). Lập luận đầy đủ luôn nằm ở `.ai/architecture.md`, nên dòng trong
+bảng chỉ cần đủ để nhớ ra *quyết định* và biết *tra ở đâu*.
 
 ---
 
@@ -107,6 +112,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Magic link auth cho Candidate Portal (email + one-time token, TTL 15 phút)
 - [x] **OAuth2 & Domain Validation:** Tích hợp Google OAuth2 (Google Sign-In) cho HR Users
 - [x] **OAuth2 & Domain Validation:** Validate email domain + pre-provisioned check khi dùng Google Sign-In
+- [x] 2026-09-23: Sửa điều hướng sau đăng nhập cho vai trò **Hiring Manager** (Google OAuth + email/mật khẩu) — bảng role→dashboard chép tay thiếu `hiring_manager` nên HM bị ném vào `/403`
 
 ### Phase 2 – Job Posting & Application
 - [x] Database schema: `job_postings`, `interview_round_configs`, `applications`
@@ -210,7 +216,8 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [ ] **On-site:** Kiosk mode frontend: nhập Interview Code → validate → vào interview room
 - [ ] Audit log: ghi lại creation time, usage time, `application_id` cho mỗi Interview Code
 - [x] Cấp mã vào phòng ngay trên danh sách ứng viên (vòng sơ loại/chuyên môn); sơ loại gửi link Kiosk kèm mã cho ứng viên làm từ nhà, chuyên môn đưa mã tận tay tại văn phòng; một mã sống mỗi vòng (ADR-016 bổ sung) ✅ 2026-09-15
-- [ ] Kiểm quyền theo tin cho `POST /interview/generate-code` + `generate-code-batch` (hiện chỉ policy `InternalStaff`, lệch quy tắc 19)
+- [ ] Kiểm quyền theo tin cho `POST /interview/generate-code` + `generate-code-batch` (hiện chỉ policy `InternalStaff`, lệch quy tắc 19) — màn hồ sơ đã chuyển sang `/applications/{id}/interview-code` (có kiểm quyền); còn màn Phỏng vấn (`CandidateRow`, `SlotCard`) gọi đường cũ
+- [x] Sửa cấp mã vòng 2 sau vòng 1 trắc nghiệm bị từ chối "Vòng 1 là bài trắc nghiệm": vòng không truyền lấy theo lịch đang giữ chỗ (`InterviewCodeRules.LiveBookingAsync`); màn hồ sơ Recruiter/HR dùng `InterviewCodeCard` ✅ 2026-09-19
 - [x] HM duyệt hồ sơ KHÔNG còn kèm lịch rảnh — lịch khai riêng ở "Lịch tôi có mặt được"; ca thi trắc nghiệm đứng ngoài luật chồng giờ + luật "HM không dự hai buổi" (ADR-067 sửa đổi) ✅ 2026-09-14
 
 ### Phase 4 – AI Interview Core
@@ -241,6 +248,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] `RagService`: retrieve logic – merge JD/CV chunks + Playbook chunks theo weighted scope — **Hybrid retriever (RRF + scope weight) trong RAG service Python** ✅ 2026-06-26
 - [x] Playbook theo tin/theo vòng quản lý **ngay trong màn tin**, người thêm/xoá là **Hiring Manager chính** (HR Leader vẫn làm được, Recruiter chỉ đọc); màn Playbook của HR chỉ còn playbook công ty (ADR-069) ✅ 2026-09-15
 - [x] Validation ở server cho mọi cửa upload: phạm vi, loại tài liệu (12 loại), đuôi file theo loại, ≤15MB, vòng hội thoại có thật, tin lưu trữ; lệnh xoá kiểm quyền theo phạm vi (ADR-069) ✅ 2026-09-15
+- [x] Bộ playbook mẫu tối ưu cho pipeline RAG: playbook công ty (5 loại) + playbook một tin Senior Backend .NET (12 file theo tin/vòng) + 3 bộ tiêu chí Excel — `docs/playbooks/` ✅ 2026-09-19
 - [ ] Validation: virus scan (optional)
 
 ### Phase 5 – Multi-round & Auto-progression
@@ -263,12 +271,13 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] HR Dashboard (Phân quyền rõ ràng cho 3 role: SuperAdmin, HR Leader, Recruiter):
   - [x] Danh sách Application per Job Posting (filter, sort) – `EvaluationsController`
   - [x] Xem Evaluation Report + recording per Application per Round
-  - [ ] Confirm / Override verdict (HrReview entity có, endpoint `/evaluations/{id}/review` cần kiểm tra)
+  - [x] 2026-09-19 Confirm / Override verdict — `POST /api/interview/review/confirm`, **một báo cáo chỉ chốt một lần** (409), thư kết quả đi kèm lệnh chốt (ADR-074)
   - [x] Unit test `SubmitHrReviewAsync` — Confirm (mọi nhân sự) vs Override (chỉ HR Admin/Super Admin + bắt buộc lý do, Recruiter bị chặn), cập nhật status hồ sơ pass/not_pass, auto-progression sang vòng kế (chỉ real + có RoundConfig → tạo InterviewInvite, status→interview; practice/not_pass không progress), thông báo ứng viên realtime + Notification chống trùng (DedupKey), audit log hr_confirm/hr_override — **16 test mới, 109/109 pass** ✅ 2026-08-05
   - [x] Unit test Luồng 8 Review Interview Result (UC-64/84–90/95) — query HR đọc/giám sát kết quả: `GetEvaluationsQuery` (ẩn buổi thử, lọc theo job + trạng thái pending/completed/verdict tôn trọng HR override, phân trang + total, join tên/vị trí/review), `GetEvaluationDetailQuery` (tra theo EvaluationId hoặc fallback SessionId, ẩn practice, kèm HR review + resolve URL video buổi thật ADR-052), `GetEvaluationsByApplicationQuery` (các vòng của hồ sơ, ẩn practice, trạng thái review), `GetSessionsForHrAsync` (bảng giám sát phiên: ẩn practice, sắp mới nhất, join ứng viên/vị trí/verdict AI mới nhất + cờ có video). Confirm/Override đã phủ ở test `SubmitHrReviewAsync`. — **24 test mới, 375/375 pass** ✅ 2026-08-05
 - [x] `AuditLogService`: entity `AuditLog` đã có, ghi lại mọi action
 - [ ] Notification: email + in-app (SignalR) khi Evaluation hoàn thành, cần HR review
-- [ ] Email kết quả cho Candidate sau khi HR Leader xác nhận
+- [x] 2026-09-19 **Email kết quả cho ứng viên qua trình soạn** sau khi Hiring Manager chốt — mẫu `interview_result` (qua vòng / vòng cuối / cảm ơn), gửi kèm lệnh chốt, ghi `email_logs` (ADR-074)
+- [x] 2026-09-19 **Thư xác nhận nhận việc** (`offer_accepted`, nối luồng thư mời) + **tự đóng tin khi số `hired` đạt `Headcount` của phiếu**; màn tin đã đóng liệt kê hồ sơ chưa khép, loại kèm thư cảm ơn qua trình soạn (ADR-074)
 - [x] **Thư mời đúng ADR-063: HM chính soạn + gửi duyệt**, gửi duyệt báo HR Leader + SA (trước đây báo nhầm HM), qua vòng cuối → báo chủ tin + HM soạn thư; link thông báo theo vai người nhận (`StaffLinks`) (ADR-068) ✅ 2026-09-15
 - [x] **Đường vào báo cáo AI sau buổi phỏng vấn thật**: danh sách "Kết quả phỏng vấn" theo vòng (ca · AI đang chấm · báo cáo · video · transcript) ở màn tin + màn hồ sơ của cả ba vai, mục "Buổi vừa kết thúc" ở màn Phòng phỏng vấn của HM, màn đánh giá có transcript đầy đủ + ca (ADR-069) ✅ 2026-09-15
 - [ ] Transcript nhảy tới đúng đoạn video của từng câu (cần mốc bắt đầu ghi hình so với phiên)
@@ -289,6 +298,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Interview recording: trường `recording_url` trong `InterviewSession` đã có
 - [x] 2026-08-15: **Realtime tầng database (ADR-057)** – trigger `arisp_notify_change()` + `LISTEN/NOTIFY` → `DbChangeListenerHostedService` → SignalR; `DbChangeRouter` định tuyến người nhận (mặc định đóng)
 - [x] 2026-08-15: Vá lỗ hổng `JobReassigned` – FE không có `case` bắt event nên chuông hai bên chỉ sáng sau khi F5
+- [x] 2026-09-19: Realtime cho màn giữ state cục bộ – sự kiện chung `db-table:changed` + `useDbTableChanged`; nối phiếu tuyển dụng, trình soạn JD, mẫu JD, đội, tài khoản, cài đặt hệ thống, cài đặt nhân sự, hồ sơ ứng viên
 - [ ] Redis backplane cho SignalR – bắt buộc trước khi chạy nhiều instance backend (hiện `AddSignalR()` in-process)
 
 ### Phase 8 – Cheat Detection
@@ -366,6 +376,7 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 - [x] Vẽ lại sơ đồ Use-case Overview sau ADR-068 (bỏ nhánh "Job has a Hiring Manager?", JD "No" → `rejected` → sửa/gửi lại, thao tác chuyển HM, HM soạn thư mời) — 2026-09-15
 - [x] Sơ đồ swimlane **luồng tính Match Score CV–JD** vẽ theo code (`docs/diagrams/arisp-cv-jd-match-score.drawio`) — 2026-09-17
 - [x] Chuyển sơ đồ **tổng quan chấm CV–JD** sang tiếng Anh, bỏ ví dụ, thêm khung chú giải (`docs/diagrams/arisp-cv-scoring-overview.drawio`) — 2026-09-19
+- [x] **Dữ liệu MOCK trên production:** hồ sơ `a1f946c4-a4a6-400a-aa37-4ad7e3c6ffec` (ứng viên `quannguyen23.a@gmail.com`, tin BACKEND DEVELOP) đã qua đủ 3 vòng, dừng ở `pass` để test luồng offer — 2026-09-19
 
 ### Phase 13 – Polish & Scale
 - [ ] Redis caching (session data, slot availability, frequently accessed evaluations)
@@ -387,8 +398,479 @@ vì sáu dòng đó đều là quyết định **còn đang nóng**, cắt bây 
 
 ## Completed
 
+<<<<<<< HEAD
 - [x] 2026-09-24: **Staff site: mỗi tab một phiên đăng nhập riêng (sessionStorage) — sửa lỗi 2 tài khoản ở 2 tab đè token nhau → F5 văng /403 → 404.** Người dùng mở 2 tab cùng trình duyệt, mỗi tab một tài khoản staff; vào job detail rồi F5 thì báo 404 và "Quay về trang chủ" nhảy sang tài khoản tab kia. Gốc: `authStore` (zustand `persist`) mặc định lưu ở **localStorage** → chia sẻ mọi tab, đăng nhập sau ghi đè trước; F5 rehydrate ra tài khoản kia, `ProtectedRoute` chặn vai trò → `<Navigate to="/403">`, mà route `/403` lại render `NotFoundPage` (nên URL `/403` hiện "404"). Sửa: `authStore` thêm storage động + `configureAuthStorage(kind)` + `skipHydration`; **Staff `main.tsx` gọi `configureAuthStorage('session')`** (mỗi tab một phiên, F5 giữ nguyên), **Candidate `main.tsx` gọi `configureAuthStorage('local')`** (giữ đăng nhập chung mọi tab như cũ). Refresh-token đọc từ store nên hoạt động per-tab (không phụ thuộc cookie). Type-check 2 site sạch. _(chưa commit)_
   - Đánh đổi: staff mở tab MỚI phải đăng nhập lại (mỗi tab một phiên); dữ liệu localStorage `arisp-auth` cũ thành mồ côi, staff đăng nhập lại 1 lần. Latent còn lại: route `/403` vẫn render trang 404 (chưa làm trang Forbidden riêng).
+=======
+- [x] 2026-09-24: **Chuông "Hồ sơ chờ bạn duyệt" của HM dẫn vào trang 404.**
+  Link trong thông báo là `/hm/shortlists` — **route không tồn tại**. ADR-067 đã bỏ màn danh sách
+  shortlist riêng ("mỗi dòng dẫn thẳng tới màn tin"), nhưng link trong lệnh thì không ai sửa theo,
+  nên frontend đẩy sang `/404`. Loại hỏng không bao giờ tự lộ: người viết lệnh không phải người bấm chuông.
+  - Sửa cả **hai** chỗ dùng nó: thông báo "hồ sơ chờ duyệt" và thông báo "cổng duyệt của bạn đã bị vượt".
+  - Dẫn thẳng tới **hồ sơ** qua `StaffLinks.CandidateAsync` (ADR-068: link theo vai người nhận) —
+    màn đó có CV để đọc và có sẵn `ShortlistGatePanel` để quyết định, không phải đi thêm một chặng.
+  - Quét toàn bộ link thông báo của backend đối chiếu bảng route của hai site: **13 đường dẫn, chỉ
+    `/hm/shortlists` chết**, còn lại khớp hết.
+  - Suite: **2265 xanh**.
+
+
+- [x] 2026-09-24: **Màn hồ sơ ứng tuyển: nhãn, màu và bộ lọc nói cùng một chuyện.**
+  - **Màu badge lệch nhãn.** Nhãn lấy từ `statusMetaOf`, còn màu thì thẻ tự tra `statusCls[app.status]`
+    bằng trạng thái THÔ — nên hồ sơ hiện "Không phù hợp" vẫn mang màu xanh của `cv_submitted`.
+    Gom màu vào chính `metaOf`/`statusMetaOf`: nhãn, nhóm, biểu tượng và màu cùng ra từ một chỗ.
+  - **Bộ lọc không theo trạng thái đang hiện.** `groupOf` kiểm `interviewCode`/`practiceAvailable`
+    TRƯỚC, mà hai thứ này còn nguyên trong dữ liệu của một hồ sơ đã khép — nên hồ sơ ghi "Không phù
+    hợp" vẫn nằm ô "Cần hành động", và thẻ còn đội dải vàng mời ứng viên vào phòng thi. Nay hồ sơ đã
+    bị loại về thẳng "Đã hoàn tất", dải vàng và nút phỏng vấn thử cũng tắt theo.
+  - Tách hàm `isEliminated` thay vì đọc `meta.group === 'done'`: `pass` cũng thuộc nhóm đó, mà người
+    đã đạt đang CHỜ thư mời — thẻ của họ không được làm mờ như một hồ sơ đã trượt.
+  - **Nhãn "Đã đóng" ngay trên thẻ** ở màn danh sách, không phải vào chi tiết mới thấy. Tách khỏi nhãn
+    trạng thái bên phải vì đó là kết cục của HỒ SƠ, còn đây là tình trạng của TIN — hai thứ có thể
+    không đi cùng nhau (người đã đạt vẫn nằm trong một tin đã đóng).
+  - Typecheck CandidateSite sạch, JSON i18n hợp lệ.
+
+
+- [x] 2026-09-24: **"Tin đã đóng" tính theo NGÀY ĐI LÀM, không phải lúc bấm đóng.**
+  Bản trước chặn thao tác của nhân sự trên tin đã đóng và ghi cứng `not_pass` vào hồ sơ dang dở.
+  Chủ dự án đổi quyết định: **hoàn tác cả hai**, thay bằng một luật theo thời gian.
+  - **Vì sao**: tin đóng lúc hết hạn nộp, nhưng phễu chưa xong — người đã nộp vẫn đang phỏng vấn, HM
+    còn chốt kết quả, HR còn gửi thư mời. Báo "tin đã đóng, bạn không phù hợp" ngay lúc đó là sai.
+  - **`JobClosure`** (mới, thay `JobLifecycle` + `JobClosureCascade` đã xoá): tin coi là KẾT THÚC khi
+    vừa đóng cửa nhận hồ sơ (`closed`/`archived`, hoặc `active` mà quá hạn nộp) **vừa** qua mốc ân hạn.
+    Mốc = **`RecruitmentRequest.ExpectedStartDate`** (ngày đi làm dự kiến) — mốc nghiệp vụ có sẵn,
+    không phải hằng số bịa ra. Dữ liệu cũ trước ADR-063 không có phiếu → **hạn nộp + 5 ngày**.
+    Không có mốc nào thì KHÔNG bao giờ kết thúc: thà để tin treo còn hơn tự đánh trượt người mà không
+    có căn cứ thời gian.
+  - **Gom luật hiển thị**: ba nơi từng tự viết `active + quá hạn ⇒ "closed"` (danh sách tin của nhân
+    sự, hai mapper DTO, bảng điều khiển HR) nay đi qua `JobClosure.DisplayStatus`. Hàm nhận **từng
+    trường rời** chứ không chỉ entity, vì các màn danh sách chiếu cột ra kiểu ẩn danh để khỏi kéo cột
+    JSON nặng — bắt chúng tự ghép lại luật là mở đường cho hai màn nói hai kiểu.
+    `GetAdminJobs` chiếu trạng thái THÔ rồi tính lại sau khi nạp: mốc cần ngày trên phiếu, mà phép
+    ghép đó SQL trong projection không làm được.
+  - **Ứng viên**: `JobClosed` trên cả danh sách lẫn chi tiết hồ sơ; hồ sơ còn treo giữa phễu của một
+    tin đã kết thúc thì hiện **"Không phù hợp"**. **Suy ra ở tầng hiển thị, không ghi vào hồ sơ** —
+    trạng thái thật là dữ liệu vận hành của nhân sự, không phải chỗ đóng dấu kết luận do thời gian
+    sinh ra. Hồ sơ đã có kết cục (`pass`/`offer`/`hired`/`withdrawn`…) thì không đụng.
+  - **Thao tác của nhân sự trên tin đã đóng: để nguyên như trước** — mọi chốt chặn đã gỡ.
+  - Hai test cũ khoá đúng hành vi vừa đổi → sửa khẳng định, không thêm test mới:
+    `Dong_tin_khong_dung_toi_ho_so...` trả lại như cũ; `Job_states_..._expired_active_projects_as_closed`
+    thêm mốc quá ân hạn để phân biệt "vừa hết hạn" với "đã kết thúc". Suite: **2265 xanh**.
+
+- [x] 2026-09-24: **Portal: chữ tiếng Việt cho kết quả vòng, và vòng sau khi bị loại.**
+  - **`badge.pass`/`badge.notPass` trong file `vi` đang là "Pass"/"Not Pass"** — chữ tiếng Anh nằm
+    trong bản tiếng Việt. Đổi thành **"Đạt" / "Không phù hợp"**, khớp với `index.json` vốn đã đúng;
+    bản `en` thành "Passed" / "Not Suitable". Các khung kết quả dùng lại đúng cặp chữ đó.
+  - **Bị loại rồi mà các vòng sau vẫn hiện "Đang diễn ra" / "Chưa phỏng vấn".** Mỗi vòng tự kể
+    chuyện của riêng nó — vòng chưa xếp lịch thì "chưa phỏng vấn", phiên chưa đóng thì "đang diễn
+    ra" — đúng theo dữ liệu của vòng đó nhưng sai với thực tế: ứng viên đã nhận thư báo không phù
+    hợp và các vòng sau sẽ không bao giờ diễn ra.
+    Thêm `eliminatedFrom`: vòng đầu tiên có kết luận `not_pass`, hoặc vòng 1 nếu hồ sơ đã đóng ở
+    khâu CV (`cv_rejected` — KHÔNG phải "rejected"; `failed` là tên cũ còn sót). `withdrawn` không
+    tính: ứng viên tự rút thì không phải họ "không phù hợp".
+    Từ vòng đó trở đi: badge "Không phù hợp", khung nội dung nói "Vòng N: Không phù hợp — hồ sơ của
+    bạn đã dừng lại ở vòng trước đó, nên vòng này không diễn ra".
+  - Typecheck CandidateSite sạch, JSON i18n hợp lệ.
+
+
+- [x] 2026-09-24: **Portal ứng viên kẹt ở "Chờ HR" dù HM đã chốt kết quả.**
+  Hồ sơ đã duyệt xong, ứng viên đã được mời sang vòng 2, nhưng vòng 1 vẫn hiện
+  "Kết quả đang chờ HR Admin xác nhận".
+  - **Nguyên nhân**: `PortalApplicationsFeature` lấy `HrReview.ShareEvaluation` làm dấu hiệu
+    "đã duyệt". Hai thứ này tách hẳn nhau — chính `HrReview` ghi rõ: **sự TỒN TẠI của dòng review**
+    là "đã chốt", còn `ShareEvaluation` là **cổng công bố báo cáo** cho ứng viên. Bốn cờ chia sẻ đều
+    mặc định `false`, nên mọi hồ sơ đã chốt mà không tick "chia sẻ" đều kẹt ở "chờ HR" vĩnh viễn.
+  - Sửa ở **cả hai** nhánh (danh sách hồ sơ + chi tiết hồ sơ): `pendingHrReview` = **chưa ai chốt**
+    (`review == null`). Vẫn KHÔNG lộ verdict/điểm khi chưa chia sẻ — mô hình bảo mật giữ nguyên.
+  - Kèm theo: i18n `pendingHrReview.description` viết `{round}` một cặp ngoặc nên in ra chữ
+    `{round}` thay vì số vòng — i18next cần `{{round}}`. Sửa cả vi lẫn en (các khoá khác trong cùng
+    file vốn đã đúng).
+  - **Tách đúng hai mức công khai** (yêu cầu của chủ dự án): lệnh chốt LUÔN gửi thư báo đạt/không đạt
+    cho ứng viên (`resultVariant` không bao giờ null với buổi thật — ADR-074), nên giấu kết luận trên
+    Portal là để màn hình nói ngược lá thư họ vừa nhận. Nay:
+      • **Kết luận đạt/không đạt** → hiện ngay khi đã chốt, lấy `HrReview.FinalVerdict` chứ KHÔNG phải
+        `AiVerdict` (HM có quyền đảo kết luận của AI, và thư mang quyết định của HM).
+      • **Báo cáo chi tiết** (điểm, tiêu chí, transcript, bản ghi) → vẫn chờ `ShareEvaluation`.
+    FE: badge bỏ điều kiện `s.evaluation &&` (đòi phải có báo cáo mới hiện kết quả); thêm khung
+    "Vòng N: Bạn đã đạt / chưa đạt" cho trạng thái đã chốt mà chưa chia sẻ, thay vì "Chưa có báo cáo".
+  - **Còn ngỏ**: chính sách chia sẻ BÁO CÁO CHI TIẾT vẫn chưa quyết (mặc định bật/tắt, ứng viên
+    bị loại có được xem báo cáo AI không, chỉ chuông hay kèm thư).
+
+
+- [x] 2026-09-24: **CV .docx dựng đúng bố cục — chuyển sang PDF ở server (LibreOffice headless).**
+  Chốt sau khi nhận ra file JD hiện đẹp còn CV thì vỡ: **không phải trình xem, mà là tài liệu đầu vào**.
+  `JdDocumentRenderer` chỉ sinh đoạn văn + bảng + ảnh `DW.Inline` (chảy theo dòng) — đúng tập con mà
+  `docx-preview` dựng chuẩn. CV ứng viên làm từ Canva/Word dùng `DW.Anchor` (khung **nổi**, neo toạ độ),
+  hộp văn bản và chia cột, nên khối nền đè lên chữ. Không cờ nào của thư viện chữa được.
+  - `IDocumentPdfConverter` + `LibreOfficePdfConverter` (`soffice --headless --convert-to pdf`).
+    **Hàng đợi một làn** (`SemaphoreSlim`): hai tiến trình dùng chung thư mục hồ sơ sẽ tranh nhau,
+    và mỗi lượt ngốn ~250MB RAM trên VPS 3.8GB/6 container. **Không bao giờ ném lỗi** — mọi kết cục
+    xấu trả `null`.
+  - `GET /api/applications/{id}/cv-preview` — qua `JobAccess.EvaluateApplicationAsync` (quy tắc 19).
+    **Cache bằng khoá suy ra** `{key}.preview.pdf` + `IFileStorageService.SaveAtAsync` (mới), nên
+    không phải thêm cột vào DB. Giữ nguyên đuôi gốc trong khoá: `a.doc` và `a.docx` cùng rút về
+    `a.pdf` là xem nhầm hồ sơ của nhau.
+  - FE: `DocumentPreview`/`openDocument` nhận `pdfUrl` thử TRƯỚC file gốc; `useFileBlob` thành chuỗi
+    dự phòng và biết gửi `Authorization` cho URL của API. 404 (chưa cài LibreOffice, file Word hỏng)
+    là **câu trả lời hợp lệ** — tự lùi về `docx-preview`. Nút "Tải về" trong lớp phủ trỏ file GỐC khi
+    đang xem bản dựng, không thì giao file PDF mang tên `.docx`.
+  - Docker: `libreoffice-writer` + `fonts-liberation` (`--no-install-recommends`, ~400MB) vào stage
+    production; `ENV HOME=/tmp` vì user `app` không đặc quyền không tạo nổi hồ sơ LibreOffice.
+  - 8 test mới (PDF không chuyển lại · dựng + lưu cache · dùng lại cache · chưa cài LibreOffice ·
+    chuyển hỏng · không có CV · ngoài đội tuyển dụng bị chặn TRƯỚC khi chạm file · lưu cache hỏng vẫn
+    xem được). Suite: **2279 xanh**. Typecheck FE sạch.
+  - **Máy dev Windows chưa có LibreOffice** → bản xem trước vẫn là `docx-preview` cho tới khi cài;
+    khai đường dẫn khác ở `Documents:SofficePath` nếu cần.
+
+
+- [x] 2026-09-24: **Mở màn chi tiết tin là CV .docx tự tải về máy.**
+  Không phải IDM (đã tắt, đã gỡ extension vẫn bị) — lỗi nằm trong code.
+  - **Nguyên nhân**: `CandidatePipeline` truyền `fileName={`${candidateName}.pdf`}` — ghép cứng đuôi
+    `.pdf` vào tên ứng viên. `kindOf` tin tên trước URL, nên **mọi** CV đều đi vào nhánh dựng PDF; CV
+    .docx thành một `<iframe>` trỏ vào blob kiểu Word, và Chrome thì **lặng lẽ tải xuống** thứ nó không
+    dựng được. Không ai bấm gì, chỉ cần trang được mở. Đây là 1 trong 24 nơi gọi trình xem và là nơi
+    DUY NHẤT bịa ra đuôi file.
+  - Sửa: truyền tên **không kèm đuôi** để trình xem suy định dạng từ URL, như 23 nơi còn lại vẫn làm.
+  - **Chặn tái diễn** (vì tên file sẽ còn sai nữa): (1) `kindOfBlob` — loại file suy từ `Content-Type`
+    của chính lượt tải, byte thắng tên khi byte nói rõ ràng; `octet-stream` không nói gì thì vẫn theo
+    tên. (2) `usePdfObjectUrl` — nhánh PDF **ép blob về `application/pdf`** trước khi đưa vào iframe,
+    nên byte sai định dạng chỉ làm trình xem báo lỗi NGAY TRONG KHUNG, không bao giờ rơi vào Downloads.
+  - Typecheck StaffSite + CandidateSite sạch.
+
+- [x] 2026-09-24: **CV .docx dựng sai bố cục trong khung xem.**
+  Sau khi hết tự tải về, CV hiện ra nhưng chữ trôi sang phải và có khối màu đè lên nội dung.
+  - `experimental: true` — bật xử lý **điểm dừng tab** (`w:tabs`). Không có nó, mỗi ký tự tab thành một
+    khoảng trắng cố định, nên mẫu CV dùng tab để chia cột sẽ có chữ trôi dạt.
+  - `useBase64URL: true` — nhúng ảnh base64 thay vì `blob:`. URL blob bị thu hồi khi unmount, mà
+    StrictMode ở dev mount–unmount–mount: lượt dựng thứ hai ăn phải URL đã chết, ảnh thành ô trống.
+  - **Nhận giới hạn thay vì giả vờ sửa được**: `docx-preview` là bản dựng gần đúng, không phải Word —
+    khung nổi / hộp văn bản / chia cột của các mẫu CV hiện đại thì nó xếp sai chỗ, và không có tuỳ chọn
+    nào chữa được. Thêm nút **"Tải bản gốc"** ngay trên đầu khung CV ở màn chi tiết tin (trước đây chỉ
+    lớp phủ mới có), để người sàng hồ sơ luôn lấy được file thật mà không phải rời màn hình.
+  - Còn ngỏ: muốn trung thực 100% thì phải **chuyển DOCX sang PDF ở server** (cần LibreOffice headless
+    hoặc dịch vụ ngoài) — chưa làm, chờ quyết định.
+
+
+- [x] 2026-09-24: **Rà toàn bộ điểm gửi mail — link trong thư đều đi qua `FrontendUrls`.**
+  Soát 10 file dựng HTML thư (mọi file chứa `font-family: Arial`) + mọi nơi gọi `SendEmailAsync`.
+  Cơ chế nền đã đúng: hai khoá `Frontend:CandidateBaseUrl` / `Authentication:AdminFrontendUrl`,
+  Development nạp sẵn localhost, non-Development **chặn ở boot** nếu thiếu, và **không** đoán URL từ
+  `Host` header (thư còn do hosted service gửi, lúc đó không có request nào để đoán). Bốn chỗ lệch:
+  - **Thư dời lịch không có nút nào** (`InterviewService.NotifyRescheduledAsync`). Thư bảo ứng viên
+    "đăng nhập Candidate Portal để xác nhận lịch mới" nhưng không kèm đường đi — chuông trong ứng dụng
+    có `Link` tương đối, còn thư thì ứng viên phải tự nhớ địa chỉ cổng rồi tự dò lại hồ sơ, đúng lúc ta
+    vừa đổi giờ hẹn của họ. Thêm nút "Xác nhận lịch mới"; chưa cấu hình gốc URL thì **bỏ hẳn nút** chứ
+    không in ra link cụt.
+  - **Nhiều origin ngăn bởi dấu phẩy làm hỏng mọi link trong thư.** Danh sách CORS vẫn luôn tách hai
+    khoá này theo dấu phẩy, nên khai apex + www là cấu hình HỢP LỆ — nhưng `FrontendUrls` trả nguyên
+    chuỗi, thành `https://a.vn,https://www.a.vn/portal/...`. Link hỏng, không lỗi, không log. Nay
+    `Candidate()`/`Staff()` lấy origin ĐẦU TIÊN để ghép link, còn `CandidateOrigins()`/`StaffOrigins()`
+    trả cả danh sách cho CORS.
+  - **Ba chỗ đọc thẳng `_configuration["Frontend:CandidateBaseUrl"]`** — `OfferFeature`,
+    `EmailTemplateRenderer` (thư mời nhận việc), `InterviewScheduleFollowUpHostedService`. Hôm nay còn
+    tương đương, nhưng đó đúng là kiểu "12 chỗ tự đọc cấu hình" mà `FrontendUrls` sinh ra để dẹp: bỏ qua
+    chuẩn hoá dấu gạch cuối, bỏ qua dự phòng, và sẽ không nhận sửa lỗi dấu phẩy ở trên.
+  - Test: 4 test mới cho `FrontendUrls` (dấu phẩy · CORS nhận đủ origin · danh sách rỗng chứ không phải
+    một phần tử rỗng) + 1 test khoá nút Portal trong thư dời lịch. Suite: **2271 xanh**.
+  - **Còn nợ**: thư dời lịch do NHÂN SỰ BẤM NÚT nhưng chưa qua trình soạn (quy tắc 21) và chưa ghi
+    `email_logs` — việc riêng, chưa làm.
+
+
+- [x] 2026-09-24: **500 "lỗi hệ thống" khi nhắc lịch — thiếu khoá chống trùng của thông báo.**
+  `POST /interview/management/booking/{id}/remind` trả 500; log API chỉ rõ:
+  `23505: duplicate key value violates unique constraint "IX_notifications_candidate_account_id_dedup_key"`.
+  - **Nguyên nhân**: `notifications` có unique index `(candidate_account_id, dedup_key)` (migration
+    `AddNotifications`), mà `Notification.DedupKey` mặc định là **chuỗi rỗng**. Lệnh nhắc lịch không gán
+    khoá, nên lời nhắc THỨ HAI cho cùng một ứng viên đâm vào lời nhắc thứ nhất — và vì `SaveChangesAsync`
+    chạy SAU khi thư đã gửi, ứng viên vẫn nhận mail còn nhân sự chỉ thấy "lỗi hệ thống".
+    Đây nhiều khả năng chính là lỗi "Nhắc lịch không hoạt động" ghi nhận hôm 2026-09-23 (khi đó chưa có
+    câu chữ toast để lần theo).
+  - Rà cả repo: chỉ **hai** chỗ tạo `Notification` mà quên `DedupKey` — nhắc lịch và **dời lịch**
+    (`NotifyRescheduledAsync`, cùng lỗi, chưa ai gặp). Sửa cả hai.
+  - Khoá dùng **Guid** chứ không phải `Ticks` như vài chỗ khác: đồng hồ Windows chỉ nhích ~15ms một lần
+    nên hai cú bấm liên tiếp lấy ra đúng một giá trị Ticks — vẫn đâm nhau, chỉ hiếm hơn.
+  - Test khoá lại: nhắc hai lần → hai thông báo, hai khoá khác nhau, không khoá nào rỗng. Suite: 2196 xanh.
+
+- [x] 2026-09-24: **Nhắc lịch theo TRẠNG THÁI lịch hẹn, qua trình soạn thư.**
+  Trước đây nút "Nhắc lịch" gửi cùng một lá thư cho mọi tình huống — kể cả ứng viên đã báo bận hay buổi
+  phỏng vấn đã trôi qua — và nội dung thư ghi "Trạng thái hiện tại: Chờ xác nhận" mà **không có nút nào
+  để xác nhận**, nên ứng viên đọc xong không làm được gì.
+  - **Một luật, ba nơi đọc**: `ScheduleReminder.Resolve(bookingStatus, confirmationStatus, slotStart, now)`
+    → `confirm` (chưa phản hồi) · `remind` (đã xác nhận) · `past` · `closed`. Giao diện bật/tắt nút,
+    trình soạn dựng bản nào, và lệnh gửi chấp nhận hay từ chối — cả ba gọi cùng hàm đó, nên nút sáng mà
+    server từ chối là chuyện không xảy ra. Server trả thẳng `remindState` trong `SlotCandidateDto`.
+  - **Chưa xác nhận** → thư kèm hai nút Xác nhận/Báo bận (dùng lại `BuildReminderAsync` của luồng nhắc
+    tự động) + chuông Portal nói "Vui lòng xác nhận". **Đã xác nhận** → `BuildTimeReminderAsync` mới:
+    giờ, địa điểm (hoặc hình thức trực tuyến), việc cần chuẩn bị; chuông nói "Nhắc nhở". Không còn khối
+    HTML viết tay trong `InterviewService`.
+  - **Đã qua giờ / đã báo bận → 409 + nút khoá** kèm câu nói rõ phải làm gì tiếp (xếp lại ca khác).
+  - **Quy tắc 21 (nợ từ 2026-09-23 đã trả)**: thư nhắc nay đi qua `EmailComposerModal` — `schedule_reminder`
+    vào `EmailTemplateKeys.All`, renderer dựng đúng biến thể theo booking, `EmailOverride` đi kèm chính
+    lệnh nhắc. Bấm Huỷ ở trình soạn = không chuông, không thư.
+  - Nhắc HÀNG LOẠT lọc trước những người không nhắc được (thay vì gửi rồi đếm lỗi) và tắt nút khi không
+    còn ai gửi được; cố ý KHÔNG mở trình soạn cho đường này vì mỗi người một biến thể thư.
+  - `InterviewService` nhận thêm `IConfiguration` (dựng link trong thư). Test: 4 ca mới (báo bận · quá giờ ·
+    đã xác nhận nhắc giờ · chưa xác nhận đòi xác nhận). Toàn bộ suite xanh (2195), build FE + BE ✅.
+
+- [x] 2026-09-24: **Lịch rảnh của HM chặn chồng lấn GIỮA CÁC VÒNG.**
+  Luật "không chồng lấn" thêm hôm qua chỉ soi trong phạm vi MỘT vòng: khai vòng 2 rảnh 14:00–15:00 rồi
+  sang tab vòng 3 khai đúng khoảng đó lần nữa là lọt. Hậu quả không nằm ở màn khai lịch mà ở màn xếp ca —
+  Recruiter gán được hai ca cùng giờ cho cùng một người, mỗi ca một vòng, và **ba luật xếp ca của ADR-067
+  đều không bắt được** (chúng so trong phạm vi một ca hoặc một vòng).
+  - Server: `HmAvailabilitySupport.OtherRoundWindowsAsync` (khung còn hiệu lực của cùng tin, vòng khác,
+    cùng HM) + `FirstClash` — một hàm cho cả hai phép so "cái mới với cái đã có" (khung đang diễn ra và
+    khung vòng khác khác nhau ở chỗ LẤY tập nào, không khác ở luật). Thông báo nói rõ vòng nào, giờ nào.
+  - Giao diện: panel nạp khung của MỌI vòng trong một lượt (`getHmAvailability` không truyền round), vòng
+    đang xem để sửa, phần còn lại thành `busy` cho `issuesOf`/`toPayload`/`hasBlockingIssue`. Lỗi hiện
+    ngay tại dòng và **gọi tên vòng đang bị đè** — người dùng đứng ở tab này không nhìn thấy khung bên kia.
+  - Test: 3 ca mới cho `FirstClash` (chồng lấn · liền nhau không tính · tập rỗng). Toàn bộ suite xanh.
+  - **Còn hở, chưa làm**: chồng lấn giữa HAI TIN khác nhau của cùng một HM. Cùng bản chất (một người
+    không thể có mặt hai nơi), nhưng cần đọc lịch của tin khác nên để lại chờ bạn quyết.
+
+- [x] 2026-09-24: **Màn tin của HM hết khoảng trắng thừa; thẻ "Thông tin ứng tuyển" gọn lại.**
+  - **Khối ứng viên ở màn tin của HM trượt NGANG được**: bố cục trang giữ nguyên như cũ (cột trái 2/3,
+    dải panel chuyên môn 1/3), nhưng khối ứng viên bên trong cần chỗ cho danh sách + hồ sơ + khung đọc
+    CV nằm cạnh nhau. Prop mới `bodyMinWidthClass` bọc **riêng khối hồ sơ** trong `HorizontalScrollArea`
+    (mới, `@ari/shared/ui`) với `lg:min-w-[64rem]` — xem đầy đủ bằng cách trượt ngang thay vì ép co lại
+    cho vừa cột. Thanh bước quy trình đứng NGOÀI: nó đã tự cuộn ngang theo cách riêng, lồng thêm một
+    tầng trượt nữa là bắt người dùng kéo hai lần cho cùng một việc. `min-w` chỉ bật từ `lg` vì dưới
+    ngưỡng đó trang đã xếp một cột.
+    - Thanh kéo đặt ở **TRÊN** nội dung: thanh mặc định của trình duyệt nằm ở đáy khung cuộn, mà khung
+      này cao vài màn hình nên phải cuộn dọc xuống tận cùng mới với tới. Component dựng thêm một thanh
+      rỗng ruột phía trên (`sticky`, mang đúng `scrollWidth` của nội dung), hai khung đồng bộ `scrollLeft`
+      cho nhau; `ResizeObserver` theo dõi cả nội dung lẫn khung nên thanh không lệch khi chọn/bỏ chọn hồ
+      sơ hay thu nhỏ cửa sổ. Không tràn ngang thì thanh tự ẩn.
+    - Kèm theo: `scrollParentOf` nay đòi phần tử **cuộn dọc được THẬT** (`scrollHeight > clientHeight`).
+      Khung chỉ đặt `overflow-x: auto` vẫn bị CSS tính `overflow-y` thành `auto`; nhận nhầm nó là phần
+      tử cuộn thì lệnh bù vị trí cộng vào một `scrollTop` không nhúc nhích, và cả trang giật đúng như
+      lỗi mà đoạn đó sinh ra để chữa.
+  - **Panel hồ sơ bỏ "Khu vực" và "Độ tuổi"**: hai ô lấy từ hồ sơ cá nhân, không bắt buộc và gần như
+    luôn in ra "—" trong một panel vốn đã hẹp. Trang hồ sơ đầy đủ vẫn giữ.
+  - **Thẻ "Thông tin ứng tuyển" mở/thu gọn được**, và **bỏ khối đối chiếu với CV** theo yêu cầu —
+    hồ sơ cũ chỉ hiện được "Chưa đối chiếu", đúng là nhiễu. Thẻ cũng thôi lặp lại họ tên/điện
+    thoại/email (đã nằm ngay phía trên ở cả bốn chỗ dùng), chỉ còn **thời gian báo trước khi nghỉ
+    việc** + **thư giới thiệu**; thu gọn thì dòng tóm tắt vẫn nói được hai thứ đó.
+  - Hai cột `contact_verification_*` (migration hôm qua) **vẫn ghi dữ liệu nhưng không còn chỗ hiện**.
+    Giữ lại để sau này muốn cảnh báo "ứng viên nộp dù lệch thông tin" thì có sẵn; nói một tiếng là gỡ.
+
+- [x] 2026-09-23: **Màn Hiring Manager: phễu chiếm trọn chiều ngang + hiện thông tin ứng viên tự khai lúc ứng tuyển.**
+  - **Khung hồ sơ của HM hẹp hơn hai vai kia**: `CandidatePipeline` ở màn tin của Recruiter và HR Leader nằm
+    FULL WIDTH, còn ở màn tin của HM lại nằm trong cột `lg:col-span-2` cạnh dải panel chuyên môn (bộ tiêu chí
+    chấm CV, chấm phỏng vấn, ngân hàng đề, playbook). Cùng một khối, nhưng người phải đọc CV kỹ nhất lại đọc
+    trong khung hẹp nhất và không có cách nào nới ra. Chuyển phễu (kèm `ClosedJobOpenApplications`) xuống dưới
+    lưới, full width — dải panel bên phải giữ nguyên chỗ vì nó thuộc việc cấu hình TIN, không phải việc đọc hồ sơ.
+  - **Email bị cắt cụt trong panel hồ sơ**: `Row` của `CandidatePipeline` dùng `truncate`, ô lại hẹp sẵn vì
+    panel chia đôi → "phongvg04…" và không còn đường nào đọc tiếp. Đổi sang `break-words`.
+  - **Ba thứ ứng viên tự khai lúc ứng tuyển chưa từng hiện ra cho nhân sự**: thư giới thiệu và thời gian báo
+    trước khi nghỉ việc nằm sẵn trong `applications` (`cover_letter` / `notice_period`) từ lâu, trả cả trong
+    `ApplicationResponse`, nhưng không màn nào của HR/Recruiter/HM kê ra. Thêm `ApplicationFormCard` dùng chung
+    cho panel hồ sơ trong màn tin + cả ba màn hồ sơ đầy đủ.
+  - **Kết quả "Xác thực thông tin" nay được LƯU**: trước đây bước đối chiếu họ tên + SĐT với nội dung CV chạy
+    lúc bấm Gửi, cảnh báo cho chính ứng viên rồi vứt kết quả đi — nhân sự không có cách nào biết người này đã
+    được báo lệch thông tin mà vẫn nộp. Thêm `applications.contact_verification_status` (`match` | `mismatch`)
+    + `contact_verification_details` (migration `ApplicationContactVerification`), đi kèm lệnh nộp hồ sơ.
+    Hồ sơ cũ hiện "Chưa đối chiếu với CV" — nói thẳng là KHÔNG BIẾT, không đoán thành "khớp".
+    Server chỉ nhận đúng hai giá trị đã biết (`NormalizeVerification`), chi tiết cắt ở 2000 ký tự.
+  - Migration viết tay vì ARI.API đang chạy dưới Visual Studio (khoá file bin) nên `dotnet ef` không build được
+    startup project; đã đối chứng bằng một lượt `migrations add` thử với startup project tạm — kết quả RỖNG,
+    tức snapshot khớp model. Chạy `dotnet ef database update` để áp lên DB.
+
+- [x] 2026-09-23: **Bốn lỗi quanh vòng trắc nghiệm và nhắc lịch.**
+  - **"40/100/100"**: `formatScore` đã kèm sẵn "/100", nơi gọi ở bảng phễu nối thêm một lần nữa. Rà 11 chỗ
+    gọi `formatScore` — chỉ đúng chỗ này bị.
+  - **Điểm sàn lộ ở màn LÀM BÀI**: chuỗi `page.progress` ghim thêm "Điểm đạt: {{pass}}/100" nhưng nơi gọi
+    chưa bao giờ truyền `pass`, nên thứ ứng viên đọc được là "Điểm đạt: /100". Bỏ hẳn vế đó — vừa hết chuỗi
+    hỏng, vừa đúng luật "điểm sàn là thông tin nội bộ" mà màn "đã nộp bài" vẫn giữ.
+  - **Màn hồ sơ của NHÂN SỰ thiếu kết quả bài thi**: `GetApplicationByIdAsync` không đọc `OnlineTestSubmission`
+    bao giờ, trong khi danh sách (`MapApplicationsAsync`) có — nên bảng phễu hiện "Chưa đạt · 40/100" còn mở
+    đúng hồ sơ đó ra thì trống trơn. Vòng trắc nghiệm KHÔNG sinh `Evaluation` nên khối "Kết quả phỏng vấn"
+    cũng trống ở đó. Bổ sung 3 trường ở endpoint chi tiết + `OnlineTestResultCard` dùng chung cho cả ba vai
+    (HR/Recruiter/HM), mở lại đúng `OnlineTestAnswerSheetModal` của bảng phễu.
+  - **Nhắc lịch**: lệnh gửi mail bằng `try { ... } catch { }` trần và controller LUÔN trả "Đã gửi nhắc nhở
+    tới ứng viên." — SMTP hỏng vẫn báo thành công, không ghi `email_logs`, không dấu vết nào để đối chiếu.
+    Nay đi qua `CandidateEmailSender` như mọi thư gửi ứng viên khác (ghi nhật ký, trả lời vào đúng luồng thư
+    mời qua `InviteEmailMessageId`), và endpoint phân biệt "đã gửi email" với "chỉ có chuông trong Portal".
+    Kèm theo: ô thông báo trong `CandidateRow` trước đây LUÔN tô xanh lá, nên mọi lỗi (kể cả "Bạn không có
+    quyền nhắc lịch cho ứng viên của tin này") hiện ra y hệt một lời báo thành công.
+  - **CÒN MỞ**: chưa biết lỗi cụ thể người dùng gặp ở nút Nhắc lịch — chờ câu chữ trong toast (nay đã tô đỏ
+    và giữ 6 giây). Nghi vấn hàng đầu: `CanManageAsync` đòi mức Owner (`job.CreatedByUserId`), Recruiter chỉ
+    là thành viên đội thì bị từ chối.
+  - **Nợ đã ghi nhận, chưa làm**: thư nhắc lịch do người bấm nút nhưng KHÔNG qua trình soạn thảo — lệch quy
+    tắc 21 (ADR-061). Cố ý để ngoài phạm vi lần sửa này.
+
+- [x] 2026-09-23: **Lịch rảnh của Hiring Manager chặn khung giờ chồng lấn.**
+  Màn khai lịch nhận được 22:50–23:20 và 23:00–23:30 cùng ngày cùng vòng — `Sanitize` chỉ loại được bản
+  sao TRÙNG KHÍT (`Start == Start && End == End`), nên chồng lấn MỘT PHẦN đi lọt. Phía Recruiter xếp ca
+  đã chặn trùng giờ từ trước, nên hai màn nói hai luật khác nhau về cùng một trục thời gian.
+  - Luật mới dùng chung `HmAvailabilitySupport.Overlaps` (nửa mở): 10:00–11:00 + 11:00–12:00 là hai khung
+    liền nhau HỢP LỆ, 10:00–11:00 + 10:30–12:00 thì không. **Chặn chứ không tự gộp** — gộp là sửa dữ liệu
+    của người dùng mà không hỏi, và họ thường đang định sửa dòng cũ chứ không định khai thêm.
+  - Chặn cả chồng lấn với **khung ĐANG DIỄN RA**: khung đó không nằm trong danh sách gửi lên (`Sanitize`
+    đòi giờ bắt đầu ở tương lai) và `ReplaceAsync` cố ý không xoá nó, nên không kiểm riêng thì luật chỉ có
+    hiệu lực trong phạm vi một lần bấm gửi.
+  - FE: `issueOf` (một dòng) không đủ vì chồng lấn là quan hệ GIỮA hai dòng → thêm `issuesOf(rows)`; cả
+    `toPayload` lẫn `hasBlockingIssue` đọc từ đó, nên dòng chồng lấn bị tô đỏ, nút lưu khoá lại, và không
+    có đường nào lọt lên server rồi mới nhận 400.
+  - Test: 3 ca mới trong `HmAvailabilityValidationTests` (chồng một phần · bọc trọn · liền nhau không tính
+    là chồng). 22/22 test lịch rảnh pass.
+
+- [x] 2026-09-23: **Trình xem tài liệu phân biệt "file không có" với "lượt tải bị chặn".**
+  Báo cáo "PDF không xem được trên localhost" hoá ra là **lệch môi trường dev, không phải lỗi code**:
+  `appsettings.Development.json` trỏ `DefaultConnection` sang DB Supabase dùng CHUNG, trong khi
+  `Storage:Provider = Local` đọc file từ ĐĨA MÁY ĐANG CHẠY. Hàng dữ liệu do máy khác tạo mang storage key
+  mà máy này chưa bao giờ ghi file → `/uploads/...` trả 404. Kiểm chứng bằng chính API đang chạy: file có
+  thật trả `200 · Content-Type: application/pdf · Access-Control-Allow-Origin: http://localhost:3001`
+  (CORS và content-type đều đúng), file không có trả `404`.
+  - `useFileBlob` nay phân biệt `missing` (404/410) với `failed` (CORS/mạng/5xx) và nói đúng lý do — trước
+    đó mọi thất bại gộp thành "Không tải được file", không ai biết nên đi sửa gì.
+  - **ĐÃ THỬ rồi GỠ đường lui "trỏ iframe vào URL gốc" cho PDF.** Ý định là giữ bản xem trước phòng khi kho
+    file chưa mở CORS. Thực tế: với tài liệu ở origin khác, trình duyệt tự quyết định dựng hay tải — và
+    Chrome chọn TẢI VỀ. Tức là lưới đỡ đó làm đúng cái việc mà cả màn hình này sinh ra để tránh, ở đúng
+    những màn hay dùng nhất (bấm ứng viên để xem CV). Nay lượt tải hỏng thì báo lỗi, không có đường vòng nào.
+  - Thẻ `<iframe>` DUY NHẤT còn lại trong toàn bộ FE trỏ vào `blob:`; không còn chỗ nào giao file cho trình
+    duyệt tự xử lý. Thông báo lỗi in kèm lý do kỹ thuật (`HTTP 404`, `Failed to fetch`) để chẩn đoán không
+    cần mở DevTools.
+  - **Thủ phạm thật của "PDF tự tải về": IDM** (Internet Download Manager) — hộp thoại "Duplicate download
+    link ... IDM Options -> Downloads" là của nó, không phải của Chrome và không phải của ứng dụng.
+    Extension của IDM cướp mọi request có URL kết thúc bằng đuôi file trong danh sách của nó, kể cả request
+    `fetch` chỉ để dựng bản xem trước. **Đây cũng là lời giải cho "dev tải về, production thì không"**: dev
+    trả `/uploads/cv/x.pdf` (kết thúc bằng `.pdf`), production trả presigned URL của R2 kết thúc bằng
+    `?X-Amz-...` nên luật theo đuôi file không khớp.
+  - Giảm bề mặt bằng `previewUrl`: lượt tải dựng bản xem trước thêm `?inline=1` khi URL CHƯA có query, để
+    URL của dev mang đúng hình dạng của production. Không đụng URL đã có query — presigned URL ký theo đúng
+    chuỗi truy vấn, thêm tham số là 403. Đây là biện pháp giảm, KHÔNG phải bảo đảm: extension chạy dưới tầng
+    ứng dụng, bắt theo `Content-Type` thì vẫn cướp. Cách chắc chắn là tắt `pdf` trong IDM Options → Downloads
+    → File types, hoặc thêm `localhost` vào danh sách loại trừ của IDM.
+
+- [x] 2026-09-23: **Xem PDF/DOCX ngay trên web ở mọi màn; tải về là thao tác riêng của người dùng.**
+  Rà toàn bộ chỗ hiển thị tài liệu. Kết quả: 18/19 điểm đã đi qua `openDocument`; còn đúng **một** chỗ
+  mở tab mới để đọc — nút "Xem CV" ở màn hồ sơ của Hiring Manager (`<a target="_blank">` trỏ vào
+  `app.cvFileUrl` NGUYÊN TRẠNG, không ghép origin API → ở dev là tab 404, và .docx thì rơi vào mục tải
+  xuống thay vì hiện ra). Đã chuyển sang trình xem trong trang.
+  - **Đỡ cho file .docx cũ**: bộ dựng JD trước đây không khai `w:sectPr`, đã sửa ở phía ghi — nhưng file
+    sinh ra TRƯỚC đó vẫn nằm trong kho và không tự tốt lên. `applyFallbackPageSize` đặt khổ A4 cho đúng
+    những trang thiếu bề rộng, không chạm vào file của Word (luôn có `w:sectPr`).
+  - **"Tải về" giờ thật sự tải.** Thuộc tính `download` bị trình duyệt BỎ QUA khi file ở origin khác — mà
+    production dùng presigned URL của R2, nên bấm "Tải về" một PDF chỉ mở thêm tab hiện chính nó. Lớp phủ
+    tải file MỘT lần rồi dùng chung blob cho cả khung xem lẫn nút tải; `blob:` same-origin nên thuộc tính
+    được tôn trọng ở mọi môi trường. `downloadName` ghép đuôi từ URL cho những nơi đặt tên không đuôi
+    ("Nguyễn Văn A - CV" → `.pdf`), trước đây lưu ra file không đuôi.
+  - Các link `target="_blank"` còn lại đã rà và **cố ý giữ**: LinkedIn/GitHub/Portfolio của ứng viên, link
+    Kiosk, nguồn tham khảo công thức chấm CV, và các lượt tải Excel/CSV (mẫu playbook, ngân hàng đề, báo
+    cáo, mẫu tiêu chí) — không có định dạng nào trong số đó xem trước được trên web.
+
+- [x] 2026-09-23: **Xem trước PDF/DOCX chạy khác nhau giữa dev và production; trang DOCX bị bóp hẹp.**
+  - **DOCX hẹp — lỗi ở FILE, không ở trình xem.** Bản dựng .docx không khai `w:sectPr` bao giờ. Word tự điền
+    khổ mặc định của máy in nên mở bằng Word không thấy gì lạ, nhưng docx-preview lấy bề rộng trang **từ chính
+    `w:sectPr`** — thiếu thì trang co vừa đúng nội dung, ra cột chữ hẹp giữa màn hình ở CẢ hai môi trường.
+    Khai A4 dọc + lề 1000 twip (= 50pt, đúng hằng `margin` của bản PDF, nên hai bản xuất ngắt dòng cùng chỗ).
+    Khoá lại bằng `JdDocxPageSizeTests`.
+  - **Nút PDF/DOCX ở màn soạn JD**: `window.open(file.viewUrl)` — mà `viewUrl` của bộ lưu trữ nội bộ là đường
+    dẫn TƯƠNG ĐỐI, được phân giải theo origin của web (`:3001`) chứ không phải của API (`:5000`) → tab mới là
+    trang 404 của Vite. Production dùng R2 (URL tuyệt đối) nên không dính. Nay hai nút mở thẳng trình xem
+    trong ứng dụng: dựng được cả PDF lẫn DOCX, giống nhau ở mọi môi trường (trước đó DOCX mở tab mới thì
+    trình duyệt không dựng được, rơi thẳng vào mục tải xuống).
+  - **Trình xem tải file về blob rồi mới dựng** (`useFileBlob`). Cùng một file, trình duyệt xử lý khác nhau
+    tuỳ origin — `blob:` là same-origin với trang nên đường dựng chỉ còn một. Kèm theo đó mới có trạng thái
+    lỗi thật cho PDF: trước đây `<iframe>` hỏng chỉ ra khung trắng, không chữ nào.
+  - **`DocumentPreview` tự ghép origin.** `openDocument` vốn đã ghép nhưng khung nhúng thì không — màn hồ sơ
+    ứng viên truyền `app.cvFileUrl` nguyên trạng nên xem CV ở dev luôn rỗng. `resolveAssetUrl` không đụng URL
+    tuyệt đối nên ghép hai lần vô hại.
+
+- [x] 2026-09-23: **Nơi làm việc của phiếu không tới được nơi cần + màn ứng tuyển chặn trùng chỉ bằng giao diện.**
+  - **Nơi làm việc (`recruitment_requests.location`)**: ô có trên biểu mẫu lập phiếu, đi đúng đường xuống DB và
+    được `SeedFromRequest` chép sang bản JD — nhưng bảng đọc ở màn chi tiết phiếu **quên kê nó ra**, nên người
+    duyệt phiếu không bao giờ thấy HM đã khai địa điểm nào. Thêm `Field` cho `detail.location`.
+  - **Điền sẵn màn tạo tin**: nhánh "có bản JD đã xuất file" `return` ngay, nên ô nào bản JD bỏ trống (hay gặp
+    nhất: nơi làm việc, cấp bậc) thì giá trị trên phiếu không tới được màn tạo tin. Đổi thành **áp theo lớp** —
+    phiếu trước, bản JD đè lên những ô nó thực sự mang giá trị — đúng như comment tại chỗ đã mô tả nhưng code
+    chưa làm (trước đó mới sửa riêng phần cấu hình vòng).
+  - **`/jobs/:id/apply`**: cửa chặn trùng duy nhất nằm ở nút "Ứng tuyển" của màn chi tiết tin. Gõ thẳng URL là
+    vào được biểu mẫu, điền hết, tải CV, chạy cả bước đối chiếu thông tin — rồi server mới trả 409. Tệ hơn,
+    nhánh bắt lỗi **nuốt 409 và điều hướng y như lúc nộp thành công**, nên ứng viên tin rằng CV mới đã thay CV
+    cũ trong khi không có gì được lưu. Nay màn ứng tuyển **tự hỏi server** (`GET /portal/applications`) lúc nạp
+    và hiện màn "đã ứng tuyển" kèm lối vào hồ sơ cũ; 409 lúc gửi (hồ sơ vừa sinh ở tab khác) đi vào **đúng màn
+    đó**, không giả vờ thành công.
+  - **Luật nộp lại giữ nguyên** theo quyết định của chủ dự án: chỉ hồ sơ `withdrawn` mới ứng tuyển lại được —
+    hồ sơ bị loại (`cv_rejected` / `not_pass`) vẫn khoá tin đó. Không đụng `ApplyToJobCommandHandler`.
+
+- [x] 2026-09-23: **Hiring Manager đăng nhập xong bị ném vào `/403`** — sửa ở FE.
+  Đăng nhập Google (và cả email + mật khẩu) bằng tài khoản HM trả token hợp lệ, lưu phiên xong rồi điều hướng
+  vào `/hr/dashboard` → `ProtectedRoute` chặn vì sai vai trò → `/403`. Bấm "quay về" lại vào đúng `/hm/dashboard`,
+  nên trông như lỗi môi trường trong khi nguyên nhân nằm gọn trong code.
+  - **Gốc rễ:** hai bản sao chép tay của bảng role→dashboard (`getRoleDashboard` ở `OAuthCallbackPage` và ở
+    `LoginPage` của StaffSite) chỉ liệt kê 4 vai trò và **không có `hiring_manager`**; `default:` trả
+    `/hr/dashboard`. Đây đúng thứ comment đầu `roles.ts` đã cảnh báo khi gom bảng về một chỗ.
+  - **Sửa:** cả hai đọc từ bảng dùng chung (`ROLE_HOME` / `STAFF_HOME` qua `homePathForRole`); vai trò lạ rơi về
+    `/` để `StaffHomeRedirect` tự định tuyến, **không đoán bừa dashboard**. Bỏ luôn hai chỗ mặc định `'Hr_admin'`
+    khi thiếu `role` — vai trò lấy từ user mà `setAuthFromResponse` trả về (đã hợp nhất với claim trong JWT).
+  - **Kèm theo:** `/403` trước đây render `NotFoundPage`, người dùng đọc được đúng câu "Trang không tìm thấy" —
+    mô tả sai tình huống và giấu manh mối. Thêm `ForbiddenPage` dùng chung (nói rõ vai trò hiện tại + lối về khu
+    làm việc đúng), nối vào `/403` của cả StaffSite lẫn CandidateSite, kèm khoá i18n vi/en.
+
+- [x] 2026-09-22: **Công thức chấm CV do Hiring Manager quyết định (ADR-075)** — nhánh `feature/be/cv-scoring-formula`.
+  Trước đó HM khai được tiêu chí, trọng số và lời neo, nhưng **công thức biến câu trả lời của AI thành điểm vẫn viết
+  cứng trong backend**: 4 dải 90/70/40, mọi ý kiểm nặng như nhau, bù trừ hoàn toàn, ngưỡng khuyến nghị 80/65/50 chung
+  mọi tin, làm tròn hai lần (79,495 → 80), và FE tô màu theo ba bộ ngưỡng khác nhau — không bộ nào khớp nhãn của server.
+  - **Khung tham số, không phải biểu thức** (theo OPM · ĐH Wyoming · 4 Corner · ZYTHR · LibreTexts/R for HR · TicNote —
+    mọi nguồn đều dùng chung khung "loại theo điều kiện bắt buộc → thang có neo → cộng có trọng số → so ngưỡng"):
+    HM khai **điều kiện bắt buộc** (đạt/không đạt, ≤ 5, trọng số 0), **điểm tối thiểu từng tiêu chí**, **trọng số ý kiểm
+    ×1/×2/×3**, **ngưỡng 4 dải** và **ngưỡng khuyến nghị**. Mặc định = đúng hành vi cũ, nên tin đang chạy không đổi số nào.
+  - **Cổng chỉ ép NHÃN**: trượt điều kiện / dưới điểm tối thiểu → khuyến nghị "Chưa phù hợp" kèm lý do + trích dẫn;
+    **điểm vẫn tính, hồ sơ không bao giờ bị loại tự động** (ADR-053). "Đạt" mà AI không trích được bằng chứng → "chưa
+    xác minh", không ép nhãn.
+  - **Một bộ tính duy nhất** `CvScoreCalculator` (hàm thuần, làm tròn **một lần**) + `CvObservations` tách "AI quan sát
+    được gì" khỏi số học. **Prompt chấm CV không còn con số nào** — AI trả dải + ý kiểm, hoặc vị trí 0..1, hoặc đạt/không đạt.
+  - **Đổi công thức thì TÍNH LẠI, không gọi AI**: `CvObservationSignature` băm đúng phần AI được hỏi; bản chấm cũ phủ
+    được bộ mới thì dựng lại quan sát từ ảnh chụp và chạy lại bộ tính (`derived_from_analysis_id`, token 0). Đường nhanh
+    nằm trước cả bước đọc file CV trong `CvApplicationScorer`.
+  - **Xem trước tác động** (`POST /api/jobs/{id}/cv-rubric/preview`): điểm/khuyến nghị trước–sau từng hồ sơ, số hồ sơ đổi
+    nhãn, số hồ sơ vướng cổng, và số lượt gọi AI mà lần lưu sẽ tốn — tính trong bộ nhớ, không ghi, không gọi AI.
+  - **FE**: trình soạn có công tắc "Điều kiện bắt buộc", ô điểm tối thiểu, nút ×1/×2/×3 cho từng ý, khối "Công thức chấm"
+    (ngưỡng + công thức sống + cơ sở tham khảo), nút "Xem trước tác động"; màn hồ sơ có khối cổng với ✓/✗/? và trích dẫn;
+    màu điểm đọc từ nhãn của server (gỡ `_jobUi.scoreColor` và hai bộ ngưỡng viết cứng ở 4 màn). Excel thêm cột Loại /
+    Điểm tối thiểu, hậu tố `(x2)` và sheet "Cong thuc". Phiếu tuyển dụng mang công thức sang tin.
+  - **Migration `CvScoringFormula`**: 5 cột nullable, không default, không backfill; sau migration không hồ sơ nào bị coi
+    là cần chấm lại. Bộ tiêu chí **phỏng vấn** không đổi (tham số `RubricPurpose` bắt buộc để trình biên dịch chỉ ra mọi cửa).
+  - **Kiểm chứng:** Application **2183/2183** (+61), Domain 63/63, Infrastructure 7/7; FE `tsc` sạch, lint 0 lỗi, vitest
+    **108/108**, `check:i18n` đạt, build hai site. **E2E API cô lập 5010 + rag 8010 + Postgres tạm + Gemini thật: 33/33** —
+    3 CV thật chấm 87/60/6; đổi công thức → **0 lượt gọi AI**, điểm khớp bản xem trước (85/57/3), token 0; lưu y hệt →
+    `unchanged`; điểm tối thiểu 70 → ép Reject mà `applications.status` không đổi; thêm điều kiện JLPT N2 → AI chấm lại,
+    CV có N2 qua cổng (93), hai CV còn lại Reject trong khi nhãn-theo-điểm vẫn "Cân nhắc"; Excel khứ hồi; migration
+    Down/Up với 12 bản chấm còn nguyên. Đã dọn container, dịch vụ tạm và file thử.
+
+- [x] 2026-09-19: **Realtime cho các màn giữ state cục bộ (bổ sung ADR-057).** Server định tuyến `recruitment_requests`, `jd_templates`, `jd_documents`, `departments`, `system_settings`, `candidate_accounts` từ lâu, nhưng FE không có nhánh nào đón, và các màn đó dùng `useState` nên `invalidateQueries` không chạm tới được. Hệ quả: HR Leader duyệt / trả lại phiếu thì HM và Recruiter phải F5 mới thấy.
+  - **FE (Shared):** `realtime/dbTableRealtime.ts` — sự kiện DOM chung `db-table:changed` do `handleDbChange` phát cho MỌI bảng (`resync` = bảng `*`), `onDbTableChanged` (lọc bảng, gom đợt ghi sát nhau 250ms, `resync` luôn lọt qua), hook `useDbTableChanged`, `touchesRow`. Màn mới chỉ cần gọi hook với tên bảng, không phải sửa `handleDbChange`. `candidate_accounts` còn huỷ `['candidate-avatar']`.
+  - **Màn:** danh sách + chi tiết phiếu (nghe thêm `job_postings` vì cờ "đã dựng thành tin" suy từ bảng tin; giữ Recruiter HR Leader đã chọn), trình soạn JD (mẫu nạp lại ngay; bản JD chỉ nạp khi không có chữ chưa lưu và không nút nào đang chạy), mẫu JD, đội, tài khoản (+ ô chọn đội), cài đặt hệ thống, cài đặt nhân sự (ô "Đội"), hồ sơ ứng viên. Nạp lại do realtime luôn **ngầm** (không khung tải, không đè lỗi); màn có form **không nạp đè khi còn thay đổi chưa lưu** và kiểm lại sau `await`.
+  - **BE (`DbChangeRouter`):** `jd_templates` gửi thêm nhóm `recruiter` (người dùng trình soạn JD nhiều nhất lại không nhận được); `users` gửi thêm chính chủ tài khoản (Super Admin gán đội thì màn Cài đặt của người đó đổi ngay).
+  - **Kiểm chứng:** router 56/56 (2 test mới/sửa), `dbTableRealtime.test.ts` 6 test, StaffSite 96/96, `tsc` hai site sạch, eslint không lỗi mới (chỉ còn cảnh báo `any` có sẵn).
+
+- [x] 2026-09-19: **Dữ liệu MOCK trên production — một ứng viên đã qua đủ các vòng, dừng ở bước offer.** Người dùng cần một hồ sơ trên bản deploy tới được bước thư mời để test luồng offer. Chèn thẳng DB (một transaction, chạy thử ROLLBACK trước rồi mới COMMIT; chỉ INSERT, không sửa dòng có sẵn) theo schema bản đang deploy (ADR-072), cho tài khoản sẵn có `quannguyen23.a@gmail.com` vào tin **BACKEND DEVELOP** (`28d640e3…`, HM Nguyễn Anh Quân, Recruiter Phạm Trung Hiếu).
+  - **Hồ sơ `a1f946c4-a4a6-400a-aa37-4ad7e3c6ffec`** — `pass`, HM đã duyệt hồ sơ. Vòng 1 trắc nghiệm 7/8 = 87.5 (bộ đề tái tạo đúng thuật toán bốc đề `DrawQuestions`, đối chiếu bằng .NET). Vòng 2 sơ loại 82.5 và vòng 3 chuyên môn 78.2: mỗi vòng có ca + lịch HM + mã Kiosk đã dùng + phiên thật (HM vào phòng, cho vào) + transcript + báo cáo AI (ảnh chụp tiêu chí) + HM chốt Đạt, chia sẻ kết quả cho ứng viên. Vòng 3 kèm đề xuất Junior, 12–15 triệu VND (thư mời điền sẵn 15 triệu). Chuông "soạn thư mời" cho HM + Recruiter.
+  - **Không có:** bản ghi hình, phân tích CV (tin chưa có bộ tiêu chí chấm CV — quy tắc 28), email nào gửi ra ngoài. Không ảnh hưởng tác vụ nền: lịch đã xác nhận + đã có phiên/bài nộp nên không bị nhắc lịch hay đánh no-show; migration ADR-073 sẽ đặt `evaluation_status = done`.
+  - **Gỡ:** mọi dòng đều treo dưới hồ sơ trên (phiên → câu hỏi/câu trả lời/báo cáo/HM chốt; lịch, ca, mã, bài thi, lịch HM, audit `hr_confirm`, 2 thông báo `offer_needed:{hồ sơ}:*`). Offer/email tạo khi test sau này cũng treo dưới `application_id` này.
+
+- [x] 2026-09-19: **Sửa lỗi cấp mã vòng 2 sau vòng 1 trắc nghiệm ("Vòng 1 là bài trắc nghiệm…" dù đang cấp cho vòng 2).** Người dùng gặp trên deploy ở màn hồ sơ ứng viên. Nguyên nhân: nút "Cấp mã" ở màn hồ sơ (Recruiter + HR) gọi đường cũ `POST /interview/generate-code` không kèm vòng, và `GenerateCodeAsync` đoán vòng bằng `max(phiên đã xong) + 1` — vòng trắc nghiệm không sinh phiên phỏng vấn nào nên phép đoán luôn ra vòng 1, rồi bị luật "vòng trắc nghiệm không dùng mã" chặn. Thẻ cấp mã ở danh sách ứng viên của tin không dính vì chọn vòng theo lịch.
+  - **BE:** `LiveBookingAsync` (lịch `scheduled` của vòng cao nhất) chuyển từ `ApplicationInterviewCodeSupport` sang `InterviewCodeRules` — luật chung cho mọi đường cấp mã; `GenerateCodeAsync` không nhận vòng thì dùng nó, không có lịch thì trả lý do "chưa có lịch" thay vì đoán vòng 1. Bỏ hẳn phép đoán từ phiên đã xong. Lịch vòng trắc nghiệm vẫn `scheduled` sau khi thi, nên qua bài thi mà chưa xếp lịch vòng kế thì lý do chặn chỉ ra bước tiếp theo ("xếp lịch vòng N+1 trước") khi tin có vòng sau (`OnlineTestReason(round, hasNextRound)` + `HasNextRoundAsync`).
+  - **FE:** màn hồ sơ Recruiter + HR bỏ nút cấp mã riêng (và state `notice` chết) → dùng `InterviewCodeCard` (cùng thẻ với danh sách ứng viên: đúng vòng, kiểm quyền theo tin, lý do khi chưa cấp được, link vào phòng cho vòng làm từ nhà); thẻ nhận `className`. Gỡ 5 khoá i18n không còn dùng (vi/en × 2 màn).
+  - **Kiểm chứng:** test mới tái hiện đúng ca lỗi ở cả hai đường (vòng 1 `online_test` + lịch vòng 1 & 2 → mã vòng 2), không lịch → "chưa có lịch", chưa xếp vòng 2 → lý do chỉ bước tiếp theo. Application **2118/2118**, Domain 63/63, Infrastructure 7/7; `tsc` StaffSite sạch, eslint sạch, StaffSite 90/90.
+
+- [x] 2026-09-19: **Bộ playbook mẫu kích hoạt RAG — công ty + một tin (`docs/playbooks/`).** Soạn theo đúng cách pipeline đọc tài liệu: chunker tách theo dòng trống (≥1000 ký tự thì cắt cứng 500), truy hồi top-5 chung với CV/JD, câu bắt buộc tách theo dòng, prompt chấm CV gộp khung năng lực + dấu hiệu (công ty + tin) cắt ở 6000 ký tự.
+  - **Công ty (5 file .txt):** compliance (7 nhóm, căn cứ BLLĐ 2019 khoản 8 Điều 3/Điều 8 + NĐ 13/2023, mỗi đoạn chứa từ khoá ứng viên có thể nói để được truy hồi), khung năng lực 4 bậc, dấu hiệu cần đào sâu, văn hoá (mẫu — cần thay bằng giá trị thật), phong cách viết theo tình huống.
+  - **Tin Senior Backend .NET (12 file .txt + 3 .xlsx):** khung năng lực + dấu hiệu cấp tin (vào chấm CV); vòng 1 và vòng 3 mỗi vòng có playbook vòng, 3 câu bắt buộc, ngân hàng câu hỏi, đáp án mong đợi (mỗi câu bắt buộc có đoạn đáp án cùng từ khoá); vòng 3 thêm kịch bản kỹ thuật + dấu hiệu theo vòng. Bộ tiêu chí chấm CV (mức neo + ý kiểm), bộ tiêu chí phỏng vấn chung (chuyên môn) và riêng vòng 1.
+  - **Kiểm chứng:** chunker thật của rag-service: 73 chunk, dài nhất 709 ký tự; parser câu bắt buộc (port 1:1) ra đúng 3 câu/vòng; ngân sách chấm CV 4031/6000; 3 file Excel qua `RubricSheet.Parse` + `ScoringRubric.Validate` + `CvRubricEditing.Normalize` không lỗi.
+  - **Phát hiện kèm (chưa sửa):** `.md` được màn upload cho chọn nhưng `DocumentParserService` từ chối; `.docx`/`.pdf` mất ranh giới đoạn khi parse.
+
+- [x] 2026-09-19: **Hoàn thiện luồng offer — thư kết quả qua trình soạn, xác nhận nhận việc, tự đóng tin khi đủ người (ADR-074, giai đoạn 2).** Sau khi ADR-073 gỡ chỗ tắc báo cáo, luồng offer lần đầu chạy tới cuối và lộ ba lỗ: thư kết quả (thư quan trọng nhất) viết cứng ở hai chỗ, gửi thẳng SMTP, không xem trước/sửa/lưu vết được — và hai nhánh chọn thư theo hai điều kiện khác nhau; chốt hai lần được; nhận việc xong không một văn bản nào, tin vẫn mở trên Job Board sau khi đủ người.
+  - **BE:** `InterviewResultEmail` (3 biến thể, `ResolveVariant` là hàm duy nhất cho cả thư lẫn trạng thái hồ sơ, `TotalRoundsAsync` dùng chung) + khoá mẫu `interview_result` + nhánh renderer (báo cáo phải thuộc hồ sơ) + `PreviewEmailQuery.Variant` (cổng xem trước của mẫu này = HM chính / quản trị viên); `ConfirmReviewRequest.EmailOverride` → `SubmitHrReviewAsync` gửi MỘT thư qua `CandidateEmailSender`; `TriggerAutoProgressionAsync` → `OpenNextRoundAsync` (không gửi thư); chốt lần hai → 409. `OfferEmail.BuildAccepted` + `RespondToOfferCommand` gửi thư xác nhận (nối `In-Reply-To` thư mời) và gọi `JobHeadcountCloser` (đóng tin, audit `job_auto_closed_headcount`, báo HM/Recruiter/HR Leader kèm số hồ sơ + thư mời còn mở; không tự loại, không tự thu hồi) — cả hai best-effort sau khi quyết định đã lưu.
+  - **FE:** `EmailComposerModal` + `emailService.preview` nhận `variant`; màn đánh giá (HR/HM) bấm chốt → mở trình soạn thư kết quả (buổi thử chốt thẳng), lỗi hiện đúng câu server qua `resolveApiError`; `ClosedJobOpenApplications` ở màn tin của HR/Recruiter/HM; `applicationService.rejectApplication` nhận `emailOverride`; i18n vi/en.
+  - **Kiểm chứng:** Application **2114/2114** (+23 test), `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm (email tắt): xem trước thư vòng 1/vòng 3 đúng biến thể; chốt vòng cuối kèm thư sửa tay → `email_logs` `was_edited`, `<script>` bị lọc, hồ sơ `pass`; chốt lần hai 409; HM soạn offer (điền sẵn từ đề xuất) → HR Leader chốt → gửi → ứng viên nhận → `hired`, thư `offer_accepted`, tin headcount 1 tự `closed` + audit + thông báo.
+
+- [x] 2026-09-19: **Báo cáo phỏng vấn không bao giờ mất im lặng — bộ tiêu chí phỏng vấn theo tin + chấm bằng hàng đợi nền (ADR-073, giai đoạn 1).** Người dùng báo buổi thử lẫn buổi thật đều không ra báo cáo. Nguyên nhân kiểm trên production (chỉ đọc): 0 bộ `interview_rubric` → `GenerateEvaluationReportAsync` thoát sớm chỉ để lại log; báo cáo sinh ngay trong lệnh đóng phiên nên lỗi nào cũng là mất vĩnh viễn; giao diện gọi mọi trường hợp là "AI đang chấm". Kéo theo luồng offer không bao giờ chạy (không hồ sơ nào tới `pass`).
+  - **BE:** `InterviewRubricStore` (vòng → tin, bỏ lùi bộ công ty) + `InterviewRubricService.SaveAsync` (đường ghi duy nhất, bỏ ý kiểm, lưu xong đưa buổi đang chờ vào hàng) + `JobInterviewRubricController` (`GET/PUT /api/jobs/{id}/interview-rubric`, `DELETE …/rounds/{n}`) + mẫu công ty & AI gợi ý (`/api/playbooks/interview-rubric/templates|suggest`, `GeminiProvider.SuggestInterviewRubricAsync`). Chặn nạp/xoá `interview_rubric` cấp tin qua playbook thường; danh sách playbook của tin ẩn nó. Cổng `→ active` mã `interview_rubric_required`. `InterviewEvaluator` (4 kết cục, ghi `evaluation_status/attempts/error/updated_at`, báo cáo hệ thống cho buổi thật không câu trả lời, đánh giá ngôn ngữ lỗi không làm mất báo cáo) + `IEvaluationQueue` + `EvaluationHostedService` (2 worker, quét 2′, thử lại 3 lượt, nhắc HM thiếu bộ tiêu chí). `EndSessionAsync` chỉ xếp hàng. `POST /api/evaluations/sessions/{id}/retry`. Trạng thái `needs_rubric`/`evaluation_failed` (nhân sự) và `EvaluationProgress` (ứng viên). Seed dev gieo bộ tiêu chí phỏng vấn. Migration `InterviewEvaluationPipeline`.
+  - **rag-service:** `RubricCriterion.levels` + in mức neo 4 dải vào prompt chấm.
+  - **FE:** `JobInterviewRubricPanel` ở màn tin của HM/HR/Recruiter (bộ chung + bộ riêng theo vòng, banner vòng thiếu + số buổi đang chờ), `CvRubricEditor mode="interview"`, `interviewRubricService`; `InterviewResultsCard` thêm hai trạng thái + nút "Chấm lại"; Portal: danh sách buổi thử + trang xem lại nói đúng lý do, tự hỏi lại khi đang chấm; mã lỗi `interview_rubric_required` (vi/en); nhãn mẫu Playbook công ty.
+  - **Kiểm chứng:** Application **2091/2091**, Infrastructure 7/7, Domain 63/63, rag-service 37/37, `tsc` hai site sạch, `check:i18n` đạt. E2E trên Postgres tạm + rag-service thật (GPT-4o) + Gemini: chấm nền → 84 `pass`; thiếu bộ tiêu chí → `blocked_no_rubric` không gọi AI; HM nhờ AI gợi ý rồi lưu → buổi đang chờ tự chấm → 78,75; buổi thử không câu trả lời → `no_answers`; rag tắt → `failed` + lý do → "Chấm lại" → `done` + audit.
+>>>>>>> 75e38bb886a05e0ead77ecc51f5607ffcb76efcb
 
 - [x] 2026-09-18: **Bài trắc nghiệm là một đợt thi có giờ cố định; thời lượng có một nguồn (ADR-072).** Người dùng hỏi thời lượng bài do người cấu hình hay mặc định. Câu trả lời: có hai ô "thời lượng", ô "Số phút" của vòng trắc nghiệm ở màn tạo tin không có tác dụng gì. Người dùng muốn gộp lại, và muốn khung giờ thi thành *"bài 30 phút bắt đầu 9h thì 9h–9h30 vào lúc nào cũng được, 9h30 đóng — vào 9h15 còn 15 phút"* thay cho cửa vào 1 tiếng + đồng hồ riêng mỗi người.
   - **BE:** luật duy nhất `OnlineTestWindow` (`ClosesAt = giờ hẹn + thời lượng`, hạn nộp `+1 phút`); bỏ `EntryWindow` ở cả 7 chỗ đọc (lấy đề/nộp bài, tự nộp khi hết hạn, lịch ứng viên, Portal, bảng ứng viên, khoảng bận khi xếp lịch, thư mời/nhắc). Thời lượng = `MaxDurationMinutes` của vòng `online_test`; màn ngân hàng đề ghi vào vòng (`DurationMinutes` nullable: tin chưa có vòng thì không lưu được). Giờ kết thúc ca thi server tự tính = giờ đóng (`SchedulingSupport.EffectiveEndTime`). Chặn đổi thời lượng khi còn ứng viên giữ chỗ ở ca thi chưa đóng (mã `online_test_duration_locked`, cả màn ngân hàng đề lẫn lệnh sửa tin); đổi được thì kéo giờ kết thúc các ca chưa đóng. `CandidateOnlineTestDto.ServerNow`. Migration `MergeOnlineTestDurationIntoRoundConfig`: chép giá trị đang có hiệu lực sang vòng, đồng bộ giờ kết thúc ca thi cũ, bỏ cột `job_postings.online_test_duration_minutes`.

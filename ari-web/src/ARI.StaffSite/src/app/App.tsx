@@ -82,6 +82,7 @@ const HrOffersPage = lazy(() => import('@/pages/hr/OffersPage'))
 const RecruiterOffersPage = lazy(() => import('@/pages/recruiter/OffersPage'))
 
 const NotFoundPage = lazy(() => import('@ari/shared/ui/NotFoundPage'))
+const ForbiddenPage = lazy(() => import('@ari/shared/ui/ForbiddenPage'))
 
 /** Fallback nhẹ khi đang tải chunk của page. */
 function RouteFallback() {
@@ -111,7 +112,7 @@ function App() {
     <DocumentViewerProvider>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/403" element={<NotFoundPage />} />
+          <Route path="/403" element={<ForbiddenPage />} />
 
           {/* Trang gốc staff: đã đăng nhập → workspace theo role; chưa → trang đăng nhập. */}
           <Route path="/" element={<StaffHomeRedirect />} />

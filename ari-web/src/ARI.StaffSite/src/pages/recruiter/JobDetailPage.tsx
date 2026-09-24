@@ -54,7 +54,9 @@ import { JobDetailSkeleton } from './_skeletons'
 import HiringTeamPanel from '@/components/hiring/HiringTeamPanel'
 import JobPlaybookPanel from '@/components/playbooks/JobPlaybookPanel'
 import JobCvRubricPanel from '@/components/cvRubric/JobCvRubricPanel'
+import JobInterviewRubricPanel from '@/components/interviewRubric/JobInterviewRubricPanel'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import ClosedJobOpenApplications from '@/components/offers/ClosedJobOpenApplications'
 
 function getDeadlineText(
   deadlineStr: string | null | undefined,
@@ -628,9 +630,24 @@ export default function RecruiterJobDetailPage() {
         <JobCvRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
       </div>
 
+      {/* Bộ tiêu chí chấm PHỎNG VẤN (ADR-073) — chủ tin CHỈ ĐỌC; thiếu thì buổi phỏng vấn không ra báo cáo. */}
+      <div className="mb-6">
+        <JobInterviewRubricPanel jobPostingId={job.id} job={{ title: job.title, jobDescription: job.jobDescription, experienceLevel: job.experienceLevel, skills: job.skills }} />
+      </div>
+
       <div className="mb-6">
         <JobPlaybookPanel jobPostingId={job.id} rounds={job.roundConfigs || []} />
       </div>
+
+      {/* Tin đã đóng (tự đóng khi đủ người — ADR-074, hoặc đóng tay) mà còn hồ sơ chưa khép. */}
+      <ClosedJobOpenApplications
+        jobStatus={job.status}
+        applications={apps}
+        canReject
+        candidateHref={(appId) => `/recruiter/candidates/${appId}`}
+        offersHref="/recruiter/offers"
+        onChanged={() => void refetchApps()}
+      />
 
       {/*
         Khối ứng viên theo lối ATS (thanh bước quy trình → danh sách → hồ sơ + CV).

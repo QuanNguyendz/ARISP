@@ -18,6 +18,25 @@ namespace ARI.Domain.Constants
     }
 
     /// <summary>
+    /// Kết quả các CỔNG của công thức chấm CV (<c>cv_jd_analyses.gate_status</c>) — ADR-075: điều kiện bắt buộc
+    /// và điểm tối thiểu của tiêu chí. <c>null</c> = bộ tiêu chí không có cổng nào.
+    ///
+    /// Cổng chỉ là NHÃN: không đạt thì khuyến nghị bị ép "Reject", hồ sơ không bao giờ bị chặn hay tự loại (ADR-053).
+    /// </summary>
+    public static class CvGateStatuses
+    {
+        /// <summary>Qua mọi cổng.</summary>
+        public const string Pass = "pass";
+        /// <summary>Trượt ít nhất một cổng — khuyến nghị bị ép "Reject".</summary>
+        public const string Fail = "fail";
+        /// <summary>
+        /// Không trượt cổng nào nhưng có cổng chưa xác minh được (AI bỏ sót, hoặc đánh "đạt" mà không trích được
+        /// bằng chứng) — cần người kiểm tra tay; KHÔNG ép khuyến nghị.
+        /// </summary>
+        public const string Review = "review";
+    }
+
+    /// <summary>
     /// Trạng thái điểm CV mà giao diện hiển thị cho một hồ sơ (suy ra, không lưu) — ADR-070.
     /// </summary>
     public static class CvScoreStates

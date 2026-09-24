@@ -1,10 +1,12 @@
 {
   "documentViewer": {
-    "defaultFileName": "Tài liệu",
-    "docxError": "Không thể hiển thị file DOCX trực tiếp (có thể do CORS hoặc file lỗi). Hãy tải về để xem.",
-    "loading": "Đang dựng nội dung tài liệu...",
-    "download": "Tải về",
     "close": "Đóng",
+    "defaultFileName": "Tài liệu",
+    "docxError": "Không tải được file DOCX để xem trước. Hãy thử lại hoặc tải file về.",
+    "download": "Tải về",
+    "fileMissing": "Không tìm thấy file trên máy chủ (404). File có thể đã bị xoá, hoặc được tải lên ở một môi trường khác với môi trường đang chạy.",
+    "loading": "Đang dựng nội dung tài liệu...",
+    "pdfError": "Không tải được file PDF để xem trước. Hãy thử lại hoặc tải file về.",
     "unsupportedFormat": "Không hỗ trợ xem trực tiếp định dạng này. Hãy tải về để mở."
   }
 }

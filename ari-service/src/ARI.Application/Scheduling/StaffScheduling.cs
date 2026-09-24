@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ARI.Application.Common;
+using ARI.Application.Common.Security;
 using ARI.Application.DTOs;
 using ARI.Application.Emails;
 using ARI.Application.Interfaces;

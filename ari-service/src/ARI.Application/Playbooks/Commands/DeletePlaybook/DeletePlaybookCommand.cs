@@ -45,6 +45,13 @@ namespace ARI.Application.Playbooks.Commands.DeletePlaybook
                     "Không xoá được bộ tiêu chí chấm CV đang dùng. Hãy sửa và lưu bộ tiêu chí mới ở màn tin.",
                     CommonErrorCodes.Conflict);
 
+            // ADR-073: bộ tiêu chí chấm PHỎNG VẤN của tin có vòng đời riêng (bộ riêng theo vòng bỏ được, bộ chung
+            // chỉ thay) — mọi thay đổi đi qua mục "Bộ tiêu chí chấm phỏng vấn" ở màn tin.
+            if (doc.DocumentType == ScoringRubric.TypeInterviewRubric && doc.Scope != PlaybookScope.ScopeOrg)
+                return Result.Failure(
+                    "Bộ tiêu chí chấm phỏng vấn của tin được quản lý trong mục \"Bộ tiêu chí chấm phỏng vấn\" ở màn tin.",
+                    CommonErrorCodes.Conflict);
+
             // Cùng luật với lúc thêm: playbook công ty là của HR Leader, playbook theo tin là của HM chính.
             // Trước đây lệnh này không kiểm gì ngoài policy ở controller.
             var (accessError, accessCode) = await PlaybookAccess.CheckWriteAsync(
