@@ -206,7 +206,11 @@ namespace ARI.Application.DTOs
                 JdFileName = job.JdFileName,
                 JdFileFormat = job.JdFileFormat,
                 InterviewMode = job.InterviewMode,
-                Status = (job.Status == "active" && job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : job.Status,
+                // Không có ngày đi làm ở đây (mapper không đọc phiếu), nên mốc lùi về "hạn nộp + ân
+                // hạn". Màn danh sách của nhân sự tính lại bằng ngày trên phiếu sau khi nạp xong —
+                // xem `JobClosure`, cả hai đường đều đi qua cùng một hàm.
+                Status = ARI.Application.Jobs.JobClosure.DisplayStatus(
+                    job.Status, job.ApplicationDeadline, null, DateTimeOffset.UtcNow),
                 RejectionReason = job.RejectionReason,
                 IsPublicListing = job.IsPublicListing,
                 DetectedLanguage = job.DetectedLanguage,
@@ -249,6 +253,9 @@ namespace ARI.Application.DTOs
         public string? Department { get; set; }
         public string InterviewMode { get; set; } = "remote";
         public string Status { get; set; } = "draft";
+
+        /// <summary>Dùng để tra ngày đi làm dự kiến khi tính trạng thái hiển thị (<c>JobClosure</c>).</summary>
+        public Guid? RecruitmentRequestId { get; set; }
         public string? DetectedLanguage { get; set; }
         public string? LanguageRequirement { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
@@ -301,7 +308,9 @@ namespace ARI.Application.DTOs
                 Title = job.Title,
                 Department = job.Department,
                 InterviewMode = job.InterviewMode,
-                Status = (job.Status == "active" && job.ApplicationDeadline.HasValue && job.ApplicationDeadline.Value <= DateTimeOffset.UtcNow) ? "closed" : job.Status,
+                Status = ARI.Application.Jobs.JobClosure.DisplayStatus(
+                    job.Status, job.ApplicationDeadline, null, DateTimeOffset.UtcNow),
+                RecruitmentRequestId = job.RecruitmentRequestId,
                 DetectedLanguage = job.DetectedLanguage,
                 LanguageRequirement = job.LanguageRequirement,
                 CreatedAt = job.CreatedAt,

@@ -166,6 +166,14 @@ namespace ARI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("candidate_phone");
 
+                    b.Property<string>("ContactVerificationDetails")
+                        .HasColumnType("text")
+                        .HasColumnName("contact_verification_details");
+
+                    b.Property<string>("ContactVerificationStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("contact_verification_status");
+
                     b.Property<string>("CoverLetter")
                         .HasColumnType("text")
                         .HasColumnName("cover_letter");

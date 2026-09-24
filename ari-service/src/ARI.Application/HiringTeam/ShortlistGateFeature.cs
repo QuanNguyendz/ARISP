@@ -85,7 +85,6 @@ namespace ARI.Application.HiringTeam
                 return Result<bool>.Failure(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
             if (level < JobAccessLevel.Owner)
                 return Result<bool>.Failure(JobAccessErrors.ApplicationManageForbidden, CommonErrorCodes.Forbidden);
-
             if (!ApplicationStatuses.Is(app.Status, ApplicationStatuses.CvSubmitted)
                 && !ApplicationStatuses.Is(app.Status, ApplicationStatuses.Invited))
                 return Result<bool>.Failure("Chỉ gửi duyệt được hồ sơ vừa nộp CV và chưa qua sàng lọc.");
@@ -111,7 +110,12 @@ namespace ARI.Application.HiringTeam
                 Type = "pending",
                 Title = "Hồ sơ chờ bạn duyệt",
                 Body = $"Ứng viên {app.CandidateName} ứng tuyển vị trí \"{job.Title}\" đang chờ bạn duyệt.",
-                Link = $"/hm/shortlists",
+                // Dẫn thẳng tới HỒ SƠ đang chờ, nơi có CV và cổng duyệt (`ShortlistGatePanel`).
+                //
+                // Trước đây link là `/hm/shortlists` — màn danh sách riêng đã bị ADR-067 bỏ, mà link
+                // thì không ai sửa theo. Route không tồn tại nên frontend đẩy thẳng sang trang 404:
+                // đúng loại hỏng không bao giờ tự lộ ra, vì người viết lệnh không phải người bấm chuông.
+                Link = await StaffLinks.CandidateAsync(_unitOfWork, hm.UserId, app.Id, ct),
                 DedupKey = $"hm_shortlist:{app.Id}",
                 IsRead = false,
             }, ct);
@@ -330,7 +334,8 @@ namespace ARI.Application.HiringTeam
                     Type = "system",
                     Title = "Cổng duyệt của bạn đã bị vượt",
                     Body = $"Hồ sơ {app.CandidateName} — vị trí \"{job?.Title}\" đã được duyệt thay. Lý do: {reason}",
-                    Link = "/hm/shortlists",
+                    // Cùng lý do với thông báo "hồ sơ chờ duyệt": `/hm/shortlists` không còn tồn tại.
+                    Link = await StaffLinks.CandidateAsync(_unitOfWork, hm.UserId, app.Id, ct),
                     DedupKey = $"hm_shortlist_bypassed:{app.Id}",
                     IsRead = false,
                 }, ct);

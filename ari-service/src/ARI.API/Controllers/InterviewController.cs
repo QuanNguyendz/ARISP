@@ -16,6 +16,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ARI.API.Controllers
 {
+    /// <summary>
+    /// Thân yêu cầu của lệnh nhắc lịch. Chỉ mang bản thư nhân sự đã sửa trong trình soạn (quy tắc 21) —
+    /// không có gì thì gửi đúng mẫu, nên client cũ gọi không kèm body vẫn chạy.
+    /// </summary>
+    public class SendReminderRequest
+    {
+        public ARI.Application.Emails.EmailOverride? EmailOverride { get; set; }
+    }
+
     [ApiController]
     [Route("api/interview")] // Đồng bộ chuẩn prefix số ít theo đúng yêu cầu đồng bộ hệ thống backend
     public class InterviewController : ControllerBase
@@ -186,11 +195,19 @@ namespace ARI.API.Controllers
         /// </summary>
         [HttpPost("management/booking/{bookingId:guid}/remind")]
         [Authorize(Policy = "InternalStaff")]
-        public async Task<IActionResult> SendBookingReminder(Guid bookingId, CancellationToken ct)
+        public async Task<IActionResult> SendBookingReminder(
+            Guid bookingId, [FromBody] SendReminderRequest? request, CancellationToken ct)
         {
-            var result = await _sender.Send(new SendBookingReminderCommand(bookingId, _currentUser.UserId, _currentUser.Role), ct);
+            var result = await _sender.Send(new SendBookingReminderCommand(
+                bookingId, _currentUser.UserId, _currentUser.Role, request?.EmailOverride), ct);
             if (result.IsFailure) return MapFailure(result);
-            return Ok(new { success = true, message = "Đã gửi nhắc nhở tới ứng viên." });
+
+            // `result.Value` = thư có ra khỏi hệ thống không. Trước đây câu trả lời luôn là "Đã gửi
+            // nhắc nhở tới ứng viên." bất kể SMTP hỏng hay không — người bấm nút tin là ứng viên đã
+            // nhận mail, trong khi thứ duy nhất chắc chắn tới nơi là chuông trong Portal.
+            return Ok(result.Value
+                ? new { success = true, message = "Đã gửi email nhắc lịch tới ứng viên." }
+                : new { success = false, message = "Đã tạo thông báo trong Portal, nhưng KHÔNG gửi được email — xem tab Lịch sử email để biết lý do." });
         }
 
         /// <summary>

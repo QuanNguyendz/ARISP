@@ -87,6 +87,25 @@ namespace ARI.Infrastructure.Documents
                     body.Append(Text(layout.FooterNote!, size: 16, color: "888888", font: layout.FontFamily));
                 }
 
+                // KHỔ GIẤY PHẢI KHAI TƯỜNG MINH, và phải là phần tử CUỐI của body.
+                //
+                // Word tự điền khổ mặc định của máy in khi thiếu `w:sectPr`, nên file mở bằng Word vẫn
+                // trông bình thường và lỗi này không lộ ra ở đó. Nhưng bản xem trước trên web
+                // (docx-preview) lấy bề rộng trang TỪ CHÍNH `w:sectPr` — không có thì trang không có
+                // bề rộng nào và co lại vừa đúng nội dung, ra một cột chữ hẹp giữa màn hình.
+                //
+                // A4 dọc, lề 1000 twip = 50pt — ĐÚNG bằng `margin` của bản PDF ở dưới, nên hai bản xuất
+                // của cùng một `JdLayout` ngắt dòng ở cùng chỗ (tinh thần "một bố cục, hai bộ xuất"
+                // của ADR-064).
+                body.Append(new SectionProperties(
+                    new PageSize { Width = 11906U, Height = 16838U, Orient = PageOrientationValues.Portrait },
+                    new PageMargin
+                    {
+                        Top = 1000, Bottom = 1000,
+                        Left = 1000U, Right = 1000U,
+                        Header = 720U, Footer = 720U, Gutter = 0U,
+                    }));
+
                 main.Document.Save();
             }
 

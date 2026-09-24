@@ -13,6 +13,12 @@
     "notFound": "Job posting not found.",
     "backToJobs": "Back to job listings"
   },
+  "alreadyApplied": {
+    "title": "You have already applied to this job",
+    "description": "Your application for {{job}} is being processed. Each job accepts one application — to submit a different CV, withdraw the current application first.",
+    "viewApplication": "View my application",
+    "backToJob": "Back to the job posting"
+  },
   "cv": {
     "title": "Application CV",
     "helpText": "By default, we use the CV from your profile. You can also submit a different CV for this specific job.",

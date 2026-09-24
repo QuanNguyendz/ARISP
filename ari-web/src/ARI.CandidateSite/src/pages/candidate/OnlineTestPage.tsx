@@ -433,6 +433,10 @@ export default function CandidateOnlineTestPage() {
         ) : (
           <>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm shadow-sm">
+              {/* Điểm sàn là thông tin NỘI BỘ của bộ phận tuyển dụng — cùng lý lẽ đã áp cho màn
+                  "đã nộp bài". Câu này từng ghim thêm "Điểm đạt: {{pass}}/100" nhưng nơi gọi chưa
+                  bao giờ truyền `pass`, nên thứ ứng viên đọc được là "Điểm đạt: /100". Bỏ hẳn vế đó:
+                  vừa hết chuỗi hỏng, vừa không lộ ngưỡng chấm. */}
               <span className="text-ink-600">
                 {t('page.progress', {
                   answered: answeredCount,

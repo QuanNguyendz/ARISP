@@ -41,6 +41,16 @@ public sealed class RecordingFileStorage : IFileStorageService
         return Task.FromResult($"{folder.ToSegment()}/{originalFileName}");
     }
 
+    /// <summary>Nội dung đã ghi bằng <see cref="SaveAtAsync"/>, theo khoá — để test đọc lại bản phái sinh.</summary>
+    public Dictionary<string, byte[]> SavedAt { get; } = new();
+
+    public Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default)
+    {
+        if (ThrowOnSave) throw new InvalidOperationException("storage down");
+        SavedAt[storageKey] = content;
+        return Task.CompletedTask;
+    }
+
     public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default)
     {
         if (GetUrlThrows != null) throw GetUrlThrows;
@@ -57,9 +67,18 @@ public sealed class RecordingFileStorage : IFileStorageService
         Deleted.Add(storageKey);
         return Task.CompletedTask;
     }
+    /// <summary>
+    /// Nội dung theo TỪNG khoá — cho các luồng đọc nhiều file khác nhau trong một lượt (bản xem
+    /// trước CV đọc file gốc rồi đọc tiếp bản đã dựng). Không khai khoá nào thì rơi về
+    /// <see cref="FileBytes"/> như trước, nên test cũ không đổi.
+    /// </summary>
+    public Dictionary<string, byte[]> BytesByKey { get; } = new();
+
     public Task<byte[]?> ReadAllBytesAsync(string storageKey, CancellationToken ct = default)
     {
         if (ReadThrows != null) throw ReadThrows;
+        if (BytesByKey.Count > 0)
+            return Task.FromResult(BytesByKey.TryGetValue(storageKey, out var bytes) ? bytes : null);
         return Task.FromResult(FileBytes);
     }
 }

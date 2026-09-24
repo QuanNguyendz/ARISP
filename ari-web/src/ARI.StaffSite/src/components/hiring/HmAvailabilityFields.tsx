@@ -48,7 +48,28 @@ export function toLocalInput(iso: string): string {
 /** Mốc "bây giờ" ở dạng `YYYY-MM-DDTHH:mm`. */
 export const nowLocalInput = () => toLocalInput(new Date().toISOString())
 
-export type WindowIssue = 'empty' | 'incomplete' | 'past' | 'endBeforeStart' | 'tooLong' | null
+export type WindowIssue =
+  | 'empty'
+  | 'incomplete'
+  | 'past'
+  | 'endBeforeStart'
+  | 'tooLong'
+  | 'overlap'
+  | 'overlapOther'
+  | null
+
+/**
+ * Khoảng thời gian Hiring Manager ĐÃ khai ở nơi khác (vòng khác của cùng tin) — không sửa được từ
+ * màn này, nhưng khung mới không được đè lên nó.
+ *
+ * `label` là thứ hiện ra cho người dùng ("Vòng 2"), vì "chồng lấn" mà không nói chồng với cái gì thì
+ * người ta phải mở từng tab đi dò.
+ */
+export interface BusyWindow {
+  start: number
+  end: number
+  label: string
+}
 
 /**
  * Lỗi của MỘT dòng, tính bằng ĐÚNG các luật mà server áp (`HmAvailabilitySupport.Sanitize`).
@@ -79,12 +100,51 @@ const ISSUE_TEXT: Record<Exclude<WindowIssue, null | 'empty'>, string> = {
   past: 'Giờ bắt đầu phải ở tương lai.',
   endBeforeStart: 'Giờ kết thúc phải sau giờ bắt đầu.',
   tooLong: `Mỗi khung tối đa ${MAX_WINDOW_HOURS} tiếng — rảnh nhiều ngày thì tách thành nhiều khung.`,
+  overlap: 'Khung này chồng lên một khung khác. Hãy gộp thành một khung hoặc tách rời nhau.',
+  overlapOther:
+    'Khung này chồng lên lịch rảnh đã khai ở vòng khác. Cùng một khoảng thời gian không thể vừa dành cho vòng này vừa dành cho vòng kia.',
+}
+
+/**
+ * Lỗi của TẤT CẢ các dòng — `issueOf` chỉ nhìn được một dòng, mà "chồng lấn" là quan hệ giữa hai dòng.
+ *
+ * Gương của `HmAvailabilitySupport.Sanitize` phía server: dòng nào tự nó đã sai thì giữ nguyên lỗi
+ * của nó (chưa biết giờ thật thì chưa so được với ai), dòng nào hợp lệ mới đem so với các dòng hợp
+ * lệ khác. Chạm đầu–cuối (10:00–11:00 rồi 11:00–12:00) KHÔNG tính là chồng lấn — đó là một buổi rảnh
+ * liên tục viết thành hai dòng.
+ */
+export function issuesOf(rows: DraftWindow[], busy: BusyWindow[] = []): WindowIssue[] {
+  const own = rows.map(issueOf)
+  const span = rows.map((r, i) =>
+    own[i] === null ? { start: new Date(r.start).getTime(), end: new Date(r.end).getTime() } : null
+  )
+
+  return own.map((issue, i) => {
+    if (issue !== null) return issue
+    const a = span[i]!
+    const clash = span.some((b, j) => j !== i && b !== null && a.start < b.end && b.start < a.end)
+    if (clash) return 'overlap'
+    // Lịch rảnh là lịch của MỘT NGƯỜI: khung ở vòng khác cũng chiếm chỗ y như khung trong danh sách
+    // này. Trước đây phép so dừng lại ở phạm vi một vòng, nên vòng 2 và vòng 3 khai trùng giờ vẫn lọt.
+    return busy.some((b) => a.start < b.end && b.start < a.end) ? 'overlapOther' : null
+  })
+}
+
+/** Khung ở nơi khác mà dòng này đang đè lên — để nói rõ "chồng với VÒNG NÀO". */
+export function busyClashOf(row: DraftWindow, busy: BusyWindow[]): BusyWindow | undefined {
+  if (issueOf(row) !== null) return undefined
+  const start = new Date(row.start).getTime()
+  const end = new Date(row.end).getTime()
+  return busy.find((b) => start < b.end && b.start < end)
 }
 
 /** Các dòng hợp lệ, đã đổi sang mốc thời gian để gửi lên server. */
-export function toPayload(rows: DraftWindow[]) {
+export function toPayload(rows: DraftWindow[], busy: BusyWindow[] = []) {
+  // Lọc theo `issuesOf` chứ không phải `issueOf`: dòng chồng lấn tự nó hợp lệ, lọc bằng luật một dòng
+  // thì nó vẫn lọt lên server và bị 400 — trong khi giao diện đã tô đỏ nó rồi.
+  const issues = issuesOf(rows, busy)
   return rows
-    .filter((r) => issueOf(r) === null)
+    .filter((_, i) => issues[i] === null)
     .map((r) => ({
       startTime: toInstant(r.start)!,
       endTime: toInstant(r.end)!,
@@ -93,22 +153,21 @@ export function toPayload(rows: DraftWindow[]) {
 }
 
 /** Có dòng nào đang SAI không (dòng trống hoàn toàn không tính — người dùng chỉ chưa gõ). */
-export function hasBlockingIssue(rows: DraftWindow[]) {
-  return rows.some((r) => {
-    const issue = issueOf(r)
-    return issue !== null && issue !== 'empty'
-  })
+export function hasBlockingIssue(rows: DraftWindow[], busy: BusyWindow[] = []) {
+  return issuesOf(rows, busy).some((issue) => issue !== null && issue !== 'empty')
 }
 
 interface Props {
   rows: DraftWindow[]
   onChange: (rows: DraftWindow[]) => void
   disabled?: boolean
+  /** Giờ đã khai ở vòng khác — chiếm chỗ y như các dòng đang soạn ở đây. */
+  busy?: BusyWindow[]
 }
 
 const LABEL = 'w-8 shrink-0 text-xs font-medium text-ink-500 dark:text-ink-400'
 
-export default function HmAvailabilityFields({ rows, onChange, disabled }: Props) {
+export default function HmAvailabilityFields({ rows, onChange, disabled, busy = [] }: Props) {
   const set = (i: number, patch: Partial<DraftWindow>) =>
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
 
@@ -129,10 +188,12 @@ export default function HmAvailabilityFields({ rows, onChange, disabled }: Props
   // Chặn chọn ngày đã qua ngay trên bộ lịch của trình duyệt, trước cả khi có thông báo lỗi nào.
   const today = splitLocalDateTime(nowLocalInput()).date
 
+  const issues = issuesOf(rows, busy)
+
   return (
     <div className="space-y-2">
       {rows.map((r, i) => {
-        const issue = issueOf(r)
+        const issue = issues[i]
         const bad = issue !== null && issue !== 'empty'
         // "Chưa nhập xong" chỉ là nhắc, không phải lỗi — tô đỏ một dòng đang gõ dở là la người dùng
         // vì chưa kịp làm xong. Đỏ chỉ dành cho giờ SAI thật (quá khứ, ngược chiều, quá dài).
@@ -201,7 +262,11 @@ export default function HmAvailabilityFields({ rows, onChange, disabled }: Props
                 }`}
               >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                {ISSUE_TEXT[issue as Exclude<WindowIssue, null | 'empty'>]}
+                {/* Chồng với vòng khác thì NÓI RÕ vòng nào — người dùng đang ở tab vòng này, không
+                    nhìn thấy khung bên kia, mà "chồng lấn" trơn thì phải mở từng tab đi dò. */}
+                {issue === 'overlapOther' && busyClashOf(r, busy)
+                  ? `Khung này chồng lên lịch rảnh đã khai ở ${busyClashOf(r, busy)!.label}. Cùng một khoảng thời gian không thể vừa dành cho vòng này vừa dành cho vòng kia.`
+                  : ISSUE_TEXT[issue as Exclude<WindowIssue, null | 'empty'>]}
               </p>
             )}
           </div>

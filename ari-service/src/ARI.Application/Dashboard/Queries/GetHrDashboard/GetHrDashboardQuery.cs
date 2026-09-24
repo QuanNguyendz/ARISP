@@ -271,7 +271,10 @@ namespace ARI.Application.Dashboard.Queries.GetHrDashboard
                     Department = j.Department,
                     CreatedByName = CreatorName(j.CreatedByUserId),
                     ApplicantCount = ApplicantsOf(j.Id),
-                    Status = j.Status == "active" && j.ApplicationDeadline.HasValue && j.ApplicationDeadline.Value <= DateTimeOffset.UtcNow ? "closed" : j.Status,
+                    // Luật hiển thị gom ở `JobClosure`. Bảng điều khiển không nạp phiếu nên mốc lùi
+                    // về "hạn nộp + ân hạn"; một widget tổng quan không đáng thêm một lượt truy vấn.
+                    Status = ARI.Application.Jobs.JobClosure.DisplayStatus(
+                        j.Status, j.ApplicationDeadline, null, DateTimeOffset.UtcNow),
                     ApplicationDeadline = j.ApplicationDeadline,
                 })
                 .ToList();

@@ -55,6 +55,18 @@ namespace ARI.Infrastructure.Storage
             return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase) ? fullPath : null;
         }
 
+        public async Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default)
+        {
+            var filePath = ResolvePath(storageKey);
+            if (filePath == null) return;
+
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllBytesAsync(filePath, content, ct);
+        }
+
         public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default)
         {
             // Đã là đường dẫn tương đối phục vụ tĩnh — frontend tự ghép origin backend.

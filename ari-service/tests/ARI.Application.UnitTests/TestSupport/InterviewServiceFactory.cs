@@ -8,6 +8,7 @@ using ARI.Application.Options;
 using ARI.Application.Services;
 using ARI.Domain.Entities;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ARI.Application.UnitTests.TestSupport;
@@ -19,6 +20,18 @@ namespace ARI.Application.UnitTests.TestSupport;
 /// </summary>
 internal static class InterviewServiceFactory
 {
+    /// <summary>
+    /// Cấu hình tối thiểu cho các lá thư dựng trong service (chỉ cần gốc URL cổng ứng viên). Không
+    /// đọc file cấu hình thật: test không được phụ thuộc vào máy đang chạy có `appsettings` nào.
+    /// </summary>
+    private static readonly IConfiguration TestConfiguration =
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Frontend:CandidateBaseUrl"] = "http://localhost:3000",
+            })
+            .Build();
+
     public static InterviewService Create(IUnitOfWork uow, INotificationService notif) => new(
         uow,
         new ThrowingAIProvider(),
@@ -28,7 +41,8 @@ internal static class InterviewServiceFactory
         new ThrowingTTSService(),
         new ThrowingFileStorageService(),
         new TestScopeFactory(uow),
-        new MemoryCache(new MemoryCacheOptions()));
+        new MemoryCache(new MemoryCacheOptions()),
+        TestConfiguration);
 
     /// <summary>
     /// Overload cho luồng phỏng vấn thử (Luồng 6): cắm AI provider + TTS điều khiển được để test sinh
@@ -45,6 +59,7 @@ internal static class InterviewServiceFactory
         new ThrowingFileStorageService(),
         new TestScopeFactory(uow),
         new MemoryCache(new MemoryCacheOptions()),
+        TestConfiguration,
         options);
 
     /// <summary>Overload cho lệnh đóng phiên (ADR-073): cắm hàng đợi chấm báo cáo để kiểm phiên được đưa vào hàng.</summary>
@@ -59,6 +74,7 @@ internal static class InterviewServiceFactory
         new ThrowingFileStorageService(),
         new TestScopeFactory(uow),
         new MemoryCache(new MemoryCacheOptions()),
+        TestConfiguration,
         null,
         null,
         queue);
@@ -79,6 +95,7 @@ internal static class InterviewServiceFactory
         storage,
         new TestScopeFactory(uow),
         new MemoryCache(new MemoryCacheOptions()),
+        TestConfiguration,
         options);
 
     private sealed class TestScopeFactory : IServiceScopeFactory, IServiceScope
@@ -128,6 +145,7 @@ internal static class InterviewServiceFactory
     private sealed class ThrowingFileStorageService : IFileStorageService
     {
         public Task<string> SaveAsync(byte[] content, string originalFileName, string contentType, StorageFolder folder, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<string> GetUrlAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default) => throw new NotImplementedException();
         public Task DeleteAsync(string storageKey, CancellationToken ct = default) => throw new NotImplementedException();

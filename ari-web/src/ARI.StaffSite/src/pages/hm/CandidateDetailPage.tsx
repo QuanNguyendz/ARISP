@@ -8,7 +8,11 @@ import ShortlistGatePanel from '@/components/hiring/ShortlistGatePanel'
 import EmailHistoryPanel from '@/components/hiring/EmailHistoryPanel'
 import CandidateOfferPanel from '@/components/offers/CandidateOfferPanel'
 import InterviewResultsCard from '@/components/evaluations/InterviewResultsCard'
+import ApplicationFormCard from '@/components/applications/ApplicationFormCard'
 import CvScoreBreakdown from '@/components/cvScore/CvScoreBreakdown'
+import OnlineTestResultCard from '@/components/onlineTest/OnlineTestResultCard'
+import { useDocumentViewer } from '@ari/shared/document/DocumentViewer'
+import { cvPreviewUrl } from '@ari/shared/fservices/application'
 
 const CARD =
   'rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card'
@@ -24,6 +28,7 @@ const CARD =
 export default function HmCandidateDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const { t } = useTranslation('modules/hm/candidateDetail')
+  const { openDocument } = useDocumentViewer()
 
   const {
     data: app,
@@ -80,21 +85,47 @@ export default function HmCandidateDetailPage() {
                 </div>
               </dl>
 
+              {/* Xem CV NGAY TRONG TRANG như mọi màn hồ sơ khác. Trước đây đây là thẻ `<a target="_blank">`
+                  trỏ vào `app.cvFileUrl` nguyên trạng — vừa không ghép origin của API (ở dev là tab 404),
+                  vừa đẩy việc dựng file cho trình duyệt, nên .docx rơi thẳng vào mục tải xuống thay vì
+                  hiện ra. Đây là chỗ CUỐI CÙNG còn mở tab mới để đọc tài liệu. */}
               {app.cvFileUrl && (
-                <a
-                  href={app.cvFileUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() =>
+                    openDocument(
+                      app.cvFileUrl!,
+                      `${app.candidateName || t('viewCv')} - CV`,
+                      cvPreviewUrl(app.id)
+                    )
+                  }
                   className="mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 dark:border-white/10 px-3 py-2 text-sm font-medium text-ink-700 dark:text-ink-200 transition-colors hover:bg-ink-50 dark:hover:bg-white/5"
                 >
                   <FileText className="h-4 w-4" /> {t('viewCv')}
-                </a>
+                </button>
               )}
             </section>
+
+            {/* Những gì ứng viên tự khai lúc nộp: liên hệ đã xác nhận · đối chiếu với CV · thư giới thiệu ·
+                thời gian báo trước khi nghỉ — HM duyệt shortlist mà không đọc được chính lời ứng viên viết
+                cho vị trí này thì thiếu hẳn một nửa hồ sơ. */}
+            <ApplicationFormCard app={app} className={CARD} />
 
             {/* Điểm CV kèm cách tính (ADR-070) — HM duyệt hồ sơ dựa trên con số này, nên phải thấy nó được
                 cộng từ tiêu chí nào, với bằng chứng nào trong CV. */}
             <CvScoreBreakdown score={app.cvScore} />
+
+            {/* Kết quả vòng trắc nghiệm (ADR-049). Vòng này KHÔNG sinh `Evaluation`, nên khối "Kết quả
+                phỏng vấn" bên dưới trống ở đó — thiếu thẻ này thì bảng phễu hiện điểm bài thi còn màn hồ
+                sơ lại không có con số nào. Tự ẩn khi ứng viên chưa nộp bài. */}
+            <OnlineTestResultCard
+              applicationId={app.id}
+              candidateName={app.candidateName}
+              score={app.onlineTestScore}
+              passed={app.onlineTestPassed}
+              expired={app.onlineTestExpired}
+              className="rounded-2xl border border-ink-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 shadow-card"
+            />
 
             {/* Kết quả phỏng vấn theo vòng (ADR-069): ca · diễn biến · báo cáo AI · video · transcript. Trước đây
                 chỉ là danh sách đánh giá — trống trơn trong lúc AI còn đang chấm buổi vừa xong. */}

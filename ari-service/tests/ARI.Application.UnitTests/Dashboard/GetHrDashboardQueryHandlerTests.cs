@@ -59,10 +59,16 @@ public class GetHrDashboardQueryHandlerTests
     {
         var now = DateTimeOffset.UtcNow;
         var jobA = ApplicationData.Job(status: "active", deadline: now.AddDays(1));   // còn hạn
-        var jobB = ApplicationData.Job(status: "active", deadline: now.AddDays(-1));  // quá hạn → closed
+        // Quá hạn nộp NHƯNG còn trong ân hạn: HM/HR vẫn đang chốt kết quả cho người đã nộp, nên tin
+        // chưa bị xếp vào nhóm đã đóng (xem `JobClosure`).
+        var jobB = ApplicationData.Job(status: "active", deadline: now.AddDays(-1));
+        // Quá hạn và đã qua ân hạn → mới thực sự đóng.
+        var jobE = ApplicationData.Job(
+            status: "active",
+            deadline: now.AddDays(-(ARI.Application.Jobs.JobClosure.GraceDaysWithoutRequest + 1)));
         var jobC = ApplicationData.Job(status: "draft");
         var jobD = ApplicationData.Job(status: "pending");
-        var uow = new InMemoryUnitOfWork().Seed(jobA, jobB, jobC, jobD);
+        var uow = new InMemoryUnitOfWork().Seed(jobA, jobB, jobC, jobD, jobE);
 
         var d = (await Run(uow)).Value;
 
@@ -71,7 +77,8 @@ public class GetHrDashboardQueryHandlerTests
         Assert.Equal(1, d.PendingJobsCount);
         Assert.Equal(jobD.Id, Assert.Single(d.PendingJobs).Id);
 
-        Assert.Equal("closed", d.TopJobs.Single(t => t.Id == jobB.Id).Status); // project closed
+        Assert.Equal("active", d.TopJobs.Single(t => t.Id == jobB.Id).Status); // còn ân hạn
+        Assert.Equal("closed", d.TopJobs.Single(t => t.Id == jobE.Id).Status); // hết ân hạn
         Assert.Equal("active", d.TopJobs.Single(t => t.Id == jobA.Id).Status);
     }
 

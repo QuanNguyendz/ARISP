@@ -7,6 +7,7 @@ import { useAuthStore } from '@ari/shared/store/auth'
 import { useOAuthRedirectError } from '@ari/shared/authflows/useOAuthRedirectError'
 import { PasswordToggle } from '@ari/shared/ui'
 import { resolveApiError } from '@ari/shared/utils/apiError'
+import { STAFF_HOME, homePathForRole } from '@ari/shared/utils/roles'
 
 // Logo component
 function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
@@ -51,21 +52,15 @@ function Logo({ size = 'default' }: { size?: 'sm' | 'default' }) {
   )
 }
 
-// Get dashboard path based on role
-function getRoleDashboard(role: string): string {
-  const r = role.toLowerCase().replace(/\s+/g, '_')
-  switch (r) {
-    case 'super_admin':
-      return '/super-admin/dashboard'
-    case 'hr_admin':
-      return '/hr/dashboard'
-    case 'recruiter':
-      return '/recruiter/dashboard'
-    case 'candidate':
-      return '/'
-    default:
-      return '/hr/dashboard'
-  }
+/**
+ * Trang đích sau đăng nhập — đọc từ BẢNG DÙNG CHUNG `STAFF_HOME`.
+ *
+ * Trước đây đây là một `switch` chép tay liệt kê 4 vai trò và KHÔNG có `hiring_manager`,
+ * nên tài khoản Hiring Manager đăng nhập xong bị ném vào `/hr/dashboard` → `ProtectedRoute`
+ * chặn → `/403`. Vai trò lạ rơi về `/`, nơi `StaffHomeRedirect` tự định tuyến tiếp.
+ */
+function getRoleDashboard(role?: string | null): string {
+  return homePathForRole(role, STAFF_HOME) ?? '/'
 }
 
 export default function LoginPage() {
@@ -118,7 +113,7 @@ export default function LoginPage() {
       const response = await authService.staffLogin({ email, password })
       setAuthFromResponse(response)
 
-      const dashboard = getRoleDashboard(response.role || 'Hr_admin')
+      const dashboard = getRoleDashboard(response.role)
       const from = (location.state as any)?.from?.pathname
       navigate(from || dashboard, { replace: true })
     } catch (err: any) {

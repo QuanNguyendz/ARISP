@@ -9,6 +9,7 @@ import type {
   StartSessionResponse,
 } from '@ari/shared/types/interview';
 import type { MyPracticeReview, MyPracticeSessionItem } from '@ari/shared/types/application';
+import type { EmailOverride } from '@ari/shared/fservices/email';
 
 interface SessionFilters {
   applicationId?: string;
@@ -329,8 +330,18 @@ export const interviewService = {
     return data;
   },
 
-  async sendBookingReminder(bookingId: string): Promise<{ success: boolean; message: string }> {
-    const { data } = await apiClient.post<{ success: boolean; message: string }>(`/interview/management/booking/${bookingId}/remind`);
+  /**
+   * Nhắc lịch. `emailOverride` = bản thư nhân sự vừa sửa trong trình soạn (quy tắc 21) — thư đi KÈM
+   * lệnh này, nên bấm Huỷ ở trình soạn là không thư nào rời hệ thống.
+   */
+  async sendBookingReminder(
+    bookingId: string,
+    emailOverride?: EmailOverride
+  ): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(
+      `/interview/management/booking/${bookingId}/remind`,
+      { emailOverride }
+    );
     return data;
   },
 
@@ -423,6 +434,12 @@ export interface SlotCandidate {
   candidateState: CandidateState;
   /** Ứng viên này có đang chiếm một chỗ của ca không. */
   occupiesSeat: boolean;
+  /**
+   * Nút "Nhắc lịch" đang ở trạng thái nào — SERVER tính, giao diện chỉ đọc:
+   * `confirm` (nhắc xác nhận) · `remind` (nhắc giờ) · `past` (đã qua giờ) · `closed` (báo bận/huỷ).
+   * Lệnh gửi dùng CHÍNH luật này, nên nút sáng mà server từ chối là chuyện không xảy ra.
+   */
+  remindState: 'confirm' | 'remind' | 'past' | 'closed';
   /** Trạng thái HỒ SƠ (khác trạng thái lịch) — để phân biệt "lịch đóng" với "hồ sơ bị loại". */
   applicationStatus?: string | null;
   sessionId?: string | null;

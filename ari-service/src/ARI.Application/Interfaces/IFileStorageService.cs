@@ -33,6 +33,16 @@ namespace ARI.Application.Interfaces
         /// </summary>
         Task<string> GetDownloadUrlAsync(string storageKey, string downloadFileName, CancellationToken ct = default);
 
+        /// <summary>
+        /// Ghi vào ĐÚNG <c>storageKey</c> chỉ định, đè lên nếu đã có.
+        ///
+        /// Khác <see cref="SaveAsync"/> ở chỗ khoá do nơi gọi quyết định chứ không sinh ngẫu nhiên —
+        /// dành cho các bản dựng PHÁI SINH từ một file gốc (bản PDF của một CV .docx). Khoá suy được
+        /// từ khoá gốc nên lần sau chỉ cần thử đọc là biết đã dựng hay chưa, không phải thêm cột vào
+        /// cơ sở dữ liệu chỉ để nhớ một cái tên.
+        /// </summary>
+        Task SaveAtAsync(string storageKey, byte[] content, string contentType, CancellationToken ct = default);
+
         /// <summary>Xoá file theo <c>storageKey</c> (best-effort, không ném lỗi nếu không tồn tại).</summary>
         Task DeleteAsync(string storageKey, CancellationToken ct = default);
 

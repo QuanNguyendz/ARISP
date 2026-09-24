@@ -25,7 +25,7 @@ namespace ARI.Application.Interfaces
         Task<List<InterviewJobSummaryDto>> GetInterviewJobsAsync(Guid? userId, string? role, CancellationToken ct = default);
         Task<Result<List<InterviewSlotDetailDto>>> GetSlotsForJobAsync(Guid jobPostingId, Guid? userId, string? role, CancellationToken ct = default);
         Task<Result<List<SlotCandidateDto>>> GetCandidatesInSlotAsync(Guid slotId, Guid? userId, string? role, CancellationToken ct = default);
-        Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, Guid? userId, string? role, CancellationToken ct = default);
+        Task<Result<bool>> SendBookingReminderAsync(Guid bookingId, Guid? userId, string? role, ARI.Application.Emails.EmailOverride? over = null, CancellationToken ct = default);
         Task<Result<bool>> RescheduleBookingAsync(Guid bookingId, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default);
         Task<Result<RescheduleResultDto>> RescheduleBookingsAsync(IReadOnlyList<Guid> bookingIds, Guid targetSlotId, Guid? userId, string? role, CancellationToken ct = default);
         // ─────────────────────────────────────────────────────

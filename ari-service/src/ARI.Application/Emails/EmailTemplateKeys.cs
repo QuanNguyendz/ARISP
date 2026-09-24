@@ -32,7 +32,17 @@ namespace ARI.Application.Emails
         /// </summary>
         public const string InterviewResult = "interview_result";
 
-        public static readonly string[] All = { InterviewInvite, ApplicationRejected, OfferSent, InterviewResult };
+        /// <summary>
+        /// Thư nhắc lịch do nhân sự bấm gửi. Ngữ cảnh: <c>applicationId</c> + <c>bookingId</c>.
+        ///
+        /// Hai biến thể, do <see cref="ARI.Application.Scheduling.ScheduleReminder"/> suy ra chứ không
+        /// do người gửi chọn: ứng viên CHƯA phản hồi thì nhắc vào xác nhận (kèm hai nút Xác nhận/Báo
+        /// bận), ĐÃ xác nhận thì nhắc giờ và việc cần chuẩn bị.
+        /// </summary>
+        public const string ScheduleReminder = "schedule_reminder";
+
+        public static readonly string[] All =
+            { InterviewInvite, ApplicationRejected, OfferSent, InterviewResult, ScheduleReminder };
 
         private static readonly HashSet<string> AllSet = new(All, StringComparer.OrdinalIgnoreCase);
 

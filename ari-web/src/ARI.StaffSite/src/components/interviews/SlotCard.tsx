@@ -85,12 +85,25 @@ export function SlotCard({
     },
   })
 
+  /**
+   * Nhắc hàng loạt. Bỏ qua người KHÔNG nhắc được (đã qua giờ, đã báo bận) ngay tại đây thay vì gửi
+   * đi rồi đếm lỗi: server từ chối những trường hợp đó, và một dòng "gửi được 2/5" không nói cho ai
+   * biết ba người kia vì sao trượt.
+   *
+   * Không mở trình soạn cho đường này: soạn một lá thư chung cho N người mà nội dung mỗi người mỗi
+   * khác (biến thể theo trạng thái xác nhận của từng lịch) là soạn một thứ không ai nhận được.
+   */
+  const remindable = useMemo(
+    () => selectedCandidates.filter((c) => c.remindState === 'confirm' || c.remindState === 'remind'),
+    [selectedCandidates]
+  )
+
   const batchRemind = useMutation({
     mutationFn: async () => {
       let ok = 0
-      for (const id of selectedBookingIds) {
+      for (const c of remindable) {
         try {
-          await interviewService.sendBookingReminder(id)
+          await interviewService.sendBookingReminder(c.bookingId)
           ok++
         } catch {
           /* tiếp tục với người còn lại */
@@ -99,7 +112,7 @@ export function SlotCard({
       return ok
     },
     onSuccess: (ok) => {
-      flash(t('slot.batchRemindSuccess', { ok, total: selectedBookingIds.length }))
+      flash(t('slot.batchRemindSuccess', { ok, total: remindable.length }))
       setSelectedBookingIds([])
     },
   })
@@ -285,12 +298,12 @@ export function SlotCard({
                           <span>{t('slot.batchReject', { count: selectedBookingIds.length })}</span>
                         </button>
                         <button
-                          disabled={busy}
+                          disabled={busy || remindable.length === 0}
                           onClick={() => batchRemind.mutate()}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
                         >
                           <Bell className="w-3.5 h-3.5 shrink-0" />
-                          <span>{t('slot.batchRemind', { count: selectedBookingIds.length })}</span>
+                          <span>{t('slot.batchRemind', { count: remindable.length })}</span>
                         </button>
                         <button
                           disabled={busy}

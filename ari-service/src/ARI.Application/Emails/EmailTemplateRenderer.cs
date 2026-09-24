@@ -48,6 +48,7 @@ namespace ARI.Application.Emails
                 EmailTemplateKeys.ApplicationRejected => await RenderApplicationRejectedAsync(contextId, ct),
                 EmailTemplateKeys.OfferSent => await RenderOfferAsync(contextId, ct),
                 EmailTemplateKeys.InterviewResult => await RenderInterviewResultAsync(contextId, secondaryId, variant, ct),
+                EmailTemplateKeys.ScheduleReminder => await RenderScheduleReminderAsync(contextId, secondaryId, ct),
                 _ => Result.Failure<RenderedEmail>($"Không biết mẫu thư '{templateKey}'.", CommonErrorCodes.NotFound),
             };
         }
@@ -101,7 +102,47 @@ namespace ARI.Application.Emails
 
             var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
             var mail = ARI.Application.Offers.OfferEmail.Build(
-                offer, app, job, _configuration["Frontend:CandidateBaseUrl"]);
+                offer, app, job, FrontendUrls.Candidate(_configuration));
+
+            return Result.Success(new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName));
+        }
+
+        /// <summary>
+        /// Thư nhắc lịch — biến thể do <see cref="ScheduleReminder.Resolve"/> quyết định, đúng hàm mà
+        /// lệnh gửi và giao diện dùng. Lịch đã đóng hoặc đã qua giờ thì KHÔNG dựng bản xem trước: nút
+        /// ở giao diện đã tắt, tới được đây nghĩa là dữ liệu vừa đổi dưới chân người dùng.
+        /// </summary>
+        private async Task<Result<RenderedEmail>> RenderScheduleReminderAsync(
+            Guid applicationId, Guid? bookingId, CancellationToken ct)
+        {
+            var app = await _unitOfWork.Repository<ARI.Domain.Entities.Application>()
+                .GetByIdAsync(applicationId, ct);
+            if (app == null)
+                return Result.Failure<RenderedEmail>(JobAccessErrors.ApplicationNotFound, CommonErrorCodes.NotFound);
+
+            if (bookingId is not { } bid || bid == Guid.Empty)
+                return Result.Failure<RenderedEmail>("Thiếu lịch hẹn để dựng thư nhắc.", CommonErrorCodes.NotFound);
+
+            var booking = await _unitOfWork.Repository<InterviewBooking>().GetByIdAsync(bid, ct);
+            if (booking == null || booking.ApplicationId != app.Id)
+                return Result.Failure<RenderedEmail>("Không tìm thấy lịch phỏng vấn.", CommonErrorCodes.NotFound);
+
+            var slot = await _unitOfWork.Repository<AvailabilitySlot>().GetByIdAsync(booking.AvailabilitySlotId, ct);
+            if (slot == null)
+                return Result.Failure<RenderedEmail>("Không tìm thấy ca phỏng vấn.", CommonErrorCodes.NotFound);
+
+            var state = ScheduleReminder.Resolve(
+                booking.Status, booking.ConfirmationStatus, slot.StartTime, DateTimeOffset.UtcNow);
+            if (!ScheduleReminder.CanSend(state))
+                return Result.Failure<RenderedEmail>(ScheduleReminder.BlockedMessage(state), CommonErrorCodes.Conflict);
+
+            var job = await _unitOfWork.Repository<JobPosting>().GetByIdAsync(app.JobPostingId, ct);
+
+            var mail = state == ScheduleReminder.States.ConfirmNeeded
+                ? await InterviewInviteEmail.BuildReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, booking.Id, slot.StartTime, ct)
+                : await InterviewInviteEmail.BuildTimeReminderAsync(
+                    _unitOfWork, _configuration, app, job, booking.RoundNumber, slot.StartTime, ct);
 
             return Result.Success(new RenderedEmail(mail.Subject, mail.Html, app.CandidateEmail, app.CandidateName));
         }

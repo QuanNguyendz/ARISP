@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { applicationService } from '@ari/shared/fservices/application'
 import { interviewService, type SlotCandidate } from '@ari/shared/fservices/interview'
+import EmailComposerModal from '@ari/shared/ui/EmailComposerModal'
+import type { EmailOverride } from '@ari/shared/fservices/email'
 import { RescheduleModal } from './RescheduleModal'
 import { canReschedule, declineReasonLabelKey, isRejected, stateOf } from './candidateState'
 import { fmtDur, initials } from './format'
@@ -45,8 +47,35 @@ export function CandidateRow({
   const [rejecting, setRejecting] = useState(false)
   const [generatingCode, setGeneratingCode] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  /**
+   * Thông báo sau một thao tác. Mang theo `kind` vì ô này trước đây LUÔN tô xanh lá — lỗi "Bạn không
+   * có quyền nhắc lịch..." hiện ra y hệt một lời báo thành công, nên người dùng đọc là "bấm xong
+   * chẳng thấy gì khác" và kết luận nút hỏng.
+   */
+  const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null)
+  const showToast = (text: string, kind: 'ok' | 'error') => {
+    setToast({ text, kind })
+    // Lỗi cần đọc lâu hơn lời báo thành công.
+    setTimeout(() => setToast(null), kind === 'error' ? 6000 : 3000)
+  }
   const [showReschedule, setShowReschedule] = useState(false)
+  const [composingReminder, setComposingReminder] = useState(false)
+
+  /**
+   * Nút "Nhắc lịch" nói gì và có bấm được không — SERVER quyết (`remindState`), giao diện chỉ dịch
+   * sang câu chữ. Bốn tình huống, hai việc khác hẳn nhau:
+   *  - `confirm` — ứng viên chưa phản hồi: nhắc họ vào XÁC NHẬN (thư kèm nút Xác nhận/Báo bận).
+   *  - `remind`  — đã xác nhận: nhắc GIỜ và việc cần chuẩn bị.
+   *  - `past`    — qua giờ hẹn: không còn gì để nhắc, khoá nút.
+   *  - `closed`  — báo bận / ca bị huỷ: lịch hết hiệu lực, phải xếp lại ca khác.
+   *
+   * `remindState` có thể vắng ở dữ liệu cũ đang nằm trong cache → coi như `confirm` (hành vi cũ),
+   * server vẫn là chốt chặn thật.
+   */
+  const remindState = c.remindState ?? 'confirm'
+  const canRemind = remindState === 'confirm' || remindState === 'remind'
+  const remindLabel = t(`candidate.remindState.${remindState}.label`)
+  const remindTooltip = t(`candidate.remindState.${remindState}.title`)
 
   const state = stateOf(c)
   const rejected = isRejected(c)
@@ -61,8 +90,7 @@ export function CandidateRow({
       onReload()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(resolveApiError(err, t, 'candidate.genCodeError'))
-      setTimeout(() => setToast(null), 3000)
+      showToast(resolveApiError(err, t, 'candidate.genCodeError'), 'error')
     } finally {
       setGeneratingCode(false)
     }
@@ -78,17 +106,23 @@ export function CandidateRow({
     }
   }
 
-  const handleRemind = async () => {
+  /**
+   * Nhắc lịch đi qua TRÌNH SOẠN THƯ (quy tắc 21): có người bấm nút thì có trình soạn. Thư gửi kèm
+   * chính lệnh nhắc, nên bấm Huỷ ở trình soạn là không chuông nào, không thư nào.
+   */
+  const handleRemind = async (override?: EmailOverride) => {
     setSendingReminder(true)
     try {
-      const res = await interviewService.sendBookingReminder(c.bookingId)
-      setToast(res.message || t('candidate.remindSuccess'))
+      const res = await interviewService.sendBookingReminder(c.bookingId, override)
+      // Server nay trả `success=false` khi chuông trong Portal đi được nhưng EMAIL thì không —
+      // đọc cờ đó thay vì mặc định coi mọi phản hồi 200 là đã gửi mail xong.
+      showToast(res.message || t('candidate.remindSuccess'), res.success === false ? 'error' : 'ok')
+      setComposingReminder(false)
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setToast(resolveApiError(err, t, 'candidate.remindError'))
+      showToast(resolveApiError(err, t, 'candidate.remindError'), 'error')
     } finally {
       setSendingReminder(false)
-      setTimeout(() => setToast(null), 3000)
     }
   }
 
@@ -99,8 +133,7 @@ export function CandidateRow({
       await applicationService.rejectApplication(c.applicationId)
       onReload()
     } catch {
-      setToast(t('candidate.rejectError'))
-      setTimeout(() => setToast(null), 3000)
+      showToast(t('candidate.rejectError'), 'error')
     } finally {
       setRejecting(false)
     }
@@ -206,18 +239,18 @@ export function CandidateRow({
           )}
 
           <button
-            disabled={sendingReminder || closed}
-            onClick={handleRemind}
+            disabled={sendingReminder || closed || !canRemind}
+            onClick={() => setComposingReminder(true)}
             title={
               closed
                 ? t('candidate.closedTitle', { state: t(state.labelKey).toLowerCase() })
-                : t('candidate.remindTitle')
+                : remindTooltip
             }
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/10 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Bell className="w-3.5 h-3.5" />
             <span className="hidden md:inline">
-              {sendingReminder ? t('candidate.sending') : t('candidate.remind')}
+              {sendingReminder ? t('candidate.sending') : remindLabel}
             </span>
           </button>
 
@@ -286,10 +319,30 @@ export function CandidateRow({
       )}
 
       {toast && (
-        <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">
-          {toast}
+        <p
+          className={`text-[11px] font-medium px-3 py-1 rounded-lg ${
+            toast.kind === 'error'
+              ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10'
+              : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10'
+          }`}
+        >
+          {toast.text}
         </p>
       )}
+
+      {/* Trình soạn thư nhắc lịch. `secondaryId` là BOOKING: server dựng đúng biến thể theo trạng
+          thái xác nhận của chính lịch đó, không phải theo lựa chọn của người gửi. */}
+      <EmailComposerModal
+        open={composingReminder}
+        templateKey="schedule_reminder"
+        contextId={c.applicationId}
+        secondaryId={c.bookingId}
+        title={remindLabel}
+        confirmLabel={remindLabel}
+        sending={sendingReminder}
+        onCancel={() => setComposingReminder(false)}
+        onSend={(override) => handleRemind(override)}
+      />
 
       {showReschedule && (
         <RescheduleModal

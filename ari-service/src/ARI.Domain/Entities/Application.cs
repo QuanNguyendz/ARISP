@@ -16,6 +16,16 @@ namespace ARI.Domain.Entities
         public string? DesiredLocation { get; set; } // Nơi làm việc mong muốn
         public string? CoverLetter { get; set; } // Thư giới thiệu / câu trả lời 1 (kinh nghiệm, kỹ năng, vì sao phù hợp)
         public string? NoticePeriod { get; set; } // Thời gian báo trước khi nghỉ việc (notice period)
+
+        // Kết quả bước "Xác thực thông tin" ở màn ứng tuyển: hệ thống đối chiếu họ tên + số điện
+        // thoại ứng viên vừa gõ với nội dung đọc được trong CV. Trước đây kết quả này chỉ hiện ra
+        // cho chính ứng viên rồi biến mất, nên nhân sự không bao giờ biết người này đã được cảnh
+        // báo lệch thông tin mà vẫn bấm nộp.
+        /// <summary>match | mismatch — null nghĩa là không đối chiếu được (lỗi mạng, CV không đọc được) hoặc hồ sơ cũ.</summary>
+        public string? ContactVerificationStatus { get; set; }
+
+        /// <summary>Chi tiết chỗ lệch do bước đối chiếu trả về. Chỉ có nghĩa khi <see cref="ContactVerificationStatus"/> = mismatch.</summary>
+        public string? ContactVerificationDetails { get; set; }
         public string Source { get; set; } = "invited"; // job_board | invited
         /// <summary>Xem <see cref="Constants.ApplicationStatuses"/> — nơi khai đầy đủ vòng đời.</summary>
         public string Status { get; set; } = "invited";

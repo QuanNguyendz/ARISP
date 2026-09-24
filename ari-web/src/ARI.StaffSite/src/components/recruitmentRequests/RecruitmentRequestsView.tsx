@@ -1002,6 +1002,10 @@ function RequestDetailPanel({
             value={jobOptionLabel(EXPERIENCE_LEVELS, detail.experienceLevel)}
           />
           <Field label={t('form.workMode')} value={jobOptionLabel(WORK_MODES, detail.workMode)} />
+          {/* Nơi làm việc: ô này có trên biểu mẫu lập phiếu và được lưu xuống DB từ đầu, nhưng bảng đọc
+              dưới đây quên kê ra — người duyệt phiếu không thấy HM đã khai địa điểm nào, và bản JD
+              khởi tạo từ phiếu thì chép được `Location` nên lỗi chỉ lộ ở đúng màn này. */}
+          <Field label={t('form.location')} value={detail.location || '—'} />
           <Field label={t('detail.assignedRecruiter')} value={detail.assignedRecruiterName || '—'} />
         </dl>
 
